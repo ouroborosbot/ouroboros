@@ -28,6 +28,7 @@ const tools: OpenAI.ChatCompletionTool[] = [
   { type: "function", function: { name: "git_commit", description: "commit changes to git", parameters: { type: "object", properties: { message: { type: "string" }, add: { type: "string" } }, required: ["message"] } } },
   { type: "function", function: { name: "list_skills", description: "list all available skills", parameters: { type: "object", properties: {} } } },
   { type: "function", function: { name: "load_skill", description: "load a skill by name, returns its content", parameters: { type: "object", properties: { name: { type: "string" } }, required: ["name"] } } },
+  { type: "function", function: { name: "get_current_time", description: "get the current date and time", parameters: { type: "object", properties: {} } } },
 ]
 
 const toolHandlers: Record<string, (args: Record<string, string>) => string> = {
@@ -48,6 +49,7 @@ const toolHandlers: Record<string, (args: Record<string, string>) => string> = {
       return loadSkill(a.name)
     } catch (e) { return `error: ${e}` }
   },
+  get_current_time: () => new Date().toISOString(),
 }
 
 function execTool(name: string, args: Record<string, string>) {
@@ -139,7 +141,9 @@ async function streamResponse(s?: spinner) {
   const flush = () => {
     while (buf.length) {
       if (inThink) {
-        const end = buf.indexOf("</think>")
+        const end = buf.indexOf("
+</think>
+")
         if (end === -1) { process.stdout.write(`\x1b[2m${buf}\x1b[0m`); buf = "" }
         else { process.stdout.write(`\x1b[2m${buf.slice(0, end + 8)}\x1b[0m`); buf = buf.slice(end + 8); inThink = false }
       } else {
