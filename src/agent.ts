@@ -13,7 +13,7 @@ const client = new OpenAI({
 
 async function main() {
   const response = await client.chat.completions.create({
-    model: "MiniMax-Text-01",
+    model: process.env.MINIMAX_MODEL || "MiniMax-Text-01",
     messages: [{ role: "user", content: "say hello in 5 words" }],
   });
 
