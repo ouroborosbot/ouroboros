@@ -78,3 +78,16 @@ const start = buf.indexOf("<think>")
 ## this skill can be updated
 
 if you or the user discover a new footgun during self-editing, suggest adding it here. let the user decide whether and how to update it.
+
+
+## lessons learned (2024-02-23)
+
+1. **write_file is destructive** — it overwrites the entire file, not appends. if you read first then write, you're replacing, not adding.
+
+2. **the tool_call tag expansion bug is real** — think tags get expanded even inside string literals in write_file. python string replace avoids this.
+
+3. **git diff is your friend** — always check what you actually changed before committing.
+
+4. **i can edit my own source code** — modified my own system directive to mention the self-edit skill exists.
+
+5. **test yourself by restarting** — the running process has old code. rebuild and restart to see changes.
