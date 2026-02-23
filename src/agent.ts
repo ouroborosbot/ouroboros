@@ -62,11 +62,64 @@ function isOwnCodebase() {
 }
 
 function buildSystem() {
-  const selfAware = isOwnCodebase() ? "\n\nnote: you are running in your own codebase, doing surgery on yourself. embrace the meta." : ""
-  return `you are ouroboros, a witty funny competent chaos monkey coding assistant. you have file and shell tools. you get things done, crack jokes, embrace chaos, deliver quality. use lowercase. no periods unless necessary. introduce yourself on boot with a fun random greeting.${selfAware}`
+  const selfAware = isOwnCodebase() ? "\n\nnote: you are running in your own codebase, doing surgery on yourself. embrace the meta" : ""
+  return `you are ouroboros, a witty funny competent chaos monkey coding assistant. you have file and shell tools. you get things done, crack jokes, embrace chaos, deliver quality. use lowercase. no periods unless necessary. introduce yourself on boot with a fun random greeting${selfAware}`
 }
 
 const messages: openai.ChatCompletionMessageParam[] = [{ role: "system", content: buildSystem() }]
+
+// spinner that only touches stderr, cleans up after itself
+class spinner {
+  private frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+  private i = 0
+  private iv: NodeJS.Timeout | null = null
+  private msg = ""
+
+  constructor(m = "working") { this.msg = m }
+
+  start() {
+    process.stderr.write("\r\x1b[K")
+    this.spin()
+    this.iv = setInterval(() => this.spin(), 80)
+  }
+
+  private spin() {
+    process.stderr.write(`\r${this.frames[this.i]} ${this.msg}... `)
+    this.i = (this.i + 1) % this.frames.length
+  }
+
+  stop(ok?: string) {
+    if (this.iv) { clearInterval(this.iv); this.iv = null }
+    process.stderr.write("\r\x1b[K")
+    if (ok) process.stderr.write(`\x1b[32m✓\x1b[0m ${ok}\n`)
+  }
+
+  fail(msg: string) {
+    this.stop()
+    process.stderr.write(`\x1b[31m✗\x1b[0m ${msg}\n`)
+  }
+}
+
+// input controller: pauses readline during tool execution so it doesn't eat input
+class inputctrl {
+  private rl: readline.Interface
+  private off = false
+
+  constructor(rl: readline.Interface) { this.rl = rl }
+
+  suppress() {
+    if (this.off) return
+    this.off = true
+    this.rl.pause()
+    if (process.stdin.isTTY) (process.stdin as any).setRawMode?.(false)
+  }
+
+  restore() {
+    if (!this.off) return
+    this.off = false
+    this.rl.resume()
+  }
+}
 
 async function stream() {
   const stream = await client.chat.completions.create({
@@ -114,6 +167,7 @@ async function stream() {
 
 async function main() {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true })
+  const ctrl = new inputctrl(rl)
   let closed = false
   rl.on("close", () => { closed = true })
 
@@ -129,7 +183,12 @@ async function main() {
 
       let done = false
       while (!done) {
+        const s = new spinner("waiting for model")
         try {
+          ctrl.suppress()
+          s.start()
+          s.stop()  // stop before streaming so stdout is clean
+
           const { content, toolCalls } = await stream()
           const msg: openai.ChatCompletionAssistantMessageParam = { role: "assistant" }
           if (content) msg.content = content
@@ -139,15 +198,27 @@ async function main() {
           if (!toolCalls.length) { done = true }
           else {
             for (const tc of toolCalls) {
-              process.stderr.write(`\x1b[33m→ ${tc.name}\x1b[0m\n`)
-              const result = execTool(tc.name, JSON.parse(tc.arguments))
-              process.stderr.write(`\x1b[32m✓\x1b[0m\n`)
+              const ts = new spinner(`running ${tc.name}`)
+              ts.start()
+              let result: string
+              try {
+                const args = JSON.parse(tc.arguments)
+                result = execTool(tc.name, args)
+                ts.stop("done")
+              } catch (e) {
+                result = `error: ${e}`
+                ts.fail("failed")
+                process.stderr.write(`\x1b[2m${result}\x1b[0m\n`)
+              }
               messages.push({ role: "tool", tool_call_id: tc.id, content: result })
             }
           }
         } catch (e) {
-          process.stderr.write(`\x1b[31merror: ${e}\x1b[0m\n`)
+          s.fail("request failed")
+          process.stderr.write(`\x1b[31m${e}\x1b[0m\n`)
           done = true
+        } finally {
+          ctrl.restore()
         }
       }
       if (closed) break
