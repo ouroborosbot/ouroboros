@@ -12,17 +12,30 @@ const client = new OpenAI({
 });
 
 async function main() {
-  const response = await client.chat.completions.create({
+  const stream = await client.chat.completions.create({
     model: process.env.MINIMAX_MODEL || "MiniMax-M2.5",
-    messages: [{ role: "user", content: "say hello in 5 words" }],
+    messages: [{ role: "user", content: "write a short poem about the joy of coding" }],
+    stream: true,
   });
 
-  const raw = response.choices[0].message.content ?? "";
-  const formatted = raw.replace(
-    /<think>([\s\S]*?)<\/think>/g,
-    (_match, thinking: string) => `\x1b[2m<think>${thinking}</think>\x1b[0m`
-  );
-  console.log(formatted);
+  let inThink = false;
+  for await (const chunk of stream) {
+    const text = chunk.choices[0]?.delta?.content;
+    if (!text) continue;
+
+    if (text.includes("<think>")) {
+      inThink = true;
+      process.stdout.write("\x1b[2m");
+    }
+
+    process.stdout.write(text);
+
+    if (text.includes("</think>")) {
+      inThink = false;
+      process.stdout.write("\x1b[0m");
+    }
+  }
+  process.stdout.write("\n");
 }
 
 main();
