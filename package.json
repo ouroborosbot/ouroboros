@@ -1,0 +1,15 @@
+{
+  "name": "best-agent-ever",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc && node dist/agent.js"
+  },
+  "dependencies": {
+    "openai": "^4.78.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
