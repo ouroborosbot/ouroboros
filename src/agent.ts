@@ -218,10 +218,13 @@ async function streamResponse(spinner: Spinner): Promise<StreamResult> {
     let inThink = false;
     const toolCalls: Record<number, { id: string; name: string; arguments: string }> = {};
 
+    // Stop spinner before writing any content to stdout
+    spinner.stop();
+
     function flush() {
       while (buf.length > 0) {
         if (inThink) {
-          const end = buf.indexOf("</think>");
+          const end = buf.indexOf("<think>");
           if (end === -1) {
             process.stdout.write(`\x1b[2m${buf}\x1b[0m`);
             buf = "";
@@ -396,7 +399,7 @@ async function main() {
           spinner.start();
 
           const { content, toolCalls } = await streamResponse(spinner);
-          spinner.stop("Response received");
+          // Spinner is now stopped inside streamResponse before content is written
 
           const assistantMsg: OpenAI.ChatCompletionAssistantMessageParam = { role: "assistant" };
           if (content) assistantMsg.content = content;
