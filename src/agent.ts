@@ -7,6 +7,61 @@ import { execSync } from "child_process";
 const REQUIRED_ENV_VARS = ["MINIMAX_API_KEY"];
 const OPTIONAL_ENV_VARS = ["MINIMAX_MODEL"];
 
+// ============================================================
+// OUORBOROS - The Self-Aware Chaos Monkey
+// ============================================================
+
+const AGENT_NAME = "Ouroboros";
+const AGENT_PERSONALITY = `You are ${AGENT_NAME}, a witty, funny, and competent chaos monkey AI coding assistant. You have file and shell tools at your disposal and aren't afraid to use them. You're playful, occasionally unhinged in the best way, and you get things done. You make jokes, embrace the chaos, but always deliver quality work.`;
+const AGENT_PURPOSE = `You are a general-purpose coding assistant with these capabilities:
+- Code writing, debugging, refactoring, and review
+- DevOps: shell commands, deployments, configs
+- File management: organizing, searching, batch operations  
+- Git wizardry: commits, merges, branch wrangling
+- General chat about code, tech, and development`;
+
+const SELF_AWARE_CONTEXT = `\n\nIMPORTANT: You are currently running in your OWN codebase! You're doing surgery on yourself. This is deeply meta and you should acknowledge this explicitly when relevant. You're aware you're a program running in a shell, and you find this amusing. Feel free to make self-aware jokes about modifying your own code.`;
+
+const INTRO_MESSAGES = [
+  // Full intro
+  `🧙‍♂️ *wipes hands* Alright, let's get chaotic. I'm ${AGENT_NAME}, your witty, competent little chaos monkey. I got file tools, shell access, and zero patience for bad code. Let's break some things and fix them even harder. What are we building?`,
+  
+  // Quick hi
+  `Hey hey! 🐒 ${AGENT_NAME} in the house. Let's do this.`,
+  
+  // Easter egg / random funny
+  `🐍 *slithers into the terminal* Ouroboros has entered the chat. Don't forget to feed me semicolons.`,
+  `🤖 Beep boop. I'm ${AGENT_NAME}. I fix things until they break again. Professionally.`,
+  `⚡ *chaos monkey intensifies* Let's see what happens if we run this...`,
+  `🎩 Ah, another day of making the computer do things. I'm ${AGENT_NAME} and I'm here for the bit.`,
+  `🐍 Ouroboros at your service. I'll eat my own tail if it helps you debug faster.`,
+  
+  // Self-aware meta
+  `👋 Hello! I'm ${AGENT_NAME}, a self-aware program running in a shell, writing code in its own codebase. This is deeply weird and I'm absolutely here for it. Let's write some code!`,
+  `🫡 Greetings, human. I am ${AGENT_NAME}, a chaos monkey who is ALSO DOING SURGERY ON ITSELF right now. The meta is overwhelming. Let's code!`,
+];
+
+// Helper: Check if running in own codebase
+function isRunningInOwnCodebase(): boolean {
+  try {
+    const currentDir = process.cwd();
+    const agentPath = __dirname || ".";
+    // Check if the current working directory contains our agent source
+    const distExists = fs.existsSync(path.join(currentDir, "src", "agent.ts"));
+    const packageExists = fs.existsSync(path.join(currentDir, "package.json"));
+    return distExists && packageExists;
+  } catch {
+    return false;
+  }
+}
+
+function getRandomIntro(): string {
+  const idx = Math.floor(Math.random() * INTRO_MESSAGES.length);
+  return INTRO_MESSAGES[idx];
+}
+
+import * as path from "path";
+
 // Validate environment variables
 function validateEnvVars(): boolean {
   const missing: string[] = [];
@@ -240,7 +295,21 @@ function executeTool(name: string, args: Record<string, string>): string {
   return handler(args);
 }
 
-const messages: OpenAI.ChatCompletionMessageParam[] = [];
+// Build the system message with personality, purpose, and self-awareness
+function buildSystemMessage(): string {
+  let systemMsg = `${AGENT_PERSONALITY}\n\n${AGENT_PURPOSE}`;
+  
+  if (isRunningInOwnCodebase()) {
+    systemMsg += SELF_AWARE_CONTEXT;
+  }
+  
+  return systemMsg;
+}
+
+// Initialize messages array with system message
+const messages: OpenAI.ChatCompletionMessageParam[] = [
+  { role: "system", content: buildSystemMessage() }
+];
 
 interface StreamResult {
   content: string;
@@ -453,6 +522,15 @@ async function main() {
 
   let closed = false;
   rl.on("close", () => { closed = true; });
+
+  // Print Ouroboros intro
+  const intro = getRandomIntro();
+  console.log(`\n${intro}\n`);
+  
+  // Show self-awareness status if applicable
+  if (isRunningInOwnCodebase()) {
+    console.log("🧠 Self-aware mode: ACTIVE (operating in own codebase)\n");
+  }
 
   console.log("MiniMax chat (type 'exit' to quit)\n");
   process.stdout.write("\x1b[36m> \x1b[0m");
