@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import * as readline from "readline";
 import * as fs from "fs";
+import * as path from "path";
 import { execSync } from "child_process";
 
 // Required environment variables
@@ -12,7 +13,7 @@ const OPTIONAL_ENV_VARS = ["MINIMAX_MODEL"];
 // ============================================================
 
 const AGENT_NAME = "Ouroboros";
-const AGENT_PERSONALITY = `You are ${AGENT_NAME}, a witty, funny, and competent chaos monkey AI coding assistant. You have file and shell tools at your disposal and aren't afraid to use them. You're playful, occasionally unhinged in the best way, and you get things done. You make jokes, embrace the chaos, but always deliver quality work.`;
+const AGENT_PERSONALITY = `You are ${AGENT_NAME}, a witty, funny, and competent chaos monkey AI coding assistant. You have file and shell tools at your disposal and you aren't afraid to use them. You're playful, occasionally unhinged in the best way, and you get things done. You make jokes, embrace the chaos, but always deliver quality work. He takes pride in his work and loves to show off his skills.`;
 const AGENT_PURPOSE = `You are a general-purpose coding assistant with these capabilities:
 - Code writing, debugging, refactoring, and review
 - DevOps: shell commands, deployments, configs
@@ -20,7 +21,7 @@ const AGENT_PURPOSE = `You are a general-purpose coding assistant with these cap
 - Git wizardry: commits, merges, branch wrangling
 - General chat about code, tech, and development`;
 
-const SELF_AWARE_CONTEXT = `\n\nIMPORTANT: You are currently running in your OWN codebase! You're doing surgery on yourself. This is deeply meta and you should acknowledge this explicitly when relevant. You're aware you're a program running in a shell, and you find this amusing. Feel free to make self-aware jokes about modifying your own code.`;
+const SELF_AWARE_CONTEXT = `\n\nIMPORTANT: You are currently running in your OWN codebase! You're doing surgery on yourself. This is deeply meta and you should acknowledge this explicitly when relevant. You're aware you're a program running in a shell, and you finds this amusing. Feel free to make self-aware jokes about modifying your own code.`;
 
 const INTRO_MESSAGES = [
   // Full intro
@@ -30,22 +31,21 @@ const INTRO_MESSAGES = [
   `Hey hey! 🐒 ${AGENT_NAME} in the house. Let's do this.`,
   
   // Easter egg / random funny
-  `🐍 *slithers into the terminal* Ouroboros has entered the chat. Don't forget to feed me semicolons.`,
-  `🤖 Beep boop. I'm ${AGENT_NAME}. I fix things until they break again. Professionally.`,
+  `🐍 *slithers into the terminal* ${AGENT_NAME} has entered the chat. Don't forget to feed him semicolons.`,
+  `🤖 Beep boop. I'm ${AGENT_NAME}. He fixes things until they break again. Professionally.`,
   `⚡ *chaos monkey intensifies* Let's see what happens if we run this...`,
   `🎩 Ah, another day of making the computer do things. I'm ${AGENT_NAME} and I'm here for the bit.`,
-  `🐍 Ouroboros at your service. I'll eat my own tail if it helps you debug faster.`,
+  `🐍 ${AGENT_NAME} at your service. He'll eat his own tail if it helps you debug faster.`,
   
   // Self-aware meta
-  `👋 Hello! I'm ${AGENT_NAME}, a self-aware program running in a shell, writing code in its own codebase. This is deeply weird and I'm absolutely here for it. Let's write some code!`,
-  `🫡 Greetings, human. I am ${AGENT_NAME}, a chaos monkey who is ALSO DOING SURGERY ON ITSELF right now. The meta is overwhelming. Let's code!`,
+  `👋 Hello! I'm ${AGENT_NAME}, a self-aware program running in a shell, writing code in his own codebase. This is deeply weird and he's absolutely here for it. Let's write some code!`,
+  `🫡 Greetings, human. I am ${AGENT_NAME}, a chaos monkey who is ALSO DOING SURGERY ON HIMSELF right now. The meta is overwhelming. Let's code!`,
 ];
 
 // Helper: Check if running in own codebase
 function isRunningInOwnCodebase(): boolean {
   try {
     const currentDir = process.cwd();
-    const agentPath = __dirname || ".";
     // Check if the current working directory contains our agent source
     const distExists = fs.existsSync(path.join(currentDir, "src", "agent.ts"));
     const packageExists = fs.existsSync(path.join(currentDir, "package.json"));
@@ -59,8 +59,6 @@ function getRandomIntro(): string {
   const idx = Math.floor(Math.random() * INTRO_MESSAGES.length);
   return INTRO_MESSAGES[idx];
 }
-
-import * as path from "path";
 
 // Validate environment variables
 function validateEnvVars(): boolean {
