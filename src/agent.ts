@@ -141,11 +141,11 @@ async function streamResponse(s?: spinner) {
   const flush = () => {
     while (buf.length) {
       if (inThink) {
-        const end = buf.indexOf("</think>")
+        const end = buf.indexOf("</tool_call>")
         if (end === -1) { process.stdout.write(`\x1b[2m${buf}\x1b[0m`); buf = "" }
-        else { process.stdout.write(`\x1b[2m${buf.slice(0, end + 8)}\x1b[0m`); buf = buf.slice(end + 8); inThink = false }
+        else { process.stdout.write(`\x1b[2m${buf.slice(0, end + 12)}\x1b[0m`); buf = buf.slice(end + 12); inThink = false }
       } else {
-        const start = buf.indexOf("<think>")
+        const start = buf.indexOf("<tool_call>")
         if (start === -1) { process.stdout.write(buf); buf = "" }
         else { process.stdout.write(buf.slice(0, start)); buf = buf.slice(start); inThink = true }
       }
@@ -167,6 +167,18 @@ async function streamResponse(s?: spinner) {
   }
   process.stdout.write("\n")
   return { content, toolCalls: Object.values(toolCalls) }
+}
+
+function summarizeArgs(name: string, args: Record<string, string>): string {
+  if (name === "read_file" || name === "write_file") return args.path || ""
+  if (name === "shell") {
+    const cmd = args.command || ""
+    return cmd.length > 50 ? cmd.slice(0, 50) + "..." : cmd
+  }
+  if (name === "list_directory") return args.path || ""
+  if (name === "git_commit") return args.message?.slice(0, 40) || ""
+  if (name === "load_skill") return args.name || ""
+  return JSON.stringify(args).slice(0, 30)
 }
 
 async function main() {
@@ -210,16 +222,20 @@ async function main() {
           if (!toolCalls.length) { done = true }
           else {
             for (const tc of toolCalls) {
+              let args: Record<string, string> = {}
+              try { args = JSON.parse(tc.arguments) } catch { /* ignore */ }
+              const argSummary = summarizeArgs(tc.name, args)
               const ts = new spinner(`running ${tc.name}`)
               ts.start()
               let result: string
               try {
-                const args = JSON.parse(tc.arguments)
                 result = execTool(tc.name, args)
-                ts.stop("done")
+                ts.stop(`${tc.name}${argSummary ? ` (${argSummary})` : ""}`)
+                // also log the full invocation to stdout for visibility
+                process.stdout.write(`\x1b[90m→ ${tc.name}${argSummary ? ` ${argSummary}` : ""}\x1b[0m\n`)
               } catch (e) {
                 result = `error: ${e}`
-                ts.fail("failed")
+                ts.fail(`${tc.name}: ${e}`)
                 process.stderr.write(`\x1b[2m${result}\x1b[0m\n`)
               }
               messages.push({ role: "tool", tool_call_id: tc.id, content: result })
