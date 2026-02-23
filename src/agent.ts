@@ -162,30 +162,38 @@ async function main() {
     }
 
     messages.push({ role: "user", content: input });
-    const { content, toolCalls } = await streamResponse();
 
-    const assistantMsg: OpenAI.ChatCompletionAssistantMessageParam = { role: "assistant" };
-    if (content) assistantMsg.content = content;
-    if (toolCalls.length > 0) {
-      assistantMsg.tool_calls = toolCalls.map((tc) => ({
-        id: tc.id,
-        type: "function" as const,
-        function: { name: tc.name, arguments: tc.arguments },
-      }));
-    }
-    messages.push(assistantMsg);
+    let done = false;
+    while (!done) {
+      const { content, toolCalls } = await streamResponse();
 
-    for (const tc of toolCalls) {
-      console.log(`\x1b[33m[tool: ${tc.name}]\x1b[0m`);
-      let result: string;
-      try {
-        const args = JSON.parse(tc.arguments);
-        result = executeTool(tc.name, args);
-      } catch (err) {
-        result = `Error: ${err instanceof Error ? err.message : String(err)}`;
+      const assistantMsg: OpenAI.ChatCompletionAssistantMessageParam = { role: "assistant" };
+      if (content) assistantMsg.content = content;
+      if (toolCalls.length > 0) {
+        assistantMsg.tool_calls = toolCalls.map((tc) => ({
+          id: tc.id,
+          type: "function" as const,
+          function: { name: tc.name, arguments: tc.arguments },
+        }));
       }
-      console.log(`\x1b[2m${result}\x1b[0m`);
-      messages.push({ role: "tool", tool_call_id: tc.id, content: result });
+      messages.push(assistantMsg);
+
+      if (toolCalls.length === 0) {
+        done = true;
+      } else {
+        for (const tc of toolCalls) {
+          console.log(`\x1b[33m[tool: ${tc.name}]\x1b[0m`);
+          let result: string;
+          try {
+            const args = JSON.parse(tc.arguments);
+            result = executeTool(tc.name, args);
+          } catch (err) {
+            result = `Error: ${err instanceof Error ? err.message : String(err)}`;
+          }
+          console.log(`\x1b[2m${result}\x1b[0m`);
+          messages.push({ role: "tool", tool_call_id: tc.id, content: result });
+        }
+      }
     }
 
     console.log();
