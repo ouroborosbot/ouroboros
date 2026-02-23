@@ -13,11 +13,16 @@ const client = new OpenAI({
 
 async function main() {
   const response = await client.chat.completions.create({
-    model: process.env.MINIMAX_MODEL || "MiniMax-Text-01",
+    model: process.env.MINIMAX_MODEL || "MiniMax-M2.5",
     messages: [{ role: "user", content: "say hello in 5 words" }],
   });
 
-  console.log(response.choices[0].message.content);
+  const raw = response.choices[0].message.content ?? "";
+  const formatted = raw.replace(
+    /<think>([\s\S]*?)<\/think>/g,
+    (_match, thinking: string) => `\x1b[2m<think>${thinking}</think>\x1b[0m`
+  );
+  console.log(formatted);
 }
 
 main();
