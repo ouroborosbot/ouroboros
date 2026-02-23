@@ -49,7 +49,7 @@ const toolHandlers: Record<string, (args: Record<string, string>) => string> = {
       return loadSkill(a.name)
     } catch (e) { return `error: ${e}` }
   },
-  get_current_time: () => new Date().toISOString(),
+  get_current_time: () => new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles", hour12: false }),
 }
 
 function execTool(name: string, args: Record<string, string>) {
