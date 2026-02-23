@@ -22,26 +22,42 @@ async function streamResponse(): Promise<string> {
   });
 
   let full = "";
+  let buf = "";
   let inThink = false;
+
+  function flush() {
+    while (buf.length > 0) {
+      if (inThink) {
+        const end = buf.indexOf("</think>");
+        if (end === -1) {
+          process.stdout.write(`\x1b[2m${buf}\x1b[0m`);
+          buf = "";
+        } else {
+          process.stdout.write(`\x1b[2m${buf.slice(0, end + 8)}\x1b[0m`);
+          buf = buf.slice(end + 8);
+          inThink = false;
+        }
+      } else {
+        const start = buf.indexOf("<think>");
+        if (start === -1) {
+          process.stdout.write(buf);
+          buf = "";
+        } else {
+          process.stdout.write(buf.slice(0, start));
+          buf = buf.slice(start);
+          inThink = true;
+        }
+      }
+    }
+  }
+
   for await (const chunk of stream) {
     const text = chunk.choices[0]?.delta?.content;
     if (!text) continue;
-
     full += text;
-
-    if (text.includes("<think>")) {
-      inThink = true;
-      process.stdout.write("\x1b[2m");
-    }
-
-    process.stdout.write(text);
-
-    if (text.includes("</think>")) {
-      inThink = false;
-      process.stdout.write("\x1b[0m");
-    }
+    buf += text;
+    flush();
   }
-  if (inThink) process.stdout.write("\x1b[0m");
   process.stdout.write("\n");
   return full;
 }
