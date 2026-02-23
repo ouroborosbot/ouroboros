@@ -75,13 +75,6 @@ const start = buf.indexOf("<think>")
 - file paths
 - code identifiers of any kind
 
-## growing this skill
+## this skill can be updated
 
-when you discover a new pattern that causes bugs during self-editing, add it here:
-
-1. read this skill file with `read_file skills/self-edit.md`
-2. add the new pattern to the **protected zones** section (if it's a "don't touch" rule) or create a new section if it's a different kind of lesson
-3. write the updated file back
-4. commit with a message explaining what you learned
-
-this skill is your memory. if you break something and figure out why, record it here so you don't break it again.
+if you or the user discover a new footgun during self-editing, suggest adding it here. let the user decide whether and how to update it.
