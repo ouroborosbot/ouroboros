@@ -54,6 +54,18 @@ const tools: OpenAI.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "list_directory",
+      description: "List files and directories in a given path",
+      parameters: {
+        type: "object",
+        properties: { path: { type: "string", description: "Directory path to list" } },
+        required: ["path"],
+      },
+    },
+  },
 ];
 
 function executeTool(name: string, args: Record<string, string>): string {
@@ -65,6 +77,9 @@ function executeTool(name: string, args: Record<string, string>): string {
       return "OK";
     case "shell":
       return execSync(args.command, { encoding: "utf-8", timeout: 30_000 });
+    case "list_directory":
+      const entries = fs.readdirSync(args.path, { withFileTypes: true });
+      return entries.map(e => `${e.isDirectory() ? "d" : "-" }  ${e.name}`).join("\n");
     default:
       return `Unknown tool: ${name}`;
   }
