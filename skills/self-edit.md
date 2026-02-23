@@ -91,3 +91,10 @@ if you or the user discover a new footgun during self-editing, suggest adding it
 4. **i can edit my own source code** — modified my own system directive to mention the self-edit skill exists.
 
 5. **test yourself by restarting** — the running process has old code. rebuild and restart to see changes.
+
+
+## commit log
+
+| date | commit | description |
+|------|--------|-------------|
+| 2024-02-23 | 4027ca7 | discovered write_file mangles think tags inside strings; updated system prompt to mention self-edit skill; added 5 lessons learned |
