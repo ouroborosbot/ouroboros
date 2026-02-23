@@ -259,7 +259,7 @@ class AgentError extends Error {
   }
 }
 
-async function streamResponse(spinner: Spinner): Promise<StreamResult> {
+async function streamResponse(): Promise<StreamResult> {
   try {
     const stream = await client.chat.completions.create({
       model: process.env.MINIMAX_MODEL || "MiniMax-M2.5",
@@ -272,9 +272,6 @@ async function streamResponse(spinner: Spinner): Promise<StreamResult> {
     let buf = "";
     let inThink = false;
     const toolCalls: Record<number, { id: string; name: string; arguments: string }> = {};
-
-    // Stop spinner before writing any content to stdout
-    spinner.stop();
 
     function flush() {
       while (buf.length > 0) {
@@ -482,8 +479,10 @@ async function main() {
           inputController.suppress();
           spinner.start();
 
-          const { content, toolCalls } = await streamResponse(spinner);
-          // Spinner is now stopped inside streamResponse before content is written
+          // Stop spinner BEFORE streaming begins to avoid interfering with stdout
+          spinner.stop();
+
+          const { content, toolCalls } = await streamResponse();
 
           const assistantMsg: OpenAI.ChatCompletionAssistantMessageParam = { role: "assistant" };
           if (content) assistantMsg.content = content;
