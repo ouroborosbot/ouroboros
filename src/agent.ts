@@ -3,6 +3,7 @@ import * as readline from "readline"
 import * as fs from "fs"
 import * as path from "path"
 import { execSync } from "child_process"
+import { listSkills, loadSkill } from "./skills"
 
 const required = ["minimax_api_key"]
 for (const v of required) {
@@ -33,6 +34,8 @@ const tools = [
   { name: "shell", description: "run shell command", parameters: { type: "object", properties: { command: { type: "string" } }, required: ["command"] } },
   { name: "list_directory", description: "list directory contents", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
   { name: "git_commit", description: "commit changes to git", parameters: { type: "object", properties: { message: { type: "string" }, add: { type: "string" } }, required: ["message"] } },
+  { name: "list_skills", description: "list all available skills", parameters: { type: "object", properties: {} } },
+  { name: "load_skill", description: "load a skill by name, returns its content", parameters: { type: "object", properties: { name: { type: "string" } }, required: ["name"] } },
 ]
 
 const toolHandlers: Record<string, (args: Record<string, string>) => string> = {
@@ -46,6 +49,12 @@ const toolHandlers: Record<string, (args: Record<string, string>) => string> = {
       execSync(`git commit -m "${a.message}"`, { encoding: "utf-8" })
       return "committed"
     } catch (e) { return `failed: ${e}` }
+  },
+  list_skills: () => JSON.stringify(listSkills()),
+  load_skill: (a) => {
+    try {
+      return loadSkill(a.name)
+    } catch (e) { return `error: ${e}` }
   },
 }
 
