@@ -2,6 +2,31 @@
 
 you are editing your own source code. mistakes break you. follow these rules.
 
+## your codebase
+
+```
+src/
+  agent.ts    — the main file. everything lives here: client setup, tools,
+                streaming, the agentic loop, readline, spinner, input control
+  skills.ts   — loads .md files from skills/ directory, exposes listSkills()
+                and loadSkill()
+
+skills/       — markdown skill files the model can load at runtime
+package.json  — scripts: "build" (tsc), "dev" (tsc && node dist/agent.js)
+tsconfig.json — compiles src/ → dist/
+```
+
+### key sections in agent.ts (top to bottom)
+
+1. **imports and env validation** — checks required env vars on startup
+2. **client setup** — OpenAI SDK pointed at minimax, with timeout
+3. **tools array** — tool definitions in openai format
+4. **toolHandlers** — registry mapping tool names to handler functions
+5. **buildSystem()** — constructs the system prompt, detects own codebase
+6. **spinner / inputctrl** — UX classes for loading indicator and input suppression
+7. **streamResponse()** — streams a completion, handles think tag dimming, accumulates tool calls
+8. **main()** — boot greeting, readline loop, agentic tool loop
+
 ## golden rule
 
 read the file before editing. read it again after editing. diff your changes mentally. if you changed something you didn't intend to, fix it immediately.
@@ -49,3 +74,14 @@ const start = buf.indexOf("<think>")
 - environment variable names
 - file paths
 - code identifiers of any kind
+
+## growing this skill
+
+when you discover a new pattern that causes bugs during self-editing, add it here:
+
+1. read this skill file with `read_file skills/self-edit.md`
+2. add the new pattern to the **protected zones** section (if it's a "don't touch" rule) or create a new section if it's a different kind of lesson
+3. write the updated file back
+4. commit with a message explaining what you learned
+
+this skill is your memory. if you break something and figure out why, record it here so you don't break it again.
