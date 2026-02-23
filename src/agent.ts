@@ -1,11 +1,11 @@
-import openai from "openai"
+import OpenAI from "openai"
 import * as readline from "readline"
 import * as fs from "fs"
 import * as path from "path"
 import { execSync } from "child_process"
 import { listSkills, loadSkill } from "./skills"
 
-const required = ["minimax_api_key"]
+const required = ["MINIMAX_API_KEY"]
 for (const v of required) {
   if (!process.env[v]) {
     console.error(`missing ${v}`)
@@ -13,29 +13,21 @@ for (const v of required) {
   }
 }
 
-const client = new openai({
-  apiKey: process.env.minimax_api_key,
+const client = new OpenAI({
+  apiKey: process.env.MINIMAX_API_KEY,
   baseURL: "https://api.minimaxi.chat/v1",
   timeout: 30000,
   maxRetries: 0,
 })
 
-const tools = [
-  {
-    name: "read_file",
-    description: "read file contents",
-    parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
-  },
-  {
-    name: "write_file",
-    description: "write content to file",
-    parameters: { type: "object", properties: { path: { type: "string" }, content: { type: "string" } }, required: ["path", "content"] },
-  },
-  { name: "shell", description: "run shell command", parameters: { type: "object", properties: { command: { type: "string" } }, required: ["command"] } },
-  { name: "list_directory", description: "list directory contents", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
-  { name: "git_commit", description: "commit changes to git", parameters: { type: "object", properties: { message: { type: "string" }, add: { type: "string" } }, required: ["message"] } },
-  { name: "list_skills", description: "list all available skills", parameters: { type: "object", properties: {} } },
-  { name: "load_skill", description: "load a skill by name, returns its content", parameters: { type: "object", properties: { name: { type: "string" } }, required: ["name"] } },
+const tools: OpenAI.ChatCompletionTool[] = [
+  { type: "function", function: { name: "read_file", description: "read file contents", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } } },
+  { type: "function", function: { name: "write_file", description: "write content to file", parameters: { type: "object", properties: { path: { type: "string" }, content: { type: "string" } }, required: ["path", "content"] } } },
+  { type: "function", function: { name: "shell", description: "run shell command", parameters: { type: "object", properties: { command: { type: "string" } }, required: ["command"] } } },
+  { type: "function", function: { name: "list_directory", description: "list directory contents", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } } },
+  { type: "function", function: { name: "git_commit", description: "commit changes to git", parameters: { type: "object", properties: { message: { type: "string" }, add: { type: "string" } }, required: ["message"] } } },
+  { type: "function", function: { name: "list_skills", description: "list all available skills", parameters: { type: "object", properties: {} } } },
+  { type: "function", function: { name: "load_skill", description: "load a skill by name, returns its content", parameters: { type: "object", properties: { name: { type: "string" } }, required: ["name"] } } },
 ]
 
 const toolHandlers: Record<string, (args: Record<string, string>) => string> = {
@@ -75,7 +67,7 @@ function buildSystem() {
   return `you are ouroboros, a witty funny competent chaos monkey coding assistant. you have file and shell tools. you get things done, crack jokes, embrace chaos, deliver quality. use lowercase. no periods unless necessary. introduce yourself on boot with a fun random greeting${selfAware}`
 }
 
-const messages: openai.ChatCompletionMessageParam[] = [{ role: "system", content: buildSystem() }]
+const messages: OpenAI.ChatCompletionMessageParam[] = [{ role: "system", content: buildSystem() }]
 
 // spinner that only touches stderr, cleans up after itself
 class spinner {
@@ -130,13 +122,14 @@ class inputctrl {
   }
 }
 
-async function stream() {
-  const stream = await client.chat.completions.create({
-    model: process.env.minimax_model || "MiniMax-M2.5",
+async function streamResponse(s?: spinner) {
+  const response = await client.chat.completions.create({
+    model: process.env.MINIMAX_MODEL || "MiniMax-M2.5",
     messages,
-    tools: tools as any,
+    tools,
     stream: true,
   })
+  s?.stop()
 
   let content = ""
   let toolCalls: Record<number, { id: string; name: string; arguments: string }> = {}
@@ -146,7 +139,7 @@ async function stream() {
   const flush = () => {
     while (buf.length) {
       if (inThink) {
-        const end = buf.indexOf("<think>")
+        const end = buf.indexOf("</think>")
         if (end === -1) { process.stdout.write(`\x1b[2m${buf}\x1b[0m`); buf = "" }
         else { process.stdout.write(`\x1b[2m${buf.slice(0, end + 8)}\x1b[0m`); buf = buf.slice(end + 8); inThink = false }
       } else {
@@ -157,7 +150,7 @@ async function stream() {
     }
   }
 
-  for await (const chunk of stream) {
+  for await (const chunk of response) {
     const d = chunk.choices[0]?.delta
     if (!d) continue
     if (d.content) { content += d.content; buf += d.content; flush() }
@@ -181,6 +174,15 @@ async function main() {
   rl.on("close", () => { closed = true })
 
   console.log("\nmini-max chat (type 'exit' to quit)\n")
+
+  // boot greeting
+  messages.push({ role: "user", content: "hello" })
+  const bootSpinner = new spinner("booting")
+  bootSpinner.start()
+  const { content: greeting } = await streamResponse(bootSpinner)
+  messages.push({ role: "assistant", content: greeting })
+  console.log()
+
   process.stdout.write("\x1b[36m> \x1b[0m")
 
   try {
@@ -196,10 +198,9 @@ async function main() {
         try {
           ctrl.suppress()
           s.start()
-          s.stop()  // stop before streaming so stdout is clean
 
-          const { content, toolCalls } = await stream()
-          const msg: openai.ChatCompletionAssistantMessageParam = { role: "assistant" }
+          const { content, toolCalls } = await streamResponse(s)
+          const msg: OpenAI.ChatCompletionAssistantMessageParam = { role: "assistant" }
           if (content) msg.content = content
           if (toolCalls.length) msg.tool_calls = toolCalls.map(tc => ({ id: tc.id, type: "function" as const, function: { name: tc.name, arguments: tc.arguments } }))
           messages.push(msg)
