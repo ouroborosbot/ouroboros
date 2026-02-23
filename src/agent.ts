@@ -114,75 +114,130 @@ const client = new OpenAI({
   maxRetries: 0,  // We handle retries ourselves via error handling
 });
 
-const tools: OpenAI.ChatCompletionTool[] = [
+// ============================================================
+// Tool Registry Pattern
+// ============================================================
+
+type ToolHandler = (args: Record<string, string>) => string;
+
+interface ToolDefinition {
+  name: string;
+  description: string;
+  parameters: {
+    type: "object";
+    properties: Record<string, { type: string; description: string }>;
+    required: string[];
+  };
+}
+
+// Tool registry: maps tool names to handler functions
+const toolRegistry: Record<string, ToolHandler> = {
+  read_file: (args) => {
+    return fs.readFileSync(args.path, "utf-8");
+  },
+  
+  write_file: (args) => {
+    fs.writeFileSync(args.path, args.content, "utf-8");
+    return "OK";
+  },
+  
+  shell: (args) => {
+    return execSync(args.command, { encoding: "utf-8", timeout: 30_000 });
+  },
+  
+  list_directory: (args) => {
+    const entries = fs.readdirSync(args.path, { withFileTypes: true });
+    return entries.map(e => `${e.isDirectory() ? "d" : "-"}  ${e.name}`).join("\n");
+  },
+
+  git_commit: (args) => {
+    const message = args.message || "Auto-commit via agent";
+    const addAll = args.add === "true" || args.add === "all";
+    
+    try {
+      if (addAll) {
+        execSync("git add -A", { encoding: "utf-8" });
+      }
+      execSync(`git commit -m "${message}"`, { encoding: "utf-8" });
+      return "Committed successfully";
+    } catch (err) {
+      return `Git commit failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  },
+};
+
+// Build tool definitions from registry
+const toolDefinitions: ToolDefinition[] = [
   {
-    type: "function",
-    function: {
-      name: "read_file",
-      description: "Read the contents of a file at the given path",
-      parameters: {
-        type: "object",
-        properties: { path: { type: "string", description: "File path to read" } },
-        required: ["path"],
-      },
+    name: "read_file",
+    description: "Read the contents of a file at the given path",
+    parameters: {
+      type: "object",
+      properties: { path: { type: "string", description: "File path to read" } },
+      required: ["path"],
     },
   },
   {
-    type: "function",
-    function: {
-      name: "write_file",
-      description: "Write content to a file at the given path",
-      parameters: {
-        type: "object",
-        properties: {
-          path: { type: "string", description: "File path to write" },
-          content: { type: "string", description: "Content to write" },
-        },
-        required: ["path", "content"],
+    name: "write_file",
+    description: "Write content to a file at the given path",
+    parameters: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "File path to write" },
+        content: { type: "string", description: "Content to write" },
       },
+      required: ["path", "content"],
     },
   },
   {
-    type: "function",
-    function: {
-      name: "shell",
-      description: "Run a shell command and return its output",
-      parameters: {
-        type: "object",
-        properties: { command: { type: "string", description: "Shell command to execute" } },
-        required: ["command"],
-      },
+    name: "shell",
+    description: "Run a shell command and return its output",
+    parameters: {
+      type: "object",
+      properties: { command: { type: "string", description: "Shell command to execute" } },
+      required: ["command"],
     },
   },
   {
-    type: "function",
-    function: {
-      name: "list_directory",
-      description: "List files and directories in a given path",
-      parameters: {
-        type: "object",
-        properties: { path: { type: "string", description: "Directory path to list" } },
-        required: ["path"],
+    name: "list_directory",
+    description: "List files and directories in a given path",
+    parameters: {
+      type: "object",
+      properties: { path: { type: "string", description: "Directory path to list" } },
+      required: ["path"],
+    },
+  },
+  {
+    name: "git_commit",
+    description: "Commit changes to git repository",
+    parameters: {
+      type: "object",
+      properties: {
+        message: { type: "string", description: "Commit message" },
+        add: { type: "string", description: "Add all files before commit (true/all)" },
       },
+      required: ["message"],
     },
   },
 ];
 
+// Convert to OpenAI tool format
+const tools: OpenAI.ChatCompletionTool[] = toolDefinitions.map((def) => ({
+  type: "function",
+  function: {
+    name: def.name,
+    description: def.description,
+    parameters: def.parameters,
+  },
+}));
+
+// Execute tool by looking up in registry
 function executeTool(name: string, args: Record<string, string>): string {
-  switch (name) {
-    case "read_file":
-      return fs.readFileSync(args.path, "utf-8");
-    case "write_file":
-      fs.writeFileSync(args.path, args.content, "utf-8");
-      return "OK";
-    case "shell":
-      return execSync(args.command, { encoding: "utf-8", timeout: 30_000 });
-    case "list_directory":
-      const entries = fs.readdirSync(args.path, { withFileTypes: true });
-      return entries.map(e => `${e.isDirectory() ? "d" : "-" }  ${e.name}`).join("\n");
-    default:
-      return `Unknown tool: ${name}`;
+  const handler = toolRegistry[name];
+  if (!handler) {
+    return `Unknown tool: ${name}`;
   }
+  return handler(args);
 }
 
 const messages: OpenAI.ChatCompletionMessageParam[] = [];
@@ -282,7 +337,7 @@ async function streamResponse(spinner: Spinner): Promise<StreamResult> {
       const obj = e as Record<string, unknown>;
       if ("response" in obj && obj.response && typeof obj.response === "object") {
         const resp = obj.response as Record<string, unknown>;
-        if (typeof resp.status === "number") return resp.status;
+        if ("status" in resp && typeof resp.status === "number") return resp.status;
       }
       if ("status" in obj && typeof obj.status === "number") return obj.status;
       return undefined;
@@ -354,6 +409,35 @@ async function streamResponse(spinner: Spinner): Promise<StreamResult> {
 // Helper function to create spinner (for compatibility)
 function newSpinner(message: string): Spinner {
   return new Spinner(message);
+}
+
+// Try to commit changes when done
+function tryGitCommit(): void {
+  try {
+    if (!fs.existsSync(".git")) {
+      return;
+    }
+
+    console.log("\nChecking for changes to commit...");
+    const status = execSync("git status --porcelain", { encoding: "utf-8" });
+    
+    if (!status.trim()) {
+      console.log("No changes to commit.");
+      return;
+    }
+
+    console.log("Changes detected:");
+    console.log(status);
+    
+    // Auto-add and commit
+    execSync("git add -A", { encoding: "utf-8" });
+    const timestamp = new Date().toISOString();
+    execSync(`git commit -m "Auto-commit at ${timestamp}"`, { encoding: "utf-8" });
+    console.log("Changes committed successfully.");
+  } catch (err) {
+    // Git not available or other error - silently ignore
+    console.log("Could not auto-commit (may need manual git add/commit).");
+  }
 }
 
 async function main() {
@@ -485,22 +569,8 @@ async function main() {
   } finally {
     rl.close();
     
-    // Attempt git commit if this is a git repo
-    try {
-      if (fs.existsSync(".git")) {
-        console.log("\nChecking for changes to commit...");
-        const status = execSync("git status --porcelain", { encoding: "utf-8" });
-        if (status.trim()) {
-          console.log("Changes detected:");
-          console.log(status);
-          console.log("\nRun 'git add .' and 'git commit' manually to commit changes.");
-        } else {
-          console.log("No changes to commit.");
-        }
-      }
-    } catch {
-      // Git not available or not a git repo - silently ignore
-    }
+    // Attempt git commit when done
+    tryGitCommit();
     
     console.log("Goodbye!");
   }
