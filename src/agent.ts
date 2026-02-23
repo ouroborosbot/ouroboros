@@ -141,9 +141,7 @@ async function streamResponse(s?: spinner) {
   const flush = () => {
     while (buf.length) {
       if (inThink) {
-        const end = buf.indexOf("
-</think>
-")
+        const end = buf.indexOf("</think>")
         if (end === -1) { process.stdout.write(`\x1b[2m${buf}\x1b[0m`); buf = "" }
         else { process.stdout.write(`\x1b[2m${buf.slice(0, end + 8)}\x1b[0m`); buf = buf.slice(end + 8); inThink = false }
       } else {
