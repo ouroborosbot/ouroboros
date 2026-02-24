@@ -263,3 +263,4 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 - 2026-02-23 17:42 Unit 1b complete: core.ts created with lazy client init, ChannelCallbacks, runAgent. agent.ts refactored to import from core. All 47 tests pass (green). Build clean.
 - 2026-02-23 17:44 Unit 1c complete: 100% coverage on core.ts (stmts/branch/funcs/lines). Added 8 edge case tests (invalid JSON, non-Error throw, missing API key, null coalescing, etc). Fixed vitest/tsc config to exclude dist/ tests.
 - 2026-02-23 17:46 Unit 2a complete: 18 CLI adapter tests (createCliCallbacks, think-tag dimming, spinner, tool display, boot greeting). All 18 fail (red) -- agent.ts doesn't export createCliCallbacks/bootGreeting yet.
+- 2026-02-23 17:48 Unit 2b complete: agent.ts refactored -- exports createCliCallbacks() and bootGreeting(), guarded main(). All 73 tests pass. Build clean.
