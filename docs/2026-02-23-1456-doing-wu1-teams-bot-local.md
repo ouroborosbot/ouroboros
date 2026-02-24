@@ -223,7 +223,7 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 **Acceptance**: All Unit 3a tests PASS (green). `npm run build` succeeds. `npm run teams` starts DevtoolsPlugin UI. Sending a message triggers the agent, streams a response with tool status updates, think tags stripped.
 
 ### Unit 3c: Teams Channel Adapter -- Coverage and Refactor
-**Status**: Not started
+**Status**: Done
 
 **What**: Run coverage on `src/teams.ts`. Fill gaps in think-tag stripping edge cases and error paths. Refactor.
 **Output**: Updated `src/__tests__/teams.test.ts`, 100% coverage on `src/teams.ts`.
