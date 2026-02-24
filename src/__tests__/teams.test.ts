@@ -238,3 +238,159 @@ describe("Teams adapter - message handling", () => {
     expect(mockStream.close).toHaveBeenCalled()
   })
 })
+
+describe("Teams adapter - startTeamsApp", () => {
+  it("creates App with DevtoolsPlugin and starts it", async () => {
+    vi.resetModules()
+
+    const mockOn = vi.fn()
+    const mockStart = vi.fn()
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = mockOn
+        start = mockStart
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../teams")
+    teams.startTeamsApp()
+
+    expect(mockOn).toHaveBeenCalledWith("message", expect.any(Function))
+    expect(mockStart).toHaveBeenCalledWith(3978)
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Teams bot started"))
+
+    consoleSpy.mockRestore()
+    vi.restoreAllMocks()
+  })
+
+  it("uses PORT env var when set", async () => {
+    vi.resetModules()
+
+    const mockStart = vi.fn()
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        start = mockStart
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    process.env.PORT = "4000"
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../teams")
+    teams.startTeamsApp()
+
+    expect(mockStart).toHaveBeenCalledWith(4000)
+
+    delete process.env.PORT
+    consoleSpy.mockRestore()
+    vi.restoreAllMocks()
+  })
+
+  it("message handler calls handleTeamsMessage with text and stream", async () => {
+    vi.resetModules()
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    const mockRunAgent = vi.fn()
+    vi.doMock("../core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../teams")
+    teams.startTeamsApp()
+
+    expect(capturedHandler).not.toBeNull()
+
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: { text: "hello from devtools" },
+    })
+
+    expect(mockRunAgent).toHaveBeenCalled()
+    expect(mockStream.close).toHaveBeenCalled()
+
+    vi.restoreAllMocks()
+  })
+
+  it("message handler handles missing activity.text", async () => {
+    vi.resetModules()
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    const mockRunAgent = vi.fn()
+    vi.doMock("../core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../teams")
+    teams.startTeamsApp()
+
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: {}, // no text property
+    })
+
+    expect(mockRunAgent).toHaveBeenCalled()
+    // The user message should be empty string
+    const messages = mockRunAgent.mock.calls[0][0]
+    const userMsg = messages.filter((m: any) => m.role === "user").pop()
+    expect(userMsg.content).toBe("")
+
+    vi.restoreAllMocks()
+  })
+})
