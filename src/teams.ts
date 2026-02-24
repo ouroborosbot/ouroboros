@@ -15,14 +15,70 @@ export function stripThinkTags(text: string): string {
   return text.replace(/<think>[\s\S]*?<\/think>/g, "")
 }
 
-// Create Teams-specific callbacks for the agent loop
-export function createTeamsCallbacks(stream: TeamsStream): ChannelCallbacks {
+// Default debounce interval for buffered streaming (ms)
+const BUFFER_INTERVAL_MS = 1500
+
+// Create Teams-specific callbacks for the agent loop.
+// Returns { callbacks, flush } -- caller must call flush() after runAgent()
+// completes to emit any remaining buffered content before closing the stream.
+export function createTeamsCallbacks(
+  stream: TeamsStream,
+  controller: AbortController,
+): { callbacks: ChannelCallbacks; flush: () => void } {
   // Track whether we're inside a think tag across chunks
   let inThink = false
   let thinkBuf = ""
   let emittedContent = false // trim leading whitespace until first real content
 
-  return {
+  // Cumulative text accumulator -- every emit sends ALL content so far
+  let cumulativeText = ""
+
+  // Buffered flushing state
+  let pendingBuffer = "" // text waiting to be flushed
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null
+  let stopped = false // set when stream signals cancellation (403)
+
+  // Safely emit cumulative text to the stream.
+  // On error (e.g. 403 from Teams stop button), abort the controller.
+  function safeEmit(text: string): void {
+    if (stopped) return
+    try {
+      stream.emit(text)
+    } catch {
+      stopped = true
+      controller.abort()
+    }
+  }
+
+  // Flush pending buffer to the stream immediately.
+  function flushBuffer(): void {
+    if (debounceTimer !== null) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
+    }
+    if (pendingBuffer.length > 0 && !stopped) {
+      cumulativeText += pendingBuffer
+      pendingBuffer = ""
+      safeEmit(cumulativeText)
+    }
+  }
+
+  // Schedule a debounced flush.
+  function scheduleFlush(): void {
+    if (debounceTimer !== null) {
+      clearTimeout(debounceTimer)
+    }
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      if (pendingBuffer.length > 0 && !stopped) {
+        cumulativeText += pendingBuffer
+        pendingBuffer = ""
+        safeEmit(cumulativeText)
+      }
+    }, BUFFER_INTERVAL_MS)
+  }
+
+  const callbacks: ChannelCallbacks = {
     onModelStart: () => {
       stream.update("thinking...")
     },
@@ -30,6 +86,8 @@ export function createTeamsCallbacks(stream: TeamsStream): ChannelCallbacks {
       // No-op for Teams -- streaming has already started
     },
     onTextChunk: (text: string) => {
+      if (stopped) return
+
       // Process chunk-by-chunk think tag stripping
       thinkBuf += text
       let output = ""
@@ -57,14 +115,15 @@ export function createTeamsCallbacks(stream: TeamsStream): ChannelCallbacks {
         }
       }
 
-      // Trim leading whitespace until first real content — prevents blank
+      // Trim leading whitespace until first real content -- prevents blank
       // space at the top of the message from newlines after think blocks
       if (!emittedContent) {
         output = output.trimStart()
       }
       if (output.length > 0) {
         emittedContent = true
-        stream.emit(output)
+        pendingBuffer += output
+        scheduleFlush()
       }
     },
     onToolStart: (name: string, args: Record<string, string>) => {
@@ -79,9 +138,12 @@ export function createTeamsCallbacks(stream: TeamsStream): ChannelCallbacks {
       }
     },
     onError: (error: Error) => {
+      if (stopped) return
       stream.emit(`Error: ${error.message}`)
     },
   }
+
+  return { callbacks, flush: flushBuffer }
 }
 
 // Global messages array (WU1 simplification -- single conversation)
@@ -92,8 +154,10 @@ const messages: OpenAI.ChatCompletionMessageParam[] = [
 // Handle an incoming Teams message
 export async function handleTeamsMessage(text: string, stream: TeamsStream): Promise<void> {
   messages.push({ role: "user", content: text })
-  const callbacks = createTeamsCallbacks(stream)
-  await runAgent(messages, callbacks)
+  const controller = new AbortController()
+  const { callbacks, flush } = createTeamsCallbacks(stream, controller)
+  await runAgent(messages, callbacks, controller.signal)
+  flush()
   stream.close()
 }
 
