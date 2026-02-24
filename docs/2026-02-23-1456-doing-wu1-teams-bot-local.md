@@ -110,7 +110,7 @@ Not started / In progress / Done / Blocked
 **Acceptance**: `npm run test:coverage` shows 100% branch/line/function coverage on `src/core.ts`. All tests green. No warnings.
 
 ### Unit 2a: CLI Adapter Refactor -- Tests
-**Status**: Not started
+**Status**: Done
 
 **What**: Write tests for the refactored `agent.ts` as a CLI channel adapter. Focus on the adapter wiring (not UX fixes, those are Unit 2d). Test:
 - CLI adapter creates messages array with system message from `buildSystem()`
