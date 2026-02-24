@@ -18,17 +18,17 @@ vi.mock("../skills", () => ({
 }))
 
 // We need to mock OpenAI before importing core
+const mockCreate = vi.fn()
 vi.mock("openai", () => {
-  const mockCreate = vi.fn()
   return {
-    default: vi.fn().mockImplementation(() => ({
-      chat: {
+    default: class MockOpenAI {
+      chat = {
         completions: {
           create: mockCreate,
         },
-      },
-    })),
-    __mockCreate: mockCreate,
+      }
+      constructor(_opts?: any) {}
+    },
   }
 })
 
@@ -295,7 +295,6 @@ describe("ChannelCallbacks interface", () => {
 
 describe("runAgent", () => {
   let runAgent: (messages: any[], callbacks: ChannelCallbacks) => Promise<void>
-  let mockCreate: ReturnType<typeof vi.fn>
 
   // Helper to create an async iterable from chunks
   function makeStream(chunks: any[]) {
@@ -318,10 +317,6 @@ describe("runAgent", () => {
   beforeEach(async () => {
     vi.resetModules()
     process.env.MINIMAX_API_KEY = "test-key"
-
-    // Re-import to get fresh mocks
-    const openaiModule = await import("openai")
-    mockCreate = (openaiModule as any).__mockCreate
     mockCreate.mockReset()
 
     const core = await import("../core")
