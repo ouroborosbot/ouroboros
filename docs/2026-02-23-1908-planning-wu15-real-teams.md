@@ -1,6 +1,6 @@
 # Planning: WU1.5 -- Bot Registration, Dev Tunnels, Real Teams Surface
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-02-23
 
 ## Goal
@@ -130,3 +130,4 @@ Key technical observations from research:
 
 - 2026-02-23 19:11 Created planning doc
 - 2026-02-23 19:20 Incorporated user feedback: streaming fixes in scope, license research (no Copilot license needed for CEA), open questions deferred to spike. Final review: added .env pattern, @mention stripping, existing test updates. Status NEEDS_REVIEW.
+- 2026-02-23 19:30 Status changed to approved. Moving to Phase 2 (doing doc creation).
