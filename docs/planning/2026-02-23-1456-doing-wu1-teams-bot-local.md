@@ -1,6 +1,6 @@
 # Doing: WU1 -- Teams Bot <> Agent Locally (DevtoolsPlugin)
 
-**Status**: drafting
+**Status**: READY_FOR_EXECUTION
 **Execution Mode**: direct
 **Created**: 2026-02-23 17:26
 **Planning**: ./2026-02-23-1456-planning-wu1-teams-bot-local.md
@@ -240,4 +240,7 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 
 ## Progress Log
 
-- 2026-02-23 17:26 Created from planning doc
+- 2026-02-23 17:26 Created from planning doc (Pass 1: first draft)
+- 2026-02-23 17:28 Pass 2: granularity -- split CLI UX fixes into Unit 2d-a/b/c, detailed test specs for all units
+- 2026-02-23 17:29 Pass 3: validation -- fixed Teams SDK class names (App not Application, DevtoolsPlugin from @microsoft/teams.dev), fixed Unit 1b to keep agent.ts compilable
+- 2026-02-23 17:30 Pass 4: quality -- added ChannelCallbacks parameter signatures, exported execTool/summarizeArgs for testability
