@@ -111,3 +111,4 @@ Key code-level observations from the prior analysis:
 - 2026-02-23 14:57 Created planning doc (correcting process -- planning before doing)
 - 2026-02-23 17:06 Applied review feedback: added buildSystem/isOwnCodebase to scope, added vitest setup to scope, streaming kept as requirement without locking implementation, CLI UX fixes confirmed in WU1
 - 2026-02-23 17:15 Corrected architecture: single repo multi-channel (no separate project/subdirectory), locked runAgent Option B (adapter pushes user message), updated all references from "bot" to "channel adapter"
+- 2026-02-23 17:22 Status changed to approved. Moving to Phase 2 (doing doc creation).
