@@ -7,23 +7,26 @@
       [2mCoverage enabled with [22m[33mv8[39m
 
  [32m✓[39m src/__tests__/setup.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
- [32m✓[39m src/__tests__/core.test.ts [2m([22m[2m54 tests[22m[2m)[22m[32m 45[2mms[22m[39m
- [32m✓[39m src/__tests__/cli.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 84[2mms[22m[39m
- [32m✓[39m src/__tests__/cli-ux.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 97[2mms[22m[39m
- [32m✓[39m src/__tests__/teams.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 247[2mms[22m[39m
+ [32m✓[39m src/__tests__/skills.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/__tests__/teams-entrypoint.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 51[2mms[22m[39m
+ [32m✓[39m src/__tests__/core.test.ts [2m([22m[2m54 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32m✓[39m src/__tests__/agent-main.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 74[2mms[22m[39m
+ [32m✓[39m src/__tests__/cli-ux.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 100[2mms[22m[39m
+ [32m✓[39m src/__tests__/cli.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 84[2mms[22m[39m
+ [32m✓[39m src/__tests__/teams.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 230[2mms[22m[39m
 
-[2m Test Files [22m [1m[32m5 passed[39m[22m[90m (5)[39m
-[2m      Tests [22m [1m[32m115 passed[39m[22m[90m (115)[39m
-[2m   Start at [22m 17:58:46
-[2m   Duration [22m 504ms[2m (transform 453ms, setup 0ms, import 456ms, tests 474ms, environment 0ms)[22m
+[2m Test Files [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m      Tests [22m [1m[32m135 passed[39m[22m[90m (135)[39m
+[2m   Start at [22m 18:28:39
+[2m   Duration [22m 499ms[2m (transform 646ms, setup 0ms, import 621ms, tests 600ms, environment 1ms)[22m
 
 [34m % [39m[2mCoverage report from [22m[33mv8[39m
 -----------|---------|----------|---------|---------|-------------------
 File       | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
 -----------|---------|----------|---------|---------|-------------------
-All files  |   79.65 |     84.1 |   82.14 |   79.13 |                   
- agent.ts  |   66.66 |    70.17 |    82.6 |   65.76 | 150-202,209       
+All files  |   99.64 |      100 |   98.21 |     100 |                   
+ agent.ts  |    99.2 |      100 |   95.65 |     100 |                   
  core.ts   |     100 |      100 |     100 |     100 |                   
- skills.ts |    12.5 |        0 |       0 |    12.5 | 11-42             
- teams.ts  |   97.72 |    94.44 |     100 |   97.72 | 112               
+ skills.ts |     100 |      100 |     100 |     100 |                   
+ teams.ts  |     100 |      100 |     100 |     100 |                   
 -----------|---------|----------|---------|---------|-------------------

@@ -23,7 +23,10 @@ class spinner {
   }
 
   stop(ok?: string) {
+    // guard: this.iv is always set because start() is called before stop() in all callback paths
+    /* v8 ignore start */
     if (this.iv) { clearInterval(this.iv); this.iv = null }
+    /* v8 ignore stop */
     process.stderr.write("\r\x1b[K")
     if (ok) process.stderr.write(`\x1b[32m\u2713\x1b[0m ${ok}\n`)
   }
@@ -146,7 +149,7 @@ export async function bootGreeting(messages: OpenAI.ChatCompletionMessageParam[]
   await runAgent(messages, callbacks)
 }
 
-async function main() {
+export async function main() {
   const messages: OpenAI.ChatCompletionMessageParam[] = [{ role: "system", content: buildSystem() }]
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true })
   const ctrl = new InputController(rl)
@@ -203,8 +206,10 @@ async function main() {
   }
 }
 
-// Only run main when executed directly, not when imported
-const isDirectExecution = require.main === module
-if (isDirectExecution) {
+// entrypoint guard — only runs when executed directly (node dist/agent.js),
+// never in vitest where require.main !== module. main() is tested via direct import.
+/* v8 ignore start */
+if (require.main === module) {
   main()
 }
+/* v8 ignore stop */

@@ -1,188 +1,135 @@
-import { describe, it, expect, vi, afterEach } from "vitest"
-import * as path from "path"
-import * as fs from "fs"
-import Module from "module"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 
-// Tests for main() in agent.ts (lines 149-203) and entrypoint guard (lines 207-209).
-//
-// IMPORTANT: main() is a private function only called via the entrypoint guard
-// `if (require.main === module) { main() }`. In vitest's module system,
-// require.main !== module, so main() never executes. The entrypoint guard
-// itself (lines 207-209) DOES execute (evaluating to false) and gets V8
-// coverage credit for the guard evaluation path.
-//
-// To test main()'s actual behavior, we load the compiled dist/agent.js via
-// Node's Module._load(path, null, true) which sets require.main === module.
-// This executes main() in the real Node CJS runtime, verifying its behavior.
-// While V8 tracks this execution, vitest's coverage reporter only credits
-// code that goes through Vite's transform pipeline, so these tests give
-// behavioral verification without vitest V8 coverage credit on the TS source.
+// Tests for main() in agent.ts -- the CLI entry point that wires readline,
+// boot greeting, input loop, SIGINT handling, and history.
+// Now that main() is exported, we call it directly through vitest for V8 coverage.
 
-const AGENT_PATH = path.resolve(__dirname, "..", "..", "dist", "agent.js")
-const CORE_PATH = path.resolve(__dirname, "..", "..", "dist", "core.js")
-const DIST_EXISTS = fs.existsSync(AGENT_PATH)
-const nativeModule = (Module as any).Module || Module
-
-// Use Module.createRequire for cache manipulation
-const { createRequire } = await import("module")
-const nativeRequire = createRequire(AGENT_PATH)
-
-function setupMocks(
-  mockRl: any,
-  runAgentFn: (...args: any[]) => Promise<void> = async () => {},
-) {
-  nativeRequire.cache[CORE_PATH] = {
-    id: CORE_PATH,
-    filename: CORE_PATH,
-    loaded: true,
-    exports: {
-      runAgent: runAgentFn,
-      buildSystem: () => "system prompt",
-      summarizeArgs: () => "",
-    },
-    children: [],
-    paths: [],
-    path: path.dirname(CORE_PATH),
-  } as any
-
-  const rlPath = nativeRequire.resolve("readline")
-  nativeRequire.cache[rlPath] = {
-    id: rlPath,
-    filename: rlPath,
-    loaded: true,
-    exports: { createInterface: () => mockRl },
-    children: [],
-    paths: [],
-    path: path.dirname(rlPath),
-  } as any
-
-  return rlPath
-}
-
-function cleanupCache(rlPath: string) {
-  delete nativeRequire.cache[AGENT_PATH]
-  delete nativeRequire.cache[CORE_PATH]
-  delete nativeRequire.cache[rlPath]
-}
-
+let stdoutChunks: string[]
+let stderrChunks: string[]
 let logCalls: string[][]
-const origLog = console.log
-const origStdout = process.stdout.write
-const origStderr = process.stderr.write
+let stdoutSpy: ReturnType<typeof vi.spyOn>
+let stderrSpy: ReturnType<typeof vi.spyOn>
+let consoleSpy: ReturnType<typeof vi.spyOn>
 
-function patchGlobals() {
+function setupSpies() {
+  stdoutChunks = []
+  stderrChunks = []
   logCalls = []
-  console.log = (...args: any[]) => { logCalls.push(args.map(String)) }
-  process.stdout.write = (() => true) as any
-  process.stderr.write = (() => true) as any
+  stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: any) => {
+    stdoutChunks.push(chunk.toString())
+    return true
+  })
+  stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
+    stderrChunks.push(chunk.toString())
+    return true
+  })
+  consoleSpy = vi.spyOn(console, "log").mockImplementation((...args: any[]) => {
+    logCalls.push(args.map(String))
+  })
 }
 
-function restoreGlobals() {
-  console.log = origLog
-  process.stdout.write = origStdout
-  process.stderr.write = origStderr
+function restoreSpies() {
+  stdoutSpy?.mockRestore()
+  stderrSpy?.mockRestore()
+  consoleSpy?.mockRestore()
 }
 
-describe.skipIf(!DIST_EXISTS)("agent.ts main() - integration via Module._load", () => {
+function createMockRl(inputSequence: string[]) {
+  let inputIdx = 0
+  let closeHandler: (() => void) | null = null
+  let sigintHandler: ((...args: any[]) => void) | null = null
+
+  const mockRl: any = {
+    on: (event: string, handler: (...args: any[]) => void) => {
+      if (event === "close") closeHandler = handler
+      if (event === "SIGINT") sigintHandler = handler
+      return mockRl
+    },
+    close: () => { if (closeHandler) closeHandler() },
+    pause: () => {},
+    resume: () => {},
+    line: "",
+    [Symbol.asyncIterator]: () => ({
+      next: async (): Promise<IteratorResult<string>> => {
+        if (inputIdx < inputSequence.length) {
+          return { value: inputSequence[inputIdx++], done: false }
+        }
+        return { value: undefined as any, done: true }
+      },
+    }),
+  }
+
+  return { mockRl, getSigintHandler: () => sigintHandler }
+}
+
+describe("agent.ts main()", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    setupSpies()
+  })
+
   afterEach(() => {
-    restoreGlobals()
+    restoreSpies()
+    vi.restoreAllMocks()
   })
 
   it("runs full loop: boot greeting, processes input, exits on 'exit'", async () => {
-    patchGlobals()
-
-    const inputSequence = ["hello world", "exit"]
-    let inputIdx = 0
-    let closeHandler: (() => void) | null = null
-
-    const mockRl: any = {
-      on: (event: string, handler: (...args: any[]) => void) => {
-        if (event === "close") closeHandler = handler
-        return mockRl
-      },
-      close: () => { if (closeHandler) closeHandler() },
-      pause: () => {},
-      resume: () => {},
-      line: "",
-      [Symbol.asyncIterator]: () => ({
-        next: async (): Promise<IteratorResult<string>> => {
-          if (inputIdx < inputSequence.length) {
-            return { value: inputSequence[inputIdx++], done: false }
-          }
-          return { value: undefined as any, done: true }
-        },
-      }),
-    }
-
+    const { mockRl } = createMockRl(["hello world", "exit"])
     const runAgentCalls: any[][] = []
-    const rlPath = setupMocks(mockRl, async (...args) => { runAgentCalls.push(args) })
 
-    nativeModule._load(AGENT_PATH, null, true)
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    vi.doMock("readline", () => ({
+      createInterface: () => mockRl,
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn().mockImplementation(async (...args: any[]) => { runAgentCalls.push(args) }),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+
+    const agent = await import("../agent")
+    await agent.main()
 
     const flatLogs = logCalls.flat()
     expect(flatLogs.some((l) => l.includes("mini-max chat"))).toBe(true)
     expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
     expect(runAgentCalls.length).toBe(2) // boot greeting + "hello world"
-
-    cleanupCache(rlPath)
   })
 
   it("skips empty input without calling runAgent", async () => {
-    patchGlobals()
-
-    const inputSequence = ["", "  ", "exit"]
-    let inputIdx = 0
-    let closeHandler: (() => void) | null = null
-
-    const mockRl: any = {
-      on: (event: string, handler: (...args: any[]) => void) => {
-        if (event === "close") closeHandler = handler
-        return mockRl
-      },
-      close: () => { if (closeHandler) closeHandler() },
-      pause: () => {},
-      resume: () => {},
-      line: "",
-      [Symbol.asyncIterator]: () => ({
-        next: async (): Promise<IteratorResult<string>> => {
-          if (inputIdx < inputSequence.length) {
-            return { value: inputSequence[inputIdx++], done: false }
-          }
-          return { value: undefined as any, done: true }
-        },
-      }),
-    }
-
+    const { mockRl } = createMockRl(["", "  ", "exit"])
     const runAgentCalls: any[][] = []
-    const rlPath = setupMocks(mockRl, async (...args) => { runAgentCalls.push(args) })
 
-    nativeModule._load(AGENT_PATH, null, true)
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    vi.doMock("readline", () => ({
+      createInterface: () => mockRl,
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn().mockImplementation(async (...args: any[]) => { runAgentCalls.push(args) }),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+
+    const agent = await import("../agent")
+    await agent.main()
 
     expect(runAgentCalls.length).toBe(1) // only boot greeting
-    expect(logCalls.flat().some((l) => l.includes("bye"))).toBe(true)
-
-    cleanupCache(rlPath)
+    // Prompt re-displayed for empty inputs
+    const prompts = stdoutChunks.filter((c) => c.includes("> "))
+    expect(prompts.length).toBeGreaterThanOrEqual(2)
   })
 
   it("SIGINT: clear on non-empty, warn on first empty, exit on second", async () => {
-    patchGlobals()
-
-    let sigintHandler: (() => void) | null = null
-    let closeHandler: (() => void) | null = null
     let inputResolve: ((result: IteratorResult<string>) => void) | null = null
 
     const mockRl: any = {
       on: (event: string, handler: (...args: any[]) => void) => {
-        if (event === "close") closeHandler = handler
-        if (event === "SIGINT") sigintHandler = handler
+        if (event === "close") mockRl._closeHandler = handler
+        if (event === "SIGINT") mockRl._sigintHandler = handler
         return mockRl
       },
-      close: () => { if (closeHandler) closeHandler() },
+      close: () => { if (mockRl._closeHandler) mockRl._closeHandler() },
       pause: () => {},
       resume: () => {},
       line: "partial",
+      _closeHandler: null as any,
+      _sigintHandler: null as any,
       [Symbol.asyncIterator]: () => ({
         next: (): Promise<IteratorResult<string>> => {
           return new Promise((resolve) => { inputResolve = resolve })
@@ -190,35 +137,43 @@ describe.skipIf(!DIST_EXISTS)("agent.ts main() - integration via Module._load", 
       }),
     }
 
-    const rlPath = setupMocks(mockRl)
+    vi.doMock("readline", () => ({
+      createInterface: () => mockRl,
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
 
-    nativeModule._load(AGENT_PATH, null, true)
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    const agent = await import("../agent")
+    const mainPromise = agent.main()
 
-    expect(sigintHandler).not.toBeNull()
+    // Wait for main to start and register handlers
+    await new Promise((r) => setTimeout(r, 50))
 
-    // Clear path
+    expect(mockRl._sigintHandler).not.toBeNull()
+
+    // Clear path (non-empty line)
     mockRl.line = "partial"
-    sigintHandler!()
+    mockRl._sigintHandler()
 
-    // Warn path
+    // Warn path (first empty Ctrl-C)
     mockRl.line = ""
-    sigintHandler!()
+    mockRl._sigintHandler()
+    expect(stderrChunks.join("")).toContain("Ctrl-C again to exit")
 
-    // Exit path
-    sigintHandler!()
+    // Exit path (second Ctrl-C)
+    mockRl._sigintHandler()
 
+    // Resolve the pending input iterator to let main() finish
     if (inputResolve) inputResolve({ value: undefined as any, done: true })
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await mainPromise
 
-    expect(logCalls.flat().some((l) => l.includes("bye"))).toBe(true)
-
-    cleanupCache(rlPath)
+    const flatLogs = logCalls.flat()
+    expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
   })
 
   it("breaks loop when closed flag is set during runAgent", async () => {
-    patchGlobals()
-
     let closeHandler: (() => void) | null = null
     let inputCall = 0
 
@@ -240,45 +195,39 @@ describe.skipIf(!DIST_EXISTS)("agent.ts main() - integration via Module._load", 
       }),
     }
 
-    const rlPath = setupMocks(mockRl, async () => {
-      if (inputCall > 0 && closeHandler) closeHandler()
-    })
-
-    nativeModule._load(AGENT_PATH, null, true)
-    await new Promise((resolve) => setTimeout(resolve, 300))
-
-    expect(logCalls.flat().some((l) => l.includes("bye"))).toBe(true)
-
-    cleanupCache(rlPath)
-  })
-})
-
-// This test ensures the entrypoint guard code (lines 207-209) is exercised
-// through vitest's module system for V8 coverage credit.
-// When imported via vitest, the guard evaluates require.main === module (false),
-// so lines 207-208 get coverage but line 209 (inside the if-block) does not.
-describe("agent.ts entrypoint guard", () => {
-  it("module loads without triggering main() in test context", async () => {
-    vi.resetModules()
-
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true)
-    vi.spyOn(process.stderr, "write").mockImplementation(() => true)
-
+    vi.doMock("readline", () => ({
+      createInterface: () => mockRl,
+    }))
     vi.doMock("../core", () => ({
-      runAgent: vi.fn(),
+      runAgent: vi.fn().mockImplementation(async () => {
+        // Simulate stream closing during runAgent
+        if (inputCall > 0 && closeHandler) closeHandler()
+      }),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
-      summarizeArgs: vi.fn().mockReturnValue(""),
     }))
 
     const agent = await import("../agent")
+    await agent.main()
 
-    // Module loaded successfully, main() did NOT run
-    expect(agent.createCliCallbacks).toBeDefined()
-    expect(agent.bootGreeting).toBeDefined()
-    expect(agent.InputController).toBeDefined()
-    expect(agent.handleSigint).toBeDefined()
-    expect(agent.addHistory).toBeDefined()
+    const flatLogs = logCalls.flat()
+    expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
+  })
 
-    vi.restoreAllMocks()
+  it("exits when input is 'exit' (case insensitive)", async () => {
+    const { mockRl } = createMockRl(["EXIT"])
+
+    vi.doMock("readline", () => ({
+      createInterface: () => mockRl,
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+
+    const agent = await import("../agent")
+    await agent.main()
+
+    const flatLogs = logCalls.flat()
+    expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
   })
 })
