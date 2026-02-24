@@ -148,7 +148,7 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 **Acceptance**: All Unit 2a tests PASS (green). `npm run build` succeeds with no warnings. CLI boots and works (same behavior as before, but through `runAgent()`).
 
 ### Unit 2c: CLI Adapter Refactor -- Coverage and Refactor
-**Status**: Not started
+**Status**: Done
 
 **What**: Run coverage on refactored `agent.ts`. Fill gaps. Refactor for clarity.
 **Output**: Updated `src/__tests__/cli.test.ts`, 100% coverage on new CLI adapter code.
