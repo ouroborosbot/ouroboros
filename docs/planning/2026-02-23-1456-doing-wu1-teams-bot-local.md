@@ -2,7 +2,7 @@
 
 **Status**: drafting
 **Execution Mode**: direct
-**Created**: TBD
+**Created**: 2026-02-23 17:26
 **Planning**: ./2026-02-23-1456-planning-wu1-teams-bot-local.md
 **Artifacts**: ./2026-02-23-1456-doing-wu1-teams-bot-local/
 
@@ -57,6 +57,8 @@ Refactor ouroboros from a CLI-only agent into a multi-channel architecture (CLI 
 - Done: [DONE]
 - Blocked: [BLOCKED]
 
+**CRITICAL: Every unit header MUST start with status emoji (use the plain text markers above for new units).**
+
 ### Unit 0: Test Infrastructure Setup
 
 **What**: Set up vitest in ouroboros. Add `vitest` as dev dependency, create `vitest.config.ts`, add `test`, `test:coverage` scripts to `package.json`. Verify with a trivial passing test.
@@ -65,98 +67,125 @@ Refactor ouroboros from a CLI-only agent into a multi-channel architecture (CLI 
 
 ### Unit 1a: Core Extraction -- Tests
 
-**What**: Write tests for the new `src/core.ts` module. Test the `ChannelCallbacks` interface shape, `runAgent()` function signature, `buildSystem()`, `isOwnCodebase()`, `execTool()`, and `summarizeArgs()`. Mock the OpenAI client. Verify that:
-- `runAgent()` accepts `(messages, callbacks)` and drives the agentic loop
-- `buildSystem()` returns a system prompt string, with self-aware suffix when `isOwnCodebase()` is true
-- `isOwnCodebase()` returns true/false based on filesystem checks
-- `execTool()` dispatches to the correct handler and returns results
-- `summarizeArgs()` produces correct summaries for each tool type
-- `onModelStart` callback fires before the API call
-- `onModelStreamStart` callback fires on first token
-- `onTextChunk` callback fires for each text delta (with raw think tags)
-- `onToolStart` / `onToolEnd` callbacks fire around each tool execution
-- `onError` callback fires on API errors
-- When no tool calls are returned, the loop ends (done)
-- When tool calls are returned, tools execute and loop continues
-- Assistant and tool messages are pushed onto the messages array by core
-- User message is NOT pushed by core (adapter responsibility)
+**What**: Write tests for the new `src/core.ts` module. Mock the OpenAI client. Test:
+- `buildSystem()` returns system prompt string; includes self-aware suffix when `isOwnCodebase()` is true, omits it when false
+- `isOwnCodebase()` returns true when `src/agent.ts` and `package.json` exist in cwd, false otherwise
+- `execTool()` dispatches to correct handler (read_file, write_file, shell, list_directory, git_commit, list_skills, load_skill, get_current_time); returns "unknown: X" for unknown tools
+- `summarizeArgs()` produces correct summaries for each tool type (path for read/write/list_directory, truncated command for shell, message for git_commit, name for load_skill, JSON slice for unknown)
+- `runAgent()` accepts `(messages, callbacks)` and drives the agentic loop:
+  - Fires `onModelStart` before the API call
+  - Fires `onModelStreamStart` on first content token
+  - Fires `onTextChunk` for each text delta (with raw think tags, no stripping)
+  - When response has no tool calls, loop ends
+  - When response has tool calls: fires `onToolStart` before each tool, executes tool, fires `onToolEnd` after each tool, then loops back for another model call
+  - Fires `onError` on API errors, loop ends
+  - Pushes assistant message (with content and/or tool_calls) onto messages array
+  - Pushes tool result messages onto messages array
+  - Does NOT push user message (adapter responsibility)
 **Output**: `src/__tests__/core.test.ts` with comprehensive tests.
 **Acceptance**: Tests exist and FAIL (red) because `src/core.ts` does not exist yet.
 
 ### Unit 1b: Core Extraction -- Implementation
 
 **What**: Create `src/core.ts` by extracting from `agent.ts`:
-- `ChannelCallbacks` interface with `onModelStart`, `onModelStreamStart`, `onTextChunk`, `onToolStart`, `onToolEnd`, `onError`
-- `runAgent(messages, callbacks)` -- the agentic loop (currently lines 210-251 of `agent.ts`), refactored to use callbacks instead of direct stdout/stderr writes
-- `buildSystem()` and `isOwnCodebase()` moved from `agent.ts`
-- `client`, `tools`, `toolHandlers`, `execTool()`, `summarizeArgs()` moved from `agent.ts`
-- `streamResponse()` refactored: no `flush()`, no ANSI, no `process.stdout.write`. Instead calls `callbacks.onTextChunk(text)` for each delta, passing raw text including think tags
-- API key validation stays in core (required for client initialization)
-- No `process.stdout`, no `process.stderr`, no ANSI codes anywhere in core
-**Output**: `src/core.ts` with all exports. `agent.ts` updated to import from core.
-**Acceptance**: All Unit 1a tests PASS (green). `npm run build` succeeds with no warnings.
+- Export `ChannelCallbacks` interface: `onModelStart`, `onModelStreamStart`, `onTextChunk`, `onToolStart`, `onToolEnd`, `onError`
+- Export `runAgent(messages, callbacks)` -- the agentic loop (currently the `while (!done)` block at lines 210-251), refactored to use callbacks instead of direct stdout/stderr
+- Export `buildSystem()` and `isOwnCodebase()` -- moved from `agent.ts`
+- Move to core (not exported, internal): `client`, `tools`, `toolHandlers`, `execTool()`, `summarizeArgs()`
+- Refactor `streamResponse()` into core: remove `flush()`, remove ANSI, remove `process.stdout.write`. Call `callbacks.onModelStreamStart()` on first content token. Call `callbacks.onTextChunk(delta)` for each content delta, passing raw text including think tags. No spinner parameter.
+- API key validation stays in core (required for client init)
+- Zero references to `process.stdout`, `process.stderr`, or ANSI escape codes in core
+**Output**: `src/core.ts` with all exports. `agent.ts` temporarily broken (will be fixed in Unit 2b).
+**Acceptance**: All Unit 1a tests PASS (green). `npm run build` may have warnings from `agent.ts` (expected, fixed in Unit 2b).
 
 ### Unit 1c: Core Extraction -- Coverage and Refactor
 
-**What**: Run coverage report. Identify any uncovered branches in `core.ts`. Add missing tests. Refactor if needed for clarity.
-**Output**: Updated test file, 100% coverage on `core.ts`.
+**What**: Run coverage report on `core.ts`. Identify uncovered branches. Add tests for edge cases: empty tool arguments, JSON parse failure in tool args, unknown tool name, `execTool` error paths, `summarizeArgs` with missing fields. Refactor if needed.
+**Output**: Updated `src/__tests__/core.test.ts`, 100% coverage on `core.ts`.
 **Acceptance**: `npm run test:coverage` shows 100% branch/line/function coverage on `src/core.ts`. All tests green. No warnings.
 
-### Unit 2a: CLI Channel Adapter -- Tests
+### Unit 2a: CLI Adapter Refactor -- Tests
 
-**What**: Write tests for the refactored `agent.ts` CLI adapter. Test that:
+**What**: Write tests for the refactored `agent.ts` as a CLI channel adapter. Focus on the adapter wiring (not UX fixes, those are Unit 2d). Test:
 - CLI adapter creates messages array with system message from `buildSystem()`
-- CLI adapter pushes user message before calling `runAgent()`
-- `onTextChunk` callback implements think-tag dimming (the flush logic, protected zone)
-- `onModelStart` starts the spinner
-- `onModelStreamStart` stops the spinner
-- `onToolStart` shows tool spinner, `onToolEnd` shows result summary
-- `onError` displays error on stderr
-- Ctrl-C with non-empty input clears the line
-- Ctrl-C with empty input prompts for exit confirmation
-- Up-arrow retrieves previous messages from history
-- Input is not echoed twice (no double message)
-- Input during model calls does not produce garbage characters
+- CLI adapter pushes `{role: "user", content: text}` onto messages before calling `runAgent()`
+- `onTextChunk` callback implements think-tag dimming via flush logic (protected zone: closing tag `</think>`, offset 8). Cases: no think tags, think at start, think in middle, multiple blocks, partial tags across chunks
+- `onModelStart` starts spinner on stderr
+- `onModelStreamStart` stops spinner
+- `onToolStart` starts a tool-specific spinner (e.g. "running read_file")
+- `onToolEnd` stops tool spinner with summary, logs invocation to stdout
+- `onError` writes error to stderr
+- Boot greeting: pushes "hello" as first user message, calls `runAgent`, displays response
 
-Note: CLI adapter tests will need to mock `process.stdin`, `process.stdout`, `process.stderr`, and `readline`. The spinner and inputctrl classes are CLI-internal and tested through the adapter's behavior.
+Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner and inputctrl are CLI-internal, tested through adapter behavior.
 **Output**: `src/__tests__/cli.test.ts`.
-**Acceptance**: Tests exist and FAIL (red) because the CLI adapter has not been refactored yet.
+**Acceptance**: Tests exist and FAIL (red) because `agent.ts` has not been refactored yet.
 
-### Unit 2b: CLI Channel Adapter -- Implementation
+### Unit 2b: CLI Adapter Refactor -- Implementation
 
 **What**: Refactor `agent.ts` to be a CLI channel adapter:
 - Import `runAgent`, `buildSystem`, `ChannelCallbacks` from `./core`
+- Remove all code moved to core (client, tools, toolHandlers, execTool, summarizeArgs, buildSystem, isOwnCodebase, streamResponse). No duplication.
 - `main()` creates messages array, pushes system message via `buildSystem()`
-- `main()` pushes user message, then calls `runAgent(messages, callbacks)`
-- Implement `ChannelCallbacks` with CLI-specific behavior: spinner, ANSI think tag dimming (flush logic stays here, protected zone preserved), tool result logging
-- Fix double message echo: manage readline prompt/line clearing properly
-- Fix garbage chars during model calls: correct the raw mode handling in inputctrl (currently sets raw mode to false, which is wrong)
-- Add Ctrl-C handling: SIGINT clears current input, or confirms exit if input is empty
-- Add input history: wire up readline's built-in history support
-- Keep `spinner` and `inputctrl` classes in `agent.ts` (they are CLI-specific)
-- Remove all code that was moved to `core.ts` (no duplication)
+- For each user input: push user message, call `runAgent(messages, cliCallbacks)`
+- Implement `ChannelCallbacks` with CLI-specific behavior:
+  - `onModelStart`: start spinner
+  - `onModelStreamStart`: stop spinner
+  - `onTextChunk`: flush logic with ANSI think-tag dimming (protected zone preserved)
+  - `onToolStart`: start tool spinner
+  - `onToolEnd`: stop tool spinner with summary, log to stdout
+  - `onError`: write to stderr
+- Keep `spinner` and `inputctrl` classes in `agent.ts`
+- Boot greeting flow preserved
 **Output**: Refactored `agent.ts`.
-**Acceptance**: All Unit 2a tests PASS (green). `npm run build` succeeds. CLI boots, greets, accepts input, runs tools, streams responses with think tag dimming -- same behavior as before but through `runAgent()`.
+**Acceptance**: All Unit 2a tests PASS (green). `npm run build` succeeds with no warnings. CLI boots and works (same behavior as before, but through `runAgent()`).
 
-### Unit 2c: CLI Channel Adapter -- Coverage and Refactor
+### Unit 2c: CLI Adapter Refactor -- Coverage and Refactor
 
-**What**: Run coverage on CLI adapter. Fill coverage gaps. Refactor for clarity.
-**Output**: Updated test file, 100% coverage on new CLI adapter code.
+**What**: Run coverage on refactored `agent.ts`. Fill gaps. Refactor for clarity.
+**Output**: Updated `src/__tests__/cli.test.ts`, 100% coverage on new CLI adapter code.
 **Acceptance**: `npm run test:coverage` shows 100% coverage on new code in `agent.ts`. All tests green. No warnings.
+
+### Unit 2d-a: CLI UX Fixes -- Tests
+
+**What**: Write tests for the four CLI UX improvements. These test the readline/input handling behavior, separate from the adapter wiring tested in Unit 2a. Test:
+- **No double echo**: When user types input, it appears exactly once (readline `terminal` config and prompt clearing tested)
+- **No garbage during model calls**: When inputctrl suppresses input, characters typed during model calls are not echoed to terminal (raw mode handling tested)
+- **Ctrl-C clears input**: When input buffer is non-empty, SIGINT clears the current line and re-displays prompt
+- **Ctrl-C confirms exit**: When input buffer is empty, SIGINT shows "press Ctrl-C again to exit" message; second Ctrl-C exits
+- **Input history**: Up-arrow retrieves previous user messages; down-arrow moves forward through history
+**Output**: Tests added to `src/__tests__/cli.test.ts` (or a new `src/__tests__/cli-ux.test.ts`).
+**Acceptance**: Tests exist and FAIL (red) because UX fixes have not been implemented yet.
+
+### Unit 2d-b: CLI UX Fixes -- Implementation
+
+**What**: Implement the four CLI UX fixes in `agent.ts`:
+- **Double echo fix**: Configure readline appropriately (terminal mode, prompt management) so input appears once
+- **Garbage chars fix**: Fix `inputctrl.suppress()` -- currently sets raw mode to `false` (wrong). Should either stay in raw mode and swallow keystrokes, or properly buffer/discard input during model calls
+- **Ctrl-C handling**: Add SIGINT listener. If current input is non-empty, clear the line and re-prompt. If input is empty, show warning; on second consecutive Ctrl-C, exit gracefully
+- **Input history**: Wire up readline's history. After each user message, add it to history. Up/down arrows navigate history.
+**Output**: Updated `agent.ts`.
+**Acceptance**: All Unit 2d-a tests PASS (green). `npm run build` succeeds. Manual verification: no double echo, no garbage, Ctrl-C works, history works.
+
+### Unit 2d-c: CLI UX Fixes -- Coverage and Refactor
+
+**What**: Run coverage on UX fix code. Fill gaps. Refactor.
+**Output**: Updated tests, 100% coverage on UX fix code.
+**Acceptance**: `npm run test:coverage` shows 100% coverage on all new UX code in `agent.ts`. All tests green. No warnings.
 
 ### Unit 3a: Teams Channel Adapter -- Tests
 
-**What**: Write tests for `src/teams.ts` Teams channel adapter. Test that:
-- Teams adapter initializes `@microsoft/teams.apps` Application with DevtoolsPlugin
-- On incoming message, adapter creates/reuses messages array, pushes system message and user message, calls `runAgent()`
-- `onTextChunk` strips think tags from text before emitting to stream
-- `onTextChunk` emits non-think content via the streaming API
-- `onModelStart` sends a "thinking..." status update
+**What**: Write tests for `src/teams.ts` Teams channel adapter. Mock `@microsoft/teams.apps`. Test:
+- Adapter initializes Application with DevtoolsPlugin
+- On incoming message: creates/reuses messages array, pushes system message (via `buildSystem()`) and user message, calls `runAgent()`
+- `onTextChunk` strips think tags before emitting to stream. Edge cases: no think tags, think at start, think at end, think in middle, multiple think blocks, partial think tags split across chunks
+- `onTextChunk` emits non-think content via streaming API
+- `onModelStart` sends "thinking..." status update
 - `onToolStart` sends informative status (e.g. "running read_file (package.json)...")
 - `onToolEnd` updates status with result summary
 - `onError` sends error text to stream
-- Stream is properly closed after `runAgent()` completes
-- Think tag stripping handles: no think tags, think at start, think at end, think in middle, multiple think blocks, partial think tags across chunks
+- Stream is closed after `runAgent()` completes
+- Single global messages array used (WU1 simplification)
 **Output**: `src/__tests__/teams.test.ts`.
 **Acceptance**: Tests exist and FAIL (red) because `src/teams.ts` does not exist yet.
 
@@ -165,28 +194,37 @@ Note: CLI adapter tests will need to mock `process.stdin`, `process.stdout`, `pr
 **What**: Create `src/teams.ts`:
 - Import `runAgent`, `buildSystem`, `ChannelCallbacks` from `./core`
 - Import from `@microsoft/teams.apps` (Application, DevtoolsPlugin)
+- Add `@microsoft/teams.apps` v2 as dependency in `package.json`
 - Create Application instance with DevtoolsPlugin for local testing
-- Register message handler: on incoming message, push system + user message, call `runAgent()`
-- Implement `ChannelCallbacks` for Teams: strip think tags from `onTextChunk`, stream content via Teams streaming API, send status updates for tool execution
-- Add `teams` script to `package.json` to start the Teams adapter
-- Single global messages array for WU1
+- Register message handler: on incoming message, push system + user message onto global messages array, call `runAgent(messages, teamsCallbacks)`
+- Implement `ChannelCallbacks` for Teams:
+  - `onTextChunk`: strip `<think>...</think>` tags, emit remaining text via streaming API
+  - `onModelStart`: send "thinking..." status update
+  - `onToolStart(name, args)`: send status like "running read_file (package.json)..."
+  - `onToolEnd(name, summary)`: update status with result
+  - `onError(err)`: send error text
+- Close stream after `runAgent()` returns
+- Add `teams` script to `package.json`: `tsc && node dist/teams.js`
 **Output**: `src/teams.ts`, updated `package.json`.
-**Acceptance**: All Unit 3a tests PASS (green). `npm run build` succeeds. `npm run teams` starts the DevtoolsPlugin UI. Sending a message triggers the agent and streams a response.
+**Acceptance**: All Unit 3a tests PASS (green). `npm run build` succeeds. `npm run teams` starts DevtoolsPlugin UI. Sending a message triggers the agent, streams a response with tool status updates, think tags stripped.
 
 ### Unit 3c: Teams Channel Adapter -- Coverage and Refactor
 
-**What**: Run coverage on Teams adapter. Fill coverage gaps. Refactor for clarity.
-**Output**: Updated test file, 100% coverage on `src/teams.ts`.
+**What**: Run coverage on `src/teams.ts`. Fill gaps in think-tag stripping edge cases and error paths. Refactor.
+**Output**: Updated `src/__tests__/teams.test.ts`, 100% coverage on `src/teams.ts`.
 **Acceptance**: `npm run test:coverage` shows 100% coverage on `src/teams.ts`. All tests green. No warnings.
 
 ### Unit 4: Integration Smoke Test
 
-**What**: Run the full test suite. Verify both channels work end-to-end:
-- CLI: `npm run dev` -- boot greeting, send message, get response, tool usage works, think tags dimmed, Ctrl-C works, history works
-- Teams: `npm run teams` -- DevtoolsPlugin opens, send message, get streamed response, tool status updates visible, think tags stripped
-- All completion criteria satisfied
-**Output**: All tests pass, coverage report in artifacts directory.
-**Acceptance**: `npm test` passes. `npm run test:coverage` shows 100% on all new code. Manual smoke test of both channels succeeds. No warnings from `npm run build`.
+**What**: Run full test suite. Verify both channels end-to-end:
+- `npm test` -- all unit tests pass
+- `npm run test:coverage` -- 100% on all new code, save report to artifacts directory
+- `npm run build` -- no warnings
+- CLI manual smoke: `npm run dev` -- boot greeting, send message, get response, tool usage works, think tags dimmed, Ctrl-C clears/confirms, history works, no double echo, no garbage chars
+- Teams manual smoke: `npm run teams` -- DevtoolsPlugin opens, send message, streamed response appears, tool status updates visible, think tags stripped
+- Walk through all completion criteria checklist
+**Output**: Coverage report saved to artifacts directory. All completion criteria checked off.
+**Acceptance**: All automated tests pass with 100% coverage on new code. Both manual smoke tests succeed. No build warnings. All 11 completion criteria satisfied.
 
 ## Execution
 
@@ -200,4 +238,4 @@ Note: CLI adapter tests will need to mock `process.stdin`, `process.stdout`, `pr
 
 ## Progress Log
 
-- TBD Created from planning doc
+- 2026-02-23 17:26 Created from planning doc
