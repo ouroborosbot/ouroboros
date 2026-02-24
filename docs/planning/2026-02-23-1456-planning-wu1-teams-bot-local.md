@@ -5,26 +5,26 @@
 
 ## Goal
 
-Extract the ouroboros agentic loop into a channel-agnostic core, then wire it to a Teams bot adapter so a user can chat with the agent through the DevtoolsPlugin local UI -- proving the interface works before any cloud deployment.
+Refactor ouroboros from a CLI-only agent into a multi-channel architecture (CLI + Teams), extracting the agentic loop into a channel-agnostic core with adapter-based I/O. Prove the Teams channel works locally via DevtoolsPlugin before any cloud deployment.
 
 ## Scope
 
 ### In Scope
 
 - Extract `runAgent()` from `agent.ts` into a new `core.ts` with a callback-based interface (`ChannelCallbacks`)
-- Move `buildSystem()` and `isOwnCodebase()` to `core.ts` (used for system prompt construction, shared by all adapters)
-- Refactor `main()` in `agent.ts` as a CLI adapter that calls `runAgent()` -- ANSI colors, spinner, think tag dimming preserved, plus CLI UX improvements:
+- Move `buildSystem()` and `isOwnCodebase()` to `core.ts` (system prompt construction, shared by all channels)
+- Refactor `main()` in `agent.ts` as the CLI channel adapter that calls `runAgent()` -- ANSI colors, spinner, think tag dimming preserved, plus CLI UX improvements:
   - Fix double message display (input echoed twice when you send)
   - Fix input during model calls (typed chars appear as garbage because raw mode is set wrong)
   - Ctrl-C clears current input instead of killing the process
   - Ctrl-C with empty input warns before exiting (confirmation)
   - Input history (up arrow for previous messages)
 - Set up vitest as the test framework for ouroboros: add dev dependency, create vitest config, add test/coverage scripts to package.json
-- Scaffold a Teams bot within the ouroboros repo (`teams-bot/` subdirectory) using `@microsoft/teams.apps` v2 with DevtoolsPlugin
-- Wire a Teams adapter that calls `runAgent()` with Teams-specific callbacks
+- Add `@microsoft/teams.apps` v2 as a dependency of ouroboros
+- Create a Teams channel adapter (e.g. `src/teams.ts`) that calls `runAgent()` with Teams-specific callbacks, starts with DevtoolsPlugin for local testing
 - Streaming text output in DevtoolsPlugin (token-by-token, following Teams SDK best practices)
 - Informative status updates during tool execution (e.g. "running read_file (package.json)...")
-- Think tag handling: CLI dims with ANSI (existing behavior), Teams strips them
+- Think tag handling: CLI dims with ANSI (existing behavior), Teams adapter strips them
 - Single global messages array for WU1 (multi-user deferred to WU2)
 
 ### Out of Scope
@@ -39,10 +39,10 @@ Extract the ouroboros agentic loop into a channel-agnostic core, then wire it to
 ## Completion Criteria
 
 - [ ] `runAgent()` exported from `src/core.ts`, fully channel-agnostic (no `process.stdout`, no `process.stderr`, no ANSI codes)
-- [ ] `ChannelCallbacks` interface covers all adapter needs: `onModelStart`, `onModelStreamStart`, `onTextChunk`, `onToolStart`, `onToolEnd`, `onError`
-- [ ] CLI adapter (`agent.ts`) calls `runAgent()` -- boot greeting, ANSI think tag dimming, spinner on stderr, tool result summaries
+- [ ] `ChannelCallbacks` interface covers all channel adapter needs: `onModelStart`, `onModelStreamStart`, `onTextChunk`, `onToolStart`, `onToolEnd`, `onError`
+- [ ] CLI channel (`agent.ts`) calls `runAgent()` -- boot greeting, ANSI think tag dimming, spinner on stderr, tool result summaries
 - [ ] CLI UX fixes: no double message echo, no garbage chars during model calls, Ctrl-C clears input (or confirms exit if empty), up-arrow history
-- [ ] Teams bot (`teams-bot/` subdirectory) starts with DevtoolsPlugin, imports `runAgent` from core
+- [ ] Teams channel adapter (inside ouroboros `src/`) starts with DevtoolsPlugin, calls `runAgent` from core
 - [ ] Sending a message in DevtoolsPlugin UI triggers the ouroboros agent and streams a response
 - [ ] Tool calls show informative updates in DevtoolsPlugin during execution
 - [ ] Think tags stripped from Teams output (not shown to user)
@@ -62,18 +62,17 @@ Extract the ouroboros agentic loop into a channel-agnostic core, then wire it to
 
 - [ ] Does `stream.update()` in DevtoolsPlugin get cleared/replaced when the first `stream.emit()` arrives, or do updates and content coexist? (Unit 0a spike will answer this)
 - [ ] Does `stream.close()` require a final message body, or does it finalize whatever was emitted? (Unit 0a spike will answer this)
-- [ ] Import strategy for `teams-bot/` subdirectory importing from `src/core.ts` -- relative imports, path aliases, or TS project references? (teams-bot is now inside the ouroboros repo, so this is simpler than cross-project)
-- [ ] Should `runAgent()` push the user message onto the messages array itself, or should the adapter do it before calling? (Leaning: runAgent does it, keeps adapter simpler)
 
 ## Decisions Made
 
-- **In-process function call, not HTTP**: The bot imports and calls `runAgent()` directly. No Express server or subprocess. This is Decision 2 from the locked plan.
+- **In-process function call, not HTTP**: The Teams channel adapter imports and calls `runAgent()` directly. No Express server or subprocess. This is Decision 2 from the locked plan.
 - **DevtoolsPlugin only for WU1**: No tunnel, no bot registration, no Azure AD. Real Teams deferred to WU1.5. This is Decision 3 from the locked plan.
 - **Teams SDK v2 (comms-only)**: Use `@microsoft/teams.apps` for the bot framework. Do NOT use the AI planner (`ActionPlanner`, `OpenAIModel`). This is Decision 1 from the locked plan.
-- **Core does not process think tags**: Raw text including `<think>...</think>` passed to `onTextChunk`. CLI adapter dims them (flush logic, protected zone). Teams adapter strips them entirely. Two separate implementations.
-- **Messages array owned by adapter, not core**: Adapter creates the array, passes it by reference. `runAgent()` mutates it (pushes user/assistant/tool messages). Enables WU2 multi-user later.
+- **Core does not process think tags**: Raw text including `<think>...</think>` passed to `onTextChunk`. CLI channel dims them (flush logic, protected zone). Teams channel strips them entirely. Two separate implementations.
+- **Messages array owned by channel adapter, not core**: Adapter creates the array, passes it by reference. `runAgent()` mutates it (pushes assistant/tool messages during the loop). Enables WU2 multi-user later.
+- **Adapter pushes user message before calling `runAgent()`**: The channel adapter constructs and pushes `{role: "user", content: text}` onto the messages array, then calls `runAgent(messages, callbacks)`. Core assumes the latest message is already present. This gives adapters full control over user message shape (metadata, structured content, etc.).
 - **`buildSystem()` exported from core**: Adapters call it to set up the initial system message. Keeps system prompt logic centralized.
-- **Teams bot lives inside ouroboros repo**: `teams-bot/` is a subdirectory of the ouroboros repo for WU1. No separate sibling repo. May be extracted later.
+- **Single repo, multi-channel architecture**: There is no separate teams-bot project or subdirectory. Ouroboros itself becomes multi-channel. The Teams channel adapter is a source file in `src/` alongside the CLI adapter (`agent.ts`).
 - **`onModelStart`/`onModelStreamStart` split**: Two callbacks because CLI needs spinner start on model-start and spinner stop on first-token. Teams needs "thinking..." on model-start. The split gives each adapter control over both moments.
 - **Teams streaming required**: Token-by-token streaming in DevtoolsPlugin is a requirement. Implementation will follow Teams SDK v2 best practices (IStreamer API discovered in type definitions). Exact approach determined during implementation.
 - **Test framework: vitest**: Fast, TS-native, good mocking support. Added as a dev dependency to ouroboros with config, test scripts, and coverage reporting.
