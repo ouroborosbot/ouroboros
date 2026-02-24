@@ -271,3 +271,4 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 - 2026-02-23 17:54 Unit 3a complete: 24 Teams adapter tests (exports, stripThinkTags, callbacks, message handling). All 24 fail (red) -- teams.ts does not exist yet.
 - 2026-02-23 17:56 Unit 3b complete: teams.ts with DevtoolsPlugin, stripThinkTags, createTeamsCallbacks, handleTeamsMessage, startTeamsApp. All 111 tests pass. Build clean.
 - 2026-02-23 17:57 Unit 3c complete: teams.ts at 97.72% stmts, 94.44% branch, 100% funcs. Only uncovered: module entrypoint guard. 115 tests pass.
+- 2026-02-23 18:00 Unit 4 complete: All 115 tests pass. Coverage: core.ts 100%, teams.ts ~98% (module guard only), new CLI code 100%. Build clean, no warnings. All 11 completion criteria satisfied. Status: done.
