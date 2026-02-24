@@ -61,6 +61,7 @@ Connect the Ouroboros agent to real Teams -- move from the DevtoolsPlugin playgr
 Not started / In progress / Done / Blocked
 
 ### Unit 0: Azure and Infra Setup (Interactive)
+**Status**: Not started
 
 **What**: Set up all Azure infrastructure and local tooling. This unit is interactive -- the agent provides commands, the user runs them.
 
@@ -110,17 +111,23 @@ Steps:
     ```
     az bot update --resource-group agent --name Ouroboros --endpoint "https://<tunnel-url>/api/messages" --subscription 99cdfbb7-03e5-4055-bad7-9cefd8f23251
     ```
-12. Create `.env` file in project root:
+12. Install dotenv:
+    ```
+    npm install --save-dev dotenv
+    ```
+13. Add `import 'dotenv/config'` to the top of `src/teams-entry.ts` (loads `.env` before anything else)
+14. Create `.env` file in project root:
     ```
     CLIENT_ID=<appId>
     CLIENT_SECRET=<password>
     TENANT_ID=smbdevnotags3.onmicrosoft.com
     ```
 
-**Output**: Azure Bot resource, dev tunnel, `.env` file, `.gitignore` updated.
+**Output**: Azure Bot resource, dev tunnel, `.env` file, `.gitignore` updated, dotenv configured.
 **Acceptance**: `az bot show --resource-group agent --name Ouroboros` returns bot details. `devtunnel show ouroboros` returns tunnel URL. `.env` exists with credentials. `.env` is in `.gitignore`.
 
 ### Unit 1a: Streaming Overhaul -- Tests
+**Status**: Not started
 
 **What**: Write tests for the new streaming behavior in `teams.ts`. The streaming changes are:
 1. **Cumulative content**: `stream.emit()` must send ALL previous content plus new content (append-only). Add an accumulator that tracks total emitted text.
@@ -128,16 +135,18 @@ Steps:
 3. **Stop-streaming support**: When the stream signals cancellation (403 error), the adapter aborts the agent via `AbortController`. `runAgent()` already supports `AbortSignal` (parameter added in WU1).
 4. **Flush-on-close**: When `runAgent()` completes, any remaining buffered content is flushed before `stream.close()`.
 
-Test cases:
+Test cases (use `vi.useFakeTimers()` for buffer timing control):
 - Cumulative: first emit is "Hello", second emit is "Hello world" (not "world")
-- Buffer: multiple rapid `onTextChunk` calls result in a single buffered `stream.emit()` (not one per chunk)
-- Buffer: after flush interval, buffered content is emitted
-- Buffer: on close, remaining buffer is flushed
-- Stop: when stream emits cancel error, the `AbortController` is aborted
-- Stop: after abort, no more `stream.emit()` calls are made
-- Think-tag stripping still works with cumulative content
+- Buffer: multiple rapid `onTextChunk` calls followed by `vi.advanceTimersByTime(1500)` result in a single `stream.emit()` with combined content
+- Buffer: no `stream.emit()` before timer fires (content is held)
+- Buffer: timer resets on each chunk (debounce behavior -- new chunk extends the wait)
+- Flush-on-close: call `flush()` explicitly, verify remaining buffer is emitted even without timer
+- Stop: when `stream.emit()` throws (simulating 403), `AbortController` is aborted
+- Stop: after abort, subsequent `onTextChunk` calls do not emit
+- Think-tag stripping still works with cumulative content (think tags stripped, visible text accumulated)
 - Leading whitespace trimming still works with cumulative content
 - `onModelStart` / `onToolStart` / `onToolEnd` / `onError` behavior unchanged
+- `onError` after abort: does not emit (graceful stop)
 
 Update existing tests in `teams.test.ts` to expect cumulative (not incremental) emit behavior.
 
@@ -145,25 +154,31 @@ Update existing tests in `teams.test.ts` to expect cumulative (not incremental) 
 **Acceptance**: New tests FAIL (red) because streaming behavior has not changed yet. Existing tests that checked incremental behavior are updated to expect cumulative behavior and also FAIL.
 
 ### Unit 1b: Streaming Overhaul -- Implementation
+**Status**: Not started
 
 **What**: Update `createTeamsCallbacks()` in `teams.ts` to implement:
 1. **Cumulative accumulator**: Track `cumulativeText` string. Every time content passes think-tag stripping, append to `cumulativeText`. Emit `cumulativeText` (not the chunk).
-2. **Buffer with timer**: Instead of emitting immediately, set a flush timer (~1500ms). On each `onTextChunk`, update `cumulativeText` but only emit when the timer fires. Reset the timer on each chunk. Use `setInterval` or `setTimeout` pattern.
+2. **Buffer with debounce timer**: Instead of emitting immediately, use a debounced `setTimeout` (~1500ms). On each `onTextChunk`, update `cumulativeText` and reset the timer. When no new chunks arrive for 1500ms, the timer fires and emits `cumulativeText`. This naturally batches rapid token streams into ~1.5s chunks.
 3. **AbortController integration**: `createTeamsCallbacks` now accepts an `AbortController` parameter. When `stream.emit()` or `stream.update()` throws (403 from Teams stop button), call `controller.abort()`. `handleTeamsMessage` creates the controller and passes `controller.signal` to `runAgent()`.
 4. **Flush on complete**: After `runAgent()` returns, flush any remaining buffered content, then close stream.
 
-Also update `handleTeamsMessage` to create `AbortController`, pass signal to `runAgent()`, and handle abort cleanup.
+Also:
+- `createTeamsCallbacks` now returns `{ callbacks, flush }` (or the callbacks object gains a `flush()` method) so the caller can flush before closing.
+- Update `handleTeamsMessage` to: create `AbortController`, call `createTeamsCallbacks(stream, controller)`, pass `controller.signal` to `runAgent()`, call `flush()` after `runAgent()` returns, then `stream.close()`.
+- Wrap `stream.emit()` and `stream.update()` in try/catch -- on error (403 stop signal), call `controller.abort()` and set a `stopped` flag to skip further emits.
 
 **Output**: Updated `src/teams.ts`.
 **Acceptance**: All Unit 1a tests PASS (green). `npm run build` succeeds. DevtoolsPlugin still works (backward compatible -- DevtoolsPlugin may not enforce append-only, but cumulative content is still valid).
 
 ### Unit 1c: Streaming Overhaul -- Coverage and Refactor
+**Status**: Not started
 
 **What**: Run coverage on updated `teams.ts`. Fill gaps: timer edge cases (flush with empty buffer, flush after abort, rapid chunks, timer cleanup on close). Refactor buffer logic for clarity if needed.
 **Output**: Updated `src/__tests__/teams.test.ts`, 100% coverage on streaming code.
 **Acceptance**: `npm run test:coverage` shows 100% coverage on new/changed code in `src/teams.ts`. All tests green. No warnings.
 
 ### Unit 2a: Bot Mode and Mention Stripping -- Tests
+**Status**: Not started
 
 **What**: Write tests for the dual-mode `startTeamsApp()` and mention stripping. Test:
 - **DevtoolsPlugin mode**: When `CLIENT_ID` env var is NOT set, `startTeamsApp()` creates App with `DevtoolsPlugin` (existing behavior)
@@ -177,6 +192,7 @@ Also update `handleTeamsMessage` to create `AbortController`, pass signal to `ru
 **Acceptance**: Tests FAIL (red) because dual-mode and mention stripping are not implemented yet.
 
 ### Unit 2b: Bot Mode and Mention Stripping -- Implementation
+**Status**: Not started
 
 **What**: Update `startTeamsApp()` in `teams.ts`:
 1. **Dual-mode detection**: Check `process.env.CLIENT_ID`. If set, run in bot mode (no DevtoolsPlugin). If not set, run in DevtoolsPlugin mode (existing behavior).
@@ -195,12 +211,14 @@ Also update `handleTeamsMessage` to create `AbortController`, pass signal to `ru
 **Acceptance**: All Unit 2a tests PASS (green). `npm run build` succeeds.
 
 ### Unit 2c: Bot Mode and Mention Stripping -- Coverage and Refactor
+**Status**: Not started
 
 **What**: Run coverage on dual-mode and mention stripping code. Fill gaps.
 **Output**: Updated tests, 100% coverage.
 **Acceptance**: `npm run test:coverage` shows 100% coverage on new/changed code. All tests green. No warnings.
 
 ### Unit 3: App Manifest and .env Setup
+**Status**: Not started
 
 **What**: Create the Teams app manifest package and document the .env setup.
 1. Create `manifest/` directory in project root with:
@@ -241,12 +259,13 @@ Note: The `copilotAgents.customEngineAgents` type does not exist in the SDK's ma
 **Acceptance**: `npm run manifest:package` creates a valid `manifest.zip`. Manifest JSON validates against the devPreview schema.
 
 ### Unit 4: Sideload and Connect (Interactive)
+**Status**: Not started
 
 **What**: Sideload the app into Teams and verify the bot connects. This unit is interactive.
 
 Steps:
 1. Start the dev tunnel: `devtunnel host ouroboros`
-2. In a second terminal, start the bot: `npm run teams` (with `.env` loaded -- `source .env && npm run teams` or use `dotenv` package)
+2. In a second terminal, start the bot: `npm run teams` (dotenv loads `.env` automatically)
 3. Upload the manifest zip to Teams:
    - Open Teams -> Apps -> Manage your apps -> Upload a custom app
    - Select `manifest.zip`
@@ -259,6 +278,7 @@ Steps:
 **Acceptance**: A message sent in 1:1 Teams chat reaches the local bot, triggers the agent, and a response appears in the chat. Console logs show the message flow.
 
 ### Unit 5: End-to-End Validation (Interactive)
+**Status**: Not started
 
 **What**: Comprehensive validation of all completion criteria, working together with the user. Test both surfaces systematically.
 
@@ -298,7 +318,7 @@ Walk through every completion criterion and check it off.
 - **Fixes/blockers**: Spawn sub-agent immediately -- don't ask, just do it
 - **Decisions made**: Update docs immediately, commit right away
 - **Interactive units (0, 4, 5)**: Agent provides commands/instructions, user executes. Agent verifies results.
-- **Environment loading**: Use `source .env` before `npm run teams` in bot mode, or add dotenv as a dev dependency
+- **Environment loading**: Add `dotenv` as a dev dependency. Load it in `teams-entry.ts` (`import 'dotenv/config'`) so `.env` is read automatically. No `source .env` needed.
 
 ## Progress Log
 
