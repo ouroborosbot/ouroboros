@@ -178,7 +178,7 @@ Also:
 **Acceptance**: `npm run test:coverage` shows 100% coverage on new/changed code in `src/teams.ts`. All tests green. No warnings.
 
 ### Unit 2a: Bot Mode and Mention Stripping -- Tests
-**Status**: Not started
+**Status**: Done
 
 **What**: Write tests for the dual-mode `startTeamsApp()` and mention stripping. Test:
 - **DevtoolsPlugin mode**: When `CLIENT_ID` env var is NOT set, `startTeamsApp()` creates App with `DevtoolsPlugin` (existing behavior)
@@ -335,3 +335,4 @@ Walk through every completion criterion and check it off.
 - 2026-02-23 20:03 Unit 1a complete: 23 new/updated tests for cumulative streaming, debounce buffer, flush-on-close, abort/stop. All FAIL (red) against current implementation. 125 other tests pass.
 - 2026-02-23 20:04 Unit 1b complete: Implemented cumulative accumulator, debounce buffer (1500ms), AbortController integration, flush-on-close. All 148 tests pass (green). Build clean.
 - 2026-02-23 20:07 Unit 1c complete: Added safeUpdate wrapper for stream.update() calls, coverage edge case tests. teams.ts now 100% stmts/branches/funcs/lines. 153 tests pass.
+- 2026-02-23 20:09 Unit 2a complete: 13 new tests for stripMentions utility, dual-mode startTeamsApp (DevtoolsPlugin vs Bot Service), mention stripping config, SingleTenant credentials. All FAIL (red).
