@@ -54,12 +54,14 @@ Refactor ouroboros from a CLI-only agent into a multi-channel architecture (CLI 
 Not started / In progress / Done / Blocked
 
 ### Unit 0: Test Infrastructure Setup
+**Status**: Not started
 
 **What**: Set up vitest in ouroboros. Add `vitest` as dev dependency, create `vitest.config.ts`, add `test`, `test:coverage` scripts to `package.json`. Verify with a trivial passing test.
 **Output**: `vitest.config.ts`, updated `package.json`, one trivial test file proving the setup works.
 **Acceptance**: `npm test` runs and passes. `npm run test:coverage` produces a coverage report.
 
 ### Unit 1a: Core Extraction -- Tests
+**Status**: Not started
 
 **What**: Write tests for the new `src/core.ts` module. Mock the OpenAI client. Test:
 - `buildSystem()` returns system prompt string; includes self-aware suffix when `isOwnCodebase()` is true, omits it when false
@@ -87,6 +89,7 @@ Not started / In progress / Done / Blocked
 **Acceptance**: Tests exist and FAIL (red) because `src/core.ts` does not exist yet.
 
 ### Unit 1b: Core Extraction -- Implementation
+**Status**: Not started
 
 **What**: Create `src/core.ts` by extracting from `agent.ts`:
 - Export `ChannelCallbacks` interface: `onModelStart()`, `onModelStreamStart()`, `onTextChunk(text)`, `onToolStart(name, args)`, `onToolEnd(name, summary, success)`, `onError(error)`
@@ -100,12 +103,14 @@ Not started / In progress / Done / Blocked
 **Acceptance**: All Unit 1a tests PASS (green). `npm run build` succeeds with no errors. `npm run dev` still works (existing behavior preserved via stub callbacks).
 
 ### Unit 1c: Core Extraction -- Coverage and Refactor
+**Status**: Not started
 
 **What**: Run coverage report on `core.ts`. Identify uncovered branches. Add tests for edge cases: empty tool arguments, JSON parse failure in tool args, unknown tool name, `execTool` error paths, `summarizeArgs` with missing fields. Refactor if needed.
 **Output**: Updated `src/__tests__/core.test.ts`, 100% coverage on `core.ts`.
 **Acceptance**: `npm run test:coverage` shows 100% branch/line/function coverage on `src/core.ts`. All tests green. No warnings.
 
 ### Unit 2a: CLI Adapter Refactor -- Tests
+**Status**: Not started
 
 **What**: Write tests for the refactored `agent.ts` as a CLI channel adapter. Focus on the adapter wiring (not UX fixes, those are Unit 2d). Test:
 - CLI adapter creates messages array with system message from `buildSystem()`
@@ -123,6 +128,7 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 **Acceptance**: Tests exist and FAIL (red) because `agent.ts` has not been refactored yet.
 
 ### Unit 2b: CLI Adapter Refactor -- Implementation
+**Status**: Not started
 
 **What**: Refactor `agent.ts` to be a CLI channel adapter:
 - Import `runAgent`, `buildSystem`, `ChannelCallbacks` from `./core`
@@ -142,12 +148,14 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 **Acceptance**: All Unit 2a tests PASS (green). `npm run build` succeeds with no warnings. CLI boots and works (same behavior as before, but through `runAgent()`).
 
 ### Unit 2c: CLI Adapter Refactor -- Coverage and Refactor
+**Status**: Not started
 
 **What**: Run coverage on refactored `agent.ts`. Fill gaps. Refactor for clarity.
 **Output**: Updated `src/__tests__/cli.test.ts`, 100% coverage on new CLI adapter code.
 **Acceptance**: `npm run test:coverage` shows 100% coverage on new code in `agent.ts`. All tests green. No warnings.
 
 ### Unit 2d-a: CLI UX Fixes -- Tests
+**Status**: Not started
 
 **What**: Write tests for the four CLI UX improvements. These test the readline/input handling behavior, separate from the adapter wiring tested in Unit 2a. Test:
 - **No double echo**: When user types input, it appears exactly once (readline `terminal` config and prompt clearing tested)
@@ -159,6 +167,7 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 **Acceptance**: Tests exist and FAIL (red) because UX fixes have not been implemented yet.
 
 ### Unit 2d-b: CLI UX Fixes -- Implementation
+**Status**: Not started
 
 **What**: Implement the four CLI UX fixes in `agent.ts`:
 - **Double echo fix**: Configure readline appropriately (terminal mode, prompt management) so input appears once
@@ -169,12 +178,14 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 **Acceptance**: All Unit 2d-a tests PASS (green). `npm run build` succeeds. Manual verification: no double echo, no garbage, Ctrl-C works, history works.
 
 ### Unit 2d-c: CLI UX Fixes -- Coverage and Refactor
+**Status**: Not started
 
 **What**: Run coverage on UX fix code. Fill gaps. Refactor.
 **Output**: Updated tests, 100% coverage on UX fix code.
 **Acceptance**: `npm run test:coverage` shows 100% coverage on all new UX code in `agent.ts`. All tests green. No warnings.
 
 ### Unit 3a: Teams Channel Adapter -- Tests
+**Status**: Not started
 
 **What**: Write tests for `src/teams.ts` Teams channel adapter. Mock `@microsoft/teams.apps`. Test:
 - Adapter initializes `App` (from `@microsoft/teams.apps`) with `DevtoolsPlugin` (from `@microsoft/teams.dev`)
@@ -191,6 +202,7 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 **Acceptance**: Tests exist and FAIL (red) because `src/teams.ts` does not exist yet.
 
 ### Unit 3b: Teams Channel Adapter -- Implementation
+**Status**: Not started
 
 **What**: Create `src/teams.ts`:
 - Import `runAgent`, `buildSystem`, `ChannelCallbacks` from `./core`
@@ -211,12 +223,14 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 **Acceptance**: All Unit 3a tests PASS (green). `npm run build` succeeds. `npm run teams` starts DevtoolsPlugin UI. Sending a message triggers the agent, streams a response with tool status updates, think tags stripped.
 
 ### Unit 3c: Teams Channel Adapter -- Coverage and Refactor
+**Status**: Not started
 
 **What**: Run coverage on `src/teams.ts`. Fill gaps in think-tag stripping edge cases and error paths. Refactor.
 **Output**: Updated `src/__tests__/teams.test.ts`, 100% coverage on `src/teams.ts`.
 **Acceptance**: `npm run test:coverage` shows 100% coverage on `src/teams.ts`. All tests green. No warnings.
 
 ### Unit 4: Integration Smoke Test
+**Status**: Not started
 
 **What**: Run full test suite. Verify both channels end-to-end:
 - `npm test` -- all unit tests pass
