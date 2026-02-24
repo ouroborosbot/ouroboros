@@ -23,7 +23,7 @@ Connect the Ouroboros agent to real Teams -- move from the DevtoolsPlugin playgr
 - [ ] Azure Bot Service resource exists with App ID and client secret
 - [ ] Dev tunnel is configured and persistent (same URL across sessions)
 - [ ] Bot messaging endpoint is set to `https://<tunnel-url>/api/messages`
-- [ ] `teams.ts` works in both DevtoolsPlugin mode (no env vars) and real bot mode (with `CLIENT_ID`, `CLIENT_SECRET`)
+- [ ] `teams.ts` works in both DevtoolsPlugin mode (no env vars) and real bot mode (with `CLIENT_ID`, `CLIENT_SECRET`, `TENANT_ID`)
 - [ ] `.env` file pattern documented and `.env` in `.gitignore`
 - [ ] App manifest is valid and sideloaded into Teams
 - [ ] Sending a message in 1:1 Teams bot chat triggers the agent and streams a response
@@ -61,7 +61,7 @@ Connect the Ouroboros agent to real Teams -- move from the DevtoolsPlugin playgr
 Not started / In progress / Done / Blocked
 
 ### Unit 0: Azure and Infra Setup (Interactive)
-**Status**: Not started
+**Status**: Done
 
 **What**: Set up all Azure infrastructure and local tooling. This unit is interactive -- the agent provides commands, the user runs them.
 
@@ -73,7 +73,7 @@ Steps:
    ```
 3. Create Microsoft Entra app registration (bot identity):
    ```
-   az ad app create --display-name "Ouroboros" --sign-in-audience AzureADMultipleOrgs
+   az ad app create --display-name "Ouroboros" --sign-in-audience AzureADMyOrg
    ```
    Capture the `appId` from output.
 4. Create a client secret for the app:
@@ -83,7 +83,7 @@ Steps:
    Capture `password` from output (this is the `CLIENT_SECRET`).
 5. Create Azure Bot Service resource:
    ```
-   az bot create --resource-group agent --name Ouroboros --app-type MultiTenant --appid <appId> --location global --subscription 99cdfbb7-03e5-4055-bad7-9cefd8f23251
+   az bot create --resource-group agent --name Ouroboros --app-type SingleTenant --appid <appId> --tenant-id 94734fc5-819d-471d-9067-9f28c0fdcd24 --location global --subscription 99cdfbb7-03e5-4055-bad7-9cefd8f23251
    ```
 6. Enable the Teams channel on the bot:
    ```
@@ -120,6 +120,7 @@ Steps:
     ```
     CLIENT_ID=<appId>
     CLIENT_SECRET=<password>
+    TENANT_ID=<tenantId>
     ```
 
 **Output**: Azure Bot resource, dev tunnel, `.env` file, `.gitignore` updated, dotenv configured.
@@ -263,9 +264,7 @@ Note: The `copilotAgents.customEngineAgents` type does not exist in the SDK's ma
 
 **What**: Sideload the app into Teams and verify the bot connects. This unit is interactive.
 
-**Cross-tenant setup**: Azure resources (Bot Service, Entra app) live in the dev tenant (`smbdevnotags3.onmicrosoft.com`). The app will be sideloaded into the **Microsoft corp tenant** for actual use. The multi-tenant Entra app registration allows this -- the bot accepts messages from any org directory. If corp tenant blocks sideloading, fall back to sideloading in the dev tenant.
-
-Note: For multi-tenant bots, `TENANT_ID` in `.env` should be left empty or omitted (not set to a specific tenant) so the bot accepts tokens from any tenant. Update `.env` accordingly.
+**SingleTenant setup**: Azure resources (Bot Service, Entra app) live in the dev tenant (tenant ID `94734fc5-819d-471d-9067-9f28c0fdcd24`). The bot is registered as SingleTenant, so `TENANT_ID` is required in `.env` and passed to the App constructor. The app will be sideloaded into the same dev tenant.
 
 Steps:
 1. Start the dev tunnel: `devtunnel host ouroboros`
@@ -332,3 +331,4 @@ Walk through every completion criterion and check it off.
 - 2026-02-23 19:33 Pass 3: validation -- SDK activity.mentions.stripText confirmed in type defs, az CLI syntax verified against docs, runAgent AbortSignal already exists in core.ts
 - 2026-02-23 19:35 Pass 4: quality -- mention stripping detail (SDK config + exported utility), all acceptance criteria verified, status READY_FOR_EXECUTION
 - 2026-02-23 19:40 Updated for cross-tenant: MultiTenant bot registration (AzureADMultipleOrgs), removed --tenant-id from az bot create, TENANT_ID omitted from .env, sideload targets Microsoft corp tenant with dev tenant fallback
+- 2026-02-23 19:44 Unit 0 complete: Azure infra set up, .env created, dotenv installed. Changed to SingleTenant (Azure deprecated MultiTenant). TENANT_ID required in .env and App constructor.
