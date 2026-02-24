@@ -95,8 +95,8 @@ Refactor ouroboros from a CLI-only agent into a multi-channel architecture (CLI 
 - Refactor `streamResponse()` into core: remove `flush()`, remove ANSI, remove `process.stdout.write`. Call `callbacks.onModelStreamStart()` on first content token. Call `callbacks.onTextChunk(delta)` for each content delta, passing raw text including think tags. No spinner parameter.
 - API key validation stays in core (required for client init)
 - Zero references to `process.stdout`, `process.stderr`, or ANSI escape codes in core
-**Output**: `src/core.ts` with all exports. `agent.ts` temporarily broken (will be fixed in Unit 2b).
-**Acceptance**: All Unit 1a tests PASS (green). `npm run build` may have warnings from `agent.ts` (expected, fixed in Unit 2b).
+**Output**: `src/core.ts` with all exports. `agent.ts` updated to import from core -- minimally refactored so the project still compiles (replace removed code with imports, keep `main()` calling `runAgent()` with stub callbacks that preserve current behavior). Full CLI adapter refactor happens in Unit 2b.
+**Acceptance**: All Unit 1a tests PASS (green). `npm run build` succeeds with no errors. `npm run dev` still works (existing behavior preserved via stub callbacks).
 
 ### Unit 1c: Core Extraction -- Coverage and Refactor
 
@@ -176,7 +176,7 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 ### Unit 3a: Teams Channel Adapter -- Tests
 
 **What**: Write tests for `src/teams.ts` Teams channel adapter. Mock `@microsoft/teams.apps`. Test:
-- Adapter initializes Application with DevtoolsPlugin
+- Adapter initializes `App` (from `@microsoft/teams.apps`) with `DevtoolsPlugin` (from `@microsoft/teams.dev`)
 - On incoming message: creates/reuses messages array, pushes system message (via `buildSystem()`) and user message, calls `runAgent()`
 - `onTextChunk` strips think tags before emitting to stream. Edge cases: no think tags, think at start, think at end, think in middle, multiple think blocks, partial think tags split across chunks
 - `onTextChunk` emits non-think content via streaming API
@@ -193,18 +193,19 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 
 **What**: Create `src/teams.ts`:
 - Import `runAgent`, `buildSystem`, `ChannelCallbacks` from `./core`
-- Import from `@microsoft/teams.apps` (Application, DevtoolsPlugin)
-- Add `@microsoft/teams.apps` v2 as dependency in `package.json`
-- Create Application instance with DevtoolsPlugin for local testing
-- Register message handler: on incoming message, push system + user message onto global messages array, call `runAgent(messages, teamsCallbacks)`
+- Import `App` from `@microsoft/teams.apps`, `DevtoolsPlugin` from `@microsoft/teams.dev`
+- Add `@microsoft/teams.apps`, `@microsoft/teams.dev`, and related Teams SDK packages as dependencies in `package.json`
+- Create `App` instance with `DevtoolsPlugin` for local testing
+- Register message handler via `app.on('message', async ({ stream, activity }) => {...})`: push system + user message onto global messages array, call `runAgent(messages, teamsCallbacks)`
 - Implement `ChannelCallbacks` for Teams:
-  - `onTextChunk`: strip `<think>...</think>` tags, emit remaining text via streaming API
-  - `onModelStart`: send "thinking..." status update
-  - `onToolStart(name, args)`: send status like "running read_file (package.json)..."
-  - `onToolEnd(name, summary)`: update status with result
-  - `onError(err)`: send error text
-- Close stream after `runAgent()` returns
+  - `onTextChunk`: strip `<think>...</think>` tags, call `stream.emit(text)` with remaining content
+  - `onModelStart`: call `stream.update("thinking...")`
+  - `onToolStart(name, args)`: call `stream.update("running read_file (package.json)...")`
+  - `onToolEnd(name, summary)`: call `stream.update(summary)`
+  - `onError(err)`: call `stream.emit(errorText)`
+- Call `stream.close()` after `runAgent()` returns
 - Add `teams` script to `package.json`: `tsc && node dist/teams.js`
+- App starts on `process.env.PORT || 3978`
 **Output**: `src/teams.ts`, updated `package.json`.
 **Acceptance**: All Unit 3a tests PASS (green). `npm run build` succeeds. `npm run teams` starts DevtoolsPlugin UI. Sending a message triggers the agent, streams a response with tool status updates, think tags stripped.
 
