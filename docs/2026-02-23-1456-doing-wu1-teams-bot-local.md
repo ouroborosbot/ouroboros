@@ -167,7 +167,7 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 **Acceptance**: Tests exist and FAIL (red) because UX fixes have not been implemented yet.
 
 ### Unit 2d-b: CLI UX Fixes -- Implementation
-**Status**: Not started
+**Status**: Done
 
 **What**: Implement the four CLI UX fixes in `agent.ts`:
 - **Double echo fix**: Configure readline appropriately (terminal mode, prompt management) so input appears once
