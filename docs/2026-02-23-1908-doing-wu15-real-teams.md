@@ -204,7 +204,7 @@ Also:
      tenantId: process.env.TENANT_ID,
    })
    ```
-3. **Mention stripping**: Configure `activity.mentions` stripping. The Teams SDK v2 App constructor accepts `activity: { mentions: { strip: true } }` option, OR we strip manually from `activity.text` before passing to `handleTeamsMessage`. Check SDK types and use the built-in approach if available, otherwise implement manual stripping: remove all `<at>...</at>` tags and trim.
+3. **Mention stripping**: Use the SDK's built-in mention stripping. The `App` constructor accepts `activity: { mentions: { stripText: true } }` (confirmed in SDK type defs: `AppActivityOptions.mentions.stripText`). Add this to both DevtoolsPlugin mode and bot mode App configs. This automatically removes `<at>...</at>` markup from `activity.text` before the message handler fires.
 4. Update console.log to indicate which mode started.
 
 **Output**: Updated `src/teams.ts`.
