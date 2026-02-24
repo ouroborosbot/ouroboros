@@ -82,16 +82,17 @@ Get the ouroboros core running behind a Teams bot adapter locally. Prove the int
 
 ## 1.5. Bot registration, dev tunnels, real Teams surface
 
-**Status**: Not started
+**Status**: Planning
+**Planning doc**: [2026-02-23-1908-planning-wu15-real-teams.md](2026-02-23-1908-planning-wu15-real-teams.md)
 
 Connect the local bot to real Teams. Move from DevtoolsPlugin playground to actual Teams chat.
 
-### Open questions
-- Which Teams surface: 1:1 bot chat vs Copilot Chat?
-- Does streaming work the same on both surfaces? (Teams streaming docs say 1:1 only — need to verify for Copilot Chat)
-- Bot registration process (Azure Bot Service, App ID, etc.)
-- Dev tunnel setup (`msft devtunnel`)
-- App manifest / sideloading
+### Answered questions
+- **Surface**: Both -- 1:1 bot chat AND Custom Engine Agent in Copilot Chat (same bot, manifest declares both)
+- **Streaming**: Works in both surfaces (CEA interactions are 1:1, which is the supported mode)
+- **Bot registration**: Azure Bot Service via `az` CLI
+- **Dev tunnels**: Microsoft Dev Tunnels CLI (`devtunnel`), persistent named tunnel
+- **App manifest**: `devPreview` version with `bots[]` + `copilotAgents.customEngineAgents[]`, sideloaded
 
 ### Context
 - Teams SDK v2 bots can appear in both Teams chat and Microsoft 365 Copilot Chat ([Custom Engine Agents docs](https://learn.microsoft.com/en-us/microsoft-365-copilot/extensibility/overview-custom-engine-agent))
