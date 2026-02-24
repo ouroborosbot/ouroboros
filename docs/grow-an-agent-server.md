@@ -36,7 +36,8 @@ Bonus: run two instances side by side so they can fix each other when one breaks
 ## 1. Teams bot ↔ agent locally (DevtoolsPlugin playground)
 
 **Status**: Planning
-**Planning doc**: [2026-02-23-1456-planning-wu1-teams-bot-local.md](planning/2026-02-23-1456-planning-wu1-teams-bot-local.md)
+**Planning doc**: [2026-02-23-1456-planning-wu1-teams-bot-local.md](2026-02-23-1456-planning-wu1-teams-bot-local.md)
+**Doing doc**: [2026-02-23-1456-doing-wu1-teams-bot-local.md](2026-02-23-1456-doing-wu1-teams-bot-local.md)
 
 Get the ouroboros core running behind a Teams bot adapter locally. Prove the interface works — send a message in the DevtoolsPlugin chat UI, get a streamed response from the agent with tool call updates.
 
