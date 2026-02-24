@@ -212,7 +212,7 @@ Also:
 **Acceptance**: All Unit 2a tests PASS (green). `npm run build` succeeds.
 
 ### Unit 2c: Bot Mode and Mention Stripping -- Coverage and Refactor
-**Status**: Not started
+**Status**: Done
 
 **What**: Run coverage on dual-mode and mention stripping code. Fill gaps.
 **Output**: Updated tests, 100% coverage.
@@ -337,3 +337,4 @@ Walk through every completion criterion and check it off.
 - 2026-02-23 20:07 Unit 1c complete: Added safeUpdate wrapper for stream.update() calls, coverage edge case tests. teams.ts now 100% stmts/branches/funcs/lines. 153 tests pass.
 - 2026-02-23 20:09 Unit 2a complete: 13 new tests for stripMentions utility, dual-mode startTeamsApp (DevtoolsPlugin vs Bot Service), mention stripping config, SingleTenant credentials. All FAIL (red).
 - 2026-02-23 20:10 Unit 2b complete: Dual-mode startTeamsApp, stripMentions utility, activity.mentions.stripText config in both modes. All 168 tests pass (green). Build clean.
+- 2026-02-23 20:11 Unit 2c complete: teams.ts already at 100% stmts/branches/funcs/lines. No gaps to fill. 168 tests pass. Build clean.
