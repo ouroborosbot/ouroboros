@@ -267,3 +267,4 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 - 2026-02-23 17:49 Unit 2c complete: new CLI adapter code (createCliCallbacks, bootGreeting) at 100% coverage. Uncovered lines are pre-existing code (inputctrl, main).
 - 2026-02-23 17:50 Unit 2d-a complete: 13 CLI UX tests (InputController, Ctrl-C handling, history). All 13 fail (red) -- exports don't exist yet.
 - 2026-02-23 17:51 Unit 2d-b complete: InputController exported (fix suppress raw mode=true), handleSigint (clear/warn/exit), addHistory (skip empty/dupes). All 86 tests pass.
+- 2026-02-23 17:52 Unit 2d-c complete: 100% coverage on new UX code. Added non-TTY edge case test. 87 tests pass.
