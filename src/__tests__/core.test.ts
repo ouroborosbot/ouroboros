@@ -270,6 +270,10 @@ describe("summarizeArgs", () => {
   it("returns empty string when name missing for load_skill", () => {
     expect(summarizeArgs("load_skill", {})).toBe("")
   })
+
+  it("returns empty string when path missing for list_directory", () => {
+    expect(summarizeArgs("list_directory", {})).toBe("")
+  })
 })
 
 describe("ChannelCallbacks interface", () => {
@@ -696,5 +700,215 @@ describe("runAgent", () => {
 
     await runAgent([{ role: "system", content: "test" }], callbacks)
     expect(chunks).toEqual(["text"])
+  })
+
+  it("handles invalid JSON in tool call arguments gracefully", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue("fallback")
+
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          makeChunk(undefined, [
+            { index: 0, id: "call_1", function: { name: "read_file", arguments: "not valid json{" } },
+          ]),
+        ])
+      }
+      return makeStream([makeChunk("done")])
+    })
+
+    const toolStarts: { name: string; args: Record<string, string> }[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onToolStart: (name, args) => toolStarts.push({ name, args }),
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    // args should be empty object when JSON parse fails
+    expect(toolStarts[0].args).toEqual({})
+  })
+
+  it("wraps non-Error thrown values in Error in onError callback", async () => {
+    mockCreate.mockImplementation(() => {
+      throw "string error"
+    })
+
+    const errors: Error[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err),
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(Error)
+    expect(errors[0].message).toBe("string error")
+  })
+
+  it("pushes assistant message without content when only tool calls are returned", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue("data")
+
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          makeChunk(undefined, [
+            { index: 0, id: "call_1", function: { name: "read_file", arguments: '{"path":"a.txt"}' } },
+          ]),
+        ])
+      }
+      return makeStream([makeChunk("result")])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks)
+
+    const firstAssistant = messages.find((m: any) => m.role === "assistant")
+    // When there's no content, content should not be set on the message
+    expect(firstAssistant.content).toBeUndefined()
+    expect(firstAssistant.tool_calls).toBeDefined()
+  })
+
+  it("handles tool call chunks with missing id and function name", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue("data")
+
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          // First chunk: no id, no function name -- only index
+          makeChunk(undefined, [
+            { index: 0 },
+          ]),
+          // Second chunk: provides id and name
+          makeChunk(undefined, [
+            { index: 0, id: "call_1", function: { name: "read_file", arguments: '{"path":"x.txt"}' } },
+          ]),
+        ])
+      }
+      return makeStream([makeChunk("done")])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks)
+    const toolMsg = messages.find((m: any) => m.role === "tool")
+    expect(toolMsg).toBeDefined()
+    expect(toolMsg.content).toBe("data")
+  })
+
+  it("handles tool call chunk with no function arguments", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue("data")
+
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          // Chunk with id and name but no arguments field
+          makeChunk(undefined, [
+            { index: 0, id: "call_1", function: { name: "get_current_time" } },
+          ]),
+        ])
+      }
+      return makeStream([makeChunk("done")])
+    })
+
+    const toolStarts: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onToolStart: (name) => toolStarts.push(name),
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(toolStarts).toContain("get_current_time")
+  })
+
+  it("uses MINIMAX_MODEL env var when set", async () => {
+    process.env.MINIMAX_MODEL = "custom-model"
+    mockCreate.mockReturnValue(makeStream([makeChunk("hi")]))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "custom-model" })
+    )
+    delete process.env.MINIMAX_MODEL
+  })
+})
+
+describe("getClient", () => {
+  it("exits when MINIMAX_API_KEY is not set", async () => {
+    vi.resetModules()
+    const savedKey = process.env.MINIMAX_API_KEY
+    delete process.env.MINIMAX_API_KEY
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../core")
+      // Trigger getClient by calling runAgent
+      const callbacks: ChannelCallbacks = {
+        onModelStart: () => {},
+        onModelStreamStart: () => {},
+        onTextChunk: () => {},
+        onToolStart: () => {},
+        onToolEnd: () => {},
+        onError: () => {},
+      }
+      await core.runAgent([], callbacks).catch(() => {})
+    } catch {
+      // Expected -- process.exit throws
+    }
+
+    expect(mockExit).toHaveBeenCalledWith(1)
+    expect(mockError).toHaveBeenCalledWith("missing MINIMAX_API_KEY")
+
+    mockExit.mockRestore()
+    mockError.mockRestore()
+    process.env.MINIMAX_API_KEY = savedKey
   })
 })
