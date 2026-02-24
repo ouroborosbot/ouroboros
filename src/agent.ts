@@ -3,7 +3,8 @@ import * as readline from "readline"
 import { runAgent, buildSystem, ChannelCallbacks } from "./core"
 
 // spinner that only touches stderr, cleans up after itself
-class spinner {
+// exported for direct testability (stop-without-start branch)
+export class Spinner {
   private frames = ["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"]
   private i = 0
   private iv: NodeJS.Timeout | null = null
@@ -23,10 +24,7 @@ class spinner {
   }
 
   stop(ok?: string) {
-    // guard: this.iv is always set because start() is called before stop() in all callback paths
-    /* v8 ignore start */
     if (this.iv) { clearInterval(this.iv); this.iv = null }
-    /* v8 ignore stop */
     process.stderr.write("\r\x1b[K")
     if (ok) process.stderr.write(`\x1b[32m\u2713\x1b[0m ${ok}\n`)
   }
@@ -92,7 +90,7 @@ export function addHistory(history: string[], entry: string): void {
 }
 
 export function createCliCallbacks(): ChannelCallbacks {
-  let currentSpinner: spinner | null = null
+  let currentSpinner: Spinner | null = null
   let buf = ""
   let inThink = false
 
@@ -112,7 +110,7 @@ export function createCliCallbacks(): ChannelCallbacks {
 
   return {
     onModelStart: () => {
-      currentSpinner = new spinner("waiting for model")
+      currentSpinner = new Spinner("waiting for model")
       currentSpinner.start()
     },
     onModelStreamStart: () => {
@@ -124,7 +122,7 @@ export function createCliCallbacks(): ChannelCallbacks {
       flush()
     },
     onToolStart: (name: string, _args: Record<string, string>) => {
-      currentSpinner = new spinner(`running ${name}`)
+      currentSpinner = new Spinner(`running ${name}`)
       currentSpinner.start()
     },
     onToolEnd: (name: string, argSummary: string, success: boolean) => {
@@ -205,11 +203,3 @@ export async function main() {
     console.log("bye")
   }
 }
-
-// entrypoint guard — only runs when executed directly (node dist/agent.js),
-// never in vitest where require.main !== module. main() is tested via direct import.
-/* v8 ignore start */
-if (require.main === module) {
-  main()
-}
-/* v8 ignore stop */
