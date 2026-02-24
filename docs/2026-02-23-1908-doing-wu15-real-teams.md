@@ -1,6 +1,6 @@
 # Doing: WU1.5 -- Bot Registration, Dev Tunnels, Real Teams Surface
 
-**Status**: drafting
+**Status**: READY_FOR_EXECUTION
 **Execution Mode**: pending
 **Created**: 2026-02-23
 **Planning**: ./2026-02-23-1908-planning-wu15-real-teams.md
@@ -184,8 +184,9 @@ Also:
 - **DevtoolsPlugin mode**: When `CLIENT_ID` env var is NOT set, `startTeamsApp()` creates App with `DevtoolsPlugin` (existing behavior)
 - **Bot mode**: When `CLIENT_ID`, `CLIENT_SECRET`, `TENANT_ID` env vars ARE set, `startTeamsApp()` creates App WITHOUT DevtoolsPlugin, passing credentials to the App constructor
 - **Bot mode constructor**: App receives `clientId`, `clientSecret`, `tenantId` in options
-- **Mention stripping**: When `activity.text` contains `<at>Ouroboros</at> hello`, the text passed to `handleTeamsMessage` is `hello` (mention markup removed)
-- **Mention stripping edge cases**: no mentions, multiple mentions, mention with extra whitespace, `activity.text` is undefined
+- **Mention stripping config**: Both DevtoolsPlugin mode and bot mode pass `activity: { mentions: { stripText: true } }` to the App constructor
+- **Mention stripping also export a `stripMentions` utility**: For testability, export a `stripMentions(text: string): string` function that removes `<at>...</at>` tags and trims -- used as a fallback/safety net in `handleTeamsMessage` even though the SDK should handle it
+- **stripMentions edge cases**: no mentions, mention at start, multiple mentions, extra whitespace after mention, empty string, undefined (returns "")
 - **Console log differs**: DevtoolsPlugin mode logs "with DevtoolsPlugin", bot mode logs "with Bot Service"
 
 **Output**: Tests added to `src/__tests__/teams.test.ts`.
