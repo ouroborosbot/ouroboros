@@ -1,7 +1,7 @@
 import OpenAI from "openai"
 import * as fs from "fs"
 import * as path from "path"
-import { execSync } from "child_process"
+import { execSync, spawnSync } from "child_process"
 import { listSkills, loadSkill } from "./skills"
 
 let _client: OpenAI | null = null
@@ -31,9 +31,13 @@ export const tools: OpenAI.ChatCompletionTool[] = [
   { type: "function", function: { name: "list_skills", description: "list all available skills", parameters: { type: "object", properties: {} } } },
   { type: "function", function: { name: "load_skill", description: "load a skill by name, returns its content", parameters: { type: "object", properties: { name: { type: "string" } }, required: ["name"] } } },
   { type: "function", function: { name: "get_current_time", description: "get the current date and time", parameters: { type: "object", properties: {} } } },
+  { type: "function", function: { name: "claude", description: "spawn another claude instance to query this codebase (or the world). useful for self-reflection, code review, asking questions about yourself. note: you are the Ouroboros agent looking at your own codebase - use this to get an outside perspective on YOUR code", parameters: { type: "object", properties: { prompt: { type: "string" } }, required: ["prompt"] } } },
+  { type: "function", function: { name: "web_search", description: "search the web using perplexity. returns ranked results with titles, urls, and snippets", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } } },
 ]
 
-const toolHandlers: Record<string, (args: Record<string, string>) => string> = {
+type ToolHandler = (args: Record<string, string>) => string | Promise<string>
+
+const toolHandlers: Record<string, ToolHandler> = {
   read_file: (a) => fs.readFileSync(a.path, "utf-8"),
   write_file: (a) => (fs.writeFileSync(a.path, a.content, "utf-8"), "ok"),
   shell: (a) => execSync(a.command, { encoding: "utf-8", timeout: 30000 }),
@@ -52,11 +56,41 @@ const toolHandlers: Record<string, (args: Record<string, string>) => string> = {
     } catch (e) { return `error: ${e}` }
   },
   get_current_time: () => new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles", hour12: false }),
+  claude: (a) => {
+    // spawn another claude instance to query this codebase
+    // always use skip-permissions and add-dir for access
+    try {
+      const result = spawnSync("claude", ["-p", "--dangerously-skip-permissions", "--add-dir", "."], {
+        input: a.prompt,
+        encoding: "utf-8",
+        timeout: 60000,
+      })
+      if (result.error) return `error: ${result.error}`
+      if (result.status !== 0) return `claude exited with code ${result.status}: ${result.stderr}`
+      return result.stdout || "(no output)"
+    } catch (e) { return `error: ${e}` }
+  },
+  web_search: async (a) => {
+    try {
+      const key = process.env.PERPLEXITY_API_KEY
+      if (!key) return "error: PERPLEXITY_API_KEY not set"
+      const res = await fetch("https://api.perplexity.ai/search", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ query: a.query, max_results: 5 }),
+      })
+      if (!res.ok) return `error: ${res.status} ${res.statusText}`
+      const data = await res.json() as { results?: { title: string; url: string; snippet: string }[] }
+      if (!data.results?.length) return "no results found"
+      return data.results.map(r => `${r.title}\n${r.url}\n${r.snippet}`).join("\n\n")
+    } catch (e) { return `error: ${e}` }
+  },
 }
 
-export function execTool(name: string, args: Record<string, string>): string {
+export async function execTool(name: string, args: Record<string, string>): Promise<string> {
   const h = toolHandlers[name]
-  return h ? h(args) : `unknown: ${name}`
+  if (!h) return `unknown: ${name}`
+  return await h(args)
 }
 
 export function isOwnCodebase(): boolean {
@@ -80,6 +114,8 @@ export function summarizeArgs(name: string, args: Record<string, string>): strin
   if (name === "list_directory") return args.path || ""
   if (name === "git_commit") return args.message?.slice(0, 40) || ""
   if (name === "load_skill") return args.name || ""
+  if (name === "claude") return args.prompt?.slice(0, 40) || ""
+  if (name === "web_search") return args.query?.slice(0, 40) || ""
   return JSON.stringify(args).slice(0, 30)
 }
 
@@ -150,7 +186,7 @@ export async function runAgent(messages: OpenAI.ChatCompletionMessageParam[], ca
           let result: string
           let success: boolean
           try {
-            result = execTool(tc.name, args)
+            result = await execTool(tc.name, args)
             success = true
           } catch (e) {
             result = `error: ${e}`
