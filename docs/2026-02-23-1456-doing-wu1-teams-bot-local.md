@@ -155,7 +155,7 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 **Acceptance**: `npm run test:coverage` shows 100% coverage on new code in `agent.ts`. All tests green. No warnings.
 
 ### Unit 2d-a: CLI UX Fixes -- Tests
-**Status**: Not started
+**Status**: Done
 
 **What**: Write tests for the four CLI UX improvements. These test the readline/input handling behavior, separate from the adapter wiring tested in Unit 2a. Test:
 - **No double echo**: When user types input, it appears exactly once (readline `terminal` config and prompt clearing tested)
