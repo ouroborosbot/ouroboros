@@ -357,7 +357,7 @@ describe("CLI adapter - bootGreeting", () => {
     await agent.bootGreeting(messages, callbacks)
 
     expect(messages.some((m: any) => m.role === "user" && m.content === "hello")).toBe(true)
-    expect(mockRunAgent).toHaveBeenCalledWith(messages, callbacks)
+    expect(mockRunAgent).toHaveBeenCalledWith(messages, callbacks, undefined)
 
     vi.restoreAllMocks()
   })

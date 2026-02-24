@@ -871,7 +871,8 @@ describe("runAgent", () => {
 
     await runAgent([{ role: "system", content: "test" }], callbacks)
     expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "custom-model" })
+      expect.objectContaining({ model: "custom-model" }),
+      expect.any(Object)
     )
     delete process.env.MINIMAX_MODEL
   })

@@ -35,33 +35,44 @@ export class Spinner {
   }
 }
 
-// Input controller: pauses readline during model/tool execution
-// Accepts stdin as parameter for testability
+// Input controller: pauses readline during model/tool execution.
+// Does NOT touch raw mode — readline with terminal:true manages raw mode
+// internally. Touching it causes ^C to be echoed by the terminal driver.
+// During suppress, we consume stdin data ourselves to swallow stray
+// keystrokes and catch Ctrl-C (0x03) for interrupt.
 export class InputController {
   private rl: readline.Interface
-  private stdin: NodeJS.ReadStream | { isTTY?: boolean; setRawMode?: (mode: boolean) => void }
-  private off = false
+  private suppressed = false
+  private dataHandler: ((data: Buffer) => void) | null = null
+  private onInterrupt: (() => void) | null = null
 
-  constructor(rl: readline.Interface, stdin?: NodeJS.ReadStream | { isTTY?: boolean; setRawMode?: (mode: boolean) => void }) {
+  constructor(rl: readline.Interface) {
     this.rl = rl
-    this.stdin = stdin || process.stdin
   }
 
-  suppress() {
-    if (this.off) return
-    this.off = true
+  suppress(onInterrupt?: () => void) {
+    if (this.suppressed) return
+    this.suppressed = true
+    this.onInterrupt = onInterrupt || null
     this.rl.pause()
-    if (this.stdin.isTTY && this.stdin.setRawMode) {
-      this.stdin.setRawMode(true)
+    // Consume stdin to swallow keystrokes; catch Ctrl-C (0x03)
+    this.dataHandler = (data: Buffer) => {
+      if (data[0] === 0x03 && this.onInterrupt) {
+        this.onInterrupt()
+      }
+      // All other input is swallowed
     }
+    process.stdin.on("data", this.dataHandler)
   }
 
   restore() {
-    if (!this.off) return
-    this.off = false
-    if (this.stdin.isTTY && this.stdin.setRawMode) {
-      this.stdin.setRawMode(false)
+    if (!this.suppressed) return
+    this.suppressed = false
+    if (this.dataHandler) {
+      process.stdin.removeListener("data", this.dataHandler)
+      this.dataHandler = null
     }
+    this.onInterrupt = null
     this.rl.resume()
   }
 }
@@ -141,15 +152,16 @@ export function createCliCallbacks(): ChannelCallbacks {
   }
 }
 
-export async function bootGreeting(messages: OpenAI.ChatCompletionMessageParam[], callbacks: ChannelCallbacks): Promise<void> {
+export async function bootGreeting(messages: OpenAI.ChatCompletionMessageParam[], callbacks: ChannelCallbacks, signal?: AbortSignal): Promise<void> {
   messages.push({ role: "user", content: "hello" })
-  await runAgent(messages, callbacks)
+  await runAgent(messages, callbacks, signal)
 }
 
 export async function main() {
   const messages: OpenAI.ChatCompletionMessageParam[] = [{ role: "system", content: buildSystem() }]
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true })
   const ctrl = new InputController(rl)
+  let currentAbort: AbortController | null = null
   const history: string[] = []
   let closed = false
   rl.on("close", () => { closed = true })
@@ -159,25 +171,26 @@ export async function main() {
   const cliCallbacks = createCliCallbacks()
 
   // boot greeting
-  ctrl.suppress()
-  await bootGreeting(messages, cliCallbacks)
+  const bootAbort = new AbortController()
+  ctrl.suppress(() => bootAbort.abort())
+  await bootGreeting(messages, cliCallbacks, bootAbort.signal).catch(() => {})
   ctrl.restore()
   process.stdout.write("\n")
 
   process.stdout.write("\x1b[36m> \x1b[0m")
 
-  // Prevent default SIGINT from killing the process — we handle it via readline
-  process.on("SIGINT", () => {})
-
-  // Ctrl-C handling
+  // Ctrl-C at the input prompt: clear line or warn/exit
+  // readline with terminal:true catches Ctrl-C in raw mode (no ^C echo)
   rl.on("SIGINT", () => {
     const currentLine = (rl as any).line || ""
     const result = handleSigint(rl, currentLine)
     if (result === "clear") {
-      // Clear the current line and re-prompt
-      process.stdout.write("\r\x1b[K")
-      process.stdout.write("\x1b[36m> \x1b[0m")
+      (rl as any).line = "";
+      (rl as any).cursor = 0
+      process.stdout.write("\r\x1b[K\x1b[36m> \x1b[0m")
     } else if (result === "warn") {
+      (rl as any).line = "";
+      (rl as any).cursor = 0
       process.stdout.write("\r\x1b[K")
       process.stderr.write("press Ctrl-C again to exit\n")
       process.stdout.write("\x1b[36m> \x1b[0m")
@@ -197,9 +210,15 @@ export async function main() {
       messages.push({ role: "user", content: input })
       addHistory(history, input)
 
-      ctrl.suppress()
-      await runAgent(messages, cliCallbacks)
+      currentAbort = new AbortController()
+      ctrl.suppress(() => currentAbort!.abort())
+      try {
+        await runAgent(messages, cliCallbacks, currentAbort.signal)
+      } catch {
+        // AbortError — silently return to prompt
+      }
       ctrl.restore()
+      currentAbort = null
       process.stdout.write("\n")
 
       if (closed) break

@@ -92,9 +92,10 @@ export interface ChannelCallbacks {
   onError(error: Error): void
 }
 
-export async function runAgent(messages: OpenAI.ChatCompletionMessageParam[], callbacks: ChannelCallbacks): Promise<void> {
+export async function runAgent(messages: OpenAI.ChatCompletionMessageParam[], callbacks: ChannelCallbacks, signal?: AbortSignal): Promise<void> {
   let done = false
   while (!done) {
+    if (signal?.aborted) break
     try {
       callbacks.onModelStart()
 
@@ -103,13 +104,14 @@ export async function runAgent(messages: OpenAI.ChatCompletionMessageParam[], ca
         messages,
         tools,
         stream: true,
-      })
+      }, signal ? { signal } : {})
 
       let content = ""
       let toolCalls: Record<number, { id: string; name: string; arguments: string }> = {}
       let streamStarted = false
 
       for await (const chunk of response) {
+        if (signal?.aborted) break
         const d = chunk.choices[0]?.delta
         if (!d) continue
         if (d.content) {
@@ -159,6 +161,8 @@ export async function runAgent(messages: OpenAI.ChatCompletionMessageParam[], ca
         }
       }
     } catch (e) {
+      // Abort is not an error — just stop cleanly
+      if (signal?.aborted) break
       callbacks.onError(e instanceof Error ? e : new Error(String(e)))
       done = true
     }
