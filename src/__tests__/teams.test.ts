@@ -121,6 +121,25 @@ describe("Teams adapter - createTeamsCallbacks", () => {
     expect(mockStream.emit).toHaveBeenCalledWith("visible")
   })
 
+  it("onTextChunk trims leading whitespace after think block", async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any)
+
+    callbacks.onTextChunk("<think>reasoning</think>\n\nhello")
+    expect(mockStream.emit).toHaveBeenCalledWith("hello")
+  })
+
+  it("onTextChunk preserves whitespace after first real content", async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any)
+
+    callbacks.onTextChunk("first")
+    callbacks.onTextChunk("\n\nsecond")
+    expect(mockStream.emit).toHaveBeenCalledWith("\n\nsecond")
+  })
+
   it("onModelStreamStart is a no-op (does not throw)", async () => {
     vi.resetModules()
     const teams = await import("../teams")
