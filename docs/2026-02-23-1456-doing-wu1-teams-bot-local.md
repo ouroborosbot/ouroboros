@@ -54,7 +54,7 @@ Refactor ouroboros from a CLI-only agent into a multi-channel architecture (CLI 
 Not started / In progress / Done / Blocked
 
 ### Unit 0: Test Infrastructure Setup
-**Status**: Not started
+**Status**: Done
 
 **What**: Set up vitest in ouroboros. Add `vitest` as dev dependency, create `vitest.config.ts`, add `test`, `test:coverage` scripts to `package.json`. Verify with a trivial passing test.
 **Output**: `vitest.config.ts`, updated `package.json`, one trivial test file proving the setup works.
