@@ -91,7 +91,7 @@ describe("buildSystem", () => {
     vi.mocked(fs.existsSync).mockReturnValue(true)
     const { buildSystem } = await import("../core")
     const result = buildSystem()
-    expect(result).toContain("you are ouroboros")
+    expect(result).toContain("you are Ouroboros")
     expect(result).toContain("running in your own codebase")
   })
 
@@ -99,7 +99,7 @@ describe("buildSystem", () => {
     vi.mocked(fs.existsSync).mockReturnValue(false)
     const { buildSystem } = await import("../core")
     const result = buildSystem()
-    expect(result).toContain("you are ouroboros")
+    expect(result).toContain("you are Ouroboros")
     expect(result).not.toContain("running in your own codebase")
   })
 })

@@ -5,7 +5,7 @@
 
 ## Goal
 
-Connect the ouroboros agent to real Teams -- move from the DevtoolsPlugin playground (WU1) to actual Teams chat. Register an Azure Bot, set up dev tunnels for local development, create an app manifest, and verify streaming works in both 1:1 Teams chat and Microsoft 365 Copilot Chat (Custom Engine Agent).
+Connect the Ouroboros agent to real Teams -- move from the DevtoolsPlugin playground (WU1) to actual Teams chat. Register an Azure Bot, set up dev tunnels for local development, create an app manifest, and verify streaming works in both 1:1 Teams chat and Microsoft 365 Copilot Chat (Custom Engine Agent).
 
 ## Scope
 
@@ -87,7 +87,7 @@ Connect the ouroboros agent to real Teams -- move from the DevtoolsPlugin playgr
 - **Environment-variable-driven mode switching**: No env vars = DevtoolsPlugin mode (existing WU1 behavior). Set `CLIENT_ID` + `CLIENT_SECRET` + `TENANT_ID` = real bot mode. No code changes needed to switch.
 - **Azure CLI for all setup**: Bot registration, resource group creation, and all Azure operations done via `az` CLI commands so the agent can automate them.
 - **Manifest version `devPreview`**: Required for `copilotAgents.customEngineAgents[]`. The SDK's built-in manifest type only supports 1.19 with `declarativeAgents`, so we'll need to handle the manifest file separately or extend the type.
-- **No Copilot license required for CEA**: The official licensing docs confirm "Users do not need a Copilot license to access custom engine agents in Microsoft 365 Copilot Chat." The Copilot license is required for declarative agents (which use Microsoft's orchestrator), not for CEAs (which bring their own LLM). Copilot Chat itself is included at no additional charge with any eligible M365 subscription. Metered charges only apply if the agent accesses shared tenant data (SharePoint, Copilot connectors) -- which ouroboros does not.
+- **No Copilot license required for CEA**: The official licensing docs confirm "Users do not need a Copilot license to access custom engine agents in Microsoft 365 Copilot Chat." The Copilot license is required for declarative agents (which use Microsoft's orchestrator), not for CEAs (which bring their own LLM). Copilot Chat itself is included at no additional charge with any eligible M365 subscription. Metered charges only apply if the agent accesses shared tenant data (SharePoint, Copilot connectors) -- which Ouroboros does not.
 - **Streaming fixes in WU1.5**: The append-only cumulative content requirement, the 1 req/sec throttle buffer, and the stop-streaming signal handling are all part of this work unit. They are changes to `teams.ts` callbacks, not to the core agentic loop.
 
 ## Context / References

@@ -1,6 +1,6 @@
 # Grow an Agent Server
 
-Deploy a self-modifying coding agent (the ouroboros pattern) as a Teams bot so people can chat with it. It lives on an Azure server with full file system and shell access, so it can read code, write code, run builds, and evolve itself through conversation — just like it does locally, but accessible to anyone in Teams.
+Deploy a self-modifying coding agent (the Ouroboros pattern) as a Teams bot so people can chat with it. It lives on an Azure server with full file system and shell access, so it can read code, write code, run builds, and evolve itself through conversation — just like it does locally, but accessible to anyone in Teams.
 
 Bonus: run two instances side by side so they can fix each other when one breaks itself.
 
@@ -39,7 +39,7 @@ Bonus: run two instances side by side so they can fix each other when one breaks
 **Planning doc**: [2026-02-23-1456-planning-wu1-teams-bot-local.md](2026-02-23-1456-planning-wu1-teams-bot-local.md)
 **Doing doc**: [2026-02-23-1456-doing-wu1-teams-bot-local.md](2026-02-23-1456-doing-wu1-teams-bot-local.md)
 
-Get the ouroboros core running behind a Teams bot adapter locally. Prove the interface works — send a message in the DevtoolsPlugin chat UI, get a streamed response from the agent with tool call updates.
+Get the Ouroboros core running behind a Teams bot adapter locally. Prove the interface works — send a message in the DevtoolsPlugin chat UI, get a streamed response from the agent with tool call updates.
 
 ### Architecture
 
@@ -47,7 +47,7 @@ Get the ouroboros core running behind a Teams bot adapter locally. Prove the int
                  ┌─────────────────┐
   stdin/stdout ──┤  CLI adapter     │──┐
                  │  (main.ts)       │  │    ┌────────────────────┐
-                 └─────────────────┘  ├────┤  ouroboros core     │
+                 └─────────────────┘  ├────┤  Ouroboros core     │
                                       │    │  (core.ts)          │
                  ┌─────────────────┐  │    │  - runAgent()       │
   DevtoolsPlugin─┤  Teams adapter  │──┘    │  - streamResponse() │
@@ -60,7 +60,7 @@ Get the ouroboros core running behind a Teams bot adapter locally. Prove the int
 
 **SDK — Teams SDK v2 (comms-only)**
 - Use `@microsoft/teams.apps` (v2.0.5) for bot scaffolding, `@microsoft/teams.dev` with `DevtoolsPlugin` for local dev
-- Do NOT use the AI planner (`ActionPlanner`, `OpenAIModel`) — ouroboros keeps its own agentic loop
+- Do NOT use the AI planner (`ActionPlanner`, `OpenAIModel`) — Ouroboros keeps its own agentic loop
 - Key packages: `@microsoft/teams.apps`, `@microsoft/teams.api`, `@microsoft/teams.cards`, `@microsoft/teams.common`, `@microsoft/teams.dev`
 
 **Bot-Agent Communication — In-process function**
@@ -124,7 +124,7 @@ Get the agent + bot running on a VM, accessible through Teams for real. Process 
 
 ```
 azure vm
-├── /srv/agent/                 # the agent's repo (ouroboros)
+├── /srv/agent/                 # the agent's repo (Ouroboros)
 │   ├── src/agent.ts
 │   ├── skills/
 │   └── ...
