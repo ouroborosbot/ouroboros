@@ -332,3 +332,4 @@ Walk through every completion criterion and check it off.
 - 2026-02-23 19:35 Pass 4: quality -- mention stripping detail (SDK config + exported utility), all acceptance criteria verified, status READY_FOR_EXECUTION
 - 2026-02-23 19:40 Updated for cross-tenant: MultiTenant bot registration (AzureADMultipleOrgs), removed --tenant-id from az bot create, TENANT_ID omitted from .env, sideload targets Microsoft corp tenant with dev tenant fallback
 - 2026-02-23 19:44 Unit 0 complete: Azure infra set up, .env created, dotenv installed. Changed to SingleTenant (Azure deprecated MultiTenant). TENANT_ID required in .env and App constructor.
+- 2026-02-23 20:03 Unit 1a complete: 23 new/updated tests for cumulative streaming, debounce buffer, flush-on-close, abort/stop. All FAIL (red) against current implementation. 125 other tests pass.
