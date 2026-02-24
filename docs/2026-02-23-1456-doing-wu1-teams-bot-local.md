@@ -178,7 +178,7 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 **Acceptance**: All Unit 2d-a tests PASS (green). `npm run build` succeeds. Manual verification: no double echo, no garbage, Ctrl-C works, history works.
 
 ### Unit 2d-c: CLI UX Fixes -- Coverage and Refactor
-**Status**: Not started
+**Status**: Done
 
 **What**: Run coverage on UX fix code. Fill gaps. Refactor.
 **Output**: Updated tests, 100% coverage on UX fix code.
