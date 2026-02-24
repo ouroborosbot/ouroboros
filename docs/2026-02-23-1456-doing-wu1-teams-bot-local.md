@@ -89,7 +89,7 @@ Not started / In progress / Done / Blocked
 **Acceptance**: Tests exist and FAIL (red) because `src/core.ts` does not exist yet.
 
 ### Unit 1b: Core Extraction -- Implementation
-**Status**: Not started
+**Status**: Done
 
 **What**: Create `src/core.ts` by extracting from `agent.ts`:
 - Export `ChannelCallbacks` interface: `onModelStart()`, `onModelStreamStart()`, `onTextChunk(text)`, `onToolStart(name, args)`, `onToolEnd(name, summary, success)`, `onError(error)`
