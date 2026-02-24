@@ -505,15 +505,69 @@ describe("Teams adapter - message handling", () => {
   })
 })
 
-describe("Teams adapter - startTeamsApp", () => {
-  it("creates App with DevtoolsPlugin and starts it", async () => {
-    vi.resetModules()
+describe("Teams adapter - stripMentions", () => {
+  let stripMentions: (text: string) => string
 
+  beforeEach(async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    stripMentions = teams.stripMentions
+  })
+
+  it("is exported from teams.ts", async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    expect(typeof teams.stripMentions).toBe("function")
+  })
+
+  it("returns text unchanged when no mentions", () => {
+    expect(stripMentions("hello world")).toBe("hello world")
+  })
+
+  it("strips mention at start of text", () => {
+    expect(stripMentions("<at>Ouroboros</at> hello")).toBe("hello")
+  })
+
+  it("strips mention in middle of text", () => {
+    expect(stripMentions("hey <at>Ouroboros</at> do something")).toBe("hey  do something")
+  })
+
+  it("strips multiple mentions", () => {
+    expect(stripMentions("<at>Bot</at> and <at>User</at> chat")).toBe("and  chat")
+  })
+
+  it("handles extra whitespace after mention removal", () => {
+    expect(stripMentions("  <at>Bot</at>  hello  ")).toBe("hello")
+  })
+
+  it("returns empty string for empty input", () => {
+    expect(stripMentions("")).toBe("")
+  })
+
+  it("returns empty string for undefined/null input", () => {
+    expect(stripMentions(undefined as any)).toBe("")
+    expect(stripMentions(null as any)).toBe("")
+  })
+})
+
+describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
+  afterEach(() => {
+    delete process.env.CLIENT_ID
+    delete process.env.CLIENT_SECRET
+    delete process.env.TENANT_ID
+    delete process.env.PORT
+  })
+
+  it("creates App with DevtoolsPlugin when CLIENT_ID is not set", async () => {
+    vi.resetModules()
+    delete process.env.CLIENT_ID
+
+    let capturedOpts: any = null
     const mockOn = vi.fn()
     const mockStart = vi.fn()
     vi.doMock("@microsoft/teams.apps", () => ({
       App: class MockApp {
-        constructor(_opts: any) {}
+        constructor(opts: any) { capturedOpts = opts }
         on = mockOn
         start = mockStart
       },
@@ -532,16 +586,79 @@ describe("Teams adapter - startTeamsApp", () => {
     const teams = await import("../teams")
     teams.startTeamsApp()
 
+    expect(capturedOpts.plugins).toHaveLength(1)
     expect(mockOn).toHaveBeenCalledWith("message", expect.any(Function))
     expect(mockStart).toHaveBeenCalledWith(3978)
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Teams bot started"))
 
     consoleSpy.mockRestore()
     vi.restoreAllMocks()
   })
 
+  it("logs 'with DevtoolsPlugin' in DevtoolsPlugin mode", async () => {
+    vi.resetModules()
+    delete process.env.CLIENT_ID
+
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../teams")
+    teams.startTeamsApp()
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("DevtoolsPlugin"))
+
+    consoleSpy.mockRestore()
+    vi.restoreAllMocks()
+  })
+
+  it("passes activity.mentions.stripText in DevtoolsPlugin mode", async () => {
+    vi.resetModules()
+    delete process.env.CLIENT_ID
+
+    let capturedOpts: any = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(opts: any) { capturedOpts = opts }
+        on = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../teams")
+    teams.startTeamsApp()
+
+    expect(capturedOpts.activity).toEqual({ mentions: { stripText: true } })
+
+    vi.restoreAllMocks()
+  })
+
   it("uses PORT env var when set", async () => {
     vi.resetModules()
+    delete process.env.CLIENT_ID
 
     const mockStart = vi.fn()
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -568,13 +685,13 @@ describe("Teams adapter - startTeamsApp", () => {
 
     expect(mockStart).toHaveBeenCalledWith(4000)
 
-    delete process.env.PORT
     consoleSpy.mockRestore()
     vi.restoreAllMocks()
   })
 
   it("message handler calls handleTeamsMessage with text and stream", async () => {
     vi.resetModules()
+    delete process.env.CLIENT_ID
 
     let capturedHandler: ((args: any) => Promise<void>) | null = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -618,6 +735,7 @@ describe("Teams adapter - startTeamsApp", () => {
 
   it("message handler handles missing activity.text", async () => {
     vi.resetModules()
+    delete process.env.CLIENT_ID
 
     let capturedHandler: ((args: any) => Promise<void>) | null = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -655,6 +773,183 @@ describe("Teams adapter - startTeamsApp", () => {
     const messages = mockRunAgent.mock.calls[0][0]
     const userMsg = messages.filter((m: any) => m.role === "user").pop()
     expect(userMsg.content).toBe("")
+
+    vi.restoreAllMocks()
+  })
+})
+
+describe("Teams adapter - startTeamsApp (Bot mode)", () => {
+  afterEach(() => {
+    delete process.env.CLIENT_ID
+    delete process.env.CLIENT_SECRET
+    delete process.env.TENANT_ID
+    delete process.env.PORT
+  })
+
+  it("creates App WITHOUT DevtoolsPlugin when CLIENT_ID is set", async () => {
+    vi.resetModules()
+    process.env.CLIENT_ID = "test-client-id"
+    process.env.CLIENT_SECRET = "test-secret"
+    process.env.TENANT_ID = "test-tenant-id"
+
+    let capturedOpts: any = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(opts: any) { capturedOpts = opts }
+        on = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../teams")
+    teams.startTeamsApp()
+
+    // Bot mode should NOT have plugins (no DevtoolsPlugin)
+    expect(capturedOpts.plugins).toBeUndefined()
+
+    vi.restoreAllMocks()
+  })
+
+  it("passes clientId, clientSecret, tenantId to App constructor", async () => {
+    vi.resetModules()
+    process.env.CLIENT_ID = "my-app-id"
+    process.env.CLIENT_SECRET = "my-secret"
+    process.env.TENANT_ID = "my-tenant"
+
+    let capturedOpts: any = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(opts: any) { capturedOpts = opts }
+        on = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../teams")
+    teams.startTeamsApp()
+
+    expect(capturedOpts.clientId).toBe("my-app-id")
+    expect(capturedOpts.clientSecret).toBe("my-secret")
+    expect(capturedOpts.tenantId).toBe("my-tenant")
+
+    vi.restoreAllMocks()
+  })
+
+  it("passes activity.mentions.stripText in bot mode", async () => {
+    vi.resetModules()
+    process.env.CLIENT_ID = "test-id"
+    process.env.CLIENT_SECRET = "test-secret"
+    process.env.TENANT_ID = "test-tenant"
+
+    let capturedOpts: any = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(opts: any) { capturedOpts = opts }
+        on = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../teams")
+    teams.startTeamsApp()
+
+    expect(capturedOpts.activity).toEqual({ mentions: { stripText: true } })
+
+    vi.restoreAllMocks()
+  })
+
+  it("logs 'with Bot Service' in bot mode", async () => {
+    vi.resetModules()
+    process.env.CLIENT_ID = "test-id"
+    process.env.CLIENT_SECRET = "test-secret"
+    process.env.TENANT_ID = "test-tenant"
+
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../teams")
+    teams.startTeamsApp()
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Bot Service"))
+
+    consoleSpy.mockRestore()
+    vi.restoreAllMocks()
+  })
+
+  it("registers message handler in bot mode", async () => {
+    vi.resetModules()
+    process.env.CLIENT_ID = "test-id"
+    process.env.CLIENT_SECRET = "test-secret"
+    process.env.TENANT_ID = "test-tenant"
+
+    const mockOn = vi.fn()
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = mockOn
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../teams")
+    teams.startTeamsApp()
+
+    expect(mockOn).toHaveBeenCalledWith("message", expect.any(Function))
 
     vi.restoreAllMocks()
   })
