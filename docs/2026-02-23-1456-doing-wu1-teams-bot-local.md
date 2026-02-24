@@ -185,7 +185,7 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 **Acceptance**: `npm run test:coverage` shows 100% coverage on all new UX code in `agent.ts`. All tests green. No warnings.
 
 ### Unit 3a: Teams Channel Adapter -- Tests
-**Status**: Not started
+**Status**: Done
 
 **What**: Write tests for `src/teams.ts` Teams channel adapter. Mock `@microsoft/teams.apps`. Test:
 - Adapter initializes `App` (from `@microsoft/teams.apps`) with `DevtoolsPlugin` (from `@microsoft/teams.dev`)
