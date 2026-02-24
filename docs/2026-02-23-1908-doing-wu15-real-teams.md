@@ -154,7 +154,7 @@ Update existing tests in `teams.test.ts` to expect cumulative (not incremental) 
 **Acceptance**: New tests FAIL (red) because streaming behavior has not changed yet. Existing tests that checked incremental behavior are updated to expect cumulative behavior and also FAIL.
 
 ### Unit 1b: Streaming Overhaul -- Implementation
-**Status**: Not started
+**Status**: Done
 
 **What**: Update `createTeamsCallbacks()` in `teams.ts` to implement:
 1. **Cumulative accumulator**: Track `cumulativeText` string. Every time content passes think-tag stripping, append to `cumulativeText`. Emit `cumulativeText` (not the chunk).
@@ -333,3 +333,4 @@ Walk through every completion criterion and check it off.
 - 2026-02-23 19:40 Updated for cross-tenant: MultiTenant bot registration (AzureADMultipleOrgs), removed --tenant-id from az bot create, TENANT_ID omitted from .env, sideload targets Microsoft corp tenant with dev tenant fallback
 - 2026-02-23 19:44 Unit 0 complete: Azure infra set up, .env created, dotenv installed. Changed to SingleTenant (Azure deprecated MultiTenant). TENANT_ID required in .env and App constructor.
 - 2026-02-23 20:03 Unit 1a complete: 23 new/updated tests for cumulative streaming, debounce buffer, flush-on-close, abort/stop. All FAIL (red) against current implementation. 125 other tests pass.
+- 2026-02-23 20:04 Unit 1b complete: Implemented cumulative accumulator, debounce buffer (1500ms), AbortController integration, flush-on-close. All 148 tests pass (green). Build clean.
