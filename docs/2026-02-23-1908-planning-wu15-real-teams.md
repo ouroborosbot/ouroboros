@@ -129,3 +129,4 @@ Key technical observations from research:
 ## Progress Log
 
 - 2026-02-23 19:11 Created planning doc
+- 2026-02-23 19:20 Incorporated user feedback: streaming fixes in scope, license research (no Copilot license needed for CEA), open questions deferred to spike. Final review: added .env pattern, @mention stripping, existing test updates. Status NEEDS_REVIEW.
