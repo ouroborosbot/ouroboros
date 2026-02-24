@@ -323,3 +323,7 @@ Walk through every completion criterion and check it off.
 
 ## Progress Log
 
+- 2026-02-23 19:30 Created from planning doc (Pass 1: first draft)
+- 2026-02-23 19:32 Pass 2: granularity -- fake timers for buffer tests, debounce pattern, dotenv for env loading, flush export detail, status fields on all units
+- 2026-02-23 19:33 Pass 3: validation -- SDK activity.mentions.stripText confirmed in type defs, az CLI syntax verified against docs, runAgent AbortSignal already exists in core.ts
+- 2026-02-23 19:35 Pass 4: quality -- mention stripping detail (SDK config + exported utility), all acceptance criteria verified, status READY_FOR_EXECUTION
