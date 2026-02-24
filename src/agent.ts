@@ -34,25 +34,58 @@ class spinner {
   }
 }
 
-// input controller: pauses readline during tool execution so it doesn't eat input
-class inputctrl {
+// Input controller: pauses readline during model/tool execution
+// Accepts stdin as parameter for testability
+export class InputController {
   private rl: readline.Interface
+  private stdin: NodeJS.ReadStream | { isTTY?: boolean; setRawMode?: (mode: boolean) => void }
   private off = false
 
-  constructor(rl: readline.Interface) { this.rl = rl }
+  constructor(rl: readline.Interface, stdin?: NodeJS.ReadStream | { isTTY?: boolean; setRawMode?: (mode: boolean) => void }) {
+    this.rl = rl
+    this.stdin = stdin || process.stdin
+  }
 
   suppress() {
     if (this.off) return
     this.off = true
     this.rl.pause()
-    if (process.stdin.isTTY) (process.stdin as any).setRawMode?.(false)
+    if (this.stdin.isTTY && this.stdin.setRawMode) {
+      this.stdin.setRawMode(true)
+    }
   }
 
   restore() {
     if (!this.off) return
     this.off = false
+    if (this.stdin.isTTY && this.stdin.setRawMode) {
+      this.stdin.setRawMode(false)
+    }
     this.rl.resume()
   }
+}
+
+// Ctrl-C handling: returns "clear" if input was non-empty, "warn" on first empty press, "exit" on second
+let _ctrlCWarned = false
+
+export function handleSigint(rl: readline.Interface, currentInput: string): "clear" | "warn" | "exit" {
+  if (currentInput.length > 0) {
+    _ctrlCWarned = false
+    return "clear"
+  }
+  if (_ctrlCWarned) {
+    _ctrlCWarned = false
+    return "exit"
+  }
+  _ctrlCWarned = true
+  return "warn"
+}
+
+// History management
+export function addHistory(history: string[], entry: string): void {
+  if (!entry.trim()) return
+  if (history.length > 0 && history[history.length - 1] === entry) return
+  history.push(entry)
 }
 
 export function createCliCallbacks(): ChannelCallbacks {
@@ -116,7 +149,8 @@ export async function bootGreeting(messages: OpenAI.ChatCompletionMessageParam[]
 async function main() {
   const messages: OpenAI.ChatCompletionMessageParam[] = [{ role: "system", content: buildSystem() }]
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true })
-  const ctrl = new inputctrl(rl)
+  const ctrl = new InputController(rl)
+  const history: string[] = []
   let closed = false
   rl.on("close", () => { closed = true })
 
@@ -132,12 +166,28 @@ async function main() {
 
   process.stdout.write("\x1b[36m> \x1b[0m")
 
+  // Ctrl-C handling
+  rl.on("SIGINT", () => {
+    const currentLine = (rl as any).line || ""
+    const result = handleSigint(rl, currentLine)
+    if (result === "clear") {
+      process.stdout.write("\n")
+      process.stdout.write("\x1b[36m> \x1b[0m")
+    } else if (result === "warn") {
+      process.stderr.write("\npress Ctrl-C again to exit\n")
+      process.stdout.write("\x1b[36m> \x1b[0m")
+    } else {
+      rl.close()
+    }
+  })
+
   try {
     for await (const input of rl) {
       if (closed || input.toLowerCase() === "exit") break
       if (!input.trim()) { process.stdout.write("\x1b[36m> \x1b[0m"); continue }
 
       messages.push({ role: "user", content: input })
+      addHistory(history, input)
 
       ctrl.suppress()
       await runAgent(messages, cliCallbacks)
