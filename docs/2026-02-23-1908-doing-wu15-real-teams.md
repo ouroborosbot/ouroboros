@@ -127,7 +127,7 @@ Steps:
 **Acceptance**: `az bot show --resource-group agent --name Ouroboros` returns bot details. `devtunnel show ouroboros` returns tunnel URL. `.env` exists with credentials. `.env` is in `.gitignore`.
 
 ### Unit 1a: Streaming Overhaul -- Tests
-**Status**: Not started
+**Status**: Done
 
 **What**: Write tests for the new streaming behavior in `teams.ts`. The streaming changes are:
 1. **Cumulative content**: `stream.emit()` must send ALL previous content plus new content (append-only). Add an accumulator that tracks total emitted text.
