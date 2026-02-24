@@ -4,12 +4,16 @@
   "private": true,
   "scripts": {
     "build": "tsc",
-    "dev": "tsc && node dist/agent.js"
+    "dev": "tsc && node dist/agent.js",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "openai": "^4.78.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.0"
+    "@vitest/coverage-v8": "^4.0.18",
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.18"
   }
 }
