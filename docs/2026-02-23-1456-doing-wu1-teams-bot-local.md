@@ -1,6 +1,6 @@
 # Doing: WU1 -- Teams Bot <> Agent Locally (DevtoolsPlugin)
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-02-23 17:26
 **Planning**: ./2026-02-23-1456-planning-wu1-teams-bot-local.md
@@ -18,17 +18,17 @@ Refactor ouroboros from a CLI-only agent into a multi-channel architecture (CLI 
 
 ## Completion Criteria
 
-- [ ] `runAgent()` exported from `src/core.ts`, fully channel-agnostic (no `process.stdout`, no `process.stderr`, no ANSI codes)
-- [ ] `ChannelCallbacks` interface covers all channel adapter needs: `onModelStart`, `onModelStreamStart`, `onTextChunk`, `onToolStart`, `onToolEnd`, `onError`
-- [ ] CLI channel (`agent.ts`) calls `runAgent()` -- boot greeting, ANSI think tag dimming, spinner on stderr, tool result summaries
-- [ ] CLI UX fixes: no double message echo, no garbage chars during model calls, Ctrl-C clears input (or confirms exit if empty), up-arrow history
-- [ ] Teams channel adapter (inside ouroboros `src/`) starts with DevtoolsPlugin, calls `runAgent` from core
-- [ ] Sending a message in DevtoolsPlugin UI triggers the ouroboros agent and streams a response
-- [ ] Tool calls show informative updates in DevtoolsPlugin during execution
-- [ ] Think tags stripped from Teams output (not shown to user)
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] `runAgent()` exported from `src/core.ts`, fully channel-agnostic (no `process.stdout`, no `process.stderr`, no ANSI codes)
+- [x] `ChannelCallbacks` interface covers all channel adapter needs: `onModelStart`, `onModelStreamStart`, `onTextChunk`, `onToolStart`, `onToolEnd`, `onError`
+- [x] CLI channel (`agent.ts`) calls `runAgent()` -- boot greeting, ANSI think tag dimming, spinner on stderr, tool result summaries
+- [x] CLI UX fixes: no double message echo, no garbage chars during model calls, Ctrl-C clears input (or confirms exit if empty), up-arrow history
+- [x] Teams channel adapter (inside ouroboros `src/`) starts with DevtoolsPlugin, calls `runAgent` from core
+- [x] Sending a message in DevtoolsPlugin UI triggers the ouroboros agent and streams a response
+- [x] Tool calls show informative updates in DevtoolsPlugin during execution
+- [x] Think tags stripped from Teams output (not shown to user)
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 
@@ -230,7 +230,7 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 **Acceptance**: `npm run test:coverage` shows 100% coverage on `src/teams.ts`. All tests green. No warnings.
 
 ### Unit 4: Integration Smoke Test
-**Status**: Not started
+**Status**: Done
 
 **What**: Run full test suite. Verify both channels end-to-end:
 - `npm test` -- all unit tests pass
