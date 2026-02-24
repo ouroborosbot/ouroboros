@@ -165,6 +165,20 @@ describe("CLI adapter - onModelStreamStart", () => {
 
     vi.restoreAllMocks()
   })
+
+  it("handles stop without prior start (no interval to clear)", async () => {
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true)
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true)
+
+    vi.resetModules()
+    const agent = await import("../agent")
+    const callbacks = agent.createCliCallbacks()
+
+    // Call onModelStreamStart without onModelStart — spinner.stop() with no interval
+    expect(() => callbacks.onModelStreamStart()).not.toThrow()
+
+    vi.restoreAllMocks()
+  })
 })
 
 describe("CLI adapter - onToolStart", () => {
