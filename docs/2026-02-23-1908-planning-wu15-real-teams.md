@@ -1,6 +1,6 @@
 # Planning: WU1.5 -- Bot Registration, Dev Tunnels, Real Teams Surface
 
-**Status**: drafting
+**Status**: NEEDS_REVIEW
 **Created**: 2026-02-23
 
 ## Goal
@@ -24,9 +24,12 @@ Connect the ouroboros agent to real Teams -- move from the DevtoolsPlugin playgr
 - Sideload the app into the user's Teams tenant (via Teams admin or developer portal)
 - Verify streaming works end-to-end in 1:1 Teams bot chat (informative updates + response streaming)
 - Verify the agent appears and works in Microsoft 365 Copilot Chat as a Custom Engine Agent
-- Add a `teams:dev` npm script that starts the tunnel + bot together for local development
-- Streaming buffer/throttle: ensure text chunks are buffered to respect the 1 req/sec throttle (Teams constraint) -- the current `stream.emit()` per token will likely hit rate limits
-- Handle the "stop streaming" signal from Teams (user clicks stop button) -- currently not handled
+- Create `.env` file pattern for local development (`CLIENT_ID`, `CLIENT_SECRET`, `TENANT_ID`), add `.env` to `.gitignore`
+- Streaming: change from incremental to cumulative content (append-only requirement -- each emit must contain all previous text plus new text)
+- Streaming buffer/throttle: buffer text chunks and flush at most once per ~1.5-2 seconds to respect the 1 req/sec throttle (Teams constraint)
+- Handle the "stop streaming" signal from Teams (user clicks stop button, bot receives `403 ContentStreamNotAllowed`) -- gracefully stop the agent
+- Handle `@mention` markup stripping: in real Teams, `activity.text` includes `<at>botname</at>` -- ensure clean text reaches the agent (SDK has `stripMentionsText` middleware)
+- Update existing `teams.test.ts` tests to reflect streaming behavior changes (cumulative content, buffering)
 - 100% test coverage on all new code
 - All tests pass
 - No warnings
@@ -47,12 +50,15 @@ Connect the ouroboros agent to real Teams -- move from the DevtoolsPlugin playgr
 - [ ] Dev tunnel is configured and persistent (same URL across sessions)
 - [ ] Bot messaging endpoint is set to `https://<tunnel-url>/api/messages`
 - [ ] `teams.ts` works in both DevtoolsPlugin mode (no env vars) and real bot mode (with `CLIENT_ID`, `CLIENT_SECRET`, `TENANT_ID`)
+- [ ] `.env` file pattern documented and `.env` in `.gitignore`
 - [ ] App manifest is valid and sideloaded into Teams
 - [ ] Sending a message in 1:1 Teams bot chat triggers the agent and streams a response
 - [ ] Sending a message via Copilot Chat (CEA) triggers the agent and streams a response
 - [ ] Informative updates appear during tool execution in both surfaces
+- [ ] Streaming sends cumulative (append-only) content, not incremental chunks
 - [ ] Streaming respects the 1 req/sec throttle (buffered, not per-token)
 - [ ] Stop-streaming signal from Teams is handled gracefully
+- [ ] `@mention` markup is stripped from incoming messages
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -67,11 +73,10 @@ Connect the ouroboros agent to real Teams -- move from the DevtoolsPlugin playgr
 
 ## Open Questions
 
-- [ ] The installed Teams SDK manifest type (`@microsoft/teams.apps` v2.0.5) defines `copilotAgents` with only `declarativeAgents`, not `customEngineAgents`. The `customEngineAgents` field requires `devPreview` manifest version. Do we need to upgrade the SDK, or can we use a manually-crafted manifest.json file outside the SDK's type system?
-- [ ] Does the `IStreamer` interface in the SDK automatically handle the streaming protocol (streamId, streamSequence, informative vs streaming types), or do we need to implement the REST API protocol manually when not using ActionPlanner?
-- [ ] The streaming docs say "streaming is not available with function calling" -- this refers to the Teams SDK's built-in ActionPlanner function calling. Need to confirm our custom loop approach (calling tools ourselves, streaming text ourselves) is not affected by this limitation.
-- [ ] What Teams tenant/M365 license does the user have? Copilot Chat CEA support requires Microsoft 365 Copilot licenses.
-- [ ] Does the dev tunnel need to be HTTPS with a trusted cert, or does the Teams service accept the dev tunnel's auto-generated HTTPS?
+- [ ] The installed Teams SDK manifest type (`@microsoft/teams.apps` v2.0.5) defines `copilotAgents` with only `declarativeAgents`, not `customEngineAgents`. The `customEngineAgents` field requires `devPreview` manifest version. Do we need to upgrade the SDK, or can we use a manually-crafted manifest.json file outside the SDK's type system? (Resolve during Unit 0 spike)
+- [ ] Does the `IStreamer` interface in the SDK automatically handle the streaming protocol (streamId, streamSequence, informative vs streaming types), or do we need to implement the REST API protocol manually when not using ActionPlanner? (Resolve during Unit 0 spike)
+- [ ] The streaming docs say "streaming is not available with function calling" -- this refers to the Teams SDK's built-in ActionPlanner function calling. Need to confirm our custom loop approach (calling tools ourselves, streaming text ourselves) is not affected by this limitation. (Resolve during Unit 0 spike)
+- [ ] Does the dev tunnel need to be HTTPS with a trusted cert, or does the Teams service accept the dev tunnel's auto-generated HTTPS? (Resolve during Unit 0 spike)
 
 ## Decisions Made
 
@@ -82,6 +87,8 @@ Connect the ouroboros agent to real Teams -- move from the DevtoolsPlugin playgr
 - **Environment-variable-driven mode switching**: No env vars = DevtoolsPlugin mode (existing WU1 behavior). Set `CLIENT_ID` + `CLIENT_SECRET` + `TENANT_ID` = real bot mode. No code changes needed to switch.
 - **Azure CLI for all setup**: Bot registration, resource group creation, and all Azure operations done via `az` CLI commands so the agent can automate them.
 - **Manifest version `devPreview`**: Required for `copilotAgents.customEngineAgents[]`. The SDK's built-in manifest type only supports 1.19 with `declarativeAgents`, so we'll need to handle the manifest file separately or extend the type.
+- **No Copilot license required for CEA**: The official licensing docs confirm "Users do not need a Copilot license to access custom engine agents in Microsoft 365 Copilot Chat." The Copilot license is required for declarative agents (which use Microsoft's orchestrator), not for CEAs (which bring their own LLM). Copilot Chat itself is included at no additional charge with any eligible M365 subscription. Metered charges only apply if the agent accesses shared tenant data (SharePoint, Copilot connectors) -- which ouroboros does not.
+- **Streaming fixes in WU1.5**: The append-only cumulative content requirement, the 1 req/sec throttle buffer, and the stop-streaming signal handling are all part of this work unit. They are changes to `teams.ts` callbacks, not to the core agentic loop.
 
 ## Context / References
 
@@ -98,6 +105,8 @@ Connect the ouroboros agent to real Teams -- move from the DevtoolsPlugin playgr
 - Streaming constraints: 1:1 chats only, 1 req/sec throttle, 2-minute time limit, content must be append-only, informative messages max 1KB/1000 chars
 - `StreamingResponse` class (Custom Planner section): `queueInformativeUpdate()`, `queueTextChunk()`, `endStream()` -- for custom model/planner development
 - Manifest `CopilotAgents` type in SDK: currently only has `declarativeAgents[]`, NOT `customEngineAgents[]` -- SDK type needs extending or manifest crafted manually
+- CEA licensing: https://learn.microsoft.com/en-us/microsoft-365-copilot/extensibility/cost-considerations -- "Users do not need a Copilot license to access custom engine agents in Microsoft 365 Copilot Chat"
+- Copilot Chat availability: included at no additional charge with eligible M365 subscriptions (Business Basic/Standard/Premium, E3/E5) -- https://www.microsoft.com/en-us/microsoft-365-copilot/pricing
 
 ## Notes
 
@@ -112,6 +121,10 @@ Key technical observations from research:
 - Streaming content must be append-only -- each `stream.emit()` must contain all previous content plus new content. Our current implementation sends incremental chunks, not cumulative text. This needs to change.
 
 - The stop-streaming error (`403 ContentStreamNotAllowed "Content stream was canceled by user"`) needs to be caught so the agent stops generating when a user clicks the stop button.
+
+- In real Teams, when a user @mentions the bot, `activity.text` includes `<at>botname</at>` markup. The SDK has a `stripMentionsText` option/middleware on the `App` constructor (`activity.mentions` handling). Must be configured or the agent receives junk HTML in the user message.
+
+- Existing `teams.test.ts` tests assume incremental `stream.emit()` calls. The switch to cumulative content and buffered flushing will require updating those tests. This is not new code but changed behavior -- tests must be updated alongside the implementation.
 
 ## Progress Log
 
