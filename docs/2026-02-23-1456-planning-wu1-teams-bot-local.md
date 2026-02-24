@@ -5,7 +5,7 @@
 
 ## Goal
 
-Refactor ouroboros from a CLI-only agent into a multi-channel architecture (CLI + Teams), extracting the agentic loop into a channel-agnostic core with adapter-based I/O. Prove the Teams channel works locally via DevtoolsPlugin before any cloud deployment.
+Refactor Ouroboros from a CLI-only agent into a multi-channel architecture (CLI + Teams), extracting the agentic loop into a channel-agnostic core with adapter-based I/O. Prove the Teams channel works locally via DevtoolsPlugin before any cloud deployment.
 
 ## Scope
 
@@ -19,8 +19,8 @@ Refactor ouroboros from a CLI-only agent into a multi-channel architecture (CLI 
   - Ctrl-C clears current input instead of killing the process
   - Ctrl-C with empty input warns before exiting (confirmation)
   - Input history (up arrow for previous messages)
-- Set up vitest as the test framework for ouroboros: add dev dependency, create vitest config, add test/coverage scripts to package.json
-- Add `@microsoft/teams.apps` v2 as a dependency of ouroboros
+- Set up vitest as the test framework for Ouroboros: add dev dependency, create vitest config, add test/coverage scripts to package.json
+- Add `@microsoft/teams.apps` v2 as a dependency of Ouroboros
 - Create a Teams channel adapter (e.g. `src/teams.ts`) that calls `runAgent()` with Teams-specific callbacks, starts with DevtoolsPlugin for local testing
 - Streaming text output in DevtoolsPlugin (token-by-token, following Teams SDK best practices)
 - Informative status updates during tool execution (e.g. "running read_file (package.json)...")
@@ -42,8 +42,8 @@ Refactor ouroboros from a CLI-only agent into a multi-channel architecture (CLI 
 - [ ] `ChannelCallbacks` interface covers all channel adapter needs: `onModelStart`, `onModelStreamStart`, `onTextChunk`, `onToolStart`, `onToolEnd`, `onError`
 - [ ] CLI channel (`agent.ts`) calls `runAgent()` -- boot greeting, ANSI think tag dimming, spinner on stderr, tool result summaries
 - [ ] CLI UX fixes: no double message echo, no garbage chars during model calls, Ctrl-C clears input (or confirms exit if empty), up-arrow history
-- [ ] Teams channel adapter (inside ouroboros `src/`) starts with DevtoolsPlugin, calls `runAgent` from core
-- [ ] Sending a message in DevtoolsPlugin UI triggers the ouroboros agent and streams a response
+- [ ] Teams channel adapter (inside Ouroboros `src/`) starts with DevtoolsPlugin, calls `runAgent` from core
+- [ ] Sending a message in DevtoolsPlugin UI triggers the Ouroboros agent and streams a response
 - [ ] Tool calls show informative updates in DevtoolsPlugin during execution
 - [ ] Think tags stripped from Teams output (not shown to user)
 - [ ] 100% test coverage on all new code
@@ -72,10 +72,10 @@ Refactor ouroboros from a CLI-only agent into a multi-channel architecture (CLI 
 - **Messages array owned by channel adapter, not core**: Adapter creates the array, passes it by reference. `runAgent()` mutates it (pushes assistant/tool messages during the loop). Enables WU2 multi-user later.
 - **Adapter pushes user message before calling `runAgent()`**: The channel adapter constructs and pushes `{role: "user", content: text}` onto the messages array, then calls `runAgent(messages, callbacks)`. Core assumes the latest message is already present. This gives adapters full control over user message shape (metadata, structured content, etc.).
 - **`buildSystem()` exported from core**: Adapters call it to set up the initial system message. Keeps system prompt logic centralized.
-- **Single repo, multi-channel architecture**: There is no separate teams-bot project or subdirectory. Ouroboros itself becomes multi-channel. The Teams channel adapter is a source file in `src/` alongside the CLI adapter (`agent.ts`).
+- **Single repo, multi-channel architecture**: There is no separate teams-bot project or subdirectory. Ouroboros itself is multi-channel. The Teams channel adapter is a source file in `src/` alongside the CLI adapter (`agent.ts`).
 - **`onModelStart`/`onModelStreamStart` split**: Two callbacks because CLI needs spinner start on model-start and spinner stop on first-token. Teams needs "thinking..." on model-start. The split gives each adapter control over both moments.
 - **Teams streaming required**: Token-by-token streaming in DevtoolsPlugin is a requirement. Implementation will follow Teams SDK v2 best practices (IStreamer API discovered in type definitions). Exact approach determined during implementation.
-- **Test framework: vitest**: Fast, TS-native, good mocking support. Added as a dev dependency to ouroboros with config, test scripts, and coverage reporting.
+- **Test framework: vitest**: Fast, TS-native, good mocking support. Added as a dev dependency to Ouroboros with config, test scripts, and coverage reporting.
 
 ## Context / References
 
@@ -86,7 +86,7 @@ Refactor ouroboros from a CLI-only agent into a multi-channel architecture (CLI 
 - Echo bot template: `/tmp/test-bot/src/index.ts` and `/tmp/test-bot/package.json`
 - Teams SDK IStreamer interface: `/tmp/test-bot/node_modules/@microsoft/teams.apps/dist/types/streamer.d.ts`
 - Teams SDK activity context (exposes `stream` property): `/tmp/test-bot/node_modules/@microsoft/teams.apps/dist/contexts/activity.d.ts`
-- ouroboros package.json: deps are `openai ^4.78.0`, devDeps `typescript ^5.7.0`, scripts `build: tsc`, `dev: tsc && node dist/agent.js`
+- Ouroboros package.json: deps are `openai ^4.78.0`, devDeps `typescript ^5.7.0`, scripts `build: tsc`, `dev: tsc && node dist/agent.js`
 - The `flush()` protected zone is at `agent.ts` lines 141-153. Closing tag `</think>`, offset 8. Do not modify.
 - The agentic loop to extract is at `agent.ts` lines 210-251 (the `while (!done)` block inside `main()`)
 

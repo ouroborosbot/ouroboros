@@ -1,4 +1,4 @@
-# toolmaker — how to add new tools to ouroboros
+# toolmaker — how to add new tools to Ouroboros
 
 ## the workflow
 

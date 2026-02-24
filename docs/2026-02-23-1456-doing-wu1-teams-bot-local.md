@@ -14,7 +14,7 @@
 
 ## Objective
 
-Refactor ouroboros from a CLI-only agent into a multi-channel architecture (CLI + Teams), extracting the agentic loop into a channel-agnostic core with adapter-based I/O. Prove the Teams channel works locally via DevtoolsPlugin before any cloud deployment.
+Refactor Ouroboros from a CLI-only agent into a multi-channel architecture (CLI + Teams), extracting the agentic loop into a channel-agnostic core with adapter-based I/O. Prove the Teams channel works locally via DevtoolsPlugin before any cloud deployment.
 
 ## Completion Criteria
 
@@ -22,8 +22,8 @@ Refactor ouroboros from a CLI-only agent into a multi-channel architecture (CLI 
 - [x] `ChannelCallbacks` interface covers all channel adapter needs: `onModelStart`, `onModelStreamStart`, `onTextChunk`, `onToolStart`, `onToolEnd`, `onError`
 - [x] CLI channel (`agent.ts`) calls `runAgent()` -- boot greeting, ANSI think tag dimming, spinner on stderr, tool result summaries
 - [x] CLI UX fixes: no double message echo, no garbage chars during model calls, Ctrl-C clears input (or confirms exit if empty), up-arrow history
-- [x] Teams channel adapter (inside ouroboros `src/`) starts with DevtoolsPlugin, calls `runAgent` from core
-- [x] Sending a message in DevtoolsPlugin UI triggers the ouroboros agent and streams a response
+- [x] Teams channel adapter (inside Ouroboros `src/`) starts with DevtoolsPlugin, calls `runAgent` from core
+- [x] Sending a message in DevtoolsPlugin UI triggers the Ouroboros agent and streams a response
 - [x] Tool calls show informative updates in DevtoolsPlugin during execution
 - [x] Think tags stripped from Teams output (not shown to user)
 - [x] 100% test coverage on all new code
@@ -56,7 +56,7 @@ Not started / In progress / Done / Blocked
 ### Unit 0: Test Infrastructure Setup
 **Status**: Done
 
-**What**: Set up vitest in ouroboros. Add `vitest` as dev dependency, create `vitest.config.ts`, add `test`, `test:coverage` scripts to `package.json`. Verify with a trivial passing test.
+**What**: Set up vitest in Ouroboros. Add `vitest` as dev dependency, create `vitest.config.ts`, add `test`, `test:coverage` scripts to `package.json`. Verify with a trivial passing test.
 **Output**: `vitest.config.ts`, updated `package.json`, one trivial test file proving the setup works.
 **Acceptance**: `npm test` runs and passes. `npm run test:coverage` produces a coverage report.
 
