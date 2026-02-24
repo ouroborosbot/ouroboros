@@ -128,7 +128,6 @@ export function createCliCallbacks(): ChannelCallbacks {
     onToolEnd: (name: string, argSummary: string, success: boolean) => {
       if (success) {
         currentSpinner?.stop(`${name}${argSummary ? ` (${argSummary})` : ""}`)
-        process.stdout.write(`\x1b[90m\u2192 ${name}${argSummary ? ` ${argSummary}` : ""}\x1b[0m\n`)
       } else {
         currentSpinner?.fail(`${name}: error`)
       }
@@ -167,15 +166,20 @@ export async function main() {
 
   process.stdout.write("\x1b[36m> \x1b[0m")
 
+  // Prevent default SIGINT from killing the process — we handle it via readline
+  process.on("SIGINT", () => {})
+
   // Ctrl-C handling
   rl.on("SIGINT", () => {
     const currentLine = (rl as any).line || ""
     const result = handleSigint(rl, currentLine)
     if (result === "clear") {
-      process.stdout.write("\n")
+      // Clear the current line and re-prompt
+      process.stdout.write("\r\x1b[K")
       process.stdout.write("\x1b[36m> \x1b[0m")
     } else if (result === "warn") {
-      process.stderr.write("\npress Ctrl-C again to exit\n")
+      process.stdout.write("\r\x1b[K")
+      process.stderr.write("press Ctrl-C again to exit\n")
       process.stdout.write("\x1b[36m> \x1b[0m")
     } else {
       rl.close()
@@ -186,6 +190,9 @@ export async function main() {
     for await (const input of rl) {
       if (closed || input.toLowerCase() === "exit") break
       if (!input.trim()) { process.stdout.write("\x1b[36m> \x1b[0m"); continue }
+
+      // Clear the echoed input line (readline terminal:true echoes it)
+      process.stdout.write("\x1b[1A\x1b[K")
 
       messages.push({ role: "user", content: input })
       addHistory(history, input)

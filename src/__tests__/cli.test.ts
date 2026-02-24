@@ -221,13 +221,13 @@ describe("CLI adapter - onToolStart", () => {
 })
 
 describe("CLI adapter - onToolEnd", () => {
-  it("stops tool spinner and logs invocation to stdout on success", async () => {
-    const stdoutChunks: string[] = []
-    vi.spyOn(process.stdout, "write").mockImplementation((chunk: any) => {
-      stdoutChunks.push(chunk.toString())
+  it("stops tool spinner with checkmark on stderr on success", async () => {
+    const stderrChunks: string[] = []
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
+      stderrChunks.push(chunk.toString())
       return true
     })
-    vi.spyOn(process.stderr, "write").mockImplementation(() => true)
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
     const agent = await import("../agent")
@@ -235,8 +235,9 @@ describe("CLI adapter - onToolEnd", () => {
 
     callbacks.onToolStart("read_file", { path: "/tmp/test.txt" })
     callbacks.onToolEnd("read_file", "/tmp/test.txt", true)
-    const output = stdoutChunks.join("")
+    const output = stderrChunks.join("")
     expect(output).toContain("read_file")
+    expect(output).toContain("\u2713") // checkmark
 
     vi.restoreAllMocks()
   })
@@ -263,12 +264,12 @@ describe("CLI adapter - onToolEnd", () => {
   })
 
   it("handles empty argSummary without extra formatting", async () => {
-    const stdoutChunks: string[] = []
-    vi.spyOn(process.stdout, "write").mockImplementation((chunk: any) => {
-      stdoutChunks.push(chunk.toString())
+    const stderrChunks: string[] = []
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
+      stderrChunks.push(chunk.toString())
       return true
     })
-    vi.spyOn(process.stderr, "write").mockImplementation(() => true)
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
     const agent = await import("../agent")
@@ -276,7 +277,7 @@ describe("CLI adapter - onToolEnd", () => {
 
     callbacks.onToolStart("get_current_time", {})
     callbacks.onToolEnd("get_current_time", "", true)
-    const output = stdoutChunks.join("")
+    const output = stderrChunks.join("")
     expect(output).toContain("get_current_time")
     // Should not have extra parentheses for empty summary
     expect(output).not.toContain("()")

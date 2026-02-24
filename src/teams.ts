@@ -20,6 +20,7 @@ export function createTeamsCallbacks(stream: TeamsStream): ChannelCallbacks {
   // Track whether we're inside a think tag across chunks
   let inThink = false
   let thinkBuf = ""
+  let emittedContent = false // trim leading whitespace until first real content
 
   return {
     onModelStart: () => {
@@ -56,7 +57,13 @@ export function createTeamsCallbacks(stream: TeamsStream): ChannelCallbacks {
         }
       }
 
+      // Trim leading whitespace until first real content — prevents blank
+      // space at the top of the message from newlines after think blocks
+      if (!emittedContent) {
+        output = output.trimStart()
+      }
       if (output.length > 0) {
+        emittedContent = true
         stream.emit(output)
       }
     },
