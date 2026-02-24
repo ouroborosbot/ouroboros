@@ -261,3 +261,4 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 - 2026-02-23 17:37 Unit 0 complete: vitest + coverage configured, trivial test passes, npm test and npm run test:coverage both work
 - 2026-02-23 17:39 Unit 1a complete: 46 tests for core.ts (isOwnCodebase, buildSystem, execTool, summarizeArgs, ChannelCallbacks, runAgent). All 45 fail (red) as expected -- core.ts does not exist yet
 - 2026-02-23 17:42 Unit 1b complete: core.ts created with lazy client init, ChannelCallbacks, runAgent. agent.ts refactored to import from core. All 47 tests pass (green). Build clean.
+- 2026-02-23 17:44 Unit 1c complete: 100% coverage on core.ts (stmts/branch/funcs/lines). Added 8 edge case tests (invalid JSON, non-Error throw, missing API key, null coalescing, etc). Fixed vitest/tsc config to exclude dist/ tests.
