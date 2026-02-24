@@ -15,6 +15,15 @@ export function stripThinkTags(text: string): string {
   return text.replace(/<think>[\s\S]*?<\/think>/g, "")
 }
 
+// Strip @mention markup from incoming messages.
+// Removes <at>...</at> tags and trims extra whitespace.
+// Fallback safety net -- the SDK's activity.mentions.stripText should handle
+// this automatically, but this utility is exported for testability.
+export function stripMentions(text: string): string {
+  if (!text) return ""
+  return text.replace(/<at>[^<]*<\/at>/g, "").trim()
+}
+
 // Default debounce interval for buffered streaming (ms)
 const BUFFER_INTERVAL_MS = 1500
 
@@ -173,11 +182,31 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream): Pro
   stream.close()
 }
 
-// Start the Teams app with DevtoolsPlugin
+// Start the Teams app in DevtoolsPlugin mode (local dev) or Bot Service mode (real Teams).
+// Mode is determined by the CLIENT_ID environment variable.
 export function startTeamsApp(): void {
-  const app = new App({
-    plugins: [new DevtoolsPlugin()],
-  })
+  const mentionStripping = { activity: { mentions: { stripText: true as const } } }
+
+  let app: InstanceType<typeof App>
+  let mode: string
+
+  if (process.env.CLIENT_ID) {
+    // Bot Service mode -- real Teams connection with SingleTenant credentials
+    app = new App({
+      clientId: process.env.CLIENT_ID,
+      clientSecret: process.env.CLIENT_SECRET,
+      tenantId: process.env.TENANT_ID,
+      ...mentionStripping,
+    })
+    mode = "Bot Service"
+  } else {
+    // DevtoolsPlugin mode -- local development with Teams DevtoolsPlugin UI
+    app = new App({
+      plugins: [new DevtoolsPlugin()],
+      ...mentionStripping,
+    })
+    mode = "DevtoolsPlugin"
+  }
 
   app.on("message", async ({ stream, activity }) => {
     const text = activity.text || ""
@@ -186,5 +215,5 @@ export function startTeamsApp(): void {
 
   const port = parseInt(process.env.PORT || "3978", 10)
   app.start(port)
-  console.log(`Teams bot started on port ${port} with DevtoolsPlugin`)
+  console.log(`Teams bot started on port ${port} with ${mode}`)
 }
