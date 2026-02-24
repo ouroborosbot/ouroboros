@@ -61,7 +61,7 @@ Not started / In progress / Done / Blocked
 **Acceptance**: `npm test` runs and passes. `npm run test:coverage` produces a coverage report.
 
 ### Unit 1a: Core Extraction -- Tests
-**Status**: Not started
+**Status**: Done
 
 **What**: Write tests for the new `src/core.ts` module. Mock the OpenAI client. Test:
 - `buildSystem()` returns system prompt string; includes self-aware suffix when `isOwnCodebase()` is true, omits it when false
