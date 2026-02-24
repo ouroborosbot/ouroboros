@@ -40,10 +40,22 @@ export function createTeamsCallbacks(
 
   // Safely emit cumulative text to the stream.
   // On error (e.g. 403 from Teams stop button), abort the controller.
+  // Callers must check `stopped` before calling this function.
   function safeEmit(text: string): void {
-    if (stopped) return
     try {
       stream.emit(text)
+    } catch {
+      stopped = true
+      controller.abort()
+    }
+  }
+
+  // Safely send a status update to the stream.
+  // On error (e.g. 403 from Teams stop button), abort the controller.
+  function safeUpdate(text: string): void {
+    if (stopped) return
+    try {
+      stream.update(text)
     } catch {
       stopped = true
       controller.abort()
@@ -80,7 +92,7 @@ export function createTeamsCallbacks(
 
   const callbacks: ChannelCallbacks = {
     onModelStart: () => {
-      stream.update("thinking...")
+      safeUpdate("thinking...")
     },
     onModelStreamStart: () => {
       // No-op for Teams -- streaming has already started
@@ -128,13 +140,13 @@ export function createTeamsCallbacks(
     },
     onToolStart: (name: string, args: Record<string, string>) => {
       const argSummary = Object.values(args).join(", ")
-      stream.update(`running ${name} (${argSummary})...`)
+      safeUpdate(`running ${name} (${argSummary})...`)
     },
     onToolEnd: (name: string, summary: string, success: boolean) => {
       if (success) {
-        stream.update(summary || `${name} done`)
+        safeUpdate(summary || `${name} done`)
       } else {
-        stream.update(`${name} failed: ${summary}`)
+        safeUpdate(`${name} failed: ${summary}`)
       }
     },
     onError: (error: Error) => {

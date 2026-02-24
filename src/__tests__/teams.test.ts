@@ -191,6 +191,76 @@ describe("Teams adapter - createTeamsCallbacks (buffered streaming)", () => {
     expect(mockStream.emit).toHaveBeenCalledWith("first second")
   })
 
+  it("flush() with empty buffer does not emit", async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    const { flush } = teams.createTeamsCallbacks(mockStream as any, controller)
+    flush()
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  it("flush() after abort does not emit (stopped flag)", async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    mockStream.emit.mockImplementation(() => { throw new Error("403 Forbidden") })
+    const { callbacks, flush } = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onTextChunk("data")
+    vi.advanceTimersByTime(1500) // triggers abort via emit error
+
+    mockStream.emit.mockClear()
+    callbacks.onTextChunk("more data")
+    flush()
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  // --- update() error handling ---
+
+  it("when update throws (403), controller is aborted", async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    mockStream.update.mockImplementation(() => { throw new Error("403 Forbidden") })
+    const { callbacks } = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onToolStart("read_file", { path: "test.txt" })
+    expect(controller.signal.aborted).toBe(true)
+  })
+
+  it("after abort via update, subsequent updates are skipped", async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    mockStream.update.mockImplementationOnce(() => { throw new Error("403") })
+    const { callbacks } = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onModelStart() // this throws and aborts
+    mockStream.update.mockClear()
+    callbacks.onToolStart("shell", { command: "ls" }) // should be skipped
+    expect(mockStream.update).not.toHaveBeenCalled()
+  })
+
+  // --- Timer fires after abort via update (covers !stopped false branch in timer callback) ---
+
+  it("debounce timer firing after abort via update does not emit", async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    const { callbacks } = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    // Schedule a debounce timer by sending text content
+    callbacks.onTextChunk("data")
+    // Advance partway -- timer not yet fired
+    vi.advanceTimersByTime(1000)
+
+    // Now make update throw -- this sets stopped=true WITHOUT clearing the timer
+    mockStream.update.mockImplementation(() => { throw new Error("403") })
+    callbacks.onToolStart("read_file", { path: "test.txt" })
+    expect(controller.signal.aborted).toBe(true)
+
+    // Now let the original debounce timer fire -- should be a no-op since stopped=true
+    mockStream.emit.mockClear()
+    vi.advanceTimersByTime(500)
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
   // --- Stop-streaming tests ---
 
   it("when emit throws (403), controller is aborted", async () => {
