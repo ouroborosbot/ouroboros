@@ -202,7 +202,7 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 **Acceptance**: Tests exist and FAIL (red) because `src/teams.ts` does not exist yet.
 
 ### Unit 3b: Teams Channel Adapter -- Implementation
-**Status**: Not started
+**Status**: Done
 
 **What**: Create `src/teams.ts`:
 - Import `runAgent`, `buildSystem`, `ChannelCallbacks` from `./core`
