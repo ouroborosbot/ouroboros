@@ -128,7 +128,7 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 **Acceptance**: Tests exist and FAIL (red) because `agent.ts` has not been refactored yet.
 
 ### Unit 2b: CLI Adapter Refactor -- Implementation
-**Status**: Not started
+**Status**: Done
 
 **What**: Refactor `agent.ts` to be a CLI channel adapter:
 - Import `runAgent`, `buildSystem`, `ChannelCallbacks` from `./core`
