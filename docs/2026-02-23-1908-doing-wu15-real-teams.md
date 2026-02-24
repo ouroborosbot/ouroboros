@@ -193,7 +193,7 @@ Also:
 **Acceptance**: Tests FAIL (red) because dual-mode and mention stripping are not implemented yet.
 
 ### Unit 2b: Bot Mode and Mention Stripping -- Implementation
-**Status**: Not started
+**Status**: Done
 
 **What**: Update `startTeamsApp()` in `teams.ts`:
 1. **Dual-mode detection**: Check `process.env.CLIENT_ID`. If set, run in bot mode (no DevtoolsPlugin). If not set, run in DevtoolsPlugin mode (existing behavior).
@@ -336,3 +336,4 @@ Walk through every completion criterion and check it off.
 - 2026-02-23 20:04 Unit 1b complete: Implemented cumulative accumulator, debounce buffer (1500ms), AbortController integration, flush-on-close. All 148 tests pass (green). Build clean.
 - 2026-02-23 20:07 Unit 1c complete: Added safeUpdate wrapper for stream.update() calls, coverage edge case tests. teams.ts now 100% stmts/branches/funcs/lines. 153 tests pass.
 - 2026-02-23 20:09 Unit 2a complete: 13 new tests for stripMentions utility, dual-mode startTeamsApp (DevtoolsPlugin vs Bot Service), mention stripping config, SingleTenant credentials. All FAIL (red).
+- 2026-02-23 20:10 Unit 2b complete: Dual-mode startTeamsApp, stripMentions utility, activity.mentions.stripText config in both modes. All 168 tests pass (green). Build clean.
