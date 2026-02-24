@@ -219,7 +219,7 @@ Also:
 **Acceptance**: `npm run test:coverage` shows 100% coverage on new/changed code. All tests green. No warnings.
 
 ### Unit 3: App Manifest and .env Setup
-**Status**: Not started
+**Status**: Done
 
 **What**: Create the Teams app manifest package and document the .env setup.
 1. Create `manifest/` directory in project root with:
@@ -338,3 +338,4 @@ Walk through every completion criterion and check it off.
 - 2026-02-23 20:09 Unit 2a complete: 13 new tests for stripMentions utility, dual-mode startTeamsApp (DevtoolsPlugin vs Bot Service), mention stripping config, SingleTenant credentials. All FAIL (red).
 - 2026-02-23 20:10 Unit 2b complete: Dual-mode startTeamsApp, stripMentions utility, activity.mentions.stripText config in both modes. All 168 tests pass (green). Build clean.
 - 2026-02-23 20:11 Unit 2c complete: teams.ts already at 100% stmts/branches/funcs/lines. No gaps to fill. 168 tests pass. Build clean.
+- 2026-02-23 20:12 Unit 3 complete: manifest.json (devPreview, bot + CEA), placeholder icons, manifest:package npm script. manifest.zip created successfully.
