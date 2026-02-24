@@ -265,3 +265,4 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 - 2026-02-23 17:46 Unit 2a complete: 18 CLI adapter tests (createCliCallbacks, think-tag dimming, spinner, tool display, boot greeting). All 18 fail (red) -- agent.ts doesn't export createCliCallbacks/bootGreeting yet.
 - 2026-02-23 17:48 Unit 2b complete: agent.ts refactored -- exports createCliCallbacks() and bootGreeting(), guarded main(). All 73 tests pass. Build clean.
 - 2026-02-23 17:49 Unit 2c complete: new CLI adapter code (createCliCallbacks, bootGreeting) at 100% coverage. Uncovered lines are pre-existing code (inputctrl, main).
+- 2026-02-23 17:50 Unit 2d-a complete: 13 CLI UX tests (InputController, Ctrl-C handling, history). All 13 fail (red) -- exports don't exist yet.
