@@ -51,13 +51,7 @@ Refactor ouroboros from a CLI-only agent into a multi-channel architecture (CLI 
 ## Work Units
 
 ### Legend
-
-- Not started: no marker
-- In progress: [WIP]
-- Done: [DONE]
-- Blocked: [BLOCKED]
-
-**CRITICAL: Every unit header MUST start with status emoji (use the plain text markers above for new units).**
+Not started / In progress / Done / Blocked
 
 ### Unit 0: Test Infrastructure Setup
 
@@ -72,13 +66,20 @@ Refactor ouroboros from a CLI-only agent into a multi-channel architecture (CLI 
 - `isOwnCodebase()` returns true when `src/agent.ts` and `package.json` exist in cwd, false otherwise
 - `execTool()` dispatches to correct handler (read_file, write_file, shell, list_directory, git_commit, list_skills, load_skill, get_current_time); returns "unknown: X" for unknown tools
 - `summarizeArgs()` produces correct summaries for each tool type (path for read/write/list_directory, truncated command for shell, message for git_commit, name for load_skill, JSON slice for unknown)
+- `ChannelCallbacks` interface has these signatures:
+  - `onModelStart()` -- no params, called before API request
+  - `onModelStreamStart()` -- no params, called on first content token
+  - `onTextChunk(text: string)` -- raw text delta including think tags
+  - `onToolStart(name: string, args: Record<string, string>)` -- tool name + parsed args
+  - `onToolEnd(name: string, summary: string, success: boolean)` -- tool name, arg summary, success/failure
+  - `onError(error: Error)` -- the caught error
 - `runAgent()` accepts `(messages, callbacks)` and drives the agentic loop:
-  - Fires `onModelStart` before the API call
-  - Fires `onModelStreamStart` on first content token
-  - Fires `onTextChunk` for each text delta (with raw think tags, no stripping)
+  - Fires `onModelStart()` before the API call
+  - Fires `onModelStreamStart()` on first content token
+  - Fires `onTextChunk(delta)` for each text delta (with raw think tags, no stripping)
   - When response has no tool calls, loop ends
-  - When response has tool calls: fires `onToolStart` before each tool, executes tool, fires `onToolEnd` after each tool, then loops back for another model call
-  - Fires `onError` on API errors, loop ends
+  - When response has tool calls: fires `onToolStart(name, args)` before each tool, executes tool, fires `onToolEnd(name, summary, success)` after each tool, then loops back for another model call
+  - Fires `onError(error)` on API errors, loop ends
   - Pushes assistant message (with content and/or tool_calls) onto messages array
   - Pushes tool result messages onto messages array
   - Does NOT push user message (adapter responsibility)
@@ -88,10 +89,10 @@ Refactor ouroboros from a CLI-only agent into a multi-channel architecture (CLI 
 ### Unit 1b: Core Extraction -- Implementation
 
 **What**: Create `src/core.ts` by extracting from `agent.ts`:
-- Export `ChannelCallbacks` interface: `onModelStart`, `onModelStreamStart`, `onTextChunk`, `onToolStart`, `onToolEnd`, `onError`
+- Export `ChannelCallbacks` interface: `onModelStart()`, `onModelStreamStart()`, `onTextChunk(text)`, `onToolStart(name, args)`, `onToolEnd(name, summary, success)`, `onError(error)`
 - Export `runAgent(messages, callbacks)` -- the agentic loop (currently the `while (!done)` block at lines 210-251), refactored to use callbacks instead of direct stdout/stderr
 - Export `buildSystem()` and `isOwnCodebase()` -- moved from `agent.ts`
-- Move to core (not exported, internal): `client`, `tools`, `toolHandlers`, `execTool()`, `summarizeArgs()`
+- Move to core: `client`, `tools`, `toolHandlers` (internal). Export `execTool()` and `summarizeArgs()` for testability.
 - Refactor `streamResponse()` into core: remove `flush()`, remove ANSI, remove `process.stdout.write`. Call `callbacks.onModelStreamStart()` on first content token. Call `callbacks.onTextChunk(delta)` for each content delta, passing raw text including think tags. No spinner parameter.
 - API key validation stays in core (required for client init)
 - Zero references to `process.stdout`, `process.stderr`, or ANSI escape codes in core
