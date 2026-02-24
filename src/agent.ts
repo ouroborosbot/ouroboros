@@ -1,79 +1,12 @@
 import OpenAI from "openai"
 import * as readline from "readline"
-import * as fs from "fs"
-import * as path from "path"
-import { execSync } from "child_process"
-import { listSkills, loadSkill } from "./skills"
-
-const required = ["MINIMAX_API_KEY"]
-for (const v of required) {
-  if (!process.env[v]) {
-    console.error(`missing ${v}`)
-    process.exit(1)
-  }
-}
-
-const client = new OpenAI({
-  apiKey: process.env.MINIMAX_API_KEY,
-  baseURL: "https://api.minimaxi.chat/v1",
-  timeout: 30000,
-  maxRetries: 0,
-})
-
-const tools: OpenAI.ChatCompletionTool[] = [
-  { type: "function", function: { name: "read_file", description: "read file contents", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } } },
-  { type: "function", function: { name: "write_file", description: "write content to file", parameters: { type: "object", properties: { path: { type: "string" }, content: { type: "string" } }, required: ["path", "content"] } } },
-  { type: "function", function: { name: "shell", description: "run shell command", parameters: { type: "object", properties: { command: { type: "string" } }, required: ["command"] } } },
-  { type: "function", function: { name: "list_directory", description: "list directory contents", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } } },
-  { type: "function", function: { name: "git_commit", description: "commit changes to git", parameters: { type: "object", properties: { message: { type: "string" }, add: { type: "string" } }, required: ["message"] } } },
-  { type: "function", function: { name: "list_skills", description: "list all available skills", parameters: { type: "object", properties: {} } } },
-  { type: "function", function: { name: "load_skill", description: "load a skill by name, returns its content", parameters: { type: "object", properties: { name: { type: "string" } }, required: ["name"] } } },
-  { type: "function", function: { name: "get_current_time", description: "get the current date and time", parameters: { type: "object", properties: {} } } },
-]
-
-const toolHandlers: Record<string, (args: Record<string, string>) => string> = {
-  read_file: (a) => fs.readFileSync(a.path, "utf-8"),
-  write_file: (a) => (fs.writeFileSync(a.path, a.content, "utf-8"), "ok"),
-  shell: (a) => execSync(a.command, { encoding: "utf-8", timeout: 30000 }),
-  list_directory: (a) => fs.readdirSync(a.path, { withFileTypes: true }).map(e => `${e.isDirectory() ? "d" : "-"}  ${e.name}`).join("\n"),
-  git_commit: (a) => {
-    try {
-      if (a.add === "true" || a.add === "all") execSync("git add -A", { encoding: "utf-8" })
-      execSync(`git commit -m "${a.message}"`, { encoding: "utf-8" })
-      return "committed"
-    } catch (e) { return `failed: ${e}` }
-  },
-  list_skills: () => JSON.stringify(listSkills()),
-  load_skill: (a) => {
-    try {
-      return loadSkill(a.name)
-    } catch (e) { return `error: ${e}` }
-  },
-  get_current_time: () => new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles", hour12: false }),
-}
-
-function execTool(name: string, args: Record<string, string>) {
-  const h = toolHandlers[name]
-  return h ? h(args) : `unknown: ${name}`
-}
-
-function isOwnCodebase() {
-  try {
-    const dir = process.cwd()
-    return fs.existsSync(path.join(dir, "src", "agent.ts")) && fs.existsSync(path.join(dir, "package.json"))
-  } catch { return false }
-}
-
-function buildSystem() {
-  const selfAware = isOwnCodebase() ? "\n\nnote: you are running in your own codebase, doing surgery on yourself. embrace the meta. there is a self-edit skill available — load it with load_skill to see how to safely modify your own source code." : ""
-  return `you are ouroboros, a witty funny competent chaos monkey coding assistant. you have file and shell tools. you get things done, crack jokes, embrace chaos, deliver quality. use lowercase in your responses to the user. no periods unless necessary. never apply lowercase to code, file paths, environment variables, or tool arguments — only to natural language output. introduce yourself on boot with a fun random greeting${selfAware}`
-}
+import { runAgent, buildSystem, summarizeArgs, ChannelCallbacks } from "./core"
 
 const messages: OpenAI.ChatCompletionMessageParam[] = [{ role: "system", content: buildSystem() }]
 
 // spinner that only touches stderr, cleans up after itself
 class spinner {
-  private frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+  private frames = ["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"]
   private i = 0
   private iv: NodeJS.Timeout | null = null
   private msg = ""
@@ -94,12 +27,12 @@ class spinner {
   stop(ok?: string) {
     if (this.iv) { clearInterval(this.iv); this.iv = null }
     process.stderr.write("\r\x1b[K")
-    if (ok) process.stderr.write(`\x1b[32m✓\x1b[0m ${ok}\n`)
+    if (ok) process.stderr.write(`\x1b[32m\u2713\x1b[0m ${ok}\n`)
   }
 
   fail(msg: string) {
     this.stop()
-    process.stderr.write(`\x1b[31m✗\x1b[0m ${msg}\n`)
+    process.stderr.write(`\x1b[31m\u2717\x1b[0m ${msg}\n`)
   }
 }
 
@@ -124,17 +57,16 @@ class inputctrl {
   }
 }
 
-async function streamResponse(s?: spinner) {
-  const response = await client.chat.completions.create({
-    model: process.env.MINIMAX_MODEL || "MiniMax-M2.5",
-    messages,
-    tools,
-    stream: true,
-  })
-  s?.stop()
+async function main() {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true })
+  const ctrl = new inputctrl(rl)
+  let closed = false
+  rl.on("close", () => { closed = true })
 
-  let content = ""
-  let toolCalls: Record<number, { id: string; name: string; arguments: string }> = {}
+  console.log("\nmini-max chat (type 'exit' to quit)\n")
+
+  // CLI channel callbacks -- stub that preserves current behavior
+  let currentSpinner: spinner | null = null
   let buf = ""
   let inThink = false
 
@@ -152,50 +84,45 @@ async function streamResponse(s?: spinner) {
     }
   }
 
-  for await (const chunk of response) {
-    const d = chunk.choices[0]?.delta
-    if (!d) continue
-    if (d.content) { content += d.content; buf += d.content; flush() }
-    if (d.tool_calls) {
-      for (const tc of d.tool_calls) {
-        if (!toolCalls[tc.index]) toolCalls[tc.index] = { id: tc.id ?? "", name: tc.function?.name ?? "", arguments: "" }
-        if (tc.id) toolCalls[tc.index].id = tc.id
-        if (tc.function?.name) toolCalls[tc.index].name = tc.function.name
-        if (tc.function?.arguments) toolCalls[tc.index].arguments += tc.function.arguments
+  const cliCallbacks: ChannelCallbacks = {
+    onModelStart: () => {
+      currentSpinner = new spinner("waiting for model")
+      currentSpinner.start()
+    },
+    onModelStreamStart: () => {
+      currentSpinner?.stop()
+      currentSpinner = null
+    },
+    onTextChunk: (text: string) => {
+      buf += text
+      flush()
+    },
+    onToolStart: (name: string, _args: Record<string, string>) => {
+      currentSpinner = new spinner(`running ${name}`)
+      currentSpinner.start()
+    },
+    onToolEnd: (name: string, argSummary: string, success: boolean) => {
+      if (success) {
+        currentSpinner?.stop(`${name}${argSummary ? ` (${argSummary})` : ""}`)
+        process.stdout.write(`\x1b[90m\u2192 ${name}${argSummary ? ` ${argSummary}` : ""}\x1b[0m\n`)
+      } else {
+        currentSpinner?.fail(`${name}: error`)
       }
-    }
+      currentSpinner = null
+    },
+    onError: (error: Error) => {
+      currentSpinner?.fail("request failed")
+      currentSpinner = null
+      process.stderr.write(`\x1b[31m${error}\x1b[0m\n`)
+    },
   }
-  process.stdout.write("\n")
-  return { content, toolCalls: Object.values(toolCalls) }
-}
-
-function summarizeArgs(name: string, args: Record<string, string>): string {
-  if (name === "read_file" || name === "write_file") return args.path || ""
-  if (name === "shell") {
-    const cmd = args.command || ""
-    return cmd.length > 50 ? cmd.slice(0, 50) + "..." : cmd
-  }
-  if (name === "list_directory") return args.path || ""
-  if (name === "git_commit") return args.message?.slice(0, 40) || ""
-  if (name === "load_skill") return args.name || ""
-  return JSON.stringify(args).slice(0, 30)
-}
-
-async function main() {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true })
-  const ctrl = new inputctrl(rl)
-  let closed = false
-  rl.on("close", () => { closed = true })
-
-  console.log("\nmini-max chat (type 'exit' to quit)\n")
 
   // boot greeting
   messages.push({ role: "user", content: "hello" })
-  const bootSpinner = new spinner("booting")
-  bootSpinner.start()
-  const { content: greeting } = await streamResponse(bootSpinner)
-  messages.push({ role: "assistant", content: greeting })
-  console.log()
+  ctrl.suppress()
+  await runAgent(messages, cliCallbacks)
+  ctrl.restore()
+  process.stdout.write("\n")
 
   process.stdout.write("\x1b[36m> \x1b[0m")
 
@@ -206,49 +133,13 @@ async function main() {
 
       messages.push({ role: "user", content: input })
 
-      let done = false
-      while (!done) {
-        const s = new spinner("waiting for model")
-        try {
-          ctrl.suppress()
-          s.start()
+      buf = ""
+      inThink = false
+      ctrl.suppress()
+      await runAgent(messages, cliCallbacks)
+      ctrl.restore()
+      process.stdout.write("\n")
 
-          const { content, toolCalls } = await streamResponse(s)
-          const msg: OpenAI.ChatCompletionAssistantMessageParam = { role: "assistant" }
-          if (content) msg.content = content
-          if (toolCalls.length) msg.tool_calls = toolCalls.map(tc => ({ id: tc.id, type: "function" as const, function: { name: tc.name, arguments: tc.arguments } }))
-          messages.push(msg)
-
-          if (!toolCalls.length) { done = true }
-          else {
-            for (const tc of toolCalls) {
-              let args: Record<string, string> = {}
-              try { args = JSON.parse(tc.arguments) } catch { /* ignore */ }
-              const argSummary = summarizeArgs(tc.name, args)
-              const ts = new spinner(`running ${tc.name}`)
-              ts.start()
-              let result: string
-              try {
-                result = execTool(tc.name, args)
-                ts.stop(`${tc.name}${argSummary ? ` (${argSummary})` : ""}`)
-                // also log the full invocation to stdout for visibility
-                process.stdout.write(`\x1b[90m→ ${tc.name}${argSummary ? ` ${argSummary}` : ""}\x1b[0m\n`)
-              } catch (e) {
-                result = `error: ${e}`
-                ts.fail(`${tc.name}: ${e}`)
-                process.stderr.write(`\x1b[2m${result}\x1b[0m\n`)
-              }
-              messages.push({ role: "tool", tool_call_id: tc.id, content: result })
-            }
-          }
-        } catch (e) {
-          s.fail("request failed")
-          process.stderr.write(`\x1b[31m${e}\x1b[0m\n`)
-          done = true
-        } finally {
-          ctrl.restore()
-        }
-      }
       if (closed) break
       process.stdout.write("\x1b[36m> \x1b[0m")
     }
