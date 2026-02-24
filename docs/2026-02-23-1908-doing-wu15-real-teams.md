@@ -171,7 +171,7 @@ Also:
 **Acceptance**: All Unit 1a tests PASS (green). `npm run build` succeeds. DevtoolsPlugin still works (backward compatible -- DevtoolsPlugin may not enforce append-only, but cumulative content is still valid).
 
 ### Unit 1c: Streaming Overhaul -- Coverage and Refactor
-**Status**: Not started
+**Status**: Done
 
 **What**: Run coverage on updated `teams.ts`. Fill gaps: timer edge cases (flush with empty buffer, flush after abort, rapid chunks, timer cleanup on close). Refactor buffer logic for clarity if needed.
 **Output**: Updated `src/__tests__/teams.test.ts`, 100% coverage on streaming code.
@@ -334,3 +334,4 @@ Walk through every completion criterion and check it off.
 - 2026-02-23 19:44 Unit 0 complete: Azure infra set up, .env created, dotenv installed. Changed to SingleTenant (Azure deprecated MultiTenant). TENANT_ID required in .env and App constructor.
 - 2026-02-23 20:03 Unit 1a complete: 23 new/updated tests for cumulative streaming, debounce buffer, flush-on-close, abort/stop. All FAIL (red) against current implementation. 125 other tests pass.
 - 2026-02-23 20:04 Unit 1b complete: Implemented cumulative accumulator, debounce buffer (1500ms), AbortController integration, flush-on-close. All 148 tests pass (green). Build clean.
+- 2026-02-23 20:07 Unit 1c complete: Added safeUpdate wrapper for stream.update() calls, coverage edge case tests. teams.ts now 100% stmts/branches/funcs/lines. 153 tests pass.
