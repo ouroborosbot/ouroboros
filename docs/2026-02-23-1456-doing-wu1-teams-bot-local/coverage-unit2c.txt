@@ -1,0 +1,26 @@
+
+> ouroboros@1.0.0 test:coverage
+> vitest run --coverage
+
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90m/Users/microsoft/code/ouroboros[39m
+      [2mCoverage enabled with [22m[33mv8[39m
+
+ [32m✓[39m src/__tests__/setup.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/__tests__/core.test.ts [2m([22m[2m54 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m src/__tests__/cli.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 76[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[32m73 passed[39m[22m[90m (73)[39m
+[2m   Start at [22m 17:49:15
+[2m   Duration [22m 281ms[2m (transform 206ms, setup 0ms, import 218ms, tests 118ms, environment 0ms)[22m
+
+[34m % [39m[2mCoverage report from [22m[33mv8[39m
+-----------|---------|----------|---------|---------|-------------------
+File       | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-----------|---------|----------|---------|---------|-------------------
+All files  |   73.27 |    79.81 |   71.42 |   73.07 |                   
+ agent.ts  |   57.28 |    51.51 |      70 |   57.83 | 40-54,117-152,159 
+ core.ts   |     100 |      100 |     100 |     100 |                   
+ skills.ts |    12.5 |        0 |       0 |    12.5 | 11-42             
+-----------|---------|----------|---------|---------|-------------------
