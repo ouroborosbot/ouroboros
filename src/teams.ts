@@ -24,33 +24,24 @@ export function stripMentions(text: string): string {
   return text.replace(/<at>[^<]*<\/at>/g, "").trim()
 }
 
-// Default debounce interval for buffered streaming (ms)
-const BUFFER_INTERVAL_MS = 1500
-
 // Create Teams-specific callbacks for the agent loop.
-// Returns { callbacks, flush } -- caller must call flush() after runAgent()
-// completes to emit any remaining buffered content before closing the stream.
+// The SDK handles cumulative text, debouncing (500ms), and the streaming
+// protocol (streamSequence, streamId, informative/streaming/final types).
+// We just send deltas and let the SDK do the rest.
 export function createTeamsCallbacks(
   stream: TeamsStream,
   controller: AbortController,
-): { callbacks: ChannelCallbacks; flush: () => void } {
+): ChannelCallbacks {
   // Track whether we're inside a think tag across chunks
   let inThink = false
   let thinkBuf = ""
   let emittedContent = false // trim leading whitespace until first real content
-
-  // Cumulative text accumulator -- every emit sends ALL content so far
-  let cumulativeText = ""
-
-  // Buffered flushing state
-  let pendingBuffer = "" // text waiting to be flushed
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null
   let stopped = false // set when stream signals cancellation (403)
 
-  // Safely emit cumulative text to the stream.
+  // Safely emit a text delta to the stream.
   // On error (e.g. 403 from Teams stop button), abort the controller.
-  // Callers must check `stopped` before calling this function.
   function safeEmit(text: string): void {
+    if (stopped) return
     try {
       stream.emit(text)
     } catch {
@@ -71,35 +62,7 @@ export function createTeamsCallbacks(
     }
   }
 
-  // Flush pending buffer to the stream immediately.
-  function flushBuffer(): void {
-    if (debounceTimer !== null) {
-      clearTimeout(debounceTimer)
-      debounceTimer = null
-    }
-    if (pendingBuffer.length > 0 && !stopped) {
-      cumulativeText += pendingBuffer
-      pendingBuffer = ""
-      safeEmit(cumulativeText)
-    }
-  }
-
-  // Schedule a debounced flush.
-  function scheduleFlush(): void {
-    if (debounceTimer !== null) {
-      clearTimeout(debounceTimer)
-    }
-    debounceTimer = setTimeout(() => {
-      debounceTimer = null
-      if (pendingBuffer.length > 0 && !stopped) {
-        cumulativeText += pendingBuffer
-        pendingBuffer = ""
-        safeEmit(cumulativeText)
-      }
-    }, BUFFER_INTERVAL_MS)
-  }
-
-  const callbacks: ChannelCallbacks = {
+  return {
     onModelStart: () => {
       safeUpdate("thinking...")
     },
@@ -143,8 +106,7 @@ export function createTeamsCallbacks(
       }
       if (output.length > 0) {
         emittedContent = true
-        pendingBuffer += output
-        scheduleFlush()
+        safeEmit(output)
       }
     },
     onToolStart: (name: string, args: Record<string, string>) => {
@@ -160,11 +122,9 @@ export function createTeamsCallbacks(
     },
     onError: (error: Error) => {
       if (stopped) return
-      stream.emit(`Error: ${error.message}`)
+      safeEmit(`Error: ${error.message}`)
     },
   }
-
-  return { callbacks, flush: flushBuffer }
 }
 
 // Global messages array (WU1 simplification -- single conversation)
@@ -176,10 +136,9 @@ const messages: OpenAI.ChatCompletionMessageParam[] = [
 export async function handleTeamsMessage(text: string, stream: TeamsStream): Promise<void> {
   messages.push({ role: "user", content: text })
   const controller = new AbortController()
-  const { callbacks, flush } = createTeamsCallbacks(stream, controller)
+  const callbacks = createTeamsCallbacks(stream, controller)
   await runAgent(messages, callbacks, controller.signal)
-  flush()
-  stream.close()
+  // SDK auto-closes the stream after our handler returns (app.process.js)
 }
 
 // Start the Teams app in DevtoolsPlugin mode (local dev) or Bot Service mode (real Teams).
@@ -210,8 +169,21 @@ export function startTeamsApp(): void {
 
   app.on("message", async ({ stream, activity }) => {
     const text = activity.text || ""
-    await handleTeamsMessage(text, stream)
+    try {
+      await handleTeamsMessage(text, stream)
+    } catch (err) {
+      console.error("Message handler error:", err)
+    }
   })
+
+  // Prevent SDK internal stream errors (e.g. "Content stream is not allowed
+  // on a already completed streamed message") from crashing the process.
+  // Guard: only register once even if startTeamsApp is called multiple times.
+  if (!process.listeners("unhandledRejection").some((l) => (l as any).__ouroboros)) {
+    const handler = (err: unknown) => { console.error("Unhandled rejection (non-fatal):", err) }
+    ;(handler as any).__ouroboros = true
+    process.on("unhandledRejection", handler)
+  }
 
   const port = parseInt(process.env.PORT || "3978", 10)
   app.start(port)
