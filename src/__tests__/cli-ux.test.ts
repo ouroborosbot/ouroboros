@@ -59,6 +59,25 @@ describe("CLI UX - InputController", () => {
     rl.close()
   })
 
+  it("suppress() works without TTY (no setRawMode)", async () => {
+    vi.resetModules()
+    const agent = await import("../agent")
+
+    const mockStdin = new Readable({ read() {} }) as any
+    // No isTTY, no setRawMode
+
+    const mockStdout = new Writable({ write(_chunk, _enc, cb) { cb(); return true } }) as any
+    const readline = await import("readline")
+    const rl = readline.createInterface({ input: mockStdin, output: mockStdout, terminal: false })
+
+    const ctrl = new agent.InputController(rl, mockStdin)
+    ctrl.suppress()
+    ctrl.restore()
+    // Should not throw
+
+    rl.close()
+  })
+
   it("suppress() is idempotent", async () => {
     vi.resetModules()
     const agent = await import("../agent")
