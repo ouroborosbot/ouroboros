@@ -1,8 +1,6 @@
 import OpenAI from "openai"
 import * as readline from "readline"
-import { runAgent, buildSystem, summarizeArgs, ChannelCallbacks } from "./core"
-
-const messages: OpenAI.ChatCompletionMessageParam[] = [{ role: "system", content: buildSystem() }]
+import { runAgent, buildSystem, ChannelCallbacks } from "./core"
 
 // spinner that only touches stderr, cleans up after itself
 class spinner {
@@ -57,15 +55,7 @@ class inputctrl {
   }
 }
 
-async function main() {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true })
-  const ctrl = new inputctrl(rl)
-  let closed = false
-  rl.on("close", () => { closed = true })
-
-  console.log("\nmini-max chat (type 'exit' to quit)\n")
-
-  // CLI channel callbacks -- stub that preserves current behavior
+export function createCliCallbacks(): ChannelCallbacks {
   let currentSpinner: spinner | null = null
   let buf = ""
   let inThink = false
@@ -84,7 +74,7 @@ async function main() {
     }
   }
 
-  const cliCallbacks: ChannelCallbacks = {
+  return {
     onModelStart: () => {
       currentSpinner = new spinner("waiting for model")
       currentSpinner.start()
@@ -116,11 +106,27 @@ async function main() {
       process.stderr.write(`\x1b[31m${error}\x1b[0m\n`)
     },
   }
+}
+
+export async function bootGreeting(messages: OpenAI.ChatCompletionMessageParam[], callbacks: ChannelCallbacks): Promise<void> {
+  messages.push({ role: "user", content: "hello" })
+  await runAgent(messages, callbacks)
+}
+
+async function main() {
+  const messages: OpenAI.ChatCompletionMessageParam[] = [{ role: "system", content: buildSystem() }]
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true })
+  const ctrl = new inputctrl(rl)
+  let closed = false
+  rl.on("close", () => { closed = true })
+
+  console.log("\nmini-max chat (type 'exit' to quit)\n")
+
+  const cliCallbacks = createCliCallbacks()
 
   // boot greeting
-  messages.push({ role: "user", content: "hello" })
   ctrl.suppress()
-  await runAgent(messages, cliCallbacks)
+  await bootGreeting(messages, cliCallbacks)
   ctrl.restore()
   process.stdout.write("\n")
 
@@ -133,8 +139,6 @@ async function main() {
 
       messages.push({ role: "user", content: input })
 
-      buf = ""
-      inThink = false
       ctrl.suppress()
       await runAgent(messages, cliCallbacks)
       ctrl.restore()
@@ -149,4 +153,8 @@ async function main() {
   }
 }
 
-main()
+// Only run main when executed directly, not when imported
+const isDirectExecution = require.main === module
+if (isDirectExecution) {
+  main()
+}
