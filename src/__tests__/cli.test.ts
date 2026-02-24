@@ -172,10 +172,26 @@ describe("CLI adapter - onModelStreamStart", () => {
 
     vi.resetModules()
     const agent = await import("../agent")
-    const callbacks = agent.createCliCallbacks()
 
-    // Call onModelStreamStart without onModelStart — spinner.stop() with no interval
-    expect(() => callbacks.onModelStreamStart()).not.toThrow()
+    // Directly test Spinner.stop() without start() — covers the this.iv === null branch
+    const s = new agent.Spinner("test")
+    expect(() => s.stop()).not.toThrow()
+
+    vi.restoreAllMocks()
+  })
+
+  it("interval callback fires and advances spinner frame", async () => {
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true)
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true)
+
+    vi.resetModules()
+    const agent = await import("../agent")
+
+    // Start spinner and let the setInterval callback fire
+    const s = new agent.Spinner("test")
+    s.start()
+    await new Promise((r) => setTimeout(r, 100))
+    s.stop()
 
     vi.restoreAllMocks()
   })

@@ -105,11 +105,3 @@ export function startTeamsApp(): void {
   app.start(port)
   console.log(`Teams bot started on port ${port} with DevtoolsPlugin`)
 }
-
-// entrypoint guard — only runs when executed directly (node dist/teams.js),
-// never in vitest where require.main !== module. startTeamsApp() is tested via direct import.
-/* v8 ignore start */
-if (require.main === module) {
-  startTeamsApp()
-}
-/* v8 ignore stop */
