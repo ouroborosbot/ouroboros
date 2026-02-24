@@ -103,7 +103,7 @@ Not started / In progress / Done / Blocked
 **Acceptance**: All Unit 1a tests PASS (green). `npm run build` succeeds with no errors. `npm run dev` still works (existing behavior preserved via stub callbacks).
 
 ### Unit 1c: Core Extraction -- Coverage and Refactor
-**Status**: Not started
+**Status**: Done
 
 **What**: Run coverage report on `core.ts`. Identify uncovered branches. Add tests for edge cases: empty tool arguments, JSON parse failure in tool args, unknown tool name, `execTool` error paths, `summarizeArgs` with missing fields. Refactor if needed.
 **Output**: Updated `src/__tests__/core.test.ts`, 100% coverage on `core.ts`.
