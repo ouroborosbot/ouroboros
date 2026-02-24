@@ -258,3 +258,4 @@ Note: Tests mock `process.stdin`, `process.stdout`, `process.stderr`. Spinner an
 - 2026-02-23 17:28 Pass 2: granularity -- split CLI UX fixes into Unit 2d-a/b/c, detailed test specs for all units
 - 2026-02-23 17:29 Pass 3: validation -- fixed Teams SDK class names (App not Application, DevtoolsPlugin from @microsoft/teams.dev), fixed Unit 1b to keep agent.ts compilable
 - 2026-02-23 17:30 Pass 4: quality -- added ChannelCallbacks parameter signatures, exported execTool/summarizeArgs for testability
+- 2026-02-23 17:37 Unit 0 complete: vitest + coverage configured, trivial test passes, npm test and npm run test:coverage both work
