@@ -118,7 +118,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Acceptance**: 100% coverage on new code, tests still green
 
 ### ⬜ Unit 3a: Session Persistence -- Tests
-**What**: Add tests to `src/__tests__/context.test.ts` (or `src/__tests__/session.test.ts`) for session persistence functions. These may live in `src/context.ts` or `src/session.ts` -- decide during implementation. Tests cover:
+**What**: Add tests to `src/__tests__/context.test.ts` for session persistence functions in `src/context.ts` (same module as token counting/trimming). Tests cover:
 - `saveSession(filePath, messages)`: writes JSON to disk. Creates parent directories if needed (`mkdirSync` recursive).
 - `loadSession(filePath)`: reads JSON from disk. Returns parsed messages array on success. Returns null if file missing (ENOENT). Returns null if file is corrupt JSON. Returns null on other read errors.
 - `deleteSession(filePath)`: removes session file. No-op if file missing (ENOENT).
@@ -126,7 +126,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Acceptance**: Tests exist and FAIL (red)
 
 ### ⬜ Unit 3b: Session Persistence -- Implementation
-**What**: Add session functions to `src/context.ts` (or `src/session.ts`):
+**What**: Add session functions to `src/context.ts`:
 - `saveSession(filePath: string, messages: OpenAI.ChatCompletionMessageParam[]): void` -- `mkdirSync(dirname, { recursive: true })`, `writeFileSync(filePath, JSON.stringify(messages, null, 2))`.
 - `loadSession(filePath: string): OpenAI.ChatCompletionMessageParam[] | null` -- try/catch around `readFileSync` + `JSON.parse`. Return null on any error.
 - `deleteSession(filePath: string): void` -- try/catch around `unlinkSync`. No-op on ENOENT.
@@ -172,6 +172,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Acceptance**: 100% coverage on new code, tests still green
 
 ### ⬜ Unit 5a: Core Module Config Integration -- Tests
+**Depends on**: Units 1a-1c (config module must exist)
 **What**: Add tests to `src/__tests__/core.test.ts` for the refactored `getClient()` that reads from config.json. Tests cover:
 - `getClient()` uses `getAzureConfig()` when azure config has apiKey (from config.json or env var).
 - `getClient()` uses `getMinimaxConfig()` when minimax config has apiKey.
@@ -193,6 +194,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Acceptance**: 100% coverage on new code, tests still green
 
 ### ⬜ Unit 6a: CLI Integration -- Tests
+**Depends on**: Units 1-4 (config, context, session, commands modules must exist)
 **What**: Add tests to `src/__tests__/agent-main.test.ts` for CLI session persistence and slash command dispatch:
 - On startup, `main()` calls `loadSession` to restore previous conversation. If session exists, messages array is pre-populated (no boot greeting).
 - On startup, if no session exists, messages array starts fresh with system prompt and boot greeting runs.
@@ -231,6 +233,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Acceptance**: 100% coverage on new code, tests still green
 
 ### ⬜ Unit 7a: Teams Integration -- Tests
+**Depends on**: Units 1-4 (config, context, session, commands modules must exist)
 **What**: Add tests to `src/__tests__/teams.test.ts` for Teams per-conversation persistence, slash commands, and manifest:
 - `handleTeamsMessage` signature changes to `handleTeamsMessage(text, stream, conversationId)`.
 - On each message: loads session for that conversation ID. If session exists, uses it. If not, creates fresh with system prompt.
@@ -273,6 +276,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Acceptance**: 100% coverage on new code, tests still green
 
 ### ⬜ Unit 8: Integration Validation
+**Depends on**: All prior units (1-7) complete
 **What**: Run full test suite (`npm test`). Verify no regressions across all test files. Run coverage report (`npm run test:coverage`). Verify 100% on all new/modified files (`src/config.ts`, `src/context.ts`, `src/commands.ts`, `src/agent.ts`, `src/teams.ts`). Fix any issues found.
 **Output**: Clean test run, full coverage report saved to artifacts directory
 **Acceptance**: All tests pass, 100% coverage on new code, no warnings
