@@ -176,12 +176,12 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: `src/commands.ts` with command system
 **Acceptance**: All Unit 4a tests PASS (green), no warnings
 
-### 🔄 Unit 4c: Slash Command System -- Coverage & Refactor
+### ✅ Unit 4c: Slash Command System -- Coverage & Refactor
 **What**: Verify 100% coverage on `src/commands.ts`. Add any missing edge case tests.
 **Output**: 100% coverage, tests still green
 **Acceptance**: 100% coverage on new code, tests still green
 
-### ⬜ Unit 5a: Core Module Config Integration -- Tests
+### 🔄 Unit 5a: Core Module Config Integration -- Tests
 **Depends on**: Units 1a-1c (config module must exist)
 **What**: Add tests to `src/__tests__/core.test.ts` for the refactored `getClient()` that reads from config.json. Tests cover:
 - `getClient()` uses `getAzureConfig()` when azure config has apiKey (from config.json or env var).
@@ -326,3 +326,6 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 - 2026-02-25 13:28 Unit 3a complete: 9 failing tests for session persistence
 - 2026-02-25 13:29 Unit 3b complete: session persistence implemented, 337 total tests pass
 - 2026-02-25 13:29 Unit 3c complete: 100% coverage on context.ts with deleteSession re-throw test
+- 2026-02-25 13:30 Unit 4a complete: 20 failing tests for slash command system
+- 2026-02-25 13:30 Unit 4b complete: commands.ts implemented, 358 total tests pass
+- 2026-02-25 13:31 Unit 4c complete: 100% coverage on commands.ts
