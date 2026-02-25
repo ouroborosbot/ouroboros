@@ -1085,6 +1085,125 @@ describe("streamResponsesApi", () => {
     expect(callbacks.onModelStreamStart).not.toHaveBeenCalled()
     expect(result.content).toBe("")
   })
+
+  // --- Tool call events ---
+
+  it("tracks function_call from output_item.added + arguments.delta + output_item.done", async () => {
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "read_file", arguments: "" } },
+      { type: "response.function_call_arguments.delta", delta: '{"path"' },
+      { type: "response.function_call_arguments.delta", delta: ':"a.txt"}' },
+      { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "read_file", arguments: '{"path":"a.txt"}' } },
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(result.toolCalls).toEqual([{ id: "c1", name: "read_file", arguments: '{"path":"a.txt"}' }])
+  })
+
+  it("tracks multiple tool calls independently", async () => {
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "read_file", arguments: "" } },
+      { type: "response.function_call_arguments.delta", delta: '{"path":"a.txt"}' },
+      { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "read_file", arguments: '{"path":"a.txt"}' } },
+      { type: "response.output_item.added", item: { type: "function_call", call_id: "c2", name: "shell", arguments: "" } },
+      { type: "response.function_call_arguments.delta", delta: '{"command":"ls"}' },
+      { type: "response.output_item.done", item: { type: "function_call", call_id: "c2", name: "shell", arguments: '{"command":"ls"}' } },
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(result.toolCalls).toHaveLength(2)
+    expect(result.toolCalls[0].name).toBe("read_file")
+    expect(result.toolCalls[1].name).toBe("shell")
+  })
+
+  // --- Output item collection ---
+
+  it("pushes all output_item.done items to outputItems regardless of type", async () => {
+    const reasoningItem = { type: "reasoning", id: "r1", summary: [{ text: "thought", type: "summary_text" }], encrypted_content: "enc123" }
+    const messageItem = { type: "message", id: "m1", content: [{ type: "output_text", text: "hello" }] }
+    const fcItem = { type: "function_call", call_id: "c1", name: "read_file", arguments: '{}' }
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_item.done", item: reasoningItem },
+      { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "read_file", arguments: "" } },
+      { type: "response.output_item.done", item: fcItem },
+      { type: "response.output_item.done", item: messageItem },
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(result.outputItems).toHaveLength(3)
+    expect(result.outputItems[0]).toEqual(reasoningItem)
+    expect(result.outputItems[1]).toEqual(fcItem)
+    expect(result.outputItems[2]).toEqual(messageItem)
+  })
+
+  it("preserves encrypted_content in reasoning output items", async () => {
+    const item = { type: "reasoning", id: "r1", summary: [], encrypted_content: "secret" }
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_item.done", item },
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(result.outputItems[0].encrypted_content).toBe("secret")
+  })
+
+  it("returns empty outputItems when no done events", async () => {
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_text.delta", delta: "text" },
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(result.outputItems).toEqual([])
+  })
+
+  // --- TurnResult shape ---
+
+  it("returns TurnResult with text + tool calls + output items", async () => {
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_text.delta", delta: "text" },
+      { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "shell", arguments: "" } },
+      { type: "response.function_call_arguments.delta", delta: '{"command":"ls"}' },
+      { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "shell", arguments: '{"command":"ls"}' } },
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(result.content).toBe("text")
+    expect(result.toolCalls).toHaveLength(1)
+    expect(result.outputItems).toHaveLength(1)
+  })
+
+  // --- Edge cases ---
+
+  it("does not track output_item.added for non-function_call types", async () => {
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_item.added", item: { type: "message", id: "m1" } },
+      { type: "response.output_item.done", item: { type: "message", id: "m1", content: [] } },
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(result.toolCalls).toEqual([])
+    expect(result.outputItems).toHaveLength(1)
+  })
+
+  it("ignores function_call_arguments.delta when no active tool call", async () => {
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.function_call_arguments.delta", delta: "stray args" },
+      { type: "response.output_text.delta", delta: "ok" },
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(result.content).toBe("ok")
+    expect(result.toolCalls).toEqual([])
+  })
+
+  it("handles tool call with empty arguments string", async () => {
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "get_current_time", arguments: "" } },
+      { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "get_current_time", arguments: "" } },
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(result.toolCalls).toEqual([{ id: "c1", name: "get_current_time", arguments: "" }])
+  })
 })
 
 describe("runAgent", () => {
