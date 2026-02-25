@@ -112,3 +112,4 @@ Design philosophy: the model should take notes on its work (via write_file tool)
 
 ## Progress Log
 - 2026-02-25 08:25 Created
+- 2026-02-25 08:36 Applied user decisions (no summarization, char/4 heuristic, single global CLI session, "new" command). Added Teams keying options analysis.
