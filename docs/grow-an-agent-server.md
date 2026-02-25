@@ -35,7 +35,7 @@ Bonus: run two instances side by side so they can fix each other when one breaks
 
 ## 1. Teams bot ↔ agent locally (DevtoolsPlugin playground)
 
-**Status**: Planning
+**Status**: Done
 **Planning doc**: [2026-02-23-1456-planning-wu1-teams-bot-local.md](2026-02-23-1456-planning-wu1-teams-bot-local.md)
 **Doing doc**: [2026-02-23-1456-doing-wu1-teams-bot-local.md](2026-02-23-1456-doing-wu1-teams-bot-local.md)
 
@@ -135,13 +135,19 @@ TENANT_ID=<tenantId>
 
 ## 2. Multi-user session handling
 
-**Status**: Not started
+**Status**: Done
+**Doing doc**: [2026-02-25-0823-doing-sliding-context-window.md](2026-02-25-0823-doing-sliding-context-window.md)
 
-The agent currently has one global `messages` array. Add per-conversation history keyed by Teams conversation ID so multiple people can use it without stepping on each other.
+Per-conversation session handling, keyed by Teams conversation ID, with file-based persistence and context window management.
 
-### Context
-- Could be as simple as a `Map<string, Message[]>` in memory to start
-- Persistence (save/resume conversations) is nice-to-have, not required initially
+### What was built
+- `sessionPath(channel, key)` — per-channel, per-conversation file paths (`~/.agentconfigs/ouroboros/sessions/{channel}/{key}.json`)
+- `loadSession` / `saveSession` / `deleteSession` — versioned JSON persistence
+- `withConversationLock(convId, fn)` — serializes messages per conversation to prevent interleaving
+- `trimMessages(messages, maxTokens, contextMargin)` — sliding context window with both token budget and `MAX_MESSAGES = 200` cap
+- `config.json` — centralized config for context limits, provider credentials, Teams credentials
+- Slash commands (`/new` to clear session, `/commands` for help) — work in both CLI and Teams
+- CLI adapter also uses session persistence (single session at `sessions/cli/session.json`)
 
 ---
 
