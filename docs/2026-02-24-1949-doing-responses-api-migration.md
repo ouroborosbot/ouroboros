@@ -161,7 +161,7 @@ Test cases:
 
 ---
 
-### ⬜ Unit 2a: toResponsesInput — Tests
+### ✅ Unit 2a: toResponsesInput — Tests
 **What**: Write tests for `toResponsesInput()` that converts `ChatCompletionMessageParam[]` to `{ instructions: string, input: any[] }`. New `describe("toResponsesInput")` block.
 Test cases:
 - Extracts system message content into `instructions`, excludes from `input`
@@ -176,7 +176,7 @@ Test cases:
 **Output**: Failing tests
 **Acceptance**: Tests FAIL (red)
 
-### ⬜ Unit 2b: toResponsesInput — Implementation
+### ✅ Unit 2b: toResponsesInput — Implementation
 **What**: Implement and export `toResponsesInput()` in `core.ts`. Pure function:
 - Find first `role === "system"` message, extract content as `instructions`
 - Convert remaining messages based on role (user, assistant, assistant+tool_calls, tool)
@@ -184,7 +184,7 @@ Test cases:
 **Output**: `toResponsesInput` exported from `core.ts`
 **Acceptance**: All Unit 2a tests PASS (green)
 
-### ⬜ Unit 2c: toResponsesInput — Coverage
+### ✅ Unit 2c: toResponsesInput — Coverage
 **What**: Verify 100% coverage. Add edge cases if needed: assistant with empty string content + tool_calls, system message with empty content, multiple system messages (only first extracted).
 **Acceptance**: 100% coverage, tests green
 
@@ -503,3 +503,4 @@ From `node_modules/openai/resources/responses/responses.d.ts`:
 - 2026-02-24 21:30 4-pass validation complete. Fixes: (1) resolved reasoning event type ambiguity — use `response.reasoning_summary_text.delta` definitively, (2) noted existing Azure test must be rewritten in Unit 6, (3) fixed pseudocode variable shadowing, (4) clarified call_id->id mapping for TurnResult, (5) enriched SDK reference section with typed fields and API call signature.
 - 2026-02-24 20:40 Unit 0 complete: Added mockResponsesCreate, updated MockOpenAI with responses.create, added makeResponsesStream helper. 208 tests pass.
 - 2026-02-24 20:42 Units 1a/1b/1c complete: toResponsesTools -- 4 tests, 100% coverage on new code. 212 tests pass.
+- 2026-02-24 20:44 Units 2a/2b/2c complete: toResponsesInput -- 11 tests, 100% coverage on new code. 223 tests pass.
