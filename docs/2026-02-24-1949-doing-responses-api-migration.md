@@ -140,7 +140,7 @@ The canonical `messages[]` stays in CC format. On each Azure turn, `toResponsesI
 
 ---
 
-### ⬜ Unit 1a: toResponsesTools — Tests
+### ✅ Unit 1a: toResponsesTools — Tests
 **What**: Write tests for `toResponsesTools()` that converts `OpenAI.ChatCompletionTool[]` to Responses API `FunctionTool[]` format. New `describe("toResponsesTools")` block in `core.test.ts`.
 Test cases:
 - Single tool: `{ type: "function", function: { name, description, parameters } }` -> `{ type: "function", name, description, parameters, strict: false }`
@@ -150,12 +150,12 @@ Test cases:
 **Output**: Failing tests
 **Acceptance**: Tests FAIL (red) — `toResponsesTools` not exported yet
 
-### ⬜ Unit 1b: toResponsesTools — Implementation
+### ✅ Unit 1b: toResponsesTools — Implementation
 **What**: Implement and export `toResponsesTools()` in `core.ts`. Pure function, no side effects. Maps each CC tool to `{ type: "function", name, description, parameters, strict: false }` by unwrapping the nested `function` property.
 **Output**: `toResponsesTools` exported from `core.ts`
 **Acceptance**: All Unit 1a tests PASS (green)
 
-### ⬜ Unit 1c: toResponsesTools — Coverage
+### ✅ Unit 1c: toResponsesTools — Coverage
 **What**: Verify 100% branch/line coverage on `toResponsesTools`. Add edge case tests if gaps found.
 **Acceptance**: 100% coverage on new code, tests green
 
@@ -502,3 +502,4 @@ From `node_modules/openai/resources/responses/responses.d.ts`:
 - 2026-02-24 21:15 Major revision: restructured around layered architecture (TurnResult, stream processors, thin orchestrator). Modularized per user feedback. 20 units retained, reorganized around proper layer separation.
 - 2026-02-24 21:30 4-pass validation complete. Fixes: (1) resolved reasoning event type ambiguity — use `response.reasoning_summary_text.delta` definitively, (2) noted existing Azure test must be rewritten in Unit 6, (3) fixed pseudocode variable shadowing, (4) clarified call_id->id mapping for TurnResult, (5) enriched SDK reference section with typed fields and API call signature.
 - 2026-02-24 20:40 Unit 0 complete: Added mockResponsesCreate, updated MockOpenAI with responses.create, added makeResponsesStream helper. 208 tests pass.
+- 2026-02-24 20:42 Units 1a/1b/1c complete: toResponsesTools -- 4 tests, 100% coverage on new code. 212 tests pass.
