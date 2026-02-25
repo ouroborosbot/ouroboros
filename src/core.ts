@@ -689,9 +689,15 @@ export async function runAgent(
   const client = getClient();
   const provider = getProvider();
   const model = getModel();
-  const reasoningItems: any[] = []; // only reasoning items, for Azure re-submission
   let done = false;
   let toolRounds = 0;
+
+  // For Azure Responses API: maintain native input array with original output
+  // items (reasoning, function_calls) in correct order.  Initialized from CC
+  // messages on first iteration (session resumption), then kept in sync with
+  // the API's own output items for accurate multi-turn tool loops.
+  let azureInput: any[] | null = null;
+  let azureInstructions = "";
 
   // Prevent MaxListenersExceeded warning — each iteration adds a listener
   try { require("events").setMaxListeners(MAX_TOOL_ROUNDS + 5, signal); } catch { /* unsupported */ }
@@ -706,14 +712,18 @@ export async function runAgent(
       let result: TurnResult;
 
       if (provider === "azure") {
-        const { instructions, input } = toResponsesInput(messages);
-        const fullInput = [...input, ...reasoningItems];
+        // First iteration: build from CC messages (handles session resumption)
+        if (!azureInput) {
+          const { instructions, input } = toResponsesInput(messages);
+          azureInput = input;
+          azureInstructions = instructions;
+        }
         result = await streamResponsesApi(
           client,
           {
             model,
-            input: fullInput,
-            instructions,
+            input: azureInput,
+            instructions: azureInstructions,
             tools: toResponsesTools(tools),
             reasoning: { effort: "medium", summary: "detailed" },
             stream: true,
@@ -723,11 +733,9 @@ export async function runAgent(
           callbacks,
           signal,
         );
-        // Track ONLY reasoning items (no CC equivalent)
+        // Append ALL output items (reasoning + function_calls + text) in order
         for (const item of result.outputItems) {
-          if (item.type === "reasoning") {
-            reasoningItems.push(item);
-          }
+          azureInput.push(item);
         }
       } else {
         const createParams: any = { messages, tools, stream: true };
@@ -782,6 +790,10 @@ export async function runAgent(
           }
           callbacks.onToolEnd(tc.name, argSummary, success);
           messages.push({ role: "tool", tool_call_id: tc.id, content: toolResult });
+          // Keep Azure input in sync with tool results
+          if (azureInput) {
+            azureInput.push({ type: "function_call_output", call_id: tc.id, output: toolResult });
+          }
         }
       }
     } catch (e) {
