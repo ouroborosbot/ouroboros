@@ -1,6 +1,6 @@
 # Planning: Migrate Azure GPT Path to OpenAI Responses API
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-02-24 19:50
 
 ## Goal
