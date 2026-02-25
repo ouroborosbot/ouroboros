@@ -335,3 +335,5 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 - 2026-02-25 13:35 Unit 6a complete: 10 failing tests for CLI session persistence, slash commands, context trimming
 - 2026-02-25 13:43 Unit 6b complete: agent.ts integrated with sessions, slash commands, context window. 374 tests pass
 - 2026-02-25 13:44 Unit 6c complete: agent.ts 98.93% stmts, 100% lines/funcs
+- 2026-02-25 13:45 Unit 7a complete: 12 failing tests for Teams session persistence, slash commands, conversation lock
+- 2026-02-25 13:51 Unit 7b complete: teams.ts integrated with sessions, slash commands, conversation lock, config module. Removed dotenv, updated manifest. 385 tests pass
