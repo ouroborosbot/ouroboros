@@ -20,12 +20,16 @@ vi.mock("../skills", () => ({
 
 // We need to mock OpenAI before importing core
 const mockCreate = vi.fn()
+const mockResponsesCreate = vi.fn()
 vi.mock("openai", () => {
   class MockOpenAI {
     chat = {
       completions: {
         create: mockCreate,
       },
+    }
+    responses = {
+      create: mockResponsesCreate,
     }
     constructor(_opts?: any) {}
   }
@@ -530,12 +534,24 @@ describe("runAgent", () => {
     return { choices: [{ delta }] }
   }
 
+  // Helper for Responses API events (flat { type, delta, ... } objects)
+  function makeResponsesStream(events: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const event of events) {
+          yield event
+        }
+      },
+    }
+  }
+
   beforeEach(async () => {
     vi.resetModules()
     delete process.env.AZURE_OPENAI_API_KEY
     process.env.MINIMAX_API_KEY = "test-key"
 process.env.MINIMAX_MODEL = "test-model"
     mockCreate.mockReset()
+    mockResponsesCreate.mockReset()
 
     const core = await import("../core")
     runAgent = core.runAgent
