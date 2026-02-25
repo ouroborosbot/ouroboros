@@ -2681,3 +2681,157 @@ describe("getClient", () => {
     expect(core.getProvider()).toBe("minimax")
   })
 })
+
+describe("getClient config integration", () => {
+  const saved: Record<string, string | undefined> = {}
+  const allVars = [
+    "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT",
+    "AZURE_OPENAI_DEPLOYMENT", "AZURE_OPENAI_MODEL_NAME",
+    "AZURE_OPENAI_API_VERSION", "MINIMAX_API_KEY", "MINIMAX_MODEL",
+    "OUROBOROS_CONFIG_PATH",
+  ]
+
+  beforeEach(() => {
+    for (const v of allVars) { saved[v] = process.env[v]; delete process.env[v] }
+  })
+
+  afterEach(() => {
+    for (const v of allVars) {
+      if (saved[v] !== undefined) process.env[v] = saved[v]
+      else delete process.env[v]
+    }
+  })
+
+  it("uses azure config from config.json when apiKey is present", async () => {
+    vi.resetModules()
+    const configData = {
+      providers: {
+        azure: {
+          apiKey: "config-az-key",
+          endpoint: "https://config.openai.azure.com",
+          deployment: "config-deploy",
+          modelName: "config-model",
+        },
+      },
+    }
+    process.env.OUROBOROS_CONFIG_PATH = "/tmp/test-config.json"
+    vi.mocked(fs.readFileSync).mockImplementation((p: any) => {
+      if (p === "/tmp/test-config.json") return JSON.stringify(configData)
+      return JSON.stringify({ name: "other" })
+    })
+
+    const { resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const core = await import("../core")
+    expect(core.getModel()).toBe("config-model")
+    expect(core.getProvider()).toBe("azure")
+  })
+
+  it("uses minimax config from config.json when apiKey is present", async () => {
+    vi.resetModules()
+    const configData = {
+      providers: {
+        minimax: {
+          apiKey: "config-mm-key",
+          model: "config-mm-model",
+        },
+      },
+    }
+    process.env.OUROBOROS_CONFIG_PATH = "/tmp/test-config.json"
+    vi.mocked(fs.readFileSync).mockImplementation((p: any) => {
+      if (p === "/tmp/test-config.json") return JSON.stringify(configData)
+      return JSON.stringify({ name: "other" })
+    })
+
+    const { resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const core = await import("../core")
+    expect(core.getModel()).toBe("config-mm-model")
+    expect(core.getProvider()).toBe("minimax")
+  })
+
+  it("prefers azure when both providers are configured in config.json", async () => {
+    vi.resetModules()
+    const configData = {
+      providers: {
+        azure: {
+          apiKey: "az-key",
+          endpoint: "https://az.openai.azure.com",
+          deployment: "deploy",
+          modelName: "az-model",
+        },
+        minimax: {
+          apiKey: "mm-key",
+          model: "mm-model",
+        },
+      },
+    }
+    process.env.OUROBOROS_CONFIG_PATH = "/tmp/test-config.json"
+    vi.mocked(fs.readFileSync).mockImplementation((p: any) => {
+      if (p === "/tmp/test-config.json") return JSON.stringify(configData)
+      return JSON.stringify({ name: "other" })
+    })
+
+    const { resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const core = await import("../core")
+    expect(core.getProvider()).toBe("azure")
+  })
+
+  it("env vars override config.json for provider selection", async () => {
+    vi.resetModules()
+    // Config has no providers
+    process.env.OUROBOROS_CONFIG_PATH = "/tmp/test-config.json"
+    vi.mocked(fs.readFileSync).mockImplementation((p: any) => {
+      if (p === "/tmp/test-config.json") return JSON.stringify({})
+      return JSON.stringify({ name: "other" })
+    })
+
+    // But env vars set minimax
+    process.env.MINIMAX_API_KEY = "env-mm-key"
+    process.env.MINIMAX_MODEL = "env-mm-model"
+
+    const { resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const core = await import("../core")
+    expect(core.getModel()).toBe("env-mm-model")
+    expect(core.getProvider()).toBe("minimax")
+  })
+
+  it("exits when neither provider configured in config or env", async () => {
+    vi.resetModules()
+    process.env.OUROBOROS_CONFIG_PATH = "/tmp/test-config.json"
+    vi.mocked(fs.readFileSync).mockImplementation((p: any) => {
+      if (p === "/tmp/test-config.json") return JSON.stringify({})
+      return JSON.stringify({ name: "other" })
+    })
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const { resetConfigCache } = await import("../config")
+    resetConfigCache()
+
+    try {
+      const core = await import("../core")
+      const callbacks: ChannelCallbacks = {
+        onModelStart: () => {},
+        onModelStreamStart: () => {},
+        onTextChunk: () => {},
+        onReasoningChunk: () => {},
+        onToolStart: () => {},
+        onToolEnd: () => {},
+        onError: () => {},
+      }
+      await core.runAgent([], callbacks).catch(() => {})
+    } catch {
+      // Expected -- process.exit throws
+    }
+
+    expect(mockExit).toHaveBeenCalledWith(1)
+    mockExit.mockRestore()
+    mockError.mockRestore()
+  })
+})
