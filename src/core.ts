@@ -675,23 +675,50 @@ export async function runAgent(
   callbacks: ChannelCallbacks,
   signal?: AbortSignal,
 ): Promise<void> {
+  const client = getClient();
+  const provider = getProvider();
+  const model = getModel();
+  const reasoningItems: any[] = []; // only reasoning items, for Azure re-submission
   let done = false;
+
   while (!done) {
     if (signal?.aborted) break;
     try {
       callbacks.onModelStart();
 
-      const client = getClient();
-      const model = getModel();
-      const provider = getProvider();
-      const createParams: any = { messages, tools, stream: true };
-      if (model) createParams.model = model;
+      let result: TurnResult;
+
       if (provider === "azure") {
-        createParams.reasoning_effort = "medium";
+        const { instructions, input } = toResponsesInput(messages);
+        const fullInput = [...input, ...reasoningItems];
+        result = await streamResponsesApi(
+          client,
+          {
+            model,
+            input: fullInput,
+            instructions,
+            tools: toResponsesTools(tools),
+            reasoning: { effort: "medium", summary: "auto" },
+            stream: true,
+            store: false,
+            include: ["reasoning.encrypted_content"],
+          },
+          callbacks,
+          signal,
+        );
+        // Track ONLY reasoning items (no CC equivalent)
+        for (const item of result.outputItems) {
+          if (item.type === "reasoning") {
+            reasoningItems.push(item);
+          }
+        }
+      } else {
+        const createParams: any = { messages, tools, stream: true };
+        if (model) createParams.model = model;
+        result = await streamChatCompletion(client, createParams, callbacks, signal);
       }
 
-      const result = await streamChatCompletion(client, createParams, callbacks, signal);
-
+      // SHARED: build CC-format assistant message from TurnResult
       const msg: OpenAI.ChatCompletionAssistantMessageParam = {
         role: "assistant",
       };
@@ -707,6 +734,7 @@ export async function runAgent(
       if (!result.toolCalls.length) {
         done = true;
       } else {
+        // SHARED: execute tools
         for (const tc of result.toolCalls) {
           let args: Record<string, string> = {};
           try {
