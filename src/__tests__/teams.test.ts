@@ -1047,3 +1047,241 @@ describe("Teams adapter - phrase rotation", () => {
     expect(mockStream.update).not.toHaveBeenCalled()
   })
 })
+
+describe("Teams adapter - session persistence", () => {
+  beforeEach(() => {
+    delete process.env.AZURE_OPENAI_API_KEY
+  })
+
+  function mockTeamsDeps(overrides: {
+    runAgentFn?: any
+    loadSessionReturn?: any
+    saveSessionCalls?: any[][]
+    deleteSessionCalls?: string[]
+    trimMessagesFn?: any
+    parseSlashCommandFn?: any
+    dispatchFn?: any
+  } = {}) {
+    const {
+      runAgentFn = vi.fn(),
+      loadSessionReturn = null,
+      saveSessionCalls = [],
+      deleteSessionCalls = [],
+      trimMessagesFn = ((msgs: any) => [...msgs]),
+      parseSlashCommandFn = (() => null),
+      dispatchFn = (() => ({ handled: false })),
+    } = overrides
+
+    vi.doMock("../core", () => ({
+      runAgent: runAgentFn,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+    }))
+    vi.doMock("../context", () => ({
+      loadSession: vi.fn().mockReturnValue(loadSessionReturn),
+      saveSession: vi.fn().mockImplementation((...args: any[]) => { saveSessionCalls.push(args) }),
+      deleteSession: vi.fn().mockImplementation((...args: any[]) => { deleteSessionCalls.push(args[0]) }),
+      trimMessages: vi.fn().mockImplementation(trimMessagesFn),
+      cachedBuildSystem: vi.fn().mockReturnValue("cached teams prompt"),
+    }))
+    vi.doMock("../commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockImplementation(dispatchFn),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockImplementation(parseSlashCommandFn),
+    }))
+  }
+
+  it("handleTeamsMessage accepts conversationId parameter", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn()
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
+    expect(runAgentFn).toHaveBeenCalled()
+  })
+
+  it("loads session for conversation on each message", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn()
+    const savedSession = [
+      { role: "system", content: "old prompt" },
+      { role: "user", content: "previous msg" },
+    ]
+    mockTeamsDeps({ runAgentFn, loadSessionReturn: savedSession })
+    const teams = await import("../teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("new msg", mockStream as any, "conv-123")
+
+    const msgs = runAgentFn.mock.calls[0][0]
+    // Should have system prompt (refreshed), previous msg, and new msg
+    expect(msgs[0].content).toBe("cached teams prompt")
+    expect(msgs.some((m: any) => m.content === "new msg")).toBe(true)
+  })
+
+  it("saves session after runAgent", async () => {
+    vi.resetModules()
+    const saveSessionCalls: any[][] = []
+    mockTeamsDeps({ saveSessionCalls })
+    const teams = await import("../teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
+
+    expect(saveSessionCalls.length).toBe(1)
+    expect(saveSessionCalls[0][0]).toBe("/tmp/teams-session.json")
+  })
+
+  it("trims messages before runAgent", async () => {
+    vi.resetModules()
+    const trimCalls: any[][] = []
+    mockTeamsDeps({
+      trimMessagesFn: (...args: any[]) => { trimCalls.push(args); return [...args[0]] },
+    })
+    const teams = await import("../teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
+
+    expect(trimCalls.length).toBe(1)
+    expect(trimCalls[0][1]).toBe(80000) // maxTokens
+  })
+
+  it("creates fresh session when no session exists", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn()
+    mockTeamsDeps({ runAgentFn, loadSessionReturn: null })
+    const teams = await import("../teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
+
+    const msgs = runAgentFn.mock.calls[0][0]
+    expect(msgs[0].role).toBe("system")
+    expect(msgs[0].content).toBe("cached teams prompt")
+    expect(msgs.length).toBe(2) // system + user
+  })
+
+  it("/new clears session and sends confirmation via stream", async () => {
+    vi.resetModules()
+    const deleteSessionCalls: string[] = []
+    const runAgentFn = vi.fn()
+    mockTeamsDeps({
+      runAgentFn,
+      deleteSessionCalls,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => {
+        if (name === "new") return { handled: true, result: { action: "new" } }
+        return { handled: false }
+      },
+    })
+    const teams = await import("../teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("/new", mockStream as any, "conv-123")
+
+    expect(deleteSessionCalls.length).toBe(1)
+    expect(mockStream.emit).toHaveBeenCalledWith(expect.stringContaining("session cleared"))
+    expect(runAgentFn).not.toHaveBeenCalled()
+  })
+
+  it("/commands sends command list via stream without calling runAgent", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn()
+    mockTeamsDeps({
+      runAgentFn,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => {
+        if (name === "commands") return { handled: true, result: { action: "response", message: "/new - start new" } }
+        return { handled: false }
+      },
+    })
+    const teams = await import("../teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("/commands", mockStream as any, "conv-123")
+
+    expect(mockStream.emit).toHaveBeenCalledWith(expect.stringContaining("/new"))
+    expect(runAgentFn).not.toHaveBeenCalled()
+  })
+
+  it("multiple conversations maintain separate sessions", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn()
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../teams")
+    const mockStream1 = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const mockStream2 = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    await teams.handleTeamsMessage("msg for conv1", mockStream1 as any, "conv-1")
+    await teams.handleTeamsMessage("msg for conv2", mockStream2 as any, "conv-2")
+
+    // Each call gets its own session (both load null, get fresh messages)
+    expect(runAgentFn).toHaveBeenCalledTimes(2)
+    const msgs1 = runAgentFn.mock.calls[0][0]
+    const msgs2 = runAgentFn.mock.calls[1][0]
+    expect(msgs1.find((m: any) => m.content === "msg for conv1")).toBeDefined()
+    expect(msgs2.find((m: any) => m.content === "msg for conv2")).toBeDefined()
+  })
+
+  it("graceful fallback on corrupt session file", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn()
+    mockTeamsDeps({ runAgentFn, loadSessionReturn: null }) // null = corrupt
+    const teams = await import("../teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
+
+    expect(runAgentFn).toHaveBeenCalled()
+    const msgs = runAgentFn.mock.calls[0][0]
+    expect(msgs[0].role).toBe("system")
+  })
+
+  it("withConversationLock serializes messages for same conversation", async () => {
+    vi.resetModules()
+    const order: string[] = []
+    const runAgentFn = vi.fn().mockImplementation(async () => {
+      const id = order.length
+      order.push(`start-${id}`)
+      await new Promise((r) => setTimeout(r, 10))
+      order.push(`end-${id}`)
+    })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../teams")
+
+    const { withConversationLock } = teams
+    await Promise.all([
+      withConversationLock("conv-1", async () => { await runAgentFn() }),
+      withConversationLock("conv-1", async () => { await runAgentFn() }),
+    ])
+
+    // Should be sequential: start-0, end-0, start-1, end-1
+    expect(order).toEqual(["start-0", "end-0", "start-1", "end-1"])
+  })
+
+  it("withConversationLock allows parallel for different conversations", async () => {
+    vi.resetModules()
+    const order: string[] = []
+    const runAgentFn = vi.fn().mockImplementation(async (id: string) => {
+      order.push(`start-${id}`)
+      await new Promise((r) => setTimeout(r, 10))
+      order.push(`end-${id}`)
+    })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../teams")
+
+    const { withConversationLock } = teams
+    await Promise.all([
+      withConversationLock("conv-1", async () => { await runAgentFn("1") }),
+      withConversationLock("conv-2", async () => { await runAgentFn("2") }),
+    ])
+
+    // Both start before either ends (parallel)
+    expect(order[0]).toBe("start-1")
+    expect(order[1]).toBe("start-2")
+  })
+})
