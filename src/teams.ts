@@ -55,6 +55,7 @@ export function createTeamsCallbacks(
 
   return {
     onModelStart: () => {
+      reasoningBuf = ""
       safeUpdate("thinking...")
     },
     onModelStreamStart: () => {
@@ -67,6 +68,10 @@ export function createTeamsCallbacks(
     },
     onTextChunk: (text: string) => {
       if (stopped) return
+      if (reasoningBuf) {
+        safeEmit(`*${reasoningBuf}*\n\n`)
+        reasoningBuf = ""
+      }
       safeEmit(text)
     },
     onToolStart: (name: string, args: Record<string, string>) => {

@@ -86,20 +86,47 @@ describe("CLI adapter - onReasoningChunk and onTextChunk rendering", () => {
     expect(output).toContain("\x1b[0m")
   })
 
-  it("reasoning then content: dim followed by normal", () => {
+  it("reasoning then content: dim followed by \\n\\n then normal", () => {
     callbacks.onReasoningChunk("thinking")
     callbacks.onTextChunk("answer")
     const output = stdoutChunks.join("")
     expect(output).toContain("\x1b[2m")
     expect(output).toContain("thinking")
+    expect(output).toContain("\n\n")
     expect(output).toContain("answer")
-    // The answer part should not be dim
-    const answerIdx = output.lastIndexOf("answer")
-    const lastDimIdx = output.lastIndexOf("\x1b[2m")
-    const lastResetIdx = output.lastIndexOf("\x1b[0m")
-    // Reset should come after dim and before answer
-    expect(lastResetIdx).toBeGreaterThan(lastDimIdx)
-    expect(answerIdx).toBeGreaterThan(lastResetIdx)
+    // The \n\n should appear between reasoning and answer
+    const nnIdx = output.indexOf("\n\n")
+    const thinkIdx = output.indexOf("thinking")
+    const answerIdx = output.indexOf("answer")
+    expect(nnIdx).toBeGreaterThan(thinkIdx)
+    expect(answerIdx).toBeGreaterThan(nnIdx)
+  })
+
+  it("text-only response has no \\n\\n prefix", () => {
+    callbacks.onTextChunk("just text")
+    const output = stdoutChunks.join("")
+    expect(output).toBe("just text")
+    expect(output).not.toContain("\n\n")
+  })
+
+  it("multiple reasoning chunks before text: only one \\n\\n separator", () => {
+    callbacks.onReasoningChunk("step1")
+    callbacks.onReasoningChunk("step2")
+    callbacks.onTextChunk("answer")
+    const output = stdoutChunks.join("")
+    // Should have exactly one \n\n (between reasoning and text)
+    const matches = output.match(/\n\n/g)
+    expect(matches).toHaveLength(1)
+  })
+
+  it("onModelStart resets reasoning state for new turn", () => {
+    callbacks.onReasoningChunk("thinking")
+    callbacks.onModelStart()
+    callbacks.onModelStreamStart()
+    callbacks.onTextChunk("answer")
+    const output = stdoutChunks.join("")
+    // No \n\n because onModelStart reset the state
+    expect(output).not.toContain("\n\nanswer")
   })
 
   it("multiple reasoning chunks are all dim", () => {

@@ -189,6 +189,43 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     expect(mockStream.emit).toHaveBeenCalledWith("hello")
   })
 
+  it("first text chunk after reasoning emits formatted reasoning + separator + text", async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onReasoningChunk("step 1")
+    callbacks.onReasoningChunk(" step 2")
+    callbacks.onTextChunk("answer")
+    // Should emit reasoning as italic, then separator, then text
+    expect(mockStream.emit).toHaveBeenCalledTimes(2)
+    expect(mockStream.emit).toHaveBeenNthCalledWith(1, "*step 1 step 2*\n\n")
+    expect(mockStream.emit).toHaveBeenNthCalledWith(2, "answer")
+  })
+
+  it("text without prior reasoning emits directly", async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onTextChunk("just text")
+    expect(mockStream.emit).toHaveBeenCalledTimes(1)
+    expect(mockStream.emit).toHaveBeenCalledWith("just text")
+  })
+
+  it("onModelStart resets reasoning buffer for new turn", async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onReasoningChunk("old reasoning")
+    callbacks.onModelStart() // reset
+    callbacks.onTextChunk("answer")
+    // Should not emit old reasoning
+    expect(mockStream.emit).toHaveBeenCalledTimes(1)
+    expect(mockStream.emit).toHaveBeenCalledWith("answer")
+  })
+
   // --- Tool/status callbacks ---
 
   it("onToolStart sends informative status", async () => {
