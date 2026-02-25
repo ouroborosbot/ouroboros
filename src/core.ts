@@ -3,51 +3,40 @@ import * as fs from "fs";
 import * as path from "path";
 import { execSync, spawnSync } from "child_process";
 import { listSkills, loadSkill } from "./skills";
+import { getAzureConfig, getMinimaxConfig } from "./config";
 
 let _client: OpenAI | null = null;
 let _model: string | null = null;
 let _provider: "azure" | "minimax" | null = null;
 
-const AZURE_REQUIRED = [
-  "AZURE_OPENAI_API_KEY",
-  "AZURE_OPENAI_ENDPOINT",
-  "AZURE_OPENAI_DEPLOYMENT",
-  "AZURE_OPENAI_MODEL_NAME",
-] as const;
-
-const MINIMAX_REQUIRED = ["MINIMAX_API_KEY", "MINIMAX_MODEL"] as const;
-
-function hasAll(vars: readonly string[]): boolean {
-  return vars.every((v) => process.env[v]);
-}
-
 function getClient(): OpenAI {
   if (!_client) {
-    if (hasAll(AZURE_REQUIRED)) {
-      const endpoint = process.env.AZURE_OPENAI_ENDPOINT!;
+    const azureConfig = getAzureConfig();
+    const minimaxConfig = getMinimaxConfig();
+
+    if (azureConfig.apiKey && azureConfig.endpoint && azureConfig.deployment && azureConfig.modelName) {
       _client = new AzureOpenAI({
-        apiKey: process.env.AZURE_OPENAI_API_KEY,
-        endpoint: endpoint.replace(/\/openai.*$/, ""),
-        deployment: process.env.AZURE_OPENAI_DEPLOYMENT,
-        apiVersion:
-          process.env.AZURE_OPENAI_API_VERSION || "2025-04-01-preview",
+        apiKey: azureConfig.apiKey,
+        endpoint: azureConfig.endpoint.replace(/\/openai.*$/, ""),
+        deployment: azureConfig.deployment,
+        apiVersion: azureConfig.apiVersion,
         timeout: 30000,
         maxRetries: 0,
       });
-      _model = process.env.AZURE_OPENAI_MODEL_NAME!;
+      _model = azureConfig.modelName;
       _provider = "azure";
-    } else if (hasAll(MINIMAX_REQUIRED)) {
+    } else if (minimaxConfig.apiKey) {
       _client = new OpenAI({
-        apiKey: process.env.MINIMAX_API_KEY,
+        apiKey: minimaxConfig.apiKey,
         baseURL: "https://api.minimaxi.chat/v1",
         timeout: 30000,
         maxRetries: 0,
       });
-      _model = process.env.MINIMAX_MODEL!;
+      _model = minimaxConfig.model;
       _provider = "minimax";
     } else {
       console.error(
-        `missing env vars. need either:\n  ${AZURE_REQUIRED.join(", ")}\n  ${MINIMAX_REQUIRED.join(", ")}`,
+        "no provider configured. set azure or minimax credentials in config.json or env vars.",
       );
       process.exit(1);
     }
