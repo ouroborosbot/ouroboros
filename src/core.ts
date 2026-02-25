@@ -590,6 +590,57 @@ export async function streamChatCompletion(
   };
 }
 
+export async function streamResponsesApi(
+  client: any,
+  createParams: any,
+  callbacks: ChannelCallbacks,
+  signal?: AbortSignal,
+): Promise<TurnResult> {
+  const response = (await client.responses.create(
+    createParams,
+    signal ? { signal } : {},
+  )) as any;
+
+  let content = "";
+  let streamStarted = false;
+  const toolCalls: { id: string; name: string; arguments: string }[] = [];
+  const outputItems: any[] = [];
+
+  for await (const event of response) {
+    if (signal?.aborted) break;
+
+    switch (event.type) {
+      case "response.output_text.delta": {
+        if (!streamStarted) {
+          callbacks.onModelStreamStart();
+          streamStarted = true;
+        }
+        const delta = String(event.delta);
+        callbacks.onTextChunk(delta);
+        content += delta;
+        break;
+      }
+      case "response.reasoning_summary_text.delta": {
+        if (!streamStarted) {
+          callbacks.onModelStreamStart();
+          streamStarted = true;
+        }
+        callbacks.onReasoningChunk(String(event.delta));
+        break;
+      }
+      default:
+        // Unknown/unhandled events silently ignored
+        break;
+    }
+  }
+
+  return {
+    content,
+    toolCalls,
+    outputItems,
+  };
+}
+
 export async function runAgent(
   messages: OpenAI.ChatCompletionMessageParam[],
   callbacks: ChannelCallbacks,
