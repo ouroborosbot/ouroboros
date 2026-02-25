@@ -67,7 +67,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 ### Legend
 ⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
-### 🔄 Unit 1a: Config Module -- Tests
+### ✅ Unit 1a: Config Module -- Tests
 **What**: Create `src/__tests__/config.test.ts` with failing tests for a new `src/config.ts` module. This module handles loading structured config from `~/.agentconfigs/ouroboros/config.json` with env var overrides. Tests cover:
 - `loadConfig()`: reads and parses `~/.agentconfigs/ouroboros/config.json`. Returns typed config object.
 - `loadConfig()`: returns defaults when file is missing (ENOENT).
@@ -85,7 +85,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: Test file that fails because `src/config.ts` does not exist yet
 **Acceptance**: Tests exist and FAIL (red) -- module not found errors
 
-### ⬜ Unit 1b: Config Module -- Implementation
+### 🔄 Unit 1b: Config Module -- Implementation
 **What**: Create `src/config.ts` implementing all functions tested in 1a:
 - Config file path: `~/.agentconfigs/ouroboros/config.json` (or `OUROBOROS_CONFIG_PATH` env var).
 - `loadConfig()`: reads file with `readFileSync`, parses JSON, merges with defaults. Returns typed `OuroborosConfig`. On ENOENT or parse error, returns defaults. **Caches result after first call** — subsequent calls return cached config. Config changes require process restart. Export a `resetConfigCache()` for testing.
