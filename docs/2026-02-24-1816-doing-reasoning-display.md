@@ -193,7 +193,7 @@ Remove the old partial-tag-split tests (lines 103-121) -- they tested adapter-le
 
 ---
 
-### ⬜ Unit 5a: Update Teams adapter for onReasoningChunk -- Tests
+### ✅ Unit 5a: Update Teams adapter for onReasoningChunk -- Tests
 **What**: Rewrite Teams think-tag tests in `src/__tests__/teams.test.ts`. The describe block "Teams adapter - createTeamsCallbacks (SDK-delegated streaming)" needs these changes:
 
 **Remove these tests** (no longer applicable):
@@ -224,7 +224,7 @@ Remove the old partial-tag-split tests (lines 103-121) -- they tested adapter-le
 
 **Acceptance**: Tests exist and FAIL (Teams adapter onReasoningChunk is still a no-op, onTextChunk still has think-tag parsing).
 
-### ⬜ Unit 5b: Update Teams adapter for onReasoningChunk -- Implementation
+### ✅ Unit 5b: Update Teams adapter for onReasoningChunk -- Implementation
 **What**: Refactor `createTeamsCallbacks` in `src/teams.ts` (lines 31-127):
 1. Remove state variables: `inThink`, `thinkBuf`, `emittedContent`.
 2. Simplify `onTextChunk` to just: `if (stopped) return; safeEmit(text)`.
@@ -237,7 +237,7 @@ Remove the old partial-tag-split tests (lines 103-121) -- they tested adapter-le
 
 **Acceptance**: All Teams tests from 5a PASS. Reasoning goes through `stream.update()`. Answer goes through `stream.emit()`. No think-tag parsing in adapter.
 
-### ⬜ Unit 5c: Unit 5 -- Coverage and refactor
+### ✅ Unit 5c: Unit 5 -- Coverage and refactor
 **What**: Run coverage on Teams adapter. Verify `stripThinkTags` is removed and no dead code remains. Clean up any unused imports or variables.
 
 **Acceptance**: 100% coverage on `createTeamsCallbacks`. All tests green. No warnings.
@@ -275,3 +275,4 @@ Remove the old partial-tag-split tests (lines 103-121) -- they tested adapter-le
 - 2026-02-24 18:55 Unit 2 complete: Azure reasoning_content normalized to onReasoningChunk, 4 tests rewritten, inReasoning/think-tag wrapping removed from core.ts, 100% coverage on core.ts
 - 2026-02-24 18:58 Unit 3 complete: MiniMax think-tag state machine added, 13 new tests (7 core + 6 edge cases), 100% coverage on core.ts, 215 tests pass
 - 2026-02-24 19:00 Unit 4 complete: CLI adapter refactored -- removed buf/inThink/flush, onTextChunk direct write, onReasoningChunk dim output, 100% coverage on agent.ts
+- 2026-02-24 19:01 Unit 5 complete: Teams adapter refactored -- removed stripThinkTags, inThink/thinkBuf/emittedContent, reasoning->update, answer->emit, 100% coverage all files
