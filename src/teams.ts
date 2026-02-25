@@ -2,6 +2,7 @@ import OpenAI from "openai"
 import { App } from "@microsoft/teams.apps"
 import { DevtoolsPlugin } from "@microsoft/teams.dev"
 import { runAgent, buildSystem, ChannelCallbacks } from "./core"
+import { pickPhrase, THINKING_PHRASES, FOLLOWUP_PHRASES } from "./phrases"
 
 // Stream interface matching IStreamer from @microsoft/teams.apps
 interface TeamsStream {
@@ -29,6 +30,9 @@ export function createTeamsCallbacks(
 ): ChannelCallbacks {
   let stopped = false // set when stream signals cancellation (403)
   let reasoningBuf = "" // accumulate reasoning so update() shows full text
+  let hadToolRun = false
+  let phraseTimer: NodeJS.Timeout | null = null
+  let lastPhrase = ""
 
   // Safely emit a text delta to the stream.
   // On error (e.g. 403 from Teams stop button), abort the controller.
@@ -53,16 +57,34 @@ export function createTeamsCallbacks(
     }
   }
 
+  function startPhraseRotation(pool: readonly string[]): void {
+    stopPhraseRotation()
+    phraseTimer = setInterval(() => {
+      const next = pickPhrase(pool, lastPhrase)
+      lastPhrase = next
+      safeUpdate(next + "...")
+    }, 1500)
+  }
+
+  function stopPhraseRotation(): void {
+    if (phraseTimer) { clearInterval(phraseTimer); phraseTimer = null }
+  }
+
   return {
     onModelStart: () => {
       reasoningBuf = ""
-      safeUpdate("thinking...")
+      const pool = hadToolRun ? FOLLOWUP_PHRASES : THINKING_PHRASES
+      const first = pickPhrase(pool)
+      lastPhrase = first
+      safeUpdate(first + "...")
+      startPhraseRotation(pool)
     },
     onModelStreamStart: () => {
-      // No-op for Teams -- streaming has already started
+      stopPhraseRotation()
     },
     onReasoningChunk: (text: string) => {
       if (stopped) return
+      stopPhraseRotation()
       reasoningBuf += text
       safeUpdate(reasoningBuf)
     },
@@ -75,10 +97,13 @@ export function createTeamsCallbacks(
       safeEmit(text)
     },
     onToolStart: (name: string, args: Record<string, string>) => {
+      stopPhraseRotation()
       const argSummary = Object.values(args).join(", ")
       safeUpdate(`running ${name} (${argSummary})...`)
+      hadToolRun = true
     },
     onToolEnd: (name: string, summary: string, success: boolean) => {
+      stopPhraseRotation()
       if (success) {
         safeUpdate(summary || `${name} done`)
       } else {
@@ -86,6 +111,7 @@ export function createTeamsCallbacks(
       }
     },
     onError: (error: Error) => {
+      stopPhraseRotation()
       if (stopped) return
       safeEmit(`Error: ${error.message}`)
     },

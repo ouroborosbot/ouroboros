@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import type { ChannelCallbacks } from "../core"
+import { THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "../phrases"
 
 // These imports will fail until agent.ts is refactored to export them.
 // That's exactly the point -- tests must FAIL (red) for Unit 2a.
@@ -224,7 +225,7 @@ describe("CLI adapter - onModelStreamStart", () => {
 })
 
 describe("CLI adapter - onToolStart", () => {
-  it("starts a tool-specific spinner with tool name", async () => {
+  it("starts a spinner with a phrase from TOOL_PHRASES", async () => {
     const stderrChunks: string[] = []
     vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
       stderrChunks.push(chunk.toString())
@@ -238,7 +239,7 @@ describe("CLI adapter - onToolStart", () => {
 
     callbacks.onToolStart("read_file", { path: "/tmp/test.txt" })
     const output = stderrChunks.join("")
-    expect(output).toContain("read_file")
+    expect(TOOL_PHRASES.some(p => output.includes(p))).toBe(true)
 
     // Clean up
     callbacks.onToolEnd("read_file", "/tmp/test.txt", true)
@@ -386,5 +387,96 @@ describe("CLI adapter - bootGreeting", () => {
     expect(mockRunAgent).toHaveBeenCalledWith(messages, callbacks, undefined)
 
     vi.restoreAllMocks()
+  })
+})
+
+describe("CLI adapter - phrase rotation", () => {
+  let stderrChunks: string[]
+  let stderrSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    stderrChunks = []
+    stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
+      stderrChunks.push(chunk.toString())
+      return true
+    })
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    stderrSpy.mockRestore()
+    vi.restoreAllMocks()
+  })
+
+  it("onModelStart uses a THINKING_PHRASES phrase", async () => {
+    vi.resetModules()
+    const agent = await import("../agent")
+    const callbacks = agent.createCliCallbacks()
+
+    callbacks.onModelStart()
+    const output = stderrChunks.join("")
+    expect(THINKING_PHRASES.some(p => output.includes(p))).toBe(true)
+
+    callbacks.onModelStreamStart()
+  })
+
+  it("onModelStart after tool uses FOLLOWUP_PHRASES", async () => {
+    vi.resetModules()
+    const agent = await import("../agent")
+    const callbacks = agent.createCliCallbacks()
+
+    // First model call
+    callbacks.onModelStart()
+    callbacks.onModelStreamStart()
+    // Tool run
+    callbacks.onToolStart("read_file", { path: "x" })
+    callbacks.onToolEnd("read_file", "x", true)
+    // Second model call — should use followup phrases
+    stderrChunks.length = 0
+    callbacks.onModelStart()
+    const output = stderrChunks.join("")
+    expect(FOLLOWUP_PHRASES.some(p => output.includes(p))).toBe(true)
+
+    callbacks.onModelStreamStart()
+  })
+
+  it("spinner rotates phrase after 1.5s", async () => {
+    vi.useFakeTimers()
+
+    vi.resetModules()
+    const agent = await import("../agent")
+    const callbacks = agent.createCliCallbacks()
+
+    callbacks.onModelStart()
+    const firstOutput = stderrChunks.join("")
+
+    stderrChunks.length = 0
+    vi.advanceTimersByTime(1500)
+    const secondOutput = stderrChunks.join("")
+
+    // After rotation, output should contain a phrase from the pool
+    expect(THINKING_PHRASES.some(p => secondOutput.includes(p))).toBe(true)
+
+    callbacks.onModelStreamStart()
+    vi.useRealTimers()
+  })
+
+  it("onModelStreamStart stops phrase rotation", async () => {
+    vi.useFakeTimers()
+
+    vi.resetModules()
+    const agent = await import("../agent")
+    const callbacks = agent.createCliCallbacks()
+
+    callbacks.onModelStart()
+    callbacks.onModelStreamStart()
+
+    stderrChunks.length = 0
+    vi.advanceTimersByTime(3000)
+    // No more spinner output after stop
+    const output = stderrChunks.join("")
+    expect(output).toBe("")
+
+    vi.useRealTimers()
   })
 })

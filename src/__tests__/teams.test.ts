@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import type { ChannelCallbacks } from "../core"
+import { THINKING_PHRASES, FOLLOWUP_PHRASES } from "../phrases"
 
 // Tests for src/teams.ts Teams channel adapter.
 
@@ -37,15 +38,20 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     controller = new AbortController()
   })
 
-  it("onModelStart sends thinking status update", async () => {
+  it("onModelStart sends a phrase from THINKING_PHRASES with trailing ...", async () => {
     vi.resetModules()
     const teams = await import("../teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     callbacks.onModelStart()
-    expect(mockStream.update).toHaveBeenCalledWith("thinking...")
+    const calledWith = mockStream.update.mock.calls[0][0] as string
+    expect(calledWith).toMatch(/\.\.\.$/)
+    const phrase = calledWith.replace(/\.\.\.$/, "")
+    expect(THINKING_PHRASES).toContain(phrase)
+    // Clean up timer
+    callbacks.onModelStreamStart()
   })
 
-  it("onModelStreamStart is a no-op (does not throw)", async () => {
+  it("onModelStreamStart stops phrase rotation (does not throw)", async () => {
     vi.resetModules()
     const teams = await import("../teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
@@ -124,6 +130,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
   })
 
   it("after abort via update, subsequent updates are skipped", async () => {
+    vi.useFakeTimers()
     vi.resetModules()
     const teams = await import("../teams")
     mockStream.update.mockImplementationOnce(() => { throw new Error("403") })
@@ -133,6 +140,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     mockStream.update.mockClear()
     callbacks.onToolStart("shell", { command: "ls" }) // should be skipped
     expect(mockStream.update).not.toHaveBeenCalled()
+    vi.useRealTimers()
   })
 
   // --- onReasoningChunk tests ---
@@ -220,6 +228,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
     callbacks.onReasoningChunk("old reasoning")
     callbacks.onModelStart() // reset
+    callbacks.onModelStreamStart() // stop rotation timer
     callbacks.onTextChunk("answer")
     // Should not emit old reasoning
     expect(mockStream.emit).toHaveBeenCalledTimes(1)
@@ -925,5 +934,116 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     expect(mockOn).toHaveBeenCalledWith("message", expect.any(Function))
 
     vi.restoreAllMocks()
+  })
+})
+
+describe("Teams adapter - phrase rotation", () => {
+  let mockStream: { emit: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> }
+  let controller: AbortController
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    mockStream = {
+      emit: vi.fn(),
+      update: vi.fn(),
+      close: vi.fn(),
+    }
+    controller = new AbortController()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("rotates phrases every 1.5s during onModelStart", async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onModelStart()
+    const firstCall = mockStream.update.mock.calls[0][0] as string
+    expect(firstCall).toMatch(/\.\.\.$/)
+
+    mockStream.update.mockClear()
+    vi.advanceTimersByTime(1500)
+    expect(mockStream.update).toHaveBeenCalledTimes(1)
+    const rotatedCall = mockStream.update.mock.calls[0][0] as string
+    expect(rotatedCall).toMatch(/\.\.\.$/)
+    const phrase = rotatedCall.replace(/\.\.\.$/, "")
+    expect(THINKING_PHRASES).toContain(phrase)
+
+    callbacks.onModelStreamStart() // cleanup
+  })
+
+  it("stopPhraseRotation on onModelStreamStart stops timer", async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onModelStart()
+    callbacks.onModelStreamStart()
+    mockStream.update.mockClear()
+    vi.advanceTimersByTime(3000)
+    expect(mockStream.update).not.toHaveBeenCalled()
+  })
+
+  it("onReasoningChunk stops phrase rotation", async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onModelStart()
+    callbacks.onReasoningChunk("thinking hard")
+    mockStream.update.mockClear()
+    vi.advanceTimersByTime(3000)
+    // Only reasoning updates, no phrase rotation
+    expect(mockStream.update).not.toHaveBeenCalled()
+  })
+
+  it("uses FOLLOWUP_PHRASES after tool run", async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    // First model call
+    callbacks.onModelStart()
+    callbacks.onModelStreamStart()
+    // Tool run
+    callbacks.onToolStart("read_file", { path: "x" })
+    callbacks.onToolEnd("read_file", "x", true)
+    // Second model call
+    mockStream.update.mockClear()
+    callbacks.onModelStart()
+    const calledWith = mockStream.update.mock.calls[0][0] as string
+    const phrase = calledWith.replace(/\.\.\.$/, "")
+    expect(FOLLOWUP_PHRASES).toContain(phrase)
+
+    callbacks.onModelStreamStart() // cleanup
+  })
+
+  it("onError stops phrase rotation", async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onModelStart()
+    callbacks.onError(new Error("boom"))
+    mockStream.update.mockClear()
+    vi.advanceTimersByTime(3000)
+    expect(mockStream.update).not.toHaveBeenCalled()
+  })
+
+  it("onToolStart stops phrase rotation from onModelStart", async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onModelStart()
+    callbacks.onModelStreamStart()
+    callbacks.onToolStart("shell", { command: "ls" })
+    mockStream.update.mockClear()
+    vi.advanceTimersByTime(3000)
+    // No rotation after tool start (it uses static tool name display)
+    expect(mockStream.update).not.toHaveBeenCalled()
   })
 })
