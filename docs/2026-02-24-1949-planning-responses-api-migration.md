@@ -112,3 +112,4 @@ Design principle: anything that makes sense to share across providers IS shared.
 - 2026-02-24 19:50 Created
 - 2026-02-24 19:56 Resolved all open questions, refined scope and decisions based on user feedback and API research
 - 2026-02-24 19:59 Approved
+- 2026-02-24 20:05 Doing doc created -- all 4 passes complete, READY_FOR_EXECUTION
