@@ -165,7 +165,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: Test file that fails because `src/commands.ts` does not exist yet
 **Acceptance**: Tests exist and FAIL (red)
 
-### 🔄 Unit 4b: Slash Command System -- Implementation
+### ✅ Unit 4b: Slash Command System -- Implementation
 **What**: Create `src/commands.ts` implementing:
 - `Command` type: `{ name: string, description: string, channels: Channel[], handler: (ctx: CommandContext) => CommandResult }`.
 - `CommandContext` type: `{ channel: Channel }` (extensible later). Note: `Channel` type (`"cli" | "teams"`) must be exported from `src/core.ts` (or extracted to a shared types file) so `commands.ts` can import it.
@@ -176,7 +176,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: `src/commands.ts` with command system
 **Acceptance**: All Unit 4a tests PASS (green), no warnings
 
-### ⬜ Unit 4c: Slash Command System -- Coverage & Refactor
+### 🔄 Unit 4c: Slash Command System -- Coverage & Refactor
 **What**: Verify 100% coverage on `src/commands.ts`. Add any missing edge case tests.
 **Output**: 100% coverage, tests still green
 **Acceptance**: 100% coverage on new code, tests still green
