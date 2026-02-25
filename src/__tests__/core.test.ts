@@ -646,6 +646,7 @@ describe("toResponsesInput", () => {
         call_id: "tc1",
         name: "read_file",
         arguments: '{"path":"a.txt"}',
+        status: "completed",
       },
     ])
   })
@@ -693,6 +694,7 @@ describe("toResponsesInput", () => {
       call_id: "tc1",
       name: "read_file",
       arguments: '{"path":"x.txt"}',
+      status: "completed",
     })
     expect(result.input[4]).toEqual({
       type: "function_call_output",
@@ -725,6 +727,7 @@ describe("toResponsesInput", () => {
         call_id: "tc1",
         name: "shell",
         arguments: '{"command":"ls"}',
+        status: "completed",
       },
     ])
   })
