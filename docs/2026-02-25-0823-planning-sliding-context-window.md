@@ -37,7 +37,8 @@ Implement a sliding context window for the ouroboros agent so that extended conv
       "tenantId": "..."
     },
     "context": {
-      "maxTokens": 80000
+      "maxTokens": 80000,
+      "contextMargin": 20
     }
   }
   ```
