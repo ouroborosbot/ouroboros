@@ -6,6 +6,7 @@ import { listSkills, loadSkill } from "./skills";
 
 let _client: OpenAI | null = null;
 let _model: string | null = null;
+let _provider: "azure" | "minimax" | null = null;
 
 const AZURE_REQUIRED = [
   "AZURE_OPENAI_API_KEY",
@@ -34,6 +35,7 @@ function getClient(): OpenAI {
         maxRetries: 0,
       });
       _model = process.env.AZURE_OPENAI_MODEL_NAME!;
+      _provider = "azure";
     } else if (hasAll(MINIMAX_REQUIRED)) {
       _client = new OpenAI({
         apiKey: process.env.MINIMAX_API_KEY,
@@ -42,6 +44,7 @@ function getClient(): OpenAI {
         maxRetries: 0,
       });
       _model = process.env.MINIMAX_MODEL!;
+      _provider = "minimax";
     } else {
       console.error(
         `missing env vars. need either:\n  ${AZURE_REQUIRED.join(", ")}\n  ${MINIMAX_REQUIRED.join(", ")}`,
@@ -55,6 +58,11 @@ function getClient(): OpenAI {
 export function getModel(): string {
   if (_model === null) getClient(); // ensure initialized
   return _model!;
+}
+
+export function getProvider(): "azure" | "minimax" {
+  if (_provider === null) getClient(); // ensure initialized
+  return _provider!;
 }
 
 export const tools: OpenAI.ChatCompletionTool[] = [
@@ -397,8 +405,12 @@ export async function runAgent(
       callbacks.onModelStart();
 
       const model = getModel();
+      const provider = getProvider();
       const createParams: any = { messages, tools, stream: true };
       if (model) createParams.model = model;
+      if (provider === "azure") {
+        createParams.reasoning = { effort: "medium", summary: "auto" };
+      }
       const response = (await getClient().chat.completions.create(
         createParams,
         signal ? { signal } : {},

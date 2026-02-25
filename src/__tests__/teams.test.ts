@@ -137,7 +137,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   // --- onReasoningChunk tests ---
 
-  it("onReasoningChunk calls stream.update()", async () => {
+  it("onReasoningChunk calls stream.update() with accumulated text", async () => {
     vi.resetModules()
     const teams = await import("../teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
@@ -146,16 +146,16 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     expect(mockStream.update).toHaveBeenCalledWith("analyzing code")
   })
 
-  it("multiple reasoning chunks each call update()", async () => {
+  it("multiple reasoning chunks accumulate into growing update()", async () => {
     vi.resetModules()
     const teams = await import("../teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onReasoningChunk("step 1")
-    callbacks.onReasoningChunk("step 2")
+    callbacks.onReasoningChunk(" step 2")
     expect(mockStream.update).toHaveBeenCalledTimes(2)
     expect(mockStream.update).toHaveBeenNthCalledWith(1, "step 1")
-    expect(mockStream.update).toHaveBeenNthCalledWith(2, "step 2")
+    expect(mockStream.update).toHaveBeenNthCalledWith(2, "step 1 step 2")
   })
 
   it("onReasoningChunk after stop (403) does not call update()", async () => {

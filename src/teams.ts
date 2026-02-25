@@ -28,6 +28,7 @@ export function createTeamsCallbacks(
   controller: AbortController,
 ): ChannelCallbacks {
   let stopped = false // set when stream signals cancellation (403)
+  let reasoningBuf = "" // accumulate reasoning so update() shows full text
 
   // Safely emit a text delta to the stream.
   // On error (e.g. 403 from Teams stop button), abort the controller.
@@ -61,7 +62,8 @@ export function createTeamsCallbacks(
     },
     onReasoningChunk: (text: string) => {
       if (stopped) return
-      safeUpdate(text)
+      reasoningBuf += text
+      safeUpdate(reasoningBuf)
     },
     onTextChunk: (text: string) => {
       if (stopped) return
