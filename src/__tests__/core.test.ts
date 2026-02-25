@@ -906,6 +906,143 @@ describe("streamChatCompletion", () => {
   })
 })
 
+describe("streamResponsesApi", () => {
+  let streamResponsesApi: any
+
+  function makeResponsesStream(events: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const event of events) {
+          yield event
+        }
+      },
+    }
+  }
+
+  function makeCallbacks(overrides: Partial<ChannelCallbacks> = {}): ChannelCallbacks {
+    return {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+      ...overrides,
+    }
+  }
+
+  beforeEach(async () => {
+    vi.resetModules()
+    process.env.MINIMAX_API_KEY = "test-key"
+    process.env.MINIMAX_MODEL = "test-model"
+    mockResponsesCreate.mockReset()
+    const core = await import("../core")
+    streamResponsesApi = core.streamResponsesApi
+  })
+
+  it("calls client.responses.create with createParams and signal", async () => {
+    const create = vi.fn().mockReturnValue(makeResponsesStream([]))
+    const client = { responses: { create } }
+    const callbacks = makeCallbacks()
+    const params = { model: "gpt-5", stream: true }
+    const controller = new AbortController()
+    await streamResponsesApi(client, params, callbacks, controller.signal)
+    expect(create).toHaveBeenCalledWith(params, { signal: controller.signal })
+  })
+
+  it("calls client.responses.create without signal options when no signal", async () => {
+    const create = vi.fn().mockReturnValue(makeResponsesStream([]))
+    const client = { responses: { create } }
+    const callbacks = makeCallbacks()
+    await streamResponsesApi(client, { model: "gpt-5" }, callbacks)
+    expect(create).toHaveBeenCalledWith({ model: "gpt-5" }, {})
+  })
+
+  it("fires onTextChunk and accumulates content on text delta events", async () => {
+    const textChunks: string[] = []
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_text.delta", delta: "hello" },
+      { type: "response.output_text.delta", delta: " world" },
+    ])) } }
+    const callbacks = makeCallbacks({ onTextChunk: (text: string) => textChunks.push(text) })
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(textChunks).toEqual(["hello", " world"])
+    expect(result.content).toBe("hello world")
+  })
+
+  it("fires onReasoningChunk on reasoning summary text delta events", async () => {
+    const reasoningChunks: string[] = []
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.reasoning_summary_text.delta", delta: "thinking" },
+    ])) } }
+    const callbacks = makeCallbacks({ onReasoningChunk: (text: string) => reasoningChunks.push(text) })
+    await streamResponsesApi(client, {}, callbacks)
+    expect(reasoningChunks).toEqual(["thinking"])
+  })
+
+  it("fires onModelStreamStart once on first text or reasoning delta", async () => {
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_text.delta", delta: "a" },
+      { type: "response.reasoning_summary_text.delta", delta: "b" },
+      { type: "response.output_text.delta", delta: "c" },
+    ])) } }
+    const callbacks = makeCallbacks()
+    await streamResponsesApi(client, {}, callbacks)
+    expect(callbacks.onModelStreamStart).toHaveBeenCalledTimes(1)
+  })
+
+  it("fires onModelStreamStart on first reasoning delta when no text", async () => {
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.reasoning_summary_text.delta", delta: "think" },
+    ])) } }
+    const callbacks = makeCallbacks()
+    await streamResponsesApi(client, {}, callbacks)
+    expect(callbacks.onModelStreamStart).toHaveBeenCalledTimes(1)
+  })
+
+  it("returns TurnResult with accumulated content, empty toolCalls and outputItems for text-only", async () => {
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_text.delta", delta: "hello" },
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(result).toEqual({ content: "hello", toolCalls: [], outputItems: [] })
+  })
+
+  it("silently ignores unknown event types", async () => {
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.created" },
+      { type: "response.completed" },
+      { type: "some.unknown.event" },
+      { type: "response.output_text.delta", delta: "ok" },
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(result.content).toBe("ok")
+  })
+
+  it("fires callback even for empty delta string", async () => {
+    const textChunks: string[] = []
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_text.delta", delta: "" },
+    ])) } }
+    const callbacks = makeCallbacks({ onTextChunk: (text: string) => textChunks.push(text) })
+    await streamResponsesApi(client, {}, callbacks)
+    expect(textChunks).toEqual([""])
+  })
+
+  it("casts non-string delta to String()", async () => {
+    const reasoningChunks: string[] = []
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.reasoning_summary_text.delta", delta: 42 },
+    ])) } }
+    const callbacks = makeCallbacks({ onReasoningChunk: (text: string) => reasoningChunks.push(text) })
+    await streamResponsesApi(client, {}, callbacks)
+    expect(reasoningChunks).toEqual(["42"])
+  })
+})
+
 describe("runAgent", () => {
   let runAgent: (messages: any[], callbacks: ChannelCallbacks) => Promise<void>
 
