@@ -240,12 +240,12 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: Modified `src/agent.ts` with slash commands and session persistence
 **Acceptance**: All Unit 6a tests PASS (green), no warnings
 
-### 🔄 Unit 6c: CLI Integration -- Coverage & Refactor
+### ✅ Unit 6c: CLI Integration -- Coverage & Refactor
 **What**: Verify 100% coverage on modified `src/agent.ts`. Ensure all existing agent tests still pass. Add any missing edge case tests.
 **Output**: 100% coverage, all tests green
 **Acceptance**: 100% coverage on new code, tests still green
 
-### ⬜ Unit 7a: Teams Integration -- Tests
+### 🔄 Unit 7a: Teams Integration -- Tests
 **Depends on**: Units 1-4 (config, context, session, commands modules must exist)
 **What**: Add tests to `src/__tests__/teams.test.ts` for Teams per-conversation persistence, slash commands, and manifest:
 - `handleTeamsMessage` signature changes to `handleTeamsMessage(text, stream, conversationId)`.
@@ -332,3 +332,6 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 - 2026-02-25 13:32 Unit 5a complete: 5 new config integration tests (3 failing, 2 passing via env vars)
 - 2026-02-25 13:33 Unit 5b complete: getClient refactored to use config module, 363 tests pass
 - 2026-02-25 13:34 Unit 5c complete: core.ts 97.19% coverage (new config code fully covered, pre-existing gaps unchanged)
+- 2026-02-25 13:35 Unit 6a complete: 10 failing tests for CLI session persistence, slash commands, context trimming
+- 2026-02-25 13:43 Unit 6b complete: agent.ts integrated with sessions, slash commands, context window. 374 tests pass
+- 2026-02-25 13:44 Unit 6c complete: agent.ts 98.93% stmts, 100% lines/funcs
