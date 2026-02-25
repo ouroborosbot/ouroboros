@@ -1,6 +1,6 @@
 # Doing: Normalize and Improve Reasoning Display Across All Surfaces
 
-**Status**: drafting
+**Status**: READY_FOR_EXECUTION
 **Execution Mode**: pending
 **Created**: 2026-02-24 18:40
 **Planning**: ./2026-02-24-1816-planning-reasoning-display.md
@@ -45,7 +45,7 @@ Normalize how reasoning/thinking tokens are handled at the model-calling level s
 ## Work Units
 
 ### Legend
-- Not started -- In progress -- Done -- Blocked
+Not started / In progress / Done / Blocked
 
 ### Unit 1: Add onReasoningChunk to ChannelCallbacks interface
 **What**: Add `onReasoningChunk(text: string): void` to the `ChannelCallbacks` interface in `src/core.ts`, and mechanically add `onReasoningChunk: () => {}` to all 27 existing `ChannelCallbacks` literal objects in test files so they continue to compile. Also add a no-op `onReasoningChunk` to both adapter implementations (`createCliCallbacks` in `agent.ts`, `createTeamsCallbacks` in `teams.ts`) so the return types satisfy the interface.
