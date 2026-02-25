@@ -25,7 +25,22 @@
   "bots": [
     {
       "botId": "7467201b-d9b4-4792-9b46-ce84494f9d09",
-      "scopes": ["personal"]
+      "scopes": ["personal"],
+      "commandLists": [
+        {
+          "scopes": ["personal"],
+          "commands": [
+            {
+              "title": "/new",
+              "description": "Clear conversation and start fresh"
+            },
+            {
+              "title": "/commands",
+              "description": "List available slash commands"
+            }
+          ]
+        }
+      ]
     }
   ],
   "copilotAgents": {

@@ -279,15 +279,40 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 })
 
 describe("Teams adapter - message handling", () => {
+  function mockHandlingDeps(mockRunAgent: any) {
+    vi.doMock("../core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-test-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+    }))
+    vi.doMock("../context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockReturnValue({ handled: false }),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockReturnValue(null),
+    }))
+  }
+
   it("on incoming message, pushes system and user message and calls runAgent", async () => {
     vi.resetModules()
 
     const mockRunAgent = vi.fn()
-    vi.doMock("../core", () => ({
-      runAgent: mockRunAgent,
-      buildSystem: vi.fn().mockReturnValue("system prompt"),
-      summarizeArgs: vi.fn().mockReturnValue(""),
-    }))
+    mockHandlingDeps(mockRunAgent)
 
     const teams = await import("../teams")
 
@@ -297,7 +322,7 @@ describe("Teams adapter - message handling", () => {
       close: vi.fn(),
     }
 
-    await teams.handleTeamsMessage("hello from Teams", mockStream as any)
+    await teams.handleTeamsMessage("hello from Teams", mockStream as any, "conv-test")
 
     expect(mockRunAgent).toHaveBeenCalled()
     const messages = mockRunAgent.mock.calls[0][0]
@@ -309,16 +334,12 @@ describe("Teams adapter - message handling", () => {
     vi.resetModules()
 
     const mockRunAgent = vi.fn()
-    vi.doMock("../core", () => ({
-      runAgent: mockRunAgent,
-      buildSystem: vi.fn().mockReturnValue("system prompt"),
-      summarizeArgs: vi.fn().mockReturnValue(""),
-    }))
+    mockHandlingDeps(mockRunAgent)
 
     const teams = await import("../teams")
 
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
-    await teams.handleTeamsMessage("test", mockStream as any)
+    await teams.handleTeamsMessage("test", mockStream as any, "conv-test")
 
     // Third argument to runAgent should be an AbortSignal
     expect(mockRunAgent).toHaveBeenCalled()
@@ -329,41 +350,35 @@ describe("Teams adapter - message handling", () => {
   it("does not explicitly close stream (framework auto-closes)", async () => {
     vi.resetModules()
 
-    vi.doMock("../core", () => ({
-      runAgent: vi.fn(),
-      buildSystem: vi.fn().mockReturnValue("system prompt"),
-      summarizeArgs: vi.fn().mockReturnValue(""),
-    }))
+    mockHandlingDeps(vi.fn())
 
     const teams = await import("../teams")
 
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
-    await teams.handleTeamsMessage("hi", mockStream as any)
+    await teams.handleTeamsMessage("hi", mockStream as any, "conv-test")
 
     expect(mockStream.close).not.toHaveBeenCalled()
   })
 
-  it("uses single global messages array across calls", async () => {
+  it("per-conversation sessions: each call loads/saves independently", async () => {
     vi.resetModules()
 
     const capturedMessages: any[][] = []
     const mockRunAgent = vi.fn().mockImplementation((msgs: any[]) => {
       capturedMessages.push([...msgs])
     })
-    vi.doMock("../core", () => ({
-      runAgent: mockRunAgent,
-      buildSystem: vi.fn().mockReturnValue("system prompt"),
-      summarizeArgs: vi.fn().mockReturnValue(""),
-    }))
+    mockHandlingDeps(mockRunAgent)
 
     const teams = await import("../teams")
 
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
 
-    await teams.handleTeamsMessage("first", mockStream as any)
-    await teams.handleTeamsMessage("second", mockStream as any)
+    await teams.handleTeamsMessage("first", mockStream as any, "conv-1")
+    await teams.handleTeamsMessage("second", mockStream as any, "conv-2")
 
-    expect(capturedMessages[1].length).toBeGreaterThan(capturedMessages[0].length)
+    // Both calls get fresh sessions (loadSession returns null), so each has system + user = 2 msgs
+    expect(capturedMessages[0].length).toBe(2)
+    expect(capturedMessages[1].length).toBe(2)
   })
 })
 
@@ -768,11 +783,16 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     delete process.env.PORT
   })
 
+  function mockBotConfig(clientId: string, clientSecret: string, tenantId: string) {
+    vi.doMock("../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/bot-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId, clientSecret, tenantId }),
+    }))
+  }
+
   it("creates App WITHOUT DevtoolsPlugin when CLIENT_ID is set", async () => {
     vi.resetModules()
-    process.env.CLIENT_ID = "test-client-id"
-    process.env.CLIENT_SECRET = "test-secret"
-    process.env.TENANT_ID = "test-tenant-id"
 
     let capturedOpts: any = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -788,8 +808,8 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     vi.doMock("../core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
-      summarizeArgs: vi.fn().mockReturnValue(""),
     }))
+    mockBotConfig("test-client-id", "test-secret", "test-tenant-id")
 
     vi.spyOn(console, "log").mockImplementation(() => {})
 
@@ -804,9 +824,6 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
 
   it("passes clientId, clientSecret, tenantId to App constructor", async () => {
     vi.resetModules()
-    process.env.CLIENT_ID = "my-app-id"
-    process.env.CLIENT_SECRET = "my-secret"
-    process.env.TENANT_ID = "my-tenant"
 
     let capturedOpts: any = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -822,8 +839,8 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     vi.doMock("../core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
-      summarizeArgs: vi.fn().mockReturnValue(""),
     }))
+    mockBotConfig("my-app-id", "my-secret", "my-tenant")
 
     vi.spyOn(console, "log").mockImplementation(() => {})
 
@@ -839,9 +856,6 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
 
   it("passes activity.mentions.stripText in bot mode", async () => {
     vi.resetModules()
-    process.env.CLIENT_ID = "test-id"
-    process.env.CLIENT_SECRET = "test-secret"
-    process.env.TENANT_ID = "test-tenant"
 
     let capturedOpts: any = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -857,8 +871,8 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     vi.doMock("../core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
-      summarizeArgs: vi.fn().mockReturnValue(""),
     }))
+    mockBotConfig("test-id", "test-secret", "test-tenant")
 
     vi.spyOn(console, "log").mockImplementation(() => {})
 
@@ -872,9 +886,6 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
 
   it("logs 'with Bot Service' in bot mode", async () => {
     vi.resetModules()
-    process.env.CLIENT_ID = "test-id"
-    process.env.CLIENT_SECRET = "test-secret"
-    process.env.TENANT_ID = "test-tenant"
 
     vi.doMock("@microsoft/teams.apps", () => ({
       App: class MockApp {
@@ -889,8 +900,8 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     vi.doMock("../core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
-      summarizeArgs: vi.fn().mockReturnValue(""),
     }))
+    mockBotConfig("test-id", "test-secret", "test-tenant")
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
 
@@ -905,9 +916,6 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
 
   it("registers message handler in bot mode", async () => {
     vi.resetModules()
-    process.env.CLIENT_ID = "test-id"
-    process.env.CLIENT_SECRET = "test-secret"
-    process.env.TENANT_ID = "test-tenant"
 
     const mockOn = vi.fn()
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -923,8 +931,8 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     vi.doMock("../core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
-      summarizeArgs: vi.fn().mockReturnValue(""),
     }))
+    mockBotConfig("test-id", "test-secret", "test-tenant")
 
     vi.spyOn(console, "log").mockImplementation(() => {})
 
@@ -1244,19 +1252,24 @@ describe("Teams adapter - session persistence", () => {
   it("withConversationLock serializes messages for same conversation", async () => {
     vi.resetModules()
     const order: string[] = []
-    const runAgentFn = vi.fn().mockImplementation(async () => {
-      const id = order.length
-      order.push(`start-${id}`)
-      await new Promise((r) => setTimeout(r, 10))
-      order.push(`end-${id}`)
-    })
-    mockTeamsDeps({ runAgentFn })
+    mockTeamsDeps({})
     const teams = await import("../teams")
 
     const { withConversationLock } = teams
+    let callCount = 0
     await Promise.all([
-      withConversationLock("conv-1", async () => { await runAgentFn() }),
-      withConversationLock("conv-1", async () => { await runAgentFn() }),
+      withConversationLock("conv-1", async () => {
+        const id = callCount++
+        order.push(`start-${id}`)
+        await new Promise((r) => setTimeout(r, 10))
+        order.push(`end-${id}`)
+      }),
+      withConversationLock("conv-1", async () => {
+        const id = callCount++
+        order.push(`start-${id}`)
+        await new Promise((r) => setTimeout(r, 10))
+        order.push(`end-${id}`)
+      }),
     ])
 
     // Should be sequential: start-0, end-0, start-1, end-1
