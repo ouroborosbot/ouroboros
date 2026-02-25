@@ -1,6 +1,6 @@
 # Planning: Sliding Context Window with Session Persistence
 
-**Status**: drafting
+**Status**: approved
 **Created**: 2026-02-25 08:23
 
 ## Goal
@@ -14,7 +14,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 - **Token counting**: Approximate token count for a messages array using character-count / 4 heuristic. No external dependencies. Conservative safety margin.
 - **Sliding window trimming**: When the messages array exceeds a configurable threshold, drop older messages while preserving the system prompt and recent context. No summarization -- simply drop old messages. The model is expected to take notes on its work and check those notes when unsure.
 - **Session persistence (CLI)**: Save the messages array to disk (e.g., JSON file in `.ouroboros/sessions/`) after each turn. Single global session (not per-directory). On startup, load the previous session so the conversation continues where it left off.
-- **Session persistence (Teams)**: Save the messages array to disk per conversation key. On incoming message, load the session for that conversation. On process restart, conversations resume. (Keying strategy TBD -- see Open Questions.)
+- **Session persistence (Teams)**: Save the messages array to disk keyed by `activity.conversation.id`. On incoming message, load the session for that conversation. On process restart, conversations resume.
 - **Configurable limits**: Token limit and recent-messages-to-keep should be configurable via environment variables (with sensible defaults).
 - **Integration with `runAgent`**: The sliding window logic runs before each `runAgent` call, ensuring the messages array passed to the API is within limits.
 - **Session reset command**: CLI supports typing "new" to clear the current session and start fresh.
@@ -52,44 +52,14 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [ ] **Teams conversation keying strategy** -- see options analysis below. User to decide.
-- [ ] What default token limit? Conservative default of 80k tokens seems reasonable for most models. Configurable via env var.
-
-### Teams Conversation Keying Options
-
-The Teams SDK `activity` object provides several identifiers that could be used to key sessions. Here are the options with trade-offs:
-
-**Option A: Per conversation ID (`activity.conversation.id`)**
-- The `conversation.id` uniquely identifies a conversation thread in Teams. In 1:1 chats, each user-to-bot pair gets a unique conversation ID. In group chats, the group chat gets one conversation ID. In channels, each channel gets a conversation ID (with thread replies sharing it).
-- Pros: Natural Teams primitive. One conversation = one session. Matches how users think about "a conversation."
-- Cons: In a channel, everyone shares the same context window. If user A asks about topic X and user B asks about topic Y, they see each other's context (which is arguably correct -- it IS a shared channel conversation).
-- Best for: Most use cases. This is the standard approach.
-
-**Option B: Per user (`activity.from.id`)**
-- The `from.id` (or `from.aadObjectId`) uniquely identifies the user who sent the message.
-- Pros: Each user gets their own private context window regardless of which channel or chat they message from. Clean isolation.
-- Cons: If the same user talks to the bot from a 1:1 chat AND a group chat, both share the same context. This may be confusing -- context from a private 1:1 leaking into group chat responses. Also loses the "shared conversation" feel in group chats.
-- Best for: Strict per-user isolation (uncommon for team bots).
-
-**Option C: Per conversation ID + user ID (composite key)**
-- Key is `${activity.conversation.id}:${activity.from.id}`.
-- Pros: Each user gets their own context window within each conversation. No cross-contamination between users in channels. No cross-contamination between conversations for the same user.
-- Cons: In a group chat or channel, users lose the shared context that makes group chat useful. User A's question and the bot's answer would not be in user B's context. The bot would respond to each person as if the others don't exist.
-- Best for: Privacy-sensitive scenarios (uncommon).
-
-**Option D: Per conversation type (hybrid)**
-- 1:1 chats (`conversationType === "personal"`): key by conversation ID (which is already unique per user-bot pair)
-- Group chats / channels: key by conversation ID (shared context)
-- This is effectively the same as Option A, since conversation ID is already unique per user in 1:1 and shared in groups.
-
-**Recommendation: Option A (per conversation ID).** It is the simplest, most natural, and matches Teams semantics. The `activity.conversation.id` is available on every message and is the standard keying approach for Teams bots.
+- (all resolved)
 
 ## Decisions Made
 - **No summarization**: Simply drop old messages when the context window is exceeded. The philosophy is to embrace the LLM's short memory and encourage the model to take notes and check them when unsure. Summarization often confuses the model more than it helps.
 - **Simple token counting**: Character count / 4 heuristic. No external tokenizer dependency. Conservative safety margin to avoid hitting actual limits.
 - **Single global CLI session**: Not per-directory. One session file for the CLI adapter.
 - **Session reset command**: CLI supports "new" to clear the session and start fresh.
-- **Teams keying**: TBD -- awaiting user decision on keying options above.
+- **Teams keying**: Per conversation ID (`activity.conversation.id`). Simplest approach, matches natural Teams semantics. 1:1 chats are unique per user-bot pair; group chats/channels share context (correct behavior).
 
 ## Context / References
 - `src/core.ts` lines 673-767: `runAgent()` -- the agent loop. Takes `messages` array, appends to it during execution. This is where sliding window would need to integrate (before the API call).
