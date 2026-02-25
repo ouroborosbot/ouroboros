@@ -411,6 +411,68 @@ export async function runAgent(
       > = {};
       let streamStarted = false;
 
+      // State machine for parsing inline <think> tags (MiniMax pattern)
+      let contentBuf = "";
+      let inThinkTag = false;
+      const OPEN_TAG = "<think>";
+      const CLOSE_TAG = "</think>";
+
+      function processContentBuf(flush: boolean): void {
+        while (contentBuf.length > 0) {
+          if (inThinkTag) {
+            const end = contentBuf.indexOf(CLOSE_TAG);
+            if (end !== -1) {
+              const reasoning = contentBuf.slice(0, end);
+              if (reasoning) callbacks.onReasoningChunk(reasoning);
+              contentBuf = contentBuf.slice(end + CLOSE_TAG.length);
+              inThinkTag = false;
+            } else {
+              // Check if buffer ends with a partial </think> prefix
+              if (!flush) {
+                let retain = 0;
+                for (let i = 1; i < CLOSE_TAG.length && i <= contentBuf.length; i++) {
+                  if (contentBuf.endsWith(CLOSE_TAG.slice(0, i))) retain = i;
+                }
+                if (retain > 0) {
+                  const reasoning = contentBuf.slice(0, -retain);
+                  if (reasoning) callbacks.onReasoningChunk(reasoning);
+                  contentBuf = contentBuf.slice(-retain);
+                  return;
+                }
+              }
+              // All reasoning, flush it
+              callbacks.onReasoningChunk(contentBuf);
+              contentBuf = "";
+            }
+          } else {
+            const start = contentBuf.indexOf(OPEN_TAG);
+            if (start !== -1) {
+              const text = contentBuf.slice(0, start);
+              if (text) callbacks.onTextChunk(text);
+              contentBuf = contentBuf.slice(start + OPEN_TAG.length);
+              inThinkTag = true;
+            } else {
+              // Check if buffer ends with a partial <think> prefix
+              if (!flush) {
+                let retain = 0;
+                for (let i = 1; i < OPEN_TAG.length && i <= contentBuf.length; i++) {
+                  if (contentBuf.endsWith(OPEN_TAG.slice(0, i))) retain = i;
+                }
+                if (retain > 0) {
+                  const text = contentBuf.slice(0, -retain);
+                  if (text) callbacks.onTextChunk(text);
+                  contentBuf = contentBuf.slice(-retain);
+                  return;
+                }
+              }
+              // All content, flush it
+              callbacks.onTextChunk(contentBuf);
+              contentBuf = "";
+            }
+          }
+        }
+      }
+
       for await (const chunk of response) {
         if (signal?.aborted) break;
         const d = chunk.choices[0]?.delta as any;
@@ -431,7 +493,8 @@ export async function runAgent(
             streamStarted = true;
           }
           content += d.content;
-          callbacks.onTextChunk(d.content);
+          contentBuf += d.content;
+          processContentBuf(false);
         }
         if (d.tool_calls) {
           for (const tc of d.tool_calls) {
@@ -448,6 +511,8 @@ export async function runAgent(
           }
         }
       }
+      // Flush any remaining buffer at end of stream
+      if (contentBuf) processContentBuf(true);
 
       const toolCallList = Object.values(toolCalls);
 
