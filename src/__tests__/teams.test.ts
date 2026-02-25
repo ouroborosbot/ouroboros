@@ -1249,6 +1249,57 @@ describe("Teams adapter - session persistence", () => {
     expect(msgs[0].role).toBe("system")
   })
 
+  it("slash command handled but no result falls through to normal message handling", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn()
+    mockTeamsDeps({
+      runAgentFn,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: () => ({ handled: true, result: undefined }),
+    })
+    const teams = await import("../teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("/unknown", mockStream as any, "conv-123")
+
+    // Should fall through to runAgent since dispatch had no result
+    expect(runAgentFn).toHaveBeenCalled()
+  })
+
+  it("/commands with no message field emits empty string", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn()
+    mockTeamsDeps({
+      runAgentFn,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => {
+        if (name === "commands") return { handled: true, result: { action: "response", message: undefined } }
+        return { handled: false }
+      },
+    })
+    const teams = await import("../teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("/commands", mockStream as any, "conv-123")
+
+    expect(mockStream.emit).toHaveBeenCalledWith("")
+    expect(runAgentFn).not.toHaveBeenCalled()
+  })
+
+  it("slash command with unrecognized action falls through to normal handling", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn()
+    mockTeamsDeps({
+      runAgentFn,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: () => ({ handled: true, result: { action: "exit" } }),
+    })
+    const teams = await import("../teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("/exit", mockStream as any, "conv-123")
+
+    // "exit" action is not handled in Teams, so falls through to runAgent
+    expect(runAgentFn).toHaveBeenCalled()
+  })
+
   it("withConversationLock serializes messages for same conversation", async () => {
     vi.resetModules()
     const order: string[] = []
