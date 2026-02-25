@@ -2492,7 +2492,7 @@ process.env.MINIMAX_MODEL = "test-model"
     delete process.env.AZURE_OPENAI_MODEL_NAME
   })
 
-  it("Azure reasoning items accumulated and appended to next turn input", async () => {
+  it("Azure native input: output items + function_call_output in correct order", async () => {
     vi.resetModules()
     delete process.env.MINIMAX_API_KEY
     delete process.env.MINIMAX_MODEL
@@ -2504,15 +2504,16 @@ process.env.MINIMAX_MODEL = "test-model"
     vi.mocked(fs.readFileSync).mockReturnValue("data")
 
     const reasoningItem = { type: "reasoning", id: "r1", summary: [{ text: "thought", type: "summary_text" }], encrypted_content: "enc1" }
+    const funcItem = { type: "function_call", id: "fc1", call_id: "c1", name: "read_file", arguments: '{"path":"a.txt"}', status: "completed" }
     let callCount = 0
-    mockResponsesCreate.mockImplementation((...args: any[]) => {
+    mockResponsesCreate.mockImplementation(() => {
       callCount++
       if (callCount === 1) {
         return makeResponsesStream([
           { type: "response.output_item.done", item: reasoningItem },
           { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "read_file", arguments: "" } },
           { type: "response.function_call_arguments.delta", delta: '{"path":"a.txt"}' },
-          { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "read_file", arguments: '{"path":"a.txt"}' } },
+          { type: "response.output_item.done", item: funcItem },
         ])
       }
       return makeResponsesStream([
@@ -2532,12 +2533,24 @@ process.env.MINIMAX_MODEL = "test-model"
     }
 
     await core.runAgent([{ role: "system", content: "test" }, { role: "user", content: "hi" }], callbacks)
-    // Second call should include the reasoning item in input
-    const secondCallParams = mockResponsesCreate.mock.calls[1][0]
-    const input = secondCallParams.input
-    // Reasoning item should be appended at the end of input
-    const hasReasoningItem = input.some((i: any) => i.type === "reasoning" && i.encrypted_content === "enc1")
-    expect(hasReasoningItem).toBe(true)
+    // Second call uses the maintained native input array
+    const secondCallInput = mockResponsesCreate.mock.calls[1][0].input
+    // Should contain: user("hi"), reasoning, function_call, function_call_output
+    const userItem = secondCallInput.find((i: any) => i.role === "user")
+    expect(userItem).toBeDefined()
+    // Reasoning item in correct position (before function_call, not at end)
+    const reasoningIdx = secondCallInput.findIndex((i: any) => i.type === "reasoning")
+    const funcCallIdx = secondCallInput.findIndex((i: any) => i.type === "function_call")
+    const funcOutputIdx = secondCallInput.findIndex((i: any) => i.type === "function_call_output")
+    expect(reasoningIdx).toBeGreaterThan(-1)
+    expect(funcCallIdx).toBeGreaterThan(reasoningIdx)
+    expect(funcOutputIdx).toBeGreaterThan(funcCallIdx)
+    // Original output items preserved (with their id fields)
+    expect(secondCallInput[reasoningIdx].encrypted_content).toBe("enc1")
+    expect(secondCallInput[funcCallIdx].id).toBe("fc1")
+    // function_call_output has the tool result
+    expect(secondCallInput[funcOutputIdx].call_id).toBe("c1")
+    expect(secondCallInput[funcOutputIdx].output).toBe("data")
 
     delete process.env.AZURE_OPENAI_API_KEY
     delete process.env.AZURE_OPENAI_ENDPOINT
@@ -2545,7 +2558,7 @@ process.env.MINIMAX_MODEL = "test-model"
     delete process.env.AZURE_OPENAI_MODEL_NAME
   })
 
-  it("Azure non-reasoning output items NOT accumulated", async () => {
+  it("Azure native input: same array reference reused across iterations", async () => {
     vi.resetModules()
     delete process.env.MINIMAX_API_KEY
     delete process.env.MINIMAX_MODEL
@@ -2556,10 +2569,13 @@ process.env.MINIMAX_MODEL = "test-model"
 
     vi.mocked(fs.readFileSync).mockReturnValue("data")
 
-    const funcItem = { type: "function_call", call_id: "c1", name: "read_file", arguments: '{"path":"a.txt"}' }
+    const funcItem = { type: "function_call", id: "fc1", call_id: "c1", name: "read_file", arguments: '{"path":"a.txt"}', status: "completed" }
+    // Capture input snapshots at call time
+    const inputSnapshots: any[][] = []
     let callCount = 0
-    mockResponsesCreate.mockImplementation(() => {
+    mockResponsesCreate.mockImplementation((params: any) => {
       callCount++
+      inputSnapshots.push([...params.input])
       if (callCount === 1) {
         return makeResponsesStream([
           { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "read_file", arguments: "" } },
@@ -2584,14 +2600,13 @@ process.env.MINIMAX_MODEL = "test-model"
     }
 
     await core.runAgent([{ role: "system", content: "test" }, { role: "user", content: "hi" }], callbacks)
-    // Second call should NOT include function_call items in input (they round-trip through CC)
-    const secondCallParams = mockResponsesCreate.mock.calls[1][0]
-    const input = secondCallParams.input
-    const hasFuncCallItem = input.some((i: any) => i.type === "function_call" && i.call_id === "c1" && i.name === "read_file")
-    // The function_call IS expected from toResponsesInput (converting CC assistant message back)
-    // But the output_item.done function_call should NOT be separately appended
-    const reasoningItems = input.filter((i: any) => i.type === "reasoning")
-    expect(reasoningItems).toHaveLength(0)
+    // First call: initialized from toResponsesInput (just user message)
+    expect(inputSnapshots[0]).toEqual([{ role: "user", content: "hi" }])
+    // Second call: same array grew with output items + function_call_output
+    expect(inputSnapshots[1].length).toBeGreaterThan(1)
+    expect(inputSnapshots[1][0]).toEqual({ role: "user", content: "hi" })
+    // It IS the same array reference (mutated in place, not rebuilt)
+    expect(mockResponsesCreate.mock.calls[0][0].input).toBe(mockResponsesCreate.mock.calls[1][0].input)
 
     delete process.env.AZURE_OPENAI_API_KEY
     delete process.env.AZURE_OPENAI_ENDPOINT
