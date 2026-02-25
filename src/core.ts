@@ -10,14 +10,16 @@ let _model: string | null = null
 function getClient(): OpenAI {
   if (!_client) {
     if (process.env.AZURE_OPENAI_API_KEY) {
+      const origin = new URL(process.env.AZURE_OPENAI_ENDPOINT || "https://localhost").origin
+      const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o"
       _client = new OpenAI({
         apiKey: process.env.AZURE_OPENAI_API_KEY,
-        baseURL: `https://${process.env.AZURE_OPENAI_ENDPOINT || "model-access-fhl.openai.azure.com"}/openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o"}`,
+        baseURL: `${origin}/openai/deployments/${deployment}`,
         defaultQuery: { "api-version": process.env.AZURE_OPENAI_API_VERSION || "2025-01-01-preview" },
         timeout: 30000,
         maxRetries: 0,
       })
-      _model = ""  // Azure deployments don't need a model param
+      _model = process.env.AZURE_OPENAI_MODEL_NAME || ""
     } else if (process.env.MINIMAX_API_KEY) {
       _client = new OpenAI({
         apiKey: process.env.MINIMAX_API_KEY,
