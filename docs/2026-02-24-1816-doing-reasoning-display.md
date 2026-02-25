@@ -45,9 +45,9 @@ Normalize how reasoning/thinking tokens are handled at the model-calling level s
 ## Work Units
 
 ### Legend
-Not started / In progress / Done / Blocked
+⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
-### Unit 1: Add onReasoningChunk to ChannelCallbacks interface
+### ⬜ Unit 1: Add onReasoningChunk to ChannelCallbacks interface
 **What**: Add `onReasoningChunk(text: string): void` to the `ChannelCallbacks` interface in `src/core.ts`, and mechanically add `onReasoningChunk: () => {}` to all 27 existing `ChannelCallbacks` literal objects in test files so they continue to compile. Also add a no-op `onReasoningChunk` to both adapter implementations (`createCliCallbacks` in `agent.ts`, `createTeamsCallbacks` in `teams.ts`) so the return types satisfy the interface.
 
 This unit is a mechanical, non-behavioral change. No test behavior changes. No logic changes. Just the interface addition and making everything compile.
@@ -64,7 +64,7 @@ This unit is a mechanical, non-behavioral change. No test behavior changes. No l
 
 ---
 
-### Unit 2a: Normalize Azure reasoning_content in runAgent -- Tests
+### ⬜ Unit 2a: Normalize Azure reasoning_content in runAgent -- Tests
 **What**: Rewrite the 5 existing Azure `reasoning_content` tests in `core.test.ts` to expect the new behavior: `onReasoningChunk` receives reasoning text, `onTextChunk` receives only answer text, no `<think>` tags anywhere.
 
 Tests to rewrite:
@@ -81,7 +81,7 @@ Also rewrite the existing test "fires onTextChunk for each text delta with raw t
 
 **Acceptance**: Tests exist and FAIL because `runAgent` still wraps `reasoning_content` in `<think>` tags via `onTextChunk` instead of calling `onReasoningChunk`.
 
-### Unit 2b: Normalize Azure reasoning_content in runAgent -- Implementation
+### ⬜ Unit 2b: Normalize Azure reasoning_content in runAgent -- Implementation
 **What**: Refactor the streaming loop in `runAgent` (`src/core.ts` lines 412-463). Replace the Azure `reasoning_content` handling:
 
 Current code (lines 419-431):
@@ -111,14 +111,14 @@ Also remove:
 
 **Acceptance**: All 5 rewritten Azure tests from 2a PASS. All other tests still pass (MiniMax `<think>` tag test at line 585 still passes since content handling is unchanged).
 
-### Unit 2c: Unit 2 -- Coverage and refactor
+### ⬜ Unit 2c: Unit 2 -- Coverage and refactor
 **What**: Run coverage. Verify all `reasoning_content` code paths covered. Add any missing edge case tests (e.g., empty `reasoning_content` string if it can occur).
 
 **Acceptance**: 100% coverage on runAgent reasoning paths. All tests green.
 
 ---
 
-### Unit 3a: Normalize MiniMax inline think tags in runAgent -- Tests
+### ⬜ Unit 3a: Normalize MiniMax inline think tags in runAgent -- Tests
 **What**: Rewrite the existing test "fires onTextChunk for each text delta with raw think tags" (line 585) and add new tests. These tests send `<think>` tags as part of `content` (the MiniMax pattern) and verify core routes them to `onReasoningChunk`.
 
 Tests needed:
@@ -135,7 +135,7 @@ Tests needed:
 
 **Acceptance**: Tests exist and FAIL (runAgent still passes `<think>` tags through onTextChunk as raw content).
 
-### Unit 3b: Normalize MiniMax inline think tags in runAgent -- Implementation
+### ⬜ Unit 3b: Normalize MiniMax inline think tags in runAgent -- Implementation
 **What**: Add a state machine in `runAgent`'s content handling path (around lines 433-444) that detects `<think>` and `</think>` tags within `d.content` chunks and routes text accordingly.
 
 Implementation approach:
@@ -151,14 +151,14 @@ Implementation approach:
 
 **Acceptance**: All 7 MiniMax tests from 3a PASS. Both Azure and MiniMax reasoning flows work. All other tests still pass.
 
-### Unit 3c: Unit 3 -- Coverage and refactor
+### ⬜ Unit 3c: Unit 3 -- Coverage and refactor
 **What**: Run coverage on the state machine code. Add edge case tests if any branches uncovered: empty content chunks, content that is just `<think>`, content that is just `</think>`, buffer flush at end of stream with partial tag.
 
 **Acceptance**: 100% coverage on all new state machine code. All tests green. No warnings.
 
 ---
 
-### Unit 4a: Update CLI adapter for onReasoningChunk -- Tests
+### ⬜ Unit 4a: Update CLI adapter for onReasoningChunk -- Tests
 **What**: Rewrite the CLI think-tag dimming tests in `src/__tests__/cli.test.ts` (the describe block "CLI adapter - onTextChunk think-tag dimming", lines 49-121).
 
 New tests for the renamed describe block "CLI adapter - onReasoningChunk and onTextChunk rendering":
@@ -175,7 +175,7 @@ Remove the old partial-tag-split tests (lines 103-121) -- they tested adapter-le
 
 **Acceptance**: Tests exist and FAIL (CLI adapter still has think-tag parsing in onTextChunk, onReasoningChunk is a no-op).
 
-### Unit 4b: Update CLI adapter for onReasoningChunk -- Implementation
+### ⬜ Unit 4b: Update CLI adapter for onReasoningChunk -- Implementation
 **What**: Refactor `createCliCallbacks` in `src/agent.ts` (lines 103-153):
 1. Remove the `buf`, `inThink`, and `flush` function used for think-tag parsing.
 2. Simplify `onTextChunk` to: `process.stdout.write(text)`.
@@ -186,14 +186,14 @@ Remove the old partial-tag-split tests (lines 103-121) -- they tested adapter-le
 
 **Acceptance**: All CLI tests from 4a PASS. Dim rendering via `onReasoningChunk`. Direct write via `onTextChunk`. No tag parsing.
 
-### Unit 4c: Unit 4 -- Coverage and refactor
+### ⬜ Unit 4c: Unit 4 -- Coverage and refactor
 **What**: Run coverage on CLI adapter. Verify no dead code remains from the old flush/buf/inThink logic.
 
 **Acceptance**: 100% coverage on `createCliCallbacks`. All tests green.
 
 ---
 
-### Unit 5a: Update Teams adapter for onReasoningChunk -- Tests
+### ⬜ Unit 5a: Update Teams adapter for onReasoningChunk -- Tests
 **What**: Rewrite Teams think-tag tests in `src/__tests__/teams.test.ts`. The describe block "Teams adapter - createTeamsCallbacks (SDK-delegated streaming)" needs these changes:
 
 **Remove these tests** (no longer applicable):
@@ -224,7 +224,7 @@ Remove the old partial-tag-split tests (lines 103-121) -- they tested adapter-le
 
 **Acceptance**: Tests exist and FAIL (Teams adapter onReasoningChunk is still a no-op, onTextChunk still has think-tag parsing).
 
-### Unit 5b: Update Teams adapter for onReasoningChunk -- Implementation
+### ⬜ Unit 5b: Update Teams adapter for onReasoningChunk -- Implementation
 **What**: Refactor `createTeamsCallbacks` in `src/teams.ts` (lines 31-127):
 1. Remove state variables: `inThink`, `thinkBuf`, `emittedContent`.
 2. Simplify `onTextChunk` to just: `if (stopped) return; safeEmit(text)`.
@@ -237,14 +237,14 @@ Remove the old partial-tag-split tests (lines 103-121) -- they tested adapter-le
 
 **Acceptance**: All Teams tests from 5a PASS. Reasoning goes through `stream.update()`. Answer goes through `stream.emit()`. No think-tag parsing in adapter.
 
-### Unit 5c: Unit 5 -- Coverage and refactor
+### ⬜ Unit 5c: Unit 5 -- Coverage and refactor
 **What**: Run coverage on Teams adapter. Verify `stripThinkTags` is removed and no dead code remains. Clean up any unused imports or variables.
 
 **Acceptance**: 100% coverage on `createTeamsCallbacks`. All tests green. No warnings.
 
 ---
 
-### Unit 6: Final validation
+### ⬜ Unit 6: Final validation
 **What**: Run full test suite, coverage, and type checks. Verify the normalization is complete end-to-end.
 
 **Verification steps:**
