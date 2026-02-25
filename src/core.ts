@@ -698,7 +698,7 @@ export async function runAgent(
             input: fullInput,
             instructions,
             tools: toResponsesTools(tools),
-            reasoning: { effort: "medium", summary: "auto" },
+            reasoning: { effort: "medium", summary: "detailed" },
             stream: true,
             store: false,
             include: ["reasoning.encrypted_content"],

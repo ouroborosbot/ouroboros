@@ -102,9 +102,11 @@ export function addHistory(history: string[], entry: string): void {
 
 export function createCliCallbacks(): ChannelCallbacks {
   let currentSpinner: Spinner | null = null
+  let hadReasoning = false
 
   return {
     onModelStart: () => {
+      hadReasoning = false
       currentSpinner = new Spinner("waiting for model")
       currentSpinner.start()
     },
@@ -113,9 +115,14 @@ export function createCliCallbacks(): ChannelCallbacks {
       currentSpinner = null
     },
     onTextChunk: (text: string) => {
+      if (hadReasoning) {
+        process.stdout.write("\n\n")
+        hadReasoning = false
+      }
       process.stdout.write(text)
     },
     onReasoningChunk: (text: string) => {
+      hadReasoning = true
       process.stdout.write(`\x1b[2m${text}\x1b[0m`)
     },
     onToolStart: (name: string, _args: Record<string, string>) => {

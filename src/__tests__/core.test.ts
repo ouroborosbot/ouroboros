@@ -2339,7 +2339,7 @@ process.env.MINIMAX_MODEL = "test-model"
     expect(params.stream).toBe(true)
     expect(params.store).toBe(false)
     expect(params.include).toEqual(["reasoning.encrypted_content"])
-    expect(params.reasoning).toEqual({ effort: "medium", summary: "auto" })
+    expect(params.reasoning).toEqual({ effort: "medium", summary: "detailed" })
     expect(params.instructions).toBe("test")
     expect(params.tools).toBeDefined()
 
