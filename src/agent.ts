@@ -132,6 +132,7 @@ export function createCliCallbacks(): ChannelCallbacks {
       buf += text
       flush()
     },
+    onReasoningChunk: () => {},
     onToolStart: (name: string, _args: Record<string, string>) => {
       currentSpinner = new Spinner(`running ${name}`)
       currentSpinner.start()

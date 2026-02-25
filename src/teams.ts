@@ -68,6 +68,7 @@ export function createTeamsCallbacks(
     onModelStreamStart: () => {
       // No-op for Teams -- streaming has already started
     },
+    onReasoningChunk: () => {},
     onTextChunk: (text: string) => {
       if (stopped) return
 
