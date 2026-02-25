@@ -182,6 +182,18 @@ export const tools: OpenAI.ChatCompletionTool[] = [
   },
 ];
 
+export function toResponsesTools(
+  ccTools: OpenAI.ChatCompletionTool[],
+): { type: "function"; name: string; description: string | null; parameters: Record<string, unknown> | null; strict: false }[] {
+  return ccTools.map((t) => ({
+    type: "function" as const,
+    name: t.function.name,
+    description: t.function.description ?? null,
+    parameters: (t.function.parameters as Record<string, unknown>) ?? null,
+    strict: false as const,
+  }));
+}
+
 type ToolHandler = (args: Record<string, string>) => string | Promise<string>;
 
 const toolHandlers: Record<string, ToolHandler> = {
