@@ -1,6 +1,6 @@
 # Doing: Sliding Context Window with Session Persistence
 
-**Status**: drafting
+**Status**: READY_FOR_EXECUTION
 **Execution Mode**: pending
 **Created**: 2026-02-25 11:11
 **Planning**: ./2026-02-25-0823-planning-sliding-context-window.md
@@ -205,7 +205,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 - Slash command `/exit`: quits the process (same as old `exit` behavior).
 - Slash command `/new`: clears messages to just system prompt, calls `deleteSession`, prints confirmation, does NOT send to model.
 - Slash command `/commands`: prints list of CLI commands, does NOT send to model.
-- Old `exit` plain text still works (backward compat) OR is replaced by `/exit` only -- decide during implementation.
+- Old `exit` plain text is removed -- replaced entirely by `/exit` slash command.
 - Boot message updated to show slash command hints.
 - Session path uses `sessionPath("cli", "session")` from config module.
 **Output**: Failing tests for CLI integration
@@ -291,4 +291,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 - **Decisions made**: Update docs immediately, commit right away
 
 ## Progress Log
-- 2026-02-25 11:11 Created from planning doc (fresh overwrite)
+- 2026-02-25 11:11 Created from planning doc (fresh overwrite, Pass 1 first draft)
+- 2026-02-25 11:18 Pass 2 granularity -- firmed up session module location, added dependency notes
+- 2026-02-25 11:28 Pass 3 validation -- verified line numbers, patterns, paths against current codebase
+- 2026-02-25 11:30 Pass 4 quality -- resolved TBD (exit replaced by /exit), verified all acceptance criteria present
