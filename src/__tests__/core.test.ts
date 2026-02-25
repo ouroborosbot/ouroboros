@@ -752,6 +752,176 @@ process.env.MINIMAX_MODEL = "test-model"
     expect(textChunks.join("")).toBe("answer")
   })
 
+  it("handles partial close tag at chunk boundary inside think block", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk("<think>reasoning</"),
+        makeChunk("think>answer"),
+      ])
+    )
+
+    const reasoningChunks: string[] = []
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: (text) => reasoningChunks.push(text),
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(reasoningChunks.join("")).toBe("reasoning")
+    expect(textChunks.join("")).toBe("answer")
+  })
+
+  it("flushes remaining content buffer as text at end of stream", async () => {
+    // Content that ends with a partial <think> prefix -- at flush time, treated as plain text
+    mockCreate.mockReturnValue(
+      makeStream([makeChunk("hello<th")])
+    )
+
+    const reasoningChunks: string[] = []
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: (text) => reasoningChunks.push(text),
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(textChunks.join("")).toBe("hello<th")
+    expect(reasoningChunks).toEqual([])
+  })
+
+  it("flushes remaining reasoning buffer at end of stream (unclosed think)", async () => {
+    // Think block that never closes -- at flush time, remaining buffer is reasoning
+    mockCreate.mockReturnValue(
+      makeStream([makeChunk("<think>unterminated reasoning")])
+    )
+
+    const reasoningChunks: string[] = []
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: (text) => reasoningChunks.push(text),
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(reasoningChunks.join("")).toBe("unterminated reasoning")
+    expect(textChunks).toEqual([])
+  })
+
+  it("retains partial close tag prefix in reasoning buffer across chunks", async () => {
+    // Reasoning text ending with partial </think> prefix: "reasoning</"
+    // Next chunk completes it: "think>answer"
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk("<think>reasoning</"),
+        makeChunk("think>answer"),
+      ])
+    )
+
+    const reasoningChunks: string[] = []
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: (text) => reasoningChunks.push(text),
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(reasoningChunks.join("")).toBe("reasoning")
+    expect(textChunks.join("")).toBe("answer")
+  })
+
+  it("flushes partial close tag prefix as reasoning at end of stream", async () => {
+    // Stream ends with buffer holding a partial </think> prefix inside think block
+    mockCreate.mockReturnValue(
+      makeStream([makeChunk("<think>reasoning</")])
+    )
+
+    const reasoningChunks: string[] = []
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: (text) => reasoningChunks.push(text),
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    // "reasoning" is emitted during chunked processing, "</" is flushed at end as reasoning
+    expect(reasoningChunks.join("")).toBe("reasoning</")
+    expect(textChunks).toEqual([])
+  })
+
+  it("handles empty reasoning before partial close tag prefix", async () => {
+    // Think tag opens, then immediately a partial close tag with no reasoning in between
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk("<think></"),
+        makeChunk("think>answer"),
+      ])
+    )
+
+    const reasoningChunks: string[] = []
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: (text) => reasoningChunks.push(text),
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(reasoningChunks).toEqual([])
+    expect(textChunks.join("")).toBe("answer")
+  })
+
+  it("handles empty content chunks in think tag processing", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([makeChunk("<think>r</think>text")])
+    )
+
+    const reasoningChunks: string[] = []
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: (text) => reasoningChunks.push(text),
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(reasoningChunks.join("")).toBe("r")
+    expect(textChunks.join("")).toBe("text")
+  })
+
   it("ends loop when response has no tool calls", async () => {
     mockCreate.mockReturnValue(makeStream([makeChunk("just text")]))
 
