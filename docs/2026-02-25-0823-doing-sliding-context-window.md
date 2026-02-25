@@ -1,7 +1,7 @@
 # Doing: Sliding Context Window with Session Persistence
 
 **Status**: READY_FOR_EXECUTION
-**Execution Mode**: pending
+**Execution Mode**: direct
 **Created**: 2026-02-25 11:11
 **Planning**: ./2026-02-25-0823-planning-sliding-context-window.md
 **Artifacts**: ./2026-02-25-0823-doing-sliding-context-window/
@@ -67,7 +67,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 ### Legend
 ⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
-### ⬜ Unit 1a: Config Module -- Tests
+### 🔄 Unit 1a: Config Module -- Tests
 **What**: Create `src/__tests__/config.test.ts` with failing tests for a new `src/config.ts` module. This module handles loading structured config from `~/.agentconfigs/ouroboros/config.json` with env var overrides. Tests cover:
 - `loadConfig()`: reads and parses `~/.agentconfigs/ouroboros/config.json`. Returns typed config object.
 - `loadConfig()`: returns defaults when file is missing (ENOENT).
