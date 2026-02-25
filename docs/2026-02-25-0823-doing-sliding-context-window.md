@@ -112,7 +112,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: Test file that fails because `src/context.ts` does not exist yet
 **Acceptance**: Tests exist and FAIL (red) -- module not found errors
 
-### 🔄 Unit 2b: Token Counting & Sliding Window -- Implementation
+### ✅ Unit 2b: Token Counting & Sliding Window -- Implementation
 **What**: Create `src/context.ts` implementing:
 - `estimateTokens(messages: OpenAI.ChatCompletionMessageParam[]): number` -- sums character lengths of all message content (including stringified tool_calls arguments and tool result content) divided by 4, rounded up.
 - `cachedBuildSystem(channel: Channel, buildFn: (ch: Channel) => string): string` -- caches per channel, returns cached if less than 60s old, otherwise rebuilds. `resetSystemPromptCache()` clears cache for testing.
@@ -120,7 +120,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: `src/context.ts` with token counting and trimming functions
 **Acceptance**: All Unit 2a tests PASS (green), no warnings
 
-### ⬜ Unit 2c: Token Counting & Sliding Window -- Coverage & Refactor
+### 🔄 Unit 2c: Token Counting & Sliding Window -- Coverage & Refactor
 **What**: Verify 100% coverage on `src/context.ts`. Add any missing edge case tests. Refactor if needed.
 **Output**: 100% coverage report for context.ts
 **Acceptance**: 100% coverage on new code, tests still green
