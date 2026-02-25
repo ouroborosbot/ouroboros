@@ -410,7 +410,6 @@ export async function runAgent(
         { id: string; name: string; arguments: string }
       > = {};
       let streamStarted = false;
-      let inReasoning = false;
 
       for await (const chunk of response) {
         if (signal?.aborted) break;
@@ -418,27 +417,18 @@ export async function runAgent(
         if (!d) continue;
 
         // Handle reasoning_content (Azure AI models like DeepSeek-R1)
-        // Wrap in <think> tags so downstream adapters handle it uniformly
         if (d.reasoning_content) {
           if (!streamStarted) {
             callbacks.onModelStreamStart();
             streamStarted = true;
           }
-          if (!inReasoning) {
-            callbacks.onTextChunk("<think>");
-            inReasoning = true;
-          }
-          callbacks.onTextChunk(d.reasoning_content);
+          callbacks.onReasoningChunk(d.reasoning_content);
         }
 
         if (d.content) {
           if (!streamStarted) {
             callbacks.onModelStreamStart();
             streamStarted = true;
-          }
-          if (inReasoning) {
-            callbacks.onTextChunk("</think>");
-            inReasoning = false;
           }
           content += d.content;
           callbacks.onTextChunk(d.content);
@@ -457,10 +447,6 @@ export async function runAgent(
               toolCalls[tc.index].arguments += tc.function.arguments;
           }
         }
-      }
-      if (inReasoning) {
-        callbacks.onTextChunk("</think>");
-        inReasoning = false;
       }
 
       const toolCallList = Object.values(toolCalls);
