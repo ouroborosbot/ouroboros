@@ -22,49 +22,6 @@ describe("Teams adapter - exports", () => {
     expect(typeof teams.startTeamsApp).toBe("function")
   })
 
-  it("exports stripThinkTags", async () => {
-    vi.resetModules()
-    const teams = await import("../teams")
-    expect(typeof teams.stripThinkTags).toBe("function")
-  })
-})
-
-describe("Teams adapter - stripThinkTags", () => {
-  let stripThinkTags: (text: string) => string
-
-  beforeEach(async () => {
-    vi.resetModules()
-    const teams = await import("../teams")
-    stripThinkTags = teams.stripThinkTags
-  })
-
-  it("passes through text with no think tags", () => {
-    expect(stripThinkTags("hello world")).toBe("hello world")
-  })
-
-  it("strips think tag at start", () => {
-    expect(stripThinkTags("<think>reasoning</think>visible")).toBe("visible")
-  })
-
-  it("strips think tag at end", () => {
-    expect(stripThinkTags("visible<think>reasoning</think>")).toBe("visible")
-  })
-
-  it("strips think tag in middle", () => {
-    expect(stripThinkTags("before<think>inner</think>after")).toBe("beforeafter")
-  })
-
-  it("strips multiple think blocks", () => {
-    expect(stripThinkTags("<think>a</think>mid<think>b</think>end")).toBe("midend")
-  })
-
-  it("returns empty string when content is only think tags", () => {
-    expect(stripThinkTags("<think>only thinking</think>")).toBe("")
-  })
-
-  it("handles empty string", () => {
-    expect(stripThinkTags("")).toBe("")
-  })
 })
 
 describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () => {
@@ -178,62 +135,58 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     expect(mockStream.update).not.toHaveBeenCalled()
   })
 
-  // --- Think-tag stripping ---
+  // --- onReasoningChunk tests ---
 
-  it("think tags stripped, visible text emitted", async () => {
+  it("onReasoningChunk calls stream.update()", async () => {
     vi.resetModules()
     const teams = await import("../teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
-    callbacks.onTextChunk("<think>reasoning</think>visible")
-    expect(mockStream.emit).toHaveBeenCalledWith("visible")
+    callbacks.onReasoningChunk("analyzing code")
+    expect(mockStream.update).toHaveBeenCalledWith("analyzing code")
   })
 
-  it("think tags split across chunks", async () => {
+  it("multiple reasoning chunks each call update()", async () => {
     vi.resetModules()
     const teams = await import("../teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
-    callbacks.onTextChunk("<think>")
-    callbacks.onTextChunk("reasoning")
-    callbacks.onTextChunk("</think>")
-    callbacks.onTextChunk("visible")
-
-    // Only "visible" should have caused an emit
-    expect(mockStream.emit).toHaveBeenCalledTimes(1)
-    expect(mockStream.emit).toHaveBeenCalledWith("visible")
+    callbacks.onReasoningChunk("step 1")
+    callbacks.onReasoningChunk("step 2")
+    expect(mockStream.update).toHaveBeenCalledTimes(2)
+    expect(mockStream.update).toHaveBeenNthCalledWith(1, "step 1")
+    expect(mockStream.update).toHaveBeenNthCalledWith(2, "step 2")
   })
 
-  it("content that is only think tags does not emit", async () => {
+  it("onReasoningChunk after stop (403) does not call update()", async () => {
     vi.resetModules()
     const teams = await import("../teams")
+    mockStream.emit.mockImplementation(() => { throw new Error("403 Forbidden") })
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
-    callbacks.onTextChunk("<think>only thinking</think>")
-    expect(mockStream.emit).not.toHaveBeenCalled()
+    callbacks.onTextChunk("data") // triggers 403, sets stopped
+    mockStream.update.mockClear()
+    callbacks.onReasoningChunk("should not appear")
+    expect(mockStream.update).not.toHaveBeenCalled()
   })
 
-  // --- Leading whitespace trimming ---
+  it("onReasoningChunk when update() throws (403) aborts controller", async () => {
+    vi.resetModules()
+    const teams = await import("../teams")
+    mockStream.update.mockImplementation(() => { throw new Error("403 Forbidden") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
-  it("leading whitespace trimmed after think block", async () => {
+    callbacks.onReasoningChunk("reasoning")
+    expect(controller.signal.aborted).toBe(true)
+  })
+
+  it("onTextChunk calls stream.emit() directly (no think-tag processing)", async () => {
     vi.resetModules()
     const teams = await import("../teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
-    callbacks.onTextChunk("<think>reasoning</think>\n\nhello")
+    callbacks.onTextChunk("hello")
     expect(mockStream.emit).toHaveBeenCalledWith("hello")
-  })
-
-  it("preserves whitespace after first real content", async () => {
-    vi.resetModules()
-    const teams = await import("../teams")
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
-
-    callbacks.onTextChunk("first")
-    callbacks.onTextChunk("\n\nsecond")
-
-    expect(mockStream.emit).toHaveBeenNthCalledWith(1, "first")
-    expect(mockStream.emit).toHaveBeenNthCalledWith(2, "\n\nsecond")
   })
 
   // --- Tool/status callbacks ---
