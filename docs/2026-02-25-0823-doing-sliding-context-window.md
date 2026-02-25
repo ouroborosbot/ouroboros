@@ -181,7 +181,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: 100% coverage, tests still green
 **Acceptance**: 100% coverage on new code, tests still green
 
-### 🔄 Unit 5a: Core Module Config Integration -- Tests
+### ✅ Unit 5a: Core Module Config Integration -- Tests
 **Depends on**: Units 1a-1c (config module must exist)
 **What**: Add tests to `src/__tests__/core.test.ts` for the refactored `getClient()` that reads from config.json. Tests cover:
 - `getClient()` uses `getAzureConfig()` when azure config has apiKey (from config.json or env var).
@@ -193,7 +193,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: Failing tests for config-based client initialization
 **Acceptance**: Tests exist and FAIL (red)
 
-### ⬜ Unit 5b: Core Module Config Integration -- Implementation
+### 🔄 Unit 5b: Core Module Config Integration -- Implementation
 **What**: Modify `src/core.ts` `getClient()` to use `getAzureConfig()` and `getMinimaxConfig()` from `src/config.ts` instead of reading env vars directly. The `AZURE_REQUIRED` and `MINIMAX_REQUIRED` constants and `hasAll()` function are replaced by checking config objects (e.g., `azureConfig.apiKey` is truthy). The `AzureOpenAI` and `OpenAI` client construction uses config values. Env var override is handled inside `getAzureConfig()` / `getMinimaxConfig()` so `getClient()` just reads the merged config.
 **Output**: Modified `src/core.ts` using config module
 **Acceptance**: All Unit 5a tests PASS (green), existing core tests still pass, no warnings
