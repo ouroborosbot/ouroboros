@@ -284,7 +284,7 @@ Test cases:
 
 ---
 
-### ⬜ Unit 5a: streamResponsesApi Tool Calls + Output Items — Tests
+### ✅ Unit 5a: streamResponsesApi Tool Calls + Output Items — Tests
 **What**: Extend `streamResponsesApi` tests with tool call event handling and output item collection.
 
 Test cases — tool call events:
@@ -312,7 +312,7 @@ Edge cases:
 **Output**: Failing tests
 **Acceptance**: Tests FAIL (red)
 
-### ⬜ Unit 5b: streamResponsesApi Tool Calls + Output Items — Implementation
+### ✅ Unit 5b: streamResponsesApi Tool Calls + Output Items — Implementation
 **What**: Add tool call and output item handling to `streamResponsesApi()`:
 - Maintain a `currentToolCall` tracker and `toolCalls` array
 - On `response.output_item.added` where `item.type === "function_call"`: set `currentToolCall = { call_id: item.call_id, name: item.name, arguments: "" }`
@@ -324,7 +324,7 @@ Edge cases:
 **Output**: Full stream processing working
 **Acceptance**: All Unit 5a tests PASS (green), all Unit 4a tests still pass
 
-### ⬜ Unit 5c: streamResponsesApi Tool Calls + Output Items — Coverage
+### ✅ Unit 5c: streamResponsesApi Tool Calls + Output Items — Coverage
 **What**: Verify coverage on all new branches. Add any missing edge cases.
 **Acceptance**: 100% coverage, tests green
 
@@ -506,3 +506,4 @@ From `node_modules/openai/resources/responses/responses.d.ts`:
 - 2026-02-24 20:44 Units 2a/2b/2c complete: toResponsesInput -- 11 tests, 100% coverage on new code. 223 tests pass.
 - 2026-02-24 20:46 Units 3a/3b/3c complete: TurnResult + streamChatCompletion -- extracted CC stream processor from runAgent, 10 direct tests + all 104 existing runAgent tests still pass. 233 tests total. 100% coverage.
 - 2026-02-24 20:49 Units 4a/4b/4c complete: streamResponsesApi text+reasoning -- 14 tests, handles text deltas, reasoning deltas, abort, errors. 247 tests total. 100% coverage.
+- 2026-02-24 20:51 Units 5a/5b/5c complete: streamResponsesApi tool calls + output items -- added 9 tests for tool call tracking and output item collection. 256 tests total. 100% coverage.
