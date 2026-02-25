@@ -147,7 +147,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: 100% coverage, tests still green
 **Acceptance**: 100% coverage on new code, tests still green
 
-### 🔄 Unit 4a: Slash Command System -- Tests
+### ✅ Unit 4a: Slash Command System -- Tests
 **What**: Create `src/__tests__/commands.test.ts` with failing tests for a new `src/commands.ts` module. Tests cover:
 - Command registry: `createCommandRegistry()` returns a registry with `register(cmd)`, `get(name)`, `list()`, `dispatch(name, context)`.
 - `register(cmd)`: adds a command with `{ name, description, handler, channels }`. `channels` is `["cli"]`, `["teams"]`, or `["cli", "teams"]`.
@@ -165,7 +165,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: Test file that fails because `src/commands.ts` does not exist yet
 **Acceptance**: Tests exist and FAIL (red)
 
-### ⬜ Unit 4b: Slash Command System -- Implementation
+### 🔄 Unit 4b: Slash Command System -- Implementation
 **What**: Create `src/commands.ts` implementing:
 - `Command` type: `{ name: string, description: string, channels: Channel[], handler: (ctx: CommandContext) => CommandResult }`.
 - `CommandContext` type: `{ channel: Channel }` (extensible later). Note: `Channel` type (`"cli" | "teams"`) must be exported from `src/core.ts` (or extracted to a shared types file) so `commands.ts` can import it.
