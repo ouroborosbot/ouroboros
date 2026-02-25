@@ -102,22 +102,6 @@ export function addHistory(history: string[], entry: string): void {
 
 export function createCliCallbacks(): ChannelCallbacks {
   let currentSpinner: Spinner | null = null
-  let buf = ""
-  let inThink = false
-
-  const flush = () => {
-    while (buf.length) {
-      if (inThink) {
-        const end = buf.indexOf("</think>")
-        if (end === -1) { process.stdout.write(`\x1b[2m${buf}\x1b[0m`); buf = "" }
-        else { process.stdout.write(`\x1b[2m${buf.slice(0, end + 8)}\x1b[0m`); buf = buf.slice(end + 8); inThink = false }
-      } else {
-        const start = buf.indexOf("<think>")
-        if (start === -1) { process.stdout.write(buf); buf = "" }
-        else { process.stdout.write(buf.slice(0, start)); buf = buf.slice(start); inThink = true }
-      }
-    }
-  }
 
   return {
     onModelStart: () => {
@@ -129,10 +113,11 @@ export function createCliCallbacks(): ChannelCallbacks {
       currentSpinner = null
     },
     onTextChunk: (text: string) => {
-      buf += text
-      flush()
+      process.stdout.write(text)
     },
-    onReasoningChunk: () => {},
+    onReasoningChunk: (text: string) => {
+      process.stdout.write(`\x1b[2m${text}\x1b[0m`)
+    },
     onToolStart: (name: string, _args: Record<string, string>) => {
       currentSpinner = new Spinner(`running ${name}`)
       currentSpinner.start()
