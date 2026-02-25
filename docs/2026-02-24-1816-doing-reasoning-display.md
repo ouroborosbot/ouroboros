@@ -64,7 +64,7 @@ This unit is a mechanical, non-behavioral change. No test behavior changes. No l
 
 ---
 
-### ⬜ Unit 2a: Normalize Azure reasoning_content in runAgent -- Tests
+### ✅ Unit 2a: Normalize Azure reasoning_content in runAgent -- Tests
 **What**: Rewrite the 5 existing Azure `reasoning_content` tests in `core.test.ts` to expect the new behavior: `onReasoningChunk` receives reasoning text, `onTextChunk` receives only answer text, no `<think>` tags anywhere.
 
 Tests to rewrite:
@@ -81,7 +81,7 @@ Also rewrite the existing test "fires onTextChunk for each text delta with raw t
 
 **Acceptance**: Tests exist and FAIL because `runAgent` still wraps `reasoning_content` in `<think>` tags via `onTextChunk` instead of calling `onReasoningChunk`.
 
-### ⬜ Unit 2b: Normalize Azure reasoning_content in runAgent -- Implementation
+### ✅ Unit 2b: Normalize Azure reasoning_content in runAgent -- Implementation
 **What**: Refactor the streaming loop in `runAgent` (`src/core.ts` lines 412-463). Replace the Azure `reasoning_content` handling:
 
 Current code (lines 419-431):
@@ -111,7 +111,7 @@ Also remove:
 
 **Acceptance**: All 5 rewritten Azure tests from 2a PASS. All other tests still pass (MiniMax `<think>` tag test at line 585 still passes since content handling is unchanged).
 
-### ⬜ Unit 2c: Unit 2 -- Coverage and refactor
+### ✅ Unit 2c: Unit 2 -- Coverage and refactor
 **What**: Run coverage. Verify all `reasoning_content` code paths covered. Add any missing edge case tests (e.g., empty `reasoning_content` string if it can occur).
 
 **Acceptance**: 100% coverage on runAgent reasoning paths. All tests green.
@@ -272,3 +272,4 @@ Remove the old partial-tag-split tests (lines 103-121) -- they tested adapter-le
 - 2026-02-24 18:40 Created from planning doc
 - 2026-02-24 18:42 Completed all 4 passes (first draft, granularity, validation, quality)
 - 2026-02-24 18:52 Unit 1 complete: added onReasoningChunk to ChannelCallbacks, no-op in both adapters, all 30 callback literals in core.test.ts updated, 202 tests pass
+- 2026-02-24 18:55 Unit 2 complete: Azure reasoning_content normalized to onReasoningChunk, 4 tests rewritten, inReasoning/think-tag wrapping removed from core.ts, 100% coverage on core.ts
