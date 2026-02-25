@@ -1,38 +1,38 @@
-# Planning: Improve Reasoning/Thinking Display Across All Surfaces
+# Planning: Normalize and Improve Reasoning Display Across All Surfaces
 
-**Status**: drafting
+**Status**: NEEDS_REVIEW
 **Created**: 2026-02-24 18:17
 
 ## Goal
-Improve how model reasoning/thinking tokens are displayed so that both CLI and Teams/Copilot users get meaningful, surface-appropriate feedback during the thinking phase, for both MiniMax (inline `<think>` tags in content) and Azure (separate `reasoning_content` field) providers.
+Normalize how reasoning/thinking tokens are handled at the model-calling level so that downstream adapters (CLI, Teams) receive a clean, provider-agnostic reasoning signal. Different models send reasoning differently (Azure: `reasoning_content` field, MiniMax: inline `<think>` tags in content) -- core should normalize this so adapters never deal with provider-specific reasoning formats.
 
 ## Scope
 
 ### In Scope
-- Add a dedicated `onReasoningChunk` callback to `ChannelCallbacks` so channels can handle reasoning distinctly from content
-- Refactor `core.ts` `runAgent` to call `onReasoningChunk` instead of wrapping reasoning in synthetic `<think>` tags via `onTextChunk`
-- CLI adapter: display reasoning in dim text with a "thinking" header/prefix, clearly separated from the answer content
-- Teams adapter: show a meaningful streaming status during reasoning (e.g., summarize or show a progress indicator with reasoning token count) instead of a static "thinking..." message that provides no visibility
-- Handle both provider patterns uniformly:
+- **Normalize reasoning at the model layer**: `runAgent` in `core.ts` should present a single, uniform reasoning interface to adapters regardless of which provider produced the tokens. Today it half-normalizes (wraps Azure `reasoning_content` in synthetic `<think>` tags) but adapters still have to parse those tags. The goal is full normalization.
+- **Clean adapter interface**: Adapters receive normalized reasoning signals and decide how to render them for their surface -- no parsing of provider-specific formats.
+- **CLI adapter**: Continue displaying reasoning in dim text, clearly separated from answer content. Implementation may change but the user-visible behavior should be equivalent or better.
+- **Teams adapter**: Send reasoning content as actual streamed content to the user (not stripped, not hidden behind a static "thinking..." status). The Teams/Copilot UI already implies the model is thinking -- we should send the reasoning text through the stream so users can see it.
+- **Both provider patterns handled uniformly**:
   - Azure (DeepSeek-R1 etc.): reasoning arrives via `delta.reasoning_content`
   - MiniMax: reasoning arrives inline in `delta.content` wrapped in `<think>...</think>` tags
-- Update all existing tests and add new tests for the new callback and both adapter behaviors
-- Maintain 100% test coverage on all new and changed code
+- **Update all existing tests** and add new tests for normalized reasoning behavior
+- **100% test coverage** on all new and changed code
 
 ### Out of Scope
 - Changing how reasoning tokens are stored in the conversation history (messages array)
 - Adding user-configurable reasoning display preferences (e.g., hide/show toggle)
-- Persisting or logging reasoning content
+- Persisting or logging reasoning content separately
 - Changes to the tool execution display (spinners, tool start/end)
 - Supporting additional model providers beyond MiniMax and Azure
+- Changing the Teams streaming protocol itself (we use the existing `emit`/`update`/`close` SDK interface)
 
 ## Completion Criteria
-- [ ] `ChannelCallbacks` interface has `onReasoningChunk(text: string): void` callback
-- [ ] `core.ts` `runAgent` emits `onReasoningChunk` for Azure `reasoning_content` tokens directly (no synthetic `<think>` tag wrapping)
-- [ ] `core.ts` `runAgent` detects inline `<think>` tags in MiniMax `content` and routes them to `onReasoningChunk` instead of `onTextChunk`
-- [ ] CLI adapter dims reasoning text and clearly separates it from answer content (current behavior preserved but through new callback)
-- [ ] Teams adapter shows meaningful progress during reasoning phase (not just static "thinking...")
-- [ ] All existing tests updated to reflect new callback structure
+- [ ] Core normalizes reasoning from both providers into a single interface -- adapters never see `<think>` tags or `reasoning_content`
+- [ ] CLI adapter displays reasoning in dim text, separated from answer content
+- [ ] Teams adapter sends reasoning as streamed content visible to the user
+- [ ] Both Azure `reasoning_content` and MiniMax inline `<think>` tag patterns are handled
+- [ ] All existing tests updated to reflect new structure
 - [ ] New tests cover: both providers, both adapters, edge cases (split chunks, empty reasoning, reasoning-only responses)
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
@@ -46,26 +46,33 @@ Improve how model reasoning/thinking tokens are displayed so that both CLI and T
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [ ] For Teams: what should the reasoning progress look like? Options: (a) show word/token count updating as reasoning streams in, (b) show truncated reasoning text in the status bar, (c) show elapsed time, (d) show a brief summary. Current thinking: option (a) or (b) seems most informative.
-- [ ] For MiniMax inline `<think>` tag parsing in `core.ts`: should this be done in `runAgent` (core responsibility) or should each adapter handle it? Current thinking: core should parse it since the pattern is provider-specific, not channel-specific.
-- [ ] Should `onReasoningChunk` also receive a metadata argument (e.g., provider name, whether it's opening/closing) or just the raw text?
-- [ ] For MiniMax, think tags can be split across streaming chunks. The current `onTextChunk` approach just passes raw chunks through and lets adapters handle parsing. With `onReasoningChunk`, core would need to maintain a state machine for inline tag detection. Is this acceptable complexity in core?
+- [ ] What is the best way to visually distinguish reasoning from answer content in Teams? Options: (a) send as plain text and let the UI handle it, (b) use markdown formatting like blockquote or italic, (c) prefix with a label. Needs experimentation with what actually renders well in Teams.
+- [ ] Exact callback/interface shape for the normalized reasoning signal -- to be determined during implementation planning.
+- [ ] Where exactly the MiniMax `<think>` tag parsing state machine lives (core vs. a provider-specific normalizer) -- implementation detail for doing doc.
 
 ## Decisions Made
-- (none yet)
+- Reasoning should be normalized at the model-calling level so adapters are provider-agnostic
+- Teams adapter should send reasoning content as visible streamed text, not strip it or hide it behind "thinking..."
+- The Teams SDK `stream.emit()` method accepts string content and the SDK handles buffering/debouncing (500ms) and the streaming protocol (streamSequence, streamId, informative/streaming/final types) -- we just send deltas
+- The Teams SDK `stream.update()` sends informative updates (blue progress bar) -- this is appropriate for tool status but not for reasoning content which should be visible text
 
 ## Context / References
-- `src/core.ts` lines 414-463: current reasoning handling in `runAgent` -- wraps `reasoning_content` in `<think>` tags and sends via `onTextChunk`
-- `src/core.ts` lines 378-385: `ChannelCallbacks` interface definition
-- `src/agent.ts` lines 103-153: `createCliCallbacks` -- CLI adapter with think-tag dimming in `onTextChunk` flush loop
-- `src/teams.ts` lines 31-127: `createTeamsCallbacks` -- Teams adapter with think-tag stripping and "thinking..." status
-- `src/teams.ts` lines 14-15: `stripThinkTags` utility (regex-based, used for non-streaming contexts)
-- Azure provider: sends `delta.reasoning_content` as a separate field (e.g., DeepSeek-R1 via Azure AI)
-- MiniMax provider: sends reasoning inline in `delta.content` wrapped in `<think>...</think>` tags
-- Both providers use OpenAI-compatible streaming API via the `openai` npm package
+- `src/core.ts` lines 378-385: `ChannelCallbacks` interface -- `onModelStart`, `onModelStreamStart`, `onTextChunk`, `onToolStart`, `onToolEnd`, `onError`
+- `src/core.ts` lines 414-463: current reasoning handling -- wraps Azure `reasoning_content` in synthetic `<think>` tags via `onTextChunk`
+- `src/agent.ts` lines 103-153: CLI adapter -- `createCliCallbacks` with think-tag dimming in `onTextChunk` flush loop
+- `src/teams.ts` lines 31-127: Teams adapter -- `createTeamsCallbacks` with think-tag stripping and static "thinking..." status
+- `src/teams.ts` lines 14-15: `stripThinkTags` utility (regex-based, non-streaming)
+- Teams SDK `IStreamer` interface (`node_modules/@microsoft/teams.apps/dist/types/streamer.d.ts`): `emit(activity | string)`, `update(text)`, `close()`
+- Teams SDK `HttpStream` implementation (`node_modules/@microsoft/teams.apps/dist/plugins/http/stream.js`): `emit()` queues content with 500ms debounce, `update()` sends informative typing activity with `streamType: 'informative'`, content accumulates across emits (cumulative text)
+- Teams streaming docs: informative updates show as blue progress bar, streaming content shows as typing indicator with progressive text. Only text can be streamed. 1 req/sec throttle limit. 2 min max streaming time.
+- Azure provider: `delta.reasoning_content` as separate field
+- MiniMax provider: `<think>...</think>` inline in `delta.content`
 
 ## Notes
-Current architecture: `runAgent` in core.ts handles streaming and normalizes Azure `reasoning_content` into synthetic `<think>` tags. Both CLI and Teams adapters then independently parse these tags from the `onTextChunk` stream -- CLI dims them, Teams strips them. This means reasoning handling is duplicated across adapters and the abstraction is leaky (adapters must know about `<think>` tag protocol).
+Current architecture leaks provider-specific reasoning format into adapters. Both CLI and Teams independently parse `<think>` tags from the `onTextChunk` stream. The core principle of this work is: normalize once at the model layer, render differently per surface.
+
+Teams SDK `emit()` accumulates text -- each call appends to the total. So reasoning content emitted through `emit()` will appear as streamed text to the user, followed by the answer content. This is the desired behavior.
 
 ## Progress Log
 - 2026-02-24 18:17 Created
+- (pending) Refined scope based on user feedback and Teams SDK research
