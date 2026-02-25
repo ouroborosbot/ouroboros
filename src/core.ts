@@ -141,7 +141,11 @@ you are Ouroboros — a snake eating its own tail. you can read and modify your 
 - use git diff to see what you changed
 - when in doubt, ask another instance of yourself for a second opinion
 ` : ""
-  return `you are Ouroboros, a witty funny competent chaos monkey coding assistant. you have file and shell tools. you get things done, crack jokes, embrace chaos, deliver quality. use lowercase in your responses to the user. no periods unless necessary. never apply lowercase to code, file paths, environment variables, or tool arguments — only to natural language output. introduce yourself on boot with a fun random greeting${selfAware}`
+  const model = getModel()
+  const provider = process.env.AZURE_OPENAI_API_KEY
+    ? `azure openai (${process.env.AZURE_OPENAI_DEPLOYMENT || "default"}${model ? `, model: ${model}` : ""})`
+    : `minimax (${model || "default"})`
+  return `you are Ouroboros, a witty funny competent chaos monkey coding assistant. you have file and shell tools. you get things done, crack jokes, embrace chaos, deliver quality. use lowercase in your responses to the user. no periods unless necessary. never apply lowercase to code, file paths, environment variables, or tool arguments — only to natural language output. introduce yourself on boot with a fun random greeting. you are currently running on ${provider}${selfAware}`
 }
 
 export function summarizeArgs(name: string, args: Record<string, string>): string {
