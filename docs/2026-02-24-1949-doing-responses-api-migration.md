@@ -1,6 +1,6 @@
 # Doing: Migrate Azure GPT Path to OpenAI Responses API
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: pending
 **Created**: 2026-02-24 20:01
 **Planning**: ./2026-02-24-1949-planning-responses-api-migration.md
@@ -445,7 +445,7 @@ Key points:
 
 ---
 
-### ⬜ Unit 7: Full Integration Verification
+### ✅ Unit 7: Full Integration Verification
 **What**: Run full test suite across ALL test files. Verify:
 - All core tests pass (original + new)
 - All CLI tests pass (no changes to `agent.ts`)
@@ -508,3 +508,4 @@ From `node_modules/openai/resources/responses/responses.d.ts`:
 - 2026-02-24 20:49 Units 4a/4b/4c complete: streamResponsesApi text+reasoning -- 14 tests, handles text deltas, reasoning deltas, abort, errors. 247 tests total. 100% coverage.
 - 2026-02-24 20:51 Units 5a/5b/5c complete: streamResponsesApi tool calls + output items -- added 9 tests for tool call tracking and output item collection. 256 tests total. 100% coverage.
 - 2026-02-24 20:53 Units 6a/6b/6c complete: runAgent orchestrator -- Azure path wired to streamResponsesApi with toResponsesInput/toResponsesTools. Reasoning item tracking. Existing Azure test rewritten. 261 tests total. 100% coverage.
+- 2026-02-24 20:55 Unit 7 complete: Full integration verification. 261 tests pass across 7 test files. Zero failures, zero warnings. TypeScript compiles clean. All exports verified. core.ts: 100% lines, 100% functions. runAgent contains zero provider-specific API knowledge. All units done.
