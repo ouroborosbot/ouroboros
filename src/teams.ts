@@ -10,11 +10,6 @@ interface TeamsStream {
   close(): void
 }
 
-// Strip think tags from text (Teams users should not see model reasoning)
-export function stripThinkTags(text: string): string {
-  return text.replace(/<think>[\s\S]*?<\/think>/g, "")
-}
-
 // Strip @mention markup from incoming messages.
 // Removes <at>...</at> tags and trims extra whitespace.
 // Fallback safety net -- the SDK's activity.mentions.stripText should handle
@@ -32,10 +27,6 @@ export function createTeamsCallbacks(
   stream: TeamsStream,
   controller: AbortController,
 ): ChannelCallbacks {
-  // Track whether we're inside a think tag across chunks
-  let inThink = false
-  let thinkBuf = ""
-  let emittedContent = false // trim leading whitespace until first real content
   let stopped = false // set when stream signals cancellation (403)
 
   // Safely emit a text delta to the stream.
@@ -68,46 +59,13 @@ export function createTeamsCallbacks(
     onModelStreamStart: () => {
       // No-op for Teams -- streaming has already started
     },
-    onReasoningChunk: () => {},
+    onReasoningChunk: (text: string) => {
+      if (stopped) return
+      safeUpdate(text)
+    },
     onTextChunk: (text: string) => {
       if (stopped) return
-
-      // Process chunk-by-chunk think tag stripping
-      thinkBuf += text
-      let output = ""
-
-      while (thinkBuf.length > 0) {
-        if (inThink) {
-          const end = thinkBuf.indexOf("</think>")
-          if (end === -1) {
-            // Still inside think -- consume and wait for more
-            thinkBuf = ""
-          } else {
-            thinkBuf = thinkBuf.slice(end + 8)
-            inThink = false
-          }
-        } else {
-          const start = thinkBuf.indexOf("<think>")
-          if (start === -1) {
-            output += thinkBuf
-            thinkBuf = ""
-          } else {
-            output += thinkBuf.slice(0, start)
-            thinkBuf = thinkBuf.slice(start + 7)
-            inThink = true
-          }
-        }
-      }
-
-      // Trim leading whitespace until first real content -- prevents blank
-      // space at the top of the message from newlines after think blocks
-      if (!emittedContent) {
-        output = output.trimStart()
-      }
-      if (output.length > 0) {
-        emittedContent = true
-        safeEmit(output)
-      }
+      safeEmit(text)
     },
     onToolStart: (name: string, args: Record<string, string>) => {
       const argSummary = Object.values(args).join(", ")
