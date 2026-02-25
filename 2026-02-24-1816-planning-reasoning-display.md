@@ -78,4 +78,4 @@ Teams has a native mechanism for reasoning vs answer: `update()` sends informati
 ## Progress Log
 - 2026-02-24 18:17 Created
 - 2026-02-24 18:23 Refined scope based on user feedback and Teams SDK research
-- (pending) Added Teams SDK reasoning mechanism finding -- update() for reasoning, emit() for answer
+- 2026-02-24 18:34 Added Teams SDK reasoning mechanism finding -- update() for reasoning, emit() for answer
