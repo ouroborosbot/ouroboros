@@ -752,6 +752,19 @@ describe("toResponsesInput", () => {
     const result = toResponsesInput(messages)
     expect(result.instructions).toBe("")
   })
+
+  it("silently skips messages with unknown roles", () => {
+    const messages = [
+      { role: "user", content: "hi" },
+      { role: "function", content: "legacy" } as any,
+      { role: "user", content: "bye" },
+    ]
+    const result = toResponsesInput(messages)
+    expect(result.input).toEqual([
+      { role: "user", content: "hi" },
+      { role: "user", content: "bye" },
+    ])
+  })
 })
 
 describe("ChannelCallbacks interface", () => {
@@ -2247,6 +2260,37 @@ process.env.MINIMAX_MODEL = "test-model"
     expect(errors).toHaveLength(0)
   })
 
+  it("skips remaining tools when signal is aborted mid-tool-execution", async () => {
+    const controller = new AbortController()
+    vi.mocked(fs.readFileSync).mockReturnValue("data")
+
+    // Return 2 tool calls in one response
+    mockCreate.mockReturnValue({
+      [Symbol.asyncIterator]: async function* () {
+        yield makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "read_file", arguments: '{"path":"a.txt"}' } },
+          { index: 1, id: "call_2", function: { name: "read_file", arguments: '{"path":"b.txt"}' } },
+        ])
+      },
+    })
+
+    const toolStarts: string[] = []
+    let toolEndCount = 0
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: (name) => toolStarts.push(name),
+      onToolEnd: () => { toolEndCount++; if (toolEndCount === 1) controller.abort() },
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks, controller.signal)
+    // First tool executes, onToolEnd aborts signal, second tool should be skipped
+    expect(toolStarts.length).toBe(1)
+  })
+
   it("fires onModelStreamStart on first reasoning_content token", async () => {
     mockCreate.mockReturnValue(
       makeStream([
@@ -2680,6 +2724,67 @@ describe("getClient", () => {
     expect(core.getModel()).toBe("MiniMax-M2.5")
     expect(core.getProvider()).toBe("minimax")
   })
+
+  it("caches client across multiple runAgent invocations", async () => {
+    vi.resetModules()
+    process.env.MINIMAX_API_KEY = "mm-key"
+    process.env.MINIMAX_MODEL = "cached-model"
+
+    mockCreate.mockReset()
+    mockCreate.mockReturnValue({
+      [Symbol.asyncIterator]: async function* () {
+        yield { choices: [{ delta: { content: "hi" } }] }
+      },
+    })
+
+    const core = await import("../core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    // First call initializes getClient()
+    await core.runAgent([{ role: "system", content: "test" }], callbacks)
+    // Second call hits the cached path (if (!_client) is false)
+    await core.runAgent([{ role: "system", content: "test" }], callbacks)
+
+    expect(core.getModel()).toBe("cached-model")
+    expect(core.getProvider()).toBe("minimax")
+  })
+
+  it("omits model param in createParams when model is empty", async () => {
+    vi.resetModules()
+    process.env.MINIMAX_API_KEY = "mm-key"
+    process.env.MINIMAX_MODEL = ""
+
+    mockCreate.mockReset()
+    mockCreate.mockReturnValue({
+      [Symbol.asyncIterator]: async function* () {
+        yield { choices: [{ delta: { content: "hi" } }] }
+      },
+    })
+
+    const core = await import("../core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+    await core.runAgent([{ role: "system", content: "test" }], callbacks)
+
+    // model param should not be in the call since getModel() returns ""
+    const callArgs = mockCreate.mock.calls[0][0]
+    expect(callArgs.model).toBeUndefined()
+  })
 })
 
 describe("getClient config integration", () => {
@@ -2796,6 +2901,121 @@ describe("getClient config integration", () => {
     const core = await import("../core")
     expect(core.getModel()).toBe("env-mm-model")
     expect(core.getProvider()).toBe("minimax")
+  })
+
+  it("stripLastToolCalls pops trailing tool messages", async () => {
+    vi.resetModules()
+    delete process.env.AZURE_OPENAI_API_KEY
+    process.env.MINIMAX_API_KEY = "test-key"
+    process.env.MINIMAX_MODEL = "test-model"
+    const { resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const { stripLastToolCalls } = await import("../core")
+
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+      { role: "assistant", content: "reply", tool_calls: [{ id: "c1", type: "function", function: { name: "read_file", arguments: "{}" } }] },
+      { role: "tool", tool_call_id: "c1", content: "result" },
+    ]
+    stripLastToolCalls(messages)
+
+    // Should pop tool message and strip tool_calls from assistant
+    expect(messages.length).toBe(2)
+    expect(messages[1].role).toBe("assistant")
+    expect(messages[1].tool_calls).toBeUndefined()
+    expect(messages[1].content).toBe("reply")
+  })
+
+  it("stripLastToolCalls removes empty assistant after stripping tool_calls", async () => {
+    vi.resetModules()
+    delete process.env.AZURE_OPENAI_API_KEY
+    process.env.MINIMAX_API_KEY = "test-key"
+    process.env.MINIMAX_MODEL = "test-model"
+    const { resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const { stripLastToolCalls } = await import("../core")
+
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+      { role: "assistant", tool_calls: [{ id: "c1", type: "function", function: { name: "read_file", arguments: "{}" } }] },
+      { role: "tool", tool_call_id: "c1", content: "result" },
+    ]
+    stripLastToolCalls(messages)
+
+    // Should pop both tool and empty assistant
+    expect(messages.length).toBe(1)
+    expect(messages[0].role).toBe("system")
+  })
+
+  it("stripLastToolCalls is a no-op when no trailing tools", async () => {
+    vi.resetModules()
+    delete process.env.AZURE_OPENAI_API_KEY
+    process.env.MINIMAX_API_KEY = "test-key"
+    process.env.MINIMAX_MODEL = "test-model"
+    const { resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const { stripLastToolCalls } = await import("../core")
+
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+      { role: "assistant", content: "just text" },
+    ]
+    stripLastToolCalls(messages)
+
+    expect(messages.length).toBe(2)
+    expect(messages[1].content).toBe("just text")
+  })
+
+  it("fires onError when tool loop limit is reached", async () => {
+    vi.resetModules()
+    delete process.env.AZURE_OPENAI_API_KEY
+    process.env.MINIMAX_API_KEY = "test-key"
+    process.env.MINIMAX_MODEL = "test-model"
+
+    vi.mocked(fs.readFileSync).mockReturnValue("data")
+
+    const { resetConfigCache } = await import("../config")
+    resetConfigCache()
+
+    // Make every API call return a tool call (never text-only)
+    mockCreate.mockReset()
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      return {
+        [Symbol.asyncIterator]: async function* () {
+          yield {
+            choices: [{
+              delta: {
+                tool_calls: [{
+                  index: 0,
+                  id: `call_${callCount}`,
+                  function: { name: "read_file", arguments: '{"path":"/tmp/f.txt"}' },
+                }],
+              },
+            }],
+          }
+        },
+      }
+    })
+
+    const errors: Error[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err),
+    }
+
+    const core = await import("../core")
+    await core.runAgent([{ role: "system", content: "test" }], callbacks)
+
+    expect(errors.length).toBe(1)
+    expect(errors[0].message).toContain("tool loop limit reached")
+    expect(callCount).toBe(core.MAX_TOOL_ROUNDS)
   })
 
   it("exits when neither provider configured in config or env", async () => {
