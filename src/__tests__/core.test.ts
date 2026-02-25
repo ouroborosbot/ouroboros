@@ -720,6 +720,27 @@ describe("toResponsesInput", () => {
       },
     ])
   })
+
+  it("only extracts first system message as instructions", () => {
+    const messages = [
+      { role: "system", content: "first system" },
+      { role: "system", content: "second system" },
+      { role: "user", content: "hi" },
+    ]
+    const result = toResponsesInput(messages)
+    expect(result.instructions).toBe("first system")
+    // Neither system message should appear in input
+    expect(result.input).toEqual([{ role: "user", content: "hi" }])
+  })
+
+  it("handles system message with empty content", () => {
+    const messages = [
+      { role: "system", content: "" },
+      { role: "user", content: "hi" },
+    ]
+    const result = toResponsesInput(messages)
+    expect(result.instructions).toBe("")
+  })
 })
 
 describe("ChannelCallbacks interface", () => {
