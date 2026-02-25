@@ -51,19 +51,49 @@ Migrate the Azure provider path in `runAgent()` from the Chat Completions API to
 ## Work Units
 
 ### Legend
-- Not started -- Out of scope / blocked -- In progress -- Done -- Blocked
+Not started / In progress / Done / Blocked
+
+### Unit 0: Test Infrastructure Setup
+**What**: Update the OpenAI mock in `core.test.ts` to support both `client.chat.completions.create` (MiniMax path) and `client.responses.create` (Azure path). This is prerequisite for all subsequent Azure-path tests.
+Changes to mock factory at top of `core.test.ts`:
+```typescript
+const mockCreate = vi.fn()           // chat.completions.create (MiniMax)
+const mockResponsesCreate = vi.fn()  // responses.create (Azure)
+vi.mock("openai", () => {
+  class MockOpenAI {
+    chat = { completions: { create: mockCreate } }
+    responses = { create: mockResponsesCreate }
+    constructor(_opts?: any) {}
+  }
+  return { default: MockOpenAI, AzureOpenAI: MockOpenAI }
+})
+```
+Add `mockResponsesCreate.mockReset()` to the `runAgent` describe's `beforeEach`.
+Add helper to create Responses API event streams:
+```typescript
+function makeResponsesStream(events: any[]) {
+  return {
+    [Symbol.asyncIterator]: async function* () {
+      for (const event of events) { yield event }
+    },
+  }
+}
+```
+Verify all existing tests still pass (they use `mockCreate` / Chat Completions path).
+**Output**: Updated mock infrastructure in `core.test.ts`, all existing tests green
+**Acceptance**: `npm test` passes with no regressions. `mockResponsesCreate` is available for subsequent units.
 
 ### Unit 1a: Tool Definition Converter -- Tests
-**What**: Write tests for a `toResponsesTools()` function that converts the existing `OpenAI.ChatCompletionTool[]` array to Responses API `FunctionTool[]` format. Test cases:
-- Converts a single tool correctly (`{ type: "function", function: { name, description, parameters } }` to `{ type: "function", name, description, parameters, strict: false }`)
-- Converts all 10 tools in the `tools` array
-- Handles tool with no description (should be `null`)
-- Handles tool with no parameters (should be `null`)
+**What**: Write tests for a `toResponsesTools()` function that converts `OpenAI.ChatCompletionTool[]` to Responses API `FunctionTool[]` format. New `describe("toResponsesTools")` block in `core.test.ts`. Test cases:
+- Converts a single tool: `{ type: "function", function: { name: "read_file", description: "read file contents", parameters: {...} } }` becomes `{ type: "function", name: "read_file", description: "read file contents", parameters: {...}, strict: false }`
+- Converts all tools in the `tools` array (verify length matches)
+- Handles tool with missing description (should produce `null`)
+- Handles tool with missing parameters (should produce `null`)
 **Output**: Failing tests in `core.test.ts`
-**Acceptance**: Tests exist and FAIL (red) because `toResponsesTools` does not exist yet
+**Acceptance**: Tests exist and FAIL (red) because `toResponsesTools` is not exported yet
 
 ### Unit 1b: Tool Definition Converter -- Implementation
-**What**: Implement `toResponsesTools()` in `core.ts`. Pure function, no side effects. Maps each `ChatCompletionTool` to `FunctionTool` format:
+**What**: Implement and export `toResponsesTools()` in `core.ts`. Pure function, no side effects:
 ```typescript
 export function toResponsesTools(chatTools: OpenAI.ChatCompletionTool[]): any[] {
   return chatTools.map(t => ({
@@ -83,184 +113,174 @@ export function toResponsesTools(chatTools: OpenAI.ChatCompletionTool[]): any[] 
 **Acceptance**: 100% coverage on new code, tests still green
 
 ### Unit 2a: Message-to-Input Converter -- Tests
-**What**: Write tests for a `toResponsesInput()` function that converts `ChatCompletionMessageParam[]` to `{ instructions: string, input: ResponseInput }`. Test cases:
-- Extracts system message into `instructions`, excludes it from `input`
-- Converts user messages to `EasyInputMessage` with `role: "user"`
-- Converts assistant messages (text only) to `EasyInputMessage` with `role: "assistant"`
-- Converts assistant messages with tool_calls to `ResponseFunctionToolCall` items (mapping `tool_call.id` to `call_id`, `tool_call.function.name` to `name`, `tool_call.function.arguments` to `arguments`)
-- Converts tool messages to `ResponseFunctionToolCallOutputItem` items (mapping `tool_call_id` to `call_id`, `content` to `output`)
-- Handles conversation with no system message (instructions should be empty string)
-- Handles mixed multi-turn conversation (system, user, assistant, tool, user, assistant)
-- Preserves message order
+**What**: Write tests for `toResponsesInput()` that converts `ChatCompletionMessageParam[]` to `{ instructions: string, input: any[] }`. New `describe("toResponsesInput")` block. Test cases:
+- Extracts system message content into `instructions`, excludes it from `input`
+- Converts user message: `{ role: "user", content: "hi" }` becomes `{ role: "user", content: "hi" }`
+- Converts assistant message (text only): `{ role: "assistant", content: "hello" }` becomes `{ role: "assistant", content: "hello" }`
+- Converts assistant message with tool_calls: produces assistant content message (if content exists) plus `{ type: "function_call", call_id, name, arguments }` items per tool_call
+- Converts tool message: `{ role: "tool", tool_call_id: "tc1", content: "result" }` becomes `{ type: "function_call_output", call_id: "tc1", output: "result" }`
+- No system message: `instructions` is empty string
+- Mixed multi-turn conversation preserves order
+- Empty messages array returns empty instructions and empty input
+- Assistant with tool_calls but no content: no assistant content message emitted, only function_call items
 **Output**: Failing tests in `core.test.ts`
 **Acceptance**: Tests exist and FAIL (red)
 
 ### Unit 2b: Message-to-Input Converter -- Implementation
-**What**: Implement `toResponsesInput()` in `core.ts`. Takes the canonical `messages` array and optional `azureInputItems` (for reasoning item re-submission), returns `{ instructions, input }`. Logic:
-- Find first system message, extract content as `instructions`
-- For remaining messages, convert based on role:
+**What**: Implement and export `toResponsesInput()` in `core.ts`:
+- Find first message with `role === "system"`, extract `content` as `instructions`
+- For non-system messages, convert based on role:
   - `user` -> `{ role: "user", content }`
-  - `assistant` (text only) -> `{ role: "assistant", content }`
-  - `assistant` (with tool_calls) -> one `{ role: "assistant", content }` if content exists, plus one `ResponseFunctionToolCall` per tool_call
-  - `tool` -> `{ type: "function_call_output", call_id, output }`
-- If `azureInputItems` is provided, append those items (reasoning items, etc.) to the input array. These take precedence over the converted messages for items that overlap (same turn's output items)
+  - `assistant` (no tool_calls) -> `{ role: "assistant", content }`
+  - `assistant` (with tool_calls) -> optionally `{ role: "assistant", content }` if content is truthy, plus one `{ type: "function_call", call_id: tc.id, name: tc.function.name, arguments: tc.function.arguments }` per tool_call
+  - `tool` -> `{ type: "function_call_output", call_id: msg.tool_call_id, output: msg.content }`
 **Output**: `toResponsesInput` exported from `core.ts`
 **Acceptance**: All Unit 2a tests PASS (green)
 
 ### Unit 2c: Message-to-Input Converter -- Coverage & Refactor
-**What**: Verify 100% coverage. Add edge case tests if needed (empty messages array, assistant with empty content and tool_calls, etc.)
+**What**: Verify 100% coverage. Add edge case tests if needed (assistant with empty string content and tool_calls, system message with empty content, multiple system messages -- only first extracted).
 **Acceptance**: 100% coverage, tests green
 
-### Unit 3a: Responses API Stream Processing -- Tests
-**What**: Write tests for Azure-path stream processing in `runAgent()`. This requires updating the mock to support `client.responses.create` when Azure env vars are set. Test cases:
-- Azure provider calls `client.responses.create` (not `client.chat.completions.create`)
-- Passes correct params: `model`, `input`, `instructions`, `tools` (converted), `stream: true`, `store: false`, `include: ["reasoning.encrypted_content"]`, `reasoning: { effort: "medium", summary: "auto" }`
-- `response.output_text.delta` events route to `callbacks.onTextChunk()`
-- `response.reasoning_summary.delta` events route to `callbacks.onReasoningChunk()`
-- `response.output_text.delta` fires `onModelStreamStart` on first token (exactly once)
-- `response.reasoning_summary.delta` fires `onModelStreamStart` on first reasoning token
-- Text-only response (no tool calls) ends the loop
-- Empty/null events are skipped gracefully
+### Unit 3a: Azure Responses API Call and Text Streaming -- Tests
+**What**: Write tests for the Azure path in `runAgent()` using Responses API streaming. Requires Azure env vars set and `mockResponsesCreate` returning event streams. New `describe("runAgent -- Azure Responses API")` block. Each test does `vi.resetModules()`, sets Azure env vars, imports fresh core. Test cases:
+- Azure provider calls `mockResponsesCreate` (NOT `mockCreate`)
+- Passes correct params: `model`, `input` (from `toResponsesInput`), `instructions` (from `toResponsesInput`), `tools` (from `toResponsesTools`), `stream: true`, `store: false`, `include: ["reasoning.encrypted_content"]`, `reasoning: { effort: "medium", summary: "auto" }`
+- `{ type: "response.output_text.delta", delta: "hello" }` event routes to `callbacks.onTextChunk("hello")`
+- `{ type: "response.reasoning_summary.delta", delta: "thinking" }` event routes to `callbacks.onReasoningChunk("thinking")`
+- `onModelStreamStart` fires once on first text delta event
+- `onModelStreamStart` fires once on first reasoning delta event (if reasoning comes first)
+- `onModelStreamStart` fires exactly once even with mixed text and reasoning events
+- Text-only response (no function_call items) ends the agent loop
+- Stream with no relevant events (e.g., only `response.created`) produces no callbacks and ends loop
+- `onModelStart` fires before each API call
 **Output**: Failing tests in `core.test.ts`
 **Acceptance**: Tests exist and FAIL (red)
 
-### Unit 3b: Responses API Stream Processing -- Implementation
-**What**: In `runAgent()`, branch on `provider === "azure"` to use `client.responses.create()` with the Responses API streaming format. The stream is `AsyncIterable<ResponseStreamEvent>`. Process events:
-- `response.output_text.delta` -> `callbacks.onTextChunk(event.delta)`, accumulate content
-- `response.reasoning_summary.delta` -> `callbacks.onReasoningChunk(event.delta)` (note: `delta` is typed as `unknown`, cast to string)
-- `response.output_item.added` where `item.type === "function_call"` -> start tracking tool call (name from item, accumulate arguments)
-- `response.function_call_arguments.delta` -> accumulate arguments for current tool call
-- `response.output_item.done` where `item.type === "function_call"` -> finalize tool call (name, arguments, call_id)
-- `response.output_item.done` where `item.type === "reasoning"` -> capture for re-submission
-- Fire `onModelStreamStart` on first text or reasoning event
-- After stream ends: if tool calls present, execute them (shared tool execution code); otherwise mark done
-The MiniMax path (Chat Completions) should remain completely unchanged.
-**Output**: Azure path in `runAgent()` processes Responses API streaming events
+### Unit 3b: Azure Responses API Call and Text Streaming -- Implementation
+**What**: In `runAgent()`, branch on `provider === "azure"`:
+- Convert messages via `toResponsesInput()` to get `instructions` and `input`
+- Convert tools via `toResponsesTools()`
+- Call `client.responses.create({ model, input, instructions, tools: convertedTools, stream: true, store: false, include: ["reasoning.encrypted_content"], reasoning: { effort: "medium", summary: "auto" } }, signal ? { signal } : {})`
+- Iterate the async stream, switching on `event.type`:
+  - `"response.output_text.delta"` -> fire `onModelStreamStart` (once), call `callbacks.onTextChunk(event.delta)`, accumulate content
+  - `"response.reasoning_summary.delta"` -> fire `onModelStreamStart` (once), call `callbacks.onReasoningChunk(String(event.delta))`
+  - All other event types: ignore for now (tool call events added in Unit 4)
+- After stream: if no tool calls collected, set `done = true`
+- Push assistant message to `messages` array for conversation history
+- MiniMax path stays completely unchanged (wrapped in `else` branch)
+**Output**: Azure text/reasoning streaming working in `runAgent()`
 **Acceptance**: All Unit 3a tests PASS (green), all existing MiniMax tests still pass
 
-### Unit 3c: Responses API Stream Processing -- Coverage & Refactor
-**What**: Verify coverage. Add tests for edge cases:
-- Stream with no events
-- Event with unknown type (should be ignored)
-- Mixed reasoning and text events
-- `onModelStreamStart` fires exactly once even with mixed event types
-**Acceptance**: 100% coverage on new stream processing code, tests green
+### Unit 3c: Azure Text Streaming -- Coverage & Refactor
+**What**: Verify coverage on new Azure stream code. Add edge cases:
+- Event with unknown type is silently ignored
+- `delta` field as non-string on reasoning event (cast to string)
+- Mixed reasoning and text events interleaved
+- Empty string delta (should still call callback)
+**Acceptance**: 100% coverage on new code, tests green
 
-### Unit 4a: Tool Call Handling in Responses API -- Tests
-**What**: Write tests for tool call execution and result submission on the Azure Responses API path. Test cases:
-- `response.output_item.added` with `type: "function_call"` starts tool tracking
-- `response.function_call_arguments.delta` accumulates arguments
-- `response.output_item.done` with `type: "function_call"` finalizes tool call with `call_id`, `name`, `arguments`
-- After stream ends with tool calls: `callbacks.onToolStart` and `callbacks.onToolEnd` fire for each tool
-- Tool results are submitted as `function_call_output` items in next turn's input
-- Multiple tool calls in single response are handled correctly
-- Tool execution error is captured and submitted as result
-- Tool-use loop: model calls tool, gets result, responds with text (2-turn loop)
+### Unit 4a: Azure Tool Call Handling -- Tests
+**What**: Write tests for tool call tracking and execution on the Azure Responses API path. Extend the Azure describe block. Test cases:
+- `{ type: "response.output_item.added", item: { type: "function_call", name: "read_file", call_id: "call_1", arguments: "" } }` starts tracking a tool call
+- `{ type: "response.function_call_arguments.delta", delta: '{"path":' }` followed by `{ ..., delta: '"/foo"}' }` accumulates arguments
+- `{ type: "response.output_item.done", item: { type: "function_call", name: "read_file", call_id: "call_1", arguments: '{"path":"/foo"}' } }` finalizes the tool call
+- After stream with tool calls: `callbacks.onToolStart` fires for each tool, tool is executed via `execTool`, `callbacks.onToolEnd` fires
+- Tool results are passed in the next API call as `function_call_output` items in the input
+- The assistant message and tool messages are also appended to canonical `messages` array
+- Multiple tool calls in one response: all are tracked and executed
+- Tool execution error: result contains error string, `onToolEnd` fires with `success: false`
+- Two-turn tool-use loop: first response has tool call, second response has text -- agent loop completes after second turn
 **Output**: Failing tests in `core.test.ts`
 **Acceptance**: Tests exist and FAIL (red)
 
-### Unit 4b: Tool Call Handling in Responses API -- Implementation
-**What**: Implement tool call handling for the Azure Responses API path:
-- Track tool calls from stream events: `output_item.added` (type function_call) initializes, `function_call_arguments.delta` accumulates, `output_item.done` (type function_call) finalizes
-- After stream: for each tool call, execute via shared `execTool()` and callback pattern
-- Build `function_call_output` items: `{ type: "function_call_output", call_id: tc.call_id, output: result }`
-- Append output items + tool results to the Azure input array for next loop iteration
-- Also append equivalent messages to the canonical `messages` array for conversation history parity
-- Loop continues (not done) when tool calls are present
+### Unit 4b: Azure Tool Call Handling -- Implementation
+**What**: Add tool call event handling to the Azure stream processing in `runAgent()`:
+- On `response.output_item.added` where `item.type === "function_call"`: initialize tool call tracker `{ call_id: item.call_id, name: item.name, arguments: "" }`
+- On `response.function_call_arguments.delta`: append `event.delta` to current tool call's arguments
+- On `response.output_item.done` where `item.type === "function_call"`: finalize tool call with completed item data (use `item.call_id`, `item.name`, `item.arguments` from the done event for accuracy)
+- After stream: if tool calls exist:
+  - For each tool call, run shared tool execution (parse args, `onToolStart`, `execTool`, `onToolEnd`)
+  - Build assistant message with tool_calls and push to `messages`
+  - Build `function_call_output` input items for tool results
+  - Push tool messages to `messages` array (Chat Completions format for history)
+  - Continue loop (not done)
+- If no tool calls: push assistant message to `messages`, set `done = true`
 **Output**: Full tool-use loop working on Azure path
-**Acceptance**: All Unit 4a tests PASS (green), existing tests still pass
+**Acceptance**: All Unit 4a tests PASS (green), all existing tests still pass
 
-### Unit 4c: Tool Call Handling -- Coverage & Refactor
-**What**: Verify coverage on tool handling code. Add edge cases:
-- Tool with malformed JSON arguments (should handle gracefully like MiniMax path)
-- Tool call with empty arguments
-- Tool call with `call_id` missing (defensive coding)
+### Unit 4c: Azure Tool Call Handling -- Coverage & Refactor
+**What**: Verify coverage. Add edge cases:
+- Tool with malformed JSON arguments (graceful handling, same as MiniMax path)
+- Tool call with empty arguments string
+- `output_item.added` for non-function_call types (should be ignored)
+- `function_call_arguments.delta` with no active tool call (defensive, should not crash)
 **Acceptance**: 100% coverage, tests green
 
 ### Unit 5a: Reasoning Item Re-submission -- Tests
-**What**: Write tests for reasoning item tracking and re-submission across turns. Test cases:
-- After Azure response with reasoning item, the reasoning item (with encrypted_content) is included in the next turn's input
-- After Azure response with tool calls, reasoning items from that response are preserved and re-submitted alongside tool results
-- Multi-turn conversation: reasoning items accumulate correctly across turns
-- Response output items (message, function_call) are also re-submitted correctly
-- Reasoning items are NOT tracked/submitted on MiniMax path (no-op)
+**What**: Write tests for reasoning item tracking and re-submission across turns on the Azure path. Test cases:
+- `response.output_item.done` with `item.type === "reasoning"` captures the item (including `encrypted_content`)
+- On next API call (tool-use loop), the captured reasoning item appears in the `input` array
+- Multi-turn: reasoning items from turn 1 are included in turn 2's input, alongside turn 2's tool results
+- Response with no reasoning items: no reasoning items in next turn's input (empty is fine)
+- Response with multiple reasoning items: all are captured and re-submitted
+- `encrypted_content` field is preserved exactly (not mutated or stripped)
+- MiniMax path does not track reasoning items (no-op, no regression)
 **Output**: Failing tests in `core.test.ts`
 **Acceptance**: Tests exist and FAIL (red)
 
 ### Unit 5b: Reasoning Item Re-submission -- Implementation
-**What**: Implement reasoning item tracking:
-- After each Azure Responses API stream completes, collect all `response.output_item.done` items
-- Store these in a running `azureInputItems` array that persists across loop iterations
-- On each Azure API call, pass these items as part of the input (via `toResponsesInput()`)
-- For tool-use loops: the reasoning items from the current turn plus the tool results form the next turn's input
-- The `azureInputItems` array is scoped to the `runAgent()` call (not global)
-**Output**: Reasoning items tracked and re-submitted across turns
+**What**: Implement reasoning item tracking in the Azure path of `runAgent()`:
+- Maintain a `azureOutputItems: any[]` array scoped to the `runAgent()` call (persists across loop iterations)
+- On `response.output_item.done` events: push the item to a per-iteration collector
+- After each stream: append all collected done items to `azureOutputItems`
+- Before each Azure API call: pass `azureOutputItems` as additional input items. These should be appended after the converted messages in the `input` array
+- For tool-use loops: the sequence is: prior items + current turn's output items + tool result items
+- Update `toResponsesInput()` to accept an optional `additionalItems` parameter and append them
+**Output**: Reasoning items tracked and re-submitted
 **Acceptance**: All Unit 5a tests PASS (green)
 
 ### Unit 5c: Reasoning Item Re-submission -- Coverage & Refactor
-**What**: Verify coverage. Edge cases:
-- Response with no reasoning items (empty array)
-- Response with multiple reasoning items
-- Encrypted content is preserved exactly (no mutation)
+**What**: Verify coverage. Ensure no edge cases are missed. Verify `toResponsesInput` additional items parameter has coverage.
 **Acceptance**: 100% coverage, tests green
 
-### Unit 6a: Abort and Error Handling -- Tests
-**What**: Write tests for abort signal and error handling on the Azure Responses API path. Test cases:
-- Abort signal during Azure stream stops processing cleanly (no error callback)
-- Abort signal before Azure API call skips the call
-- API error from `client.responses.create` fires `callbacks.onError`
-- API error does not crash -- loop ends gracefully
-- Network timeout fires error callback
+### Unit 6a: Azure Abort and Error Handling -- Tests
+**What**: Write tests for abort signal and error handling on the Azure path. Test cases:
+- Abort signal already aborted before API call: loop breaks, no API call made, no error callback
+- Abort signal fires during stream iteration: processing stops cleanly, no error callback
+- `client.responses.create` throws an error: `callbacks.onError` fires with the error, loop ends
+- `client.responses.create` throws non-Error: `callbacks.onError` fires with wrapped Error
+- Stream iteration throws: `callbacks.onError` fires, loop ends
 **Output**: Failing tests in `core.test.ts`
 **Acceptance**: Tests exist and FAIL (red)
 
-### Unit 6b: Abort and Error Handling -- Implementation
-**What**: Ensure Azure path has same abort/error behavior as MiniMax path:
-- Pass `signal` to `client.responses.create` options
-- Check `signal?.aborted` before API call and during stream iteration
-- Catch errors from API call and stream, route to `callbacks.onError`
-- On abort, break cleanly without firing error callback
+### Unit 6b: Azure Abort and Error Handling -- Implementation
+**What**: Ensure the Azure path in `runAgent()` has identical abort/error semantics to the MiniMax path:
+- Check `signal?.aborted` at top of loop before API call
+- Pass `signal` to `client.responses.create` options: `signal ? { signal } : {}`
+- Check `signal?.aborted` inside stream iteration loop
+- Wrap Azure path in try/catch: on abort, break cleanly; on error, fire `callbacks.onError`, set `done = true`
 **Output**: Abort and error handling working on Azure path
 **Acceptance**: All Unit 6a tests PASS (green)
 
-### Unit 6c: Abort and Error Handling -- Coverage & Refactor
-**What**: Verify coverage on error/abort paths. Add edge cases if needed.
+### Unit 6c: Azure Abort and Error Handling -- Coverage & Refactor
+**What**: Verify coverage on all error/abort branches. Add any missing edge cases.
 **Acceptance**: 100% coverage, tests green
 
-### Unit 7a: Update Existing Azure Tests -- Tests
-**What**: Update the existing Azure-specific test ("passes reasoning params for Azure provider") to verify the new Responses API call shape instead of Chat Completions. The mock needs to support `client.responses.create` in addition to `client.chat.completions.create`. Update the mock factory:
-```typescript
-const mockCreate = vi.fn()
-const mockResponsesCreate = vi.fn()
-vi.mock("openai", () => {
-  class MockOpenAI {
-    chat = { completions: { create: mockCreate } }
-    responses = { create: mockResponsesCreate }
-    constructor(_opts?: any) {}
-  }
-  return { default: MockOpenAI, AzureOpenAI: MockOpenAI }
-})
-```
-Test cases:
-- Existing "passes reasoning params for Azure provider" test now verifies `mockResponsesCreate` was called with `reasoning: { effort: "medium", summary: "auto" }`, `store: false`, `include: ["reasoning.encrypted_content"]`
-- Existing "does not pass reasoning params for MiniMax provider" test still passes (MiniMax uses `mockCreate` / `chat.completions.create`)
-- All existing MiniMax runAgent tests still pass unchanged
-**Output**: Updated mock and existing tests adapted
-**Acceptance**: All tests PASS (green)
-
-### Unit 7b: Integration Verification
-**What**: Run full test suite. Verify:
-- All 104+ core tests pass
-- All 19 CLI tests pass (no changes needed)
-- All 47 Teams tests pass (no changes needed)
-- No warnings
-- Coverage meets requirements
-**Output**: Clean test run
-**Acceptance**: `npm test` passes with no failures, no warnings
+### Unit 7: Full Integration Verification
+**What**: Run full test suite across all test files. Verify:
+- All core tests pass (original + new)
+- All 19 CLI tests pass (no changes to `agent.ts`)
+- All 47 Teams tests pass (no changes to `teams.ts`)
+- No warnings from TypeScript compilation
+- Coverage meets 100% on all new code
+- Existing Azure-specific test ("passes reasoning params for Azure provider") now correctly tests Responses API params
+- Existing MiniMax-specific test ("does not pass reasoning params for MiniMax provider") still passes unchanged
+**Output**: Clean `npm test` run, full green
+**Acceptance**: `npm test` passes with zero failures, zero warnings
 
 ## Execution
 - **TDD strictly enforced**: tests -> red -> implement -> green -> refactor
-- Commit after each phase (1a, 1b, 1c)
+- Commit after each phase (0, 1a, 1b, 1c, etc.)
 - Push after each unit complete
 - Run full test suite before marking unit done
 - **All artifacts**: Save outputs, logs, data to `./2026-02-24-1949-doing-responses-api-migration/` directory
