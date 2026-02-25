@@ -312,11 +312,317 @@ describe("agent.ts main()", () => {
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
+    vi.doMock("../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+    }))
+    vi.doMock("../context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockReturnValue({ handled: false }),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockReturnValue(null),
+    }))
 
     const agent = await import("../agent")
     await agent.main()
 
     const flatLogs = logCalls.flat()
     expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
+  })
+})
+
+describe("agent.ts main() - session persistence", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    setupSpies()
+  })
+
+  afterEach(() => {
+    restoreSpies()
+    vi.restoreAllMocks()
+  })
+
+  function mockDeps(overrides: {
+    inputSequence?: string[]
+    loadSessionReturn?: any
+    runAgentCalls?: any[][]
+    saveSessionCalls?: any[][]
+    deleteSessionCalls?: string[]
+    trimMessagesFn?: any
+    parseSlashCommandFn?: any
+    dispatchFn?: any
+  } = {}) {
+    const {
+      inputSequence = [],
+      loadSessionReturn = null,
+      runAgentCalls = [],
+      saveSessionCalls = [],
+      deleteSessionCalls = [],
+      trimMessagesFn = ((msgs: any) => [...msgs]),
+      parseSlashCommandFn = (() => null),
+      dispatchFn = (() => ({ handled: false })),
+    } = overrides
+
+    const { mockRl } = createMockRl(inputSequence)
+
+    vi.doMock("readline", () => ({
+      createInterface: () => mockRl,
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn().mockImplementation(async (...args: any[]) => { runAgentCalls.push(args) }),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/test-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+    }))
+    vi.doMock("../context", () => ({
+      loadSession: vi.fn().mockReturnValue(loadSessionReturn),
+      saveSession: vi.fn().mockImplementation((...args: any[]) => { saveSessionCalls.push(args) }),
+      deleteSession: vi.fn().mockImplementation((...args: any[]) => { deleteSessionCalls.push(args[0]) }),
+      trimMessages: vi.fn().mockImplementation(trimMessagesFn),
+      cachedBuildSystem: vi.fn().mockReturnValue("cached system prompt"),
+    }))
+    vi.doMock("../commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockImplementation(dispatchFn),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockImplementation(parseSlashCommandFn),
+    }))
+
+    return { mockRl }
+  }
+
+  it("loads existing session on startup (no boot greeting)", async () => {
+    const runAgentCalls: any[][] = []
+    const savedSession = [
+      { role: "system", content: "old system" },
+      { role: "user", content: "previous message" },
+      { role: "assistant", content: "previous reply" },
+    ]
+
+    mockDeps({
+      inputSequence: ["/exit"],
+      loadSessionReturn: savedSession,
+      runAgentCalls,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => name === "exit" ? { handled: true, result: { action: "exit" } } : { handled: false },
+    })
+
+    const agent = await import("../agent")
+    await agent.main()
+
+    // No boot greeting runAgent call -- session was restored
+    expect(runAgentCalls.length).toBe(0)
+  })
+
+  it("starts fresh with boot greeting when no session exists", async () => {
+    const runAgentCalls: any[][] = []
+
+    mockDeps({
+      inputSequence: ["/exit"],
+      loadSessionReturn: null,
+      runAgentCalls,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => name === "exit" ? { handled: true, result: { action: "exit" } } : { handled: false },
+    })
+
+    const agent = await import("../agent")
+    await agent.main()
+
+    // Boot greeting fires
+    expect(runAgentCalls.length).toBe(1) // boot greeting only
+  })
+
+  it("starts fresh with boot greeting when session is corrupt", async () => {
+    const runAgentCalls: any[][] = []
+
+    mockDeps({
+      inputSequence: ["/exit"],
+      loadSessionReturn: null, // loadSession returns null for corrupt
+      runAgentCalls,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => name === "exit" ? { handled: true, result: { action: "exit" } } : { handled: false },
+    })
+
+    const agent = await import("../agent")
+    await agent.main()
+
+    expect(runAgentCalls.length).toBe(1) // boot greeting
+  })
+
+  it("saves session after each turn", async () => {
+    const saveSessionCalls: any[][] = []
+
+    mockDeps({
+      inputSequence: ["hello", "/exit"],
+      loadSessionReturn: null,
+      saveSessionCalls,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => name === "exit" ? { handled: true, result: { action: "exit" } } : { handled: false },
+    })
+
+    const agent = await import("../agent")
+    await agent.main()
+
+    // saveSession called: after boot greeting + after user turn
+    expect(saveSessionCalls.length).toBeGreaterThanOrEqual(2)
+    expect(saveSessionCalls[0][0]).toBe("/tmp/test-session.json")
+  })
+
+  it("calls trimMessages before runAgent", async () => {
+    const trimCalls: any[][] = []
+
+    mockDeps({
+      inputSequence: ["hello", "/exit"],
+      loadSessionReturn: null,
+      trimMessagesFn: (...args: any[]) => { trimCalls.push(args); return [...args[0]] },
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => name === "exit" ? { handled: true, result: { action: "exit" } } : { handled: false },
+    })
+
+    const agent = await import("../agent")
+    await agent.main()
+
+    // trimMessages should be called for the "hello" input
+    expect(trimCalls.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it("/exit quits the process", async () => {
+    mockDeps({
+      inputSequence: ["/exit"],
+      loadSessionReturn: null,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => name === "exit" ? { handled: true, result: { action: "exit" } } : { handled: false },
+    })
+
+    const agent = await import("../agent")
+    await agent.main()
+
+    const flatLogs = logCalls.flat()
+    expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
+  })
+
+  it("/new clears session and prints confirmation", async () => {
+    const deleteSessionCalls: string[] = []
+    const saveSessionCalls: any[][] = []
+
+    mockDeps({
+      inputSequence: ["/new", "/exit"],
+      loadSessionReturn: null,
+      deleteSessionCalls,
+      saveSessionCalls,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => {
+        if (name === "exit") return { handled: true, result: { action: "exit" } }
+        if (name === "new") return { handled: true, result: { action: "new" } }
+        return { handled: false }
+      },
+    })
+
+    const agent = await import("../agent")
+    await agent.main()
+
+    expect(deleteSessionCalls.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it("/commands prints command list without calling runAgent", async () => {
+    const runAgentCalls: any[][] = []
+
+    mockDeps({
+      inputSequence: ["/commands", "/exit"],
+      loadSessionReturn: null,
+      runAgentCalls,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => {
+        if (name === "exit") return { handled: true, result: { action: "exit" } }
+        if (name === "commands") return { handled: true, result: { action: "response", message: "/exit - quit\n/new - new session" } }
+        return { handled: false }
+      },
+    })
+
+    const agent = await import("../agent")
+    await agent.main()
+
+    // Only boot greeting, not /commands
+    expect(runAgentCalls.length).toBe(1)
+  })
+
+  it("context window integration: trims old messages when exceeding limit", async () => {
+    const trimCalls: any[][] = []
+
+    mockDeps({
+      inputSequence: ["msg1", "msg2", "/exit"],
+      loadSessionReturn: null,
+      trimMessagesFn: (msgs: any[], maxTokens: number, margin: number) => {
+        trimCalls.push([msgs.length, maxTokens, margin])
+        // Simulate trimming by keeping system + last 2
+        if (msgs.length > 3) return [msgs[0], ...msgs.slice(-2)]
+        return [...msgs]
+      },
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => name === "exit" ? { handled: true, result: { action: "exit" } } : { handled: false },
+    })
+
+    const agent = await import("../agent")
+    await agent.main()
+
+    expect(trimCalls.length).toBeGreaterThanOrEqual(1)
+    // Verify trimMessages was called with maxTokens and contextMargin
+    expect(trimCalls[0][1]).toBe(80000)
+    expect(trimCalls[0][2]).toBe(20)
+  })
+
+  it("refreshes system prompt from cachedBuildSystem on each turn", async () => {
+    const runAgentCalls: any[][] = []
+
+    mockDeps({
+      inputSequence: ["hello", "/exit"],
+      loadSessionReturn: [
+        { role: "system", content: "old stale prompt" },
+        { role: "user", content: "old message" },
+      ],
+      runAgentCalls,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => name === "exit" ? { handled: true, result: { action: "exit" } } : { handled: false },
+    })
+
+    const agent = await import("../agent")
+    await agent.main()
+
+    // The messages passed to runAgent should have the refreshed system prompt
+    expect(runAgentCalls.length).toBe(1) // "hello" turn
+    const msgs = runAgentCalls[0][0]
+    expect(msgs[0].content).toBe("cached system prompt")
+  })
+
+  it("boot message shows slash command hints", async () => {
+    mockDeps({
+      inputSequence: ["/exit"],
+      loadSessionReturn: null,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => name === "exit" ? { handled: true, result: { action: "exit" } } : { handled: false },
+    })
+
+    const agent = await import("../agent")
+    await agent.main()
+
+    const flatLogs = logCalls.flat()
+    expect(flatLogs.some((l) => l.includes("/commands"))).toBe(true)
   })
 })
