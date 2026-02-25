@@ -1,6 +1,6 @@
 # Doing: Normalize and Improve Reasoning Display Across All Surfaces
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: pending
 **Created**: 2026-02-24 18:40
 **Planning**: ./2026-02-24-1816-planning-reasoning-display.md
@@ -244,7 +244,7 @@ Remove the old partial-tag-split tests (lines 103-121) -- they tested adapter-le
 
 ---
 
-### ⬜ Unit 6: Final validation
+### ✅ Unit 6: Final validation
 **What**: Run full test suite, coverage, and type checks. Verify the normalization is complete end-to-end.
 
 **Verification steps:**
@@ -276,3 +276,4 @@ Remove the old partial-tag-split tests (lines 103-121) -- they tested adapter-le
 - 2026-02-24 18:58 Unit 3 complete: MiniMax think-tag state machine added, 13 new tests (7 core + 6 edge cases), 100% coverage on core.ts, 215 tests pass
 - 2026-02-24 19:00 Unit 4 complete: CLI adapter refactored -- removed buf/inThink/flush, onTextChunk direct write, onReasoningChunk dim output, 100% coverage on agent.ts
 - 2026-02-24 19:01 Unit 5 complete: Teams adapter refactored -- removed stripThinkTags, inThink/thinkBuf/emittedContent, reasoning->update, answer->emit, 100% coverage all files
+- 2026-02-24 19:02 Unit 6 complete: final validation -- 206 tests pass, 100% coverage all files, no type errors, no warnings, all 8 verification steps pass
