@@ -582,6 +582,146 @@ describe("toResponsesTools", () => {
   })
 })
 
+describe("toResponsesInput", () => {
+  let toResponsesInput: (messages: any[]) => { instructions: string; input: any[] }
+
+  beforeEach(async () => {
+    vi.resetModules()
+    process.env.MINIMAX_API_KEY = "test-key"
+    process.env.MINIMAX_MODEL = "test-model"
+    const core = await import("../core")
+    toResponsesInput = core.toResponsesInput
+  })
+
+  it("extracts system message content into instructions", () => {
+    const messages = [
+      { role: "system", content: "you are helpful" },
+      { role: "user", content: "hi" },
+    ]
+    const result = toResponsesInput(messages)
+    expect(result.instructions).toBe("you are helpful")
+    // System message should not appear in input
+    expect(result.input.find((i: any) => i.role === "system")).toBeUndefined()
+  })
+
+  it("converts user message to input item", () => {
+    const messages = [{ role: "user", content: "hi" }]
+    const result = toResponsesInput(messages)
+    expect(result.input).toEqual([{ role: "user", content: "hi" }])
+  })
+
+  it("converts assistant message (text only) to input item", () => {
+    const messages = [{ role: "assistant", content: "hello" }]
+    const result = toResponsesInput(messages)
+    expect(result.input).toEqual([{ role: "assistant", content: "hello" }])
+  })
+
+  it("converts assistant with tool_calls to content + function_call items", () => {
+    const messages = [
+      {
+        role: "assistant",
+        content: "let me check",
+        tool_calls: [
+          {
+            id: "tc1",
+            type: "function",
+            function: { name: "read_file", arguments: '{"path":"a.txt"}' },
+          },
+        ],
+      },
+    ]
+    const result = toResponsesInput(messages)
+    expect(result.input).toEqual([
+      { role: "assistant", content: "let me check" },
+      {
+        type: "function_call",
+        call_id: "tc1",
+        name: "read_file",
+        arguments: '{"path":"a.txt"}',
+      },
+    ])
+  })
+
+  it("converts tool message to function_call_output item", () => {
+    const messages = [
+      { role: "tool", tool_call_id: "tc1", content: "file contents" },
+    ]
+    const result = toResponsesInput(messages)
+    expect(result.input).toEqual([
+      { type: "function_call_output", call_id: "tc1", output: "file contents" },
+    ])
+  })
+
+  it("returns empty instructions when no system message", () => {
+    const messages = [{ role: "user", content: "hi" }]
+    const result = toResponsesInput(messages)
+    expect(result.instructions).toBe("")
+  })
+
+  it("preserves order in mixed multi-turn conversation", () => {
+    const messages = [
+      { role: "system", content: "system prompt" },
+      { role: "user", content: "hello" },
+      { role: "assistant", content: "hi there" },
+      { role: "user", content: "read this file" },
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [
+          { id: "tc1", type: "function", function: { name: "read_file", arguments: '{"path":"x.txt"}' } },
+        ],
+      },
+      { role: "tool", tool_call_id: "tc1", content: "data" },
+      { role: "assistant", content: "here is the file" },
+    ]
+    const result = toResponsesInput(messages)
+    expect(result.instructions).toBe("system prompt")
+    expect(result.input).toHaveLength(6)
+    expect(result.input[0]).toEqual({ role: "user", content: "hello" })
+    expect(result.input[1]).toEqual({ role: "assistant", content: "hi there" })
+    expect(result.input[2]).toEqual({ role: "user", content: "read this file" })
+    expect(result.input[3]).toEqual({
+      type: "function_call",
+      call_id: "tc1",
+      name: "read_file",
+      arguments: '{"path":"x.txt"}',
+    })
+    expect(result.input[4]).toEqual({
+      type: "function_call_output",
+      call_id: "tc1",
+      output: "data",
+    })
+    expect(result.input[5]).toEqual({ role: "assistant", content: "here is the file" })
+  })
+
+  it("returns empty instructions and empty input for empty messages", () => {
+    const result = toResponsesInput([])
+    expect(result.instructions).toBe("")
+    expect(result.input).toEqual([])
+  })
+
+  it("omits assistant content message when content is empty/falsy with tool_calls", () => {
+    const messages = [
+      {
+        role: "assistant",
+        tool_calls: [
+          { id: "tc1", type: "function", function: { name: "shell", arguments: '{"command":"ls"}' } },
+        ],
+      },
+    ]
+    const result = toResponsesInput(messages)
+    // Only function_call item, no assistant content message
+    expect(result.input).toEqual([
+      {
+        type: "function_call",
+        call_id: "tc1",
+        name: "shell",
+        arguments: '{"command":"ls"}',
+      },
+    ])
+  })
+})
+
 describe("ChannelCallbacks interface", () => {
   it("accepts an object with all required callback signatures", () => {
     const callbacks: ChannelCallbacks = {
