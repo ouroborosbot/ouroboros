@@ -130,3 +130,4 @@ Design philosophy: the model should take notes on its work (via write_file tool)
 - 2026-02-25 Scope update: replaced ad-hoc commands with slash-command system. Shared command registry, `/exit` `/new` `/commands`. Teams manifest `commandLists` for native surfacing.
 - 2026-02-25 Scope update: moved all config (including API keys, provider settings) from env vars to `~/.agentconfigs/ouroboros/config.json`. Structured sections for providers. Env vars still override for CI.
 - 2026-02-25 Removed keepRecent config — trimming simply drops oldest messages until under maxTokens.
+- 2026-02-25 11:11 Approved
