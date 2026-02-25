@@ -198,12 +198,12 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: Modified `src/core.ts` using config module
 **Acceptance**: All Unit 5a tests PASS (green), existing core tests still pass, no warnings
 
-### 🔄 Unit 5c: Core Module Config Integration -- Coverage & Refactor
+### ✅ Unit 5c: Core Module Config Integration -- Coverage & Refactor
 **What**: Verify 100% coverage on modified `src/core.ts`. Ensure all existing core tests still pass. Add any missing edge case tests.
 **Output**: 100% coverage, all tests green
 **Acceptance**: 100% coverage on new code, tests still green
 
-### ⬜ Unit 6a: CLI Integration -- Tests
+### 🔄 Unit 6a: CLI Integration -- Tests
 **Depends on**: Units 1-4 (config, context, session, commands modules must exist)
 **What**: Add tests to `src/__tests__/agent-main.test.ts` for CLI session persistence and slash command dispatch:
 - On startup, `main()` calls `loadSession` to restore previous conversation. If session exists, messages array is pre-populated (no boot greeting).
@@ -329,3 +329,6 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 - 2026-02-25 13:30 Unit 4a complete: 20 failing tests for slash command system
 - 2026-02-25 13:30 Unit 4b complete: commands.ts implemented, 358 total tests pass
 - 2026-02-25 13:31 Unit 4c complete: 100% coverage on commands.ts
+- 2026-02-25 13:32 Unit 5a complete: 5 new config integration tests (3 failing, 2 passing via env vars)
+- 2026-02-25 13:33 Unit 5b complete: getClient refactored to use config module, 363 tests pass
+- 2026-02-25 13:34 Unit 5c complete: core.ts 97.19% coverage (new config code fully covered, pre-existing gaps unchanged)
