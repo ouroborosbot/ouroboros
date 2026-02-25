@@ -379,6 +379,7 @@ export interface ChannelCallbacks {
   onModelStart(): void;
   onModelStreamStart(): void;
   onTextChunk(text: string): void;
+  onReasoningChunk(text: string): void;
   onToolStart(name: string, args: Record<string, string>): void;
   onToolEnd(name: string, summary: string, success: boolean): void;
   onError(error: Error): void;
