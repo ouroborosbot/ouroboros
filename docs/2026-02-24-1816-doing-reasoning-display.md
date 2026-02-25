@@ -158,7 +158,7 @@ Implementation approach:
 
 ---
 
-### ⬜ Unit 4a: Update CLI adapter for onReasoningChunk -- Tests
+### ✅ Unit 4a: Update CLI adapter for onReasoningChunk -- Tests
 **What**: Rewrite the CLI think-tag dimming tests in `src/__tests__/cli.test.ts` (the describe block "CLI adapter - onTextChunk think-tag dimming", lines 49-121).
 
 New tests for the renamed describe block "CLI adapter - onReasoningChunk and onTextChunk rendering":
@@ -175,7 +175,7 @@ Remove the old partial-tag-split tests (lines 103-121) -- they tested adapter-le
 
 **Acceptance**: Tests exist and FAIL (CLI adapter still has think-tag parsing in onTextChunk, onReasoningChunk is a no-op).
 
-### ⬜ Unit 4b: Update CLI adapter for onReasoningChunk -- Implementation
+### ✅ Unit 4b: Update CLI adapter for onReasoningChunk -- Implementation
 **What**: Refactor `createCliCallbacks` in `src/agent.ts` (lines 103-153):
 1. Remove the `buf`, `inThink`, and `flush` function used for think-tag parsing.
 2. Simplify `onTextChunk` to: `process.stdout.write(text)`.
@@ -186,7 +186,7 @@ Remove the old partial-tag-split tests (lines 103-121) -- they tested adapter-le
 
 **Acceptance**: All CLI tests from 4a PASS. Dim rendering via `onReasoningChunk`. Direct write via `onTextChunk`. No tag parsing.
 
-### ⬜ Unit 4c: Unit 4 -- Coverage and refactor
+### ✅ Unit 4c: Unit 4 -- Coverage and refactor
 **What**: Run coverage on CLI adapter. Verify no dead code remains from the old flush/buf/inThink logic.
 
 **Acceptance**: 100% coverage on `createCliCallbacks`. All tests green.
@@ -274,3 +274,4 @@ Remove the old partial-tag-split tests (lines 103-121) -- they tested adapter-le
 - 2026-02-24 18:52 Unit 1 complete: added onReasoningChunk to ChannelCallbacks, no-op in both adapters, all 30 callback literals in core.test.ts updated, 202 tests pass
 - 2026-02-24 18:55 Unit 2 complete: Azure reasoning_content normalized to onReasoningChunk, 4 tests rewritten, inReasoning/think-tag wrapping removed from core.ts, 100% coverage on core.ts
 - 2026-02-24 18:58 Unit 3 complete: MiniMax think-tag state machine added, 13 new tests (7 core + 6 edge cases), 100% coverage on core.ts, 215 tests pass
+- 2026-02-24 19:00 Unit 4 complete: CLI adapter refactored -- removed buf/inThink/flush, onTextChunk direct write, onReasoningChunk dim output, 100% coverage on agent.ts
