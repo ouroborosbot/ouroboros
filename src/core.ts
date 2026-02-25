@@ -605,6 +605,7 @@ export async function streamResponsesApi(
   let streamStarted = false;
   const toolCalls: { id: string; name: string; arguments: string }[] = [];
   const outputItems: any[] = [];
+  let currentToolCall: { call_id: string; name: string; arguments: string } | null = null;
 
   for await (const event of response) {
     if (signal?.aborted) break;
@@ -626,6 +627,34 @@ export async function streamResponsesApi(
           streamStarted = true;
         }
         callbacks.onReasoningChunk(String(event.delta));
+        break;
+      }
+      case "response.output_item.added": {
+        if (event.item?.type === "function_call") {
+          currentToolCall = {
+            call_id: event.item.call_id,
+            name: event.item.name,
+            arguments: "",
+          };
+        }
+        break;
+      }
+      case "response.function_call_arguments.delta": {
+        if (currentToolCall) {
+          currentToolCall.arguments += event.delta;
+        }
+        break;
+      }
+      case "response.output_item.done": {
+        outputItems.push(event.item);
+        if (event.item?.type === "function_call") {
+          toolCalls.push({
+            id: event.item.call_id,
+            name: event.item.name,
+            arguments: event.item.arguments,
+          });
+          currentToolCall = null;
+        }
         break;
       }
       default:
