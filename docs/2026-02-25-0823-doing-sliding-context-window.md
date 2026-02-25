@@ -142,12 +142,12 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: Session persistence functions implemented
 **Acceptance**: All Unit 3a tests PASS (green), no warnings
 
-### 🔄 Unit 3c: Session Persistence -- Coverage & Refactor
+### ✅ Unit 3c: Session Persistence -- Coverage & Refactor
 **What**: Verify 100% coverage on session persistence code. Add any missing edge case tests.
 **Output**: 100% coverage, tests still green
 **Acceptance**: 100% coverage on new code, tests still green
 
-### ⬜ Unit 4a: Slash Command System -- Tests
+### 🔄 Unit 4a: Slash Command System -- Tests
 **What**: Create `src/__tests__/commands.test.ts` with failing tests for a new `src/commands.ts` module. Tests cover:
 - Command registry: `createCommandRegistry()` returns a registry with `register(cmd)`, `get(name)`, `list()`, `dispatch(name, context)`.
 - `register(cmd)`: adds a command with `{ name, description, handler, channels }`. `channels` is `["cli"]`, `["teams"]`, or `["cli", "teams"]`.
@@ -323,3 +323,6 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 - 2026-02-25 13:26 Unit 2a complete: 18 failing tests for estimateTokens, cachedBuildSystem, trimMessages
 - 2026-02-25 13:27 Unit 2b complete: context.ts implemented, all 18 tests pass, 326 total tests pass
 - 2026-02-25 13:27 Unit 2c complete: 100% coverage on context.ts after adding edge case tests
+- 2026-02-25 13:28 Unit 3a complete: 9 failing tests for session persistence
+- 2026-02-25 13:29 Unit 3b complete: session persistence implemented, 337 total tests pass
+- 2026-02-25 13:29 Unit 3c complete: 100% coverage on context.ts with deleteSession re-throw test
