@@ -766,6 +766,146 @@ describe("ChannelCallbacks interface", () => {
   })
 })
 
+describe("streamChatCompletion", () => {
+  let streamChatCompletion: any
+
+  function makeStream(chunks: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const chunk of chunks) {
+          yield chunk
+        }
+      },
+    }
+  }
+
+  function makeChunk(content?: string, toolCalls?: any[], reasoningContent?: string) {
+    const delta: any = {}
+    if (content !== undefined) delta.content = content
+    if (toolCalls !== undefined) delta.tool_calls = toolCalls
+    if (reasoningContent !== undefined) delta.reasoning_content = reasoningContent
+    return { choices: [{ delta }] }
+  }
+
+  function makeCallbacks(overrides: Partial<ChannelCallbacks> = {}): ChannelCallbacks {
+    return {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+      ...overrides,
+    }
+  }
+
+  beforeEach(async () => {
+    vi.resetModules()
+    process.env.MINIMAX_API_KEY = "test-key"
+    process.env.MINIMAX_MODEL = "test-model"
+    mockCreate.mockReset()
+    const core = await import("../core")
+    streamChatCompletion = core.streamChatCompletion
+  })
+
+  it("returns TurnResult with content for text-only response", async () => {
+    const client = { chat: { completions: { create: vi.fn().mockReturnValue(makeStream([makeChunk("hello")])) } } }
+    const callbacks = makeCallbacks()
+    const result = await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
+    expect(result).toEqual({ content: "hello", toolCalls: [], outputItems: [] })
+  })
+
+  it("calls onModelStreamStart once on first content delta", async () => {
+    const client = { chat: { completions: { create: vi.fn().mockReturnValue(makeStream([makeChunk("a"), makeChunk("b")])) } } }
+    const callbacks = makeCallbacks()
+    await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
+    expect(callbacks.onModelStreamStart).toHaveBeenCalledTimes(1)
+  })
+
+  it("calls onTextChunk for each content delta", async () => {
+    const textChunks: string[] = []
+    const client = { chat: { completions: { create: vi.fn().mockReturnValue(makeStream([makeChunk("a"), makeChunk("b")])) } } }
+    const callbacks = makeCallbacks({ onTextChunk: (text: string) => textChunks.push(text) })
+    await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
+    expect(textChunks).toEqual(["a", "b"])
+  })
+
+  it("accumulates tool call deltas and returns them in toolCalls", async () => {
+    const client = { chat: { completions: { create: vi.fn().mockReturnValue(makeStream([
+      makeChunk(undefined, [{ index: 0, id: "call_1", function: { name: "read_file", arguments: '{"path"' } }]),
+      makeChunk(undefined, [{ index: 0, function: { arguments: ':"a.txt"}' } }]),
+    ])) } } }
+    const callbacks = makeCallbacks()
+    const result = await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
+    expect(result.toolCalls).toEqual([{ id: "call_1", name: "read_file", arguments: '{"path":"a.txt"}' }])
+  })
+
+  it("calls onReasoningChunk for reasoning_content delta", async () => {
+    const reasoningChunks: string[] = []
+    const client = { chat: { completions: { create: vi.fn().mockReturnValue(makeStream([
+      { choices: [{ delta: { reasoning_content: "thinking" } }] },
+    ])) } } }
+    const callbacks = makeCallbacks({ onReasoningChunk: (text: string) => reasoningChunks.push(text) })
+    await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
+    expect(reasoningChunks).toEqual(["thinking"])
+  })
+
+  it("routes think tags through processContentBuf correctly", async () => {
+    const reasoningChunks: string[] = []
+    const textChunks: string[] = []
+    const client = { chat: { completions: { create: vi.fn().mockReturnValue(makeStream([
+      makeChunk("<think>reasoning</think>answer"),
+    ])) } } }
+    const callbacks = makeCallbacks({
+      onTextChunk: (text: string) => textChunks.push(text),
+      onReasoningChunk: (text: string) => reasoningChunks.push(text),
+    })
+    await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
+    expect(reasoningChunks.join("")).toBe("reasoning")
+    expect(textChunks.join("")).toBe("answer")
+  })
+
+  it("handles mixed content + tool_calls in same response", async () => {
+    const client = { chat: { completions: { create: vi.fn().mockReturnValue(makeStream([
+      makeChunk("text"),
+      makeChunk(undefined, [{ index: 0, id: "c1", function: { name: "shell", arguments: '{"command":"ls"}' } }]),
+    ])) } } }
+    const callbacks = makeCallbacks()
+    const result = await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
+    expect(result.content).toBe("text")
+    expect(result.toolCalls).toHaveLength(1)
+  })
+
+  it("always returns empty outputItems (CC path)", async () => {
+    const client = { chat: { completions: { create: vi.fn().mockReturnValue(makeStream([makeChunk("hello")])) } } }
+    const callbacks = makeCallbacks()
+    const result = await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
+    expect(result.outputItems).toEqual([])
+  })
+
+  it("respects abort signal during stream iteration", async () => {
+    const controller = new AbortController()
+    const client = { chat: { completions: { create: vi.fn().mockReturnValue({
+      [Symbol.asyncIterator]: async function* () {
+        yield makeChunk("first")
+        controller.abort()
+        yield makeChunk("second")
+      },
+    }) } } }
+    const textChunks: string[] = []
+    const callbacks = makeCallbacks({ onTextChunk: (text: string) => textChunks.push(text) })
+    await streamChatCompletion(client, { messages: [], stream: true }, callbacks, controller.signal)
+    expect(textChunks).toEqual(["first"])
+  })
+
+  it("propagates errors from client.chat.completions.create", async () => {
+    const client = { chat: { completions: { create: vi.fn().mockImplementation(() => { throw new Error("API down") }) } } }
+    const callbacks = makeCallbacks()
+    await expect(streamChatCompletion(client, { messages: [], stream: true }, callbacks)).rejects.toThrow("API down")
+  })
+})
+
 describe("runAgent", () => {
   let runAgent: (messages: any[], callbacks: ChannelCallbacks) => Promise<void>
 
