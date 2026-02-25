@@ -73,6 +73,28 @@ describe("estimateTokens", () => {
     // "let me check" (12) + "shell" (5) + '{"command":"ls"}' (16) = 33 chars, ceil(33/4) = 9
     expect(estimateTokens(msgs)).toBe(9)
   })
+
+  it("handles tool_calls with missing function fields gracefully", async () => {
+    const { estimateTokens } = await import("../context")
+    const msgs: OpenAI.ChatCompletionMessageParam[] = [
+      {
+        role: "assistant",
+        tool_calls: [
+          { id: "tc1", type: "function" as const, function: {} },
+        ],
+      } as any,
+    ]
+    // No name, no arguments -> 0 chars -> 0 tokens
+    expect(estimateTokens(msgs)).toBe(0)
+  })
+
+  it("handles message with null content", async () => {
+    const { estimateTokens } = await import("../context")
+    const msgs: OpenAI.ChatCompletionMessageParam[] = [
+      { role: "assistant", content: null } as any,
+    ]
+    expect(estimateTokens(msgs)).toBe(0)
+  })
 })
 
 describe("cachedBuildSystem", () => {
