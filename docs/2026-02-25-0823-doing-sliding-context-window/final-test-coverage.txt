@@ -1,0 +1,36 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90m/Users/microsoft/code/ouroboros[39m
+      [2mCoverage enabled with [22m[33mv8[39m
+
+ [32m✓[39m src/__tests__/setup.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/__tests__/phrases.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/__tests__/commands.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 111[2mms[22m[39m
+ [32m✓[39m src/__tests__/skills.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 59[2mms[22m[39m
+ [32m✓[39m src/__tests__/config.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 156[2mms[22m[39m
+ [32m✓[39m src/__tests__/context.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 66[2mms[22m[39m
+ [32m✓[39m src/__tests__/cli-ux.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 230[2mms[22m[39m
+ [32m✓[39m src/__tests__/agent-main.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 272[2mms[22m[39m
+ [32m✓[39m src/__tests__/core.test.ts [2m([22m[2m162 tests[22m[2m)[22m[32m 172[2mms[22m[39m
+ [32m✓[39m src/__tests__/cli.test.ts [2m([22m[2m26 tests[22m[2m)[22m[33m 339[2mms[22m[39m
+ [32m✓[39m src/__tests__/teams.test.ts [2m([22m[2m70 tests[22m[2m)[22m[33m 461[2mms[22m[39m
+     [33m[2m✓[22m[39m exports createTeamsCallbacks [33m 349[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m11 passed[39m[22m[90m (11)[39m
+[2m      Tests [22m [1m[32m388 passed[39m[22m[90m (388)[39m
+[2m   Start at [22m 13:52:31
+[2m   Duration [22m 933ms[2m (transform 1.97s, setup 0ms, import 1.59s, tests 1.87s, environment 1ms)[22m
+
+[34m % [39m[2mCoverage report from [22m[33mv8[39m
+-------------|---------|----------|---------|---------|------------------------
+File         | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s      
+-------------|---------|----------|---------|---------|------------------------
+All files    |   98.58 |     96.4 |     100 |   98.98 |                        
+ agent.ts    |   98.93 |    92.77 |     100 |     100 | 40,239,246,256-257,268 
+ commands.ts |     100 |      100 |     100 |     100 |                        
+ config.ts   |     100 |      100 |     100 |     100 |                        
+ context.ts  |     100 |      100 |     100 |     100 |                        
+ core.ts     |   97.19 |    95.69 |     100 |   97.52 | 673,678-680,758-761    
+ phrases.ts  |     100 |      100 |     100 |     100 |                        
+ skills.ts   |     100 |      100 |     100 |     100 |                        
+ teams.ts    |     100 |      100 |     100 |     100 |                        
+-------------|---------|----------|---------|---------|------------------------
