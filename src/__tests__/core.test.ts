@@ -170,22 +170,30 @@ describe("buildSystem", () => {
   it("includes azure provider string when AZURE_OPENAI_API_KEY is set", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
     process.env.AZURE_OPENAI_API_KEY = "test-azure-key"
+    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
     process.env.AZURE_OPENAI_DEPLOYMENT = "gpt-4o-deploy"
+    process.env.AZURE_OPENAI_MODEL_NAME = "test-model"
     const { buildSystem } = await import("../core")
     const result = buildSystem()
     expect(result).toContain("azure openai (gpt-4o-deploy, model: test-model)")
     delete process.env.AZURE_OPENAI_API_KEY
+    delete process.env.AZURE_OPENAI_ENDPOINT
     delete process.env.AZURE_OPENAI_DEPLOYMENT
+    delete process.env.AZURE_OPENAI_MODEL_NAME
   })
 
   it("uses 'default' deployment when AZURE_OPENAI_DEPLOYMENT is not set", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
     process.env.AZURE_OPENAI_API_KEY = "test-azure-key"
+    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
+    process.env.AZURE_OPENAI_MODEL_NAME = "test-model"
     delete process.env.AZURE_OPENAI_DEPLOYMENT
     const { buildSystem } = await import("../core")
     const result = buildSystem()
     expect(result).toContain("azure openai (default, model: test-model)")
     delete process.env.AZURE_OPENAI_API_KEY
+    delete process.env.AZURE_OPENAI_ENDPOINT
+    delete process.env.AZURE_OPENAI_MODEL_NAME
   })
 })
 

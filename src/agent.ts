@@ -1,6 +1,7 @@
 import OpenAI from "openai"
 import * as readline from "readline"
 import { runAgent, buildSystem, ChannelCallbacks } from "./core"
+import { pickPhrase, THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "./phrases"
 
 // spinner that only touches stderr, cleans up after itself
 // exported for direct testability (stop-without-start branch)
@@ -8,14 +9,23 @@ export class Spinner {
   private frames = ["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"]
   private i = 0
   private iv: NodeJS.Timeout | null = null
+  private piv: NodeJS.Timeout | null = null
   private msg = ""
+  private phrases: readonly string[] | null = null
+  private lastPhrase = ""
 
-  constructor(m = "working") { this.msg = m }
+  constructor(m = "working", phrases?: readonly string[]) {
+    this.msg = m
+    if (phrases && phrases.length > 0) this.phrases = phrases
+  }
 
   start() {
     process.stderr.write("\r\x1b[K")
     this.spin()
     this.iv = setInterval(() => this.spin(), 80)
+    if (this.phrases) {
+      this.piv = setInterval(() => this.rotatePhrase(), 1500)
+    }
   }
 
   private spin() {
@@ -23,8 +33,16 @@ export class Spinner {
     this.i = (this.i + 1) % this.frames.length
   }
 
+  private rotatePhrase() {
+    if (!this.phrases) return
+    const next = pickPhrase(this.phrases, this.lastPhrase)
+    this.lastPhrase = next
+    this.msg = next
+  }
+
   stop(ok?: string) {
     if (this.iv) { clearInterval(this.iv); this.iv = null }
+    if (this.piv) { clearInterval(this.piv); this.piv = null }
     process.stderr.write("\r\x1b[K")
     if (ok) process.stderr.write(`\x1b[32m\u2713\x1b[0m ${ok}\n`)
   }
@@ -103,11 +121,14 @@ export function addHistory(history: string[], entry: string): void {
 export function createCliCallbacks(): ChannelCallbacks {
   let currentSpinner: Spinner | null = null
   let hadReasoning = false
+  let hadToolRun = false
 
   return {
     onModelStart: () => {
       hadReasoning = false
-      currentSpinner = new Spinner("waiting for model")
+      const pool = hadToolRun ? FOLLOWUP_PHRASES : THINKING_PHRASES
+      const first = pickPhrase(pool)
+      currentSpinner = new Spinner(first, pool)
       currentSpinner.start()
     },
     onModelStreamStart: () => {
@@ -126,8 +147,14 @@ export function createCliCallbacks(): ChannelCallbacks {
       process.stdout.write(`\x1b[2m${text}\x1b[0m`)
     },
     onToolStart: (name: string, _args: Record<string, string>) => {
-      currentSpinner = new Spinner(`running ${name}`)
+      // Stop the model-start spinner: when the model returns only tool calls
+      // (no content/reasoning), onModelStreamStart never fires, so the old
+      // spinner's intervals would leak.
+      currentSpinner?.stop()
+      const first = pickPhrase(TOOL_PHRASES)
+      currentSpinner = new Spinner(first, TOOL_PHRASES)
       currentSpinner.start()
+      hadToolRun = true
     },
     onToolEnd: (name: string, argSummary: string, success: boolean) => {
       if (success) {
