@@ -190,7 +190,7 @@ Test cases:
 
 ---
 
-### ⬜ Unit 3a: TurnResult + streamChatCompletion — Tests
+### ✅ Unit 3a: TurnResult + streamChatCompletion — Tests
 **What**: Define the `TurnResult` interface and write tests for `streamChatCompletion()` — a standalone function extracted from the current MiniMax stream processing in `runAgent()`. New `describe("streamChatCompletion")` block.
 
 The TurnResult interface:
@@ -216,7 +216,7 @@ Test cases (these mirror existing runAgent behavior but test the extracted funct
 **Output**: Failing tests
 **Acceptance**: Tests FAIL (red) — `streamChatCompletion` and `TurnResult` not exported yet
 
-### ⬜ Unit 3b: TurnResult + streamChatCompletion — Implementation
+### ✅ Unit 3b: TurnResult + streamChatCompletion — Implementation
 **What**: Extract stream processing from `runAgent()` into a standalone exported function `streamChatCompletion()`.
 
 Steps:
@@ -234,7 +234,7 @@ Steps:
 **Output**: `TurnResult` and `streamChatCompletion` exported from `core.ts`, runAgent delegates to it
 **Acceptance**: All Unit 3a tests PASS, ALL existing tests still pass
 
-### ⬜ Unit 3c: streamChatCompletion — Coverage
+### ✅ Unit 3c: streamChatCompletion — Coverage
 **What**: Verify 100% coverage on `streamChatCompletion`. This should largely be covered by existing runAgent tests + new direct tests. Add edge cases if gaps:
 - Empty stream (no deltas)
 - Delta with no content/tool_calls/reasoning_content (skip)
@@ -504,3 +504,4 @@ From `node_modules/openai/resources/responses/responses.d.ts`:
 - 2026-02-24 20:40 Unit 0 complete: Added mockResponsesCreate, updated MockOpenAI with responses.create, added makeResponsesStream helper. 208 tests pass.
 - 2026-02-24 20:42 Units 1a/1b/1c complete: toResponsesTools -- 4 tests, 100% coverage on new code. 212 tests pass.
 - 2026-02-24 20:44 Units 2a/2b/2c complete: toResponsesInput -- 11 tests, 100% coverage on new code. 223 tests pass.
+- 2026-02-24 20:46 Units 3a/3b/3c complete: TurnResult + streamChatCompletion -- extracted CC stream processor from runAgent, 10 direct tests + all 104 existing runAgent tests still pass. 233 tests total. 100% coverage.
