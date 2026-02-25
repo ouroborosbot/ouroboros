@@ -2,7 +2,7 @@ import OpenAI from "openai"
 import { App } from "@microsoft/teams.apps"
 import { DevtoolsPlugin } from "@microsoft/teams.dev"
 import { runAgent, buildSystem, ChannelCallbacks } from "./core"
-import { pickPhrase, THINKING_PHRASES, FOLLOWUP_PHRASES } from "./phrases"
+import { pickPhrase, THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "./phrases"
 import { sessionPath, getContextConfig, getTeamsConfig } from "./config"
 import { loadSession, saveSession, deleteSession, trimMessages, cachedBuildSystem } from "./context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "./commands"
@@ -32,7 +32,6 @@ export function createTeamsCallbacks(
   controller: AbortController,
 ): ChannelCallbacks {
   let stopped = false // set when stream signals cancellation (403)
-  let reasoningBuf = "" // accumulate reasoning so update() shows full text
   let hadToolRun = false
   let phraseTimer: NodeJS.Timeout | null = null
   let lastPhrase = ""
@@ -75,7 +74,6 @@ export function createTeamsCallbacks(
 
   return {
     onModelStart: () => {
-      reasoningBuf = ""
       const pool = hadToolRun ? FOLLOWUP_PHRASES : THINKING_PHRASES
       const first = pickPhrase(pool)
       lastPhrase = first
@@ -88,15 +86,10 @@ export function createTeamsCallbacks(
     onReasoningChunk: (text: string) => {
       if (stopped) return
       stopPhraseRotation()
-      reasoningBuf += text
-      safeUpdate(reasoningBuf)
+      safeUpdate(text)
     },
     onTextChunk: (text: string) => {
       if (stopped) return
-      if (reasoningBuf) {
-        safeEmit(`*${reasoningBuf}*\n\n`)
-        reasoningBuf = ""
-      }
       safeEmit(text)
     },
     onToolStart: (name: string, args: Record<string, string>) => {
