@@ -125,7 +125,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: 100% coverage report for context.ts
 **Acceptance**: 100% coverage on new code, tests still green
 
-### 🔄 Unit 3a: Session Persistence -- Tests
+### ✅ Unit 3a: Session Persistence -- Tests
 **Depends on**: Units 2a-2c (context.ts and context.test.ts must exist)
 **What**: Add tests to `src/__tests__/context.test.ts` for session persistence functions in `src/context.ts` (same module as token counting/trimming). Tests cover:
 - `saveSession(filePath, messages)`: writes JSON to disk as `{ version: 1, messages: [...] }` wrapper. Creates parent directories if needed (`mkdirSync` recursive).
@@ -134,7 +134,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: Failing tests for session persistence
 **Acceptance**: Tests exist and FAIL (red)
 
-### ⬜ Unit 3b: Session Persistence -- Implementation
+### 🔄 Unit 3b: Session Persistence -- Implementation
 **What**: Add session functions to `src/context.ts`:
 - `saveSession(filePath: string, messages: OpenAI.ChatCompletionMessageParam[]): void` -- `mkdirSync(dirname, { recursive: true })`, `writeFileSync(filePath, JSON.stringify({ version: 1, messages }, null, 2))`.
 - `loadSession(filePath: string): OpenAI.ChatCompletionMessageParam[] | null` -- try/catch around `readFileSync` + `JSON.parse`. Expects `{ version: 1, messages }` envelope. Return null on any error or unrecognized version.
