@@ -37,8 +37,7 @@ export class Spinner {
   }
 
   private rotatePhrase() {
-    if (!this.phrases) return
-    const next = pickPhrase(this.phrases, this.lastPhrase)
+    const next = pickPhrase(this.phrases!, this.lastPhrase)
     this.lastPhrase = next
     this.msg = next
   }
@@ -265,7 +264,7 @@ export async function main() {
       // Calculate terminal rows the echo occupied (prompt "> " + input, wrapped)
       const cols = process.stdout.columns || 80
       const echoLen = 2 + input.length // "> " prefix + input
-      const rows = Math.ceil(echoLen / cols) || 1
+      const rows = Math.ceil(echoLen / cols)
       process.stdout.write(`\x1b[${rows}A\x1b[K` + `\x1b[1m> ${input}\x1b[0m\n`)
 
       messages.push({ role: "user", content: input })
