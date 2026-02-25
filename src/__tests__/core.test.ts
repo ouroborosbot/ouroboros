@@ -490,6 +490,98 @@ process.env.MINIMAX_MODEL = "test-model"
   })
 })
 
+describe("toResponsesTools", () => {
+  let toResponsesTools: (ccTools: any[]) => any[]
+  let tools: any[]
+
+  beforeEach(async () => {
+    vi.resetModules()
+    process.env.MINIMAX_API_KEY = "test-key"
+    process.env.MINIMAX_MODEL = "test-model"
+    const core = await import("../core")
+    toResponsesTools = core.toResponsesTools
+    tools = core.tools
+  })
+
+  it("converts a single CC tool to Responses API FunctionTool format", () => {
+    const ccTools = [
+      {
+        type: "function",
+        function: {
+          name: "read_file",
+          description: "read file contents",
+          parameters: {
+            type: "object",
+            properties: { path: { type: "string" } },
+            required: ["path"],
+          },
+        },
+      },
+    ]
+
+    const result = toResponsesTools(ccTools)
+    expect(result).toEqual([
+      {
+        type: "function",
+        name: "read_file",
+        description: "read file contents",
+        parameters: {
+          type: "object",
+          properties: { path: { type: "string" } },
+          required: ["path"],
+        },
+        strict: false,
+      },
+    ])
+  })
+
+  it("converts all tools in the exported tools array", () => {
+    const result = toResponsesTools(tools)
+    expect(result).toHaveLength(tools.length)
+    // Spot-check a couple
+    const readFile = result.find((t: any) => t.name === "read_file")
+    expect(readFile).toBeDefined()
+    expect(readFile.type).toBe("function")
+    expect(readFile.strict).toBe(false)
+    expect(readFile.description).toBe("read file contents")
+
+    const shell = result.find((t: any) => t.name === "shell")
+    expect(shell).toBeDefined()
+    expect(shell.name).toBe("shell")
+    expect(shell.description).toBe("run shell command")
+  })
+
+  it("sets description to null when undefined", () => {
+    const ccTools = [
+      {
+        type: "function",
+        function: {
+          name: "no_desc",
+          parameters: { type: "object", properties: {} },
+        },
+      },
+    ]
+
+    const result = toResponsesTools(ccTools)
+    expect(result[0].description).toBeNull()
+  })
+
+  it("sets parameters to null when undefined", () => {
+    const ccTools = [
+      {
+        type: "function",
+        function: {
+          name: "no_params",
+          description: "a tool without params",
+        },
+      },
+    ]
+
+    const result = toResponsesTools(ccTools)
+    expect(result[0].parameters).toBeNull()
+  })
+})
+
 describe("ChannelCallbacks interface", () => {
   it("accepts an object with all required callback signatures", () => {
     const callbacks: ChannelCallbacks = {
