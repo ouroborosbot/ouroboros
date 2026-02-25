@@ -1,5 +1,7 @@
 import type OpenAI from "openai"
 import type { Channel } from "./core"
+import * as fs from "fs"
+import * as path from "path"
 
 export function estimateTokens(messages: OpenAI.ChatCompletionMessageParam[]): number {
   let totalChars = 0
@@ -60,4 +62,28 @@ export function trimMessages(
   }
 
   return [messages[0], ...messages.slice(cutIndex)]
+}
+
+export function saveSession(filePath: string, messages: OpenAI.ChatCompletionMessageParam[]): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true })
+  fs.writeFileSync(filePath, JSON.stringify({ version: 1, messages }, null, 2))
+}
+
+export function loadSession(filePath: string): OpenAI.ChatCompletionMessageParam[] | null {
+  try {
+    const raw = fs.readFileSync(filePath, "utf-8")
+    const data = JSON.parse(raw)
+    if (data.version !== 1) return null
+    return data.messages
+  } catch {
+    return null
+  }
+}
+
+export function deleteSession(filePath: string): void {
+  try {
+    fs.unlinkSync(filePath)
+  } catch (e: any) {
+    if (e.code !== "ENOENT") throw e
+  }
 }
