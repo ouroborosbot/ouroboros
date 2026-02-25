@@ -47,7 +47,7 @@ Normalize how reasoning/thinking tokens are handled at the model-calling level s
 ### Legend
 ⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
-### ⬜ Unit 1: Add onReasoningChunk to ChannelCallbacks interface
+### ✅ Unit 1: Add onReasoningChunk to ChannelCallbacks interface
 **What**: Add `onReasoningChunk(text: string): void` to the `ChannelCallbacks` interface in `src/core.ts`, and mechanically add `onReasoningChunk: () => {}` to all 27 existing `ChannelCallbacks` literal objects in test files so they continue to compile. Also add a no-op `onReasoningChunk` to both adapter implementations (`createCliCallbacks` in `agent.ts`, `createTeamsCallbacks` in `teams.ts`) so the return types satisfy the interface.
 
 This unit is a mechanical, non-behavioral change. No test behavior changes. No logic changes. Just the interface addition and making everything compile.
