@@ -120,12 +120,12 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: `src/context.ts` with token counting and trimming functions
 **Acceptance**: All Unit 2a tests PASS (green), no warnings
 
-### 🔄 Unit 2c: Token Counting & Sliding Window -- Coverage & Refactor
+### ✅ Unit 2c: Token Counting & Sliding Window -- Coverage & Refactor
 **What**: Verify 100% coverage on `src/context.ts`. Add any missing edge case tests. Refactor if needed.
 **Output**: 100% coverage report for context.ts
 **Acceptance**: 100% coverage on new code, tests still green
 
-### ⬜ Unit 3a: Session Persistence -- Tests
+### 🔄 Unit 3a: Session Persistence -- Tests
 **Depends on**: Units 2a-2c (context.ts and context.test.ts must exist)
 **What**: Add tests to `src/__tests__/context.test.ts` for session persistence functions in `src/context.ts` (same module as token counting/trimming). Tests cover:
 - `saveSession(filePath, messages)`: writes JSON to disk as `{ version: 1, messages: [...] }` wrapper. Creates parent directories if needed (`mkdirSync` recursive).
@@ -320,3 +320,6 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 - 2026-02-25 13:24 Unit 1a complete: 21 failing tests for config module (loadConfig, getAzureConfig, getMinimaxConfig, getTeamsConfig, getContextConfig, sessionPath)
 - 2026-02-25 13:25 Unit 1b complete: config.ts implemented, all 21 tests pass, 308 total tests pass
 - 2026-02-25 13:25 Unit 1c complete: 100% coverage on config.ts (stmts/branch/funcs/lines)
+- 2026-02-25 13:26 Unit 2a complete: 18 failing tests for estimateTokens, cachedBuildSystem, trimMessages
+- 2026-02-25 13:27 Unit 2b complete: context.ts implemented, all 18 tests pass, 326 total tests pass
+- 2026-02-25 13:27 Unit 2c complete: 100% coverage on context.ts after adding edge case tests
