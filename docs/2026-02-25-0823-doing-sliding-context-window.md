@@ -223,7 +223,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: Failing tests for CLI integration
 **Acceptance**: Tests exist and FAIL (red)
 
-### 🔄 Unit 6b: CLI Integration -- Implementation
+### ✅ Unit 6b: CLI Integration -- Implementation
 **What**: Modify `src/agent.ts` `main()`:
 - Import from `./config`: `getSessionDir`, `sessionPath`, `getContextConfig`.
 - Import from `./context`: `loadSession`, `saveSession`, `deleteSession`, `trimMessages`, `cachedBuildSystem`.
@@ -240,7 +240,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: Modified `src/agent.ts` with slash commands and session persistence
 **Acceptance**: All Unit 6a tests PASS (green), no warnings
 
-### ⬜ Unit 6c: CLI Integration -- Coverage & Refactor
+### 🔄 Unit 6c: CLI Integration -- Coverage & Refactor
 **What**: Verify 100% coverage on modified `src/agent.ts`. Ensure all existing agent tests still pass. Add any missing edge case tests.
 **Output**: 100% coverage, all tests green
 **Acceptance**: 100% coverage on new code, tests still green
