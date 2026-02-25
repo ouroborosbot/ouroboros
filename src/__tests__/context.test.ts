@@ -385,4 +385,14 @@ describe("deleteSession", () => {
     })
     expect(() => deleteSession("/tmp/missing.json")).not.toThrow()
   })
+
+  it("re-throws non-ENOENT errors", async () => {
+    const { deleteSession } = await import("../context")
+    vi.mocked(fs.unlinkSync).mockImplementation(() => {
+      const err: any = new Error("EPERM")
+      err.code = "EPERM"
+      throw err
+    })
+    expect(() => deleteSession("/tmp/noperm.json")).toThrow("EPERM")
+  })
 })
