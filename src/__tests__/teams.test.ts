@@ -3,6 +3,12 @@ import type { ChannelCallbacks } from "../core"
 
 // Tests for src/teams.ts Teams channel adapter.
 
+// AzureOpenAI requires endpoint env var when AZURE_OPENAI_API_KEY is set.
+// Ensure Azure path isn't triggered during tests that only need MiniMax.
+const _savedAzureKey = process.env.AZURE_OPENAI_API_KEY
+beforeEach(() => { delete process.env.AZURE_OPENAI_API_KEY })
+afterEach(() => { if (_savedAzureKey) process.env.AZURE_OPENAI_API_KEY = _savedAzureKey })
+
 describe("Teams adapter - exports", () => {
   it("exports createTeamsCallbacks", async () => {
     vi.resetModules()
@@ -670,6 +676,86 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     })).resolves.not.toThrow()
 
     expect(errorSpy).toHaveBeenCalled()
+
+    vi.restoreAllMocks()
+  })
+})
+
+describe("Teams adapter - unhandledRejection guard", () => {
+  afterEach(() => {
+    // Clean up any __ouroboros listeners we registered
+    const listeners = process.listeners("unhandledRejection")
+    for (const l of listeners) {
+      if ((l as any).__ouroboros) process.removeListener("unhandledRejection", l)
+    }
+  })
+
+  it("registers unhandledRejection handler with __ouroboros marker", async () => {
+    vi.resetModules()
+    delete process.env.CLIENT_ID
+
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../teams")
+    teams.startTeamsApp()
+
+    const listeners = process.listeners("unhandledRejection")
+    const ouroboros = listeners.find((l) => (l as any).__ouroboros)
+    expect(ouroboros).toBeDefined()
+
+    // Invoke the handler to cover the console.error line
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    ;(ouroboros as Function)(new Error("test rejection"))
+    expect(errorSpy).toHaveBeenCalledWith("Unhandled rejection (non-fatal):", expect.any(Error))
+
+    vi.restoreAllMocks()
+  })
+
+  it("does not register duplicate handler on second call", async () => {
+    vi.resetModules()
+    delete process.env.CLIENT_ID
+
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../teams")
+    teams.startTeamsApp()
+    teams.startTeamsApp()
+
+    const listeners = process.listeners("unhandledRejection")
+    const ouroborosCount = listeners.filter((l) => (l as any).__ouroboros).length
+    expect(ouroborosCount).toBe(1)
 
     vi.restoreAllMocks()
   })

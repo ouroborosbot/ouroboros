@@ -213,6 +213,95 @@ describe("agent.ts main()", () => {
     expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
   })
 
+  it("handles boot greeting rejection gracefully", async () => {
+    const { mockRl } = createMockRl(["exit"])
+
+    vi.doMock("readline", () => ({
+      createInterface: () => mockRl,
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn().mockRejectedValue(new Error("boot failed")),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+
+    const agent = await import("../agent")
+    await agent.main()
+
+    // Should still reach "bye" despite boot greeting failing
+    const flatLogs = logCalls.flat()
+    expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
+  })
+
+  it("abort callback fires during boot when Ctrl-C is pressed", async () => {
+    let bootSignal: AbortSignal | undefined
+
+    const mockRl: any = {
+      on: (event: string, handler: (...args: any[]) => void) => {
+        if (event === "close") mockRl._closeHandler = handler
+        return mockRl
+      },
+      close: () => { if (mockRl._closeHandler) mockRl._closeHandler() },
+      pause: () => {},
+      resume: () => {},
+      line: "",
+      [Symbol.asyncIterator]: () => ({
+        next: async (): Promise<IteratorResult<string>> => {
+          return { value: "exit", done: false }
+        },
+      }),
+    }
+
+    vi.doMock("readline", () => ({
+      createInterface: () => mockRl,
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn().mockImplementation(async (_msgs: any, _cb: any, signal?: AbortSignal) => {
+        bootSignal = signal
+        // Simulate Ctrl-C by writing 0x03 to the data handler on stdin
+        const listeners = process.stdin.listeners("data") as ((data: Buffer) => void)[]
+        if (listeners.length > 0) {
+          listeners[listeners.length - 1](Buffer.from([0x03]))
+        }
+      }),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+
+    const agent = await import("../agent")
+    await agent.main()
+
+    expect(bootSignal?.aborted).toBe(true)
+  })
+
+  it("abort callback fires during runAgent when Ctrl-C is pressed", async () => {
+    let agentSignal: AbortSignal | undefined
+    let callCount = 0
+
+    const { mockRl } = createMockRl(["hello", "exit"])
+
+    vi.doMock("readline", () => ({
+      createInterface: () => mockRl,
+    }))
+    vi.doMock("../core", () => ({
+      runAgent: vi.fn().mockImplementation(async (_msgs: any, _cb: any, signal?: AbortSignal) => {
+        callCount++
+        if (callCount === 2) {
+          // This is the "hello" input call, simulate Ctrl-C
+          agentSignal = signal
+          const listeners = process.stdin.listeners("data") as ((data: Buffer) => void)[]
+          if (listeners.length > 0) {
+            listeners[listeners.length - 1](Buffer.from([0x03]))
+          }
+        }
+      }),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+
+    const agent = await import("../agent")
+    await agent.main()
+
+    expect(agentSignal?.aborted).toBe(true)
+  })
+
   it("exits when input is 'exit' (case insensitive)", async () => {
     const { mockRl } = createMockRl(["EXIT"])
 
