@@ -409,7 +409,7 @@ export async function runAgent(
       const createParams: any = { messages, tools, stream: true };
       if (model) createParams.model = model;
       if (provider === "azure") {
-        createParams.reasoning = { effort: "medium", summary: "auto" };
+        createParams.reasoning_effort = "medium";
       }
       const response = (await getClient().chat.completions.create(
         createParams,

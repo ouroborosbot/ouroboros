@@ -1624,7 +1624,7 @@ process.env.MINIMAX_MODEL = "test-model"
 
     await core.runAgent([{ role: "system", content: "test" }], callbacks)
     const params = mockCreate.mock.calls[0][0]
-    expect(params.reasoning).toEqual({ effort: "medium", summary: "auto" })
+    expect(params.reasoning_effort).toBe("medium")
 
     delete process.env.AZURE_OPENAI_API_KEY
     delete process.env.AZURE_OPENAI_ENDPOINT
@@ -1649,7 +1649,7 @@ process.env.MINIMAX_MODEL = "test-model"
 
     await runAgent([{ role: "system", content: "test" }], callbacks)
     const params = mockCreate.mock.calls[0][0]
-    expect(params.reasoning).toBeUndefined()
+    expect(params.reasoning_effort).toBeUndefined()
   })
 })
 
