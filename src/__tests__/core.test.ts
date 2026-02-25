@@ -586,29 +586,170 @@ process.env.MINIMAX_MODEL = "test-model"
     expect(calls).toEqual(["streamStart"])
   })
 
-  it("fires onTextChunk for each text delta with raw think tags", async () => {
+  it("routes inline think tags to onReasoningChunk and answer to onTextChunk (single chunk)", async () => {
     mockCreate.mockReturnValue(
-      makeStream([
-        makeChunk("<think>"),
-        makeChunk("reasoning"),
-        makeChunk("</think>"),
-        makeChunk("visible text"),
-      ])
+      makeStream([makeChunk("<think>reasoning</think>answer")])
     )
 
-    const chunks: string[] = []
+    const reasoningChunks: string[] = []
+    const textChunks: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
-      onTextChunk: (text) => chunks.push(text),
-      onReasoningChunk: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: (text) => reasoningChunks.push(text),
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: () => {},
     }
 
     await runAgent([{ role: "system", content: "test" }], callbacks)
-    expect(chunks).toEqual(["<think>", "reasoning", "</think>", "visible text"])
+    expect(reasoningChunks.join("")).toBe("reasoning")
+    expect(textChunks.join("")).toBe("answer")
+  })
+
+  it("routes inline think tags split across chunks", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk("<think>"),
+        makeChunk("reasoning"),
+        makeChunk("</think>"),
+        makeChunk("answer"),
+      ])
+    )
+
+    const reasoningChunks: string[] = []
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: (text) => reasoningChunks.push(text),
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(reasoningChunks.join("")).toBe("reasoning")
+    expect(textChunks.join("")).toBe("answer")
+  })
+
+  it("content-only (no think tags) goes only to onTextChunk", async () => {
+    mockCreate.mockReturnValue(makeStream([makeChunk("just text")]))
+
+    const reasoningChunks: string[] = []
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: (text) => reasoningChunks.push(text),
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(textChunks).toEqual(["just text"])
+    expect(reasoningChunks).toEqual([])
+  })
+
+  it("think-only content goes only to onReasoningChunk", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([makeChunk("<think>only thinking</think>")])
+    )
+
+    const reasoningChunks: string[] = []
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: (text) => reasoningChunks.push(text),
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(reasoningChunks.join("")).toBe("only thinking")
+    expect(textChunks).toEqual([])
+  })
+
+  it("handles multiple think blocks in content", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([makeChunk("<think>a</think>mid<think>b</think>end")])
+    )
+
+    const reasoningChunks: string[] = []
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: (text) => reasoningChunks.push(text),
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(reasoningChunks.join("")).toBe("ab")
+    expect(textChunks.join("")).toBe("midend")
+  })
+
+  it("handles partial think tag at chunk boundary", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk("some text<thi"),
+        makeChunk("nk>reasoning</think>answer"),
+      ])
+    )
+
+    const reasoningChunks: string[] = []
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: (text) => reasoningChunks.push(text),
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(reasoningChunks.join("")).toBe("reasoning")
+    expect(textChunks.join("")).toBe("some textanswer")
+  })
+
+  it("handles think tags split across many chunks", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk("<th"),
+        makeChunk("ink>"),
+        makeChunk("reas"),
+        makeChunk("oning</thi"),
+        makeChunk("nk>answer"),
+      ])
+    )
+
+    const reasoningChunks: string[] = []
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: (text) => reasoningChunks.push(text),
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(reasoningChunks.join("")).toBe("reasoning")
+    expect(textChunks.join("")).toBe("answer")
   })
 
   it("ends loop when response has no tool calls", async () => {
