@@ -271,3 +271,4 @@ Remove the old partial-tag-split tests (lines 103-121) -- they tested adapter-le
 ## Progress Log
 - 2026-02-24 18:40 Created from planning doc
 - 2026-02-24 18:42 Completed all 4 passes (first draft, granularity, validation, quality)
+- 2026-02-24 18:52 Unit 1 complete: added onReasoningChunk to ChannelCallbacks, no-op in both adapters, all 30 callback literals in core.test.ts updated, 202 tests pass
