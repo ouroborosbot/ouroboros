@@ -5,21 +5,38 @@ import { execSync, spawnSync } from "child_process"
 import { listSkills, loadSkill } from "./skills"
 
 let _client: OpenAI | null = null
+let _model: string | null = null
 
 function getClient(): OpenAI {
   if (!_client) {
-    if (!process.env.MINIMAX_API_KEY) {
-      console.error("missing MINIMAX_API_KEY")
+    if (process.env.AZURE_OPENAI_API_KEY) {
+      _client = new OpenAI({
+        apiKey: process.env.AZURE_OPENAI_API_KEY,
+        baseURL: `https://${process.env.AZURE_OPENAI_ENDPOINT || "model-access-fhl.openai.azure.com"}/openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o"}`,
+        defaultQuery: { "api-version": process.env.AZURE_OPENAI_API_VERSION || "2025-01-01-preview" },
+        timeout: 30000,
+        maxRetries: 0,
+      })
+      _model = ""  // Azure deployments don't need a model param
+    } else if (process.env.MINIMAX_API_KEY) {
+      _client = new OpenAI({
+        apiKey: process.env.MINIMAX_API_KEY,
+        baseURL: "https://api.minimaxi.chat/v1",
+        timeout: 30000,
+        maxRetries: 0,
+      })
+      _model = process.env.MINIMAX_MODEL || "MiniMax-M2.5"
+    } else {
+      console.error("missing AZURE_OPENAI_API_KEY or MINIMAX_API_KEY")
       process.exit(1)
     }
-    _client = new OpenAI({
-      apiKey: process.env.MINIMAX_API_KEY,
-      baseURL: "https://api.minimaxi.chat/v1",
-      timeout: 30000,
-      maxRetries: 0,
-    })
   }
   return _client
+}
+
+export function getModel(): string {
+  if (_model === null) getClient()  // ensure initialized
+  return _model!
 }
 
 export const tools: OpenAI.ChatCompletionTool[] = [
@@ -155,26 +172,38 @@ export async function runAgent(messages: OpenAI.ChatCompletionMessageParam[], ca
     try {
       callbacks.onModelStart()
 
-      const response = await getClient().chat.completions.create({
-        model: process.env.MINIMAX_MODEL || "MiniMax-M2.5",
-        messages,
-        tools,
-        stream: true,
-      }, signal ? { signal } : {})
+      const model = getModel()
+      const createParams: any = { messages, tools, stream: true }
+      if (model) createParams.model = model
+      const response = await getClient().chat.completions.create(createParams, signal ? { signal } : {}) as any
 
       let content = ""
       let toolCalls: Record<number, { id: string; name: string; arguments: string }> = {}
       let streamStarted = false
+      let inReasoning = false
 
       for await (const chunk of response) {
         if (signal?.aborted) break
-        const d = chunk.choices[0]?.delta
+        const d = chunk.choices[0]?.delta as any
         if (!d) continue
+
+        // Handle reasoning_content (Azure AI models like DeepSeek-R1)
+        // Wrap in <think> tags so downstream adapters handle it uniformly
+        if (d.reasoning_content) {
+          if (!streamStarted) {
+            callbacks.onModelStreamStart()
+            streamStarted = true
+          }
+          if (!inReasoning) { callbacks.onTextChunk("<think>"); inReasoning = true }
+          callbacks.onTextChunk(d.reasoning_content)
+        }
+
         if (d.content) {
           if (!streamStarted) {
             callbacks.onModelStreamStart()
             streamStarted = true
           }
+          if (inReasoning) { callbacks.onTextChunk("</think>"); inReasoning = false }
           content += d.content
           callbacks.onTextChunk(d.content)
         }
@@ -187,6 +216,7 @@ export async function runAgent(messages: OpenAI.ChatCompletionMessageParam[], ca
           }
         }
       }
+      if (inReasoning) { callbacks.onTextChunk("</think>"); inReasoning = false }
 
       const toolCallList = Object.values(toolCalls)
 

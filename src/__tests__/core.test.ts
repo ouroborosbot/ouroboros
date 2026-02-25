@@ -93,7 +93,7 @@ describe("buildSystem", () => {
     const { buildSystem } = await import("../core")
     const result = buildSystem()
     expect(result).toContain("you are Ouroboros")
-    expect(result).toContain("running in your own codebase")
+    expect(result).toContain("you are in your own codebase")
   })
 
   it("omits self-aware suffix when isOwnCodebase returns false", async () => {
@@ -441,6 +441,7 @@ describe("runAgent", () => {
 
   beforeEach(async () => {
     vi.resetModules()
+    delete process.env.AZURE_OPENAI_API_KEY
     process.env.MINIMAX_API_KEY = "test-key"
     mockCreate.mockReset()
 
@@ -991,19 +992,85 @@ describe("runAgent", () => {
     }
 
     await runAgent([{ role: "system", content: "test" }], callbacks)
-    expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "custom-model" }),
-      expect.any(Object)
-    )
+    const callArgs = mockCreate.mock.calls[0][0]
+    expect(callArgs.model).toBe("custom-model")
     delete process.env.MINIMAX_MODEL
+  })
+
+  it("wraps reasoning_content in think tags", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        { choices: [{ delta: { reasoning_content: "thinking hard" } }] },
+        { choices: [{ delta: { content: "answer" } }] },
+      ])
+    )
+
+    const chunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => chunks.push(text),
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(chunks).toEqual(["<think>", "thinking hard", "</think>", "answer"])
+  })
+
+  it("closes reasoning tag at end of stream if still open", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        { choices: [{ delta: { reasoning_content: "still thinking" } }] },
+      ])
+    )
+
+    const chunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => chunks.push(text),
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(chunks).toEqual(["<think>", "still thinking", "</think>"])
+  })
+
+  it("handles multiple reasoning_content chunks before content", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        { choices: [{ delta: { reasoning_content: "step 1 " } }] },
+        { choices: [{ delta: { reasoning_content: "step 2" } }] },
+        { choices: [{ delta: { content: "result" } }] },
+      ])
+    )
+
+    const chunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => chunks.push(text),
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(chunks).toEqual(["<think>", "step 1 ", "step 2", "</think>", "result"])
   })
 })
 
 describe("getClient", () => {
-  it("exits when MINIMAX_API_KEY is not set", async () => {
+  it("exits when no API keys are set", async () => {
     vi.resetModules()
-    const savedKey = process.env.MINIMAX_API_KEY
+    const savedMinimax = process.env.MINIMAX_API_KEY
+    const savedAzure = process.env.AZURE_OPENAI_API_KEY
     delete process.env.MINIMAX_API_KEY
+    delete process.env.AZURE_OPENAI_API_KEY
 
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
@@ -1027,10 +1094,26 @@ describe("getClient", () => {
     }
 
     expect(mockExit).toHaveBeenCalledWith(1)
-    expect(mockError).toHaveBeenCalledWith("missing MINIMAX_API_KEY")
+    expect(mockError).toHaveBeenCalledWith("missing AZURE_OPENAI_API_KEY or MINIMAX_API_KEY")
 
     mockExit.mockRestore()
     mockError.mockRestore()
-    process.env.MINIMAX_API_KEY = savedKey
+    process.env.MINIMAX_API_KEY = savedMinimax
+    if (savedAzure) process.env.AZURE_OPENAI_API_KEY = savedAzure
+  })
+
+  it("prefers Azure when AZURE_OPENAI_API_KEY is set", async () => {
+    vi.resetModules()
+    const savedMinimax = process.env.MINIMAX_API_KEY
+    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
+    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
+
+    const core = await import("../core")
+    // getModel returns empty string for Azure (deployment is in the URL)
+    expect(core.getModel()).toBe("")
+
+    delete process.env.AZURE_OPENAI_API_KEY
+    delete process.env.AZURE_OPENAI_DEPLOYMENT
+    process.env.MINIMAX_API_KEY = savedMinimax
   })
 })
