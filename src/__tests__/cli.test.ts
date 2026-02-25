@@ -46,7 +46,7 @@ describe("CLI adapter - createCliCallbacks", () => {
   })
 })
 
-describe("CLI adapter - onTextChunk think-tag dimming", () => {
+describe("CLI adapter - onReasoningChunk and onTextChunk rendering", () => {
   let stdoutChunks: string[]
   let stdoutSpy: ReturnType<typeof vi.spyOn>
   let stderrSpy: ReturnType<typeof vi.spyOn>
@@ -71,52 +71,51 @@ describe("CLI adapter - onTextChunk think-tag dimming", () => {
     vi.restoreAllMocks()
   })
 
-  it("outputs plain text without think tags unchanged", () => {
+  it("onTextChunk outputs plain text unchanged (no dim, no tag parsing)", () => {
     callbacks.onTextChunk("hello world")
     const output = stdoutChunks.join("")
     expect(output).toContain("hello world")
     expect(output).not.toContain("\x1b[2m")
   })
 
-  it("dims think tags at the start of content", () => {
-    callbacks.onTextChunk("<think>reasoning</think>visible")
+  it("onReasoningChunk outputs dim text", () => {
+    callbacks.onReasoningChunk("reasoning")
     const output = stdoutChunks.join("")
     expect(output).toContain("\x1b[2m")
-    expect(output).toContain("visible")
+    expect(output).toContain("reasoning")
+    expect(output).toContain("\x1b[0m")
   })
 
-  it("dims think tags in the middle of content", () => {
-    callbacks.onTextChunk("before<think>inner</think>after")
+  it("reasoning then content: dim followed by normal", () => {
+    callbacks.onReasoningChunk("thinking")
+    callbacks.onTextChunk("answer")
     const output = stdoutChunks.join("")
-    expect(output).toContain("before")
     expect(output).toContain("\x1b[2m")
-    expect(output).toContain("after")
+    expect(output).toContain("thinking")
+    expect(output).toContain("answer")
+    // The answer part should not be dim
+    const answerIdx = output.lastIndexOf("answer")
+    const lastDimIdx = output.lastIndexOf("\x1b[2m")
+    const lastResetIdx = output.lastIndexOf("\x1b[0m")
+    // Reset should come after dim and before answer
+    expect(lastResetIdx).toBeGreaterThan(lastDimIdx)
+    expect(answerIdx).toBeGreaterThan(lastResetIdx)
   })
 
-  it("handles multiple think blocks", () => {
-    callbacks.onTextChunk("<think>a</think>mid<think>b</think>end")
+  it("multiple reasoning chunks are all dim", () => {
+    callbacks.onReasoningChunk("chunk1")
+    callbacks.onReasoningChunk("chunk2")
     const output = stdoutChunks.join("")
-    expect(output).toContain("mid")
-    expect(output).toContain("end")
+    // Both chunks should have dim codes
+    expect(output).toContain("\x1b[2mchunk1\x1b[0m")
+    expect(output).toContain("\x1b[2mchunk2\x1b[0m")
   })
 
-  it("handles partial think opening tag split across chunks", () => {
-    // When <think> is split across chunks, the first partial is output as plain text
-    // because the buffer cannot predict the future. The second chunk processes
-    // whatever think tags it can find within its own buffer.
-    callbacks.onTextChunk("<thi")
-    callbacks.onTextChunk("nk>inside</think>after")
+  it("content-only: no dim codes in output", () => {
+    callbacks.onTextChunk("just text")
     const output = stdoutChunks.join("")
-    // The split means <thi is written as plain text, then nk>inside</think>after
-    // is also written as plain text (no complete <think> in second chunk alone)
-    expect(output).toContain("after")
-  })
-
-  it("handles partial think closing tag split across chunks", () => {
-    callbacks.onTextChunk("<think>start</th")
-    callbacks.onTextChunk("ink>visible")
-    const output = stdoutChunks.join("")
-    expect(output).toContain("visible")
+    expect(output).toBe("just text")
+    expect(output).not.toContain("\x1b[2m")
   })
 })
 
