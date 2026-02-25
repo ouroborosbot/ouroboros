@@ -1,6 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import type OpenAI from "openai"
 
+// Mock fs for session persistence tests
+vi.mock("fs", () => ({
+  readFileSync: vi.fn(),
+  writeFileSync: vi.fn(),
+  mkdirSync: vi.fn(),
+  unlinkSync: vi.fn(),
+}))
+
+import * as fs from "fs"
+
 describe("estimateTokens", () => {
   beforeEach(() => { vi.resetModules() })
 
@@ -272,5 +282,107 @@ describe("trimMessages", () => {
     const result = trimMessages(msgs, 80000, 20)
     expect(result.length).toBe(1)
     expect(result[0].role).toBe("system")
+  })
+})
+
+describe("saveSession", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.mocked(fs.writeFileSync).mockReset()
+    vi.mocked(fs.mkdirSync).mockReset()
+  })
+
+  it("writes messages wrapped in versioned envelope", async () => {
+    const { saveSession } = await import("../context")
+    const msgs: OpenAI.ChatCompletionMessageParam[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "hi" },
+    ]
+    saveSession("/tmp/test-session.json", msgs)
+
+    expect(fs.mkdirSync).toHaveBeenCalledWith("/tmp", { recursive: true })
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      "/tmp/test-session.json",
+      JSON.stringify({ version: 1, messages: msgs }, null, 2),
+    )
+  })
+
+  it("creates parent directories recursively", async () => {
+    const { saveSession } = await import("../context")
+    saveSession("/a/b/c/session.json", [])
+
+    expect(fs.mkdirSync).toHaveBeenCalledWith("/a/b/c", { recursive: true })
+  })
+})
+
+describe("loadSession", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockReset()
+  })
+
+  it("returns messages array from valid session file", async () => {
+    const { loadSession } = await import("../context")
+    const msgs = [{ role: "system", content: "sys" }, { role: "user", content: "hi" }]
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({ version: 1, messages: msgs }),
+    )
+    const result = loadSession("/tmp/session.json")
+    expect(result).toEqual(msgs)
+  })
+
+  it("returns null when file is missing (ENOENT)", async () => {
+    const { loadSession } = await import("../context")
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      const err: any = new Error("ENOENT")
+      err.code = "ENOENT"
+      throw err
+    })
+    expect(loadSession("/tmp/missing.json")).toBeNull()
+  })
+
+  it("returns null when file contains invalid JSON", async () => {
+    const { loadSession } = await import("../context")
+    vi.mocked(fs.readFileSync).mockReturnValue("not valid json{{{")
+    expect(loadSession("/tmp/corrupt.json")).toBeNull()
+  })
+
+  it("returns null when version is unrecognized", async () => {
+    const { loadSession } = await import("../context")
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({ version: 99, messages: [] }),
+    )
+    expect(loadSession("/tmp/future.json")).toBeNull()
+  })
+
+  it("returns null on other read errors", async () => {
+    const { loadSession } = await import("../context")
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw new Error("EPERM")
+    })
+    expect(loadSession("/tmp/noperm.json")).toBeNull()
+  })
+})
+
+describe("deleteSession", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.mocked(fs.unlinkSync).mockReset()
+  })
+
+  it("removes the session file", async () => {
+    const { deleteSession } = await import("../context")
+    deleteSession("/tmp/session.json")
+    expect(fs.unlinkSync).toHaveBeenCalledWith("/tmp/session.json")
+  })
+
+  it("is a no-op when file is missing (ENOENT)", async () => {
+    const { deleteSession } = await import("../context")
+    vi.mocked(fs.unlinkSync).mockImplementation(() => {
+      const err: any = new Error("ENOENT")
+      err.code = "ENOENT"
+      throw err
+    })
+    expect(() => deleteSession("/tmp/missing.json")).not.toThrow()
   })
 })
