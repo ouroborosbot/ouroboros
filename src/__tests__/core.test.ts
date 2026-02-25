@@ -1101,7 +1101,7 @@ process.env.MINIMAX_MODEL = "test-model"
     delete process.env.MINIMAX_MODEL
   })
 
-  it("wraps reasoning_content in think tags", async () => {
+  it("calls onReasoningChunk for reasoning_content", async () => {
     mockCreate.mockReturnValue(
       makeStream([
         { choices: [{ delta: { reasoning_content: "thinking hard" } }] },
@@ -1109,41 +1109,45 @@ process.env.MINIMAX_MODEL = "test-model"
       ])
     )
 
-    const chunks: string[] = []
+    const reasoningChunks: string[] = []
+    const textChunks: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
-      onTextChunk: (text) => chunks.push(text),
-      onReasoningChunk: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: (text) => reasoningChunks.push(text),
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: () => {},
     }
 
     await runAgent([{ role: "system", content: "test" }], callbacks)
-    expect(chunks).toEqual(["<think>", "thinking hard", "</think>", "answer"])
+    expect(reasoningChunks).toEqual(["thinking hard"])
+    expect(textChunks).toEqual(["answer"])
   })
 
-  it("closes reasoning tag at end of stream if still open", async () => {
+  it("calls onReasoningChunk for reasoning-only stream", async () => {
     mockCreate.mockReturnValue(
       makeStream([
         { choices: [{ delta: { reasoning_content: "still thinking" } }] },
       ])
     )
 
-    const chunks: string[] = []
+    const reasoningChunks: string[] = []
+    const textChunks: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
-      onTextChunk: (text) => chunks.push(text),
-      onReasoningChunk: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: (text) => reasoningChunks.push(text),
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: () => {},
     }
 
     await runAgent([{ role: "system", content: "test" }], callbacks)
-    expect(chunks).toEqual(["<think>", "still thinking", "</think>"])
+    expect(reasoningChunks).toEqual(["still thinking"])
+    expect(textChunks).toEqual([])
   })
 
   it("stops immediately when signal is pre-aborted", async () => {
@@ -1201,6 +1205,7 @@ process.env.MINIMAX_MODEL = "test-model"
       onModelStart: () => {},
       onModelStreamStart: () => {},
       onTextChunk: () => {},
+      onReasoningChunk: () => {},
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: (err) => errors.push(err),
@@ -1233,7 +1238,7 @@ process.env.MINIMAX_MODEL = "test-model"
     expect(calls).toEqual(["streamStart"])
   })
 
-  it("does not re-open think tag for subsequent reasoning chunks", async () => {
+  it("calls onReasoningChunk for each reasoning chunk", async () => {
     mockCreate.mockReturnValue(
       makeStream([
         { choices: [{ delta: { reasoning_content: "step 1" } }] },
@@ -1241,20 +1246,19 @@ process.env.MINIMAX_MODEL = "test-model"
       ])
     )
 
-    const chunks: string[] = []
+    const reasoningChunks: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
-      onTextChunk: (text) => chunks.push(text),
-      onReasoningChunk: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: (text) => reasoningChunks.push(text),
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: () => {},
     }
 
     await runAgent([{ role: "system", content: "test" }], callbacks)
-    // Should open think once, emit both, close at end
-    expect(chunks).toEqual(["<think>", "step 1", "step 2", "</think>"])
+    expect(reasoningChunks).toEqual(["step 1", "step 2"])
   })
 
   it("handles multiple reasoning_content chunks before content", async () => {
@@ -1266,19 +1270,21 @@ process.env.MINIMAX_MODEL = "test-model"
       ])
     )
 
-    const chunks: string[] = []
+    const reasoningChunks: string[] = []
+    const textChunks: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
-      onTextChunk: (text) => chunks.push(text),
-      onReasoningChunk: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: (text) => reasoningChunks.push(text),
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: () => {},
     }
 
     await runAgent([{ role: "system", content: "test" }], callbacks)
-    expect(chunks).toEqual(["<think>", "step 1 ", "step 2", "</think>", "result"])
+    expect(reasoningChunks).toEqual(["step 1 ", "step 2"])
+    expect(textChunks).toEqual(["result"])
   })
 })
 
