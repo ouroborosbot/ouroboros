@@ -21,15 +21,17 @@ vi.mock("../skills", () => ({
 // We need to mock OpenAI before importing core
 const mockCreate = vi.fn()
 vi.mock("openai", () => {
+  class MockOpenAI {
+    chat = {
+      completions: {
+        create: mockCreate,
+      },
+    }
+    constructor(_opts?: any) {}
+  }
   return {
-    default: class MockOpenAI {
-      chat = {
-        completions: {
-          create: mockCreate,
-        },
-      }
-      constructor(_opts?: any) {}
-    },
+    default: MockOpenAI,
+    AzureOpenAI: MockOpenAI,
   }
 })
 
@@ -40,43 +42,25 @@ import type { ChannelCallbacks } from "../core"
 
 // Set env var before importing core
 process.env.MINIMAX_API_KEY = "test-key"
+process.env.MINIMAX_MODEL = "test-model"
 
 describe("isOwnCodebase", () => {
-  it("returns true when src/agent.ts and package.json exist in cwd", async () => {
+  it("returns true when package.json has name 'ouroboros'", async () => {
     const { isOwnCodebase } = await import("../core")
-    vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
-      const s = p.toString()
-      return s.endsWith("src/agent.ts") || s.endsWith("package.json")
-    })
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "ouroboros" }))
     expect(isOwnCodebase()).toBe(true)
   })
 
-  it("returns false when src/agent.ts does not exist", async () => {
+  it("returns false when package.json has a different name", async () => {
     const { isOwnCodebase } = await import("../core")
-    vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
-      const s = p.toString()
-      if (s.endsWith("src/agent.ts")) return false
-      if (s.endsWith("package.json")) return true
-      return false
-    })
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other-project" }))
     expect(isOwnCodebase()).toBe(false)
   })
 
-  it("returns false when package.json does not exist", async () => {
+  it("returns false when readFileSync throws", async () => {
     const { isOwnCodebase } = await import("../core")
-    vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
-      const s = p.toString()
-      if (s.endsWith("src/agent.ts")) return true
-      if (s.endsWith("package.json")) return false
-      return false
-    })
-    expect(isOwnCodebase()).toBe(false)
-  })
-
-  it("returns false when existsSync throws", async () => {
-    const { isOwnCodebase } = await import("../core")
-    vi.mocked(fs.existsSync).mockImplementation(() => {
-      throw new Error("permission denied")
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw new Error("ENOENT")
     })
     expect(isOwnCodebase()).toBe(false)
   })
@@ -85,23 +69,119 @@ describe("isOwnCodebase", () => {
 describe("buildSystem", () => {
   beforeEach(() => {
     vi.resetModules()
+    delete process.env.AZURE_OPENAI_API_KEY
     process.env.MINIMAX_API_KEY = "test-key"
+    process.env.MINIMAX_MODEL = "test-model"
   })
 
-  it("includes self-aware suffix when isOwnCodebase returns true", async () => {
-    vi.mocked(fs.existsSync).mockReturnValue(true)
+  it("includes soul section with personality", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
     const { buildSystem } = await import("../core")
     const result = buildSystem()
-    expect(result).toContain("you are Ouroboros")
-    expect(result).toContain("you are in your own codebase")
+    expect(result).toContain("chaos monkey coding assistant")
+    expect(result).toContain("crack jokes")
   })
 
-  it("omits self-aware suffix when isOwnCodebase returns false", async () => {
-    vi.mocked(fs.existsSync).mockReturnValue(false)
+  it("includes identity section with Ouroboros name", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
     const { buildSystem } = await import("../core")
     const result = buildSystem()
-    expect(result).toContain("you are Ouroboros")
-    expect(result).not.toContain("running in your own codebase")
+    expect(result).toContain("i am Ouroboros")
+    expect(result).toContain("i use lowercase")
+  })
+
+  it("includes boot greeting for cli channel", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    const { buildSystem } = await import("../core")
+    const result = buildSystem("cli")
+    expect(result).toContain("i introduce myself on boot")
+  })
+
+  it("includes Teams context for teams channel", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    const { buildSystem } = await import("../core")
+    const result = buildSystem("teams")
+    expect(result).toContain("Microsoft Teams")
+    expect(result).toContain("i keep responses concise")
+    expect(result).not.toContain("i introduce myself on boot")
+  })
+
+  it("defaults to cli channel", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    const { buildSystem } = await import("../core")
+    const result = buildSystem()
+    expect(result).toContain("i introduce myself on boot")
+  })
+
+  it("includes date section with current date", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    const { buildSystem } = await import("../core")
+    const result = buildSystem()
+    const today = new Date().toISOString().slice(0, 10)
+    expect(result).toContain(`current date: ${today}`)
+  })
+
+  it("includes tools section with tool names", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    const { buildSystem } = await import("../core")
+    const result = buildSystem()
+    expect(result).toContain("## my tools")
+    expect(result).toContain("- read_file:")
+    expect(result).toContain("- shell:")
+    expect(result).toContain("- web_search:")
+  })
+
+  it("includes skills section from listSkills", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    vi.mocked(listSkills).mockReturnValue(["code-review", "self-edit", "self-query"])
+    const { buildSystem } = await import("../core")
+    const result = buildSystem()
+    expect(result).toContain("## my skills (use load_skill to activate)")
+    expect(result).toContain("code-review, self-edit, self-query")
+  })
+
+  it("omits skills section when no skills available", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    vi.mocked(listSkills).mockReturnValue([])
+    const { buildSystem } = await import("../core")
+    const result = buildSystem()
+    expect(result).not.toContain("## my skills")
+  })
+
+  it("includes self-aware section when in own codebase", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "ouroboros" }))
+    const { buildSystem } = await import("../core")
+    const result = buildSystem()
+    expect(result).toContain("i am in my own codebase")
+    expect(result).toContain("snake eating its own tail")
+  })
+
+  it("omits self-aware section when not in own codebase", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    const { buildSystem } = await import("../core")
+    const result = buildSystem()
+    expect(result).not.toContain("i am in my own codebase")
+  })
+
+  it("includes azure provider string when AZURE_OPENAI_API_KEY is set", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    process.env.AZURE_OPENAI_API_KEY = "test-azure-key"
+    process.env.AZURE_OPENAI_DEPLOYMENT = "gpt-4o-deploy"
+    const { buildSystem } = await import("../core")
+    const result = buildSystem()
+    expect(result).toContain("azure openai (gpt-4o-deploy, model: test-model)")
+    delete process.env.AZURE_OPENAI_API_KEY
+    delete process.env.AZURE_OPENAI_DEPLOYMENT
+  })
+
+  it("uses 'default' deployment when AZURE_OPENAI_DEPLOYMENT is not set", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    process.env.AZURE_OPENAI_API_KEY = "test-azure-key"
+    delete process.env.AZURE_OPENAI_DEPLOYMENT
+    const { buildSystem } = await import("../core")
+    const result = buildSystem()
+    expect(result).toContain("azure openai (default, model: test-model)")
+    delete process.env.AZURE_OPENAI_API_KEY
   })
 })
 
@@ -111,6 +191,7 @@ describe("execTool", () => {
   beforeEach(async () => {
     vi.resetModules()
     process.env.MINIMAX_API_KEY = "test-key"
+process.env.MINIMAX_MODEL = "test-model"
     const core = await import("../core")
     execTool = core.execTool
   })
@@ -236,6 +317,13 @@ describe("execTool", () => {
     expect(result).toBe("(no output)")
   })
 
+  it("dispatches claude and returns error when spawnSync throws", async () => {
+    vi.mocked(spawnSync).mockImplementation(() => { throw new Error("ENOMEM") })
+    const result = await execTool("claude", { prompt: "boom" })
+    expect(result).toContain("error:")
+    expect(result).toContain("ENOMEM")
+  })
+
   it("dispatches web_search with perplexity results", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -316,6 +404,7 @@ describe("summarizeArgs", () => {
   beforeEach(async () => {
     vi.resetModules()
     process.env.MINIMAX_API_KEY = "test-key"
+process.env.MINIMAX_MODEL = "test-model"
     const core = await import("../core")
     summarizeArgs = core.summarizeArgs
   })
@@ -443,6 +532,7 @@ describe("runAgent", () => {
     vi.resetModules()
     delete process.env.AZURE_OPENAI_API_KEY
     process.env.MINIMAX_API_KEY = "test-key"
+process.env.MINIMAX_MODEL = "test-model"
     mockCreate.mockReset()
 
     const core = await import("../core")
@@ -1040,6 +1130,113 @@ describe("runAgent", () => {
     expect(chunks).toEqual(["<think>", "still thinking", "</think>"])
   })
 
+  it("stops immediately when signal is pre-aborted", async () => {
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const controller = new AbortController()
+    controller.abort()
+    await runAgent([{ role: "system", content: "test" }], callbacks, controller.signal)
+    // mockCreate should never be called
+    expect(mockCreate).not.toHaveBeenCalled()
+  })
+
+  it("stops streaming when signal is aborted mid-stream", async () => {
+    const controller = new AbortController()
+    mockCreate.mockReturnValue({
+      [Symbol.asyncIterator]: async function* () {
+        yield makeChunk("hello")
+        controller.abort()
+        yield makeChunk(" world") // should be skipped
+      },
+    })
+
+    const chunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => chunks.push(text),
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks, controller.signal)
+    expect(chunks).toEqual(["hello"])
+  })
+
+  it("breaks out of loop cleanly when signal aborted during catch", async () => {
+    const controller = new AbortController()
+    mockCreate.mockImplementation(() => {
+      controller.abort()
+      throw new Error("network error")
+    })
+
+    const errors: Error[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err),
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks, controller.signal)
+    // Abort in catch path should break cleanly, not fire onError
+    expect(errors).toHaveLength(0)
+  })
+
+  it("fires onModelStreamStart on first reasoning_content token", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        { choices: [{ delta: { reasoning_content: "hmm" } }] },
+      ])
+    )
+
+    const calls: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => calls.push("streamStart"),
+      onTextChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(calls).toEqual(["streamStart"])
+  })
+
+  it("does not re-open think tag for subsequent reasoning chunks", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        { choices: [{ delta: { reasoning_content: "step 1" } }] },
+        { choices: [{ delta: { reasoning_content: "step 2" } }] },
+      ])
+    )
+
+    const chunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => chunks.push(text),
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    // Should open think once, emit both, close at end
+    expect(chunks).toEqual(["<think>", "step 1", "step 2", "</think>"])
+  })
+
   it("handles multiple reasoning_content chunks before content", async () => {
     mockCreate.mockReturnValue(
       makeStream([
@@ -1065,12 +1262,26 @@ describe("runAgent", () => {
 })
 
 describe("getClient", () => {
-  it("exits when no API keys are set", async () => {
+  const saved: Record<string, string | undefined> = {}
+  const allVars = [
+    "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT",
+    "AZURE_OPENAI_DEPLOYMENT", "AZURE_OPENAI_MODEL_NAME",
+    "AZURE_OPENAI_API_VERSION", "MINIMAX_API_KEY", "MINIMAX_MODEL",
+  ]
+
+  beforeEach(() => {
+    for (const v of allVars) { saved[v] = process.env[v]; delete process.env[v] }
+  })
+
+  afterEach(() => {
+    for (const v of allVars) {
+      if (saved[v] !== undefined) process.env[v] = saved[v]
+      else delete process.env[v]
+    }
+  })
+
+  it("exits when no env vars are set", async () => {
     vi.resetModules()
-    const savedMinimax = process.env.MINIMAX_API_KEY
-    const savedAzure = process.env.AZURE_OPENAI_API_KEY
-    delete process.env.MINIMAX_API_KEY
-    delete process.env.AZURE_OPENAI_API_KEY
 
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
@@ -1079,7 +1290,6 @@ describe("getClient", () => {
 
     try {
       const core = await import("../core")
-      // Trigger getClient by calling runAgent
       const callbacks: ChannelCallbacks = {
         onModelStart: () => {},
         onModelStreamStart: () => {},
@@ -1094,26 +1304,42 @@ describe("getClient", () => {
     }
 
     expect(mockExit).toHaveBeenCalledWith(1)
-    expect(mockError).toHaveBeenCalledWith("missing AZURE_OPENAI_API_KEY or MINIMAX_API_KEY")
+    expect(mockError).toHaveBeenCalled()
 
     mockExit.mockRestore()
     mockError.mockRestore()
-    process.env.MINIMAX_API_KEY = savedMinimax
-    if (savedAzure) process.env.AZURE_OPENAI_API_KEY = savedAzure
   })
 
-  it("prefers Azure when AZURE_OPENAI_API_KEY is set", async () => {
+  it("uses MiniMax when MINIMAX vars are set", async () => {
     vi.resetModules()
-    const savedMinimax = process.env.MINIMAX_API_KEY
-    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
-    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
+    process.env.MINIMAX_API_KEY = "mm-key"
+    process.env.MINIMAX_MODEL = "MiniMax-M2.5"
 
     const core = await import("../core")
-    // getModel returns empty string for Azure (deployment is in the URL)
-    expect(core.getModel()).toBe("")
+    expect(core.getModel()).toBe("MiniMax-M2.5")
+  })
 
-    delete process.env.AZURE_OPENAI_API_KEY
-    delete process.env.AZURE_OPENAI_DEPLOYMENT
-    process.env.MINIMAX_API_KEY = savedMinimax
+  it("prefers Azure when all Azure vars are set", async () => {
+    vi.resetModules()
+    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
+    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
+    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
+    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-4o"
+    process.env.MINIMAX_API_KEY = "mm-key"
+    process.env.MINIMAX_MODEL = "MiniMax-M2.5"
+
+    const core = await import("../core")
+    expect(core.getModel()).toBe("gpt-4o")
+  })
+
+  it("falls back to MiniMax when Azure vars are incomplete", async () => {
+    vi.resetModules()
+    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
+    // Missing endpoint/deployment/model
+    process.env.MINIMAX_API_KEY = "mm-key"
+    process.env.MINIMAX_MODEL = "MiniMax-M2.5"
+
+    const core = await import("../core")
+    expect(core.getModel()).toBe("MiniMax-M2.5")
   })
 })

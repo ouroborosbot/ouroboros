@@ -41,7 +41,6 @@ export function createTeamsCallbacks(
   // Safely emit a text delta to the stream.
   // On error (e.g. 403 from Teams stop button), abort the controller.
   function safeEmit(text: string): void {
-    if (stopped) return
     try {
       stream.emit(text)
     } catch {
@@ -129,7 +128,7 @@ export function createTeamsCallbacks(
 
 // Global messages array (WU1 simplification -- single conversation)
 const messages: OpenAI.ChatCompletionMessageParam[] = [
-  { role: "system", content: buildSystem() },
+  { role: "system", content: buildSystem("teams") },
 ]
 
 // Handle an incoming Teams message
