@@ -10,12 +10,13 @@ let _model: string | null = null
 function getClient(): OpenAI {
   if (!_client) {
     if (process.env.AZURE_OPENAI_API_KEY) {
-      const origin = new URL(process.env.AZURE_OPENAI_ENDPOINT || "https://localhost").origin
+      const endpoint = new URL(process.env.AZURE_OPENAI_ENDPOINT || "https://localhost")
       const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o"
+      const apiVersion = process.env.AZURE_OPENAI_API_VERSION || endpoint.searchParams.get("api-version") || "2025-01-01-preview"
       _client = new OpenAI({
         apiKey: process.env.AZURE_OPENAI_API_KEY,
-        baseURL: `${origin}/openai/deployments/${deployment}`,
-        defaultQuery: { "api-version": process.env.AZURE_OPENAI_API_VERSION || "2025-01-01-preview" },
+        baseURL: `${endpoint.origin}/openai/deployments/${deployment}`,
+        defaultQuery: { "api-version": apiVersion },
         timeout: 30000,
         maxRetries: 0,
       })

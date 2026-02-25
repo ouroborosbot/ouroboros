@@ -89,7 +89,7 @@ describe("agent.ts main()", () => {
     await agent.main()
 
     const flatLogs = logCalls.flat()
-    expect(flatLogs.some((l) => l.includes("mini-max chat"))).toBe(true)
+    expect(flatLogs.some((l) => l.includes("ouroboros"))).toBe(true)
     expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
     expect(runAgentCalls.length).toBe(2) // boot greeting + "hello world"
   })

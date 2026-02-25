@@ -166,7 +166,7 @@ export async function main() {
   let closed = false
   rl.on("close", () => { closed = true })
 
-  console.log("\nmini-max chat (type 'exit' to quit)\n")
+  console.log("\nouroboros (type 'exit' to quit)\n")
 
   const cliCallbacks = createCliCallbacks()
 
