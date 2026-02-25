@@ -2,6 +2,9 @@ import OpenAI from "openai"
 import * as readline from "readline"
 import { runAgent, buildSystem, ChannelCallbacks } from "./core"
 import { pickPhrase, THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "./phrases"
+import { sessionPath, getContextConfig } from "./config"
+import { loadSession, saveSession, deleteSession, trimMessages, cachedBuildSystem } from "./context"
+import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "./commands"
 
 // spinner that only touches stderr, cleans up after itself
 // exported for direct testability (stop-without-start branch)
@@ -178,7 +181,16 @@ export async function bootGreeting(messages: OpenAI.ChatCompletionMessageParam[]
 }
 
 export async function main() {
-  const messages: OpenAI.ChatCompletionMessageParam[] = [{ role: "system", content: buildSystem() }]
+  const sessPath = sessionPath("cli", "session")
+  const registry = createCommandRegistry()
+  registerDefaultCommands(registry)
+
+  // Load existing session or start fresh
+  const existing = loadSession(sessPath)
+  const messages: OpenAI.ChatCompletionMessageParam[] = existing && existing.length > 0
+    ? existing
+    : [{ role: "system", content: cachedBuildSystem("cli", buildSystem) }]
+
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true })
   const ctrl = new InputController(rl)
   let currentAbort: AbortController | null = null
@@ -186,16 +198,19 @@ export async function main() {
   let closed = false
   rl.on("close", () => { closed = true })
 
-  console.log("\nouroboros (type 'exit' to quit)\n")
+  console.log("\nouroboros (type /commands for help)\n")
 
   const cliCallbacks = createCliCallbacks()
 
-  // boot greeting
-  const bootAbort = new AbortController()
-  ctrl.suppress(() => bootAbort.abort())
-  await bootGreeting(messages, cliCallbacks, bootAbort.signal).catch(() => {})
-  ctrl.restore()
-  process.stdout.write("\n")
+  // Only run boot greeting for fresh sessions
+  if (!existing || existing.length === 0) {
+    const bootAbort = new AbortController()
+    ctrl.suppress(() => bootAbort.abort())
+    await bootGreeting(messages, cliCallbacks, bootAbort.signal).catch(() => {})
+    ctrl.restore()
+    process.stdout.write("\n")
+    saveSession(sessPath, messages)
+  }
 
   process.stdout.write("\x1b[36m> \x1b[0m")
 
@@ -221,8 +236,30 @@ export async function main() {
 
   try {
     for await (const input of rl) {
-      if (closed || input.toLowerCase() === "exit") break
+      if (closed) break
       if (!input.trim()) { process.stdout.write("\x1b[36m> \x1b[0m"); continue }
+
+      // Check for slash commands
+      const parsed = parseSlashCommand(input)
+      if (parsed) {
+        const dispatchResult = registry.dispatch(parsed.command, { channel: "cli" })
+        if (dispatchResult.handled && dispatchResult.result) {
+          if (dispatchResult.result.action === "exit") {
+            break
+          } else if (dispatchResult.result.action === "new") {
+            messages.length = 0
+            messages.push({ role: "system", content: cachedBuildSystem("cli", buildSystem) })
+            deleteSession(sessPath)
+            console.log("session cleared")
+            process.stdout.write("\x1b[36m> \x1b[0m")
+            continue
+          } else if (dispatchResult.result.action === "response") {
+            console.log(dispatchResult.result.message || "")
+            process.stdout.write("\x1b[36m> \x1b[0m")
+            continue
+          }
+        }
+      }
 
       // Re-style the echoed input line (readline terminal:true echoes it as "> input")
       // Calculate terminal rows the echo occupied (prompt "> " + input, wrapped)
@@ -234,6 +271,15 @@ export async function main() {
       messages.push({ role: "user", content: input })
       addHistory(history, input)
 
+      // Refresh system prompt
+      messages[0] = { role: "system", content: cachedBuildSystem("cli", buildSystem) }
+
+      // Trim context window
+      const { maxTokens, contextMargin } = getContextConfig()
+      const trimmed = trimMessages(messages, maxTokens, contextMargin)
+      messages.length = 0
+      messages.push(...trimmed)
+
       currentAbort = new AbortController()
       ctrl.suppress(() => currentAbort!.abort())
       try {
@@ -244,6 +290,8 @@ export async function main() {
       ctrl.restore()
       currentAbort = null
       process.stdout.write("\n")
+
+      saveSession(sessPath, messages)
 
       if (closed) break
       process.stdout.write("\x1b[36m> \x1b[0m")
