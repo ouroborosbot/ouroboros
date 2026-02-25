@@ -51,9 +51,9 @@ Migrate the Azure provider path in `runAgent()` from the Chat Completions API to
 ## Work Units
 
 ### Legend
-Not started / In progress / Done / Blocked
+[_] Not started / [~] In progress / [x] Done / [!] Blocked
 
-### Unit 0: Test Infrastructure Setup
+### [_] Unit 0: Test Infrastructure Setup
 **What**: Update the OpenAI mock in `core.test.ts` to support both `client.chat.completions.create` (MiniMax path) and `client.responses.create` (Azure path). This is prerequisite for all subsequent Azure-path tests.
 Changes to mock factory at top of `core.test.ts`:
 ```typescript
@@ -83,7 +83,7 @@ Verify all existing tests still pass (they use `mockCreate` / Chat Completions p
 **Output**: Updated mock infrastructure in `core.test.ts`, all existing tests green
 **Acceptance**: `npm test` passes with no regressions. `mockResponsesCreate` is available for subsequent units.
 
-### Unit 1a: Tool Definition Converter -- Tests
+### [_] Unit 1a: Tool Definition Converter -- Tests
 **What**: Write tests for a `toResponsesTools()` function that converts `OpenAI.ChatCompletionTool[]` to Responses API `FunctionTool[]` format. New `describe("toResponsesTools")` block in `core.test.ts`. Test cases:
 - Converts a single tool: `{ type: "function", function: { name: "read_file", description: "read file contents", parameters: {...} } }` becomes `{ type: "function", name: "read_file", description: "read file contents", parameters: {...}, strict: false }`
 - Converts all tools in the `tools` array (verify length matches)
@@ -92,7 +92,7 @@ Verify all existing tests still pass (they use `mockCreate` / Chat Completions p
 **Output**: Failing tests in `core.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `toResponsesTools` is not exported yet
 
-### Unit 1b: Tool Definition Converter -- Implementation
+### [_] Unit 1b: Tool Definition Converter -- Implementation
 **What**: Implement and export `toResponsesTools()` in `core.ts`. Pure function, no side effects:
 ```typescript
 export function toResponsesTools(chatTools: OpenAI.ChatCompletionTool[]): any[] {
@@ -108,11 +108,11 @@ export function toResponsesTools(chatTools: OpenAI.ChatCompletionTool[]): any[] 
 **Output**: `toResponsesTools` exported from `core.ts`
 **Acceptance**: All Unit 1a tests PASS (green), no warnings
 
-### Unit 1c: Tool Definition Converter -- Coverage & Refactor
+### [_] Unit 1c: Tool Definition Converter -- Coverage & Refactor
 **What**: Verify 100% coverage on `toResponsesTools`. Refactor if needed.
 **Acceptance**: 100% coverage on new code, tests still green
 
-### Unit 2a: Message-to-Input Converter -- Tests
+### [_] Unit 2a: Message-to-Input Converter -- Tests
 **What**: Write tests for `toResponsesInput()` that converts `ChatCompletionMessageParam[]` to `{ instructions: string, input: any[] }`. New `describe("toResponsesInput")` block. Test cases:
 - Extracts system message content into `instructions`, excludes it from `input`
 - Converts user message: `{ role: "user", content: "hi" }` becomes `{ role: "user", content: "hi" }`
@@ -126,7 +126,7 @@ export function toResponsesTools(chatTools: OpenAI.ChatCompletionTool[]): any[] 
 **Output**: Failing tests in `core.test.ts`
 **Acceptance**: Tests exist and FAIL (red)
 
-### Unit 2b: Message-to-Input Converter -- Implementation
+### [_] Unit 2b: Message-to-Input Converter -- Implementation
 **What**: Implement and export `toResponsesInput()` in `core.ts`:
 - Find first message with `role === "system"`, extract `content` as `instructions`
 - For non-system messages, convert based on role:
@@ -137,11 +137,11 @@ export function toResponsesTools(chatTools: OpenAI.ChatCompletionTool[]): any[] 
 **Output**: `toResponsesInput` exported from `core.ts`
 **Acceptance**: All Unit 2a tests PASS (green)
 
-### Unit 2c: Message-to-Input Converter -- Coverage & Refactor
+### [_] Unit 2c: Message-to-Input Converter -- Coverage & Refactor
 **What**: Verify 100% coverage. Add edge case tests if needed (assistant with empty string content and tool_calls, system message with empty content, multiple system messages -- only first extracted).
 **Acceptance**: 100% coverage, tests green
 
-### Unit 3a: Azure Responses API Call and Text Streaming -- Tests
+### [_] Unit 3a: Azure Responses API Call and Text Streaming -- Tests
 **What**: Write tests for the Azure path in `runAgent()` using Responses API streaming. Requires Azure env vars set and `mockResponsesCreate` returning event streams. New `describe("runAgent -- Azure Responses API")` block. Each test does `vi.resetModules()`, sets Azure env vars, imports fresh core. Test cases:
 - Azure provider calls `mockResponsesCreate` (NOT `mockCreate`)
 - Passes correct params: `model`, `input` (from `toResponsesInput`), `instructions` (from `toResponsesInput`), `tools` (from `toResponsesTools`), `stream: true`, `store: false`, `include: ["reasoning.encrypted_content"]`, `reasoning: { effort: "medium", summary: "auto" }`
@@ -156,7 +156,7 @@ export function toResponsesTools(chatTools: OpenAI.ChatCompletionTool[]): any[] 
 **Output**: Failing tests in `core.test.ts`
 **Acceptance**: Tests exist and FAIL (red)
 
-### Unit 3b: Azure Responses API Call and Text Streaming -- Implementation
+### [_] Unit 3b: Azure Responses API Call and Text Streaming -- Implementation
 **What**: In `runAgent()`, branch on `provider === "azure"`:
 - Convert messages via `toResponsesInput()` to get `instructions` and `input`
 - Convert tools via `toResponsesTools()`
@@ -171,7 +171,7 @@ export function toResponsesTools(chatTools: OpenAI.ChatCompletionTool[]): any[] 
 **Output**: Azure text/reasoning streaming working in `runAgent()`
 **Acceptance**: All Unit 3a tests PASS (green), all existing MiniMax tests still pass
 
-### Unit 3c: Azure Text Streaming -- Coverage & Refactor
+### [_] Unit 3c: Azure Text Streaming -- Coverage & Refactor
 **What**: Verify coverage on new Azure stream code. Add edge cases:
 - Event with unknown type is silently ignored
 - `delta` field as non-string on reasoning event (cast to string)
@@ -179,7 +179,7 @@ export function toResponsesTools(chatTools: OpenAI.ChatCompletionTool[]): any[] 
 - Empty string delta (should still call callback)
 **Acceptance**: 100% coverage on new code, tests green
 
-### Unit 4a: Azure Tool Call Handling -- Tests
+### [_] Unit 4a: Azure Tool Call Handling -- Tests
 **What**: Write tests for tool call tracking and execution on the Azure Responses API path. Extend the Azure describe block. Test cases:
 - `{ type: "response.output_item.added", item: { type: "function_call", name: "read_file", call_id: "call_1", arguments: "" } }` starts tracking a tool call
 - `{ type: "response.function_call_arguments.delta", delta: '{"path":' }` followed by `{ ..., delta: '"/foo"}' }` accumulates arguments
@@ -193,7 +193,7 @@ export function toResponsesTools(chatTools: OpenAI.ChatCompletionTool[]): any[] 
 **Output**: Failing tests in `core.test.ts`
 **Acceptance**: Tests exist and FAIL (red)
 
-### Unit 4b: Azure Tool Call Handling -- Implementation
+### [_] Unit 4b: Azure Tool Call Handling -- Implementation
 **What**: Add tool call event handling to the Azure stream processing in `runAgent()`:
 - On `response.output_item.added` where `item.type === "function_call"`: initialize tool call tracker `{ call_id: item.call_id, name: item.name, arguments: "" }`
 - On `response.function_call_arguments.delta`: append `event.delta` to current tool call's arguments
@@ -208,7 +208,7 @@ export function toResponsesTools(chatTools: OpenAI.ChatCompletionTool[]): any[] 
 **Output**: Full tool-use loop working on Azure path
 **Acceptance**: All Unit 4a tests PASS (green), all existing tests still pass
 
-### Unit 4c: Azure Tool Call Handling -- Coverage & Refactor
+### [_] Unit 4c: Azure Tool Call Handling -- Coverage & Refactor
 **What**: Verify coverage. Add edge cases:
 - Tool with malformed JSON arguments (graceful handling, same as MiniMax path)
 - Tool call with empty arguments string
@@ -216,7 +216,7 @@ export function toResponsesTools(chatTools: OpenAI.ChatCompletionTool[]): any[] 
 - `function_call_arguments.delta` with no active tool call (defensive, should not crash)
 **Acceptance**: 100% coverage, tests green
 
-### Unit 5a: Reasoning Item Re-submission -- Tests
+### [_] Unit 5a: Reasoning Item Re-submission -- Tests
 **What**: Write tests for reasoning item tracking and re-submission across turns on the Azure path. Test cases:
 - `response.output_item.done` with `item.type === "reasoning"` captures the item (including `encrypted_content`)
 - On next API call (tool-use loop), the captured reasoning item appears in the `input` array
@@ -228,7 +228,7 @@ export function toResponsesTools(chatTools: OpenAI.ChatCompletionTool[]): any[] 
 **Output**: Failing tests in `core.test.ts`
 **Acceptance**: Tests exist and FAIL (red)
 
-### Unit 5b: Reasoning Item Re-submission -- Implementation
+### [_] Unit 5b: Reasoning Item Re-submission -- Implementation
 **What**: Implement reasoning item tracking in the Azure path of `runAgent()`:
 - Maintain a `azureOutputItems: any[]` array scoped to the `runAgent()` call (persists across loop iterations)
 - On `response.output_item.done` events: push the item to a per-iteration collector
@@ -239,11 +239,11 @@ export function toResponsesTools(chatTools: OpenAI.ChatCompletionTool[]): any[] 
 **Output**: Reasoning items tracked and re-submitted
 **Acceptance**: All Unit 5a tests PASS (green)
 
-### Unit 5c: Reasoning Item Re-submission -- Coverage & Refactor
+### [_] Unit 5c: Reasoning Item Re-submission -- Coverage & Refactor
 **What**: Verify coverage. Ensure no edge cases are missed. Verify `toResponsesInput` additional items parameter has coverage.
 **Acceptance**: 100% coverage, tests green
 
-### Unit 6a: Azure Abort and Error Handling -- Tests
+### [_] Unit 6a: Azure Abort and Error Handling -- Tests
 **What**: Write tests for abort signal and error handling on the Azure path. Test cases:
 - Abort signal already aborted before API call: loop breaks, no API call made, no error callback
 - Abort signal fires during stream iteration: processing stops cleanly, no error callback
@@ -253,7 +253,7 @@ export function toResponsesTools(chatTools: OpenAI.ChatCompletionTool[]): any[] 
 **Output**: Failing tests in `core.test.ts`
 **Acceptance**: Tests exist and FAIL (red)
 
-### Unit 6b: Azure Abort and Error Handling -- Implementation
+### [_] Unit 6b: Azure Abort and Error Handling -- Implementation
 **What**: Ensure the Azure path in `runAgent()` has identical abort/error semantics to the MiniMax path:
 - Check `signal?.aborted` at top of loop before API call
 - Pass `signal` to `client.responses.create` options: `signal ? { signal } : {}`
@@ -262,11 +262,11 @@ export function toResponsesTools(chatTools: OpenAI.ChatCompletionTool[]): any[] 
 **Output**: Abort and error handling working on Azure path
 **Acceptance**: All Unit 6a tests PASS (green)
 
-### Unit 6c: Azure Abort and Error Handling -- Coverage & Refactor
+### [_] Unit 6c: Azure Abort and Error Handling -- Coverage & Refactor
 **What**: Verify coverage on all error/abort branches. Add any missing edge cases.
 **Acceptance**: 100% coverage, tests green
 
-### Unit 7: Full Integration Verification
+### [_] Unit 7: Full Integration Verification
 **What**: Run full test suite across all test files. Verify:
 - All core tests pass (original + new)
 - All 19 CLI tests pass (no changes to `agent.ts`)
