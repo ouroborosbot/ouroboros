@@ -672,6 +672,25 @@ export async function streamResponsesApi(
 
 export const MAX_TOOL_ROUNDS = 10;
 
+// Remove orphan tool_calls from the last assistant message and any
+// trailing tool-result messages that lack a matching tool_call.
+// This keeps the conversation valid after an abort or tool-loop limit.
+export function stripLastToolCalls(
+  messages: OpenAI.ChatCompletionMessageParam[],
+): void {
+  // Pop any trailing tool-result messages
+  while (messages.length && messages[messages.length - 1].role === "tool") {
+    messages.pop();
+  }
+  // Strip tool_calls from the last assistant message
+  const last = messages[messages.length - 1] as any;
+  if (last?.role === "assistant" && last.tool_calls) {
+    delete last.tool_calls;
+    // If the assistant message is now empty, remove it entirely
+    if (!last.content) messages.pop();
+  }
+}
+
 export async function runAgent(
   messages: OpenAI.ChatCompletionMessageParam[],
   callbacks: ChannelCallbacks,
@@ -744,6 +763,9 @@ export async function runAgent(
       } else {
         toolRounds++;
         if (toolRounds >= MAX_TOOL_ROUNDS) {
+          // Strip tool_calls from the assistant message we just pushed so the
+          // conversation stays valid (every tool_call needs a tool response).
+          stripLastToolCalls(messages);
           callbacks.onError(new Error(`tool loop limit reached (${MAX_TOOL_ROUNDS} rounds)`));
           done = true;
           break;
@@ -774,8 +796,12 @@ export async function runAgent(
       }
     } catch (e) {
       // Abort is not an error — just stop cleanly
-      if (signal?.aborted) break;
+      if (signal?.aborted) {
+        stripLastToolCalls(messages);
+        break;
+      }
       callbacks.onError(e instanceof Error ? e : new Error(String(e)));
+      stripLastToolCalls(messages);
       done = true;
     }
   }
