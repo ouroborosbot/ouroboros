@@ -3,6 +3,9 @@ import { App } from "@microsoft/teams.apps"
 import { DevtoolsPlugin } from "@microsoft/teams.dev"
 import { runAgent, buildSystem, ChannelCallbacks } from "./core"
 import { pickPhrase, THINKING_PHRASES, FOLLOWUP_PHRASES } from "./phrases"
+import { sessionPath, getContextConfig, getTeamsConfig } from "./config"
+import { loadSession, saveSession, deleteSession, trimMessages, cachedBuildSystem } from "./context"
+import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "./commands"
 
 // Stream interface matching IStreamer from @microsoft/teams.apps
 interface TeamsStream {
@@ -118,34 +121,82 @@ export function createTeamsCallbacks(
   }
 }
 
-// Global messages array (WU1 simplification -- single conversation)
-const messages: OpenAI.ChatCompletionMessageParam[] = [
-  { role: "system", content: buildSystem("teams") },
-]
+// Per-conversation lock to serialize messages for the same conversation
+const _convLocks = new Map<string, Promise<void>>()
+
+export async function withConversationLock(convId: string, fn: () => Promise<void>): Promise<void> {
+  const prev = _convLocks.get(convId) || Promise.resolve()
+  const current = prev.then(fn, fn)
+  _convLocks.set(convId, current)
+  await current
+}
 
 // Handle an incoming Teams message
-export async function handleTeamsMessage(text: string, stream: TeamsStream): Promise<void> {
+export async function handleTeamsMessage(text: string, stream: TeamsStream, conversationId: string): Promise<void> {
+  const registry = createCommandRegistry()
+  registerDefaultCommands(registry)
+
+  // Check for slash commands
+  const parsed = parseSlashCommand(text)
+  if (parsed) {
+    const dispatchResult = registry.dispatch(parsed.command, { channel: "teams" })
+    if (dispatchResult.handled && dispatchResult.result) {
+      if (dispatchResult.result.action === "new") {
+        const sessPath = sessionPath("teams", conversationId)
+        deleteSession(sessPath)
+        stream.emit("session cleared")
+        return
+      } else if (dispatchResult.result.action === "response") {
+        stream.emit(dispatchResult.result.message || "")
+        return
+      }
+    }
+  }
+
+  // Load or create session
+  const sessPath = sessionPath("teams", conversationId)
+  const existing = loadSession(sessPath)
+  const messages: OpenAI.ChatCompletionMessageParam[] = existing && existing.length > 0
+    ? existing
+    : [{ role: "system", content: cachedBuildSystem("teams", buildSystem) }]
+
+  // Refresh system prompt
+  messages[0] = { role: "system", content: cachedBuildSystem("teams", buildSystem) }
+
+  // Push user message
   messages.push({ role: "user", content: text })
+
+  // Trim context window
+  const { maxTokens, contextMargin } = getContextConfig()
+  const trimmed = trimMessages(messages, maxTokens, contextMargin)
+  messages.length = 0
+  messages.push(...trimmed)
+
+  // Run agent
   const controller = new AbortController()
   const callbacks = createTeamsCallbacks(stream, controller)
   await runAgent(messages, callbacks, controller.signal)
+
+  // Save session
+  saveSession(sessPath, messages)
   // SDK auto-closes the stream after our handler returns (app.process.js)
 }
 
 // Start the Teams app in DevtoolsPlugin mode (local dev) or Bot Service mode (real Teams).
-// Mode is determined by the CLIENT_ID environment variable.
+// Mode is determined by getTeamsConfig().clientId.
 export function startTeamsApp(): void {
   const mentionStripping = { activity: { mentions: { stripText: true as const } } }
+  const teamsConfig = getTeamsConfig()
 
   let app: InstanceType<typeof App>
   let mode: string
 
-  if (process.env.CLIENT_ID) {
+  if (teamsConfig.clientId) {
     // Bot Service mode -- real Teams connection with SingleTenant credentials
     app = new App({
-      clientId: process.env.CLIENT_ID,
-      clientSecret: process.env.CLIENT_SECRET,
-      tenantId: process.env.TENANT_ID,
+      clientId: teamsConfig.clientId,
+      clientSecret: teamsConfig.clientSecret,
+      tenantId: teamsConfig.tenantId,
       ...mentionStripping,
     })
     mode = "Bot Service"
@@ -160,8 +211,9 @@ export function startTeamsApp(): void {
 
   app.on("message", async ({ stream, activity }) => {
     const text = activity.text || ""
+    const convId = activity.conversation?.id || "unknown"
     try {
-      await handleTeamsMessage(text, stream)
+      await withConversationLock(convId, () => handleTeamsMessage(text, stream, convId))
     } catch (err) {
       console.error("Message handler error:", err)
     }
