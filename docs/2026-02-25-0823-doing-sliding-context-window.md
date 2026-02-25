@@ -289,12 +289,12 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: Modified `src/teams.ts`, `src/teams-entry.ts`, `manifest/manifest.json`, `package.json`
 **Acceptance**: All Unit 7a tests PASS (green), no warnings
 
-### 🔄 Unit 7c: Teams Integration -- Coverage & Refactor
+### ✅ Unit 7c: Teams Integration -- Coverage & Refactor
 **What**: Verify 100% coverage on modified `src/teams.ts`. Ensure all existing Teams tests still pass. Add any missing edge case tests.
 **Output**: 100% coverage, all tests green
 **Acceptance**: 100% coverage on new code, tests still green
 
-### ⬜ Unit 8: Integration Validation
+### 🔄 Unit 8: Integration Validation
 **Depends on**: All prior units (1-7) complete
 **What**: Run full test suite (`npm test`). Verify no regressions across all test files. Run coverage report (`npm run test:coverage`). Verify 100% on all new/modified files (`src/config.ts`, `src/context.ts`, `src/commands.ts`, `src/agent.ts`, `src/teams.ts`). Fix any issues found.
 **Output**: Clean test run, full coverage report saved to artifacts directory
