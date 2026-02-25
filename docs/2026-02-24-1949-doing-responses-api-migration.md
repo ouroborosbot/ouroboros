@@ -330,7 +330,7 @@ Edge cases:
 
 ---
 
-### ⬜ Unit 6a: runAgent Orchestrator — Tests
+### ✅ Unit 6a: runAgent Orchestrator — Tests
 **What**: Write tests for the refactored `runAgent()` that uses `TurnResult` from both stream processors. This is the integration point. New `describe("runAgent orchestrator")` block or extend existing.
 
 **NOTE**: The existing test "passes reasoning params for Azure provider" currently asserts `mockCreate` is called with `reasoning_effort: "medium"`. After this refactor, Azure calls `mockResponsesCreate` instead. This test MUST be rewritten to check `mockResponsesCreate` params (Responses API format). Similarly, update the `getProvider` test that checks Azure routing.
@@ -367,7 +367,7 @@ Test cases — abort and error handling:
 **Output**: Failing tests
 **Acceptance**: Tests FAIL (red)
 
-### ⬜ Unit 6b: runAgent Orchestrator — Implementation
+### ✅ Unit 6b: runAgent Orchestrator — Implementation
 **What**: Rewrite `runAgent()` as a thin provider-agnostic orchestrator:
 
 ```
@@ -433,7 +433,7 @@ Key points:
 **Output**: Refactored `runAgent()` using both stream processors
 **Acceptance**: All Unit 6a tests PASS, ALL existing tests still pass
 
-### ⬜ Unit 6c: runAgent Orchestrator — Coverage
+### ✅ Unit 6c: runAgent Orchestrator — Coverage
 **What**: Verify 100% coverage on refactored `runAgent()`. Focus on:
 - Both provider branches exercised
 - Reasoning item filter (type === "reasoning" vs other types)
@@ -507,3 +507,4 @@ From `node_modules/openai/resources/responses/responses.d.ts`:
 - 2026-02-24 20:46 Units 3a/3b/3c complete: TurnResult + streamChatCompletion -- extracted CC stream processor from runAgent, 10 direct tests + all 104 existing runAgent tests still pass. 233 tests total. 100% coverage.
 - 2026-02-24 20:49 Units 4a/4b/4c complete: streamResponsesApi text+reasoning -- 14 tests, handles text deltas, reasoning deltas, abort, errors. 247 tests total. 100% coverage.
 - 2026-02-24 20:51 Units 5a/5b/5c complete: streamResponsesApi tool calls + output items -- added 9 tests for tool call tracking and output item collection. 256 tests total. 100% coverage.
+- 2026-02-24 20:53 Units 6a/6b/6c complete: runAgent orchestrator -- Azure path wired to streamResponsesApi with toResponsesInput/toResponsesTools. Reasoning item tracking. Existing Azure test rewritten. 261 tests total. 100% coverage.
