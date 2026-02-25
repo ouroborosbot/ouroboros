@@ -670,6 +670,8 @@ export async function streamResponsesApi(
   };
 }
 
+export const MAX_TOOL_ROUNDS = 10;
+
 export async function runAgent(
   messages: OpenAI.ChatCompletionMessageParam[],
   callbacks: ChannelCallbacks,
@@ -680,8 +682,14 @@ export async function runAgent(
   const model = getModel();
   const reasoningItems: any[] = []; // only reasoning items, for Azure re-submission
   let done = false;
+  let toolRounds = 0;
+
+  // Prevent MaxListenersExceeded warning — each iteration adds a listener
+  try { require("events").setMaxListeners(MAX_TOOL_ROUNDS + 5, signal); } catch { /* unsupported */ }
 
   while (!done) {
+    // Yield so pending I/O (stdin Ctrl-C) can be processed between iterations
+    await new Promise((r) => setImmediate(r));
     if (signal?.aborted) break;
     try {
       callbacks.onModelStart();
@@ -734,8 +742,15 @@ export async function runAgent(
       if (!result.toolCalls.length) {
         done = true;
       } else {
+        toolRounds++;
+        if (toolRounds >= MAX_TOOL_ROUNDS) {
+          callbacks.onError(new Error(`tool loop limit reached (${MAX_TOOL_ROUNDS} rounds)`));
+          done = true;
+          break;
+        }
         // SHARED: execute tools
         for (const tc of result.toolCalls) {
+          if (signal?.aborted) break;
           let args: Record<string, string> = {};
           try {
             args = JSON.parse(tc.arguments);
