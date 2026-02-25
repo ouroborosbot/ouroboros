@@ -118,7 +118,7 @@ Also remove:
 
 ---
 
-### ⬜ Unit 3a: Normalize MiniMax inline think tags in runAgent -- Tests
+### ✅ Unit 3a: Normalize MiniMax inline think tags in runAgent -- Tests
 **What**: Rewrite the existing test "fires onTextChunk for each text delta with raw think tags" (line 585) and add new tests. These tests send `<think>` tags as part of `content` (the MiniMax pattern) and verify core routes them to `onReasoningChunk`.
 
 Tests needed:
@@ -135,7 +135,7 @@ Tests needed:
 
 **Acceptance**: Tests exist and FAIL (runAgent still passes `<think>` tags through onTextChunk as raw content).
 
-### ⬜ Unit 3b: Normalize MiniMax inline think tags in runAgent -- Implementation
+### ✅ Unit 3b: Normalize MiniMax inline think tags in runAgent -- Implementation
 **What**: Add a state machine in `runAgent`'s content handling path (around lines 433-444) that detects `<think>` and `</think>` tags within `d.content` chunks and routes text accordingly.
 
 Implementation approach:
@@ -151,7 +151,7 @@ Implementation approach:
 
 **Acceptance**: All 7 MiniMax tests from 3a PASS. Both Azure and MiniMax reasoning flows work. All other tests still pass.
 
-### ⬜ Unit 3c: Unit 3 -- Coverage and refactor
+### ✅ Unit 3c: Unit 3 -- Coverage and refactor
 **What**: Run coverage on the state machine code. Add edge case tests if any branches uncovered: empty content chunks, content that is just `<think>`, content that is just `</think>`, buffer flush at end of stream with partial tag.
 
 **Acceptance**: 100% coverage on all new state machine code. All tests green. No warnings.
@@ -273,3 +273,4 @@ Remove the old partial-tag-split tests (lines 103-121) -- they tested adapter-le
 - 2026-02-24 18:42 Completed all 4 passes (first draft, granularity, validation, quality)
 - 2026-02-24 18:52 Unit 1 complete: added onReasoningChunk to ChannelCallbacks, no-op in both adapters, all 30 callback literals in core.test.ts updated, 202 tests pass
 - 2026-02-24 18:55 Unit 2 complete: Azure reasoning_content normalized to onReasoningChunk, 4 tests rewritten, inReasoning/think-tag wrapping removed from core.ts, 100% coverage on core.ts
+- 2026-02-24 18:58 Unit 3 complete: MiniMax think-tag state machine added, 13 new tests (7 core + 6 edge cases), 100% coverage on core.ts, 215 tests pass
