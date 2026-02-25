@@ -145,25 +145,15 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   // --- onReasoningChunk tests ---
 
-  it("onReasoningChunk calls stream.update() with accumulated text", async () => {
+  it("onReasoningChunk shows reasoning via stream.update()", async () => {
     vi.resetModules()
     const teams = await import("../teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onReasoningChunk("analyzing code")
     expect(mockStream.update).toHaveBeenCalledWith("analyzing code")
-  })
-
-  it("multiple reasoning chunks accumulate into growing update()", async () => {
-    vi.resetModules()
-    const teams = await import("../teams")
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
-
-    callbacks.onReasoningChunk("step 1")
-    callbacks.onReasoningChunk(" step 2")
-    expect(mockStream.update).toHaveBeenCalledTimes(2)
-    expect(mockStream.update).toHaveBeenNthCalledWith(1, "step 1")
-    expect(mockStream.update).toHaveBeenNthCalledWith(2, "step 1 step 2")
+    // Not emitted into the final message
+    expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
   it("onReasoningChunk after stop (403) does not call update()", async () => {
@@ -197,7 +187,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     expect(mockStream.emit).toHaveBeenCalledWith("hello")
   })
 
-  it("first text chunk after reasoning emits formatted reasoning + separator + text", async () => {
+  it("text after reasoning emits only text (reasoning NOT included in final message)", async () => {
     vi.resetModules()
     const teams = await import("../teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
@@ -205,10 +195,10 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     callbacks.onReasoningChunk("step 1")
     callbacks.onReasoningChunk(" step 2")
     callbacks.onTextChunk("answer")
-    // Should emit reasoning as italic, then separator, then text
-    expect(mockStream.emit).toHaveBeenCalledTimes(2)
-    expect(mockStream.emit).toHaveBeenNthCalledWith(1, "*step 1 step 2*\n\n")
-    expect(mockStream.emit).toHaveBeenNthCalledWith(2, "answer")
+    // Reasoning was shown via update() during streaming,
+    // but only text is emitted into the final message
+    expect(mockStream.emit).toHaveBeenCalledTimes(1)
+    expect(mockStream.emit).toHaveBeenCalledWith("answer")
   })
 
   it("text without prior reasoning emits directly", async () => {
@@ -221,16 +211,16 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     expect(mockStream.emit).toHaveBeenCalledWith("just text")
   })
 
-  it("onModelStart resets reasoning buffer for new turn", async () => {
+  it("reasoning never leaks into emitted text across turns", async () => {
     vi.resetModules()
     const teams = await import("../teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onReasoningChunk("old reasoning")
-    callbacks.onModelStart() // reset
+    callbacks.onModelStart()
     callbacks.onModelStreamStart() // stop rotation timer
     callbacks.onTextChunk("answer")
-    // Should not emit old reasoning
+    // Reasoning was shown via update(), never emitted
     expect(mockStream.emit).toHaveBeenCalledTimes(1)
     expect(mockStream.emit).toHaveBeenCalledWith("answer")
   })
