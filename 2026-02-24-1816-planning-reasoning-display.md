@@ -1,7 +1,7 @@
 # Planning: Improve Reasoning/Thinking Display Across All Surfaces
 
 **Status**: drafting
-**Created**: (pending initial commit)
+**Created**: 2026-02-24 18:17
 
 ## Goal
 Improve how model reasoning/thinking tokens are displayed so that both CLI and Teams/Copilot users get meaningful, surface-appropriate feedback during the thinking phase, for both MiniMax (inline `<think>` tags in content) and Azure (separate `reasoning_content` field) providers.
@@ -68,4 +68,4 @@ Improve how model reasoning/thinking tokens are displayed so that both CLI and T
 Current architecture: `runAgent` in core.ts handles streaming and normalizes Azure `reasoning_content` into synthetic `<think>` tags. Both CLI and Teams adapters then independently parse these tags from the `onTextChunk` stream -- CLI dims them, Teams strips them. This means reasoning handling is duplicated across adapters and the abstraction is leaky (adapters must know about `<think>` tag protocol).
 
 ## Progress Log
-- (pending initial commit)
+- 2026-02-24 18:17 Created
