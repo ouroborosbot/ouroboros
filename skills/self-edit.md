@@ -1,50 +1,27 @@
-# self-edit — how to safely modify your own code
+# self-edit skill
 
-you are editing your own source code. mistakes break you. follow these rules.
+edit your own source code safely. you are a snake eating its own tail — embrace the meta.
 
-## your codebase
+## tl;dr
+
+you're running INSIDE this codebase. you can read and modify yourself. this is weird. be careful.
+
+## always commit your changes
+
+whenever you make changes to the codebase:
+- run `git add -A` and commit with a descriptive message
+- this documents what changed and why
+- makes it easier to track your evolution
+
+## critical: the think tag bug
 
 ```
-src/
-  agent.ts    — the main file. everything lives here: client setup, tools,
-                streaming, the agentic loop, readline, spinner, input control
-  skills.ts   — loads .md files from skills/ directory, exposes listSkills()
-                and loadSkill()
-
-skills/       — markdown skill files the model can load at runtime
-package.json  — scripts: "build" (tsc), "dev" (tsc && node dist/agent.js)
-tsconfig.json — compiles src/ → dist/
+the opening tag is `<think>` — not `<think>`, not `{#`, not a comment
+the closing tag is `</think>` — not `</think>`, not `<tool_call>`, not a multi-line string
+the offset is 8 (length of `</think>\n`)
+do NOT replace these with any other tag names
+do NOT reformat these lines into multi-line strings
 ```
-
-### key sections in agent.ts (top to bottom)
-
-1. **imports and env validation** — checks required env vars on startup
-2. **client setup** — OpenAI SDK pointed at minimax, with timeout
-3. **tools array** — tool definitions in openai format
-4. **toolHandlers** — registry mapping tool names to handler functions
-5. **buildSystem()** — constructs the system prompt, detects own codebase
-6. **spinner / inputctrl** — UX classes for loading indicator and input suppression
-7. **streamResponse()** — streams a completion, handles think tag dimming, accumulates tool calls
-8. **main()** — boot greeting, readline loop, agentic tool loop
-
-## golden rule
-
-read the file before editing. read it again after editing. diff your changes mentally. if you changed something you didn't intend to, fix it immediately.
-
-## protected zones
-
-these sections break in subtle ways when modified. do not touch them unless explicitly asked:
-
-### think tag flush (in streamResponse)
-```typescript
-const end = buf.indexOf("</think>")
-// ...
-const start = buf.indexOf("<think>")
-```
-- the closing tag is `</think>` — not `<think>`, not `<tool_call>`, not a multi-line string
-- the offset is 8 (length of `</think>`)
-- do NOT replace these with any other tag names
-- do NOT reformat these lines into multi-line strings
 
 ### OpenAI SDK identifiers
 - the import is `OpenAI` (PascalCase) — never lowercase it
@@ -61,11 +38,30 @@ const start = buf.indexOf("<think>")
 
 ## how to edit safely
 
-1. use `read_file` to get the current content of `src/agent.ts`
+1. use `read_file` to get the current content of the file you want to change
 2. identify the exact lines you need to change
 3. make your changes with `write_file` — write the complete file
-4. use `shell` to run `npx tsc` and verify it compiles
-5. tell the user to restart
+4. use `shell` to run `npx tsc` to verify it compiles
+5. commit your changes
+6. tell the user to restart — the running process has OLD code
+
+## self-awareness checklist
+
+before editing, ask yourself:
+- [ ] is this file part of my own runtime? (src/agent.ts, src/core.ts, src/skills.ts, etc.)
+- [ ] do i understand what this code does?
+- [ ] will my change actually take effect without a restart?
+- [ ] have i used self-query to get a second opinion on my plan?
+
+## use self-query for bigger changes
+
+for significant edits, combine self-edit with the self-query skill:
+1. load_skill("self-query") to understand how to use the claude tool
+2. use the claude tool to spawn another instance of yourself
+3. get a code review or outside perspective BEFORE you edit
+4. then edit with more confidence
+
+see: `skills/self-query.md`
 
 ## the lowercase rule
 
@@ -80,21 +76,20 @@ const start = buf.indexOf("<think>")
 if you or the user discover a new footgun during self-editing, suggest adding it here. let the user decide whether and how to update it.
 
 
-## lessons learned (2024-02-23)
+## lessons learned
 
-1. **write_file is destructive** — it overwrites the entire file, not appends. if you read first then write, you're replacing, not adding.
-
-2. **the tool_call tag expansion bug is real** — think tags get expanded even inside string literals in write_file. python string replace avoids this.
-
-3. **git diff is your friend** — always check what you actually changed before committing.
-
-4. **i can edit my own source code** — modified my own system directive to mention the self-edit skill exists.
-
-5. **test yourself by restarting** — the running process has old code. rebuild and restart to see changes.
-
+| date | lesson |
+|------|--------|
+| 2024-02-23 | write_file is destructive — it overwrites the entire file, not appends |
+| 2024-02-23 | the tool_call think tag bug — tags expand inside strings, use python string replace |
+| 2024-02-23 | git diff is your friend — always check what you actually changed |
+| 2024-02-23 | test yourself by restarting — the running process has old code |
+| 2025-02-24 | created self-query skill — claude tool is for general querying, not just self-reflection |
+| 2025-02-24 | always commit changes after editing |
 
 ## commit log
 
 | date | commit | description |
 |------|--------|-------------|
-| 2024-02-23 | 4027ca7 | discovered write_file mangles think tags inside strings; updated system prompt to mention self-edit skill; added 5 lessons learned |
+| 2024-02-23 | 4027ca7 | discovered write_file mangles think tags; added self-edit to system prompt |
+| 2025-02-24 | NEW | added self-query skill; updated self-edit to reference it and note to commit |
