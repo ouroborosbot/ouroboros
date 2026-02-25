@@ -99,12 +99,12 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: `src/config.ts` with all functions
 **Acceptance**: All Unit 1a tests PASS (green), no warnings
 
-### 🔄 Unit 1c: Config Module -- Coverage & Refactor
+### ✅ Unit 1c: Config Module -- Coverage & Refactor
 **What**: Verify 100% coverage on `src/config.ts`. Add any missing edge case tests. Refactor if needed.
 **Output**: 100% coverage report for config.ts
 **Acceptance**: 100% coverage on new code, tests still green
 
-### ⬜ Unit 2a: Token Counting & Sliding Window -- Tests
+### 🔄 Unit 2a: Token Counting & Sliding Window -- Tests
 **What**: Create `src/__tests__/context.test.ts` with failing tests for token counting and sliding window functions in a new `src/context.ts` module. Tests cover:
 - `estimateTokens(messages)`: returns total char-count / 4 for a messages array. Test with empty array (returns 0), single user message, multiple messages, messages with `tool_calls` (should count stringified function name + arguments), tool-result messages (count content).
 - `cachedBuildSystem(channel, buildFn)`: returns cached system prompt string. On first call, calls `buildFn(channel)` and caches result + timestamp. On subsequent calls, returns cached result if less than 60 seconds old. If 60+ seconds, rebuilds and re-caches. Export `resetSystemPromptCache()` for testing. Tests: first call invokes buildFn, second call within 60s returns cached (buildFn not called again), call after 60s re-invokes buildFn, different channels get separate caches.
@@ -317,3 +317,6 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 - 2026-02-25 Post-review fixes: (1) session versioned envelope `{ version: 1, messages }`, (2) trimMessages uses single slice instead of one-at-a-time loop, (3) Teams slash commands don't call stream.close() manually (SDK auto-closes)
 - 2026-02-25 Added: config caching (restart required), per-conversation queue in Teams, remove dotenv, slash command edge cases, system prompt 60s debounce cache
 - 2026-02-25 Final pass: added Unit 3 dependency on Unit 2, fixed trimMessages result assignment in Unit 7b
+- 2026-02-25 13:24 Unit 1a complete: 21 failing tests for config module (loadConfig, getAzureConfig, getMinimaxConfig, getTeamsConfig, getContextConfig, sessionPath)
+- 2026-02-25 13:25 Unit 1b complete: config.ts implemented, all 21 tests pass, 308 total tests pass
+- 2026-02-25 13:25 Unit 1c complete: 100% coverage on config.ts (stmts/branch/funcs/lines)
