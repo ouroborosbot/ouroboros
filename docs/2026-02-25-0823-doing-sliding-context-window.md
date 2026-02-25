@@ -245,7 +245,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: 100% coverage, all tests green
 **Acceptance**: 100% coverage on new code, tests still green
 
-### 🔄 Unit 7a: Teams Integration -- Tests
+### ✅ Unit 7a: Teams Integration -- Tests
 **Depends on**: Units 1-4 (config, context, session, commands modules must exist)
 **What**: Add tests to `src/__tests__/teams.test.ts` for Teams per-conversation persistence, slash commands, and manifest:
 - `handleTeamsMessage` signature changes to `handleTeamsMessage(text, stream, conversationId)`.
@@ -266,7 +266,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: Failing tests for Teams integration
 **Acceptance**: Tests exist and FAIL (red)
 
-### ⬜ Unit 7b: Teams Integration -- Implementation
+### 🔄 Unit 7b: Teams Integration -- Implementation
 **What**: Modify `src/teams.ts`:
 - Import from `./config`: `getSessionDir`, `sessionPath`, `getContextConfig`, `getTeamsConfig`.
 - Import from `./context`: `loadSession`, `saveSession`, `deleteSession`, `trimMessages`, `cachedBuildSystem`.
