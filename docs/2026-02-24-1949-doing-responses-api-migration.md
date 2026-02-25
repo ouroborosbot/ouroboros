@@ -244,7 +244,7 @@ Steps:
 
 ---
 
-### ⬜ Unit 4a: streamResponsesApi Text + Reasoning — Tests
+### ✅ Unit 4a: streamResponsesApi Text + Reasoning — Tests
 **What**: Write tests for `streamResponsesApi()` — the Azure Responses API stream processor. New `describe("streamResponsesApi")` block. Uses `mockResponsesCreate` and `makeResponsesStream` from Unit 0.
 
 Test cases:
@@ -262,7 +262,7 @@ Test cases:
 **Output**: Failing tests
 **Acceptance**: Tests FAIL (red) — `streamResponsesApi` not exported yet
 
-### ⬜ Unit 4b: streamResponsesApi Text + Reasoning — Implementation
+### ✅ Unit 4b: streamResponsesApi Text + Reasoning — Implementation
 **What**: Implement and export `streamResponsesApi()` in `core.ts`:
 - Calls `client.responses.create(createParams, signal ? { signal } : {})`
 - Iterates async event stream, switching on `event.type`:
@@ -275,7 +275,7 @@ Test cases:
 **Output**: `streamResponsesApi` exported, handles text + reasoning streaming
 **Acceptance**: All Unit 4a tests PASS (green)
 
-### ⬜ Unit 4c: streamResponsesApi Text + Reasoning — Coverage
+### ✅ Unit 4c: streamResponsesApi Text + Reasoning — Coverage
 **What**: Verify coverage. Add edge cases:
 - Stream with only `response.created` / `response.completed` events (no content callbacks)
 - Abort signal already aborted before iteration starts
@@ -505,3 +505,4 @@ From `node_modules/openai/resources/responses/responses.d.ts`:
 - 2026-02-24 20:42 Units 1a/1b/1c complete: toResponsesTools -- 4 tests, 100% coverage on new code. 212 tests pass.
 - 2026-02-24 20:44 Units 2a/2b/2c complete: toResponsesInput -- 11 tests, 100% coverage on new code. 223 tests pass.
 - 2026-02-24 20:46 Units 3a/3b/3c complete: TurnResult + streamChatCompletion -- extracted CC stream processor from runAgent, 10 direct tests + all 104 existing runAgent tests still pass. 233 tests total. 100% coverage.
+- 2026-02-24 20:49 Units 4a/4b/4c complete: streamResponsesApi text+reasoning -- 14 tests, handles text deltas, reasoning deltas, abort, errors. 247 tests total. 100% coverage.
