@@ -219,7 +219,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 - On startup: compute session path via `sessionPath("cli", "session")`. Load session. If non-null and contains messages, use as messages array (skip boot greeting). If null, create fresh with system prompt and run boot greeting.
 - Create command registry, register defaults.
 - In input loop: check `parseSlashCommand(input)`. If slash command found, dispatch through registry. Handle results: `exit` -> break, `new` -> reset messages + deleteSession + print confirmation, `response` -> print message. Skip `runAgent` for handled commands.
-- Before `runAgent`: call `trimMessages(messages, getContextConfig().maxTokens)`.
+- After `messages.push({ role: "user", ... })` but before `runAgent`: call `trimMessages` and replace messages array contents. `const trimmed = trimMessages(messages, getContextConfig().maxTokens); messages.length = 0; messages.push(...trimmed);`.
 - After `runAgent`: call `saveSession(path, messages)`.
 - After boot greeting: call `saveSession(path, messages)`.
 - Remove old `exit` plain-text check (replaced by `/exit`).
