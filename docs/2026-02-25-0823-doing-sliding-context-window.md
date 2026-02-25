@@ -104,7 +104,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: 100% coverage report for config.ts
 **Acceptance**: 100% coverage on new code, tests still green
 
-### 🔄 Unit 2a: Token Counting & Sliding Window -- Tests
+### ✅ Unit 2a: Token Counting & Sliding Window -- Tests
 **What**: Create `src/__tests__/context.test.ts` with failing tests for token counting and sliding window functions in a new `src/context.ts` module. Tests cover:
 - `estimateTokens(messages)`: returns total char-count / 4 for a messages array. Test with empty array (returns 0), single user message, multiple messages, messages with `tool_calls` (should count stringified function name + arguments), tool-result messages (count content).
 - `cachedBuildSystem(channel, buildFn)`: returns cached system prompt string. On first call, calls `buildFn(channel)` and caches result + timestamp. On subsequent calls, returns cached result if less than 60 seconds old. If 60+ seconds, rebuilds and re-caches. Export `resetSystemPromptCache()` for testing. Tests: first call invokes buildFn, second call within 60s returns cached (buildFn not called again), call after 60s re-invokes buildFn, different channels get separate caches.
@@ -112,7 +112,7 @@ Implement a sliding context window for the ouroboros agent so that extended conv
 **Output**: Test file that fails because `src/context.ts` does not exist yet
 **Acceptance**: Tests exist and FAIL (red) -- module not found errors
 
-### ⬜ Unit 2b: Token Counting & Sliding Window -- Implementation
+### 🔄 Unit 2b: Token Counting & Sliding Window -- Implementation
 **What**: Create `src/context.ts` implementing:
 - `estimateTokens(messages: OpenAI.ChatCompletionMessageParam[]): number` -- sums character lengths of all message content (including stringified tool_calls arguments and tool result content) divided by 4, rounded up.
 - `cachedBuildSystem(channel: Channel, buildFn: (ch: Channel) => string): string` -- caches per channel, returns cached if less than 60s old, otherwise rebuilds. `resetSystemPromptCache()` clears cache for testing.
