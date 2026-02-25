@@ -1597,6 +1597,60 @@ process.env.MINIMAX_MODEL = "test-model"
     expect(reasoningChunks).toEqual(["step 1 ", "step 2"])
     expect(textChunks).toEqual(["result"])
   })
+
+  it("passes reasoning params for Azure provider", async () => {
+    vi.resetModules()
+    delete process.env.MINIMAX_API_KEY
+    delete process.env.MINIMAX_MODEL
+    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
+    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
+    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
+    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+
+    mockCreate.mockReturnValue(
+      makeStream([makeChunk("hello")])
+    )
+
+    const core = await import("../core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await core.runAgent([{ role: "system", content: "test" }], callbacks)
+    const params = mockCreate.mock.calls[0][0]
+    expect(params.reasoning).toEqual({ effort: "medium", summary: "auto" })
+
+    delete process.env.AZURE_OPENAI_API_KEY
+    delete process.env.AZURE_OPENAI_ENDPOINT
+    delete process.env.AZURE_OPENAI_DEPLOYMENT
+    delete process.env.AZURE_OPENAI_MODEL_NAME
+  })
+
+  it("does not pass reasoning params for MiniMax provider", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([makeChunk("hello")])
+    )
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    const params = mockCreate.mock.calls[0][0]
+    expect(params.reasoning).toBeUndefined()
+  })
 })
 
 describe("getClient", () => {
@@ -1655,6 +1709,7 @@ describe("getClient", () => {
 
     const core = await import("../core")
     expect(core.getModel()).toBe("MiniMax-M2.5")
+    expect(core.getProvider()).toBe("minimax")
   })
 
   it("prefers Azure when all Azure vars are set", async () => {
@@ -1668,6 +1723,7 @@ describe("getClient", () => {
 
     const core = await import("../core")
     expect(core.getModel()).toBe("gpt-4o")
+    expect(core.getProvider()).toBe("azure")
   })
 
   it("falls back to MiniMax when Azure vars are incomplete", async () => {
@@ -1679,5 +1735,6 @@ describe("getClient", () => {
 
     const core = await import("../core")
     expect(core.getModel()).toBe("MiniMax-M2.5")
+    expect(core.getProvider()).toBe("minimax")
   })
 })

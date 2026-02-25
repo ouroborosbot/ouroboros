@@ -191,7 +191,11 @@ export async function main() {
       if (!input.trim()) { process.stdout.write("\x1b[36m> \x1b[0m"); continue }
 
       // Re-style the echoed input line (readline terminal:true echoes it as "> input")
-      process.stdout.write(`\x1b[1A\x1b[K\x1b[1m> ${input}\x1b[0m\n`)
+      // Calculate terminal rows the echo occupied (prompt "> " + input, wrapped)
+      const cols = process.stdout.columns || 80
+      const echoLen = 2 + input.length // "> " prefix + input
+      const rows = Math.ceil(echoLen / cols) || 1
+      process.stdout.write(`\x1b[${rows}A\x1b[K` + `\x1b[1m> ${input}\x1b[0m\n`)
 
       messages.push({ role: "user", content: input })
       addHistory(history, input)
