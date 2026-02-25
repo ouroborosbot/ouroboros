@@ -4,6 +4,30 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 // boot greeting, input loop, SIGINT handling, and history.
 // Now that main() is exported, we call it directly through vitest for V8 coverage.
 
+function mockNewDeps() {
+  vi.doMock("../config", () => ({
+    sessionPath: vi.fn().mockReturnValue("/tmp/test-session.json"),
+    getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+  }))
+  vi.doMock("../context", () => ({
+    loadSession: vi.fn().mockReturnValue(null),
+    saveSession: vi.fn(),
+    deleteSession: vi.fn(),
+    trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+    cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+  }))
+  vi.doMock("../commands", () => ({
+    createCommandRegistry: vi.fn().mockReturnValue({
+      register: vi.fn(),
+      get: vi.fn(),
+      list: vi.fn().mockReturnValue([]),
+      dispatch: vi.fn().mockReturnValue({ handled: false }),
+    }),
+    registerDefaultCommands: vi.fn(),
+    parseSlashCommand: vi.fn().mockReturnValue(null),
+  }))
+}
+
 let stdoutChunks: string[]
 let stderrChunks: string[]
 let logCalls: string[][]
@@ -73,8 +97,8 @@ describe("agent.ts main()", () => {
     vi.restoreAllMocks()
   })
 
-  it("runs full loop: boot greeting, processes input, exits on 'exit'", async () => {
-    const { mockRl } = createMockRl(["hello world", "exit"])
+  it("runs full loop: boot greeting, processes input, exits on /exit", async () => {
+    const { mockRl } = createMockRl(["hello world", "/exit"])
     const runAgentCalls: any[][] = []
 
     vi.doMock("readline", () => ({
@@ -83,19 +107,46 @@ describe("agent.ts main()", () => {
     vi.doMock("../core", () => ({
       runAgent: vi.fn().mockImplementation(async (...args: any[]) => { runAgentCalls.push(args) }),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/test-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+    }))
+    vi.doMock("../context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockImplementation((name: string) => {
+          if (name === "exit") return { handled: true, result: { action: "exit" } }
+          return { handled: false }
+        }),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockImplementation((input: string) => {
+        if (input.startsWith("/")) return { command: input.slice(1).toLowerCase(), args: "" }
+        return null
+      }),
     }))
 
     const agent = await import("../agent")
     await agent.main()
 
     const flatLogs = logCalls.flat()
-    expect(flatLogs.some((l) => l.includes("ouroboros"))).toBe(true)
+    expect(flatLogs.some((l) => l.includes("ouroboros") || l.includes("/commands"))).toBe(true)
     expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
     expect(runAgentCalls.length).toBe(2) // boot greeting + "hello world"
   })
 
   it("skips empty input without calling runAgent", async () => {
-    const { mockRl } = createMockRl(["", "  ", "exit"])
+    const { mockRl } = createMockRl(["", "  ", "/exit"])
     const runAgentCalls: any[][] = []
 
     vi.doMock("readline", () => ({
@@ -104,6 +155,33 @@ describe("agent.ts main()", () => {
     vi.doMock("../core", () => ({
       runAgent: vi.fn().mockImplementation(async (...args: any[]) => { runAgentCalls.push(args) }),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/test-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+    }))
+    vi.doMock("../context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockImplementation((name: string) => {
+          if (name === "exit") return { handled: true, result: { action: "exit" } }
+          return { handled: false }
+        }),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockImplementation((input: string) => {
+        if (input.startsWith("/")) return { command: input.slice(1).toLowerCase(), args: "" }
+        return null
+      }),
     }))
 
     const agent = await import("../agent")
@@ -144,6 +222,7 @@ describe("agent.ts main()", () => {
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
+    mockNewDeps()
 
     const agent = await import("../agent")
     const mainPromise = agent.main()
@@ -205,6 +284,7 @@ describe("agent.ts main()", () => {
       }),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
+    mockNewDeps()
 
     const agent = await import("../agent")
     await agent.main()
@@ -214,7 +294,7 @@ describe("agent.ts main()", () => {
   })
 
   it("handles boot greeting rejection gracefully", async () => {
-    const { mockRl } = createMockRl(["exit"])
+    const { mockRl } = createMockRl(["/exit"])
 
     vi.doMock("readline", () => ({
       createInterface: () => mockRl,
@@ -222,6 +302,33 @@ describe("agent.ts main()", () => {
     vi.doMock("../core", () => ({
       runAgent: vi.fn().mockRejectedValue(new Error("boot failed")),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/test-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+    }))
+    vi.doMock("../context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockImplementation((name: string) => {
+          if (name === "exit") return { handled: true, result: { action: "exit" } }
+          return { handled: false }
+        }),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockImplementation((input: string) => {
+        if (input.startsWith("/")) return { command: input.slice(1).toLowerCase(), args: "" }
+        return null
+      }),
     }))
 
     const agent = await import("../agent")
@@ -246,7 +353,7 @@ describe("agent.ts main()", () => {
       line: "",
       [Symbol.asyncIterator]: () => ({
         next: async (): Promise<IteratorResult<string>> => {
-          return { value: "exit", done: false }
+          return { value: "/exit", done: false }
         },
       }),
     }
@@ -265,6 +372,33 @@ describe("agent.ts main()", () => {
       }),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
+    vi.doMock("../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/test-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+    }))
+    vi.doMock("../context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockImplementation((name: string) => {
+          if (name === "exit") return { handled: true, result: { action: "exit" } }
+          return { handled: false }
+        }),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockImplementation((input: string) => {
+        if (input.startsWith("/")) return { command: input.slice(1).toLowerCase(), args: "" }
+        return null
+      }),
+    }))
 
     const agent = await import("../agent")
     await agent.main()
@@ -276,7 +410,7 @@ describe("agent.ts main()", () => {
     let agentSignal: AbortSignal | undefined
     let callCount = 0
 
-    const { mockRl } = createMockRl(["hello", "exit"])
+    const { mockRl } = createMockRl(["hello", "/exit"])
 
     vi.doMock("readline", () => ({
       createInterface: () => mockRl,
@@ -295,6 +429,33 @@ describe("agent.ts main()", () => {
       }),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
+    vi.doMock("../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/test-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+    }))
+    vi.doMock("../context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockImplementation((name: string) => {
+          if (name === "exit") return { handled: true, result: { action: "exit" } }
+          return { handled: false }
+        }),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockImplementation((input: string) => {
+        if (input.startsWith("/")) return { command: input.slice(1).toLowerCase(), args: "" }
+        return null
+      }),
+    }))
 
     const agent = await import("../agent")
     await agent.main()
@@ -302,8 +463,8 @@ describe("agent.ts main()", () => {
     expect(agentSignal?.aborted).toBe(true)
   })
 
-  it("exits when input is 'exit' (case insensitive)", async () => {
-    const { mockRl } = createMockRl(["EXIT"])
+  it("exits when input is /Exit (case insensitive slash command)", async () => {
+    const { mockRl } = createMockRl(["/Exit"])
 
     vi.doMock("readline", () => ({
       createInterface: () => mockRl,
@@ -328,10 +489,16 @@ describe("agent.ts main()", () => {
         register: vi.fn(),
         get: vi.fn(),
         list: vi.fn().mockReturnValue([]),
-        dispatch: vi.fn().mockReturnValue({ handled: false }),
+        dispatch: vi.fn().mockImplementation((name: string) => {
+          if (name === "exit") return { handled: true, result: { action: "exit" } }
+          return { handled: false }
+        }),
       }),
       registerDefaultCommands: vi.fn(),
-      parseSlashCommand: vi.fn().mockReturnValue(null),
+      parseSlashCommand: vi.fn().mockImplementation((input: string) => {
+        if (input.startsWith("/")) return { command: input.slice(1).toLowerCase(), args: "" }
+        return null
+      }),
     }))
 
     const agent = await import("../agent")
