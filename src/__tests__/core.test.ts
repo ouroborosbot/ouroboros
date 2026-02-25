@@ -1041,6 +1041,50 @@ describe("streamResponsesApi", () => {
     await streamResponsesApi(client, {}, callbacks)
     expect(reasoningChunks).toEqual(["42"])
   })
+
+  it("respects abort signal during stream iteration", async () => {
+    const controller = new AbortController()
+    const textChunks: string[] = []
+    const client = { responses: { create: vi.fn().mockReturnValue({
+      [Symbol.asyncIterator]: async function* () {
+        yield { type: "response.output_text.delta", delta: "first" }
+        controller.abort()
+        yield { type: "response.output_text.delta", delta: "second" }
+      },
+    }) } }
+    const callbacks = makeCallbacks({ onTextChunk: (text: string) => textChunks.push(text) })
+    await streamResponsesApi(client, {}, callbacks, controller.signal)
+    expect(textChunks).toEqual(["first"])
+  })
+
+  it("handles abort signal already aborted before iteration", async () => {
+    const controller = new AbortController()
+    controller.abort()
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_text.delta", delta: "should not fire" },
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks, controller.signal)
+    expect(callbacks.onTextChunk).not.toHaveBeenCalled()
+    expect(result.content).toBe("")
+  })
+
+  it("propagates errors from client.responses.create", async () => {
+    const client = { responses: { create: vi.fn().mockImplementation(() => { throw new Error("API error") }) } }
+    const callbacks = makeCallbacks()
+    await expect(streamResponsesApi(client, {}, callbacks)).rejects.toThrow("API error")
+  })
+
+  it("handles stream with only non-content events", async () => {
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.created" },
+      { type: "response.completed" },
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(callbacks.onModelStreamStart).not.toHaveBeenCalled()
+    expect(result.content).toBe("")
+  })
 })
 
 describe("runAgent", () => {
