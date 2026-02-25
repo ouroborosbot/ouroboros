@@ -283,6 +283,25 @@ describe("trimMessages", () => {
     expect(result.length).toBe(1)
     expect(result[0].role).toBe("system")
   })
+
+  it("trims by message count even when token estimate is under limit", async () => {
+    const { trimMessages } = await import("../context")
+    // 300 tiny messages — well under 80K token estimate but over MAX_MESSAGES (200)
+    const msgs: OpenAI.ChatCompletionMessageParam[] = [
+      { role: "system", content: "sys" },
+    ]
+    for (let i = 0; i < 299; i++) {
+      msgs.push({ role: i % 2 === 0 ? "user" : "assistant", content: "hi" })
+    }
+    expect(msgs.length).toBe(300)
+
+    const result = trimMessages(msgs, 80000, 20)
+    // Should trim down to MAX_MESSAGES (200)
+    expect(result.length).toBeLessThanOrEqual(200)
+    expect(result[0].role).toBe("system")
+    // Should keep most recent messages
+    expect(result[result.length - 1]).toBe(msgs[msgs.length - 1])
+  })
 })
 
 describe("saveSession", () => {
