@@ -2307,7 +2307,7 @@ process.env.MINIMAX_MODEL = "test-model"
     expect(textChunks).toEqual(["result"])
   })
 
-  it("passes reasoning params for Azure provider", async () => {
+  it("Azure provider calls mockResponsesCreate with Responses API params", async () => {
     vi.resetModules()
     delete process.env.MINIMAX_API_KEY
     delete process.env.MINIMAX_MODEL
@@ -2316,9 +2316,9 @@ process.env.MINIMAX_MODEL = "test-model"
     process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
     process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
 
-    mockCreate.mockReturnValue(
-      makeStream([makeChunk("hello")])
-    )
+    mockResponsesCreate.mockReturnValue(makeResponsesStream([
+      { type: "response.output_text.delta", delta: "hello" },
+    ]))
 
     const core = await import("../core")
     const callbacks: ChannelCallbacks = {
@@ -2332,8 +2332,211 @@ process.env.MINIMAX_MODEL = "test-model"
     }
 
     await core.runAgent([{ role: "system", content: "test" }], callbacks)
-    const params = mockCreate.mock.calls[0][0]
-    expect(params.reasoning_effort).toBe("medium")
+    expect(mockResponsesCreate).toHaveBeenCalledTimes(1)
+    expect(mockCreate).not.toHaveBeenCalled()
+    const params = mockResponsesCreate.mock.calls[0][0]
+    expect(params.model).toBe("gpt-5.2-chat")
+    expect(params.stream).toBe(true)
+    expect(params.store).toBe(false)
+    expect(params.include).toEqual(["reasoning.encrypted_content"])
+    expect(params.reasoning).toEqual({ effort: "medium", summary: "auto" })
+    expect(params.instructions).toBe("test")
+    expect(params.tools).toBeDefined()
+
+    delete process.env.AZURE_OPENAI_API_KEY
+    delete process.env.AZURE_OPENAI_ENDPOINT
+    delete process.env.AZURE_OPENAI_DEPLOYMENT
+    delete process.env.AZURE_OPENAI_MODEL_NAME
+  })
+
+  it("Azure text-only response: assistant message pushed in CC format, loop ends", async () => {
+    vi.resetModules()
+    delete process.env.MINIMAX_API_KEY
+    delete process.env.MINIMAX_MODEL
+    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
+    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
+    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
+    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+
+    mockResponsesCreate.mockReturnValue(makeResponsesStream([
+      { type: "response.output_text.delta", delta: "hello azure" },
+    ]))
+
+    const core = await import("../core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await core.runAgent(messages, callbacks)
+    const assistantMsg = messages.find((m: any) => m.role === "assistant")
+    expect(assistantMsg).toBeDefined()
+    expect(assistantMsg.content).toBe("hello azure")
+
+    delete process.env.AZURE_OPENAI_API_KEY
+    delete process.env.AZURE_OPENAI_ENDPOINT
+    delete process.env.AZURE_OPENAI_DEPLOYMENT
+    delete process.env.AZURE_OPENAI_MODEL_NAME
+  })
+
+  it("Azure tool-use turn: tool executed, result pushed, loop continues", async () => {
+    vi.resetModules()
+    delete process.env.MINIMAX_API_KEY
+    delete process.env.MINIMAX_MODEL
+    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
+    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
+    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
+    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+
+    vi.mocked(fs.readFileSync).mockReturnValue("file contents")
+
+    let callCount = 0
+    mockResponsesCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeResponsesStream([
+          { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "read_file", arguments: "" } },
+          { type: "response.function_call_arguments.delta", delta: '{"path":"a.txt"}' },
+          { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "read_file", arguments: '{"path":"a.txt"}' } },
+        ])
+      }
+      return makeResponsesStream([
+        { type: "response.output_text.delta", delta: "done" },
+      ])
+    })
+
+    const core = await import("../core")
+    const toolStarts: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: (name) => toolStarts.push(name),
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await core.runAgent(messages, callbacks)
+    expect(callCount).toBe(2)
+    expect(toolStarts).toEqual(["read_file"])
+    const toolMsg = messages.find((m: any) => m.role === "tool")
+    expect(toolMsg).toBeDefined()
+    expect(toolMsg.content).toBe("file contents")
+
+    delete process.env.AZURE_OPENAI_API_KEY
+    delete process.env.AZURE_OPENAI_ENDPOINT
+    delete process.env.AZURE_OPENAI_DEPLOYMENT
+    delete process.env.AZURE_OPENAI_MODEL_NAME
+  })
+
+  it("Azure reasoning items accumulated and appended to next turn input", async () => {
+    vi.resetModules()
+    delete process.env.MINIMAX_API_KEY
+    delete process.env.MINIMAX_MODEL
+    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
+    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
+    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
+    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+
+    vi.mocked(fs.readFileSync).mockReturnValue("data")
+
+    const reasoningItem = { type: "reasoning", id: "r1", summary: [{ text: "thought", type: "summary_text" }], encrypted_content: "enc1" }
+    let callCount = 0
+    mockResponsesCreate.mockImplementation((...args: any[]) => {
+      callCount++
+      if (callCount === 1) {
+        return makeResponsesStream([
+          { type: "response.output_item.done", item: reasoningItem },
+          { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "read_file", arguments: "" } },
+          { type: "response.function_call_arguments.delta", delta: '{"path":"a.txt"}' },
+          { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "read_file", arguments: '{"path":"a.txt"}' } },
+        ])
+      }
+      return makeResponsesStream([
+        { type: "response.output_text.delta", delta: "done" },
+      ])
+    })
+
+    const core = await import("../core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await core.runAgent([{ role: "system", content: "test" }, { role: "user", content: "hi" }], callbacks)
+    // Second call should include the reasoning item in input
+    const secondCallParams = mockResponsesCreate.mock.calls[1][0]
+    const input = secondCallParams.input
+    // Reasoning item should be appended at the end of input
+    const hasReasoningItem = input.some((i: any) => i.type === "reasoning" && i.encrypted_content === "enc1")
+    expect(hasReasoningItem).toBe(true)
+
+    delete process.env.AZURE_OPENAI_API_KEY
+    delete process.env.AZURE_OPENAI_ENDPOINT
+    delete process.env.AZURE_OPENAI_DEPLOYMENT
+    delete process.env.AZURE_OPENAI_MODEL_NAME
+  })
+
+  it("Azure non-reasoning output items NOT accumulated", async () => {
+    vi.resetModules()
+    delete process.env.MINIMAX_API_KEY
+    delete process.env.MINIMAX_MODEL
+    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
+    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
+    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
+    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+
+    vi.mocked(fs.readFileSync).mockReturnValue("data")
+
+    const funcItem = { type: "function_call", call_id: "c1", name: "read_file", arguments: '{"path":"a.txt"}' }
+    let callCount = 0
+    mockResponsesCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeResponsesStream([
+          { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "read_file", arguments: "" } },
+          { type: "response.function_call_arguments.delta", delta: '{"path":"a.txt"}' },
+          { type: "response.output_item.done", item: funcItem },
+        ])
+      }
+      return makeResponsesStream([
+        { type: "response.output_text.delta", delta: "done" },
+      ])
+    })
+
+    const core = await import("../core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await core.runAgent([{ role: "system", content: "test" }, { role: "user", content: "hi" }], callbacks)
+    // Second call should NOT include function_call items in input (they round-trip through CC)
+    const secondCallParams = mockResponsesCreate.mock.calls[1][0]
+    const input = secondCallParams.input
+    const hasFuncCallItem = input.some((i: any) => i.type === "function_call" && i.call_id === "c1" && i.name === "read_file")
+    // The function_call IS expected from toResponsesInput (converting CC assistant message back)
+    // But the output_item.done function_call should NOT be separately appended
+    const reasoningItems = input.filter((i: any) => i.type === "reasoning")
+    expect(reasoningItems).toHaveLength(0)
 
     delete process.env.AZURE_OPENAI_API_KEY
     delete process.env.AZURE_OPENAI_ENDPOINT
@@ -2359,6 +2562,26 @@ process.env.MINIMAX_MODEL = "test-model"
     await runAgent([{ role: "system", content: "test" }], callbacks)
     const params = mockCreate.mock.calls[0][0]
     expect(params.reasoning_effort).toBeUndefined()
+  })
+
+  it("MiniMax path calls mockCreate, not mockResponsesCreate", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([makeChunk("hello")])
+    )
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(mockCreate).toHaveBeenCalledTimes(1)
+    expect(mockResponsesCreate).not.toHaveBeenCalled()
   })
 })
 
