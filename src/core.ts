@@ -182,6 +182,57 @@ export const tools: OpenAI.ChatCompletionTool[] = [
   },
 ];
 
+export function toResponsesInput(
+  messages: OpenAI.ChatCompletionMessageParam[],
+): { instructions: string; input: any[] } {
+  let instructions = "";
+  const input: any[] = [];
+
+  for (const msg of messages) {
+    if (msg.role === "system") {
+      if (!instructions) {
+        instructions = (msg as any).content || "";
+      }
+      continue;
+    }
+
+    if (msg.role === "user") {
+      input.push({ role: "user", content: (msg as any).content });
+      continue;
+    }
+
+    if (msg.role === "assistant") {
+      const a = msg as any;
+      if (a.content) {
+        input.push({ role: "assistant", content: a.content });
+      }
+      if (a.tool_calls) {
+        for (const tc of a.tool_calls) {
+          input.push({
+            type: "function_call",
+            call_id: tc.id,
+            name: tc.function.name,
+            arguments: tc.function.arguments,
+          });
+        }
+      }
+      continue;
+    }
+
+    if (msg.role === "tool") {
+      const t = msg as any;
+      input.push({
+        type: "function_call_output",
+        call_id: t.tool_call_id,
+        output: t.content,
+      });
+      continue;
+    }
+  }
+
+  return { instructions, input };
+}
+
 export function toResponsesTools(
   ccTools: OpenAI.ChatCompletionTool[],
 ): { type: "function"; name: string; description: string | null; parameters: Record<string, unknown> | null; strict: false }[] {
