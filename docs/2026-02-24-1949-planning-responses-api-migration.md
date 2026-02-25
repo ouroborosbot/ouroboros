@@ -1,7 +1,7 @@
 # Planning: Migrate Azure GPT Path to OpenAI Responses API
 
 **Status**: drafting
-**Created**: (pending first commit)
+**Created**: 2026-02-24 19:50
 
 ## Goal
 Migrate the Azure provider path in `runAgent()` from the Chat Completions API (`client.chat.completions.create()`) to the OpenAI Responses API (`client.responses.create()`) to unlock reasoning summaries (`reasoning: { effort: "medium", summary: "auto" }`), while keeping MiniMax on the Chat Completions API since it does not support the Responses API.
@@ -91,3 +91,4 @@ Migrate the Azure provider path in `runAgent()` from the Chat Completions API (`
 The migration is scoped to `core.ts` only. The `ChannelCallbacks` abstraction layer means adapters (agent.ts, teams.ts) are completely isolated from which API is used. The main complexity is in the stream processing -- Responses API uses discrete events instead of delta chunks, so the stream loop needs two separate implementations (one per provider). The tool-use loop structure (call model -> parse tool calls -> execute -> submit results -> call model again) stays the same, just with different wire formats on each side.
 
 ## Progress Log
+- 2026-02-24 19:50 Created
