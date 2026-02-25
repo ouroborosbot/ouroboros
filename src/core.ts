@@ -213,6 +213,7 @@ export function toResponsesInput(
             call_id: tc.id,
             name: tc.function.name,
             arguments: tc.function.arguments,
+            status: "completed",
           });
         }
       }
