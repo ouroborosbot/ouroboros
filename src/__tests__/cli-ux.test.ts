@@ -122,6 +122,29 @@ describe("CLI UX - InputController", () => {
     rl.close()
   })
 
+  it("restore() handles null dataHandler when suppressed", async () => {
+    vi.resetModules()
+    const agent = await import("../agent")
+
+    const mockStdin = new Readable({ read() {} }) as any
+    const mockStdout = new Writable({ write(_chunk, _enc, cb) { cb(); return true } }) as any
+    const readline = await import("readline")
+    const rl = readline.createInterface({ input: mockStdin, output: mockStdout, terminal: false })
+    const resumeSpy = vi.spyOn(rl, "resume")
+
+    const ctrl = new agent.InputController(rl)
+    // Force suppressed=true without a dataHandler (defensive edge case)
+    ;(ctrl as any).suppressed = true
+    ;(ctrl as any).dataHandler = null
+    ctrl.restore()
+
+    expect(resumeSpy).toHaveBeenCalled()
+    // removeListener should NOT be called since dataHandler was null
+    expect(process.stdin.removeListener).not.toHaveBeenCalled()
+
+    rl.close()
+  })
+
   it("suppress() is idempotent", async () => {
     vi.resetModules()
     const agent = await import("../agent")
