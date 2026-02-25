@@ -204,8 +204,8 @@ export async function main() {
       if (closed || input.toLowerCase() === "exit") break
       if (!input.trim()) { process.stdout.write("\x1b[36m> \x1b[0m"); continue }
 
-      // Clear the echoed input line (readline terminal:true echoes it)
-      process.stdout.write("\x1b[1A\x1b[K")
+      // Re-style the echoed input line (readline terminal:true echoes it as "> input")
+      process.stdout.write(`\x1b[1A\x1b[K\x1b[1m> ${input}\x1b[0m\n`)
 
       messages.push({ role: "user", content: input })
       addHistory(history, input)
