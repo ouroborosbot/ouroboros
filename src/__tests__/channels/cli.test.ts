@@ -115,7 +115,7 @@ describe("CLI adapter - onReasoningChunk and onTextChunk rendering", () => {
   let stdoutChunks: string[]
   let stdoutSpy: ReturnType<typeof vi.spyOn>
   let stderrSpy: ReturnType<typeof vi.spyOn>
-  let callbacks: ChannelCallbacks & { getBuffer(): string }
+  let callbacks: ChannelCallbacks
 
   beforeEach(async () => {
     stdoutChunks = []
@@ -136,17 +136,14 @@ describe("CLI adapter - onReasoningChunk and onTextChunk rendering", () => {
     vi.restoreAllMocks()
   })
 
-  it("onTextChunk buffers text (not written to stdout)", () => {
+  it("onTextChunk streams text to stdout immediately", () => {
     callbacks.onTextChunk("hello world")
-    expect(stdoutChunks.join("")).toBe("")
-    expect(callbacks.getBuffer()).toBe("hello world")
+    expect(stdoutChunks.join("")).toBe("hello world")
   })
 
-  it("getBuffer clears buffer after read", () => {
-    callbacks.onTextChunk("hello")
-    callbacks.onTextChunk(" world")
-    expect(callbacks.getBuffer()).toBe("hello world")
-    expect(callbacks.getBuffer()).toBe("")
+  it("onTextChunk applies markdown rendering", () => {
+    callbacks.onTextChunk("hello **world**")
+    expect(stdoutChunks.join("")).toBe("hello \x1b[1mworld\x1b[22m")
   })
 
   it("onReasoningChunk outputs dim text", () => {
@@ -157,43 +154,39 @@ describe("CLI adapter - onReasoningChunk and onTextChunk rendering", () => {
     expect(output).toContain("\x1b[0m")
   })
 
-  it("reasoning then content: dim on stdout, \\n\\n + text in buffer", () => {
+  it("reasoning then content: \\n\\n separator before text on stdout", () => {
     callbacks.onReasoningChunk("thinking")
     callbacks.onTextChunk("answer")
-    // Reasoning goes to stdout
     const output = stdoutChunks.join("")
-    expect(output).toContain("\x1b[2m")
-    expect(output).toContain("thinking")
-    // Text with separator goes to buffer
-    const buf = callbacks.getBuffer()
-    expect(buf).toBe("\n\nanswer")
+    expect(output).toContain("\x1b[2mthinking\x1b[0m")
+    expect(output).toContain("\n\nanswer")
   })
 
-  it("text-only response has no \\n\\n prefix in buffer", () => {
+  it("text-only response has no \\n\\n prefix", () => {
     callbacks.onTextChunk("just text")
-    const buf = callbacks.getBuffer()
-    expect(buf).toBe("just text")
-    expect(buf).not.toContain("\n\n")
+    const output = stdoutChunks.join("")
+    expect(output).toBe("just text")
+    expect(output).not.toContain("\n\n")
   })
 
-  it("multiple reasoning chunks before text: only one \\n\\n separator in buffer", () => {
+  it("multiple reasoning chunks before text: only one \\n\\n separator", () => {
     callbacks.onReasoningChunk("step1")
     callbacks.onReasoningChunk("step2")
     callbacks.onTextChunk("answer")
-    const buf = callbacks.getBuffer()
-    const matches = buf.match(/\n\n/g)
+    const output = stdoutChunks.join("")
+    const matches = output.match(/\n\n/g)
     expect(matches).toHaveLength(1)
-    expect(buf).toBe("\n\nanswer")
   })
 
   it("onModelStart resets reasoning state for new turn", () => {
     callbacks.onReasoningChunk("thinking")
     callbacks.onModelStart()
     callbacks.onModelStreamStart()
+    stdoutChunks.length = 0
     callbacks.onTextChunk("answer")
-    const buf = callbacks.getBuffer()
-    expect(buf).toBe("answer")
-    expect(buf).not.toContain("\n\n")
+    const output = stdoutChunks.join("")
+    expect(output).toBe("answer")
+    expect(output).not.toContain("\n\n")
   })
 
   it("multiple reasoning chunks are all dim", () => {
@@ -204,11 +197,11 @@ describe("CLI adapter - onReasoningChunk and onTextChunk rendering", () => {
     expect(output).toContain("\x1b[2mchunk2\x1b[0m")
   })
 
-  it("content-only: no dim codes in buffer", () => {
+  it("content-only: no dim codes on stdout", () => {
     callbacks.onTextChunk("just text")
-    const buf = callbacks.getBuffer()
-    expect(buf).toBe("just text")
-    expect(buf).not.toContain("\x1b[2m")
+    const output = stdoutChunks.join("")
+    expect(output).toBe("just text")
+    expect(output).not.toContain("\x1b[2m")
   })
 })
 
