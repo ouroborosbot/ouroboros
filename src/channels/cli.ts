@@ -1,6 +1,7 @@
 import OpenAI from "openai"
 import * as readline from "readline"
-import { runAgent, buildSystem, ChannelCallbacks } from "../engine/core"
+import { runAgent, ChannelCallbacks } from "../engine/core"
+import { buildSystem } from "../mind/prompt"
 import { pickPhrase, THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "../repertoire/phrases"
 import { sessionPath, getContextConfig } from "../config"
 import { loadSession, saveSession, deleteSession, trimMessages, cachedBuildSystem } from "../mind/context"

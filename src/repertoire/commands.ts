@@ -1,4 +1,4 @@
-import type { Channel } from "../engine/core"
+import type { Channel } from "../mind/prompt"
 
 export interface CommandContext {
   channel: Channel
