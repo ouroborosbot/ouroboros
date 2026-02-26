@@ -32,28 +32,28 @@ const mocks = vi.hoisted(() => ({
 vi.mock("readline", () => ({
   createInterface: (...a: any[]) => mocks.createInterface(...a),
 }))
-vi.mock("../core", () => ({
+vi.mock("../../core", () => ({
   runAgent: (...a: any[]) => mocks.runAgent(...a),
   buildSystem: (...a: any[]) => mocks.buildSystem(...a),
 }))
-vi.mock("../config", () => ({
+vi.mock("../../config", () => ({
   sessionPath: (...a: any[]) => mocks.sessionPath(...a),
   getContextConfig: (...a: any[]) => mocks.getContextConfig(...a),
 }))
-vi.mock("../mind/context", () => ({
+vi.mock("../../mind/context", () => ({
   loadSession: (...a: any[]) => mocks.loadSession(...a),
   saveSession: (...a: any[]) => mocks.saveSession(...a),
   deleteSession: (...a: any[]) => mocks.deleteSession(...a),
   trimMessages: (...a: any[]) => mocks.trimMessages(...a),
   cachedBuildSystem: (...a: any[]) => mocks.cachedBuildSystem(...a),
 }))
-vi.mock("../repertoire/commands", () => ({
+vi.mock("../../repertoire/commands", () => ({
   createCommandRegistry: (...a: any[]) => mocks.createCommandRegistry(...a),
   registerDefaultCommands: (...a: any[]) => mocks.registerDefaultCommands(...a),
   parseSlashCommand: (...a: any[]) => mocks.parseSlashCommand(...a),
 }))
 
-import { main } from "../agent"
+import { main } from "../../channels/cli"
 
 // ── helpers ──
 

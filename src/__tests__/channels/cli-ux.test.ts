@@ -31,13 +31,13 @@ describe("CLI UX - InputController", () => {
 
   it("is exported from agent.ts", async () => {
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     expect(typeof agent.InputController).toBe("function")
   })
 
   it("suppress() pauses readline and listens on stdin for data", async () => {
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
 
     const mockStdin = new Readable({ read() {} }) as any
     const mockStdout = new Writable({ write(_chunk, _enc, cb) { cb(); return true } }) as any
@@ -56,7 +56,7 @@ describe("CLI UX - InputController", () => {
 
   it("restore() resumes readline and removes stdin listener", async () => {
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
 
     const mockStdin = new Readable({ read() {} }) as any
     const mockStdout = new Writable({ write(_chunk, _enc, cb) { cb(); return true } }) as any
@@ -79,7 +79,7 @@ describe("CLI UX - InputController", () => {
 
   it("suppress() calls onInterrupt when Ctrl-C (0x03) is received", async () => {
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
 
     const mockStdin = new Readable({ read() {} }) as any
     const mockStdout = new Writable({ write(_chunk, _enc, cb) { cb(); return true } }) as any
@@ -102,7 +102,7 @@ describe("CLI UX - InputController", () => {
 
   it("suppress() swallows non-Ctrl-C input", async () => {
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
 
     const mockStdin = new Readable({ read() {} }) as any
     const mockStdout = new Writable({ write(_chunk, _enc, cb) { cb(); return true } }) as any
@@ -124,7 +124,7 @@ describe("CLI UX - InputController", () => {
 
   it("restore() handles null dataHandler when suppressed", async () => {
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
 
     const mockStdin = new Readable({ read() {} }) as any
     const mockStdout = new Writable({ write(_chunk, _enc, cb) { cb(); return true } }) as any
@@ -147,7 +147,7 @@ describe("CLI UX - InputController", () => {
 
   it("suppress() is idempotent", async () => {
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
 
     const mockStdin = new Readable({ read() {} }) as any
     const mockStdout = new Writable({ write(_chunk, _enc, cb) { cb(); return true } }) as any
@@ -166,7 +166,7 @@ describe("CLI UX - InputController", () => {
 describe("CLI UX - Ctrl-C handling", () => {
   it("handleSigint is exported from agent.ts", async () => {
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     expect(typeof agent.handleSigint).toBe("function")
   })
 
@@ -175,7 +175,7 @@ describe("CLI UX - Ctrl-C handling", () => {
     vi.spyOn(process.stderr, "write").mockImplementation(() => true)
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
 
     const mockStdin = new Readable({ read() {} }) as any
     const mockStdout = new Writable({ write(_chunk, _enc, cb) { cb(); return true } }) as any
@@ -194,7 +194,7 @@ describe("CLI UX - Ctrl-C handling", () => {
     vi.spyOn(process.stderr, "write").mockImplementation(() => true)
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
 
     const mockStdin = new Readable({ read() {} }) as any
     const mockStdout = new Writable({ write(_chunk, _enc, cb) { cb(); return true } }) as any
@@ -213,7 +213,7 @@ describe("CLI UX - Ctrl-C handling", () => {
     vi.spyOn(process.stderr, "write").mockImplementation(() => true)
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
 
     const mockStdin = new Readable({ read() {} }) as any
     const mockStdout = new Writable({ write(_chunk, _enc, cb) { cb(); return true } }) as any
@@ -233,7 +233,7 @@ describe("CLI UX - Ctrl-C handling", () => {
     vi.spyOn(process.stderr, "write").mockImplementation(() => true)
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
 
     const mockStdin = new Readable({ read() {} }) as any
     const mockStdout = new Writable({ write(_chunk, _enc, cb) { cb(); return true } }) as any
@@ -253,13 +253,13 @@ describe("CLI UX - Ctrl-C handling", () => {
 describe("CLI UX - History", () => {
   it("addHistory is exported from agent.ts", async () => {
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     expect(typeof agent.addHistory).toBe("function")
   })
 
   it("adds entries to history array", async () => {
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     const history: string[] = []
     agent.addHistory(history, "first command")
     agent.addHistory(history, "second command")
@@ -268,7 +268,7 @@ describe("CLI UX - History", () => {
 
   it("does not add empty strings to history", async () => {
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     const history: string[] = []
     agent.addHistory(history, "")
     agent.addHistory(history, "  ")
@@ -277,7 +277,7 @@ describe("CLI UX - History", () => {
 
   it("does not add duplicate consecutive entries", async () => {
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     const history: string[] = []
     agent.addHistory(history, "same command")
     agent.addHistory(history, "same command")

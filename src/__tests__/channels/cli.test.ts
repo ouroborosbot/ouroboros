@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import type { ChannelCallbacks } from "../core"
-import { THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "../repertoire/phrases"
+import type { ChannelCallbacks } from "../../core"
+import { THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "../../repertoire/phrases"
 
 // These imports will fail until agent.ts is refactored to export them.
 // That's exactly the point -- tests must FAIL (red) for Unit 2a.
@@ -31,12 +31,12 @@ describe("CLI adapter - createCliCallbacks", () => {
   })
 
   it("is exported from agent.ts", async () => {
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     expect(typeof agent.createCliCallbacks).toBe("function")
   })
 
   it("returns an object implementing ChannelCallbacks", async () => {
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     const callbacks = agent.createCliCallbacks()
     expect(typeof callbacks.onModelStart).toBe("function")
     expect(typeof callbacks.onModelStreamStart).toBe("function")
@@ -62,7 +62,7 @@ describe("CLI adapter - onReasoningChunk and onTextChunk rendering", () => {
     stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     callbacks = agent.createCliCallbacks()
   })
 
@@ -157,7 +157,7 @@ describe("CLI adapter - onModelStart", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onModelStart()
@@ -181,7 +181,7 @@ describe("CLI adapter - onModelStreamStart", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onModelStart()
@@ -198,7 +198,7 @@ describe("CLI adapter - onModelStreamStart", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
 
     // Directly test Spinner.stop() without start() — covers the this.iv === null branch
     const s = new agent.Spinner("test")
@@ -212,7 +212,7 @@ describe("CLI adapter - onModelStreamStart", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
 
     // Start spinner and let the setInterval callback fire
     const s = new agent.Spinner("test")
@@ -234,7 +234,7 @@ describe("CLI adapter - onToolStart", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onToolStart("read_file", { path: "/tmp/test.txt" })
@@ -257,7 +257,7 @@ describe("CLI adapter - onToolEnd", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onToolStart("read_file", { path: "/tmp/test.txt" })
@@ -278,7 +278,7 @@ describe("CLI adapter - onToolEnd", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onToolStart("read_file", { path: "/tmp/test.txt" })
@@ -299,7 +299,7 @@ describe("CLI adapter - onToolEnd", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onToolStart("get_current_time", {})
@@ -323,7 +323,7 @@ describe("CLI adapter - onError", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onError(new Error("connection failed"))
@@ -342,7 +342,7 @@ describe("CLI adapter - onError", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onModelStart() // start spinner
@@ -360,7 +360,7 @@ describe("CLI adapter - onError", () => {
 describe("CLI adapter - bootGreeting", () => {
   it("is exported from agent.ts", async () => {
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     expect(typeof agent.bootGreeting).toBe("function")
   })
 
@@ -372,13 +372,13 @@ describe("CLI adapter - bootGreeting", () => {
 
     // We need to mock runAgent within core
     const mockRunAgent = vi.fn()
-    vi.doMock("../core", () => ({
+    vi.doMock("../../core", () => ({
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
 
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     const messages: any[] = [{ role: "system", content: "system prompt" }]
     const callbacks = agent.createCliCallbacks()
     await agent.bootGreeting(messages, callbacks)
@@ -410,7 +410,7 @@ describe("CLI adapter - phrase rotation", () => {
 
   it("onModelStart uses a THINKING_PHRASES phrase", async () => {
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onModelStart()
@@ -422,7 +422,7 @@ describe("CLI adapter - phrase rotation", () => {
 
   it("onModelStart after tool uses FOLLOWUP_PHRASES", async () => {
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     const callbacks = agent.createCliCallbacks()
 
     // First model call
@@ -444,7 +444,7 @@ describe("CLI adapter - phrase rotation", () => {
     vi.useFakeTimers()
 
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onModelStart()
@@ -465,7 +465,7 @@ describe("CLI adapter - phrase rotation", () => {
     vi.useFakeTimers()
 
     vi.resetModules()
-    const agent = await import("../agent")
+    const agent = await import("../../channels/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onModelStart()
