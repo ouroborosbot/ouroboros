@@ -141,7 +141,7 @@ Every local import in the codebase after reorganization:
 
 ---
 
-### ⬜ Unit 1: Create directory structure
+### ✅ Unit 1: Create directory structure
 **What**: Create all new directories:
 - `src/engine/`
 - `src/mind/`
@@ -476,3 +476,4 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 - 2026-02-25 21:59 Passes 2-4 complete
 - 2026-02-25 22:02 Pre-execution: IDENTITY.md, identitySection/selfAwareSection split
 - 2026-02-25 22:22 Major rewrite: src subdirectories (engine/mind/channels/repertoire), docs/psyche + docs/tasks, reordered units for minimal breakage
+- 2026-02-25 22:38 Unit 1 complete: created all directory structure (engine/, mind/, channels/, repertoire/, tests, docs/psyche/, docs/tasks/)
