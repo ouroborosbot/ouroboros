@@ -290,11 +290,11 @@ Update `engine/core.ts` to `import { tools, execTool, summarizeArgs } from "./to
 
 ---
 
-### ⬜ Unit 8a: Extract engine/streaming.ts -- Tests
+### ✅ Unit 8a: Extract engine/streaming.ts -- Tests
 **What**: Create `src/__tests__/engine/streaming.test.ts` by moving `describe("streamChatCompletion", ...)`, `describe("streamResponsesApi", ...)`, `describe("toResponsesTools", ...)`, `describe("toResponsesInput", ...)` from `core.test.ts`. Update imports to `../../engine/streaming`.
 **Acceptance**: Tests exist and FAIL because `src/engine/streaming.ts` does not exist yet.
 
-### ⬜ Unit 8b: Extract engine/streaming.ts -- Implementation
+### ✅ Unit 8b: Extract engine/streaming.ts -- Implementation
 **What**: Create `src/engine/streaming.ts` by extracting from `engine/core.ts`:
 - `TurnResult` interface
 - `toResponsesInput()`, `toResponsesTools()`
@@ -305,7 +305,7 @@ Update `engine/core.ts` to `import { tools, execTool, summarizeArgs } from "./to
 Update `engine/core.ts` to import from `./streaming`.
 **Acceptance**: `npm test` -- all tests pass. `npm run build` clean.
 
-### ⬜ Unit 8c: Extract engine/streaming.ts -- Coverage & Cleanup
+### ✅ Unit 8c: Extract engine/streaming.ts -- Coverage & Cleanup
 **What**: Verify 100% coverage on `src/engine/streaming.ts`. Remove duplicate test blocks from `core.test.ts`.
 **Acceptance**: 100% coverage on `src/engine/streaming.ts`. All tests green.
 
@@ -483,3 +483,4 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 - 2026-02-25 22:46 Unit 5 complete: moved core.ts to engine/ with all import updates. Only config.ts and entry points in src/ root
 - 2026-02-25 22:47 Unit 6 complete: checkpoint passed -- 400 tests, 100% coverage, build clean
 - 2026-02-25 22:51 Units 7a-7c complete: extracted engine/tools.ts via TDD, 100% coverage, 400 tests
+- 2026-02-25 22:58 Units 8a-8c complete: extracted engine/streaming.ts via TDD, 100% coverage, 401 tests
