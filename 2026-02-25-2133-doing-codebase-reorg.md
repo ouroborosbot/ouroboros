@@ -232,7 +232,7 @@ Every local import in the codebase after reorganization:
 
 ---
 
-### ⬜ Unit 5: Move core.ts to engine/ + tests + update imports
+### ✅ Unit 5: Move core.ts to engine/ + tests + update imports
 **What**: Move core.ts to its final home:
 1. `git mv src/core.ts src/engine/core.ts`
 2. `git mv src/__tests__/core.test.ts src/__tests__/engine/core.test.ts`
@@ -480,3 +480,4 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 - 2026-02-25 22:40 Unit 2 complete: moved phrases, skills, commands to repertoire/ with all import updates
 - 2026-02-25 22:41 Unit 3 complete: moved context.ts to mind/ with all import updates
 - 2026-02-25 22:44 Unit 4 complete: moved agent.ts -> channels/cli.ts, teams.ts -> channels/teams.ts with all import updates
+- 2026-02-25 22:46 Unit 5 complete: moved core.ts to engine/ with all import updates. Only config.ts and entry points in src/ root
