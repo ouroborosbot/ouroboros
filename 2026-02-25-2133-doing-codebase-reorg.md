@@ -24,7 +24,7 @@ Reorganize the Ouroboros codebase for better modularity: rename agent.ts to cli.
 - [ ] No references to `agent.ts` remain in source code imports
 - [ ] No references to old paths remain in active source code (test files, src files)
 - [ ] `core.ts` contains only the agent loop, callbacks interface, client init, and glue
-- [ ] Soul markdown files (`SOUL.md`, `LORE.md`, `FRIENDS.md`) exist in `docs/inner-flame/` and are loaded at runtime
+- [ ] Soul markdown files (`SOUL.md`, `IDENTITY.md`, `LORE.md`, `FRIENDS.md`) exist in `docs/inner-flame/` and are loaded at runtime
 - [ ] Only truly static text lives in markdown files -- all runtime-branching/computed sections stay in code
 - [ ] All planning/doing docs and artifacts live in `docs/lab-notes/`
 - [ ] README.md reflects the new file structure accurately
@@ -119,15 +119,32 @@ Update `core.ts` to import from `./streaming` and re-export for backward compati
 ---
 
 ### ⬜ Unit 4a: Extract prompt.ts -- Tests
-**What**: Write tests for the new `src/prompt.ts` module. This covers `buildSystem()`, `isOwnCodebase()`, `Channel` type, `soulSection()`, `identitySection()`, `providerSection()`, `dateSection()`, `toolsSection()`, `skillsSection()`, `selfAwareSection()`. These tests currently live in `core.test.ts` under `describe("buildSystem", ...)` and `describe("isOwnCodebase", ...)`. Create `src/__tests__/prompt.test.ts` by moving the relevant test blocks. Tests should import from `../prompt`.
+**What**: Write tests for the new `src/prompt.ts` module. This covers `buildSystem()`, `isOwnCodebase()`, `Channel` type, `soulSection()`, `identitySection()`, `providerSection()`, `dateSection()`, `toolsSection()`, `skillsSection()`, `selfAwareSection(channel)`. These tests currently live in `core.test.ts` under `describe("buildSystem", ...)` and `describe("isOwnCodebase", ...)`. Create `src/__tests__/prompt.test.ts` by moving the relevant test blocks. Tests should import from `../prompt`.
+
+Note: the refactored function signatures are:
+- `identitySection()` -- no params, returns static text (will read from IDENTITY.md in Unit 6b)
+- `selfAwareSection(channel)` -- takes channel param, handles channel-specific behavior + isOwnCodebase check
+
+Tests should cover:
+- `selfAwareSection("cli")` includes cli greeting line
+- `selfAwareSection("teams")` includes Teams behavior line
+- `selfAwareSection(channel)` returns empty when not in own codebase (existing behavior preserved)
+- `identitySection()` returns static identity text (no channel branching)
 **Acceptance**: Tests exist in `src/__tests__/prompt.test.ts` and FAIL because `src/prompt.ts` does not exist yet.
 
 ### ⬜ Unit 4b: Extract prompt.ts -- Implementation
 **What**: Create `src/prompt.ts` by extracting from `core.ts`:
 - `Channel` type (line 339)
 - `isOwnCodebase()` function (lines 328-337)
-- All section builders: `soulSection()`, `identitySection()`, `providerSection()`, `dateSection()`, `toolsSection()`, `skillsSection()`, `selfAwareSection()` (lines 341-406)
-- `buildSystem()` function (lines 408-420)
+- All section builders (lines 341-406), with these refactors:
+  - `soulSection()` -- moves as-is (pure static string, will read from SOUL.md in Unit 6b)
+  - `identitySection()` -- **refactored**: remove `channel` parameter, keep only static lines: "i am Ouroboros." + lowercase style rule. The channel-specific lines move to `selfAwareSection`.
+  - `selfAwareSection(channel)` -- **refactored**: gains `channel: Channel` parameter. Prepends channel-specific lines before the isOwnCodebase block:
+    - `channel === "cli"`: "i introduce myself on boot with a fun random greeting."
+    - `channel === "teams"`: "i am responding in Microsoft Teams. i keep responses concise. i use markdown formatting. i do not introduce myself on boot."
+    - Then the existing isOwnCodebase conditional block
+  - `providerSection()`, `dateSection()`, `toolsSection()`, `skillsSection()` -- move as-is
+- `buildSystem(channel)` function (lines 408-420) -- update to pass `channel` to `selfAwareSection(channel)` instead of `identitySection(channel)`
 - Required imports: `fs`, `path`, `getModel` from `./core`, `tools` from `./tools`, `listSkills` from `./skills`
 - All exports: `Channel`, `isOwnCodebase`, `buildSystem`
 
@@ -136,7 +153,7 @@ Update `core.ts` to import from `./streaming` and re-export for backward compati
 Update `core.ts` to import from `./prompt` and re-export `Channel`, `isOwnCodebase`, `buildSystem` for backward compatibility.
 
 Update `src/context.ts` and `src/commands.ts` to import `Channel` from `./prompt` instead of `./core` (or leave importing from `./core` via re-exports -- decide based on what's cleaner).
-**Acceptance**: `npm test` -- all tests pass. `npm run build` clean.
+**Acceptance**: `npm test` -- all tests pass. `npm run build` clean. `buildSystem("cli")` output identical to before (same content, just assembled differently). `buildSystem("teams")` output identical to before.
 
 ### ⬜ Unit 4c: Extract prompt.ts -- Coverage & Refactor
 **What**: Verify 100% coverage on `src/prompt.ts`. Remove duplicate test blocks from `core.test.ts`. Ensure no regressions.
@@ -166,26 +183,29 @@ Run full test suite. Verify `core.test.ts` only tests `runAgent()`, `stripLastTo
 
 ### ⬜ Unit 6a: Create docs/inner-flame/ -- soul markdown files
 **What**: Create the `docs/inner-flame/` directory and populate:
-- `SOUL.md` -- extract content from `soulSection()` in current code: "i am a witty, funny, competent chaos monkey coding assistant.\ni get things done, crack jokes, embrace chaos, deliver quality."
+- `SOUL.md` -- extract content from `soulSection()`: "i am a witty, funny, competent chaos monkey coding assistant.\ni get things done, crack jokes, embrace chaos, deliver quality."
+- `IDENTITY.md` -- extract static content from `identitySection()`: "i am Ouroboros.\ni use lowercase in my responses to the user except for proper nouns. no periods unless necessary. i never apply lowercase to code, file paths, environment variables, or tool arguments -- only to natural language output."
 - `LORE.md` -- new file with minimal starter lore content about the ouroboros character
 - `FRIENDS.md` -- new file describing the people/agents who interact with ouroboros
-**Output**: Three markdown files in `docs/inner-flame/`
-**Acceptance**: Files exist with meaningful content. `cat docs/inner-flame/SOUL.md` shows the soul text.
+**Output**: Four markdown files in `docs/inner-flame/`
+**Acceptance**: Files exist with meaningful content. `cat docs/inner-flame/SOUL.md` shows the soul text. `cat docs/inner-flame/IDENTITY.md` shows the identity text.
 
 ### ⬜ Unit 6b: Wire prompt.ts to read soul markdown files
 **What**: Modify `src/prompt.ts` to:
-1. Add top-level `fs.readFileSync` calls that load `SOUL.md` (and optionally `LORE.md`, `FRIENDS.md`) into module-scoped constants at import time
+1. Add top-level `fs.readFileSync` calls that load `SOUL.md`, `IDENTITY.md` (and optionally `LORE.md`, `FRIENDS.md`) into module-scoped constants at import time
 2. Replace the hardcoded string in `soulSection()` with the loaded `SOUL.md` content
-3. Integrate `LORE.md` and `FRIENDS.md` content into `buildSystem()` at appropriate positions
+3. Replace the hardcoded static lines in `identitySection()` with the loaded `IDENTITY.md` content
+4. Integrate `LORE.md` and `FRIENDS.md` content into `buildSystem()` at appropriate positions
 
 Add tests to `prompt.test.ts` verifying:
-- `buildSystem()` output includes the soul text from the markdown file
+- `buildSystem()` output includes the soul text from `SOUL.md`
+- `buildSystem()` output includes the identity text from `IDENTITY.md`
 - Mock `fs.readFileSync` to control file content in tests
 **Acceptance**:
 - `npm test` -- all tests pass
 - `npm run build` clean
-- `buildSystem()` output includes soul content from file
-- No hardcoded soul text remains in `prompt.ts`
+- `buildSystem()` output includes soul and identity content from files
+- No hardcoded soul or identity text remains in `prompt.ts`
 - `fs.readFileSync` is called at module load time (top-level), not inside `buildSystem()`
 
 ### ⬜ Unit 6c: Soul files -- Coverage & Refactor
@@ -249,7 +269,7 @@ Update internal cross-references in the doing doc (`**Planning**:` and `**Artifa
 4. `grep -r 'from.*"./agent"' src/` -- no results
 5. `grep -r 'from.*"../agent"' src/` -- no results
 6. `ls docs/` -- only `inner-flame/` and `lab-notes/`
-7. Verify `docs/inner-flame/` contains `SOUL.md`, `LORE.md`, `FRIENDS.md`
+7. Verify `docs/inner-flame/` contains `SOUL.md`, `IDENTITY.md`, `LORE.md`, `FRIENDS.md`
 8. Verify `core.ts` line count < 300
 9. Verify `README.md` has no `agent.ts` references
 **Output**: Coverage report saved to `./2026-02-25-2133-doing-codebase-reorg/final-coverage.txt`
