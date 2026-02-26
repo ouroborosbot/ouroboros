@@ -32,7 +32,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("readline", () => ({
   createInterface: (...a: any[]) => mocks.createInterface(...a),
 }))
-vi.mock("../../core", () => ({
+vi.mock("../../engine/core", () => ({
   runAgent: (...a: any[]) => mocks.runAgent(...a),
   buildSystem: (...a: any[]) => mocks.buildSystem(...a),
 }))
