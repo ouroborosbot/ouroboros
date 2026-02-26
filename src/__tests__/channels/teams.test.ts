@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import type { ChannelCallbacks } from "../core"
-import { THINKING_PHRASES, FOLLOWUP_PHRASES } from "../repertoire/phrases"
+import type { ChannelCallbacks } from "../../core"
+import { THINKING_PHRASES, FOLLOWUP_PHRASES } from "../../repertoire/phrases"
 
 // Tests for src/teams.ts Teams channel adapter.
 
@@ -13,13 +13,13 @@ afterEach(() => { if (_savedAzureKey) process.env.AZURE_OPENAI_API_KEY = _savedA
 describe("Teams adapter - exports", () => {
   it("exports createTeamsCallbacks", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     expect(typeof teams.createTeamsCallbacks).toBe("function")
   })
 
   it("exports startTeamsApp", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     expect(typeof teams.startTeamsApp).toBe("function")
   })
 
@@ -40,7 +40,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("onModelStart sends a phrase from THINKING_PHRASES with trailing ...", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     callbacks.onModelStart()
     const calledWith = mockStream.update.mock.calls[0][0] as string
@@ -53,7 +53,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("onModelStreamStart stops phrase rotation (does not throw)", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     expect(() => callbacks.onModelStreamStart()).not.toThrow()
   })
@@ -62,7 +62,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("emits text delta directly to stream", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     callbacks.onTextChunk("Hello")
     expect(mockStream.emit).toHaveBeenCalledWith("Hello")
@@ -70,7 +70,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("emits each chunk as a delta (not cumulative)", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onTextChunk("Hello")
@@ -85,7 +85,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("when emit throws (403), controller is aborted", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     mockStream.emit.mockImplementation(() => { throw new Error("403 Forbidden") })
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
@@ -95,7 +95,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("after abort, subsequent onTextChunk calls do not emit", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     mockStream.emit.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
@@ -107,7 +107,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("onError after abort does not emit (graceful stop)", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     mockStream.emit.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
@@ -121,7 +121,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("when update throws (403), controller is aborted", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     mockStream.update.mockImplementation(() => { throw new Error("403 Forbidden") })
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
@@ -132,7 +132,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
   it("after abort via update, subsequent updates are skipped", async () => {
     vi.useFakeTimers()
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     mockStream.update.mockImplementationOnce(() => { throw new Error("403") })
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
@@ -147,7 +147,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("onReasoningChunk is a no-op (reasoning is internal, phrases keep cycling)", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onReasoningChunk("analyzing code")
@@ -158,7 +158,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("onReasoningChunk after stop (403) is still a no-op", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     mockStream.emit.mockImplementation(() => { throw new Error("403 Forbidden") })
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
@@ -170,7 +170,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("onTextChunk calls stream.emit() directly (no think-tag processing)", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onTextChunk("hello")
@@ -179,7 +179,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("text after reasoning emits only text (reasoning NOT included in final message)", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onReasoningChunk("step 1")
@@ -193,7 +193,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("text without prior reasoning emits directly", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onTextChunk("just text")
@@ -203,7 +203,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("reasoning never leaks into emitted text across turns", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onReasoningChunk("old reasoning")
@@ -218,7 +218,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("onToolStart sends informative status", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     callbacks.onToolStart("read_file", { path: "package.json" })
     expect(mockStream.update).toHaveBeenCalledWith("running read_file (package.json)...")
@@ -226,7 +226,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("onToolEnd updates status with result summary", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     callbacks.onToolEnd("read_file", "package.json", true)
     expect(mockStream.update).toHaveBeenCalledWith("package.json")
@@ -234,7 +234,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("onToolEnd handles empty summary", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     callbacks.onToolEnd("get_current_time", "", true)
     expect(mockStream.update).toHaveBeenCalledWith("get_current_time done")
@@ -242,7 +242,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("onToolEnd handles failure", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     callbacks.onToolEnd("read_file", "missing.txt", false)
     expect(mockStream.update).toHaveBeenCalledWith("read_file failed: missing.txt")
@@ -250,7 +250,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   it("onError sends error text to stream via emit", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     callbacks.onError(new Error("something broke"))
     expect(mockStream.emit).toHaveBeenCalledWith("Error: something broke")
@@ -259,23 +259,23 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
 describe("Teams adapter - message handling", () => {
   function mockHandlingDeps(mockRunAgent: any) {
-    vi.doMock("../core", () => ({
+    vi.doMock("../../core", () => ({
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
-    vi.doMock("../config", () => ({
+    vi.doMock("../../config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-test-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
     }))
-    vi.doMock("../mind/context", () => ({
+    vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(null),
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
       cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
-    vi.doMock("../repertoire/commands", () => ({
+    vi.doMock("../../repertoire/commands", () => ({
       createCommandRegistry: vi.fn().mockReturnValue({
         register: vi.fn(),
         get: vi.fn(),
@@ -293,7 +293,7 @@ describe("Teams adapter - message handling", () => {
     const mockRunAgent = vi.fn()
     mockHandlingDeps(mockRunAgent)
 
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
 
     const mockStream = {
       emit: vi.fn(),
@@ -315,7 +315,7 @@ describe("Teams adapter - message handling", () => {
     const mockRunAgent = vi.fn()
     mockHandlingDeps(mockRunAgent)
 
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
 
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     await teams.handleTeamsMessage("test", mockStream as any, "conv-test")
@@ -331,7 +331,7 @@ describe("Teams adapter - message handling", () => {
 
     mockHandlingDeps(vi.fn())
 
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
 
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     await teams.handleTeamsMessage("hi", mockStream as any, "conv-test")
@@ -348,7 +348,7 @@ describe("Teams adapter - message handling", () => {
     })
     mockHandlingDeps(mockRunAgent)
 
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
 
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
 
@@ -366,13 +366,13 @@ describe("Teams adapter - stripMentions", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     stripMentions = teams.stripMentions
   })
 
   it("is exported from teams.ts", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     expect(typeof teams.stripMentions).toBe("function")
   })
 
@@ -431,7 +431,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../core", () => ({
+    vi.doMock("../../core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -439,7 +439,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
 
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     teams.startTeamsApp()
 
     expect(capturedOpts.plugins).toHaveLength(1)
@@ -464,7 +464,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../core", () => ({
+    vi.doMock("../../core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -472,7 +472,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
 
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     teams.startTeamsApp()
 
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("DevtoolsPlugin"))
@@ -496,7 +496,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../core", () => ({
+    vi.doMock("../../core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -504,7 +504,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
     vi.spyOn(console, "log").mockImplementation(() => {})
 
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     teams.startTeamsApp()
 
     expect(capturedOpts.activity).toEqual({ mentions: { stripText: true } })
@@ -527,7 +527,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../core", () => ({
+    vi.doMock("../../core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -536,7 +536,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     process.env.PORT = "4000"
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
 
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     teams.startTeamsApp()
 
     expect(mockStart).toHaveBeenCalledWith(4000)
@@ -564,7 +564,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     }))
 
     const mockRunAgent = vi.fn()
-    vi.doMock("../core", () => ({
+    vi.doMock("../../core", () => ({
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -572,7 +572,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
     vi.spyOn(console, "log").mockImplementation(() => {})
 
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     teams.startTeamsApp()
 
     expect(capturedHandler).not.toBeNull()
@@ -607,7 +607,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     }))
 
     const mockRunAgent = vi.fn()
-    vi.doMock("../core", () => ({
+    vi.doMock("../../core", () => ({
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -615,7 +615,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
     vi.spyOn(console, "log").mockImplementation(() => {})
 
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     teams.startTeamsApp()
 
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
@@ -650,7 +650,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
 
-    vi.doMock("../core", () => ({
+    vi.doMock("../../core", () => ({
       runAgent: vi.fn().mockRejectedValue(new Error("agent crashed")),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -659,7 +659,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     vi.spyOn(console, "log").mockImplementation(() => {})
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
 
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     teams.startTeamsApp()
 
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
@@ -697,7 +697,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../core", () => ({
+    vi.doMock("../../core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -705,7 +705,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
 
     vi.spyOn(console, "log").mockImplementation(() => {})
 
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     teams.startTeamsApp()
 
     const listeners = process.listeners("unhandledRejection")
@@ -734,7 +734,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../core", () => ({
+    vi.doMock("../../core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -742,7 +742,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
 
     vi.spyOn(console, "log").mockImplementation(() => {})
 
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     teams.startTeamsApp()
     teams.startTeamsApp()
 
@@ -763,7 +763,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
   })
 
   function mockBotConfig(clientId: string, clientSecret: string, tenantId: string) {
-    vi.doMock("../config", () => ({
+    vi.doMock("../../config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/bot-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId, clientSecret, tenantId }),
@@ -784,7 +784,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../core", () => ({
+    vi.doMock("../../core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -792,7 +792,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
 
     vi.spyOn(console, "log").mockImplementation(() => {})
 
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     teams.startTeamsApp()
 
     // Bot mode should NOT have plugins (no DevtoolsPlugin)
@@ -815,7 +815,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../core", () => ({
+    vi.doMock("../../core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -823,7 +823,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
 
     vi.spyOn(console, "log").mockImplementation(() => {})
 
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     teams.startTeamsApp()
 
     expect(capturedOpts.clientId).toBe("my-app-id")
@@ -847,7 +847,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../core", () => ({
+    vi.doMock("../../core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -855,7 +855,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
 
     vi.spyOn(console, "log").mockImplementation(() => {})
 
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     teams.startTeamsApp()
 
     expect(capturedOpts.activity).toEqual({ mentions: { stripText: true } })
@@ -876,7 +876,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../core", () => ({
+    vi.doMock("../../core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -884,7 +884,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
 
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     teams.startTeamsApp()
 
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Bot Service"))
@@ -907,7 +907,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../core", () => ({
+    vi.doMock("../../core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -915,7 +915,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
 
     vi.spyOn(console, "log").mockImplementation(() => {})
 
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     teams.startTeamsApp()
 
     expect(mockOn).toHaveBeenCalledWith("message", expect.any(Function))
@@ -944,7 +944,7 @@ describe("Teams adapter - phrase rotation", () => {
 
   it("rotates phrases every 1.5s during onModelStart", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onModelStart()
@@ -964,7 +964,7 @@ describe("Teams adapter - phrase rotation", () => {
 
   it("onModelStreamStart is a no-op (phrases keep cycling through reasoning)", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onModelStart()
@@ -979,7 +979,7 @@ describe("Teams adapter - phrase rotation", () => {
 
   it("onReasoningChunk does not stop phrase rotation", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onModelStart()
@@ -994,7 +994,7 @@ describe("Teams adapter - phrase rotation", () => {
 
   it("onTextChunk stops phrase rotation", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onModelStart()
@@ -1008,7 +1008,7 @@ describe("Teams adapter - phrase rotation", () => {
 
   it("uses FOLLOWUP_PHRASES after tool run", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     // First model call
@@ -1029,7 +1029,7 @@ describe("Teams adapter - phrase rotation", () => {
 
   it("onError stops phrase rotation", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onModelStart()
@@ -1041,7 +1041,7 @@ describe("Teams adapter - phrase rotation", () => {
 
   it("onToolStart stops phrase rotation from onModelStart", async () => {
     vi.resetModules()
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onModelStart()
@@ -1077,23 +1077,23 @@ describe("Teams adapter - session persistence", () => {
       dispatchFn = (() => ({ handled: false })),
     } = overrides
 
-    vi.doMock("../core", () => ({
+    vi.doMock("../../core", () => ({
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
-    vi.doMock("../config", () => ({
+    vi.doMock("../../config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
     }))
-    vi.doMock("../mind/context", () => ({
+    vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(loadSessionReturn),
       saveSession: vi.fn().mockImplementation((...args: any[]) => { saveSessionCalls.push(args) }),
       deleteSession: vi.fn().mockImplementation((...args: any[]) => { deleteSessionCalls.push(args[0]) }),
       trimMessages: vi.fn().mockImplementation(trimMessagesFn),
       cachedBuildSystem: vi.fn().mockReturnValue("cached teams prompt"),
     }))
-    vi.doMock("../repertoire/commands", () => ({
+    vi.doMock("../../repertoire/commands", () => ({
       createCommandRegistry: vi.fn().mockReturnValue({
         register: vi.fn(),
         get: vi.fn(),
@@ -1109,7 +1109,7 @@ describe("Teams adapter - session persistence", () => {
     vi.resetModules()
     const runAgentFn = vi.fn()
     mockTeamsDeps({ runAgentFn })
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
     expect(runAgentFn).toHaveBeenCalled()
@@ -1123,7 +1123,7 @@ describe("Teams adapter - session persistence", () => {
       { role: "user", content: "previous msg" },
     ]
     mockTeamsDeps({ runAgentFn, loadSessionReturn: savedSession })
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     await teams.handleTeamsMessage("new msg", mockStream as any, "conv-123")
 
@@ -1137,7 +1137,7 @@ describe("Teams adapter - session persistence", () => {
     vi.resetModules()
     const saveSessionCalls: any[][] = []
     mockTeamsDeps({ saveSessionCalls })
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
 
@@ -1151,7 +1151,7 @@ describe("Teams adapter - session persistence", () => {
     mockTeamsDeps({
       trimMessagesFn: (...args: any[]) => { trimCalls.push(args); return [...args[0]] },
     })
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
 
@@ -1163,7 +1163,7 @@ describe("Teams adapter - session persistence", () => {
     vi.resetModules()
     const runAgentFn = vi.fn()
     mockTeamsDeps({ runAgentFn, loadSessionReturn: null })
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
 
@@ -1186,7 +1186,7 @@ describe("Teams adapter - session persistence", () => {
         return { handled: false }
       },
     })
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     await teams.handleTeamsMessage("/new", mockStream as any, "conv-123")
 
@@ -1206,7 +1206,7 @@ describe("Teams adapter - session persistence", () => {
         return { handled: false }
       },
     })
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     await teams.handleTeamsMessage("/commands", mockStream as any, "conv-123")
 
@@ -1218,7 +1218,7 @@ describe("Teams adapter - session persistence", () => {
     vi.resetModules()
     const runAgentFn = vi.fn()
     mockTeamsDeps({ runAgentFn })
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const mockStream1 = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     const mockStream2 = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
 
@@ -1237,7 +1237,7 @@ describe("Teams adapter - session persistence", () => {
     vi.resetModules()
     const runAgentFn = vi.fn()
     mockTeamsDeps({ runAgentFn, loadSessionReturn: null }) // null = corrupt
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
 
@@ -1254,7 +1254,7 @@ describe("Teams adapter - session persistence", () => {
       parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
       dispatchFn: () => ({ handled: true, result: undefined }),
     })
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     await teams.handleTeamsMessage("/unknown", mockStream as any, "conv-123")
 
@@ -1273,7 +1273,7 @@ describe("Teams adapter - session persistence", () => {
         return { handled: false }
       },
     })
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     await teams.handleTeamsMessage("/commands", mockStream as any, "conv-123")
 
@@ -1289,7 +1289,7 @@ describe("Teams adapter - session persistence", () => {
       parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
       dispatchFn: () => ({ handled: true, result: { action: "exit" } }),
     })
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     await teams.handleTeamsMessage("/exit", mockStream as any, "conv-123")
 
@@ -1301,7 +1301,7 @@ describe("Teams adapter - session persistence", () => {
     vi.resetModules()
     const order: string[] = []
     mockTeamsDeps({})
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
 
     const { withConversationLock } = teams
     let callCount = 0
@@ -1333,7 +1333,7 @@ describe("Teams adapter - session persistence", () => {
       order.push(`end-${id}`)
     })
     mockTeamsDeps({ runAgentFn })
-    const teams = await import("../teams")
+    const teams = await import("../../channels/teams")
 
     const { withConversationLock } = teams
     await Promise.all([

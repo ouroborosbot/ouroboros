@@ -1,11 +1,11 @@
 import OpenAI from "openai"
 import { App } from "@microsoft/teams.apps"
 import { DevtoolsPlugin } from "@microsoft/teams.dev"
-import { runAgent, buildSystem, ChannelCallbacks } from "./core"
-import { pickPhrase, THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "./repertoire/phrases"
-import { sessionPath, getContextConfig, getTeamsConfig } from "./config"
-import { loadSession, saveSession, deleteSession, trimMessages, cachedBuildSystem } from "./mind/context"
-import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "./repertoire/commands"
+import { runAgent, buildSystem, ChannelCallbacks } from "../core"
+import { pickPhrase, THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "../repertoire/phrases"
+import { sessionPath, getContextConfig, getTeamsConfig } from "../config"
+import { loadSession, saveSession, deleteSession, trimMessages, cachedBuildSystem } from "../mind/context"
+import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "../repertoire/commands"
 
 // Stream interface matching IStreamer from @microsoft/teams.apps
 interface TeamsStream {

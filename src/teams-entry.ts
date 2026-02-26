@@ -3,5 +3,5 @@
 // 100% test coverage — entrypoints can't be covered by vitest since
 // require.main !== module in the test runner.
 // All config now comes from ~/.agentconfigs/ouroboros/config.json (with env var overrides).
-import { startTeamsApp } from "./teams"
+import { startTeamsApp } from "./channels/teams"
 startTeamsApp()
