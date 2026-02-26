@@ -1,4 +1,4 @@
-import type { Channel } from "./core"
+import type { Channel } from "../core"
 
 export interface CommandContext {
   channel: Channel

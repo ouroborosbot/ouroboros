@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { pickPhrase, THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "../phrases"
+import { pickPhrase, THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "../../repertoire/phrases"
 
 describe("phrases - pool exports", () => {
   it("exports THINKING_PHRASES as non-empty array", () => {

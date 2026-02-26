@@ -47,7 +47,7 @@ vi.mock("../context", () => ({
   trimMessages: (...a: any[]) => mocks.trimMessages(...a),
   cachedBuildSystem: (...a: any[]) => mocks.cachedBuildSystem(...a),
 }))
-vi.mock("../commands", () => ({
+vi.mock("../repertoire/commands", () => ({
   createCommandRegistry: (...a: any[]) => mocks.createCommandRegistry(...a),
   registerDefaultCommands: (...a: any[]) => mocks.registerDefaultCommands(...a),
   parseSlashCommand: (...a: any[]) => mocks.parseSlashCommand(...a),
