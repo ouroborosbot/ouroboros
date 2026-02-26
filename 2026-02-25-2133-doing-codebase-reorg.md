@@ -187,7 +187,7 @@ Every local import in the codebase after reorganization:
 
 ---
 
-### ⬜ Unit 3: Move context.ts to mind/ + tests + update imports
+### ✅ Unit 3: Move context.ts to mind/ + tests + update imports
 **What**: Move context.ts (prompt.ts doesn't exist yet -- created during core.ts split):
 1. `git mv src/context.ts src/mind/context.ts`
 2. `git mv src/__tests__/context.test.ts src/__tests__/mind/context.test.ts`
@@ -478,3 +478,4 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 - 2026-02-25 22:22 Major rewrite: src subdirectories (engine/mind/channels/repertoire), docs/psyche + docs/tasks, reordered units for minimal breakage
 - 2026-02-25 22:38 Unit 1 complete: created all directory structure (engine/, mind/, channels/, repertoire/, tests, docs/psyche/, docs/tasks/)
 - 2026-02-25 22:40 Unit 2 complete: moved phrases, skills, commands to repertoire/ with all import updates
+- 2026-02-25 22:41 Unit 3 complete: moved context.ts to mind/ with all import updates
