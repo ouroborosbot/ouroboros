@@ -144,11 +144,10 @@ export function renderMarkdown(text: string): string {
   return result
 }
 
-export function createCliCallbacks(): ChannelCallbacks & { getBuffer(): string } {
+export function createCliCallbacks(): ChannelCallbacks {
   let currentSpinner: Spinner | null = null
   let hadReasoning = false
   let hadToolRun = false
-  let textBuffer = ""
 
   return {
     onModelStart: () => {
@@ -164,10 +163,10 @@ export function createCliCallbacks(): ChannelCallbacks & { getBuffer(): string }
     },
     onTextChunk: (text: string) => {
       if (hadReasoning) {
-        textBuffer += "\n\n"
+        process.stdout.write("\n\n")
         hadReasoning = false
       }
-      textBuffer += text
+      process.stdout.write(renderMarkdown(text))
     },
     onReasoningChunk: (text: string) => {
       hadReasoning = true
@@ -195,11 +194,6 @@ export function createCliCallbacks(): ChannelCallbacks & { getBuffer(): string }
       currentSpinner?.fail("request failed")
       currentSpinner = null
       process.stderr.write(`\x1b[31m${error}\x1b[0m\n`)
-    },
-    getBuffer() {
-      const buf = textBuffer
-      textBuffer = ""
-      return buf
     },
   }
 }
@@ -237,8 +231,6 @@ export async function main() {
     ctrl.suppress(() => bootAbort.abort())
     await bootGreeting(messages, cliCallbacks, bootAbort.signal).catch(() => {})
     ctrl.restore()
-    const greetingText = cliCallbacks.getBuffer()
-    if (greetingText) process.stdout.write(renderMarkdown(greetingText))
     process.stdout.write("\n\n")
     saveSession(sessPath, messages)
   }
@@ -320,8 +312,6 @@ export async function main() {
       }
       ctrl.restore()
       currentAbort = null
-      const responseText = cliCallbacks.getBuffer()
-      if (responseText) process.stdout.write(renderMarkdown(responseText))
       process.stdout.write("\n\n")
 
       saveSession(sessPath, messages)
