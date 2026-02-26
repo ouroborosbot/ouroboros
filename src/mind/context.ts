@@ -1,5 +1,5 @@
 import type OpenAI from "openai"
-import type { Channel } from "../core"
+import type { Channel } from "../engine/core"
 import * as fs from "fs"
 import * as path from "path"
 

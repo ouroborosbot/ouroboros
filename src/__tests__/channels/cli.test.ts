@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import type { ChannelCallbacks } from "../../core"
+import type { ChannelCallbacks } from "../../engine/core"
 import { THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "../../repertoire/phrases"
 
 // These imports will fail until agent.ts is refactored to export them.
@@ -372,7 +372,7 @@ describe("CLI adapter - bootGreeting", () => {
 
     // We need to mock runAgent within core
     const mockRunAgent = vi.fn()
-    vi.doMock("../../core", () => ({
+    vi.doMock("../../engine/core", () => ({
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),

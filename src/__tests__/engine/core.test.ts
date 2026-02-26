@@ -13,7 +13,7 @@ vi.mock("child_process", () => ({
   spawnSync: vi.fn(),
 }))
 
-vi.mock("../repertoire/skills", () => ({
+vi.mock("../../repertoire/skills", () => ({
   listSkills: vi.fn(),
   loadSkill: vi.fn(),
 }))
@@ -41,8 +41,8 @@ vi.mock("openai", () => {
 
 import * as fs from "fs"
 import { execSync, spawnSync } from "child_process"
-import { listSkills, loadSkill } from "../repertoire/skills"
-import type { ChannelCallbacks } from "../core"
+import { listSkills, loadSkill } from "../../repertoire/skills"
+import type { ChannelCallbacks } from "../../engine/core"
 
 // Set env var before importing core
 process.env.MINIMAX_API_KEY = "test-key"
@@ -50,19 +50,19 @@ process.env.MINIMAX_MODEL = "test-model"
 
 describe("isOwnCodebase", () => {
   it("returns true when package.json has name 'ouroboros'", async () => {
-    const { isOwnCodebase } = await import("../core")
+    const { isOwnCodebase } = await import("../../engine/core")
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "ouroboros" }))
     expect(isOwnCodebase()).toBe(true)
   })
 
   it("returns false when package.json has a different name", async () => {
-    const { isOwnCodebase } = await import("../core")
+    const { isOwnCodebase } = await import("../../engine/core")
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other-project" }))
     expect(isOwnCodebase()).toBe(false)
   })
 
   it("returns false when readFileSync throws", async () => {
-    const { isOwnCodebase } = await import("../core")
+    const { isOwnCodebase } = await import("../../engine/core")
     vi.mocked(fs.readFileSync).mockImplementation(() => {
       throw new Error("ENOENT")
     })
@@ -80,7 +80,7 @@ describe("buildSystem", () => {
 
   it("includes soul section with personality", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
-    const { buildSystem } = await import("../core")
+    const { buildSystem } = await import("../../engine/core")
     const result = buildSystem()
     expect(result).toContain("chaos monkey coding assistant")
     expect(result).toContain("crack jokes")
@@ -88,7 +88,7 @@ describe("buildSystem", () => {
 
   it("includes identity section with Ouroboros name", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
-    const { buildSystem } = await import("../core")
+    const { buildSystem } = await import("../../engine/core")
     const result = buildSystem()
     expect(result).toContain("i am Ouroboros")
     expect(result).toContain("i use lowercase")
@@ -96,14 +96,14 @@ describe("buildSystem", () => {
 
   it("includes boot greeting for cli channel", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
-    const { buildSystem } = await import("../core")
+    const { buildSystem } = await import("../../engine/core")
     const result = buildSystem("cli")
     expect(result).toContain("i introduce myself on boot")
   })
 
   it("includes Teams context for teams channel", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
-    const { buildSystem } = await import("../core")
+    const { buildSystem } = await import("../../engine/core")
     const result = buildSystem("teams")
     expect(result).toContain("Microsoft Teams")
     expect(result).toContain("i keep responses concise")
@@ -112,14 +112,14 @@ describe("buildSystem", () => {
 
   it("defaults to cli channel", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
-    const { buildSystem } = await import("../core")
+    const { buildSystem } = await import("../../engine/core")
     const result = buildSystem()
     expect(result).toContain("i introduce myself on boot")
   })
 
   it("includes date section with current date", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
-    const { buildSystem } = await import("../core")
+    const { buildSystem } = await import("../../engine/core")
     const result = buildSystem()
     const today = new Date().toISOString().slice(0, 10)
     expect(result).toContain(`current date: ${today}`)
@@ -127,7 +127,7 @@ describe("buildSystem", () => {
 
   it("includes tools section with tool names", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
-    const { buildSystem } = await import("../core")
+    const { buildSystem } = await import("../../engine/core")
     const result = buildSystem()
     expect(result).toContain("## my tools")
     expect(result).toContain("- read_file:")
@@ -138,7 +138,7 @@ describe("buildSystem", () => {
   it("includes skills section from listSkills", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
     vi.mocked(listSkills).mockReturnValue(["code-review", "self-edit", "self-query"])
-    const { buildSystem } = await import("../core")
+    const { buildSystem } = await import("../../engine/core")
     const result = buildSystem()
     expect(result).toContain("## my skills (use load_skill to activate)")
     expect(result).toContain("code-review, self-edit, self-query")
@@ -147,14 +147,14 @@ describe("buildSystem", () => {
   it("omits skills section when no skills available", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
     vi.mocked(listSkills).mockReturnValue([])
-    const { buildSystem } = await import("../core")
+    const { buildSystem } = await import("../../engine/core")
     const result = buildSystem()
     expect(result).not.toContain("## my skills")
   })
 
   it("includes self-aware section when in own codebase", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "ouroboros" }))
-    const { buildSystem } = await import("../core")
+    const { buildSystem } = await import("../../engine/core")
     const result = buildSystem()
     expect(result).toContain("i am in my own codebase")
     expect(result).toContain("snake eating its own tail")
@@ -162,7 +162,7 @@ describe("buildSystem", () => {
 
   it("omits self-aware section when not in own codebase", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
-    const { buildSystem } = await import("../core")
+    const { buildSystem } = await import("../../engine/core")
     const result = buildSystem()
     expect(result).not.toContain("i am in my own codebase")
   })
@@ -173,7 +173,7 @@ describe("buildSystem", () => {
     process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
     process.env.AZURE_OPENAI_DEPLOYMENT = "gpt-4o-deploy"
     process.env.AZURE_OPENAI_MODEL_NAME = "test-model"
-    const { buildSystem } = await import("../core")
+    const { buildSystem } = await import("../../engine/core")
     const result = buildSystem()
     expect(result).toContain("azure openai (gpt-4o-deploy, model: test-model)")
     delete process.env.AZURE_OPENAI_API_KEY
@@ -188,7 +188,7 @@ describe("buildSystem", () => {
     process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
     process.env.AZURE_OPENAI_MODEL_NAME = "test-model"
     delete process.env.AZURE_OPENAI_DEPLOYMENT
-    const { buildSystem } = await import("../core")
+    const { buildSystem } = await import("../../engine/core")
     const result = buildSystem()
     expect(result).toContain("azure openai (default, model: test-model)")
     delete process.env.AZURE_OPENAI_API_KEY
@@ -204,7 +204,7 @@ describe("execTool", () => {
     vi.resetModules()
     process.env.MINIMAX_API_KEY = "test-key"
 process.env.MINIMAX_MODEL = "test-model"
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     execTool = core.execTool
   })
 
@@ -417,7 +417,7 @@ describe("summarizeArgs", () => {
     vi.resetModules()
     process.env.MINIMAX_API_KEY = "test-key"
 process.env.MINIMAX_MODEL = "test-model"
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     summarizeArgs = core.summarizeArgs
   })
 
@@ -506,7 +506,7 @@ describe("toResponsesTools", () => {
     vi.resetModules()
     process.env.MINIMAX_API_KEY = "test-key"
     process.env.MINIMAX_MODEL = "test-model"
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     toResponsesTools = core.toResponsesTools
     tools = core.tools
   })
@@ -597,7 +597,7 @@ describe("toResponsesInput", () => {
     vi.resetModules()
     process.env.MINIMAX_API_KEY = "test-key"
     process.env.MINIMAX_MODEL = "test-model"
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     toResponsesInput = core.toResponsesInput
   })
 
@@ -829,7 +829,7 @@ describe("streamChatCompletion", () => {
     process.env.MINIMAX_API_KEY = "test-key"
     process.env.MINIMAX_MODEL = "test-model"
     mockCreate.mockReset()
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     streamChatCompletion = core.streamChatCompletion
   })
 
@@ -961,7 +961,7 @@ describe("streamResponsesApi", () => {
     process.env.MINIMAX_API_KEY = "test-key"
     process.env.MINIMAX_MODEL = "test-model"
     mockResponsesCreate.mockReset()
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     streamResponsesApi = core.streamResponsesApi
   })
 
@@ -1270,7 +1270,7 @@ process.env.MINIMAX_MODEL = "test-model"
     mockCreate.mockReset()
     mockResponsesCreate.mockReset()
 
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     runAgent = core.runAgent
   })
 
@@ -2375,7 +2375,7 @@ process.env.MINIMAX_MODEL = "test-model"
       { type: "response.output_text.delta", delta: "hello" },
     ]))
 
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -2417,7 +2417,7 @@ process.env.MINIMAX_MODEL = "test-model"
       { type: "response.output_text.delta", delta: "hello azure" },
     ]))
 
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -2466,7 +2466,7 @@ process.env.MINIMAX_MODEL = "test-model"
       ])
     })
 
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     const toolStarts: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
@@ -2521,7 +2521,7 @@ process.env.MINIMAX_MODEL = "test-model"
       ])
     })
 
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -2588,7 +2588,7 @@ process.env.MINIMAX_MODEL = "test-model"
       ])
     })
 
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -2683,7 +2683,7 @@ describe("getClient", () => {
     const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
-      const core = await import("../core")
+      const core = await import("../../engine/core")
       const callbacks: ChannelCallbacks = {
         onModelStart: () => {},
         onModelStreamStart: () => {},
@@ -2709,7 +2709,7 @@ describe("getClient", () => {
     process.env.MINIMAX_API_KEY = "mm-key"
     process.env.MINIMAX_MODEL = "MiniMax-M2.5"
 
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     expect(core.getModel()).toBe("MiniMax-M2.5")
     expect(core.getProvider()).toBe("minimax")
   })
@@ -2723,7 +2723,7 @@ describe("getClient", () => {
     process.env.MINIMAX_API_KEY = "mm-key"
     process.env.MINIMAX_MODEL = "MiniMax-M2.5"
 
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     expect(core.getModel()).toBe("gpt-4o")
     expect(core.getProvider()).toBe("azure")
   })
@@ -2735,7 +2735,7 @@ describe("getClient", () => {
     process.env.MINIMAX_API_KEY = "mm-key"
     process.env.MINIMAX_MODEL = "MiniMax-M2.5"
 
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     expect(core.getModel()).toBe("MiniMax-M2.5")
     expect(core.getProvider()).toBe("minimax")
   })
@@ -2752,7 +2752,7 @@ describe("getClient", () => {
       },
     })
 
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -2784,7 +2784,7 @@ describe("getClient", () => {
       },
     })
 
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -2840,9 +2840,9 @@ describe("getClient config integration", () => {
       return JSON.stringify({ name: "other" })
     })
 
-    const { resetConfigCache } = await import("../config")
+    const { resetConfigCache } = await import("../../config")
     resetConfigCache()
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     expect(core.getModel()).toBe("config-model")
     expect(core.getProvider()).toBe("azure")
   })
@@ -2863,9 +2863,9 @@ describe("getClient config integration", () => {
       return JSON.stringify({ name: "other" })
     })
 
-    const { resetConfigCache } = await import("../config")
+    const { resetConfigCache } = await import("../../config")
     resetConfigCache()
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     expect(core.getModel()).toBe("config-mm-model")
     expect(core.getProvider()).toBe("minimax")
   })
@@ -2892,9 +2892,9 @@ describe("getClient config integration", () => {
       return JSON.stringify({ name: "other" })
     })
 
-    const { resetConfigCache } = await import("../config")
+    const { resetConfigCache } = await import("../../config")
     resetConfigCache()
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     expect(core.getProvider()).toBe("azure")
   })
 
@@ -2911,9 +2911,9 @@ describe("getClient config integration", () => {
     process.env.MINIMAX_API_KEY = "env-mm-key"
     process.env.MINIMAX_MODEL = "env-mm-model"
 
-    const { resetConfigCache } = await import("../config")
+    const { resetConfigCache } = await import("../../config")
     resetConfigCache()
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     expect(core.getModel()).toBe("env-mm-model")
     expect(core.getProvider()).toBe("minimax")
   })
@@ -2923,9 +2923,9 @@ describe("getClient config integration", () => {
     delete process.env.AZURE_OPENAI_API_KEY
     process.env.MINIMAX_API_KEY = "test-key"
     process.env.MINIMAX_MODEL = "test-model"
-    const { resetConfigCache } = await import("../config")
+    const { resetConfigCache } = await import("../../config")
     resetConfigCache()
-    const { stripLastToolCalls } = await import("../core")
+    const { stripLastToolCalls } = await import("../../engine/core")
 
     const messages: any[] = [
       { role: "system", content: "sys" },
@@ -2946,9 +2946,9 @@ describe("getClient config integration", () => {
     delete process.env.AZURE_OPENAI_API_KEY
     process.env.MINIMAX_API_KEY = "test-key"
     process.env.MINIMAX_MODEL = "test-model"
-    const { resetConfigCache } = await import("../config")
+    const { resetConfigCache } = await import("../../config")
     resetConfigCache()
-    const { stripLastToolCalls } = await import("../core")
+    const { stripLastToolCalls } = await import("../../engine/core")
 
     const messages: any[] = [
       { role: "system", content: "sys" },
@@ -2967,9 +2967,9 @@ describe("getClient config integration", () => {
     delete process.env.AZURE_OPENAI_API_KEY
     process.env.MINIMAX_API_KEY = "test-key"
     process.env.MINIMAX_MODEL = "test-model"
-    const { resetConfigCache } = await import("../config")
+    const { resetConfigCache } = await import("../../config")
     resetConfigCache()
-    const { stripLastToolCalls } = await import("../core")
+    const { stripLastToolCalls } = await import("../../engine/core")
 
     const messages: any[] = [
       { role: "system", content: "sys" },
@@ -2989,7 +2989,7 @@ describe("getClient config integration", () => {
 
     vi.mocked(fs.readFileSync).mockReturnValue("data")
 
-    const { resetConfigCache } = await import("../config")
+    const { resetConfigCache } = await import("../../config")
     resetConfigCache()
 
     // Make every API call return a tool call (never text-only)
@@ -3025,7 +3025,7 @@ describe("getClient config integration", () => {
       onError: (err) => errors.push(err),
     }
 
-    const core = await import("../core")
+    const core = await import("../../engine/core")
     await core.runAgent([{ role: "system", content: "test" }], callbacks)
 
     expect(errors.length).toBe(1)
@@ -3046,11 +3046,11 @@ describe("getClient config integration", () => {
     }) as any)
     const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
-    const { resetConfigCache } = await import("../config")
+    const { resetConfigCache } = await import("../../config")
     resetConfigCache()
 
     try {
-      const core = await import("../core")
+      const core = await import("../../engine/core")
       const callbacks: ChannelCallbacks = {
         onModelStart: () => {},
         onModelStreamStart: () => {},

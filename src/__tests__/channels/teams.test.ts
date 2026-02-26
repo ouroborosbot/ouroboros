@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import type { ChannelCallbacks } from "../../core"
+import type { ChannelCallbacks } from "../../engine/core"
 import { THINKING_PHRASES, FOLLOWUP_PHRASES } from "../../repertoire/phrases"
 
 // Tests for src/teams.ts Teams channel adapter.
@@ -259,7 +259,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
 describe("Teams adapter - message handling", () => {
   function mockHandlingDeps(mockRunAgent: any) {
-    vi.doMock("../../core", () => ({
+    vi.doMock("../../engine/core", () => ({
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -431,7 +431,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../../core", () => ({
+    vi.doMock("../../engine/core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -464,7 +464,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../../core", () => ({
+    vi.doMock("../../engine/core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -496,7 +496,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../../core", () => ({
+    vi.doMock("../../engine/core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -527,7 +527,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../../core", () => ({
+    vi.doMock("../../engine/core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -564,7 +564,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     }))
 
     const mockRunAgent = vi.fn()
-    vi.doMock("../../core", () => ({
+    vi.doMock("../../engine/core", () => ({
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -607,7 +607,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     }))
 
     const mockRunAgent = vi.fn()
-    vi.doMock("../../core", () => ({
+    vi.doMock("../../engine/core", () => ({
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -650,7 +650,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
 
-    vi.doMock("../../core", () => ({
+    vi.doMock("../../engine/core", () => ({
       runAgent: vi.fn().mockRejectedValue(new Error("agent crashed")),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -697,7 +697,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../../core", () => ({
+    vi.doMock("../../engine/core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -734,7 +734,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../../core", () => ({
+    vi.doMock("../../engine/core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -784,7 +784,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../../core", () => ({
+    vi.doMock("../../engine/core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -815,7 +815,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../../core", () => ({
+    vi.doMock("../../engine/core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -847,7 +847,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../../core", () => ({
+    vi.doMock("../../engine/core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -876,7 +876,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../../core", () => ({
+    vi.doMock("../../engine/core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -907,7 +907,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../../core", () => ({
+    vi.doMock("../../engine/core", () => ({
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -1077,7 +1077,7 @@ describe("Teams adapter - session persistence", () => {
       dispatchFn = (() => ({ handled: false })),
     } = overrides
 
-    vi.doMock("../../core", () => ({
+    vi.doMock("../../engine/core", () => ({
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
