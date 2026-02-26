@@ -418,7 +418,7 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 
 ---
 
-### ⬜ Unit 13: Update README.md
+### ✅ Unit 13: Update README.md
 **What**: Update all references in `README.md`:
 - Replace `agent.ts` with `channels/cli.ts` everywhere
 - Update "Two Front Doors" diagram: `channels/cli.ts`, `channels/teams.ts`
@@ -488,3 +488,4 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 - 2026-02-25 23:03 Unit 10 complete: engine/core.ts is 223 lines (<300 target), contains only agent loop, callbacks, client init, re-exports
 - 2026-02-25 23:08 Units 11a-11c complete: psyche files created, prompt.ts reads from markdown, 100% coverage, 405 tests
 - 2026-02-25 23:09 Unit 12 complete: all dev docs moved to docs/tasks/, only psyche/ and tasks/ in docs/
+- 2026-02-25 23:13 Unit 13 complete: README.md updated with new file structure, diagrams, and references
