@@ -81,15 +81,16 @@ export function createTeamsCallbacks(
       startPhraseRotation(pool)
     },
     onModelStreamStart: () => {
-      stopPhraseRotation()
+      // No-op: don't stop rotation here — keep cycling phrases through
+      // the reasoning phase until actual text arrives in onTextChunk.
     },
-    onReasoningChunk: (text: string) => {
-      if (stopped) return
-      stopPhraseRotation()
-      safeUpdate(text)
+    onReasoningChunk: () => {
+      // No-op: reasoning is internal model thought, not user-facing.
+      // Phrases keep cycling while the model reasons.
     },
     onTextChunk: (text: string) => {
       if (stopped) return
+      stopPhraseRotation()
       safeEmit(text)
     },
     onToolStart: (name: string, args: Record<string, string>) => {
@@ -126,6 +127,11 @@ export async function withConversationLock(convId: string, fn: () => Promise<voi
 
 // Handle an incoming Teams message
 export async function handleTeamsMessage(text: string, stream: TeamsStream, conversationId: string): Promise<void> {
+  // Send first thinking phrase immediately so the user sees feedback
+  // before sync I/O (session load, trim) blocks the event loop.
+  stream.update(pickPhrase(THINKING_PHRASES) + "...")
+  await new Promise(r => setImmediate(r))
+
   const registry = createCommandRegistry()
   registerDefaultCommands(registry)
 
