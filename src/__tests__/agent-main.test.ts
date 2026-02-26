@@ -40,7 +40,7 @@ vi.mock("../config", () => ({
   sessionPath: (...a: any[]) => mocks.sessionPath(...a),
   getContextConfig: (...a: any[]) => mocks.getContextConfig(...a),
 }))
-vi.mock("../context", () => ({
+vi.mock("../mind/context", () => ({
   loadSession: (...a: any[]) => mocks.loadSession(...a),
   saveSession: (...a: any[]) => mocks.saveSession(...a),
   deleteSession: (...a: any[]) => mocks.deleteSession(...a),
