@@ -401,7 +401,7 @@ Update prompt.test.ts:
 
 ---
 
-### ⬜ Unit 12: Move docs to tasks/
+### ✅ Unit 12: Move docs to tasks/
 **What**: Move all dev docs from `docs/` and repo root into `docs/tasks/`:
 - All `docs/2026-*` files and directories -> `docs/tasks/`
 - `docs/grow-an-agent-server.md` -> `docs/tasks/`
@@ -487,3 +487,4 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 - 2026-02-25 23:02 Units 9a-9c complete: extracted mind/prompt.ts via TDD, 100% coverage, 401 tests
 - 2026-02-25 23:03 Unit 10 complete: engine/core.ts is 223 lines (<300 target), contains only agent loop, callbacks, client init, re-exports
 - 2026-02-25 23:08 Units 11a-11c complete: psyche files created, prompt.ts reads from markdown, 100% coverage, 405 tests
+- 2026-02-25 23:09 Unit 12 complete: all dev docs moved to docs/tasks/, only psyche/ and tasks/ in docs/
