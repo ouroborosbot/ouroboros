@@ -267,11 +267,11 @@ Every local import in the codebase after reorganization:
 
 ---
 
-### ⬜ Unit 7a: Extract engine/tools.ts -- Tests
+### ✅ Unit 7a: Extract engine/tools.ts -- Tests
 **What**: Create `src/__tests__/engine/tools.test.ts` by moving the `describe("execTool", ...)` and `describe("summarizeArgs", ...)` blocks from `core.test.ts`. Update imports to `../../engine/tools`.
 **Acceptance**: Tests exist in tools.test.ts and FAIL because `src/engine/tools.ts` does not exist yet.
 
-### ⬜ Unit 7b: Extract engine/tools.ts -- Implementation
+### ✅ Unit 7b: Extract engine/tools.ts -- Implementation
 **What**: Create `src/engine/tools.ts` by extracting from `engine/core.ts`:
 - `tools` array (tool definitions)
 - `ToolHandler` type alias
@@ -284,7 +284,7 @@ Every local import in the codebase after reorganization:
 Update `engine/core.ts` to `import { tools, execTool, summarizeArgs } from "./tools"`.
 **Acceptance**: `npm test` -- all tests pass. `npm run build` clean.
 
-### ⬜ Unit 7c: Extract engine/tools.ts -- Coverage & Cleanup
+### ✅ Unit 7c: Extract engine/tools.ts -- Coverage & Cleanup
 **What**: Verify 100% coverage on `src/engine/tools.ts`. Remove duplicate test blocks from `core.test.ts`.
 **Acceptance**: 100% coverage on `src/engine/tools.ts`. All tests green.
 
@@ -482,3 +482,4 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 - 2026-02-25 22:44 Unit 4 complete: moved agent.ts -> channels/cli.ts, teams.ts -> channels/teams.ts with all import updates
 - 2026-02-25 22:46 Unit 5 complete: moved core.ts to engine/ with all import updates. Only config.ts and entry points in src/ root
 - 2026-02-25 22:47 Unit 6 complete: checkpoint passed -- 400 tests, 100% coverage, build clean
+- 2026-02-25 22:51 Units 7a-7c complete: extracted engine/tools.ts via TDD, 100% coverage, 400 tests
