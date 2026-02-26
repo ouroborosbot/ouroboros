@@ -158,7 +158,7 @@ Every local import in the codebase after reorganization:
 
 ---
 
-### ⬜ Unit 2: Move repertoire/ files + tests + update imports
+### ✅ Unit 2: Move repertoire/ files + tests + update imports
 **What**: Move the simplest files first (fewest dependencies, fewest dependents):
 1. `git mv src/phrases.ts src/repertoire/phrases.ts`
 2. `git mv src/skills.ts src/repertoire/skills.ts`
@@ -477,3 +477,4 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 - 2026-02-25 22:02 Pre-execution: IDENTITY.md, identitySection/selfAwareSection split
 - 2026-02-25 22:22 Major rewrite: src subdirectories (engine/mind/channels/repertoire), docs/psyche + docs/tasks, reordered units for minimal breakage
 - 2026-02-25 22:38 Unit 1 complete: created all directory structure (engine/, mind/, channels/, repertoire/, tests, docs/psyche/, docs/tasks/)
+- 2026-02-25 22:40 Unit 2 complete: moved phrases, skills, commands to repertoire/ with all import updates
