@@ -371,7 +371,7 @@ Verify `core.test.ts` only tests `runAgent()`, `stripLastToolCalls()`, `getClien
 
 ---
 
-### ⬜ Unit 11a: Create docs/psyche/ -- soul markdown files
+### ✅ Unit 11a: Create docs/psyche/ -- soul markdown files
 **What**: Populate `docs/psyche/` (directory created in Unit 1):
 - `SOUL.md` -- extract from `soulSection()`: "i am a witty, funny, competent chaos monkey coding assistant.\ni get things done, crack jokes, embrace chaos, deliver quality."
 - `IDENTITY.md` -- extract static lines from `identitySection()`: "i am Ouroboros.\ni use lowercase in my responses to the user except for proper nouns..."
@@ -380,7 +380,7 @@ Verify `core.test.ts` only tests `runAgent()`, `stripLastToolCalls()`, `getClien
 **Output**: Four files in `docs/psyche/`
 **Acceptance**: Files exist with meaningful content.
 
-### ⬜ Unit 11b: Wire mind/prompt.ts to read psyche markdown files
+### ✅ Unit 11b: Wire mind/prompt.ts to read psyche markdown files
 **What**: Modify `src/mind/prompt.ts`:
 1. Top-level `fs.readFileSync` calls load `SOUL.md`, `IDENTITY.md`, `LORE.md`, `FRIENDS.md` into module-scoped constants. Path: `path.join(__dirname, "..", "..", "docs", "psyche", "<FILE>.md")`
 2. `soulSection()` returns loaded SOUL.md content
@@ -395,7 +395,7 @@ Update prompt.test.ts:
 - No hardcoded soul or identity text remains in `prompt.ts`
 - `fs.readFileSync` called at module load time (top-level), not inside functions
 
-### ⬜ Unit 11c: Psyche files -- Coverage & Refactor
+### ✅ Unit 11c: Psyche files -- Coverage & Refactor
 **What**: Verify 100% coverage on `src/mind/prompt.ts`. Cover file-loading paths and error handling.
 **Acceptance**: 100% coverage on `src/mind/prompt.ts`. All tests green. No warnings.
 
@@ -486,3 +486,4 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 - 2026-02-25 22:58 Units 8a-8c complete: extracted engine/streaming.ts via TDD, 100% coverage, 401 tests
 - 2026-02-25 23:02 Units 9a-9c complete: extracted mind/prompt.ts via TDD, 100% coverage, 401 tests
 - 2026-02-25 23:03 Unit 10 complete: engine/core.ts is 223 lines (<300 target), contains only agent loop, callbacks, client init, re-exports
+- 2026-02-25 23:08 Units 11a-11c complete: psyche files created, prompt.ts reads from markdown, 100% coverage, 405 tests
