@@ -1,5 +1,5 @@
 import type OpenAI from "openai"
-import type { Channel } from "../engine/core"
+import type { Channel } from "./prompt"
 import * as fs from "fs"
 import * as path from "path"
 
