@@ -204,7 +204,7 @@ Every local import in the codebase after reorganization:
 
 ---
 
-### ⬜ Unit 4: Move agent.ts -> channels/cli.ts, teams.ts -> channels/teams.ts + tests + update imports
+### ✅ Unit 4: Move agent.ts -> channels/cli.ts, teams.ts -> channels/teams.ts + tests + update imports
 **What**: Move adapters to channels/, renaming agent.ts to cli.ts:
 1. `git mv src/agent.ts src/channels/cli.ts`
 2. `git mv src/teams.ts src/channels/teams.ts`
@@ -479,3 +479,4 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 - 2026-02-25 22:38 Unit 1 complete: created all directory structure (engine/, mind/, channels/, repertoire/, tests, docs/psyche/, docs/tasks/)
 - 2026-02-25 22:40 Unit 2 complete: moved phrases, skills, commands to repertoire/ with all import updates
 - 2026-02-25 22:41 Unit 3 complete: moved context.ts to mind/ with all import updates
+- 2026-02-25 22:44 Unit 4 complete: moved agent.ts -> channels/cli.ts, teams.ts -> channels/teams.ts with all import updates
