@@ -433,7 +433,7 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 
 ---
 
-### ⬜ Unit 14: Final validation
+### ✅ Unit 14: Final validation
 **What**: Full validation:
 1. `npm run build` -- clean
 2. `npm test` -- all tests pass
@@ -489,3 +489,4 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 - 2026-02-25 23:08 Units 11a-11c complete: psyche files created, prompt.ts reads from markdown, 100% coverage, 405 tests
 - 2026-02-25 23:09 Unit 12 complete: all dev docs moved to docs/tasks/, only psyche/ and tasks/ in docs/
 - 2026-02-25 23:13 Unit 13 complete: README.md updated with new file structure, diagrams, and references
+- 2026-02-25 23:14 Unit 14 complete: all 11 validation checks passed -- 405 tests, 100% coverage, build clean, no stale paths
