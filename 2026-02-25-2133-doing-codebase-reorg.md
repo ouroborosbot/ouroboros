@@ -311,7 +311,7 @@ Update `engine/core.ts` to import from `./streaming`.
 
 ---
 
-### ⬜ Unit 9a: Extract mind/prompt.ts -- Tests
+### ✅ Unit 9a: Extract mind/prompt.ts -- Tests
 **What**: Create `src/__tests__/mind/prompt.test.ts` by moving `describe("buildSystem", ...)` and `describe("isOwnCodebase", ...)` from `core.test.ts`. Update imports to `../../mind/prompt`.
 
 Refactored function signatures for tests:
@@ -327,7 +327,7 @@ Tests must cover:
 - `buildSystem("cli")` and `buildSystem("teams")` produce correct output
 **Acceptance**: Tests exist and FAIL because `src/mind/prompt.ts` does not exist yet.
 
-### ⬜ Unit 9b: Extract mind/prompt.ts -- Implementation
+### ✅ Unit 9b: Extract mind/prompt.ts -- Implementation
 **What**: Create `src/mind/prompt.ts` by extracting from `engine/core.ts`:
 - `Channel` type
 - `isOwnCodebase()` function
@@ -347,7 +347,7 @@ Update downstream imports:
 - `channels/teams.ts`: same split
 **Acceptance**: `npm test` -- all tests pass. `npm run build` clean. `buildSystem("cli")` and `buildSystem("teams")` produce identical output to before (same content, assembled differently).
 
-### ⬜ Unit 9c: Extract mind/prompt.ts -- Coverage & Cleanup
+### ✅ Unit 9c: Extract mind/prompt.ts -- Coverage & Cleanup
 **What**: Verify 100% coverage on `src/mind/prompt.ts`. Remove duplicate test blocks from `core.test.ts`.
 **Acceptance**: 100% coverage on `src/mind/prompt.ts`. All tests green.
 
@@ -484,3 +484,4 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 - 2026-02-25 22:47 Unit 6 complete: checkpoint passed -- 400 tests, 100% coverage, build clean
 - 2026-02-25 22:51 Units 7a-7c complete: extracted engine/tools.ts via TDD, 100% coverage, 400 tests
 - 2026-02-25 22:58 Units 8a-8c complete: extracted engine/streaming.ts via TDD, 100% coverage, 401 tests
+- 2026-02-25 23:02 Units 9a-9c complete: extracted mind/prompt.ts via TDD, 100% coverage, 401 tests
