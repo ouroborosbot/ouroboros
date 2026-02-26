@@ -255,7 +255,7 @@ Every local import in the codebase after reorganization:
 
 ---
 
-### ⬜ Unit 6: Checkpoint -- full validation after all moves
+### ✅ Unit 6: Checkpoint -- full validation after all moves
 **What**: Full validation before starting the core.ts split:
 1. `npm run build` -- clean
 2. `npm test` -- all 208+ tests pass
@@ -481,3 +481,4 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 - 2026-02-25 22:41 Unit 3 complete: moved context.ts to mind/ with all import updates
 - 2026-02-25 22:44 Unit 4 complete: moved agent.ts -> channels/cli.ts, teams.ts -> channels/teams.ts with all import updates
 - 2026-02-25 22:46 Unit 5 complete: moved core.ts to engine/ with all import updates. Only config.ts and entry points in src/ root
+- 2026-02-25 22:47 Unit 6 complete: checkpoint passed -- 400 tests, 100% coverage, build clean
