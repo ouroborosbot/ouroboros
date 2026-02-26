@@ -79,10 +79,11 @@ Reorganize the Ouroboros codebase for better modularity: rename agent.ts to cli.
 ### ⬜ Unit 2b: Extract tools.ts -- Implementation
 **What**: Create `src/tools.ts` by extracting from `core.ts`:
 - `tools` array (lines 57-172)
+- `ToolHandler` type alias (line 238)
 - `toolHandlers` record (lines 240-317)
 - `execTool()` function (lines 319-326)
 - `summarizeArgs()` function (lines 422-437)
-- Required imports: `fs`, `path`, `child_process`, `skills`
+- Required imports: `OpenAI` type, `fs`, `path`, `child_process` (`execSync`, `spawnSync`), `listSkills`/`loadSkill` from `./skills`
 - All exports: `tools`, `execTool`, `summarizeArgs`
 
 Update `core.ts` to import `tools`, `execTool`, `summarizeArgs` from `./tools` and re-export them for backward compatibility.
@@ -129,6 +130,8 @@ Update `core.ts` to import from `./streaming` and re-export for backward compati
 - `buildSystem()` function (lines 408-420)
 - Required imports: `fs`, `path`, `getModel` from `./core`, `tools` from `./tools`, `listSkills` from `./skills`
 - All exports: `Channel`, `isOwnCodebase`, `buildSystem`
+
+**Circular dependency note**: `prompt.ts` imports `getModel` from `core.ts`, while `core.ts` imports `buildSystem` from `prompt.ts`. This is safe in CommonJS because both imports are used only inside function bodies (lazy), never at module top-level. By the time any function executes, both modules are fully loaded. TypeScript compiles to CommonJS `require()`, so this just works. However, if this causes issues during testing (vitest module mocking), the fallback is to have `buildSystem()` accept `getModel` as a parameter.
 
 Update `core.ts` to import from `./prompt` and re-export `Channel`, `isOwnCodebase`, `buildSystem` for backward compatibility.
 
