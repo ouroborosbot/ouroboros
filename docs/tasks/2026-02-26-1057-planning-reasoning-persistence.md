@@ -1,7 +1,7 @@
 # Planning: Reasoning Item Persistence and Token Estimation
 
 **Status**: drafting
-**Created**: 2026-02-26
+**Created**: 2026-02-26 15:42
 
 ## Goal
 Fix two bugs that cause the sliding context window to fail when using Azure Responses API reasoning models (gpt-5.2-chat) with `store: false`. Reasoning items are lost between turns (breaking reasoning continuity) and reasoning tokens are invisible to the token estimator (preventing context trimming from triggering).
@@ -76,4 +76,4 @@ The root cause is that `azureInput` in `runAgent` is a local variable. Reasoning
 The token estimation gap compounds this: `estimateTokens` only measures `msg.content` and `msg.tool_calls`, so even if reasoning items were somehow present, they would not be counted. The estimate says ~44K tokens while real context (including reasoning) is much higher. Trimming never triggers, and the model runs out of context mid-turn.
 
 ## Progress Log
-- 2026-02-26 Created
+- 2026-02-26 15:42 Created
