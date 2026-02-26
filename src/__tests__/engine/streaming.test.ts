@@ -9,9 +9,10 @@ describe("toResponsesTools", () => {
     vi.resetModules()
     process.env.MINIMAX_API_KEY = "test-key"
     process.env.MINIMAX_MODEL = "test-model"
-    const core = await import("../../engine/streaming")
-    toResponsesTools = core.toResponsesTools
-    tools = core.tools
+    const streaming = await import("../../engine/streaming")
+    const toolsMod = await import("../../engine/tools")
+    toResponsesTools = streaming.toResponsesTools
+    tools = toolsMod.tools
   })
 
   it("converts a single CC tool to Responses API FunctionTool format", () => {
@@ -331,7 +332,6 @@ describe("streamChatCompletion", () => {
     vi.resetModules()
     process.env.MINIMAX_API_KEY = "test-key"
     process.env.MINIMAX_MODEL = "test-model"
-    mockCreate.mockReset()
     const core = await import("../../engine/streaming")
     streamChatCompletion = core.streamChatCompletion
   })
@@ -463,7 +463,6 @@ describe("streamResponsesApi", () => {
     vi.resetModules()
     process.env.MINIMAX_API_KEY = "test-key"
     process.env.MINIMAX_MODEL = "test-model"
-    mockResponsesCreate.mockReset()
     const core = await import("../../engine/streaming")
     streamResponsesApi = core.streamResponsesApi
   })
