@@ -1,6 +1,6 @@
 # Doing: Codebase Reorganization
 
-**Status**: drafting
+**Status**: READY_FOR_EXECUTION
 **Execution Mode**: pending
 **Created**: 2026-02-25 21:55
 **Planning**: ./2026-02-25-2133-planning-codebase-reorg.md
