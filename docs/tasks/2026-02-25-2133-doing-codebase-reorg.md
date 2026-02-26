@@ -1,6 +1,6 @@
 # Doing: Codebase Reorganization
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: pending
 **Created**: 2026-02-25 21:55
 **Planning**: ./2026-02-25-2133-planning-codebase-reorg.md
@@ -451,7 +451,7 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 
 ---
 
-### ⬜ Unit 15: Verify this task's own docs landed in docs/tasks/
+### ✅ Unit 15: Verify this task's own docs landed in docs/tasks/
 **What**: Confirm that Unit 12 successfully moved this task's planning/doing docs:
 1. Verify `docs/tasks/2026-02-25-2133-planning-codebase-reorg.md` exists
 2. Verify `docs/tasks/2026-02-25-2133-doing-codebase-reorg.md` exists
@@ -490,3 +490,5 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 - 2026-02-25 23:09 Unit 12 complete: all dev docs moved to docs/tasks/, only psyche/ and tasks/ in docs/
 - 2026-02-25 23:13 Unit 13 complete: README.md updated with new file structure, diagrams, and references
 - 2026-02-25 23:14 Unit 14 complete: all 11 validation checks passed -- 405 tests, 100% coverage, build clean, no stale paths
+- 2026-02-25 23:15 Unit 15 complete: all task docs verified in docs/tasks/, no stale docs in repo root
+- 2026-02-25 23:15 ALL UNITS COMPLETE -- codebase reorganization done
