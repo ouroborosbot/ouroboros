@@ -119,3 +119,4 @@ Strict static-only rule for markdown extraction: if a section function takes par
 
 ## Progress Log
 - 2026-02-25 21:34 Created
+- 2026-02-25 21:38 Corrected static-only rule for markdown extraction, added keeper naming options, full section audit
