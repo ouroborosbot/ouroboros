@@ -353,7 +353,7 @@ Update downstream imports:
 
 ---
 
-### ⬜ Unit 10: Verify lean engine/core.ts
+### ✅ Unit 10: Verify lean engine/core.ts
 **What**: Verify `engine/core.ts` contains only:
 - Client init (`_client`, `_model`, `_provider`, `getClient`, `getModel`, `getProvider`)
 - `ChannelCallbacks` interface
@@ -485,3 +485,4 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 - 2026-02-25 22:51 Units 7a-7c complete: extracted engine/tools.ts via TDD, 100% coverage, 400 tests
 - 2026-02-25 22:58 Units 8a-8c complete: extracted engine/streaming.ts via TDD, 100% coverage, 401 tests
 - 2026-02-25 23:02 Units 9a-9c complete: extracted mind/prompt.ts via TDD, 100% coverage, 401 tests
+- 2026-02-25 23:03 Unit 10 complete: engine/core.ts is 223 lines (<300 target), contains only agent loop, callbacks, client init, re-exports
