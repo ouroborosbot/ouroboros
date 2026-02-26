@@ -47,11 +47,75 @@ describe("CLI adapter - createCliCallbacks", () => {
   })
 })
 
+describe("CLI adapter - renderMarkdown", () => {
+  it("renders **bold** as ANSI bold", async () => {
+    vi.resetModules()
+    const agent = await import("../../channels/cli")
+    expect(agent.renderMarkdown("hello **world**")).toBe("hello \x1b[1mworld\x1b[22m")
+  })
+
+  it("renders *italic* as ANSI italic", async () => {
+    vi.resetModules()
+    const agent = await import("../../channels/cli")
+    expect(agent.renderMarkdown("hello *world*")).toBe("hello \x1b[3mworld\x1b[23m")
+  })
+
+  it("renders `code` as ANSI cyan", async () => {
+    vi.resetModules()
+    const agent = await import("../../channels/cli")
+    expect(agent.renderMarkdown("use `npm install`")).toBe("use \x1b[36mnpm install\x1b[39m")
+  })
+
+  it("renders code blocks as ANSI dim", async () => {
+    vi.resetModules()
+    const agent = await import("../../channels/cli")
+    const input = "code:\n```\nconst x = 1\n```"
+    const expected = "code:\n\x1b[2mconst x = 1\x1b[22m"
+    expect(agent.renderMarkdown(input)).toBe(expected)
+  })
+
+  it("passes plain text through unchanged", async () => {
+    vi.resetModules()
+    const agent = await import("../../channels/cli")
+    expect(agent.renderMarkdown("no markdown here")).toBe("no markdown here")
+  })
+
+  it("does not render markdown inside code blocks", async () => {
+    vi.resetModules()
+    const agent = await import("../../channels/cli")
+    const input = "```\n**not bold**\n```"
+    const expected = "\x1b[2m**not bold**\x1b[22m"
+    expect(agent.renderMarkdown(input)).toBe(expected)
+  })
+
+  it("does not render markdown inside inline code", async () => {
+    vi.resetModules()
+    const agent = await import("../../channels/cli")
+    expect(agent.renderMarkdown("`**not bold**`")).toBe("\x1b[36m**not bold**\x1b[39m")
+  })
+
+  it("handles bold and italic together", async () => {
+    vi.resetModules()
+    const agent = await import("../../channels/cli")
+    expect(agent.renderMarkdown("**bold** and *italic*")).toBe(
+      "\x1b[1mbold\x1b[22m and \x1b[3mitalic\x1b[23m"
+    )
+  })
+
+  it("handles code blocks with language specifier", async () => {
+    vi.resetModules()
+    const agent = await import("../../channels/cli")
+    const input = "```ts\nconst x = 1\n```"
+    const expected = "\x1b[2mconst x = 1\x1b[22m"
+    expect(agent.renderMarkdown(input)).toBe(expected)
+  })
+})
+
 describe("CLI adapter - onReasoningChunk and onTextChunk rendering", () => {
   let stdoutChunks: string[]
   let stdoutSpy: ReturnType<typeof vi.spyOn>
   let stderrSpy: ReturnType<typeof vi.spyOn>
-  let callbacks: ChannelCallbacks
+  let callbacks: ChannelCallbacks & { getBuffer(): string }
 
   beforeEach(async () => {
     stdoutChunks = []
@@ -72,11 +136,17 @@ describe("CLI adapter - onReasoningChunk and onTextChunk rendering", () => {
     vi.restoreAllMocks()
   })
 
-  it("onTextChunk outputs plain text unchanged (no dim, no tag parsing)", () => {
+  it("onTextChunk buffers text (not written to stdout)", () => {
     callbacks.onTextChunk("hello world")
-    const output = stdoutChunks.join("")
-    expect(output).toContain("hello world")
-    expect(output).not.toContain("\x1b[2m")
+    expect(stdoutChunks.join("")).toBe("")
+    expect(callbacks.getBuffer()).toBe("hello world")
+  })
+
+  it("getBuffer clears buffer after read", () => {
+    callbacks.onTextChunk("hello")
+    callbacks.onTextChunk(" world")
+    expect(callbacks.getBuffer()).toBe("hello world")
+    expect(callbacks.getBuffer()).toBe("")
   })
 
   it("onReasoningChunk outputs dim text", () => {
@@ -87,37 +157,33 @@ describe("CLI adapter - onReasoningChunk and onTextChunk rendering", () => {
     expect(output).toContain("\x1b[0m")
   })
 
-  it("reasoning then content: dim followed by \\n\\n then normal", () => {
+  it("reasoning then content: dim on stdout, \\n\\n + text in buffer", () => {
     callbacks.onReasoningChunk("thinking")
     callbacks.onTextChunk("answer")
+    // Reasoning goes to stdout
     const output = stdoutChunks.join("")
     expect(output).toContain("\x1b[2m")
     expect(output).toContain("thinking")
-    expect(output).toContain("\n\n")
-    expect(output).toContain("answer")
-    // The \n\n should appear between reasoning and answer
-    const nnIdx = output.indexOf("\n\n")
-    const thinkIdx = output.indexOf("thinking")
-    const answerIdx = output.indexOf("answer")
-    expect(nnIdx).toBeGreaterThan(thinkIdx)
-    expect(answerIdx).toBeGreaterThan(nnIdx)
+    // Text with separator goes to buffer
+    const buf = callbacks.getBuffer()
+    expect(buf).toBe("\n\nanswer")
   })
 
-  it("text-only response has no \\n\\n prefix", () => {
+  it("text-only response has no \\n\\n prefix in buffer", () => {
     callbacks.onTextChunk("just text")
-    const output = stdoutChunks.join("")
-    expect(output).toBe("just text")
-    expect(output).not.toContain("\n\n")
+    const buf = callbacks.getBuffer()
+    expect(buf).toBe("just text")
+    expect(buf).not.toContain("\n\n")
   })
 
-  it("multiple reasoning chunks before text: only one \\n\\n separator", () => {
+  it("multiple reasoning chunks before text: only one \\n\\n separator in buffer", () => {
     callbacks.onReasoningChunk("step1")
     callbacks.onReasoningChunk("step2")
     callbacks.onTextChunk("answer")
-    const output = stdoutChunks.join("")
-    // Should have exactly one \n\n (between reasoning and text)
-    const matches = output.match(/\n\n/g)
+    const buf = callbacks.getBuffer()
+    const matches = buf.match(/\n\n/g)
     expect(matches).toHaveLength(1)
+    expect(buf).toBe("\n\nanswer")
   })
 
   it("onModelStart resets reasoning state for new turn", () => {
@@ -125,25 +191,24 @@ describe("CLI adapter - onReasoningChunk and onTextChunk rendering", () => {
     callbacks.onModelStart()
     callbacks.onModelStreamStart()
     callbacks.onTextChunk("answer")
-    const output = stdoutChunks.join("")
-    // No \n\n because onModelStart reset the state
-    expect(output).not.toContain("\n\nanswer")
+    const buf = callbacks.getBuffer()
+    expect(buf).toBe("answer")
+    expect(buf).not.toContain("\n\n")
   })
 
   it("multiple reasoning chunks are all dim", () => {
     callbacks.onReasoningChunk("chunk1")
     callbacks.onReasoningChunk("chunk2")
     const output = stdoutChunks.join("")
-    // Both chunks should have dim codes
     expect(output).toContain("\x1b[2mchunk1\x1b[0m")
     expect(output).toContain("\x1b[2mchunk2\x1b[0m")
   })
 
-  it("content-only: no dim codes in output", () => {
+  it("content-only: no dim codes in buffer", () => {
     callbacks.onTextChunk("just text")
-    const output = stdoutChunks.join("")
-    expect(output).toBe("just text")
-    expect(output).not.toContain("\x1b[2m")
+    const buf = callbacks.getBuffer()
+    expect(buf).toBe("just text")
+    expect(buf).not.toContain("\x1b[2m")
   })
 })
 

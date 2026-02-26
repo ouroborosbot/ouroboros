@@ -455,6 +455,25 @@ describe("agent.ts main() - session persistence", () => {
     expect(runAgentCalls.length).toBe(1)
   })
 
+  it("renders buffered text with markdown after runAgent", async () => {
+    setupBasic({ inputSequence: ["hello", "/exit"] })
+    let callCount = 0
+    mocks.runAgent.mockImplementation(async (_msgs: any, cb: any) => {
+      callCount++
+      if (callCount === 1) cb.onTextChunk("**greeting**")
+      if (callCount === 2) cb.onTextChunk("**bold** reply")
+    })
+
+    await main()
+
+    const output = stdoutChunks.join("")
+    // Markdown should be rendered (bold ANSI codes, not raw **)
+    expect(output).toContain("\x1b[1mgreeting\x1b[22m")
+    expect(output).toContain("\x1b[1mbold\x1b[22m reply")
+    expect(output).not.toContain("**greeting**")
+    expect(output).not.toContain("**bold**")
+  })
+
   it("saves session after each turn", async () => {
     const saveSessionCalls: any[][] = []
     setupBasic({ inputSequence: ["hello", "/exit"] })

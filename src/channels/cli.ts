@@ -121,10 +121,34 @@ export function addHistory(history: string[], entry: string): void {
   history.push(entry)
 }
 
-export function createCliCallbacks(): ChannelCallbacks {
+export function renderMarkdown(text: string): string {
+  const placeholders: string[] = []
+  // Protect fenced code blocks
+  let result = text.replace(/```(?:\w*\n)?([\s\S]*?)```/g, (_m, code: string) => {
+    const idx = placeholders.length
+    placeholders.push(`\x1b[2m${code.replace(/\n$/, "")}\x1b[22m`)
+    return `\x00${idx}\x00`
+  })
+  // Protect inline code
+  result = result.replace(/`([^`\n]+)`/g, (_m, code: string) => {
+    const idx = placeholders.length
+    placeholders.push(`\x1b[36m${code}\x1b[39m`)
+    return `\x00${idx}\x00`
+  })
+  // Bold
+  result = result.replace(/\*\*(.+?)\*\*/g, "\x1b[1m$1\x1b[22m")
+  // Italic (avoid matching inside bold remnants)
+  result = result.replace(/(?<!\*)\*(.+?)\*(?!\*)/g, "\x1b[3m$1\x1b[23m")
+  // Restore placeholders
+  result = result.replace(/\x00(\d+)\x00/g, (_m, idx: string) => placeholders[parseInt(idx)])
+  return result
+}
+
+export function createCliCallbacks(): ChannelCallbacks & { getBuffer(): string } {
   let currentSpinner: Spinner | null = null
   let hadReasoning = false
   let hadToolRun = false
+  let textBuffer = ""
 
   return {
     onModelStart: () => {
@@ -140,10 +164,10 @@ export function createCliCallbacks(): ChannelCallbacks {
     },
     onTextChunk: (text: string) => {
       if (hadReasoning) {
-        process.stdout.write("\n\n")
+        textBuffer += "\n\n"
         hadReasoning = false
       }
-      process.stdout.write(text)
+      textBuffer += text
     },
     onReasoningChunk: (text: string) => {
       hadReasoning = true
@@ -171,6 +195,11 @@ export function createCliCallbacks(): ChannelCallbacks {
       currentSpinner?.fail("request failed")
       currentSpinner = null
       process.stderr.write(`\x1b[31m${error}\x1b[0m\n`)
+    },
+    getBuffer() {
+      const buf = textBuffer
+      textBuffer = ""
+      return buf
     },
   }
 }
@@ -208,7 +237,9 @@ export async function main() {
     ctrl.suppress(() => bootAbort.abort())
     await bootGreeting(messages, cliCallbacks, bootAbort.signal).catch(() => {})
     ctrl.restore()
-    process.stdout.write("\n")
+    const greetingText = cliCallbacks.getBuffer()
+    if (greetingText) process.stdout.write(renderMarkdown(greetingText))
+    process.stdout.write("\n\n")
     saveSession(sessPath, messages)
   }
 
@@ -266,7 +297,7 @@ export async function main() {
       const cols = process.stdout.columns || 80
       const echoLen = 2 + input.length // "> " prefix + input
       const rows = Math.ceil(echoLen / cols)
-      process.stdout.write(`\x1b[${rows}A\x1b[K` + `\x1b[1m> ${input}\x1b[0m\n`)
+      process.stdout.write(`\x1b[${rows}A\x1b[K` + `\x1b[1m> ${input}\x1b[0m\n\n`)
 
       messages.push({ role: "user", content: input })
       addHistory(history, input)
@@ -289,7 +320,9 @@ export async function main() {
       }
       ctrl.restore()
       currentAbort = null
-      process.stdout.write("\n")
+      const responseText = cliCallbacks.getBuffer()
+      if (responseText) process.stdout.write(renderMarkdown(responseText))
+      process.stdout.write("\n\n")
 
       saveSession(sessPath, messages)
 
