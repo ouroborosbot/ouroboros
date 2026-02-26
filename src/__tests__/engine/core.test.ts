@@ -1,9 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 
+// Default readFileSync: return psyche file stubs so prompt.ts module-level loads work
+function defaultReadFileSync(filePath: any, _encoding?: any): string {
+  const p = String(filePath)
+  if (p.endsWith("SOUL.md")) return "mock soul"
+  if (p.endsWith("IDENTITY.md")) return "mock identity"
+  if (p.endsWith("LORE.md")) return "mock lore"
+  if (p.endsWith("FRIENDS.md")) return "mock friends"
+  if (p.endsWith("package.json")) return JSON.stringify({ name: "other" })
+  return ""
+}
+
 // Mock fs and child_process before importing core
 vi.mock("fs", () => ({
   existsSync: vi.fn(),
-  readFileSync: vi.fn(),
+  readFileSync: vi.fn(defaultReadFileSync),
   writeFileSync: vi.fn(),
   readdirSync: vi.fn(),
 }))
@@ -106,9 +117,11 @@ describe("runAgent", () => {
     vi.resetModules()
     delete process.env.AZURE_OPENAI_API_KEY
     process.env.MINIMAX_API_KEY = "test-key"
-process.env.MINIMAX_MODEL = "test-model"
+    process.env.MINIMAX_MODEL = "test-model"
     mockCreate.mockReset()
     mockResponsesCreate.mockReset()
+    // Restore default readFileSync so prompt.ts module-level psyche file loads work
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
 
     const core = await import("../../engine/core")
     runAgent = core.runAgent
@@ -1505,6 +1518,7 @@ describe("getClient", () => {
 
   beforeEach(() => {
     for (const v of allVars) { saved[v] = process.env[v]; delete process.env[v] }
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
   })
 
   afterEach(() => {
@@ -1653,6 +1667,7 @@ describe("getClient config integration", () => {
 
   beforeEach(() => {
     for (const v of allVars) { saved[v] = process.env[v]; delete process.env[v] }
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
   })
 
   afterEach(() => {

@@ -36,24 +36,56 @@ import { listSkills } from "../../repertoire/skills"
 process.env.MINIMAX_API_KEY = "test-key"
 process.env.MINIMAX_MODEL = "test-model"
 
+// Default psyche file contents used by the mock
+const MOCK_SOUL = "i am a witty, funny, competent chaos monkey coding assistant.\ni get things done, crack jokes, embrace chaos, deliver quality."
+const MOCK_IDENTITY = "i am Ouroboros.\ni use lowercase in my responses to the user except for proper nouns. no periods unless necessary. i never apply lowercase to code, file paths, environment variables, or tool arguments — only to natural language output."
+const MOCK_LORE = "i am named after the ouroboros — the ancient symbol of a serpent eating its own tail."
+const MOCK_FRIENDS = "my creator works at microsoft and talks to me through the CLI and Teams."
+
+// Helper: configure readFileSync to return psyche files by path and package.json
+function setupReadFileSync(pkgName: string = "other") {
+  vi.mocked(fs.readFileSync).mockImplementation((filePath: any, _encoding?: any) => {
+    const p = String(filePath)
+    if (p.endsWith("SOUL.md")) return MOCK_SOUL
+    if (p.endsWith("IDENTITY.md")) return MOCK_IDENTITY
+    if (p.endsWith("LORE.md")) return MOCK_LORE
+    if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
+    if (p.endsWith("package.json")) return JSON.stringify({ name: pkgName })
+    return ""
+  })
+}
+
 describe("isOwnCodebase", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    delete process.env.AZURE_OPENAI_API_KEY
+    process.env.MINIMAX_API_KEY = "test-key"
+    process.env.MINIMAX_MODEL = "test-model"
+  })
+
   it("returns true when package.json has name 'ouroboros'", async () => {
+    setupReadFileSync("ouroboros")
     const { isOwnCodebase } = await import("../../mind/prompt")
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "ouroboros" }))
     expect(isOwnCodebase()).toBe(true)
   })
 
   it("returns false when package.json has a different name", async () => {
+    setupReadFileSync("other-project")
     const { isOwnCodebase } = await import("../../mind/prompt")
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other-project" }))
     expect(isOwnCodebase()).toBe(false)
   })
 
-  it("returns false when readFileSync throws", async () => {
-    const { isOwnCodebase } = await import("../../mind/prompt")
-    vi.mocked(fs.readFileSync).mockImplementation(() => {
+  it("returns false when readFileSync throws for package.json", async () => {
+    // Set up psyche files normally but make package.json throw
+    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, _encoding?: any) => {
+      const p = String(filePath)
+      if (p.endsWith("SOUL.md")) return MOCK_SOUL
+      if (p.endsWith("IDENTITY.md")) return MOCK_IDENTITY
+      if (p.endsWith("LORE.md")) return MOCK_LORE
+      if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
       throw new Error("ENOENT")
     })
+    const { isOwnCodebase } = await import("../../mind/prompt")
     expect(isOwnCodebase()).toBe(false)
   })
 })
@@ -67,7 +99,7 @@ describe("buildSystem", () => {
   })
 
   it("includes soul section with personality", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    setupReadFileSync()
     const { buildSystem } = await import("../../mind/prompt")
     const result = buildSystem()
     expect(result).toContain("chaos monkey coding assistant")
@@ -75,22 +107,38 @@ describe("buildSystem", () => {
   })
 
   it("includes identity section with Ouroboros name", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    setupReadFileSync()
     const { buildSystem } = await import("../../mind/prompt")
     const result = buildSystem()
     expect(result).toContain("i am Ouroboros")
     expect(result).toContain("i use lowercase")
   })
 
+  it("includes lore section", async () => {
+    setupReadFileSync()
+    const { buildSystem } = await import("../../mind/prompt")
+    const result = buildSystem()
+    expect(result).toContain("## my lore")
+    expect(result).toContain("ouroboros")
+  })
+
+  it("includes friends section", async () => {
+    setupReadFileSync()
+    const { buildSystem } = await import("../../mind/prompt")
+    const result = buildSystem()
+    expect(result).toContain("## my friends")
+    expect(result).toContain("microsoft")
+  })
+
   it("includes boot greeting for cli channel", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    setupReadFileSync()
     const { buildSystem } = await import("../../mind/prompt")
     const result = buildSystem("cli")
     expect(result).toContain("i introduce myself on boot")
   })
 
   it("includes Teams context for teams channel", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    setupReadFileSync()
     const { buildSystem } = await import("../../mind/prompt")
     const result = buildSystem("teams")
     expect(result).toContain("Microsoft Teams")
@@ -99,14 +147,14 @@ describe("buildSystem", () => {
   })
 
   it("defaults to cli channel", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    setupReadFileSync()
     const { buildSystem } = await import("../../mind/prompt")
     const result = buildSystem()
     expect(result).toContain("i introduce myself on boot")
   })
 
   it("includes date section with current date", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    setupReadFileSync()
     const { buildSystem } = await import("../../mind/prompt")
     const result = buildSystem()
     const today = new Date().toISOString().slice(0, 10)
@@ -114,7 +162,7 @@ describe("buildSystem", () => {
   })
 
   it("includes tools section with tool names", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    setupReadFileSync()
     const { buildSystem } = await import("../../mind/prompt")
     const result = buildSystem()
     expect(result).toContain("## my tools")
@@ -124,7 +172,7 @@ describe("buildSystem", () => {
   })
 
   it("includes skills section from listSkills", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    setupReadFileSync()
     vi.mocked(listSkills).mockReturnValue(["code-review", "self-edit", "self-query"])
     const { buildSystem } = await import("../../mind/prompt")
     const result = buildSystem()
@@ -133,7 +181,7 @@ describe("buildSystem", () => {
   })
 
   it("omits skills section when no skills available", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    setupReadFileSync()
     vi.mocked(listSkills).mockReturnValue([])
     const { buildSystem } = await import("../../mind/prompt")
     const result = buildSystem()
@@ -141,7 +189,7 @@ describe("buildSystem", () => {
   })
 
   it("includes self-aware section when in own codebase", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "ouroboros" }))
+    setupReadFileSync("ouroboros")
     const { buildSystem } = await import("../../mind/prompt")
     const result = buildSystem()
     expect(result).toContain("i am in my own codebase")
@@ -149,14 +197,14 @@ describe("buildSystem", () => {
   })
 
   it("omits self-aware section when not in own codebase", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    setupReadFileSync()
     const { buildSystem } = await import("../../mind/prompt")
     const result = buildSystem()
     expect(result).not.toContain("i am in my own codebase")
   })
 
   it("includes azure provider string when AZURE_OPENAI_API_KEY is set", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    setupReadFileSync()
     process.env.AZURE_OPENAI_API_KEY = "test-azure-key"
     process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
     process.env.AZURE_OPENAI_DEPLOYMENT = "gpt-4o-deploy"
@@ -171,7 +219,7 @@ describe("buildSystem", () => {
   })
 
   it("uses 'default' deployment when AZURE_OPENAI_DEPLOYMENT is not set", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ name: "other" }))
+    setupReadFileSync()
     process.env.AZURE_OPENAI_API_KEY = "test-azure-key"
     process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
     process.env.AZURE_OPENAI_MODEL_NAME = "test-model"
@@ -182,5 +230,35 @@ describe("buildSystem", () => {
     delete process.env.AZURE_OPENAI_API_KEY
     delete process.env.AZURE_OPENAI_ENDPOINT
     delete process.env.AZURE_OPENAI_MODEL_NAME
+  })
+
+  it("reads soul content from SOUL.md file", async () => {
+    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, _encoding?: any) => {
+      const p = String(filePath)
+      if (p.endsWith("SOUL.md")) return "custom soul content"
+      if (p.endsWith("IDENTITY.md")) return MOCK_IDENTITY
+      if (p.endsWith("LORE.md")) return MOCK_LORE
+      if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
+      if (p.endsWith("package.json")) return JSON.stringify({ name: "other" })
+      return ""
+    })
+    const { buildSystem } = await import("../../mind/prompt")
+    const result = buildSystem()
+    expect(result).toContain("custom soul content")
+  })
+
+  it("reads identity content from IDENTITY.md file", async () => {
+    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, _encoding?: any) => {
+      const p = String(filePath)
+      if (p.endsWith("SOUL.md")) return MOCK_SOUL
+      if (p.endsWith("IDENTITY.md")) return "custom identity content"
+      if (p.endsWith("LORE.md")) return MOCK_LORE
+      if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
+      if (p.endsWith("package.json")) return JSON.stringify({ name: "other" })
+      return ""
+    })
+    const { buildSystem } = await import("../../mind/prompt")
+    const result = buildSystem()
+    expect(result).toContain("custom identity content")
   })
 })
