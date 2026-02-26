@@ -446,8 +446,19 @@ Update cross-references in doing doc (Planning/Artifacts paths).
 9. `engine/core.ts` line count < 300
 10. README.md has no `agent.ts` references
 11. No stale import paths to old locations
-**Output**: `./2026-02-25-2133-doing-codebase-reorg/final-coverage.txt`
+**Output**: `./docs/tasks/2026-02-25-2133-doing-codebase-reorg/final-coverage.txt`
 **Acceptance**: All checks pass. Zero warnings, zero errors.
+
+---
+
+### ⬜ Unit 15: Verify this task's own docs landed in docs/tasks/
+**What**: Confirm that Unit 12 successfully moved this task's planning/doing docs:
+1. Verify `docs/tasks/2026-02-25-2133-planning-codebase-reorg.md` exists
+2. Verify `docs/tasks/2026-02-25-2133-doing-codebase-reorg.md` exists
+3. Verify `docs/tasks/2026-02-25-2133-doing-codebase-reorg/` exists (artifacts dir)
+4. Verify the `Planning:` and `Artifacts:` paths at the top of the doing doc are updated
+5. Verify no planning/doing docs remain in repo root
+**Acceptance**: All paths correct. No stale docs in repo root.
 
 ---
 
