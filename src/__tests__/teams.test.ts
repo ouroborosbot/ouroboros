@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import type { ChannelCallbacks } from "../core"
-import { THINKING_PHRASES, FOLLOWUP_PHRASES } from "../phrases"
+import { THINKING_PHRASES, FOLLOWUP_PHRASES } from "../repertoire/phrases"
 
 // Tests for src/teams.ts Teams channel adapter.
 
@@ -275,7 +275,7 @@ describe("Teams adapter - message handling", () => {
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
       cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
-    vi.doMock("../commands", () => ({
+    vi.doMock("../repertoire/commands", () => ({
       createCommandRegistry: vi.fn().mockReturnValue({
         register: vi.fn(),
         get: vi.fn(),
@@ -1093,7 +1093,7 @@ describe("Teams adapter - session persistence", () => {
       trimMessages: vi.fn().mockImplementation(trimMessagesFn),
       cachedBuildSystem: vi.fn().mockReturnValue("cached teams prompt"),
     }))
-    vi.doMock("../commands", () => ({
+    vi.doMock("../repertoire/commands", () => ({
       createCommandRegistry: vi.fn().mockReturnValue({
         register: vi.fn(),
         get: vi.fn(),

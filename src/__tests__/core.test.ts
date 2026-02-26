@@ -13,7 +13,7 @@ vi.mock("child_process", () => ({
   spawnSync: vi.fn(),
 }))
 
-vi.mock("../skills", () => ({
+vi.mock("../repertoire/skills", () => ({
   listSkills: vi.fn(),
   loadSkill: vi.fn(),
 }))
@@ -41,7 +41,7 @@ vi.mock("openai", () => {
 
 import * as fs from "fs"
 import { execSync, spawnSync } from "child_process"
-import { listSkills, loadSkill } from "../skills"
+import { listSkills, loadSkill } from "../repertoire/skills"
 import type { ChannelCallbacks } from "../core"
 
 // Set env var before importing core

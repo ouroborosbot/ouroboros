@@ -4,7 +4,7 @@ describe("createCommandRegistry", () => {
   beforeEach(() => { vi.resetModules() })
 
   it("register and get a command", async () => {
-    const { createCommandRegistry } = await import("../commands")
+    const { createCommandRegistry } = await import("../../repertoire/commands")
     const registry = createCommandRegistry()
     const handler = vi.fn().mockReturnValue({ action: "response", message: "ok" })
     registry.register({ name: "test", description: "a test command", channels: ["cli"], handler })
@@ -15,13 +15,13 @@ describe("createCommandRegistry", () => {
   })
 
   it("get returns undefined for unknown command", async () => {
-    const { createCommandRegistry } = await import("../commands")
+    const { createCommandRegistry } = await import("../../repertoire/commands")
     const registry = createCommandRegistry()
     expect(registry.get("nonexistent")).toBeUndefined()
   })
 
   it("list returns commands filtered by channel", async () => {
-    const { createCommandRegistry } = await import("../commands")
+    const { createCommandRegistry } = await import("../../repertoire/commands")
     const registry = createCommandRegistry()
     const handler = vi.fn()
     registry.register({ name: "clionly", description: "cli", channels: ["cli"], handler })
@@ -36,7 +36,7 @@ describe("createCommandRegistry", () => {
   })
 
   it("dispatch calls handler and returns handled:true", async () => {
-    const { createCommandRegistry } = await import("../commands")
+    const { createCommandRegistry } = await import("../../repertoire/commands")
     const registry = createCommandRegistry()
     const handler = vi.fn().mockReturnValue({ action: "exit" })
     registry.register({ name: "quit", description: "quit", channels: ["cli"], handler })
@@ -47,7 +47,7 @@ describe("createCommandRegistry", () => {
   })
 
   it("dispatch returns handled:false for unknown command", async () => {
-    const { createCommandRegistry } = await import("../commands")
+    const { createCommandRegistry } = await import("../../repertoire/commands")
     const registry = createCommandRegistry()
     const result = registry.dispatch("unknown", { channel: "cli" })
     expect(result).toEqual({ handled: false })
@@ -58,7 +58,7 @@ describe("registerDefaultCommands", () => {
   beforeEach(() => { vi.resetModules() })
 
   it("registers exit, new, and commands", async () => {
-    const { createCommandRegistry, registerDefaultCommands } = await import("../commands")
+    const { createCommandRegistry, registerDefaultCommands } = await import("../../repertoire/commands")
     const registry = createCommandRegistry()
     registerDefaultCommands(registry)
 
@@ -68,7 +68,7 @@ describe("registerDefaultCommands", () => {
   })
 
   it("/exit handler returns action:exit", async () => {
-    const { createCommandRegistry, registerDefaultCommands } = await import("../commands")
+    const { createCommandRegistry, registerDefaultCommands } = await import("../../repertoire/commands")
     const registry = createCommandRegistry()
     registerDefaultCommands(registry)
 
@@ -77,7 +77,7 @@ describe("registerDefaultCommands", () => {
   })
 
   it("/new handler returns action:new", async () => {
-    const { createCommandRegistry, registerDefaultCommands } = await import("../commands")
+    const { createCommandRegistry, registerDefaultCommands } = await import("../../repertoire/commands")
     const registry = createCommandRegistry()
     registerDefaultCommands(registry)
 
@@ -86,7 +86,7 @@ describe("registerDefaultCommands", () => {
   })
 
   it("/commands handler returns formatted list for cli channel", async () => {
-    const { createCommandRegistry, registerDefaultCommands } = await import("../commands")
+    const { createCommandRegistry, registerDefaultCommands } = await import("../../repertoire/commands")
     const registry = createCommandRegistry()
     registerDefaultCommands(registry)
 
@@ -99,7 +99,7 @@ describe("registerDefaultCommands", () => {
   })
 
   it("/commands handler for teams does NOT include /exit", async () => {
-    const { createCommandRegistry, registerDefaultCommands } = await import("../commands")
+    const { createCommandRegistry, registerDefaultCommands } = await import("../../repertoire/commands")
     const registry = createCommandRegistry()
     registerDefaultCommands(registry)
 
@@ -110,7 +110,7 @@ describe("registerDefaultCommands", () => {
   })
 
   it("/exit is NOT available in teams channel list", async () => {
-    const { createCommandRegistry, registerDefaultCommands } = await import("../commands")
+    const { createCommandRegistry, registerDefaultCommands } = await import("../../repertoire/commands")
     const registry = createCommandRegistry()
     registerDefaultCommands(registry)
 
@@ -123,52 +123,52 @@ describe("parseSlashCommand", () => {
   beforeEach(() => { vi.resetModules() })
 
   it("parses /exit as command 'exit'", async () => {
-    const { parseSlashCommand } = await import("../commands")
+    const { parseSlashCommand } = await import("../../repertoire/commands")
     const result = parseSlashCommand("/exit")
     expect(result).toEqual({ command: "exit", args: "" })
   })
 
   it("parses /new with no args", async () => {
-    const { parseSlashCommand } = await import("../commands")
+    const { parseSlashCommand } = await import("../../repertoire/commands")
     const result = parseSlashCommand("/new")
     expect(result).toEqual({ command: "new", args: "" })
   })
 
   it("parses command with arguments", async () => {
-    const { parseSlashCommand } = await import("../commands")
+    const { parseSlashCommand } = await import("../../repertoire/commands")
     const result = parseSlashCommand("/search hello world")
     expect(result).toEqual({ command: "search", args: "hello world" })
   })
 
   it("returns null for regular text", async () => {
-    const { parseSlashCommand } = await import("../commands")
+    const { parseSlashCommand } = await import("../../repertoire/commands")
     expect(parseSlashCommand("hello")).toBeNull()
   })
 
   it("returns null for text with / in the middle", async () => {
-    const { parseSlashCommand } = await import("../commands")
+    const { parseSlashCommand } = await import("../../repertoire/commands")
     expect(parseSlashCommand("use /new to reset")).toBeNull()
   })
 
   it("trims leading spaces before checking", async () => {
-    const { parseSlashCommand } = await import("../commands")
+    const { parseSlashCommand } = await import("../../repertoire/commands")
     const result = parseSlashCommand("  /exit")
     expect(result).toEqual({ command: "exit", args: "" })
   })
 
   it("is case insensitive", async () => {
-    const { parseSlashCommand } = await import("../commands")
+    const { parseSlashCommand } = await import("../../repertoire/commands")
     const result = parseSlashCommand("/Exit")
     expect(result).toEqual({ command: "exit", args: "" })
   })
 
   it("returns null for / alone", async () => {
-    const { parseSlashCommand } = await import("../commands")
+    const { parseSlashCommand } = await import("../../repertoire/commands")
     expect(parseSlashCommand("/")).toBeNull()
   })
 
   it("returns null for //double", async () => {
-    const { parseSlashCommand } = await import("../commands")
+    const { parseSlashCommand } = await import("../../repertoire/commands")
     expect(parseSlashCommand("//double")).toBeNull()
   })
 })

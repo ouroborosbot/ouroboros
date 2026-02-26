@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 // skills live in skills/ directory relative to project root
-const SKILLS_DIR = path.join(__dirname, "..", "skills");
+const SKILLS_DIR = path.join(__dirname, "..", "..", "skills");
 
 // in-memory store for loaded skills
 const loadedSkills: string[] = [];

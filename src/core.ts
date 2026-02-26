@@ -2,7 +2,7 @@ import OpenAI, { AzureOpenAI } from "openai";
 import * as fs from "fs";
 import * as path from "path";
 import { execSync, spawnSync } from "child_process";
-import { listSkills, loadSkill } from "./skills";
+import { listSkills, loadSkill } from "./repertoire/skills";
 import { getAzureConfig, getMinimaxConfig } from "./config";
 
 let _client: OpenAI | null = null;
