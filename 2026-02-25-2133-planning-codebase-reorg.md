@@ -1,6 +1,6 @@
 # Planning: Codebase Reorganization
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-02-25 21:34
 
 ## Goal
@@ -21,7 +21,7 @@ Reorganize the Ouroboros codebase for better modularity: rename agent.ts to cli.
 - Extract truly static soul/identity text from `prompt.ts` into markdown files under `docs/inner-flame/`:
   - `SOUL.md` -- the soul section ("witty, funny, competent chaos monkey...")
   - `LORE.md` -- additional lore/character content (new file, starts minimal)
-  - `KEEPER.md` -- description of the person the agent works with (new file -- see naming options in Decisions Made)
+  - `FRIENDS.md` -- description of the people/agents who interact with ouroboros (new file)
 - Sections that stay as code in `prompt.ts` (runtime-computed or runtime-branching):
   - `identitySection(channel)` -- branches on cli vs teams parameter
   - `selfAwareSection()` -- conditionally returns empty based on `isOwnCodebase()` call
@@ -31,7 +31,7 @@ Reorganize the Ouroboros codebase for better modularity: rename agent.ts to cli.
   - `skillsSection()` -- calls `listSkills()` (filesystem read)
 - Sync preloading of soul markdown files at module load time so `buildSystem()` has zero latency impact
 - Restructure `docs/` folder with two creative subdirectories:
-  - `docs/inner-flame/` -- soul, lore, keeper files (runtime personality -- truly static text only)
+  - `docs/inner-flame/` -- soul, lore, friends files (runtime personality -- truly static text only)
   - `docs/lab-notes/` -- planning docs, doing docs, roadmap, development artifacts
 - Update README.md architecture diagrams, project map, and all file references
 - Update all docs/ references to `agent.ts` (historical docs -- add a note, don't rewrite history)
@@ -52,7 +52,7 @@ Reorganize the Ouroboros codebase for better modularity: rename agent.ts to cli.
 - [ ] No references to `agent.ts` remain in source code imports
 - [ ] No references to old paths remain in active source code (test files, src files)
 - [ ] `core.ts` contains only the agent loop, callbacks interface, client init, and glue
-- [ ] Soul markdown files (`SOUL.md`, `LORE.md`, `KEEPER.md`) exist in `docs/inner-flame/` and are loaded at runtime
+- [ ] Soul markdown files (`SOUL.md`, `LORE.md`, `FRIENDS.md`) exist in `docs/inner-flame/` and are loaded at runtime
 - [ ] Only truly static text lives in markdown files -- all runtime-branching/computed sections stay in code
 - [ ] All planning/doing docs and artifacts live in `docs/lab-notes/`
 - [ ] README.md reflects the new file structure accurately
@@ -70,7 +70,7 @@ Reorganize the Ouroboros codebase for better modularity: rename agent.ts to cli.
 - [x] Where should client initialization (`getClient`, `getModel`, `getProvider`) live? Decision: stays in `core.ts` since `runAgent()` depends on it directly and it's the "glue" that wires provider to loop.
 - [x] Should `Channel` type move to `prompt.ts` or stay in `core.ts`? Decision: moves to `prompt.ts` since it's used by `buildSystem()` and the section builders. `core.ts`, `commands.ts`, and `context.ts` import it from there.
 - [x] How to handle historical docs that reference `agent.ts`? Decision: don't rewrite history. Add a brief note at the top of `docs/lab-notes/` README or leave as-is. These are archives.
-- [ ] **Naming the "user" file**: Options presented: KEEPER, SUMMONER, INVOKER, WIELDER, BONDED. Recommendation is KEEPER. Awaiting user choice.
+- [x] **Naming the "user" file**: Decision: `FRIENDS.md` -- works for both humans and other agents who interact with ouroboros.
 
 ## Decisions Made
 - **agent.ts -> cli.ts**: Rename source file and its test file (`agent-main.test.ts` -> `cli-main.test.ts`). The existing `cli.test.ts` and `cli-ux.test.ts` keep their names (they already test cli adapter code).
@@ -83,14 +83,8 @@ Reorganize the Ouroboros codebase for better modularity: rename agent.ts to cli.
   - `dateSection()` -- CODE. Calls `new Date()`. Must stay in `prompt.ts`.
   - `toolsSection()` -- CODE. Iterates `tools` array. Must stay in `prompt.ts`.
   - `skillsSection()` -- CODE. Calls `listSkills()`. Must stay in `prompt.ts`.
-  - New files `LORE.md` and `KEEPER.md` are new content (not extracted from existing code).
-- **"User" concept file -- naming options** (for the person the agent works with):
-  - **`KEEPER.md`** -- "the keeper" -- someone who tends to and stewards the snake. Warm, implies mutual care. "my keeper asked me to..."
-  - **`SUMMONER.md`** -- "the summoner" -- the one who called the snake into being. More dramatic/mystical. "the summoner commands..."
-  - **`INVOKER.md`** -- "the invoker" -- the one who invokes the agent. Technical-mystical crossover. "invoked by..."
-  - **`WIELDER.md`** -- "the wielder" -- the one who wields the snake as a tool. Implies power and agency on the human's side. "my wielder needs..."
-  - **`BONDED.md`** -- "the bonded" -- implies a bond between snake and human. More intimate/familiar. "my bonded and i..."
-  - **Recommendation**: `KEEPER.md` -- it fits the inner-flame/mystical theme, implies a relationship (not just usage), and reads naturally in the agent's voice.
+  - New files `LORE.md` and `FRIENDS.md` are new content (not extracted from existing code).
+- **"User" concept file**: `FRIENDS.md` -- works for both humans and other agents who interact with ouroboros. Inclusive, warm, fits the personality.
 - **Sync preloading pattern**: Use synchronous `fs.readFileSync` at module load time (top-level in `prompt.ts`) to read the markdown files once into module-scoped constants. This is the simplest approach and has zero latency impact on `buildSystem()` calls. Module load happens once at process startup. No async needed -- the files are tiny (< 1KB each) and local disk reads at startup are standard Node.js practice (every `require`/`import` already does this). The `cachedBuildSystem()` TTL in `context.ts` continues to work as before -- it caches the assembled string, not the file reads. When the cache expires, `buildSystem()` re-assembles from the already-in-memory constants.
 - **Docs directory names**: `docs/inner-flame/` for soul/identity/lore files (mystical, character-ish -- the inner flame of the ouroboros). `docs/lab-notes/` for development planning/doing docs (workshop/lab notebook feel).
 - **Historical docs**: Planning/doing docs are development archives. Move them to `docs/lab-notes/` as-is without rewriting their content. References to `agent.ts` in those docs are historically accurate.
