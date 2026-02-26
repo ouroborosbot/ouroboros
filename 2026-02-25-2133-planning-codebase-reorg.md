@@ -118,3 +118,4 @@ Static-only rule for markdown extraction: pure string constants with zero runtim
 - 2026-02-25 21:34 Created
 - 2026-02-25 21:38 Corrected static-only rule for markdown extraction, added keeper naming options, full section audit
 - 2026-02-25 21:55 Approved -- FRIENDS.md naming decided, all questions resolved
+- 2026-02-25 22:00 Pre-execution change: add IDENTITY.md, split identitySection static text from channel logic, channel logic absorbed by selfAwareSection(channel)
