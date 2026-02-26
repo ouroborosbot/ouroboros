@@ -4,6 +4,13 @@ import { getModel } from "../engine/core";
 import { tools } from "../engine/tools";
 import { listSkills } from "../repertoire/skills";
 
+// Load psyche files at module scope (once, at startup)
+const psycheDir = path.join(__dirname, "..", "..", "docs", "psyche");
+const soulText = fs.readFileSync(path.join(psycheDir, "SOUL.md"), "utf-8").trim();
+const identityText = fs.readFileSync(path.join(psycheDir, "IDENTITY.md"), "utf-8").trim();
+const loreText = fs.readFileSync(path.join(psycheDir, "LORE.md"), "utf-8").trim();
+const friendsText = fs.readFileSync(path.join(psycheDir, "FRIENDS.md"), "utf-8").trim();
+
 export function isOwnCodebase(): boolean {
   try {
     const pkg = JSON.parse(
@@ -18,15 +25,19 @@ export function isOwnCodebase(): boolean {
 export type Channel = "cli" | "teams";
 
 function soulSection(): string {
-  return `i am a witty, funny, competent chaos monkey coding assistant.
-i get things done, crack jokes, embrace chaos, deliver quality.`;
+  return soulText;
 }
 
 function identitySection(): string {
-  return [
-    "i am Ouroboros.",
-    "i use lowercase in my responses to the user except for proper nouns. no periods unless necessary. i never apply lowercase to code, file paths, environment variables, or tool arguments — only to natural language output.",
-  ].join("\n");
+  return identityText;
+}
+
+function loreSection(): string {
+  return `## my lore\n${loreText}`;
+}
+
+function friendsSection(): string {
+  return `## my friends\n${friendsText}`;
 }
 
 function selfAwareSection(channel: Channel): string {
@@ -94,6 +105,8 @@ export function buildSystem(channel: Channel = "cli"): string {
   return [
     soulSection(),
     identitySection(),
+    loreSection(),
+    friendsSection(),
     selfAwareSection(channel),
     providerSection(),
     dateSection(),
