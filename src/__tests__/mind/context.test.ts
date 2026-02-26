@@ -15,12 +15,12 @@ describe("estimateTokens", () => {
   beforeEach(() => { vi.resetModules() })
 
   it("returns 0 for empty array", async () => {
-    const { estimateTokens } = await import("../context")
+    const { estimateTokens } = await import("../../mind/context")
     expect(estimateTokens([])).toBe(0)
   })
 
   it("returns char count / 4 rounded up for a single user message", async () => {
-    const { estimateTokens } = await import("../context")
+    const { estimateTokens } = await import("../../mind/context")
     // "hello" = 5 chars, 5/4 = 1.25, ceil = 2
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
       { role: "user", content: "hello" },
@@ -29,7 +29,7 @@ describe("estimateTokens", () => {
   })
 
   it("sums across multiple messages", async () => {
-    const { estimateTokens } = await import("../context")
+    const { estimateTokens } = await import("../../mind/context")
     // "hello" (5) + "world!" (6) = 11 chars, 11/4 = 2.75, ceil = 3
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
       { role: "user", content: "hello" },
@@ -39,7 +39,7 @@ describe("estimateTokens", () => {
   })
 
   it("counts stringified tool_calls (function name + arguments)", async () => {
-    const { estimateTokens } = await import("../context")
+    const { estimateTokens } = await import("../../mind/context")
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
       {
         role: "assistant",
@@ -57,7 +57,7 @@ describe("estimateTokens", () => {
   })
 
   it("counts tool result content", async () => {
-    const { estimateTokens } = await import("../context")
+    const { estimateTokens } = await import("../../mind/context")
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
       { role: "tool", tool_call_id: "tc1", content: "file contents here" } as any,
     ]
@@ -66,7 +66,7 @@ describe("estimateTokens", () => {
   })
 
   it("counts assistant message with both content and tool_calls", async () => {
-    const { estimateTokens } = await import("../context")
+    const { estimateTokens } = await import("../../mind/context")
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
       {
         role: "assistant",
@@ -85,7 +85,7 @@ describe("estimateTokens", () => {
   })
 
   it("handles tool_calls with missing function fields gracefully", async () => {
-    const { estimateTokens } = await import("../context")
+    const { estimateTokens } = await import("../../mind/context")
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
       {
         role: "assistant",
@@ -99,7 +99,7 @@ describe("estimateTokens", () => {
   })
 
   it("handles message with null content", async () => {
-    const { estimateTokens } = await import("../context")
+    const { estimateTokens } = await import("../../mind/context")
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
       { role: "assistant", content: null } as any,
     ]
@@ -111,7 +111,7 @@ describe("cachedBuildSystem", () => {
   beforeEach(() => { vi.resetModules() })
 
   it("calls buildFn on first call and returns result", async () => {
-    const { cachedBuildSystem, resetSystemPromptCache } = await import("../context")
+    const { cachedBuildSystem, resetSystemPromptCache } = await import("../../mind/context")
     resetSystemPromptCache()
     const buildFn = vi.fn().mockReturnValue("system prompt v1")
     const result = cachedBuildSystem("cli", buildFn)
@@ -121,7 +121,7 @@ describe("cachedBuildSystem", () => {
   })
 
   it("returns cached result on second call within 60s", async () => {
-    const { cachedBuildSystem, resetSystemPromptCache } = await import("../context")
+    const { cachedBuildSystem, resetSystemPromptCache } = await import("../../mind/context")
     resetSystemPromptCache()
     const buildFn = vi.fn().mockReturnValue("system prompt v1")
     cachedBuildSystem("cli", buildFn)
@@ -131,7 +131,7 @@ describe("cachedBuildSystem", () => {
   })
 
   it("re-invokes buildFn after 60 seconds", async () => {
-    const { cachedBuildSystem, resetSystemPromptCache } = await import("../context")
+    const { cachedBuildSystem, resetSystemPromptCache } = await import("../../mind/context")
     resetSystemPromptCache()
     const buildFn = vi.fn()
       .mockReturnValueOnce("system prompt v1")
@@ -150,7 +150,7 @@ describe("cachedBuildSystem", () => {
   })
 
   it("maintains separate caches per channel", async () => {
-    const { cachedBuildSystem, resetSystemPromptCache } = await import("../context")
+    const { cachedBuildSystem, resetSystemPromptCache } = await import("../../mind/context")
     resetSystemPromptCache()
     const buildFn = vi.fn()
       .mockReturnValueOnce("cli prompt")
@@ -171,7 +171,7 @@ describe("trimMessages", () => {
   beforeEach(() => { vi.resetModules() })
 
   it("returns messages unchanged when under limit", async () => {
-    const { trimMessages } = await import("../context")
+    const { trimMessages } = await import("../../mind/context")
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: "sys" },
       { role: "user", content: "hi" },
@@ -182,7 +182,7 @@ describe("trimMessages", () => {
   })
 
   it("preserves system prompt and drops oldest messages when over limit", async () => {
-    const { trimMessages } = await import("../context")
+    const { trimMessages } = await import("../../mind/context")
     // System prompt: 40 chars = 10 tokens
     // Each user message: 40 chars = 10 tokens
     const sys = "a".repeat(40)
@@ -207,7 +207,7 @@ describe("trimMessages", () => {
   })
 
   it("does not mutate input array", async () => {
-    const { trimMessages } = await import("../context")
+    const { trimMessages } = await import("../../mind/context")
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: "a".repeat(40) },
       { role: "user", content: "b".repeat(40) },
@@ -219,7 +219,7 @@ describe("trimMessages", () => {
   })
 
   it("keeps system prompt even if it alone exceeds limit", async () => {
-    const { trimMessages } = await import("../context")
+    const { trimMessages } = await import("../../mind/context")
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: "a".repeat(400) }, // 100 tokens
       { role: "user", content: "b".repeat(40) },
@@ -231,7 +231,7 @@ describe("trimMessages", () => {
   })
 
   it("returns only system prompt when all other messages must be trimmed", async () => {
-    const { trimMessages } = await import("../context")
+    const { trimMessages } = await import("../../mind/context")
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: "sys" },
       { role: "user", content: "a".repeat(400) },
@@ -246,7 +246,7 @@ describe("trimMessages", () => {
   })
 
   it("does not trim when exactly at maxTokens (boundary)", async () => {
-    const { trimMessages } = await import("../context")
+    const { trimMessages } = await import("../../mind/context")
     // 4 chars = 1 token
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: "abcd" }, // 1 token
@@ -258,7 +258,7 @@ describe("trimMessages", () => {
   })
 
   it("with contextMargin=0, trims to exactly maxTokens", async () => {
-    const { trimMessages } = await import("../context")
+    const { trimMessages } = await import("../../mind/context")
     const sys = "a".repeat(40) // 10 tokens
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: sys },
@@ -275,7 +275,7 @@ describe("trimMessages", () => {
   })
 
   it("handles only system prompt (nothing to trim)", async () => {
-    const { trimMessages } = await import("../context")
+    const { trimMessages } = await import("../../mind/context")
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: "hello" },
     ]
@@ -285,7 +285,7 @@ describe("trimMessages", () => {
   })
 
   it("trims by message count even when token estimate is under limit", async () => {
-    const { trimMessages } = await import("../context")
+    const { trimMessages } = await import("../../mind/context")
     // 300 tiny messages — well under 80K token estimate but over MAX_MESSAGES (200)
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: "sys" },
@@ -312,7 +312,7 @@ describe("saveSession", () => {
   })
 
   it("writes messages wrapped in versioned envelope", async () => {
-    const { saveSession } = await import("../context")
+    const { saveSession } = await import("../../mind/context")
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: "sys" },
       { role: "user", content: "hi" },
@@ -327,7 +327,7 @@ describe("saveSession", () => {
   })
 
   it("creates parent directories recursively", async () => {
-    const { saveSession } = await import("../context")
+    const { saveSession } = await import("../../mind/context")
     saveSession("/a/b/c/session.json", [])
 
     expect(fs.mkdirSync).toHaveBeenCalledWith("/a/b/c", { recursive: true })
@@ -341,7 +341,7 @@ describe("loadSession", () => {
   })
 
   it("returns messages array from valid session file", async () => {
-    const { loadSession } = await import("../context")
+    const { loadSession } = await import("../../mind/context")
     const msgs = [{ role: "system", content: "sys" }, { role: "user", content: "hi" }]
     vi.mocked(fs.readFileSync).mockReturnValue(
       JSON.stringify({ version: 1, messages: msgs }),
@@ -351,7 +351,7 @@ describe("loadSession", () => {
   })
 
   it("returns null when file is missing (ENOENT)", async () => {
-    const { loadSession } = await import("../context")
+    const { loadSession } = await import("../../mind/context")
     vi.mocked(fs.readFileSync).mockImplementation(() => {
       const err: any = new Error("ENOENT")
       err.code = "ENOENT"
@@ -361,13 +361,13 @@ describe("loadSession", () => {
   })
 
   it("returns null when file contains invalid JSON", async () => {
-    const { loadSession } = await import("../context")
+    const { loadSession } = await import("../../mind/context")
     vi.mocked(fs.readFileSync).mockReturnValue("not valid json{{{")
     expect(loadSession("/tmp/corrupt.json")).toBeNull()
   })
 
   it("returns null when version is unrecognized", async () => {
-    const { loadSession } = await import("../context")
+    const { loadSession } = await import("../../mind/context")
     vi.mocked(fs.readFileSync).mockReturnValue(
       JSON.stringify({ version: 99, messages: [] }),
     )
@@ -375,7 +375,7 @@ describe("loadSession", () => {
   })
 
   it("returns null on other read errors", async () => {
-    const { loadSession } = await import("../context")
+    const { loadSession } = await import("../../mind/context")
     vi.mocked(fs.readFileSync).mockImplementation(() => {
       throw new Error("EPERM")
     })
@@ -390,13 +390,13 @@ describe("deleteSession", () => {
   })
 
   it("removes the session file", async () => {
-    const { deleteSession } = await import("../context")
+    const { deleteSession } = await import("../../mind/context")
     deleteSession("/tmp/session.json")
     expect(fs.unlinkSync).toHaveBeenCalledWith("/tmp/session.json")
   })
 
   it("is a no-op when file is missing (ENOENT)", async () => {
-    const { deleteSession } = await import("../context")
+    const { deleteSession } = await import("../../mind/context")
     vi.mocked(fs.unlinkSync).mockImplementation(() => {
       const err: any = new Error("ENOENT")
       err.code = "ENOENT"
@@ -406,7 +406,7 @@ describe("deleteSession", () => {
   })
 
   it("re-throws non-ENOENT errors", async () => {
-    const { deleteSession } = await import("../context")
+    const { deleteSession } = await import("../../mind/context")
     vi.mocked(fs.unlinkSync).mockImplementation(() => {
       const err: any = new Error("EPERM")
       err.code = "EPERM"

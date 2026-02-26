@@ -268,7 +268,7 @@ describe("Teams adapter - message handling", () => {
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
     }))
-    vi.doMock("../context", () => ({
+    vi.doMock("../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(null),
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
@@ -1086,7 +1086,7 @@ describe("Teams adapter - session persistence", () => {
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
     }))
-    vi.doMock("../context", () => ({
+    vi.doMock("../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(loadSessionReturn),
       saveSession: vi.fn().mockImplementation((...args: any[]) => { saveSessionCalls.push(args) }),
       deleteSession: vi.fn().mockImplementation((...args: any[]) => { deleteSessionCalls.push(args[0]) }),
