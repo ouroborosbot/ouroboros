@@ -279,14 +279,11 @@ export async function main() {
       messages.push({ role: "user", content: input })
       addHistory(history, input)
 
-      // Refresh system prompt
-      messages[0] = { role: "system", content: cachedBuildSystem("cli", buildSystem) }
-
       currentAbort = new AbortController()
       ctrl.suppress(() => currentAbort!.abort())
       let result: { usage?: any } | undefined
       try {
-        result = await runAgent(messages, cliCallbacks, currentAbort.signal)
+        result = await runAgent(messages, cliCallbacks, "cli", currentAbort.signal)
       } catch {
         // AbortError — silently return to prompt
       }

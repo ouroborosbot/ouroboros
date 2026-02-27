@@ -1060,7 +1060,7 @@ describe("runAgent", () => {
 
     const controller = new AbortController()
     controller.abort()
-    await runAgent([{ role: "system", content: "test" }], callbacks, controller.signal)
+    await runAgent([{ role: "system", content: "test" }], callbacks, undefined, controller.signal)
     // mockCreate should never be called
     expect(mockCreate).not.toHaveBeenCalled()
   })
@@ -1086,7 +1086,7 @@ describe("runAgent", () => {
       onError: () => {},
     }
 
-    await runAgent([{ role: "system", content: "test" }], callbacks, controller.signal)
+    await runAgent([{ role: "system", content: "test" }], callbacks, undefined, controller.signal)
     expect(chunks).toEqual(["hello"])
   })
 
@@ -1108,7 +1108,7 @@ describe("runAgent", () => {
       onError: (err) => errors.push(err),
     }
 
-    await runAgent([{ role: "system", content: "test" }], callbacks, controller.signal)
+    await runAgent([{ role: "system", content: "test" }], callbacks, undefined, controller.signal)
     // Abort in catch path should break cleanly, not fire onError
     expect(errors).toHaveLength(0)
   })
@@ -1139,7 +1139,7 @@ describe("runAgent", () => {
       onError: () => {},
     }
 
-    await runAgent([{ role: "system", content: "test" }], callbacks, controller.signal)
+    await runAgent([{ role: "system", content: "test" }], callbacks, undefined, controller.signal)
     // First tool executes, onToolEnd aborts signal, second tool should be skipped
     expect(toolStarts.length).toBe(1)
   })

@@ -321,9 +321,10 @@ describe("Teams adapter - message handling", () => {
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     await teams.handleTeamsMessage("test", mockStream as any, "conv-test")
 
-    // Third argument to runAgent should be an AbortSignal
+    // Fourth argument to runAgent should be an AbortSignal (channel is third)
     expect(mockRunAgent).toHaveBeenCalled()
-    const signal = mockRunAgent.mock.calls[0][2]
+    expect(mockRunAgent.mock.calls[0][2]).toBe("teams")
+    const signal = mockRunAgent.mock.calls[0][3]
     expect(signal).toBeInstanceOf(AbortSignal)
   })
 
@@ -1149,8 +1150,8 @@ describe("Teams adapter - session persistence", () => {
     await teams.handleTeamsMessage("new msg", mockStream as any, "conv-123")
 
     const msgs = runAgentFn.mock.calls[0][0]
-    // Should have system prompt (refreshed), previous msg, and new msg
-    expect(msgs[0].content).toBe("cached teams prompt")
+    // System prompt comes from loaded session (refresh now happens inside runAgent)
+    expect(msgs[0].role).toBe("system")
     expect(msgs.some((m: any) => m.content === "new msg")).toBe(true)
   })
 

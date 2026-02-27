@@ -4,7 +4,9 @@ import { tools, execTool, summarizeArgs } from "./tools";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
 import type { TurnResult } from "./streaming";
 import type { UsageData } from "../mind/context";
-import { trimMessages } from "../mind/context";
+import { trimMessages, cachedBuildSystem } from "../mind/context";
+import { buildSystem } from "../mind/prompt";
+import type { Channel } from "../mind/prompt";
 
 let _client: OpenAI | null = null;
 let _model: string | null = null;
@@ -110,11 +112,18 @@ function isContextOverflow(err: unknown): boolean {
 export async function runAgent(
   messages: OpenAI.ChatCompletionMessageParam[],
   callbacks: ChannelCallbacks,
+  channel?: Channel,
   signal?: AbortSignal,
 ): Promise<{ usage?: UsageData }> {
   const client = getClient();
   const provider = getProvider();
   const model = getModel();
+
+  // Refresh system prompt at start of each turn when channel is provided
+  if (channel) {
+    messages[0] = { role: "system", content: cachedBuildSystem(channel, buildSystem) };
+  }
+
   let done = false;
   let toolRounds = 0;
   let lastUsage: UsageData | undefined;
