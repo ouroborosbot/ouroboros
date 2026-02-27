@@ -137,7 +137,7 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 **Output**: Modified `src/engine/streaming.ts`
 **Acceptance**: All Unit 2c tests PASS (green), existing tests still pass, no warnings
 
-### ⬜ Unit 2e: API usage capture -- Coverage & Refactor
+### ✅ Unit 2e: API usage capture -- Coverage & Refactor
 **What**: Verify 100% coverage on Units 2a-2d changes (Azure and MiniMax usage capture). Run full test suite. Confirm no regressions.
 **Output**: Coverage report confirms 100% on new usage capture code
 **Acceptance**: 100% coverage on new code, all tests green, no warnings
