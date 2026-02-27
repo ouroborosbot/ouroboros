@@ -225,7 +225,7 @@ This avoids the compile breakage that would occur if loadSession's return type c
 **Output**: Failing tests in `src/__tests__/mind/context.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `postTurn` does not yet exist
 
-### ⬜ Unit 3f: Shared postTurn function -- Implementation
+### ✅ Unit 3f: Shared postTurn function -- Implementation
 **What**: In `src/mind/context.ts`, add and export a `postTurn(messages, sessPath, usage?)` function that:
 1. Calls `getContextConfig()` to get `maxTokens` and `contextMargin`
 2. Calls `trimMessages(messages, maxTokens, contextMargin, usage?.input_tokens)` to get trimmed messages
