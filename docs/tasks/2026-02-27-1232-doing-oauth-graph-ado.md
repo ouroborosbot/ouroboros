@@ -181,7 +181,7 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 - All existing tests still pass (no regressions)
 - No warnings
 
-### ⬜ Unit 4: Full Test Suite and Integration Check
+### ✅ Unit 4: Full Test Suite and Integration Check
 **What**: Run the full test suite (`npm run test:coverage`). Verify no regressions. Verify all new code has 100% coverage. Fix any issues.
 **Output**: Clean test run, coverage report in `./2026-02-27-1232-doing-oauth-graph-ado/`.
 **Acceptance**:
@@ -361,3 +361,4 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 - 2026-02-27 13:42 Unit 1 complete: docs/OAUTH-SETUP.md written covering app registration, API permissions, two OAuth connections (graph + ado), manifest webApplicationInfo, dev tunnel, env vars
 - 2026-02-27 13:43 Unit 2 complete: OAuthConfig + AdoConfig interfaces, getOAuthConfig() + getAdoConfig() with env var overrides, 10 new tests all green, 599 total tests passing
 - 2026-02-27 13:55 Unit 3 complete: full vertical slice -- api-error.ts, graph-client.ts, ado-client.ts, ToolContext, getToolsForChannel, graph_profile + ado_work_items handlers, core.ts wiring, teams.ts token threading. 645 tests passing, no warnings, no TS errors
+- 2026-02-27 13:56 Unit 4 complete: 646 tests passing, 100% coverage on all new files (ado-client.ts, api-error.ts, graph-client.ts, tools.ts, teams.ts), no warnings, coverage report saved to artifacts
