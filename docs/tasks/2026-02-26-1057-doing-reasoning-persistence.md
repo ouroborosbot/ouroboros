@@ -112,7 +112,7 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 **Output**: Failing tests in `src/__tests__/engine/streaming.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `TurnResult` has no `usage` field and `streamResponsesApi` does not capture usage
 
-### ⬜ Unit 2b: Add usage to TurnResult and capture Azure usage -- Implementation
+### ✅ Unit 2b: Add usage to TurnResult and capture Azure usage -- Implementation
 **What**:
 - Add `usage` field to `TurnResult` interface in `src/engine/streaming.ts`: `usage?: { input_tokens: number; output_tokens: number; reasoning_tokens: number; total_tokens: number }`
 - In `streamResponsesApi`, add a `response.completed` event handler in the switch statement to capture usage data from `event.response.usage`. Map `output_tokens_details.reasoning_tokens` to `reasoning_tokens`.
