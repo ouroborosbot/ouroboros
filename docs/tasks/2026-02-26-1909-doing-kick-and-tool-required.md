@@ -52,7 +52,7 @@ Fix the agent proactivity bug where the model narrates tool-use intent ("let me 
 
 ---
 
-### 🔄 Unit 1: Kick Mechanism
+### ✅ Unit 1: Kick Mechanism
 
 **What**: Implement the kick mechanism in `src/engine/core.ts` that detects when the model narrates tool-use intent (e.g., "let me read that file") but fails to produce actual `tool_calls`, and re-prompts the model.
 
