@@ -1,6 +1,7 @@
 import OpenAI, { AzureOpenAI } from "openai";
 import { getAzureConfig, getMinimaxConfig, getContextConfig } from "../config";
-import { tools, execTool, summarizeArgs, finalAnswerTool } from "./tools";
+import { execTool, summarizeArgs, finalAnswerTool, getToolsForChannel } from "./tools";
+import type { ToolContext } from "./tools";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
 import type { AssistantMessageWithReasoning, ResponseItem } from "./streaming";
 import { detectKick } from "./kicks";
@@ -60,7 +61,8 @@ export function getProvider(): "azure" | "minimax" {
 }
 
 // Re-export tools, execTool, summarizeArgs from ./tools for backward compat
-export { tools, execTool, summarizeArgs } from "./tools";
+export { tools, execTool, summarizeArgs, getToolsForChannel } from "./tools";
+export type { ToolContext } from "./tools";
 // Re-export streaming functions for backward compat
 export { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
 export type { TurnResult } from "./streaming";
@@ -83,6 +85,7 @@ export interface ChannelCallbacks {
 export interface RunAgentOptions {
   toolChoiceRequired?: boolean;
   maxKicks?: number;
+  toolContext?: ToolContext;
 }
 
 // Re-export kick utilities for backward compat
@@ -184,7 +187,8 @@ export async function runAgent(
   // Prevent MaxListenersExceeded warning — each iteration adds a listener
   try { require("events").setMaxListeners(MAX_TOOL_ROUNDS + 5, signal); } catch { /* unsupported */ }
 
-  const activeTools = options?.toolChoiceRequired ? [...tools, finalAnswerTool] : tools;
+  const baseTools = getToolsForChannel(channel);
+  const activeTools = options?.toolChoiceRequired ? [...baseTools, finalAnswerTool] : baseTools;
 
   while (!done) {
     // Yield so pending I/O (stdin Ctrl-C) can be processed between iterations
@@ -325,7 +329,7 @@ export async function runAgent(
           let toolResult: string;
           let success: boolean;
           try {
-            toolResult = await execTool(tc.name, args);
+            toolResult = await execTool(tc.name, args, options?.toolContext);
             success = true;
           } catch (e) {
             toolResult = `error: ${e}`;

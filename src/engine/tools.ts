@@ -2,6 +2,15 @@ import type OpenAI from "openai";
 import * as fs from "fs";
 import { execSync, spawnSync } from "child_process";
 import { listSkills, loadSkill } from "../repertoire/skills";
+import { getProfile } from "./graph-client";
+import { queryWorkItems } from "./ado-client";
+
+export interface ToolContext {
+  graphToken?: string;
+  adoToken?: string;
+  signin: (connectionName: string) => Promise<string | undefined>;
+  adoOrganizations: string[];
+}
 
 export const tools: OpenAI.ChatCompletionTool[] = [
   {
@@ -137,7 +146,7 @@ export const tools: OpenAI.ChatCompletionTool[] = [
   },
 ];
 
-type ToolHandler = (args: Record<string, string>) => string | Promise<string>;
+type ToolHandler = (args: Record<string, string>, ctx?: ToolContext) => string | Promise<string>;
 
 const postIt = (msg: string) => `post-it from past you:\n${msg}`;
 
@@ -236,6 +245,64 @@ const toolHandlers: Record<string, ToolHandler> = {
   },
 };
 
+// Graph and ADO tools -- only available on Teams channel
+export const graphAdoTools: OpenAI.ChatCompletionTool[] = [
+  {
+    type: "function",
+    function: {
+      name: "graph_profile",
+      description: "get the current user's Microsoft 365 profile (name, email, job title, department, office location)",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "ado_work_items",
+      description: "query or list Azure DevOps work items. provide an organization and optionally a WIQL query.",
+      parameters: {
+        type: "object",
+        properties: {
+          organization: { type: "string", description: "Azure DevOps organization name" },
+          query: { type: "string", description: "WIQL query (optional, defaults to recent assigned work items)" },
+        },
+        required: ["organization"],
+      },
+    },
+  },
+];
+
+const DEFAULT_ADO_QUERY = "SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo] FROM WorkItems WHERE [System.AssignedTo] = @Me AND [System.State] <> 'Closed' ORDER BY [System.ChangedDate] DESC";
+
+const graphAdoToolHandlers: Record<string, ToolHandler> = {
+  graph_profile: async (_args, ctx) => {
+    if (!ctx?.graphToken) {
+      return "AUTH_REQUIRED:graph -- I need access to your Microsoft 365 profile. Please sign in when prompted.";
+    }
+    return getProfile(ctx.graphToken);
+  },
+  ado_work_items: async (args, ctx) => {
+    if (!ctx?.adoToken) {
+      return "AUTH_REQUIRED:ado -- I need access to your Azure DevOps account. Please sign in when prompted.";
+    }
+    const org = args.organization;
+    if (ctx.adoOrganizations.length > 0 && !ctx.adoOrganizations.includes(org)) {
+      return `Organization "${org}" is not in the configured organizations: ${ctx.adoOrganizations.join(", ")}. Use one of these instead.`;
+    }
+    const query = args.query || DEFAULT_ADO_QUERY;
+    return queryWorkItems(ctx.adoToken, org, query);
+  },
+};
+
+// Return the appropriate tools list based on channel.
+// Teams gets base tools + graph/ado tools; CLI (and any other channel) gets base tools only.
+export function getToolsForChannel(channel?: string): OpenAI.ChatCompletionTool[] {
+  if (channel === "teams") {
+    return [...tools, ...graphAdoTools];
+  }
+  return tools;
+}
+
 export const finalAnswerTool: OpenAI.ChatCompletionTool = {
   type: "function",
   function: {
@@ -250,10 +317,10 @@ export const finalAnswerTool: OpenAI.ChatCompletionTool = {
   },
 };
 
-export async function execTool(name: string, args: Record<string, string>): Promise<string> {
-  const h = toolHandlers[name];
+export async function execTool(name: string, args: Record<string, string>, ctx?: ToolContext): Promise<string> {
+  const h = toolHandlers[name] || graphAdoToolHandlers[name];
   if (!h) return `unknown: ${name}`;
-  return await h(args);
+  return await h(args, ctx);
 }
 
 export function summarizeArgs(name: string, args: Record<string, string>): string {
@@ -268,5 +335,7 @@ export function summarizeArgs(name: string, args: Record<string, string>): strin
   if (name === "load_skill") return args.name || "";
   if (name === "claude") return args.prompt?.slice(0, 40) || "";
   if (name === "web_search") return args.query?.slice(0, 40) || "";
+  if (name === "graph_profile") return "";
+  if (name === "ado_work_items") return args.organization || "";
   return JSON.stringify(args).slice(0, 30);
 }

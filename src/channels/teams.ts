@@ -2,6 +2,8 @@ import OpenAI from "openai"
 import { App } from "@microsoft/teams.apps"
 import { DevtoolsPlugin } from "@microsoft/teams.dev"
 import { runAgent, ChannelCallbacks } from "../engine/core"
+import type { ToolContext } from "../engine/tools"
+import { getOAuthConfig, getAdoConfig } from "../config"
 import { buildSystem } from "../mind/prompt"
 import { pickPhrase, THINKING_PHRASES, FOLLOWUP_PHRASES } from "../repertoire/phrases"
 import { sessionPath, getTeamsConfig } from "../config"
@@ -126,8 +128,15 @@ export async function withConversationLock(convId: string, fn: () => Promise<voi
   await current
 }
 
+// Context from the Teams activity that carries OAuth tokens and signin ability
+export interface TeamsMessageContext {
+  graphToken?: string
+  adoToken?: string
+  signin: (connectionName: string) => Promise<string | undefined>
+}
+
 // Handle an incoming Teams message
-export async function handleTeamsMessage(text: string, stream: TeamsStream, conversationId: string): Promise<void> {
+export async function handleTeamsMessage(text: string, stream: TeamsStream, conversationId: string, teamsContext?: TeamsMessageContext): Promise<void> {
   // Send first thinking phrase immediately so the user sees feedback
   // before sync I/O (session load, trim) blocks the event loop.
   stream.update(pickPhrase(THINKING_PHRASES) + "...")
@@ -166,7 +175,13 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   // Run agent
   const controller = new AbortController()
   const callbacks = createTeamsCallbacks(stream, controller)
-  const result = await runAgent(messages, callbacks, "teams", controller.signal)
+  const toolContext: ToolContext | undefined = teamsContext ? {
+    graphToken: teamsContext.graphToken,
+    adoToken: teamsContext.adoToken,
+    signin: teamsContext.signin,
+    adoOrganizations: getAdoConfig().organizations,
+  } : undefined
+  const result = await runAgent(messages, callbacks, "teams", controller.signal, toolContext ? { toolContext } : undefined)
 
   // Trim context and save session
   postTurn(messages, sessPath, result.usage)
@@ -182,12 +197,15 @@ export function startTeamsApp(): void {
   let app: InstanceType<typeof App>
   let mode: string
 
+  const oauthConfig = getOAuthConfig()
+
   if (teamsConfig.clientId) {
     // Bot Service mode -- real Teams connection with SingleTenant credentials
     app = new App({
       clientId: teamsConfig.clientId,
       clientSecret: teamsConfig.clientSecret,
       tenantId: teamsConfig.tenantId,
+      oauth: { defaultConnectionName: oauthConfig.graphConnectionName },
       ...mentionStripping,
     })
     mode = "Bot Service"
@@ -200,11 +218,34 @@ export function startTeamsApp(): void {
     mode = "DevtoolsPlugin"
   }
 
-  app.on("message", async ({ stream, activity }) => {
+  app.on("message", async (ctx) => {
+    const { stream, activity, api, signin } = ctx
     const text = activity.text || ""
     const convId = activity.conversation?.id || "unknown"
+    const userId = activity.from?.id || ""
+    const channelId = activity.channelId || "msteams"
+
+    // Fetch tokens for both OAuth connections independently.
+    // Failures are silently caught -- the tool handler will request signin if needed.
+    let graphToken: string | undefined
+    let adoToken: string | undefined
     try {
-      await withConversationLock(convId, () => handleTeamsMessage(text, stream, convId))
+      const graphRes = await api.users.token.get({ userId, connectionName: oauthConfig.graphConnectionName, channelId })
+      graphToken = graphRes?.token
+    } catch { /* token not available yet */ }
+    try {
+      const adoRes = await api.users.token.get({ userId, connectionName: oauthConfig.adoConnectionName, channelId })
+      adoToken = adoRes?.token
+    } catch { /* token not available yet */ }
+
+    const teamsContext: TeamsMessageContext = {
+      graphToken,
+      adoToken,
+      signin: (connectionName: string) => signin({ connectionName }),
+    }
+
+    try {
+      await withConversationLock(convId, () => handleTeamsMessage(text, stream, convId, teamsContext))
     } catch (err) {
       console.error("Message handler error:", err)
     }
