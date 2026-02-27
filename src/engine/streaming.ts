@@ -91,6 +91,8 @@ export async function streamChatCompletion(
   callbacks: ChannelCallbacks,
   signal?: AbortSignal,
 ): Promise<TurnResult> {
+  // Request usage data in the final streaming chunk
+  createParams.stream_options = { include_usage: true };
   const response = (await client.chat.completions.create(
     createParams,
     signal ? { signal } : {},
@@ -102,6 +104,7 @@ export async function streamChatCompletion(
     { id: string; name: string; arguments: string }
   > = {};
   let streamStarted = false;
+  let usage: UsageData | undefined;
 
   // State machine for parsing inline <think> tags (MiniMax pattern)
   let contentBuf = "";
@@ -167,6 +170,16 @@ export async function streamChatCompletion(
 
   for await (const chunk of response) {
     if (signal?.aborted) break;
+    // Capture usage from final chunk (sent when stream_options.include_usage is true)
+    if (chunk.usage) {
+      const u = chunk.usage;
+      usage = {
+        input_tokens: u.prompt_tokens,
+        output_tokens: u.completion_tokens,
+        reasoning_tokens: u.completion_tokens_details?.reasoning_tokens ?? 0,
+        total_tokens: u.total_tokens,
+      };
+    }
     const d = chunk.choices[0]?.delta as any;
     if (!d) continue;
 
@@ -210,6 +223,7 @@ export async function streamChatCompletion(
     content,
     toolCalls: Object.values(toolCalls),
     outputItems: [],
+    usage,
   };
 }
 
