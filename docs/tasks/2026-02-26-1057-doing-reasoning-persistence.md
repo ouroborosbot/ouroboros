@@ -148,7 +148,7 @@ Note: `estimateTokens` deletion is deferred to Feature 3 where it is replaced at
 
 ### Feature 3: Retroactive Trimming with Real Token Counts
 
-### ⬜ Unit 3a: Rework trimMessages and delete estimateTokens -- Tests
+### ✅ Unit 3a: Rework trimMessages and delete estimateTokens -- Tests
 **What**: Write new failing tests in `src/__tests__/mind/context.test.ts` for the reworked `trimMessages` AND remove all `estimateTokens` tests. The new `trimMessages` signature: `trimMessages(messages, maxTokens, contextMargin, actualTokenCount)` where `actualTokenCount` is the API-reported `input_tokens` from the last turn. Tests cover:
 - When `actualTokenCount` exceeds `maxTokens`, messages are trimmed (oldest after system prompt dropped first)
 - When `actualTokenCount` is under `maxTokens`, no trimming occurs (returns copy of messages)
