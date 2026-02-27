@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 
 // Tests for main() in agent.ts -- the CLI entry point that wires readline,
-// boot greeting, input loop, SIGINT handling, and history.
+// input loop, SIGINT handling, postTurn, and history.
 // Uses vi.hoisted + vi.mock so agent.ts is loaded ONCE (single V8 instance
 // for accurate branch coverage).
 
 // ── hoisted mock fns (available before vi.mock factories run) ──
 const mocks = vi.hoisted(() => ({
-  runAgent: vi.fn(),
+  runAgent: vi.fn().mockResolvedValue({ usage: undefined }),
   buildSystem: vi.fn().mockReturnValue("system prompt"),
   sessionPath: vi.fn().mockReturnValue("/tmp/test-session.json"),
   getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   deleteSession: vi.fn(),
   trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
   cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+  postTurn: vi.fn(),
   createCommandRegistry: vi.fn(),
   registerDefaultCommands: vi.fn(),
   parseSlashCommand: vi.fn().mockReturnValue(null),
@@ -46,6 +47,7 @@ vi.mock("../../mind/context", () => ({
   deleteSession: (...a: any[]) => mocks.deleteSession(...a),
   trimMessages: (...a: any[]) => mocks.trimMessages(...a),
   cachedBuildSystem: (...a: any[]) => mocks.cachedBuildSystem(...a),
+  postTurn: (...a: any[]) => mocks.postTurn(...a),
 }))
 vi.mock("../../repertoire/commands", () => ({
   createCommandRegistry: (...a: any[]) => mocks.createCommandRegistry(...a),
@@ -117,7 +119,7 @@ function createMockRl(inputSequence: string[]) {
 
 /** Reset all hoisted mocks to default behaviour */
 function resetMocks() {
-  mocks.runAgent.mockReset()
+  mocks.runAgent.mockReset().mockResolvedValue({ usage: undefined })
   mocks.buildSystem.mockReset().mockReturnValue("system prompt")
   mocks.sessionPath.mockReset().mockReturnValue("/tmp/test-session.json")
   mocks.getContextConfig.mockReset().mockReturnValue({ maxTokens: 80000, contextMargin: 20 })
@@ -126,6 +128,7 @@ function resetMocks() {
   mocks.deleteSession.mockReset()
   mocks.trimMessages.mockReset().mockImplementation((msgs: any) => [...msgs])
   mocks.cachedBuildSystem.mockReset().mockReturnValue("system prompt")
+  mocks.postTurn.mockReset()
   mocks.registerDefaultCommands.mockReset()
   mocks.parseSlashCommand.mockReset().mockReturnValue(null)
 
@@ -179,29 +182,29 @@ describe("agent.ts main()", () => {
     vi.restoreAllMocks()
   })
 
-  it("runs full loop: boot greeting, processes input, exits on /exit", async () => {
+  it("runs full loop: processes input, exits on /exit", async () => {
     setupBasic({ inputSequence: ["hello world", "/exit"] })
 
     const runAgentCalls: any[][] = []
-    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args) })
+    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
     await main()
 
     const flatLogs = logCalls.flat()
     expect(flatLogs.some((l) => l.includes("ouroboros") || l.includes("/commands"))).toBe(true)
     expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
-    expect(runAgentCalls.length).toBe(2) // boot greeting + "hello world"
+    expect(runAgentCalls.length).toBe(1) // "hello world" only (no boot greeting)
   })
 
   it("skips empty input without calling runAgent", async () => {
     setupBasic({ inputSequence: ["", "  ", "/exit"] })
 
     const runAgentCalls: any[][] = []
-    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args) })
+    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
     await main()
 
-    expect(runAgentCalls.length).toBe(1) // only boot greeting
+    expect(runAgentCalls.length).toBe(0) // no calls (no boot greeting, all input empty)
     const prompts = stdoutChunks.filter((c) => c.includes("> "))
     expect(prompts.length).toBeGreaterThanOrEqual(2)
   })
@@ -259,6 +262,7 @@ describe("agent.ts main()", () => {
   it("breaks loop when closed flag is set during runAgent", async () => {
     let closeHandler: (() => void) | null = null
     let inputCall = 0
+    // Note: no boot greeting, so runAgent is only called for user input
 
     const mockRl: any = {
       on: (event: string, handler: (...args: any[]) => void) => {
@@ -285,7 +289,8 @@ describe("agent.ts main()", () => {
     mocks.runAgent.mockImplementation(async (...args: any[]) => {
       runAgentCalls.push(args)
       // Simulate stream closing during runAgent for user input
-      if (inputCall > 0 && closeHandler) closeHandler()
+      if (closeHandler) closeHandler()
+      return { usage: undefined }
     })
 
     await main()
@@ -293,89 +298,8 @@ describe("agent.ts main()", () => {
     const flatLogs = logCalls.flat()
     expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
     // "should not process" should not have been sent to runAgent
-    // Only boot greeting + "some input" = 2 calls
-    expect(runAgentCalls.length).toBe(2)
-  })
-
-  it("breaks on first iteration when closed during boot greeting", async () => {
-    let closeHandler: (() => void) | null = null
-
-    const mockRl: any = {
-      on: (event: string, handler: (...args: any[]) => void) => {
-        if (event === "close") closeHandler = handler
-        return mockRl
-      },
-      close: () => { if (closeHandler) closeHandler() },
-      pause: () => {},
-      resume: () => {},
-      line: "",
-      [Symbol.asyncIterator]: () => ({
-        next: async (): Promise<IteratorResult<string>> => {
-          // Always yield input -- but closed flag should prevent processing
-          return { value: "should not process", done: false }
-        },
-      }),
-    }
-
-    mocks.createInterface.mockReturnValue(mockRl)
-    const runAgentCalls: any[][] = []
-    mocks.runAgent.mockImplementation(async (...args: any[]) => {
-      runAgentCalls.push(args)
-      // Close during boot greeting (before for-await loop)
-      if (closeHandler) closeHandler()
-    })
-
-    await main()
-
-    // Only boot greeting; the loop input should be skipped via if (closed) break
+    // "some input" only = 1 call (no boot greeting)
     expect(runAgentCalls.length).toBe(1)
-  })
-
-  it("handles boot greeting rejection gracefully", async () => {
-    setupBasic({ inputSequence: ["/exit"] })
-    mocks.runAgent.mockRejectedValue(new Error("boot failed"))
-
-    await main()
-
-    const flatLogs = logCalls.flat()
-    expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
-  })
-
-  it("abort callback fires during boot when Ctrl-C is pressed", async () => {
-    let bootSignal: AbortSignal | undefined
-
-    const mockRl: any = {
-      on: (event: string, handler: (...args: any[]) => void) => {
-        if (event === "close") mockRl._closeHandler = handler
-        return mockRl
-      },
-      close: () => { if (mockRl._closeHandler) mockRl._closeHandler() },
-      pause: () => {},
-      resume: () => {},
-      line: "",
-      [Symbol.asyncIterator]: () => ({
-        next: async (): Promise<IteratorResult<string>> => {
-          return { value: "/exit", done: false }
-        },
-      }),
-    }
-
-    mocks.createInterface.mockReturnValue(mockRl)
-    mocks.runAgent.mockImplementation(async (_msgs: any, _cb: any, signal?: AbortSignal) => {
-      bootSignal = signal
-      const listeners = process.stdin.listeners("data") as ((data: Buffer) => void)[]
-      if (listeners.length > 0) {
-        listeners[listeners.length - 1](Buffer.from([0x03]))
-      }
-    })
-    mocks.parseSlashCommand.mockImplementation((input: string) =>
-      input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null)
-    mocks.registry.dispatch.mockImplementation((name: string) =>
-      name === "exit" ? { handled: true, result: { action: "exit" } } : { handled: false })
-
-    await main()
-
-    expect(bootSignal?.aborted).toBe(true)
   })
 
   it("abort callback fires during runAgent when Ctrl-C is pressed", async () => {
@@ -385,13 +309,14 @@ describe("agent.ts main()", () => {
     setupBasic({ inputSequence: ["hello", "/exit"] })
     mocks.runAgent.mockImplementation(async (_msgs: any, _cb: any, signal?: AbortSignal) => {
       callCount++
-      if (callCount === 2) {
+      if (callCount === 1) {
         agentSignal = signal
         const listeners = process.stdin.listeners("data") as ((data: Buffer) => void)[]
         if (listeners.length > 0) {
           listeners[listeners.length - 1](Buffer.from([0x03]))
         }
       }
+      return { usage: undefined }
     })
 
     await main()
@@ -427,32 +352,32 @@ describe("agent.ts main() - session persistence", () => {
       { role: "assistant", content: "previous reply" },
     ]
     const runAgentCalls: any[][] = []
-    setupBasic({ inputSequence: ["/exit"], loadSessionReturn: savedSession })
-    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args) })
+    setupBasic({ inputSequence: ["/exit"], loadSessionReturn: { messages: savedSession, lastUsage: undefined } })
+    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
     await main()
 
     expect(runAgentCalls.length).toBe(0)
   })
 
-  it("starts fresh with boot greeting when no session exists", async () => {
+  it("starts fresh when no session exists (no boot greeting)", async () => {
     const runAgentCalls: any[][] = []
     setupBasic({ inputSequence: ["/exit"] })
-    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args) })
+    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
     await main()
 
-    expect(runAgentCalls.length).toBe(1)
+    expect(runAgentCalls.length).toBe(0) // no boot greeting
   })
 
-  it("starts fresh with boot greeting when session is corrupt", async () => {
+  it("starts fresh when session is corrupt (no boot greeting)", async () => {
     const runAgentCalls: any[][] = []
     setupBasic({ inputSequence: ["/exit"], loadSessionReturn: null })
-    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args) })
+    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
     await main()
 
-    expect(runAgentCalls.length).toBe(1)
+    expect(runAgentCalls.length).toBe(0) // no boot greeting
   })
 
   it("renders buffered text with markdown after runAgent", async () => {
@@ -460,41 +385,44 @@ describe("agent.ts main() - session persistence", () => {
     let callCount = 0
     mocks.runAgent.mockImplementation(async (_msgs: any, cb: any) => {
       callCount++
-      if (callCount === 1) cb.onTextChunk("**greeting**")
-      if (callCount === 2) cb.onTextChunk("**bold** reply")
+      if (callCount === 1) cb.onTextChunk("**bold** reply")
+      return { usage: undefined }
     })
 
     await main()
 
     const output = stdoutChunks.join("")
     // Markdown should be rendered (bold ANSI codes, not raw **)
-    expect(output).toContain("\x1b[1mgreeting\x1b[22m")
     expect(output).toContain("\x1b[1mbold\x1b[22m reply")
-    expect(output).not.toContain("**greeting**")
     expect(output).not.toContain("**bold**")
   })
 
-  it("saves session after each turn", async () => {
-    const saveSessionCalls: any[][] = []
+  it("calls postTurn after runAgent with usage", async () => {
+    const postTurnCalls: any[][] = []
+    const usageData = { input_tokens: 100, output_tokens: 50, reasoning_tokens: 10, total_tokens: 160 }
     setupBasic({ inputSequence: ["hello", "/exit"] })
-    mocks.runAgent.mockImplementation(async () => {})
-    mocks.saveSession.mockImplementation((...args: any[]) => { saveSessionCalls.push(args) })
+    mocks.runAgent.mockImplementation(async () => ({ usage: usageData }))
+    mocks.postTurn.mockImplementation((...args: any[]) => { postTurnCalls.push(args) })
 
     await main()
 
-    expect(saveSessionCalls.length).toBeGreaterThanOrEqual(2)
-    expect(saveSessionCalls[0][0]).toBe("/tmp/test-session.json")
+    expect(postTurnCalls.length).toBe(1)
+    expect(postTurnCalls[0][0]).toEqual(expect.arrayContaining([
+      expect.objectContaining({ role: "system" }),
+    ]))
+    expect(postTurnCalls[0][1]).toBe("/tmp/test-session.json")
+    expect(postTurnCalls[0][2]).toEqual(usageData)
   })
 
-  it("calls trimMessages before runAgent", async () => {
+  it("does not call trimMessages directly (postTurn handles it)", async () => {
     const trimCalls: any[][] = []
     setupBasic({ inputSequence: ["hello", "/exit"] })
-    mocks.runAgent.mockImplementation(async () => {})
+    mocks.runAgent.mockImplementation(async () => ({ usage: undefined }))
     mocks.trimMessages.mockImplementation((...args: any[]) => { trimCalls.push(args); return [...args[0]] })
 
     await main()
 
-    expect(trimCalls.length).toBeGreaterThanOrEqual(1)
+    expect(trimCalls.length).toBe(0) // trimming moved to postTurn
   })
 
   it("/exit quits the process", async () => {
@@ -533,40 +461,41 @@ describe("agent.ts main() - session persistence", () => {
         return { handled: false }
       },
     })
-    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args) })
+    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
     await main()
 
-    expect(runAgentCalls.length).toBe(1) // only boot greeting
+    expect(runAgentCalls.length).toBe(0) // no boot greeting, /commands handled without runAgent
   })
 
-  it("context window integration: trims old messages when exceeding limit", async () => {
-    const trimCalls: any[][] = []
+  it("calls postTurn after each user turn (not before runAgent)", async () => {
+    const postTurnCalls: any[][] = []
     setupBasic({ inputSequence: ["msg1", "msg2", "/exit"] })
-    mocks.runAgent.mockImplementation(async () => {})
-    mocks.trimMessages.mockImplementation((msgs: any[], maxTokens: number, margin: number) => {
-      trimCalls.push([msgs.length, maxTokens, margin])
-      if (msgs.length > 3) return [msgs[0], ...msgs.slice(-2)]
-      return [...msgs]
-    })
+    mocks.runAgent.mockImplementation(async () => ({ usage: undefined }))
+    mocks.postTurn.mockImplementation((...args: any[]) => { postTurnCalls.push(args) })
 
     await main()
 
-    expect(trimCalls.length).toBeGreaterThanOrEqual(1)
-    expect(trimCalls[0][1]).toBe(80000)
-    expect(trimCalls[0][2]).toBe(20)
+    // postTurn called once per user message (msg1, msg2)
+    expect(postTurnCalls.length).toBe(2)
+    // Each postTurn call gets (messages, sessPath, usage)
+    expect(postTurnCalls[0][1]).toBe("/tmp/test-session.json")
+    expect(postTurnCalls[1][1]).toBe("/tmp/test-session.json")
   })
 
   it("refreshes system prompt from cachedBuildSystem on each turn", async () => {
     const runAgentCalls: any[][] = []
     setupBasic({
       inputSequence: ["hello", "/exit"],
-      loadSessionReturn: [
-        { role: "system", content: "old stale prompt" },
-        { role: "user", content: "old message" },
-      ],
+      loadSessionReturn: {
+        messages: [
+          { role: "system", content: "old stale prompt" },
+          { role: "user", content: "old message" },
+        ],
+        lastUsage: undefined,
+      },
     })
-    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args) })
+    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
     await main()
 
@@ -584,13 +513,13 @@ describe("agent.ts main() - session persistence", () => {
         return { handled: false }
       },
     })
-    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args) })
+    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
     await main()
 
     // /unknown is not handled, so it's sent to runAgent as regular input
-    // boot greeting + "/unknown" as text = 2 calls
-    expect(runAgentCalls.length).toBe(2)
+    // No boot greeting, just "/unknown" as text = 1 call
+    expect(runAgentCalls.length).toBe(1)
   })
 
   it("slash command with unknown action falls through to regular input", async () => {
@@ -603,13 +532,13 @@ describe("agent.ts main() - session persistence", () => {
         return { handled: false }
       },
     })
-    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args) })
+    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
     await main()
 
     // /weird is handled but action is unknown, falls through to regular input
-    // boot greeting + "/weird" as text = 2 calls
-    expect(runAgentCalls.length).toBe(2)
+    // No boot greeting, just "/weird" as text = 1 call
+    expect(runAgentCalls.length).toBe(1)
   })
 
   it("/commands with empty message prints empty line", async () => {
@@ -628,7 +557,7 @@ describe("agent.ts main() - session persistence", () => {
     expect(flatLogs.some((l) => l === "")).toBe(true)
   })
 
-  it("boot message shows slash command hints", async () => {
+  it("welcome banner shows slash command hints", async () => {
     setupBasic({ inputSequence: ["/exit"] })
 
     await main()
