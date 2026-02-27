@@ -402,3 +402,4 @@ Call sites to update (source files only):
 - 2026-02-26 17:49 Feature 3 complete (Units 3a-3k): retroactive trimming with real token counts, postTurn shared function, estimateTokens deleted. 100% coverage on all changed files. 402 tests pass.
 - 2026-02-26 17:51 Unit 4a complete: 6 overflow recovery tests (5 fail as expected, 1 passes for non-overflow validation).
 - 2026-02-26 17:55 Feature 4 complete (Units 4a-4c): context overflow auto-recovery with isContextOverflow detection, aggressive trim, single retry. 100% coverage on core.ts. 410 tests pass.
+- 2026-02-26 17:59 Unit 5a complete: 3 tests for system prompt refresh in runAgent (2 fail as expected, 1 passes for backward compat).
