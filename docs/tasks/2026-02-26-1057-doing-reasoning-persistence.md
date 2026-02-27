@@ -162,7 +162,7 @@ Note: `estimateTokens` deletion is deferred to Feature 3 where it is replaced at
 **Output**: Rewritten trimMessages tests and removed estimateTokens tests in `src/__tests__/mind/context.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `trimMessages` still uses the old signature and `estimateTokens` still exists
 
-### ⬜ Unit 3b: Rework trimMessages and delete estimateTokens -- Implementation
+### ✅ Unit 3b: Rework trimMessages and delete estimateTokens -- Implementation
 **What**: Atomically rework `trimMessages` AND delete `estimateTokens` in `src/mind/context.ts`:
 - Delete the `estimateTokens` function and its export
 - New `trimMessages` signature: `trimMessages(messages, maxTokens, contextMargin, actualTokenCount?: number)`
