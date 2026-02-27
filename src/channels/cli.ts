@@ -146,14 +146,119 @@ export function renderMarkdown(text: string): string {
   return result
 }
 
-export function createCliCallbacks(): ChannelCallbacks {
+// Ordered longest-first so we match ``` before ` and ** before *
+const MARKERS = ["```", "**", "*", "`"] as const
+
+export class MarkdownStreamer {
+  private buf = ""
+  private openMarker: string | null = null
+
+  push(text: string): string {
+    this.buf += text
+    return this.drain(false)
+  }
+
+  flush(): string {
+    return this.drain(true)
+  }
+
+  reset(): void {
+    this.buf = ""
+    this.openMarker = null
+  }
+
+  private drain(final: boolean): string {
+    let out = ""
+
+    while (this.buf.length > 0) {
+      if (this.openMarker) {
+        const closeIdx = this.buf.indexOf(this.openMarker)
+        if (closeIdx !== -1) {
+          const segment = this.openMarker + this.buf.slice(0, closeIdx + this.openMarker.length)
+          out += renderMarkdown(segment)
+          this.buf = this.buf.slice(closeIdx + this.openMarker.length)
+          this.openMarker = null
+          continue
+        }
+        if (final) {
+          out += renderMarkdown(this.openMarker + this.buf)
+          this.buf = ""
+          this.openMarker = null
+        }
+        break
+      }
+
+      // Normal mode — look for the next opening marker
+      let earliest = -1
+      let matched: string | null = null
+      for (const m of MARKERS) {
+        const idx = this.buf.indexOf(m)
+        if (idx !== -1 && (earliest === -1 || idx < earliest)) {
+          earliest = idx
+          matched = m
+        }
+      }
+
+      if (matched !== null && earliest !== -1) {
+        // If the tail from the match to end-of-buffer is a proper prefix of a
+        // longer marker, hold it back rather than consuming it prematurely.
+        // E.g. a trailing `*` could be the start of `**`, trailing `` ` `` could be `` ``` ``.
+        const tail = this.buf.slice(earliest)
+        if (!final && MARKERS.some(m => m.length > tail.length && m.startsWith(tail))) {
+          if (earliest > 0) {
+            out += renderMarkdown(this.buf.slice(0, earliest))
+            this.buf = this.buf.slice(earliest)
+          }
+          break
+        }
+        if (earliest > 0) {
+          out += renderMarkdown(this.buf.slice(0, earliest))
+        }
+        this.buf = this.buf.slice(earliest + matched.length)
+        this.openMarker = matched
+        continue
+      }
+
+      // No marker found — check for partial marker at end of buffer
+      if (!final) {
+        const held = this.partialSuffix()
+        if (held > 0) {
+          const safe = this.buf.slice(0, this.buf.length - held)
+          if (safe.length > 0) out += renderMarkdown(safe)
+          this.buf = this.buf.slice(this.buf.length - held)
+          break
+        }
+      }
+
+      out += renderMarkdown(this.buf)
+      this.buf = ""
+      break
+    }
+
+    return out
+  }
+
+  private partialSuffix(): number {
+    for (let len = Math.min(this.buf.length, 3); len >= 1; len--) {
+      const tail = this.buf.slice(-len)
+      if (MARKERS.some(m => m.startsWith(tail) && m !== tail)) return len
+    }
+    return 0
+  }
+}
+
+export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void } {
   let currentSpinner: Spinner | null = null
   let hadReasoning = false
   let hadToolRun = false
+  let textDirty = false // true when text/reasoning was written without a trailing newline
+  const streamer = new MarkdownStreamer()
 
   return {
     onModelStart: () => {
       hadReasoning = false
+      textDirty = false
+      streamer.reset()
       const pool = hadToolRun ? FOLLOWUP_PHRASES : THINKING_PHRASES
       const first = pickPhrase(pool)
       currentSpinner = new Spinner(first, pool)
@@ -168,17 +273,26 @@ export function createCliCallbacks(): ChannelCallbacks {
         process.stdout.write("\n\n")
         hadReasoning = false
       }
-      process.stdout.write(renderMarkdown(text))
+      const rendered = streamer.push(text)
+      if (rendered) process.stdout.write(rendered)
+      textDirty = text.length > 0 && !text.endsWith("\n")
     },
     onReasoningChunk: (text: string) => {
       hadReasoning = true
       process.stdout.write(`\x1b[2m${text}\x1b[0m`)
+      textDirty = text.length > 0 && !text.endsWith("\n")
     },
     onToolStart: (name: string, _args: Record<string, string>) => {
       // Stop the model-start spinner: when the model returns only tool calls
       // (no content/reasoning), onModelStreamStart never fires, so the old
       // spinner's intervals would leak.
       currentSpinner?.stop()
+      // Ensure the spinner starts on a fresh line so it doesn't overwrite
+      // the last line of text/reasoning output via \r\x1b[K
+      if (textDirty) {
+        process.stdout.write("\n")
+        textDirty = false
+      }
       const first = pickPhrase(TOOL_PHRASES)
       currentSpinner = new Spinner(first, TOOL_PHRASES)
       currentSpinner.start()
@@ -198,7 +312,13 @@ export function createCliCallbacks(): ChannelCallbacks {
       process.stderr.write(`\x1b[31m${error}\x1b[0m\n`)
     },
     onKick: (attempt: number, maxKicks: number) => {
-      process.stderr.write(`\x1b[33mkick ${attempt}/${maxKicks}\x1b[0m\n`)
+      currentSpinner?.stop()
+      currentSpinner = null
+      process.stderr.write(`\r\x1b[K\x1b[33m↻ kick ${attempt}/${maxKicks}\x1b[0m\n`)
+    },
+    flushMarkdown: () => {
+      const remaining = streamer.flush()
+      if (remaining) process.stdout.write(remaining)
     },
   }
 }
@@ -292,6 +412,7 @@ export async function main() {
       } catch {
         // AbortError — silently return to prompt
       }
+      cliCallbacks.flushMarkdown()
       ctrl.restore()
       currentAbort = null
 

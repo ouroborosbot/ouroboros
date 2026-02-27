@@ -111,6 +111,204 @@ describe("CLI adapter - renderMarkdown", () => {
   })
 })
 
+describe("CLI adapter - MarkdownStreamer", () => {
+  let MarkdownStreamer: typeof import("../../channels/cli").MarkdownStreamer
+
+  beforeEach(async () => {
+    vi.resetModules()
+    const mod = await import("../../channels/cli")
+    MarkdownStreamer = mod.MarkdownStreamer
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("passes plain text through immediately", () => {
+    const s = new MarkdownStreamer()
+    expect(s.push("hello world")).toBe("hello world")
+  })
+
+  it("buffers bold marker split across chunks", () => {
+    const s = new MarkdownStreamer()
+    const out1 = s.push("hello **")
+    // "hello " is flushed, "**" opens bold buffering
+    expect(out1).toBe("hello ")
+    const out2 = s.push("bold")
+    // still inside bold, nothing flushed
+    expect(out2).toBe("")
+    const out3 = s.push("** rest")
+    // bold closes, rest flushed
+    expect(out3).toContain("\x1b[1mbold\x1b[22m")
+    expect(out3).toContain(" rest")
+  })
+
+  it("buffers inline code split across chunks", () => {
+    const s = new MarkdownStreamer()
+    const out1 = s.push("use `")
+    expect(out1).toBe("use ")
+    const out2 = s.push("npm install")
+    expect(out2).toBe("")
+    const out3 = s.push("` ok")
+    expect(out3).toContain("\x1b[36mnpm install\x1b[39m")
+    expect(out3).toContain(" ok")
+  })
+
+  it("buffers code block split across chunks", () => {
+    const s = new MarkdownStreamer()
+    const out1 = s.push("code:\n```")
+    expect(out1).toBe("code:\n")
+    const out2 = s.push("\nconst x = 1\n")
+    expect(out2).toBe("")
+    const out3 = s.push("``` done")
+    expect(out3).toContain("\x1b[2m")
+    expect(out3).toContain("const x = 1")
+    expect(out3).toContain(" done")
+  })
+
+  it("holds back partial marker at end of chunk", () => {
+    const s = new MarkdownStreamer()
+    // single * at end could be start of ** or italic
+    const out1 = s.push("hello *")
+    expect(out1).toBe("hello ")
+    // next chunk completes **
+    const out2 = s.push("*bold**")
+    expect(out2).toContain("\x1b[1mbold\x1b[22m")
+  })
+
+  it("holds back single backtick at end of chunk", () => {
+    const s = new MarkdownStreamer()
+    const out1 = s.push("use `")
+    expect(out1).toBe("use ")
+    const out2 = s.push("cmd` ok")
+    expect(out2).toContain("\x1b[36mcmd\x1b[39m")
+    expect(out2).toContain(" ok")
+  })
+
+  it("flush renders remaining buffer literally on stream end", () => {
+    const s = new MarkdownStreamer()
+    s.push("unclosed **bold")
+    const out = s.flush()
+    // Should render the raw ** and text literally (no ANSI bold)
+    expect(out).toContain("**bold")
+  })
+
+  it("flush renders incomplete inline code literally", () => {
+    const s = new MarkdownStreamer()
+    s.push("unclosed `code")
+    const out = s.flush()
+    expect(out).toContain("`code")
+  })
+
+  it("reset clears buffer state", () => {
+    const s = new MarkdownStreamer()
+    s.push("**open")
+    s.reset()
+    expect(s.push("plain")).toBe("plain")
+  })
+
+  it("handles complete markdown in single chunk", () => {
+    const s = new MarkdownStreamer()
+    const out = s.push("**bold** and `code`")
+    expect(out).toContain("\x1b[1mbold\x1b[22m")
+    expect(out).toContain("\x1b[36mcode\x1b[39m")
+  })
+
+  it("handles italic split across chunks", () => {
+    const s = new MarkdownStreamer()
+    const out1 = s.push("hello *")
+    expect(out1).toBe("hello ")
+    // next chunk doesn't start with *, so it's italic
+    const out2 = s.push("italic* rest")
+    expect(out2).toContain("\x1b[3mitalic\x1b[23m")
+    expect(out2).toContain(" rest")
+  })
+
+  it("handles multiple sequential markers", () => {
+    const s = new MarkdownStreamer()
+    const out = s.push("**a** then `b`")
+    expect(out).toContain("\x1b[1ma\x1b[22m")
+    expect(out).toContain("\x1b[36mb\x1b[39m")
+  })
+
+  it("consecutive pushes without markers accumulate nothing", () => {
+    const s = new MarkdownStreamer()
+    expect(s.push("hello ")).toBe("hello ")
+    expect(s.push("world")).toBe("world")
+    expect(s.flush()).toBe("")
+  })
+})
+
+describe("CLI adapter - streaming onTextChunk with MarkdownStreamer", () => {
+  let stdoutChunks: string[]
+  let stdoutSpy: ReturnType<typeof vi.spyOn>
+  let stderrSpy: ReturnType<typeof vi.spyOn>
+  let callbacks: ChannelCallbacks & { flushMarkdown(): void }
+
+  beforeEach(async () => {
+    stdoutChunks = []
+    stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: any) => {
+      stdoutChunks.push(chunk.toString())
+      return true
+    })
+    stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true)
+
+    vi.resetModules()
+    const agent = await import("../../channels/cli")
+    callbacks = agent.createCliCallbacks()
+  })
+
+  afterEach(() => {
+    stdoutSpy.mockRestore()
+    stderrSpy.mockRestore()
+    vi.restoreAllMocks()
+  })
+
+  it("bold split across two chunks renders correctly after flush", () => {
+    callbacks.onTextChunk("hello **")
+    callbacks.onTextChunk("world**")
+    callbacks.flushMarkdown()
+    const output = stdoutChunks.join("")
+    expect(output).toContain("hello ")
+    expect(output).toContain("\x1b[1mworld\x1b[22m")
+  })
+
+  it("inline code split across chunks renders correctly", () => {
+    callbacks.onTextChunk("use `")
+    callbacks.onTextChunk("npm install")
+    callbacks.onTextChunk("` now")
+    callbacks.flushMarkdown()
+    const output = stdoutChunks.join("")
+    expect(output).toContain("\x1b[36mnpm install\x1b[39m")
+  })
+
+  it("complete markdown in single chunk renders immediately", () => {
+    callbacks.onTextChunk("**bold** text")
+    callbacks.flushMarkdown()
+    const output = stdoutChunks.join("")
+    expect(output).toContain("\x1b[1mbold\x1b[22m")
+    expect(output).toContain(" text")
+  })
+
+  it("flushMarkdown renders incomplete markers literally", () => {
+    callbacks.onTextChunk("unclosed **bold")
+    callbacks.flushMarkdown()
+    const output = stdoutChunks.join("")
+    expect(output).toContain("**bold")
+  })
+
+  it("onModelStart resets streamer state", () => {
+    callbacks.onTextChunk("**open")
+    callbacks.onModelStart()
+    callbacks.onModelStreamStart()
+    stdoutChunks.length = 0
+    callbacks.onTextChunk("plain text")
+    callbacks.flushMarkdown()
+    const output = stdoutChunks.join("")
+    expect(output).toBe("plain text")
+  })
+})
+
 describe("CLI adapter - onReasoningChunk and onTextChunk rendering", () => {
   let stdoutChunks: string[]
   let stdoutSpy: ReturnType<typeof vi.spyOn>
