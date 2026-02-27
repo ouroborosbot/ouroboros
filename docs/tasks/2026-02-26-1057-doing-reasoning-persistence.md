@@ -1,6 +1,6 @@
 # Doing: Reasoning Item Persistence and API-Reported Token Usage
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-02-26 16:42
 **Planning**: ./2026-02-26-1057-planning-reasoning-persistence.md
@@ -16,28 +16,28 @@
 Fix two bugs that cause the sliding context window to fail when using Azure Responses API reasoning models (gpt-5.2-chat) with `store: false`. Reasoning items are lost between turns (breaking reasoning continuity) and reasoning tokens are invisible to the token estimator (preventing context trimming from triggering). Replace the chars/4 token estimation heuristic with actual API-reported usage data from both providers. Add automatic context overflow recovery.
 
 ## Completion Criteria
-- [ ] Reasoning items from `result.outputItems` are stored on assistant messages and persist through session save/load
-- [ ] `toResponsesInput` restores reasoning items when rebuilding azureInput from loaded session messages
-- [ ] Reasoning items emitted before assistant content in toResponsesInput (matching API item order)
-- [ ] `estimateTokens` is deleted; all callers replaced with API-reported usage
-- [ ] Azure streaming captures usage from `response.completed` event and returns it in `TurnResult`
-- [ ] MiniMax streaming captures usage from final chunk (with `stream_options: { include_usage: true }`) and returns it in `TurnResult`
-- [ ] `trimMessages` uses actual API-reported token count instead of estimated count
-- [ ] Trimming runs retroactively after API call returns (not before the call)
-- [ ] Post-turn trim+save is encapsulated in a shared `postTurn` function in context.ts (no duplication across adapters)
-- [ ] `lastUsage` is stored in session JSON alongside messages
-- [ ] Context trimming triggers correctly for sessions with large reasoning payloads
-- [ ] Cold start (no prior usage data) handled gracefully -- no pre-call trimming, API errors caught
-- [ ] Context overflow errors from both providers are caught and trigger automatic trim + retry
-- [ ] User is informed when auto-trim happens (log message, not an error)
-- [ ] Retry succeeds after trimming (or surfaces the error if trimming can't help)
-- [ ] Within-turn reasoning accumulation in azureInput is preserved (existing behavior unchanged)
-- [ ] Boot greeting removed from CLI `main()` and `bootGreeting` function deleted entirely (dead code after Feature 5 changes runAgent signature)
-- [ ] System prompt refresh happens inside `runAgent`, not in adapters
-- [ ] No duplicate `cachedBuildSystem` calls in adapter code
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] Reasoning items from `result.outputItems` are stored on assistant messages and persist through session save/load
+- [x] `toResponsesInput` restores reasoning items when rebuilding azureInput from loaded session messages
+- [x] Reasoning items emitted before assistant content in toResponsesInput (matching API item order)
+- [x] `estimateTokens` is deleted; all callers replaced with API-reported usage
+- [x] Azure streaming captures usage from `response.completed` event and returns it in `TurnResult`
+- [x] MiniMax streaming captures usage from final chunk (with `stream_options: { include_usage: true }`) and returns it in `TurnResult`
+- [x] `trimMessages` uses actual API-reported token count instead of estimated count
+- [x] Trimming runs retroactively after API call returns (not before the call)
+- [x] Post-turn trim+save is encapsulated in a shared `postTurn` function in context.ts (no duplication across adapters)
+- [x] `lastUsage` is stored in session JSON alongside messages
+- [x] Context trimming triggers correctly for sessions with large reasoning payloads
+- [x] Cold start (no prior usage data) handled gracefully -- no pre-call trimming, API errors caught
+- [x] Context overflow errors from both providers are caught and trigger automatic trim + retry
+- [x] User is informed when auto-trim happens (log message, not an error)
+- [x] Retry succeeds after trimming (or surfaces the error if trimming can't help)
+- [x] Within-turn reasoning accumulation in azureInput is preserved (existing behavior unchanged)
+- [x] Boot greeting removed from CLI `main()` and `bootGreeting` function deleted entirely (dead code after Feature 5 changes runAgent signature)
+- [x] System prompt refresh happens inside `runAgent`, not in adapters
+- [x] No duplicate `cachedBuildSystem` calls in adapter code
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -370,7 +370,7 @@ Call sites to update (source files only):
 
 ### Final
 
-### ⬜ Unit 6: Full integration verification
+### ✅ Unit 6: Full integration verification
 **What**: Run the complete test suite. Verify all completion criteria are met. Verify no warnings. Run coverage report and confirm 100% on all new code.
 **Output**: All tests pass, coverage confirmed, no warnings
 **Acceptance**: All completion criteria checked off
