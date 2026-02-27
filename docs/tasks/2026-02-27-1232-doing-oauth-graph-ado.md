@@ -68,7 +68,7 @@ Add OAuth/SSO authentication to the Ouroboros Teams bot so the LLM agent can cal
 - Documents dev tunnel setup for local testing
 - Documents required `.env` variables
 
-### ⬜ Unit 2: Config Changes
+### ✅ Unit 2: Config Changes
 **What**: Add `OAuthConfig` and `AdoConfig` to `src/config.ts` with `getOAuthConfig()` and `getAdoConfig()` functions. (Manifest `webApplicationInfo` already committed separately -- not included here.)
 **Output**: Updated `src/config.ts`, new/updated tests in `src/__tests__/engine/config.test.ts`.
 **Files modified**: `src/config.ts`
@@ -359,3 +359,4 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 - 2026-02-27 13:38 Phase 1 compression: Pass 3 validation - cross-checked all old units, no losses found
 - 2026-02-27 13:39 Phase 1 compression: Pass 4 quality - added Output line to Unit 3 for consistency
 - 2026-02-27 13:42 Unit 1 complete: docs/OAUTH-SETUP.md written covering app registration, API permissions, two OAuth connections (graph + ado), manifest webApplicationInfo, dev tunnel, env vars
+- 2026-02-27 13:43 Unit 2 complete: OAuthConfig + AdoConfig interfaces, getOAuthConfig() + getAdoConfig() with env var overrides, 10 new tests all green, 599 total tests passing
