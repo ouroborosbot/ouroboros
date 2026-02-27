@@ -1062,15 +1062,17 @@ describe("Teams adapter - session persistence", () => {
     runAgentFn?: any
     loadSessionReturn?: any
     saveSessionCalls?: any[][]
+    postTurnCalls?: any[][]
     deleteSessionCalls?: string[]
     trimMessagesFn?: any
     parseSlashCommandFn?: any
     dispatchFn?: any
   } = {}) {
     const {
-      runAgentFn = vi.fn(),
+      runAgentFn = vi.fn().mockResolvedValue({ usage: undefined }),
       loadSessionReturn = null,
       saveSessionCalls = [],
+      postTurnCalls = [],
       deleteSessionCalls = [],
       trimMessagesFn = ((msgs: any) => [...msgs]),
       parseSlashCommandFn = (() => null),
@@ -1092,6 +1094,7 @@ describe("Teams adapter - session persistence", () => {
       deleteSession: vi.fn().mockImplementation((...args: any[]) => { deleteSessionCalls.push(args[0]) }),
       trimMessages: vi.fn().mockImplementation(trimMessagesFn),
       cachedBuildSystem: vi.fn().mockReturnValue("cached teams prompt"),
+      postTurn: vi.fn().mockImplementation((...args: any[]) => { postTurnCalls.push(args) }),
     }))
     vi.doMock("../../repertoire/commands", () => ({
       createCommandRegistry: vi.fn().mockReturnValue({
@@ -1117,12 +1120,12 @@ describe("Teams adapter - session persistence", () => {
 
   it("loads session for conversation on each message", async () => {
     vi.resetModules()
-    const runAgentFn = vi.fn()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     const savedSession = [
       { role: "system", content: "old prompt" },
       { role: "user", content: "previous msg" },
     ]
-    mockTeamsDeps({ runAgentFn, loadSessionReturn: savedSession })
+    mockTeamsDeps({ runAgentFn, loadSessionReturn: { messages: savedSession, lastUsage: undefined } })
     const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     await teams.handleTeamsMessage("new msg", mockStream as any, "conv-123")
@@ -1133,19 +1136,24 @@ describe("Teams adapter - session persistence", () => {
     expect(msgs.some((m: any) => m.content === "new msg")).toBe(true)
   })
 
-  it("saves session after runAgent", async () => {
+  it("calls postTurn after runAgent with usage", async () => {
     vi.resetModules()
-    const saveSessionCalls: any[][] = []
-    mockTeamsDeps({ saveSessionCalls })
+    const usageData = { input_tokens: 200, output_tokens: 100, reasoning_tokens: 20, total_tokens: 320 }
+    const postTurnCalls: any[][] = []
+    mockTeamsDeps({
+      runAgentFn: vi.fn().mockResolvedValue({ usage: usageData }),
+      postTurnCalls,
+    })
     const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
 
-    expect(saveSessionCalls.length).toBe(1)
-    expect(saveSessionCalls[0][0]).toBe("/tmp/teams-session.json")
+    expect(postTurnCalls.length).toBe(1)
+    expect(postTurnCalls[0][1]).toBe("/tmp/teams-session.json")
+    expect(postTurnCalls[0][2]).toEqual(usageData)
   })
 
-  it("trims messages before runAgent", async () => {
+  it("does not call trimMessages directly (postTurn handles it)", async () => {
     vi.resetModules()
     const trimCalls: any[][] = []
     mockTeamsDeps({
@@ -1155,8 +1163,7 @@ describe("Teams adapter - session persistence", () => {
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
 
-    expect(trimCalls.length).toBe(1)
-    expect(trimCalls[0][1]).toBe(80000) // maxTokens
+    expect(trimCalls.length).toBe(0) // trimming moved to postTurn
   })
 
   it("creates fresh session when no session exists", async () => {
