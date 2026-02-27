@@ -167,7 +167,7 @@ describe("trimMessages", () => {
     expect(result).toEqual(msgs)
   })
 
-  it("MAX_MESSAGES hard cap (200) still enforced regardless of token count", async () => {
+  it("no trimming when message count is high but tokens are under maxTokens", async () => {
     const { trimMessages } = await import("../../mind/context")
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: "sys" },
@@ -176,11 +176,10 @@ describe("trimMessages", () => {
       msgs.push({ role: i % 2 === 0 ? "user" : "assistant", content: "hi" })
     }
     expect(msgs.length).toBe(300)
-    // Token count is fine but message count exceeds MAX_MESSAGES
+    // Token count is under maxTokens — no trimming despite high message count
     const result = trimMessages(msgs, 80000, 20, 1000)
-    expect(result.length).toBeLessThanOrEqual(200)
+    expect(result.length).toBe(300)
     expect(result[0].role).toBe("system")
-    expect(result[result.length - 1]).toBe(msgs[msgs.length - 1])
   })
 
   it("single message (system only) -- nothing to trim", async () => {
@@ -218,7 +217,7 @@ describe("trimMessages", () => {
     expect(msgs.length).toBe(originalLength)
   })
 
-  it("MAX_MESSAGES enforced even when actualTokenCount is undefined", async () => {
+  it("no trimming when actualTokenCount is undefined regardless of message count", async () => {
     const { trimMessages } = await import("../../mind/context")
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: "sys" },
@@ -228,7 +227,7 @@ describe("trimMessages", () => {
     }
     expect(msgs.length).toBe(251)
     const result = trimMessages(msgs, 80000, 20)
-    expect(result.length).toBeLessThanOrEqual(200)
+    expect(result.length).toBe(251)
     expect(result[0].role).toBe("system")
   })
 })
