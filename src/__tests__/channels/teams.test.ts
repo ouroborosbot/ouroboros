@@ -274,6 +274,7 @@ describe("Teams adapter - message handling", () => {
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
       cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+      postTurn: vi.fn(),
     }))
     vi.doMock("../../repertoire/commands", () => ({
       createCommandRegistry: vi.fn().mockReturnValue({
@@ -290,7 +291,7 @@ describe("Teams adapter - message handling", () => {
   it("on incoming message, pushes system and user message and calls runAgent", async () => {
     vi.resetModules()
 
-    const mockRunAgent = vi.fn()
+    const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
     mockHandlingDeps(mockRunAgent)
 
     const teams = await import("../../channels/teams")
@@ -312,7 +313,7 @@ describe("Teams adapter - message handling", () => {
   it("passes AbortSignal to runAgent", async () => {
     vi.resetModules()
 
-    const mockRunAgent = vi.fn()
+    const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
     mockHandlingDeps(mockRunAgent)
 
     const teams = await import("../../channels/teams")
@@ -329,7 +330,7 @@ describe("Teams adapter - message handling", () => {
   it("does not explicitly close stream (framework auto-closes)", async () => {
     vi.resetModules()
 
-    mockHandlingDeps(vi.fn())
+    mockHandlingDeps(vi.fn().mockResolvedValue({ usage: undefined }))
 
     const teams = await import("../../channels/teams")
 
@@ -345,6 +346,7 @@ describe("Teams adapter - message handling", () => {
     const capturedMessages: any[][] = []
     const mockRunAgent = vi.fn().mockImplementation((msgs: any[]) => {
       capturedMessages.push([...msgs])
+      return { usage: undefined }
     })
     mockHandlingDeps(mockRunAgent)
 
@@ -1110,7 +1112,7 @@ describe("Teams adapter - session persistence", () => {
 
   it("handleTeamsMessage accepts conversationId parameter", async () => {
     vi.resetModules()
-    const runAgentFn = vi.fn()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDeps({ runAgentFn })
     const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
@@ -1168,7 +1170,7 @@ describe("Teams adapter - session persistence", () => {
 
   it("creates fresh session when no session exists", async () => {
     vi.resetModules()
-    const runAgentFn = vi.fn()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDeps({ runAgentFn, loadSessionReturn: null })
     const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
@@ -1183,7 +1185,7 @@ describe("Teams adapter - session persistence", () => {
   it("/new clears session and sends confirmation via stream", async () => {
     vi.resetModules()
     const deleteSessionCalls: string[] = []
-    const runAgentFn = vi.fn()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDeps({
       runAgentFn,
       deleteSessionCalls,
@@ -1204,7 +1206,7 @@ describe("Teams adapter - session persistence", () => {
 
   it("/commands sends command list via stream without calling runAgent", async () => {
     vi.resetModules()
-    const runAgentFn = vi.fn()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDeps({
       runAgentFn,
       parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
@@ -1223,7 +1225,7 @@ describe("Teams adapter - session persistence", () => {
 
   it("multiple conversations maintain separate sessions", async () => {
     vi.resetModules()
-    const runAgentFn = vi.fn()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDeps({ runAgentFn })
     const teams = await import("../../channels/teams")
     const mockStream1 = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
@@ -1242,7 +1244,7 @@ describe("Teams adapter - session persistence", () => {
 
   it("graceful fallback on corrupt session file", async () => {
     vi.resetModules()
-    const runAgentFn = vi.fn()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDeps({ runAgentFn, loadSessionReturn: null }) // null = corrupt
     const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
@@ -1255,7 +1257,7 @@ describe("Teams adapter - session persistence", () => {
 
   it("slash command handled but no result falls through to normal message handling", async () => {
     vi.resetModules()
-    const runAgentFn = vi.fn()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDeps({
       runAgentFn,
       parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
@@ -1271,7 +1273,7 @@ describe("Teams adapter - session persistence", () => {
 
   it("/commands with no message field emits empty string", async () => {
     vi.resetModules()
-    const runAgentFn = vi.fn()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDeps({
       runAgentFn,
       parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
@@ -1290,7 +1292,7 @@ describe("Teams adapter - session persistence", () => {
 
   it("slash command with unrecognized action falls through to normal handling", async () => {
     vi.resetModules()
-    const runAgentFn = vi.fn()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDeps({
       runAgentFn,
       parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
