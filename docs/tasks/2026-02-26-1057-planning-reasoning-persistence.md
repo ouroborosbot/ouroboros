@@ -16,11 +16,11 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 - **Delete `estimateTokens`** -- replace the chars/4 heuristic with actual API-reported token usage from both providers
 - **Capture usage from Azure Responses API** -- add `response.completed` handler in `streamResponsesApi` to capture `input_tokens`, `output_tokens`, `reasoning_tokens`. Return usage data in `TurnResult`
 - **Capture usage from MiniMax Chat Completions** -- add `stream_options: { include_usage: true }` to `streamChatCompletion` and capture `chunk.usage` from the final streaming chunk. Return usage data in `TurnResult`
-- **Rework `trimMessages`** -- use last-known actual token count from the API instead of calling `estimateTokens`
+- **Rework `trimMessages`** -- use last-known actual token count from the API instead of calling `estimateTokens`. Trimming runs retroactively after API call returns, during user typing dead time (no pre-call trimming)
+- **Store `lastUsage` in session JSON** -- persist the API-reported usage object alongside messages for observability/debugging and future use
 - 100% test coverage on all new code
 
 ### Out of Scope
-- Changes to session save/load mechanics (JSON.stringify already preserves arbitrary properties on message objects)
 - Changes to MiniMax reasoning item handling (MiniMax reasoning is already in content via `<think>` tags; only token usage capture is in scope)
 - `responses.compact` API (not yet available on Azure)
 - Changes to `contextMargin` default (stays at 20%, configurable)
@@ -33,7 +33,10 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 - [ ] Azure streaming captures usage from `response.completed` event and returns it in `TurnResult`
 - [ ] MiniMax streaming captures usage from final chunk (with `stream_options: { include_usage: true }`) and returns it in `TurnResult`
 - [ ] `trimMessages` uses actual API-reported token count instead of estimated count
+- [ ] Trimming runs retroactively after API call returns (not before the call)
+- [ ] `lastUsage` is stored in session JSON alongside messages
 - [ ] Context trimming triggers correctly for sessions with large reasoning payloads
+- [ ] Cold start (no prior usage data) handled gracefully -- no pre-call trimming, API errors caught
 - [ ] Within-turn reasoning accumulation in azureInput is preserved (existing behavior unchanged)
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
@@ -47,8 +50,7 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [ ] How do we handle trimming BEFORE the first API call of a session? We have no usage data yet on cold start. Options: (a) estimate from JSON size as a one-time fallback, (b) don't trim on first call and let it self-correct after the API reports actual usage, (c) something else.
-- [ ] Should we store the last-known usage on the session JSON so we have it on reload? This would give us a starting point for trimming decisions on session resume without needing a fallback estimator.
+- (all resolved)
 
 ## Decisions Made
 - `_reasoning_items` (underscore prefix) signals this is internal/private, not part of OpenAI types
@@ -59,6 +61,9 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 - chars/4 heuristic question is RESOLVED (we don't use it anymore -- real API counts replace it)
 - `responses.compact` is OUT OF SCOPE (not available on Azure yet)
 - `contextMargin` default stays at 20% (configurable, no change needed)
+- **Cold start**: No pre-call trimming. Send whatever we have on the first API call. If context is too large, the API will error -- handle that gracefully. On subsequent turns we have real usage data and trim retroactively.
+- **Persist usage in session**: Store `lastUsage` (API-reported usage object) in session JSON alongside messages. NOT used for pre-call trimming on cold start -- stored for observability/debugging and future use.
+- **Trim timing**: Trim AFTER the API call returns (retroactively), during user typing dead time. Flow: (1) user sends message, (2) call API with no pre-call trimming, (3) API returns response + usage, (4) store usage in session, (5) trim messages based on actual usage, (6) save trimmed session, (7) user is typing (trimming already done). This eliminates the need for any pre-call estimation entirely.
 
 ## Context / References
 - `src/engine/core.ts` -- `runAgent` builds assistant messages at ~line 144-154, pushes outputItems to local azureInput at line 135-137
@@ -84,3 +89,4 @@ Live API testing confirmed both providers return actual token counts in streamin
 ## Progress Log
 - 2026-02-26 15:42 Created
 - 2026-02-26 16:20 Live tested both providers -- both return streaming usage data. Azure via `response.completed` event, MiniMax via final chunk with `stream_options: { include_usage: true }`. Decision: delete estimateTokens, use real API counts.
+- 2026-02-26 Resolved cold-start and trim-timing questions. Trim retroactively after API responds, during user typing dead time. No pre-call estimation needed. Store usage in session for observability.
