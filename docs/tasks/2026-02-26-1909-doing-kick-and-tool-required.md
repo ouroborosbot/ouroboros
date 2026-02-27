@@ -137,7 +137,7 @@ Fix the agent proactivity bug where the model narrates tool-use intent ("let me 
 
 ---
 
-### ⬜ Unit 3: CLI Integration
+### 🔄 Unit 3: CLI Integration
 
 **What**: Wire up the `/tool-required` slash command, update the system prompt with `final_answer` guidance when the mode is active, and connect the `onKick` callback in the CLI.
 
