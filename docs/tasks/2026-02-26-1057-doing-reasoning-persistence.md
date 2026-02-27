@@ -246,7 +246,7 @@ This eliminates the duplicated trim+save code in both adapters. Each adapter jus
 **Output**: Failing/updated tests in `src/__tests__/channels/cli-main.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because CLI still trims before runAgent
 
-### ⬜ Unit 3h: Move trimming to after runAgent in CLI -- Implementation
+### ✅ Unit 3h: Move trimming to after runAgent in CLI -- Implementation
 **What**: In `src/channels/cli.ts` `main()`:
 - Remove the boot greeting block: delete the `if (!existing || existing.length === 0)` block that calls `bootGreeting` (lines 229-236) AND delete the `bootGreeting` function itself (lines 201-204). The function is dead code -- keeping it would cause a compile error after Feature 5 changes `runAgent`'s signature. Add a TODO comment where the block was: `// TODO: first-run experience (greeting) -- addressed separately`.
 - Remove any `bootGreeting` tests from `src/__tests__/channels/cli-main.test.ts` (they test dead code)
