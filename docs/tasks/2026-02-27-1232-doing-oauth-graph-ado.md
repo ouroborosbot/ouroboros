@@ -89,7 +89,7 @@ Add OAuth/SSO authentication to the Ouroboros Teams bot so the LLM agent can cal
 - 100% coverage on new config code
 - All existing tests still pass
 
-### ⬜ Unit 3: OAuth Plumbing (Vertical Slice)
+### ✅ Unit 3: OAuth Plumbing (Vertical Slice)
 **What**: Build the entire vertical slice needed for the two smoke-test tools (`graph_profile` and `ado_work_items`) to work end-to-end. This combines ToolContext, channel-conditional tools, core.ts wiring, Teams adapter refactoring, Graph client, ADO client, shared error handling, and the two tool handlers into a single unit.
 **Output**: 3 new source files, 3 new test files, 3 modified source files, 3 modified test files (see below).
 
@@ -360,3 +360,4 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 - 2026-02-27 13:39 Phase 1 compression: Pass 4 quality - added Output line to Unit 3 for consistency
 - 2026-02-27 13:42 Unit 1 complete: docs/OAUTH-SETUP.md written covering app registration, API permissions, two OAuth connections (graph + ado), manifest webApplicationInfo, dev tunnel, env vars
 - 2026-02-27 13:43 Unit 2 complete: OAuthConfig + AdoConfig interfaces, getOAuthConfig() + getAdoConfig() with env var overrides, 10 new tests all green, 599 total tests passing
+- 2026-02-27 13:55 Unit 3 complete: full vertical slice -- api-error.ts, graph-client.ts, ado-client.ts, ToolContext, getToolsForChannel, graph_profile + ado_work_items handlers, core.ts wiring, teams.ts token threading. 645 tests passing, no warnings, no TS errors
