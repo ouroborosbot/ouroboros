@@ -14,7 +14,8 @@ export type ResponseItem =
   | { type: "message"; id?: string; role: "assistant"; content: { type: string; text: string }[] }
   | { type: "function_call"; call_id: string; name: string; arguments: string; status: string }
   | { type: "function_call_output"; call_id: string; output: string }
-  | { role: "user"; content: string };
+  | { role: "user"; content: string }
+  | { role: "assistant"; content: string };
 
 // Azure Responses API streaming event (untyped in SDK — use a flexible record)
 interface ResponseStreamEvent {
