@@ -811,4 +811,46 @@ describe("streamResponsesApi", () => {
     const result = await streamResponsesApi(client, {}, callbacks)
     expect(result.toolCalls).toEqual([{ id: "c1", name: "get_current_time", arguments: "" }])
   })
+
+  // --- Unit 2a: Capture Azure usage from response.completed ---
+
+  it("captures usage from response.completed event", async () => {
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_text.delta", delta: "hello" },
+      { type: "response.completed", response: {
+        usage: { input_tokens: 100, output_tokens: 50, output_tokens_details: { reasoning_tokens: 20 }, total_tokens: 150 },
+      }},
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(result.usage).toEqual({
+      input_tokens: 100,
+      output_tokens: 50,
+      reasoning_tokens: 20,
+      total_tokens: 150,
+    })
+  })
+
+  it("returns undefined usage when no response.completed event fires", async () => {
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_text.delta", delta: "hello" },
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(result.usage).toBeUndefined()
+  })
+
+  it("maps usage fields correctly from response.completed", async () => {
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.completed", response: {
+        usage: { input_tokens: 500, output_tokens: 200, output_tokens_details: { reasoning_tokens: 80 }, total_tokens: 700 },
+      }},
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(result.usage!.input_tokens).toBe(500)
+    expect(result.usage!.output_tokens).toBe(200)
+    expect(result.usage!.reasoning_tokens).toBe(80)
+    expect(result.usage!.total_tokens).toBe(700)
+  })
 })
