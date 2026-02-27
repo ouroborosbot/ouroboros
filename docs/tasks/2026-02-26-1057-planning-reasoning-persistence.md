@@ -110,3 +110,4 @@ Context overflow testing: both providers return distinct error shapes on overflo
 - 2026-02-26 16:36 Tested context overflow errors on both providers. Azure: context_length_exceeded. MiniMax: "context window exceeds limit" (code 2013). Neither returns usage data on overflow.
 - 2026-02-26 16:36 Root cause clarification: the "out of juice" incident was the model getting stuck in a text-only loop (3/10 tool rounds used), not context overflow. MAX_NO_TOOL_TURNS addresses this. But underlying estimation/persistence bugs remain.
 - 2026-02-26 16:36 Added context overflow auto-recovery to scope: catch overflow error, trim, retry transparently.
+- 2026-02-26 16:40 Approved
