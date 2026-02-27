@@ -75,6 +75,8 @@ describe("isTransientError", () => {
     expect(isTransientError(new Error("network error"))).toBe(true)
     expect(isTransientError(new Error("socket hang up"))).toBe(true)
     expect(isTransientError(new Error("getaddrinfo ENOTFOUND"))).toBe(true)
+    expect(isTransientError(new Error("ECONNRESET by peer"))).toBe(true)
+    expect(isTransientError(new Error("ETIMEDOUT waiting"))).toBe(true)
   })
 
   it("detects HTTP status codes 429 and 5xx", async () => {
@@ -91,6 +93,7 @@ describe("isTransientError", () => {
     expect(isTransientError(new Error("invalid request"))).toBe(false)
     expect(isTransientError(new Error("authentication failed"))).toBe(false)
     expect(isTransientError("not an error")).toBe(false)
+    expect(isTransientError(new Error())).toBe(false) // empty message
     const err: any = new Error("bad request")
     err.status = 400
     expect(isTransientError(err)).toBe(false)
@@ -2258,6 +2261,37 @@ describe("runAgent", () => {
     vi.useRealTimers()
   })
 
+  it("skips retry wait immediately when signal is already aborted", async () => {
+    const controller = new AbortController()
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      const err: any = new Error("fetch failed")
+      throw err
+    })
+
+    const errors: Error[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      // Abort in the error callback — signal is not yet aborted when the
+      // catch block's signal?.aborted check runs, but IS aborted by the
+      // time the retry wait promise checks signal.aborted (line 365).
+      onError: (err) => { errors.push(err); controller.abort() },
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, controller.signal)
+
+    expect(callCount).toBe(1)
+    expect(errors.length).toBe(1)
+    expect(errors[0].message).toContain("retrying")
+  })
+
   it("resets retry count after successful call", async () => {
     vi.useFakeTimers()
     let callCount = 0
@@ -2839,14 +2873,35 @@ describe("getClient config integration", () => {
 describe("hasToolIntent", () => {
   it("returns true for each intent phrase", async () => {
     const { hasToolIntent } = await import("../../engine/core")
+    // Explicit intent
     expect(hasToolIntent("let me read that file")).toBe(true)
     expect(hasToolIntent("I'll read that file")).toBe(true)
     expect(hasToolIntent("I will read that file")).toBe(true)
+    expect(hasToolIntent("I would like to read that file")).toBe(true)
+    expect(hasToolIntent("I want to read that file")).toBe(true)
+    // "going to" variants
     expect(hasToolIntent("I'm going to read that file")).toBe(true)
     expect(hasToolIntent("going to read that file")).toBe(true)
     expect(hasToolIntent("I am going to read that file")).toBe(true)
-    expect(hasToolIntent("I would like to read that file")).toBe(true)
-    expect(hasToolIntent("I want to read that file")).toBe(true)
+    // Action announcements
+    expect(hasToolIntent("I need to check the database")).toBe(true)
+    expect(hasToolIntent("I should look at the logs")).toBe(true)
+    expect(hasToolIntent("I can help with that")).toBe(true)
+    // Gerund phase shifts
+    expect(hasToolIntent("entering execution mode.")).toBe(true)
+    expect(hasToolIntent("starting with the first file")).toBe(true)
+    expect(hasToolIntent("proceeding to the next step")).toBe(true)
+    expect(hasToolIntent("switching to plan B")).toBe(true)
+    // Temporal narration
+    expect(hasToolIntent("first, I will check the logs")).toBe(true)
+    expect(hasToolIntent("now I will investigate")).toBe(true)
+    expect(hasToolIntent("next, I should look at the code")).toBe(true)
+    // Hedged intent
+    expect(hasToolIntent("allow me to take a look")).toBe(true)
+    expect(hasToolIntent("time to check the logs")).toBe(true)
+    // Self-narration
+    expect(hasToolIntent("my next step is to read the file")).toBe(true)
+    expect(hasToolIntent("my plan is to refactor this")).toBe(true)
   })
 
   it("returns false for text without intent phrases", async () => {
@@ -3603,6 +3658,87 @@ describe("tool_choice required and final_answer", () => {
     const assistantMsg = messages.find((m: any) => m.role === "assistant")
     expect(assistantMsg).toBeDefined()
     expect(assistantMsg.content).toBe("some content")
+  })
+
+  it("final_answer with valid JSON but no answer field: falls back to result.content", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk("fallback content", [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"text":"hello"}' } },
+        ]),
+      ])
+    )
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    const assistantMsg = messages.find((m: any) => m.role === "assistant")
+    expect(assistantMsg).toBeDefined()
+    expect(assistantMsg.content).toBe("fallback content")
+  })
+
+  it("final_answer with invalid JSON and no content: falls back to empty string", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: "bad json" } },
+        ]),
+      ])
+    )
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    const assistantMsg = messages.find((m: any) => m.role === "assistant")
+    expect(assistantMsg).toBeDefined()
+    expect(assistantMsg.content).toBe("")
+  })
+
+  it("final_answer with valid JSON, no answer field, and no content: falls back to empty string", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"text":"hello"}' } },
+        ]),
+      ])
+    )
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    const assistantMsg = messages.find((m: any) => m.role === "assistant")
+    expect(assistantMsg).toBeDefined()
+    expect(assistantMsg.content).toBe("")
   })
 })
 

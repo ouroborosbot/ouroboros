@@ -4,14 +4,37 @@ import type { Kick } from "../../engine/kicks"
 
 describe("hasToolIntent", () => {
   it.each([
+    // Explicit intent
     "let me read that file",
     "I'll check that for you",
     "I will look into it",
+    "I would like to help with that",
+    "I want to read the code",
+    // "going to" variants
     "I'm going to run the command",
     "going to check the logs",
     "I am going to investigate",
-    "I would like to help with that",
-    "I want to read the code",
+    // Action announcements
+    "I need to check the database",
+    "I should look at the logs",
+    "I can help with that",
+    // Gerund phase shifts
+    "entering execution mode.",
+    "starting with the first file",
+    "proceeding to the next step",
+    "switching to plan B",
+    // Temporal narration
+    "first, I will check the logs",
+    "first I need to read the file",
+    "now I will investigate",
+    "next, I should look at the code",
+    "next I will check the tests",
+    // Hedged intent
+    "allow me to take a look",
+    "time to check the logs",
+    // Self-narration
+    "my next step is to read the file",
+    "my plan is to refactor this",
   ])("returns true for intent phrase: %s", (text) => {
     expect(hasToolIntent(text)).toBe(true)
   })
