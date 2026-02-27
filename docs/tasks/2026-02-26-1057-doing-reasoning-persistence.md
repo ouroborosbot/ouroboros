@@ -31,6 +31,8 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 - [ ] User is informed when auto-trim happens (log message, not an error)
 - [ ] Retry succeeds after trimming (or surfaces the error if trimming can't help)
 - [ ] Within-turn reasoning accumulation in azureInput is preserved (existing behavior unchanged)
+- [ ] Boot greeting removed from CLI `main()` (sessions persist forever -- first-run experience addressed separately)
+- [ ] System prompt refresh preserved pre-call in both CLI and Teams adapters
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -168,66 +170,71 @@ Note: `estimateTokens` deletion is deferred to Feature 3 where it is replaced at
 **Output**: Modified `src/mind/context.ts`
 **Acceptance**: All Unit 3a tests PASS (green), no warnings, no references to `estimateTokens` remain
 
-### ⬜ Unit 3c: Store lastUsage in session -- Tests
-**What**: Write failing tests in `src/__tests__/mind/context.test.ts` for `saveSession` and `loadSession` handling `lastUsage`:
+### ⬜ Unit 3c: Store lastUsage in session and runAgent return type -- Tests
+**What**: Write failing tests covering three tightly coupled changes:
+
+**In `src/__tests__/mind/context.test.ts`** (saveSession/loadSession):
 - `saveSession` accepts optional `lastUsage` parameter and includes it in the JSON envelope: `{ version: 1, messages, lastUsage }`
 - `loadSession` returns `{ messages, lastUsage }` (updated return type) instead of just messages
 - When `lastUsage` is undefined/not present in saved file, `loadSession` returns `lastUsage: undefined`
 - Backward compatibility: loading a session without `lastUsage` still works (returns messages, undefined lastUsage)
-**Output**: Failing tests in `src/__tests__/mind/context.test.ts`
-**Acceptance**: Tests exist and FAIL (red)
 
-### ⬜ Unit 3d: Store lastUsage in session -- Implementation
-**What**: Update `saveSession` and `loadSession` in `src/mind/context.ts`:
-- `saveSession(filePath, messages, lastUsage?)`: include `lastUsage` in the JSON envelope
-- `loadSession(filePath)`: return `{ messages, lastUsage }` object instead of just the messages array
-- Define and export a `UsageData` type: `{ input_tokens: number; output_tokens: number; reasoning_tokens: number; total_tokens: number }`
-- Define a `SessionData` return type: `{ messages: OpenAI.ChatCompletionMessageParam[]; lastUsage?: UsageData } | null`
-
-**Breaking change**: `loadSession` currently returns `OpenAI.ChatCompletionMessageParam[] | null`. Callers in `src/channels/cli.ts` (line 212) and `src/channels/teams.ts` (line 158) use `existing && existing.length > 0`. These callers MUST be updated in Units 3h and 3j to use `existing?.messages` instead. Until those units are completed, the adapters will have compile errors.
-**Output**: Modified `src/mind/context.ts`
-**Acceptance**: All Unit 3c tests PASS (green), no warnings. Adapter compile errors are expected and resolved in Units 3h/3j.
-
-### ⬜ Unit 3e: runAgent returns usage data -- Tests
-**What**: Write failing tests in `src/__tests__/engine/core.test.ts` for `runAgent` returning usage data:
+**In `src/__tests__/engine/core.test.ts`** (runAgent return type):
 - `runAgent` returns `Promise<{ usage?: UsageData }>` instead of `Promise<void>`
 - The returned `usage` is from the LAST streaming call of the turn (the final API call before done=true)
 - When the model responds without tool calls (single API call), usage is from that call
 - When the model does multiple tool rounds, usage is from the last round's API call
 - When an error occurs, usage may be undefined
-**Output**: Failing tests in `src/__tests__/engine/core.test.ts`
-**Acceptance**: Tests exist and FAIL (red) because `runAgent` returns `Promise<void>`
+**Output**: Failing tests in `src/__tests__/mind/context.test.ts` and `src/__tests__/engine/core.test.ts`
+**Acceptance**: Tests exist and FAIL (red)
 
-### ⬜ Unit 3f: runAgent returns usage data -- Implementation
-**What**: Update `runAgent` in `src/engine/core.ts`:
-- Change return type from `Promise<void>` to `Promise<{ usage?: UsageData }>`
+### ⬜ Unit 3d: Store lastUsage in session and runAgent return type -- Implementation
+**What**: Implement all three changes atomically so the codebase never enters an uncompilable state:
+
+**In `src/mind/context.ts`**:
+- Define and export a `UsageData` type: `{ input_tokens: number; output_tokens: number; reasoning_tokens: number; total_tokens: number }`
+- `saveSession(filePath, messages, lastUsage?)`: include `lastUsage` in the JSON envelope
+- `loadSession(filePath)`: return `{ messages, lastUsage }` object instead of just `messages[]`
+
+**In `src/engine/core.ts`**:
+- Change `runAgent` return type from `Promise<void>` to `Promise<{ usage?: UsageData }>`
 - Track the latest `result.usage` from each streaming call
 - Return `{ usage: lastUsage }` at the end of the function (after the while loop)
-- Import `UsageData` type from `src/mind/context.ts` (or define it in streaming.ts and re-export)
-**Output**: Modified `src/engine/core.ts`
-**Acceptance**: All Unit 3e tests PASS (green), existing tests still pass (callers that ignore return value are unaffected), no warnings
+- Import `UsageData` type from `src/mind/context.ts`
 
-### ⬜ Unit 3g: Move trimming to after runAgent in CLI -- Tests
+**In `src/channels/cli.ts`** (fix loadSession callers immediately):
+- Update `loadSession` usage: `existing` is now `{ messages, lastUsage } | null`, so change `existing && existing.length > 0` to `existing?.messages && existing.messages.length > 0` and `existing` to `existing.messages` where messages are extracted
+
+**In `src/channels/teams.ts`** (fix loadSession callers immediately):
+- Same `loadSession` migration: `existing?.messages && existing.messages.length > 0`
+
+This avoids the compile breakage that would occur if loadSession's return type changed without immediately updating its callers.
+**Output**: Modified `src/mind/context.ts`, `src/engine/core.ts`, `src/channels/cli.ts`, `src/channels/teams.ts`
+**Acceptance**: All Unit 3c tests PASS (green), all existing tests still pass, no warnings, no compile errors
+
+### ⬜ Unit 3e: Move trimming to after runAgent in CLI -- Tests
 **What**: Write/update failing tests in `src/__tests__/channels/cli-main.test.ts` for the new trim flow:
 - Trimming no longer happens before `runAgent` -- it happens after
 - After `runAgent` returns, `trimMessages` is called with `usage.input_tokens` from the return value
 - `saveSession` is called with messages AND lastUsage
 - On cold start (first message, no prior usage), no trimming occurs before the API call
+- Boot greeting block is removed (sessions persist forever -- first-run experience addressed separately)
 **Output**: Failing/updated tests in `src/__tests__/channels/cli-main.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because CLI still trims before runAgent
 
-### ⬜ Unit 3h: Move trimming to after runAgent in CLI -- Implementation
+### ⬜ Unit 3f: Move trimming to after runAgent in CLI -- Implementation
 **What**: In `src/channels/cli.ts` `main()`:
-- Update `loadSession` usage: `existing` is now `{ messages, lastUsage } | null`, so change `existing && existing.length > 0` to `existing?.messages && existing.messages.length > 0` and `existing` to `existing.messages` where messages are extracted
+- Remove the boot greeting block: delete the `if (!existing || existing.length === 0)` block that calls `bootGreeting` (lines 229-236). Add a TODO comment: `// TODO: first-run experience (greeting) -- addressed separately`. Keep the `bootGreeting` function itself (tests may reference it), just remove the call in `main()`.
+- **Preserve system prompt refresh pre-call**: the line `messages[0] = { role: "system", content: cachedBuildSystem("cli", buildSystem) }` (line 298) MUST remain before `runAgent`. Do NOT move or remove it when restructuring the trim flow.
 - Remove the pre-call `trimMessages` block (lines 301-304)
 - Capture the return value from `runAgent`: `const result = await runAgent(messages, cliCallbacks, currentAbort.signal)`
-- Call `trimMessages(messages, maxTokens, contextMargin, result.usage?.input_tokens)` after runAgent
+- After runAgent, get context config and call `trimMessages(messages, maxTokens, contextMargin, result.usage?.input_tokens)`
 - Replace messages array contents with trimmed result
 - Update `saveSession` call to include `result.usage` as lastUsage
 **Output**: Modified `src/channels/cli.ts`
-**Acceptance**: All Unit 3g tests PASS (green), existing tests still pass, no warnings
+**Acceptance**: All Unit 3e tests PASS (green), existing tests still pass, no warnings
 
-### ⬜ Unit 3i: Move trimming to after runAgent in Teams -- Tests
+### ⬜ Unit 3g: Move trimming to after runAgent in Teams -- Tests
 **What**: Write/update failing tests in `src/__tests__/channels/teams.test.ts` for the new trim flow:
 - Trimming no longer happens before `runAgent` -- it happens after
 - After `runAgent` returns, `trimMessages` is called with the usage data
@@ -235,18 +242,18 @@ Note: `estimateTokens` deletion is deferred to Feature 3 where it is replaced at
 **Output**: Failing/updated tests in `src/__tests__/channels/teams.test.ts`
 **Acceptance**: Tests exist and FAIL (red)
 
-### ⬜ Unit 3j: Move trimming to after runAgent in Teams -- Implementation
+### ⬜ Unit 3h: Move trimming to after runAgent in Teams -- Implementation
 **What**: In `src/channels/teams.ts` `handleTeamsMessage()`:
-- Update `loadSession` usage: `existing` is now `{ messages, lastUsage } | null`, so change `existing && existing.length > 0` to `existing?.messages && existing.messages.length > 0` and extract `existing.messages` where messages are used
+- **Preserve system prompt refresh pre-call**: the line `messages[0] = { role: "system", content: cachedBuildSystem("teams", buildSystem) }` (line 164) MUST remain before `runAgent`. Do NOT move or remove it when restructuring the trim flow.
 - Remove the pre-call `trimMessages` block (lines 170-173)
 - Capture the return value from `runAgent`: `const result = await runAgent(messages, callbacks, controller.signal)`
-- Call `trimMessages(messages, maxTokens, contextMargin, result.usage?.input_tokens)` after runAgent
+- After runAgent, get context config and call `trimMessages(messages, maxTokens, contextMargin, result.usage?.input_tokens)`
 - Replace messages array contents with trimmed result
 - Update `saveSession` call to include `result.usage` as lastUsage
 **Output**: Modified `src/channels/teams.ts`
-**Acceptance**: All Unit 3i tests PASS (green), existing tests still pass, no warnings
+**Acceptance**: All Unit 3g tests PASS (green), existing tests still pass, no warnings
 
-### ⬜ Unit 3k: Retroactive trimming -- Coverage & Refactor
+### ⬜ Unit 3i: Retroactive trimming -- Coverage & Refactor
 **What**: Verify 100% coverage on all Feature 3 changes. Run full test suite. Refactor if needed.
 **Output**: Coverage report confirms 100% on new code
 **Acceptance**: 100% coverage on new code, all tests green, no warnings
@@ -270,11 +277,13 @@ Note: `estimateTokens` deletion is deferred to Feature 3 where it is replaced at
 ### ⬜ Unit 4b: Implement context overflow auto-recovery
 **What**: In `src/engine/core.ts` `runAgent`, in the catch block (line 201-208):
 - Add overflow detection: check if the error matches Azure pattern (`error.code === "context_length_exceeded"` OR error message includes "context_length_exceeded") or MiniMax pattern (error message includes "context window exceeds limit")
-- On overflow: call `trimMessages(messages, maxTokens, contextMargin, maxTokens * 2)` to force aggressive trimming (passing a token count double the limit forces heavy trimming)
+- On overflow: call `stripLastToolCalls(messages)` first (clean up any partial tool state from mid-turn overflow), then call `trimMessages(messages, maxTokens, contextMargin, maxTokens * 2)` to force aggressive trimming (passing a token count double the limit forces heavy trimming)
 - Log via `callbacks.onError(new Error("context trimmed, retrying..."))` or introduce a lighter callback
 - Reset the loop state (`azureInput = null` to force rebuild from trimmed messages) and `continue` the while loop to retry
 - Track retry count: only retry once. On second overflow, fall through to normal error handling.
 - Import `trimMessages` and `getContextConfig` in `core.ts`
+
+Note: With retroactive trimming after each turn (Feature 3), context overflow should rarely happen in practice -- this is a safety net for edge cases like cold start with a huge session or unexpectedly large reasoning output. The `stripLastToolCalls` before trimming handles the case where overflow occurs mid-tool-loop, ensuring the messages array is in a clean state before retry.
 **Output**: Modified `src/engine/core.ts`
 **Acceptance**: All Unit 4a tests PASS (green), existing tests still pass, no warnings
 
@@ -306,3 +315,4 @@ Note: `estimateTokens` deletion is deferred to Feature 3 where it is replaced at
 - 2026-02-26 16:44 Granularity pass: extracted runAgent return type change into its own unit (3e/3f), deferred estimateTokens deletion to Feature 3 for atomic replacement, renumbered units
 - 2026-02-26 16:46 Validation pass: verified all line numbers, function signatures, event names, error shapes against actual source. Documented loadSession breaking change in Unit 3d with explicit migration notes in Units 3h/3j. Confirmed OpenAI SDK APIError.code property maps correctly for overflow detection.
 - 2026-02-26 16:47 Quality pass: all 25 units have acceptance criteria, emoji status markers, What/Output/Acceptance fields. No TBD items. Completion criteria testable. Code coverage requirements included. No changes needed.
+- 2026-02-26 Review pass: reordered Feature 3 units to avoid compile breakage (combined loadSession change + runAgent return type + adapter loadSession fixes into single atomic unit 3c/3d), noted stripLastToolCalls for overflow recovery, removed boot greeting from CLI main (sessions persist forever), preserved system prompt refresh pre-call in both adapters.
