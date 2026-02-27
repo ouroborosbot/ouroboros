@@ -181,10 +181,12 @@ Note: `estimateTokens` deletion is deferred to Feature 3 where it is replaced at
 **What**: Update `saveSession` and `loadSession` in `src/mind/context.ts`:
 - `saveSession(filePath, messages, lastUsage?)`: include `lastUsage` in the JSON envelope
 - `loadSession(filePath)`: return `{ messages, lastUsage }` object instead of just the messages array
-- Define a `UsageData` type: `{ input_tokens: number; output_tokens: number; reasoning_tokens: number; total_tokens: number }`
+- Define and export a `UsageData` type: `{ input_tokens: number; output_tokens: number; reasoning_tokens: number; total_tokens: number }`
 - Define a `SessionData` return type: `{ messages: OpenAI.ChatCompletionMessageParam[]; lastUsage?: UsageData } | null`
+
+**Breaking change**: `loadSession` currently returns `OpenAI.ChatCompletionMessageParam[] | null`. Callers in `src/channels/cli.ts` (line 212) and `src/channels/teams.ts` (line 158) use `existing && existing.length > 0`. These callers MUST be updated in Units 3h and 3j to use `existing?.messages` instead. Until those units are completed, the adapters will have compile errors.
 **Output**: Modified `src/mind/context.ts`
-**Acceptance**: All Unit 3c tests PASS (green), no warnings
+**Acceptance**: All Unit 3c tests PASS (green), no warnings. Adapter compile errors are expected and resolved in Units 3h/3j.
 
 ### ⬜ Unit 3e: runAgent returns usage data -- Tests
 **What**: Write failing tests in `src/__tests__/engine/core.test.ts` for `runAgent` returning usage data:
@@ -216,6 +218,7 @@ Note: `estimateTokens` deletion is deferred to Feature 3 where it is replaced at
 
 ### ⬜ Unit 3h: Move trimming to after runAgent in CLI -- Implementation
 **What**: In `src/channels/cli.ts` `main()`:
+- Update `loadSession` usage: `existing` is now `{ messages, lastUsage } | null`, so change `existing && existing.length > 0` to `existing?.messages && existing.messages.length > 0` and `existing` to `existing.messages` where messages are extracted
 - Remove the pre-call `trimMessages` block (lines 301-304)
 - Capture the return value from `runAgent`: `const result = await runAgent(messages, cliCallbacks, currentAbort.signal)`
 - Call `trimMessages(messages, maxTokens, contextMargin, result.usage?.input_tokens)` after runAgent
@@ -234,6 +237,7 @@ Note: `estimateTokens` deletion is deferred to Feature 3 where it is replaced at
 
 ### ⬜ Unit 3j: Move trimming to after runAgent in Teams -- Implementation
 **What**: In `src/channels/teams.ts` `handleTeamsMessage()`:
+- Update `loadSession` usage: `existing` is now `{ messages, lastUsage } | null`, so change `existing && existing.length > 0` to `existing?.messages && existing.messages.length > 0` and extract `existing.messages` where messages are used
 - Remove the pre-call `trimMessages` block (lines 170-173)
 - Capture the return value from `runAgent`: `const result = await runAgent(messages, callbacks, controller.signal)`
 - Call `trimMessages(messages, maxTokens, contextMargin, result.usage?.input_tokens)` after runAgent
