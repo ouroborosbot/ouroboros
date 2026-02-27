@@ -307,9 +307,7 @@ export async function runAgent(
           done = true;
           break;
         }
-        // Check for mixed final_answer: reject it, execute other tools normally
-        const hasMixedFinalAnswer = result.toolCalls.some((tc) => tc.name === "final_answer");
-        // SHARED: execute tools
+        // SHARED: execute tools (final_answer in mixed calls is rejected inline)
         for (const tc of result.toolCalls) {
           if (signal?.aborted) break;
           // Intercept final_answer in mixed call: reject it

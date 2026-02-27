@@ -3584,3 +3584,267 @@ describe("tool_choice required and final_answer", () => {
     expect(assistantMsg.content).toBe("some content")
   })
 })
+
+describe("integration: kick + tool_choice required combined", () => {
+  let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal, options?: { toolChoiceRequired?: boolean; maxKicks?: number }) => Promise<{ usage?: any }>
+
+  function makeStream(chunks: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const chunk of chunks) {
+          yield chunk
+        }
+      },
+    }
+  }
+
+  function makeChunk(content?: string, toolCalls?: any[]) {
+    const delta: any = {}
+    if (content !== undefined) delta.content = content
+    if (toolCalls !== undefined) delta.tool_calls = toolCalls
+    return { choices: [{ delta }] }
+  }
+
+  beforeEach(async () => {
+    vi.resetModules()
+    delete process.env.AZURE_OPENAI_API_KEY
+    process.env.MINIMAX_API_KEY = "test-key"
+    process.env.MINIMAX_MODEL = "test-model"
+    mockCreate.mockReset()
+    mockResponsesCreate.mockReset()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+
+    const core = await import("../../engine/core")
+    runAgent = core.runAgent
+  })
+
+  it("kick fires when toolChoiceRequired is true and model narrates intent", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([makeChunk("let me check that for you")])
+      }
+      return makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"answer":"done"}' } },
+        ]),
+      ])
+    })
+
+    const kicks: number[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: (attempt: number) => kicks.push(attempt),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    expect(kicks).toHaveLength(1)
+    expect(callCount).toBe(2)
+    const lastAssistant = [...messages].reverse().find((m: any) => m.role === "assistant")
+    expect(lastAssistant.content).toBe("done")
+  })
+
+  it("after kick, model returns final_answer -- terminates cleanly", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([makeChunk("I'll read that file")])
+      }
+      return makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"answer":"the answer is 42"}' } },
+        ]),
+      ])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    expect(callCount).toBe(2)
+    const lastAssistant = [...messages].reverse().find((m: any) => m.role === "assistant")
+    expect(lastAssistant.content).toBe("the answer is 42")
+    expect(lastAssistant.tool_calls).toBeUndefined()
+  })
+
+  it("MAX_TOOL_ROUNDS budget accounts for kicks + tool rounds together", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue("data")
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      // Alternate: narrate intent (kick) then tool call, repeat
+      if (callCount % 2 === 1 && callCount <= 5) {
+        return makeStream([makeChunk("I will do that")])
+      }
+      return makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: `call_${callCount}`, function: { name: "read_file", arguments: '{"path":"a.txt"}' } },
+        ]),
+      ])
+    })
+
+    const errors: string[] = []
+    const kicks: number[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err.message),
+      onKick: (attempt: number) => kicks.push(attempt),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { maxKicks: 10 })
+
+    // Should hit MAX_TOOL_ROUNDS (10) combining kicks and tool rounds
+    expect(errors.some(e => e.includes("tool loop limit"))).toBe(true)
+  })
+
+  it("abort during kick attempt -- clean stop, no dangling messages", async () => {
+    const controller = new AbortController()
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([makeChunk("let me read that")])
+      }
+      // On retry (after kick), abort before streaming completes
+      controller.abort()
+      return makeStream([makeChunk("hello")])
+    })
+
+    const kicks: number[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: (attempt: number) => kicks.push(attempt),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, controller.signal)
+
+    // Kick fires, then abort happens on retry
+    expect(kicks).toHaveLength(1)
+    // Messages should not have dangling tool_calls
+    const lastMsg = messages[messages.length - 1]
+    if (lastMsg.role === "assistant" && lastMsg.tool_calls) {
+      // This should not happen -- stripLastToolCalls should have cleaned up
+      expect(lastMsg.tool_calls).toBeUndefined()
+    }
+  })
+
+  it("empty content with no tool_calls -- normal termination, no kick", async () => {
+    mockCreate.mockReturnValue(makeStream([{ choices: [{ delta: {} }] }]))
+
+    const kicks: number[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: (attempt: number) => kicks.push(attempt),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks)
+
+    expect(kicks).toHaveLength(0)
+    expect(mockCreate).toHaveBeenCalledTimes(1)
+  })
+
+  it("intent phrase only in model content triggers kick, not in tool results", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue("let me read the file content here")
+
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        // Model returns tool call, tool result contains intent phrase
+        return makeStream([
+          makeChunk(undefined, [
+            { index: 0, id: "call_1", function: { name: "read_file", arguments: '{"path":"a.txt"}' } },
+          ]),
+        ])
+      }
+      // Model response after tool execution -- no intent phrase, normal text
+      return makeStream([makeChunk("here are the results")])
+    })
+
+    const kicks: number[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: (attempt: number) => kicks.push(attempt),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks)
+
+    // No kick should fire -- the intent phrase is in the tool result, not model content
+    expect(kicks).toHaveLength(0)
+  })
+
+  it("final_answer with very long text -- full text preserved", async () => {
+    const longText = "x".repeat(100000)
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: JSON.stringify({ answer: longText }) } },
+        ]),
+      ])
+    )
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    const assistantMsg = messages.find((m: any) => m.role === "assistant")
+    expect(assistantMsg.content).toBe(longText)
+    expect(assistantMsg.content.length).toBe(100000)
+  })
+})
