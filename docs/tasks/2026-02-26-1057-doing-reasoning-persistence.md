@@ -331,7 +331,7 @@ Note: there are ~50 existing `runAgent` call sites in `core.test.ts` that use th
 **Output**: Failing tests in `src/__tests__/engine/core.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `runAgent` does not yet accept `channel` or refresh the system prompt
 
-### ⬜ Unit 5b: Move system prompt refresh into runAgent -- Implementation
+### ✅ Unit 5b: Move system prompt refresh into runAgent -- Implementation
 **What**:
 **In `src/engine/core.ts`**:
 - Add `channel: Channel` parameter to `runAgent` signature: `runAgent(messages, callbacks, channel, signal?)`
