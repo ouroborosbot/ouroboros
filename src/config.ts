@@ -24,6 +24,7 @@ export interface TeamsConfig {
 export interface ContextConfig {
   maxTokens: number
   contextMargin: number
+  maxToolOutputChars: number
 }
 
 export interface OuroborosConfig {
@@ -57,6 +58,7 @@ const DEFAULT_CONFIG: OuroborosConfig = {
   context: {
     maxTokens: 80000,
     contextMargin: 20,
+    maxToolOutputChars: 20000,
   },
 }
 
@@ -66,8 +68,8 @@ function defaultConfigPath(): string {
   return path.join(os.homedir(), ".agentconfigs", "ouroboros", "config.json")
 }
 
-function deepMerge(defaults: any, partial: any): any {
-  const result: any = { ...defaults }
+function deepMerge(defaults: Record<string, unknown>, partial: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...defaults }
   for (const key of Object.keys(partial)) {
     if (
       partial[key] !== null &&
@@ -76,7 +78,7 @@ function deepMerge(defaults: any, partial: any): any {
       typeof defaults[key] === "object" &&
       defaults[key] !== null
     ) {
-      result[key] = deepMerge(defaults[key], partial[key])
+      result[key] = deepMerge(defaults[key] as Record<string, unknown>, partial[key] as Record<string, unknown>)
     } else {
       result[key] = partial[key]
     }
@@ -89,15 +91,15 @@ export function loadConfig(): OuroborosConfig {
 
   const configPath = process.env.OUROBOROS_CONFIG_PATH || defaultConfigPath()
 
-  let fileData: any = {}
+  let fileData: Record<string, unknown> = {}
   try {
     const raw = fs.readFileSync(configPath, "utf-8")
-    fileData = JSON.parse(raw)
+    fileData = JSON.parse(raw) as Record<string, unknown>
   } catch {
     // ENOENT or parse error -- use defaults
   }
 
-  _cachedConfig = deepMerge(DEFAULT_CONFIG, fileData) as OuroborosConfig
+  _cachedConfig = deepMerge(DEFAULT_CONFIG as unknown as Record<string, unknown>, fileData) as unknown as OuroborosConfig
   return _cachedConfig
 }
 
@@ -145,6 +147,7 @@ export function getContextConfig(): ContextConfig {
 
   if (process.env.OUROBOROS_MAX_TOKENS) ctx.maxTokens = parseInt(process.env.OUROBOROS_MAX_TOKENS, 10)
   if (process.env.OUROBOROS_CONTEXT_MARGIN) ctx.contextMargin = parseInt(process.env.OUROBOROS_CONTEXT_MARGIN, 10)
+  if (process.env.OUROBOROS_MAX_TOOL_OUTPUT) ctx.maxToolOutputChars = parseInt(process.env.OUROBOROS_MAX_TOOL_OUTPUT, 10)
 
   return ctx
 }
