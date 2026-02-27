@@ -5,7 +5,11 @@ import { buildSystem } from "../mind/prompt"
 import { pickPhrase, THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "../repertoire/phrases"
 import { sessionPath } from "../config"
 import { loadSession, deleteSession, cachedBuildSystem, postTurn } from "../mind/context"
+import type { UsageData } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand, getToolChoiceRequired } from "../repertoire/commands"
+
+// readline.Interface exposes undocumented mutable line/cursor for in-progress input
+type ReadlineInternals = readline.Interface & { line: string; cursor: number }
 
 // spinner that only touches stderr, cleans up after itself
 // exported for direct testability (stop-without-start branch)
@@ -237,6 +241,8 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
 
   return {
     onModelStart: () => {
+      currentSpinner?.stop()
+      currentSpinner = null
       hadReasoning = false
       textDirty = false
       streamer.reset()
@@ -303,6 +309,8 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
       process.stderr.write(`\x1b[33m↻ kick${counter}\x1b[0m\n`)
     },
     flushMarkdown: () => {
+      currentSpinner?.stop()
+      currentSpinner = null
       const remaining = streamer.flush()
       if (remaining) process.stdout.write(remaining)
     },
@@ -336,15 +344,16 @@ export async function main() {
   // Ctrl-C at the input prompt: clear line or warn/exit
   // readline with terminal:true catches Ctrl-C in raw mode (no ^C echo)
   rl.on("SIGINT", () => {
-    const currentLine = (rl as any).line || ""
+    const rlInt = rl as ReadlineInternals
+    const currentLine = rlInt.line || ""
     const result = handleSigint(rl, currentLine)
     if (result === "clear") {
-      (rl as any).line = "";
-      (rl as any).cursor = 0
+      rlInt.line = "";
+      rlInt.cursor = 0
       process.stdout.write("\r\x1b[K\x1b[36m> \x1b[0m")
     } else if (result === "warn") {
-      (rl as any).line = "";
-      (rl as any).cursor = 0
+      rlInt.line = "";
+      rlInt.cursor = 0
       process.stdout.write("\r\x1b[K")
       process.stderr.write("press Ctrl-C again to exit\n")
       process.stdout.write("\x1b[36m> \x1b[0m")
@@ -392,7 +401,7 @@ export async function main() {
 
       currentAbort = new AbortController()
       ctrl.suppress(() => currentAbort!.abort())
-      let result: { usage?: any } | undefined
+      let result: { usage?: UsageData } | undefined
       try {
         result = await runAgent(messages, cliCallbacks, "cli", currentAbort.signal, { toolChoiceRequired: getToolChoiceRequired() })
       } catch {
@@ -403,8 +412,8 @@ export async function main() {
       currentAbort = null
 
       // Safety net: never silently swallow an empty response
-      const lastMsg = messages[messages.length - 1] as any
-      if (lastMsg?.role === "assistant" && !lastMsg.content?.trim()) {
+      const lastMsg = messages[messages.length - 1]
+      if (lastMsg?.role === "assistant" && !(typeof lastMsg.content === "string" ? lastMsg.content : "").trim()) {
         process.stderr.write("\x1b[33m(empty response)\x1b[0m\n")
       }
 

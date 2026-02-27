@@ -1,5 +1,6 @@
 import type OpenAI from "openai"
 import type { Channel } from "./prompt"
+import type { BuildSystemOptions } from "./prompt"
 import { getContextConfig } from "../config"
 import * as fs from "fs"
 import * as path from "path"
@@ -14,7 +15,7 @@ export interface UsageData {
 // System prompt cache: per channel, with 60s TTL
 const _promptCache = new Map<string, { value: string; timestamp: number }>()
 
-export function cachedBuildSystem(channel: Channel, buildFn: (ch: Channel, opts?: any) => string, options?: { toolChoiceRequired?: boolean }): string {
+export function cachedBuildSystem(channel: Channel, buildFn: (ch: Channel, opts?: BuildSystemOptions) => string, options?: BuildSystemOptions): string {
   const cacheKey = options?.toolChoiceRequired ? `${channel}:tcr` : channel
   const cached = _promptCache.get(cacheKey)
   const now = Date.now()
@@ -63,7 +64,7 @@ export function trimMessages(
 
 export function saveSession(filePath: string, messages: OpenAI.ChatCompletionMessageParam[], lastUsage?: UsageData): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true })
-  const envelope: any = { version: 1, messages }
+  const envelope: { version: number; messages: OpenAI.ChatCompletionMessageParam[]; lastUsage?: UsageData } = { version: 1, messages }
   if (lastUsage) envelope.lastUsage = lastUsage
   fs.writeFileSync(filePath, JSON.stringify(envelope, null, 2))
 }
@@ -93,7 +94,7 @@ export function postTurn(
 export function deleteSession(filePath: string): void {
   try {
     fs.unlinkSync(filePath)
-  } catch (e: any) {
-    if (e.code !== "ENOENT") throw e
+  } catch (e: unknown) {
+    if (e instanceof Error && (e as NodeJS.ErrnoException).code !== "ENOENT") throw e
   }
 }

@@ -213,9 +213,10 @@ export function startTeamsApp(): void {
   // Prevent SDK internal stream errors (e.g. "Content stream is not allowed
   // on a already completed streamed message") from crashing the process.
   // Guard: only register once even if startTeamsApp is called multiple times.
-  if (!process.listeners("unhandledRejection").some((l) => (l as any).__ouroboros)) {
-    const handler = (err: unknown) => { console.error("Unhandled rejection (non-fatal):", err) }
-    ;(handler as any).__ouroboros = true
+  interface OuroborosHandler { (...args: unknown[]): void; __ouroboros?: boolean }
+  if (!process.listeners("unhandledRejection").some((l) => (l as OuroborosHandler).__ouroboros)) {
+    const handler: OuroborosHandler = (err: unknown) => { console.error("Unhandled rejection (non-fatal):", err) }
+    handler.__ouroboros = true
     process.on("unhandledRejection", handler)
   }
 

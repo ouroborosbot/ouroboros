@@ -8,34 +8,72 @@ export interface UsageData {
   total_tokens: number;
 }
 
+// Azure Responses API item types (SDK doesn't export these)
+export type ResponseItem =
+  | { type: "reasoning"; id: string; summary: { text: string; type: string }[]; encrypted_content?: string }
+  | { type: "message"; id?: string; role: "assistant"; content: { type: string; text: string }[] }
+  | { type: "function_call"; call_id: string; name: string; arguments: string; status: string }
+  | { type: "function_call_output"; call_id: string; output: string }
+  | { role: "user"; content: string };
+
+// Azure Responses API streaming event (untyped in SDK — use a flexible record)
+interface ResponseStreamEvent {
+  type: string;
+  delta?: string;
+  item?: Record<string, unknown>;
+  response?: Record<string, unknown>;
+}
+
+// Azure Responses API usage shape
+interface ResponseUsage {
+  input_tokens: number;
+  output_tokens: number;
+  output_tokens_details?: { reasoning_tokens?: number };
+  total_tokens: number;
+}
+
+// MiniMax streaming delta (has reasoning_content not in OpenAI SDK types)
+interface StreamDelta {
+  content?: string;
+  reasoning_content?: string;
+  tool_calls?: Array<{ index: number; id?: string; function?: { name?: string; arguments?: string } }>;
+}
+
 export interface TurnResult {
   content: string;
   toolCalls: { id: string; name: string; arguments: string }[];
-  outputItems: any[];
+  outputItems: ResponseItem[];
   usage?: UsageData;
+}
+
+// Assistant message with optional reasoning items (persisted through sessions)
+export interface AssistantMessageWithReasoning extends OpenAI.ChatCompletionAssistantMessageParam {
+  _reasoning_items?: ResponseItem[];
 }
 
 export function toResponsesInput(
   messages: OpenAI.ChatCompletionMessageParam[],
-): { instructions: string; input: any[] } {
+): { instructions: string; input: ResponseItem[] } {
   let instructions = "";
-  const input: any[] = [];
+  const input: ResponseItem[] = [];
 
   for (const msg of messages) {
     if (msg.role === "system") {
       if (!instructions) {
-        instructions = (msg as any).content || "";
+        const sys = msg as OpenAI.ChatCompletionSystemMessageParam;
+        instructions = (typeof sys.content === "string" ? sys.content : "") || "";
       }
       continue;
     }
 
     if (msg.role === "user") {
-      input.push({ role: "user", content: (msg as any).content });
+      const u = msg as OpenAI.ChatCompletionUserMessageParam;
+      input.push({ role: "user", content: typeof u.content === "string" ? u.content : "" });
       continue;
     }
 
     if (msg.role === "assistant") {
-      const a = msg as any;
+      const a = msg as AssistantMessageWithReasoning;
       // Restore reasoning items before content (matching API item order)
       if (a._reasoning_items) {
         for (const ri of a._reasoning_items) {
@@ -43,7 +81,7 @@ export function toResponsesInput(
         }
       }
       if (a.content) {
-        input.push({ role: "assistant", content: a.content });
+        input.push({ role: "assistant", content: typeof a.content === "string" ? a.content : "" } as ResponseItem);
       }
       if (a.tool_calls) {
         for (const tc of a.tool_calls) {
@@ -60,11 +98,11 @@ export function toResponsesInput(
     }
 
     if (msg.role === "tool") {
-      const t = msg as any;
+      const t = msg as OpenAI.ChatCompletionToolMessageParam;
       input.push({
         type: "function_call_output",
         call_id: t.tool_call_id,
-        output: t.content,
+        output: typeof t.content === "string" ? t.content : "",
       });
       continue;
     }
@@ -86,17 +124,17 @@ export function toResponsesTools(
 }
 
 export async function streamChatCompletion(
-  client: any,
-  createParams: any,
+  client: OpenAI,
+  createParams: Record<string, unknown>,
   callbacks: ChannelCallbacks,
   signal?: AbortSignal,
 ): Promise<TurnResult> {
   // Request usage data in the final streaming chunk
   createParams.stream_options = { include_usage: true };
-  const response = (await client.chat.completions.create(
-    createParams,
+  const response = await client.chat.completions.create(
+    createParams as unknown as OpenAI.ChatCompletionCreateParams & { stream: true },
     signal ? { signal } : {},
-  )) as any;
+  ) as AsyncIterable<OpenAI.ChatCompletionChunk>;
 
   let content = "";
   let toolCalls: Record<
@@ -180,7 +218,7 @@ export async function streamChatCompletion(
         total_tokens: u.total_tokens,
       };
     }
-    const d = chunk.choices[0]?.delta as any;
+    const d = chunk.choices[0]?.delta as StreamDelta | undefined;
     if (!d) continue;
 
     // Handle reasoning_content (Azure AI models like DeepSeek-R1)
@@ -228,20 +266,21 @@ export async function streamChatCompletion(
 }
 
 export async function streamResponsesApi(
-  client: any,
-  createParams: any,
+  client: OpenAI,
+  createParams: Record<string, unknown>,
   callbacks: ChannelCallbacks,
   signal?: AbortSignal,
 ): Promise<TurnResult> {
-  const response = (await client.responses.create(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Azure Responses API not in OpenAI SDK types
+  const response = await (client as any).responses.create(
     createParams,
     signal ? { signal } : {},
-  )) as any;
+  ) as AsyncIterable<ResponseStreamEvent>;
 
   let content = "";
   let streamStarted = false;
   const toolCalls: { id: string; name: string; arguments: string }[] = [];
-  const outputItems: any[] = [];
+  const outputItems: ResponseItem[] = [];
   let currentToolCall: { call_id: string; name: string; arguments: string } | null = null;
   let usage: UsageData | undefined;
 
@@ -249,29 +288,26 @@ export async function streamResponsesApi(
     if (signal?.aborted) break;
 
     switch (event.type) {
-      case "response.output_text.delta": {
-        if (!streamStarted) {
-          callbacks.onModelStreamStart();
-          streamStarted = true;
-        }
-        const delta = String(event.delta);
-        callbacks.onTextChunk(delta);
-        content += delta;
-        break;
-      }
+      case "response.output_text.delta":
       case "response.reasoning_summary_text.delta": {
         if (!streamStarted) {
           callbacks.onModelStreamStart();
           streamStarted = true;
         }
-        callbacks.onReasoningChunk(String(event.delta));
+        const delta = String(event.delta);
+        if (event.type === "response.output_text.delta") {
+          callbacks.onTextChunk(delta);
+          content += delta;
+        } else {
+          callbacks.onReasoningChunk(delta);
+        }
         break;
       }
       case "response.output_item.added": {
         if (event.item?.type === "function_call") {
           currentToolCall = {
-            call_id: event.item.call_id,
-            name: event.item.name,
+            call_id: String(event.item.call_id),
+            name: String(event.item.name),
             arguments: "",
           };
         }
@@ -284,19 +320,19 @@ export async function streamResponsesApi(
         break;
       }
       case "response.output_item.done": {
-        outputItems.push(event.item);
+        outputItems.push(event.item as ResponseItem);
         if (event.item?.type === "function_call") {
           toolCalls.push({
-            id: event.item.call_id,
-            name: event.item.name,
-            arguments: event.item.arguments,
+            id: String(event.item.call_id),
+            name: String(event.item.name),
+            arguments: String(event.item.arguments),
           });
           currentToolCall = null;
         }
         break;
       }
       case "response.completed": {
-        const u = event.response?.usage;
+        const u = event.response?.usage as ResponseUsage | undefined;
         if (u) {
           usage = {
             input_tokens: u.input_tokens,

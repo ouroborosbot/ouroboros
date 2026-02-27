@@ -137,7 +137,7 @@ export const tools: OpenAI.ChatCompletionTool[] = [
   },
 ];
 
-type ToolHandler = (args: any) => string | Promise<string>;
+type ToolHandler = (args: Record<string, string>) => string | Promise<string>;
 
 const postIt = (msg: string) => `post-it from past you:\n${msg}`;
 
@@ -167,14 +167,14 @@ const toolHandlers: Record<string, ToolHandler> = {
       }
       execSync(`git commit -m \"${a.message}\"`, { encoding: "utf-8" });
       return `${diff}\ncommitted`;
-    } catch (e: any) {
+    } catch (e: unknown) {
       return `failed: ${e}`;
     }
   },
   gh_cli: (a) => {
     try {
       return execSync(`gh ${a.command}`, { encoding: "utf-8", timeout: 60000 });
-    } catch (e: any) {
+    } catch (e: unknown) {
       return `error: ${e}`;
     }
   },
@@ -250,13 +250,13 @@ export const finalAnswerTool: OpenAI.ChatCompletionTool = {
   },
 };
 
-export async function execTool(name: string, args: any): Promise<string> {
+export async function execTool(name: string, args: Record<string, string>): Promise<string> {
   const h = toolHandlers[name];
   if (!h) return `unknown: ${name}`;
   return await h(args);
 }
 
-export function summarizeArgs(name: string, args: Record<string, any>): string {
+export function summarizeArgs(name: string, args: Record<string, string>): string {
   if (name === "read_file" || name === "write_file") return args.path || "";
   if (name === "shell") {
     const cmd = args.command || "";

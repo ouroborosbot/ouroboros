@@ -2,6 +2,7 @@ import OpenAI, { AzureOpenAI } from "openai";
 import { getAzureConfig, getMinimaxConfig, getContextConfig } from "../config";
 import { tools, execTool, summarizeArgs, finalAnswerTool } from "./tools";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
+import type { AssistantMessageWithReasoning, ResponseItem } from "./streaming";
 import { detectKick } from "./kicks";
 import type { TurnResult } from "./streaming";
 import type { UsageData } from "../mind/context";
@@ -100,18 +101,21 @@ export function stripLastToolCalls(
     messages.pop();
   }
   // Strip tool_calls from the last assistant message
-  const last = messages[messages.length - 1] as any;
-  if (last?.role === "assistant" && last.tool_calls) {
-    delete last.tool_calls;
-    // If the assistant message is now empty, remove it entirely
-    if (!last.content) messages.pop();
+  const last = messages[messages.length - 1];
+  if (last?.role === "assistant") {
+    const asst = last as OpenAI.ChatCompletionAssistantMessageParam;
+    if (asst.tool_calls) {
+      delete asst.tool_calls;
+      // If the assistant message is now empty, remove it entirely
+      if (!asst.content) messages.pop();
+    }
   }
 }
 
 // Detect context overflow errors from Azure or MiniMax
 function isContextOverflow(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
-  const code = (err as any).code;
+  const code = (err as NodeJS.ErrnoException).code;
   const msg = err.message || "";
   if (code === "context_length_exceeded") return true;
   if (msg.includes("context_length_exceeded")) return true;
@@ -119,11 +123,14 @@ function isContextOverflow(err: unknown): boolean {
   return false;
 }
 
+// HTTP error with optional status code (OpenAI SDK errors)
+interface HttpError extends Error { status?: number }
+
 // Detect transient network errors worth retrying
 export function isTransientError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   const msg = err.message || "";
-  const code = (err as any).code || "";
+  const code = (err as NodeJS.ErrnoException).code || "";
   // Node.js network error codes
   if (["ECONNRESET", "ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT", "EPIPE",
        "EAI_AGAIN", "EHOSTUNREACH", "ENETUNREACH", "ECONNABORTED"].includes(code)) return true;
@@ -134,7 +141,7 @@ export function isTransientError(err: unknown): boolean {
   if (msg.includes("socket hang up")) return true;
   if (msg.includes("getaddrinfo")) return true;
   // HTTP 429 / 500 / 502 / 503 / 504
-  const status = (err as any).status;
+  const status = (err as HttpError).status;
   if (status === 429 || status === 500 || status === 502 || status === 503 || status === 504) return true;
   return false;
 }
@@ -152,6 +159,7 @@ export async function runAgent(
   const client = getClient();
   const provider = getProvider();
   const model = getModel();
+  const { maxToolOutputChars } = getContextConfig();
 
   // Refresh system prompt at start of each turn when channel is provided
   if (channel) {
@@ -170,7 +178,7 @@ export async function runAgent(
   // items (reasoning, function_calls) in correct order.  Initialized from CC
   // messages on first iteration (session resumption), then kept in sync with
   // the API's own output items for accurate multi-turn tool loops.
-  let azureInput: any[] | null = null;
+  let azureInput: ResponseItem[] | null = null;
   let azureInstructions = "";
 
   // Prevent MaxListenersExceeded warning — each iteration adds a listener
@@ -194,7 +202,7 @@ export async function runAgent(
           azureInput = input;
           azureInstructions = instructions;
         }
-        const azureParams: any = {
+        const azureParams: Record<string, unknown> = {
           model,
           input: azureInput,
           instructions: azureInstructions,
@@ -216,7 +224,7 @@ export async function runAgent(
           azureInput.push(item);
         }
       } else {
-        const createParams: any = { messages, tools: activeTools, stream: true };
+        const createParams: Record<string, unknown> = { messages, tools: activeTools, stream: true };
         if (model) createParams.model = model;
         if (options?.toolChoiceRequired) createParams.tool_choice = "required";
         result = await streamChatCompletion(client, createParams, callbacks, signal);
@@ -239,9 +247,9 @@ export async function runAgent(
         }));
       // Store reasoning items from the API response on the assistant message
       // so they persist through session save/load and can be restored in toResponsesInput
-      const reasoningItems = result.outputItems.filter((item: any) => item.type === "reasoning");
+      const reasoningItems = result.outputItems.filter((item): item is ResponseItem & { type: "reasoning" } => "type" in item && item.type === "reasoning");
       if (reasoningItems.length > 0) {
-        (msg as any)._reasoning_items = reasoningItems;
+        (msg as AssistantMessageWithReasoning)._reasoning_items = reasoningItems;
       }
       if (!result.toolCalls.length) {
         const kick = kickCount < maxKicks
@@ -321,6 +329,10 @@ export async function runAgent(
             success = true;
           } catch (e) {
             toolResult = `error: ${e}`;
+            success = false;
+          }
+          if (toolResult.length > maxToolOutputChars) {
+            toolResult = `output too large (${toolResult.length} chars, limit ${maxToolOutputChars}). retry with narrower scope — e.g. read fewer lines, filter output, or use a more specific command.`;
             success = false;
           }
           callbacks.onToolEnd(tc.name, argSummary, success);
