@@ -1,10 +1,18 @@
 import type OpenAI from "openai";
 import type { ChannelCallbacks } from "./core";
 
+export interface UsageData {
+  input_tokens: number;
+  output_tokens: number;
+  reasoning_tokens: number;
+  total_tokens: number;
+}
+
 export interface TurnResult {
   content: string;
   toolCalls: { id: string; name: string; arguments: string }[];
   outputItems: any[];
+  usage?: UsageData;
 }
 
 export function toResponsesInput(
@@ -221,6 +229,7 @@ export async function streamResponsesApi(
   const toolCalls: { id: string; name: string; arguments: string }[] = [];
   const outputItems: any[] = [];
   let currentToolCall: { call_id: string; name: string; arguments: string } | null = null;
+  let usage: UsageData | undefined;
 
   for await (const event of response) {
     if (signal?.aborted) break;
@@ -272,6 +281,18 @@ export async function streamResponsesApi(
         }
         break;
       }
+      case "response.completed": {
+        const u = event.response?.usage;
+        if (u) {
+          usage = {
+            input_tokens: u.input_tokens,
+            output_tokens: u.output_tokens,
+            reasoning_tokens: u.output_tokens_details?.reasoning_tokens ?? 0,
+            total_tokens: u.total_tokens,
+          };
+        }
+        break;
+      }
       default:
         // Unknown/unhandled events silently ignored
         break;
@@ -282,5 +303,6 @@ export async function streamResponsesApi(
     content,
     toolCalls,
     outputItems,
+    usage,
   };
 }
