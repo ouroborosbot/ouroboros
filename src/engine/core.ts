@@ -167,6 +167,12 @@ export async function runAgent(
           type: "function" as const,
           function: { name: tc.name, arguments: tc.arguments },
         }));
+      // Store reasoning items from the API response on the assistant message
+      // so they persist through session save/load and can be restored in toResponsesInput
+      const reasoningItems = result.outputItems.filter((item: any) => item.type === "reasoning");
+      if (reasoningItems.length > 0) {
+        (msg as any)._reasoning_items = reasoningItems;
+      }
       messages.push(msg);
 
       if (!result.toolCalls.length) {
