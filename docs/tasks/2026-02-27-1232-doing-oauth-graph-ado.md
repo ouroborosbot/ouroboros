@@ -107,8 +107,8 @@ Add OAuth/SSO authentication to the Ouroboros Teams bot so the LLM agent can cal
 - `getToolsForChannel("cli")` returns only base tools (read_file, write_file, shell, etc.)
 - `getToolsForChannel("teams")` returns base tools + `graph_profile` + `ado_work_items` (Phase 1 tools)
 - `execTool` passes `ToolContext` through to handler when provided
-- `runAgent` uses `getToolsForChannel(channel)` instead of static `tools` import
-- `runAgent` passes `options.toolContext` to `execTool` calls
+- `runAgent` uses `getToolsForChannel(channel)` instead of static `tools` import. Note: line 187 of `core.ts` currently reads `const activeTools = options?.toolChoiceRequired ? [...tools, finalAnswerTool] : tools;` -- the replacement must preserve the `finalAnswerTool` conditional: `const baseTools = getToolsForChannel(channel); const activeTools = options?.toolChoiceRequired ? [...baseTools, finalAnswerTool] : baseTools;`
+- `runAgent` passes `options.toolContext` to `execTool` calls (line 328 of `core.ts`)
 - All existing tests still pass (no regressions from refactoring tool selection)
 - 100% coverage on new code
 
@@ -170,9 +170,9 @@ Add OAuth/SSO authentication to the Ouroboros Teams bot so the LLM agent can cal
 **Acceptance**: Tests exist and FAIL (red) because tool handlers are not yet registered.
 
 ### ⬜ Unit 7b: graph_profile and ado_work_items Tools -- Implementation
-**What**: Add `graph_profile` and `ado_work_items` tool definitions and handlers to `src/engine/tools.ts`. Register them in the `graphAdoTools` array used by `getToolsForChannel("teams")`. Each handler checks for its required token in `ToolContext`, returns `AUTH_REQUIRED:{connection}` if missing. `ado_work_items` validates the `organization` param against `toolContext.adoOrganizations`.
+**What**: Add `graph_profile` and `ado_work_items` tool definitions and handlers to `src/engine/tools.ts`. Register them in the `graphAdoTools` array used by `getToolsForChannel("teams")`. Each handler checks for its required token in `ToolContext`, returns `AUTH_REQUIRED:{connection}` if missing. `ado_work_items` validates the `organization` param against `toolContext.adoOrganizations`. Also update `summarizeArgs` (line 259 of `tools.ts`) to handle the new tool names.
 **Output**: Updated `src/engine/tools.ts`.
-**Acceptance**: All tool tests PASS (green), no warnings.
+**Acceptance**: All tool tests PASS (green), `summarizeArgs` handles new tools, no warnings.
 
 ### ⬜ Unit 7c: graph_profile and ado_work_items Tools -- Coverage
 **What**: Verify 100% coverage on new tool code. Refactor if needed.
@@ -242,9 +242,9 @@ Add OAuth/SSO authentication to the Ouroboros Teams bot so the LLM agent can cal
 **Acceptance**: Tests exist and FAIL (red).
 
 ### ⬜ Unit 12b: Remaining Read Tools -- Implementation
-**What**: Add 8 read tool definitions and handlers. Register in `graphAdoTools`. Update `getToolsForChannel("teams")` to include all 10.
+**What**: Add 8 read tool definitions and handlers. Register in `graphAdoTools`. Update `getToolsForChannel("teams")` to include all 10. Update `summarizeArgs` to handle all new tool names.
 **Output**: Updated `src/engine/tools.ts`.
-**Acceptance**: All tests PASS (green), no warnings.
+**Acceptance**: All tests PASS (green), `summarizeArgs` handles all 10 tools, no warnings.
 
 ### ⬜ Unit 12c: Remaining Read Tools -- Coverage
 **What**: Verify 100% coverage on all new tool code. Full test suite passes.
@@ -321,9 +321,9 @@ Add OAuth/SSO authentication to the Ouroboros Teams bot so the LLM agent can cal
 **Acceptance**: Tests exist and FAIL (red).
 
 ### ⬜ Unit 17b: Write Tool Definitions -- Implementation
-**What**: Add 6 write tool definitions with `requiresConfirmation: true` metadata. Add handlers. Register in `graphAdoTools`.
+**What**: Add 6 write tool definitions with `requiresConfirmation: true` metadata. Add handlers. Register in `graphAdoTools`. Update `summarizeArgs` to handle all 16 tool names.
 **Output**: Updated `src/engine/tools.ts`.
-**Acceptance**: All tests PASS (green).
+**Acceptance**: All tests PASS (green), `summarizeArgs` handles all 16 tools.
 
 ### ⬜ Unit 17c: Write Tool Definitions -- Coverage
 **What**: Verify 100% coverage on all write tool code.
