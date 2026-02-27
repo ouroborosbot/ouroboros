@@ -109,6 +109,29 @@ function isContextOverflow(err: unknown): boolean {
   return false;
 }
 
+// Detect transient network errors worth retrying
+export function isTransientError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message || "";
+  const code = (err as any).code || "";
+  // Node.js network error codes
+  if (["ECONNRESET", "ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT", "EPIPE",
+       "EAI_AGAIN", "EHOSTUNREACH", "ENETUNREACH", "ECONNABORTED"].includes(code)) return true;
+  // OpenAI SDK / fetch errors
+  if (msg.includes("fetch failed")) return true;
+  if (msg.includes("network") && !msg.includes("context")) return true;
+  if (msg.includes("ECONNRESET") || msg.includes("ETIMEDOUT")) return true;
+  if (msg.includes("socket hang up")) return true;
+  if (msg.includes("getaddrinfo")) return true;
+  // HTTP 429 / 500 / 502 / 503 / 504
+  const status = (err as any).status;
+  if (status === 429 || status === 500 || status === 502 || status === 503 || status === 504) return true;
+  return false;
+}
+
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 2000;
+
 export async function runAgent(
   messages: OpenAI.ChatCompletionMessageParam[],
   callbacks: ChannelCallbacks,
@@ -128,6 +151,7 @@ export async function runAgent(
   let toolRounds = 0;
   let lastUsage: UsageData | undefined;
   let overflowRetried = false;
+  let retryCount = 0;
 
   // For Azure Responses API: maintain native input array with original output
   // items (reasoning, function_calls) in correct order.  Initialized from CC
@@ -182,6 +206,7 @@ export async function runAgent(
 
       // Track usage from the latest API call
       if (result.usage) lastUsage = result.usage;
+      retryCount = 0; // reset on success
 
       // SHARED: build CC-format assistant message from TurnResult
       const msg: OpenAI.ChatCompletionAssistantMessageParam = {
@@ -257,6 +282,24 @@ export async function runAgent(
         messages.splice(0, messages.length, ...trimmed);
         azureInput = null; // force rebuild from trimmed messages
         callbacks.onError(new Error("context trimmed, retrying..."));
+        continue;
+      }
+      // Transient network errors: retry with exponential backoff
+      if (isTransientError(e) && retryCount < MAX_RETRIES) {
+        retryCount++;
+        const delay = RETRY_BASE_MS * Math.pow(2, retryCount - 1);
+        callbacks.onError(new Error(`network error, retrying in ${delay / 1000}s (${retryCount}/${MAX_RETRIES})...`));
+        // Wait with abort support
+        const aborted = await new Promise<boolean>((resolve) => {
+          const timer = setTimeout(() => resolve(false), delay);
+          if (signal) {
+            const onAbort = () => { clearTimeout(timer); resolve(true); };
+            if (signal.aborted) { clearTimeout(timer); resolve(true); return; }
+            signal.addEventListener("abort", onAbort, { once: true });
+          }
+        });
+        if (aborted) { stripLastToolCalls(messages); break; }
+        azureInput = null; // force rebuild on retry
         continue;
       }
       callbacks.onError(e instanceof Error ? e : new Error(String(e)));
