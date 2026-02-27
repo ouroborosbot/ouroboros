@@ -1803,6 +1803,213 @@ describe("runAgent", () => {
     const result = await runAgent([{ role: "system", content: "test" }], callbacks)
     expect(result.usage).toBeUndefined()
   })
+
+  // ── context overflow auto-recovery ──
+
+  it("recovers from Azure context_length_exceeded error by trimming and retrying", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        const err: any = new Error("context_length_exceeded")
+        err.code = "context_length_exceeded"
+        throw err
+      }
+      return makeStream([makeChunk("recovered")])
+    })
+
+    const errors: Error[] = []
+    const chunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (t) => chunks.push(t),
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err),
+    }
+
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "old msg 1" },
+      { role: "assistant", content: "old reply 1" },
+      { role: "user", content: "latest" },
+    ]
+    await runAgent(messages, callbacks)
+
+    // Should have retried and succeeded
+    expect(callCount).toBe(2)
+    expect(chunks).toContain("recovered")
+    // Should have logged a trim info message
+    expect(errors.some(e => e.message.includes("trimm"))).toBe(true)
+  })
+
+  it("recovers from Azure overflow via error message (no .code)", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        throw new Error("Request failed: context_length_exceeded for this model")
+      }
+      return makeStream([makeChunk("ok")])
+    })
+
+    const errors: Error[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err),
+    }
+
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "msg" },
+    ]
+    await runAgent(messages, callbacks)
+
+    expect(callCount).toBe(2) // retry succeeded
+  })
+
+  it("recovers from MiniMax context window exceeds limit error", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        throw new Error("context window exceeds limit")
+      }
+      return makeStream([makeChunk("ok")])
+    })
+
+    const errors: Error[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err),
+    }
+
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "msg" },
+    ]
+    await runAgent(messages, callbacks)
+
+    expect(callCount).toBe(2) // retry succeeded
+  })
+
+  it("surfaces error via onError when retry also fails with overflow", async () => {
+    mockCreate.mockImplementation(() => {
+      const err: any = new Error("context_length_exceeded")
+      err.code = "context_length_exceeded"
+      throw err
+    })
+
+    const errors: Error[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err),
+    }
+
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "msg" },
+    ]
+    await runAgent(messages, callbacks)
+
+    // First error is trim info, second is the actual overflow error
+    expect(errors.length).toBeGreaterThanOrEqual(2)
+    expect(errors[errors.length - 1].message).toContain("context_length_exceeded")
+  })
+
+  it("does not catch non-overflow errors with overflow recovery", async () => {
+    mockCreate.mockImplementation(() => {
+      throw new Error("network timeout")
+    })
+
+    const errors: Error[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err),
+    }
+
+    const messages: any[] = [{ role: "system", content: "sys" }]
+    await runAgent(messages, callbacks)
+
+    // Should have exactly 1 error (the original network error), no retry
+    expect(errors).toHaveLength(1)
+    expect(errors[0].message).toBe("network timeout")
+  })
+
+  it("strips tool calls before trimming on mid-turn overflow", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        // First call returns tool calls
+        return makeStream([
+          makeChunk(undefined, [{ index: 0, id: "tc1", function: { name: "search", arguments: '{"q":"test"}' } }]),
+        ])
+      }
+      if (callCount === 2) {
+        // Second call (tool execution done) overflows
+        const err: any = new Error("context_length_exceeded")
+        err.code = "context_length_exceeded"
+        throw err
+      }
+      // Third call succeeds after trim
+      return makeStream([makeChunk("recovered after tool overflow")])
+    })
+
+    const toolResults = new Map()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([] as any)
+    vi.mocked(spawnSync).mockReturnValue({ stdout: "tool result", stderr: "", status: 0 } as any)
+    vi.mocked(execSync).mockReturnValue("tool result" as any)
+
+    const errors: Error[] = []
+    const chunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (t) => chunks.push(t),
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err),
+    }
+
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "do something" },
+    ]
+    await runAgent(messages, callbacks)
+
+    // Should have recovered after trim
+    expect(callCount).toBe(3)
+    expect(chunks).toContain("recovered after tool overflow")
+    // Messages should not have orphan tool_calls or tool results
+    const hasToolMsg = messages.some((m: any) => m.role === "tool")
+    // After trim+stripLastToolCalls, tool messages should be cleaned
+    expect(errors.some(e => e.message.includes("trimm"))).toBe(true)
+  })
 })
 
 describe("getClient", () => {
