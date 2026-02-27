@@ -27,6 +27,7 @@ describe("hasToolIntent", () => {
     "first, I will check the logs",
     "first I need to read the file",
     "now I will investigate",
+    "next turn will be strict TDD repair",
     "next, I should look at the code",
     "next I will check the tests",
     // Hedged intent
@@ -35,6 +36,7 @@ describe("hasToolIntent", () => {
     // Self-narration
     "my next step is to read the file",
     "my plan is to refactor this",
+    "tool calls only from here on",
   ])("returns true for intent phrase: %s", (text) => {
     expect(hasToolIntent(text)).toBe(true)
   })

@@ -44,18 +44,20 @@ const TOOL_INTENT_PATTERNS = [
   /\bproceeding\b/i,
   /\bswitching to\b/i,
 
-  // Temporal narration — "first", "now I", "next"
+  // Temporal narration — "first", "now I", "next turn", "next, I"
   /\bfirst,?\s+i\b/i,
   /\bnow i\b/i,
+  /\bnext turn\b/i,
   /\bnext,?\s+i\b/i,
 
   // Hedged intent — "allow me to", "time to"
   /\ballow me to\b/i,
   /\btime to\b/i,
 
-  // Self-narration — "my next step", "my plan"
+  // Self-narration — "my next step", "my plan", "tool calls only"
   /\bmy next step\b/i,
   /\bmy plan\b/i,
+  /\btool calls only\b/i,
 ];
 
 // Normalize curly quotes/apostrophes to straight so patterns match consistently
