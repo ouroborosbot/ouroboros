@@ -190,7 +190,7 @@ Note: `estimateTokens` deletion is deferred to Feature 3 where it is replaced at
 **Output**: Failing tests in `src/__tests__/mind/context.test.ts` and `src/__tests__/engine/core.test.ts`
 **Acceptance**: Tests exist and FAIL (red)
 
-### ⬜ Unit 3d: Store lastUsage in session and runAgent return type -- Implementation
+### ✅ Unit 3d: Store lastUsage in session and runAgent return type -- Implementation
 **What**: Implement all three changes atomically so the codebase never enters an uncompilable state:
 
 **In `src/mind/context.ts`**:
