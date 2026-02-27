@@ -404,3 +404,4 @@ Call sites to update (source files only):
 - 2026-02-26 17:55 Feature 4 complete (Units 4a-4c): context overflow auto-recovery with isContextOverflow detection, aggressive trim, single retry. 100% coverage on core.ts. 410 tests pass.
 - 2026-02-26 17:59 Unit 5a complete: 3 tests for system prompt refresh in runAgent (2 fail as expected, 1 passes for backward compat).
 - 2026-02-26 18:02 Unit 5b complete: moved system prompt refresh into runAgent with channel parameter. Removed refresh from cli.ts and teams.ts. Updated 4 signal call sites and 2 adapter tests. 413 tests pass.
+- 2026-02-26 18:03 Feature 5 complete (Units 5a-5c): system prompt refresh moved into runAgent. 100% coverage on all changed files. cachedBuildSystem only used in adapters for initial session creation. 413 tests pass.
