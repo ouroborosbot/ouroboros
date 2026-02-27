@@ -258,7 +258,7 @@ This eliminates the duplicated trim+save code in both adapters. Each adapter jus
 **Output**: Modified `src/channels/cli.ts`, `src/__tests__/channels/cli-main.test.ts`
 **Acceptance**: All Unit 3g tests PASS (green), existing tests still pass, no warnings
 
-### ⬜ Unit 3i: Move trimming to after runAgent in Teams -- Tests
+### ✅ Unit 3i: Move trimming to after runAgent in Teams -- Tests
 **What**: Write/update failing tests in `src/__tests__/channels/teams.test.ts` for the new trim flow:
 - Trimming no longer happens before `runAgent` -- it happens after
 - After `runAgent` returns, `postTurn` is called with messages, sessPath, and `result.usage`
