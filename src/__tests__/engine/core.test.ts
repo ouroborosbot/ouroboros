@@ -2010,6 +2010,67 @@ describe("runAgent", () => {
     // After trim+stripLastToolCalls, tool messages should be cleaned
     expect(errors.some(e => e.message.includes("trimm"))).toBe(true)
   })
+
+  it("handles overflow error with empty message property", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        const err: any = new Error()
+        err.code = "context_length_exceeded"
+        err.message = "" // empty message
+        throw err
+      }
+      return makeStream([makeChunk("ok")])
+    })
+
+    const errors: Error[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err),
+    }
+
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "msg" },
+    ]
+    await runAgent(messages, callbacks)
+
+    expect(callCount).toBe(2) // retry succeeded via .code check
+  })
+
+  it("overflow on cold start with only system message still retries", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        throw new Error("context_length_exceeded")
+      }
+      return makeStream([makeChunk("ok")])
+    })
+
+    const errors: Error[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err),
+    }
+
+    // Only system message -- can't trim further, but retry should still happen
+    const messages: any[] = [{ role: "system", content: "sys" }]
+    await runAgent(messages, callbacks)
+
+    expect(callCount).toBe(2) // retry attempted
+  })
 })
 
 describe("getClient", () => {
