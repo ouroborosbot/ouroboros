@@ -4058,4 +4058,95 @@ describe("integration: kick + tool_choice required combined", () => {
     const lastAssistant = [...messages].reverse().find((m: any) => m.role === "assistant")
     expect(lastAssistant.content).toBe("here you go")
   })
+
+  it("uses getToolsForChannel to select tools based on channel", async () => {
+    let usedTools: any[] | undefined
+    mockCreate.mockImplementation((params: any) => {
+      usedTools = params.tools
+      return makeStream([makeChunk("hello")])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    // Run with "teams" channel -- tools should include graph_profile and ado_work_items
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, "teams")
+
+    const toolNames = usedTools?.map((t: any) => t.function.name) || []
+    expect(toolNames).toContain("graph_profile")
+    expect(toolNames).toContain("ado_work_items")
+    expect(toolNames).toContain("read_file") // base tool still present
+  })
+
+  it("does not include graph/ado tools for cli channel", async () => {
+    let usedTools: any[] | undefined
+    mockCreate.mockImplementation((params: any) => {
+      usedTools = params.tools
+      return makeStream([makeChunk("hello")])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, "cli")
+
+    const toolNames = usedTools?.map((t: any) => t.function.name) || []
+    expect(toolNames).not.toContain("graph_profile")
+    expect(toolNames).not.toContain("ado_work_items")
+    expect(toolNames).toContain("read_file")
+  })
+
+  it("passes toolContext to execTool when calling graph/ado tools", async () => {
+    // The tool will be called through the agent loop -- mock the API to return a tool call
+    mockCreate.mockReturnValueOnce(
+      makeStream([
+        makeChunk(undefined, [{ index: 0, id: "tc1", function: { name: "graph_profile", arguments: "" } }]),
+        makeChunk(undefined, [{ index: 0, function: { arguments: "{}" } }]),
+      ]),
+    ).mockReturnValueOnce(
+      makeStream([makeChunk("here is your profile")])
+    )
+
+    const toolContext = {
+      graphToken: "mock-graph-token",
+      adoToken: undefined,
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, "teams", undefined, { toolContext } as any)
+
+    // The tool should have been executed -- look for the tool result in messages
+    const toolMessage = messages.find((m: any) => m.role === "tool" && m.tool_call_id === "tc1")
+    expect(toolMessage).toBeDefined()
+    // The result should come from the graph_profile handler (not "unknown")
+    expect(toolMessage.content).not.toContain("unknown")
+  })
 })

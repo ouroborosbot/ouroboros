@@ -17,6 +17,14 @@ vi.mock("../../repertoire/skills", () => ({
   loadSkill: vi.fn(),
 }))
 
+vi.mock("../../engine/graph-client", () => ({
+  getProfile: vi.fn(),
+}))
+
+vi.mock("../../engine/ado-client", () => ({
+  queryWorkItems: vi.fn(),
+}))
+
 import * as fs from "fs"
 import { execSync, spawnSync } from "child_process"
 import { listSkills, loadSkill } from "../../repertoire/skills"
@@ -564,5 +572,224 @@ describe("finalAnswerTool", () => {
     const { tools } = await import("../../engine/tools")
     const names = tools.map((t) => t.function.name)
     expect(names).not.toContain("final_answer")
+  })
+})
+
+describe("getToolsForChannel", () => {
+  it("returns only base tools for cli channel", async () => {
+    vi.resetModules()
+    const { getToolsForChannel, tools } = await import("../../engine/tools")
+    const cliTools = getToolsForChannel("cli")
+    const names = cliTools.map((t) => t.function.name)
+    // Should have all base tools
+    expect(names).toContain("read_file")
+    expect(names).toContain("shell")
+    // Should NOT have graph/ado tools
+    expect(names).not.toContain("graph_profile")
+    expect(names).not.toContain("ado_work_items")
+    // Same length as base tools
+    expect(cliTools.length).toBe(tools.length)
+  })
+
+  it("returns base tools plus graph/ado tools for teams channel", async () => {
+    vi.resetModules()
+    const { getToolsForChannel, tools } = await import("../../engine/tools")
+    const teamsTools = getToolsForChannel("teams")
+    const names = teamsTools.map((t) => t.function.name)
+    // Should have all base tools
+    expect(names).toContain("read_file")
+    expect(names).toContain("shell")
+    // Should have graph/ado tools
+    expect(names).toContain("graph_profile")
+    expect(names).toContain("ado_work_items")
+    // Should be longer than base tools
+    expect(teamsTools.length).toBeGreaterThan(tools.length)
+  })
+
+  it("returns base tools for undefined channel", async () => {
+    vi.resetModules()
+    const { getToolsForChannel, tools } = await import("../../engine/tools")
+    const result = getToolsForChannel(undefined)
+    expect(result.length).toBe(tools.length)
+  })
+})
+
+describe("execTool with ToolContext", () => {
+  it("passes ToolContext to graph_profile handler", async () => {
+    vi.resetModules()
+    const { getProfile } = await import("../../engine/graph-client")
+    vi.mocked(getProfile).mockResolvedValue("Profile: Jane Doe")
+
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: "test-graph-token",
+      adoToken: undefined,
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const result = await execTool("graph_profile", {}, ctx)
+    expect(result).toBe("Profile: Jane Doe")
+    expect(getProfile).toHaveBeenCalledWith("test-graph-token")
+  })
+
+  it("graph_profile returns AUTH_REQUIRED when graphToken missing", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: undefined,
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const result = await execTool("graph_profile", {}, ctx)
+    expect(result).toBe("AUTH_REQUIRED:graph -- I need access to your Microsoft 365 profile. Please sign in when prompted.")
+  })
+
+  it("graph_profile returns AUTH_REQUIRED when no ToolContext provided", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+
+    const result = await execTool("graph_profile", {})
+    expect(result).toBe("AUTH_REQUIRED:graph -- I need access to your Microsoft 365 profile. Please sign in when prompted.")
+  })
+
+  it("passes ToolContext to ado_work_items handler", async () => {
+    vi.resetModules()
+    const { queryWorkItems } = await import("../../engine/ado-client")
+    vi.mocked(queryWorkItems).mockResolvedValue("Work items: #123 Fix bug")
+
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-ado-token",
+      signin: vi.fn(),
+      adoOrganizations: ["myorg"],
+    }
+
+    const result = await execTool("ado_work_items", { organization: "myorg", query: "SELECT * FROM WorkItems" }, ctx)
+    expect(result).toBe("Work items: #123 Fix bug")
+    expect(queryWorkItems).toHaveBeenCalledWith("test-ado-token", "myorg", "SELECT * FROM WorkItems")
+  })
+
+  it("ado_work_items returns AUTH_REQUIRED when adoToken missing", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: undefined,
+      signin: vi.fn(),
+      adoOrganizations: ["myorg"],
+    }
+
+    const result = await execTool("ado_work_items", { organization: "myorg" }, ctx)
+    expect(result).toBe("AUTH_REQUIRED:ado -- I need access to your Azure DevOps account. Please sign in when prompted.")
+  })
+
+  it("ado_work_items rejects invalid organization", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+      adoOrganizations: ["org1", "org2"],
+    }
+
+    const result = await execTool("ado_work_items", { organization: "bad-org" }, ctx)
+    expect(result).toContain("not in the configured organizations")
+    expect(result).toContain("org1")
+    expect(result).toContain("org2")
+  })
+
+  it("ado_work_items uses default query when none provided", async () => {
+    vi.resetModules()
+    const { queryWorkItems } = await import("../../engine/ado-client")
+    vi.mocked(queryWorkItems).mockResolvedValue("Work items found")
+
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+      adoOrganizations: ["myorg"],
+    }
+
+    const result = await execTool("ado_work_items", { organization: "myorg" }, ctx)
+    expect(result).toBe("Work items found")
+    // Should use default query
+    expect(queryWorkItems).toHaveBeenCalledWith("test-token", "myorg", expect.stringContaining("SELECT"))
+  })
+
+  it("ado_work_items allows any org when adoOrganizations is empty", async () => {
+    vi.resetModules()
+    const { queryWorkItems } = await import("../../engine/ado-client")
+    vi.mocked(queryWorkItems).mockResolvedValue("Work items found")
+
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const result = await execTool("ado_work_items", { organization: "any-org" }, ctx)
+    expect(result).toBe("Work items found")
+  })
+
+  it("ado_work_items returns AUTH_REQUIRED when no ToolContext provided", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+
+    const result = await execTool("ado_work_items", { organization: "myorg" })
+    expect(result).toBe("AUTH_REQUIRED:ado -- I need access to your Azure DevOps account. Please sign in when prompted.")
+  })
+
+  it("base tools work without ToolContext", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockReturnValue("file content")
+    const { execTool } = await import("../../engine/tools")
+
+    const result = await execTool("read_file", { path: "/tmp/test.txt" })
+    expect(result).toBe("file content")
+  })
+
+  it("base tools work with ToolContext (context is ignored)", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockReturnValue("file content")
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: "token",
+      adoToken: "token",
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const result = await execTool("read_file", { path: "/tmp/test.txt" }, ctx)
+    expect(result).toBe("file content")
+  })
+})
+
+describe("summarizeArgs for graph/ado tools", () => {
+  let summarizeArgs: (name: string, args: Record<string, any>) => string
+
+  beforeEach(async () => {
+    vi.resetModules()
+    const tools = await import("../../engine/tools")
+    summarizeArgs = tools.summarizeArgs
+  })
+
+  it("returns empty string for graph_profile", () => {
+    expect(summarizeArgs("graph_profile", {})).toBe("")
+  })
+
+  it("returns organization for ado_work_items", () => {
+    expect(summarizeArgs("ado_work_items", { organization: "myorg", query: "some query" })).toBe("myorg")
+  })
+
+  it("returns empty string for ado_work_items with no organization", () => {
+    expect(summarizeArgs("ado_work_items", {})).toBe("")
   })
 })

@@ -267,6 +267,8 @@ describe("Teams adapter - message handling", () => {
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-test-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
     }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(null),
@@ -786,6 +788,8 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       sessionPath: vi.fn().mockReturnValue("/tmp/bot-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId, clientSecret, tenantId }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
     }))
   }
 
@@ -1106,6 +1110,8 @@ describe("Teams adapter - session persistence", () => {
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
     }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(loadSessionReturn),
@@ -1370,5 +1376,44 @@ describe("Teams adapter - session persistence", () => {
     // Both start before either ends (parallel)
     expect(order[0]).toBe("start-1")
     expect(order[1]).toBe("start-2")
+  })
+
+  it("handleTeamsMessage passes toolContext to runAgent when provided via TeamsMessageContext", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../channels/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const teamsContext = {
+      graphToken: "g-token",
+      adoToken: "a-token",
+      signin: vi.fn(),
+    }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123", teamsContext)
+    expect(runAgentFn).toHaveBeenCalled()
+
+    // Check that runAgent was called with options containing toolContext
+    const callArgs = runAgentFn.mock.calls[0]
+    const options = callArgs[4] // 5th arg is options
+    expect(options).toBeDefined()
+    expect(options.toolContext).toBeDefined()
+    expect(options.toolContext.graphToken).toBe("g-token")
+    expect(options.toolContext.adoToken).toBe("a-token")
+    expect(typeof options.toolContext.signin).toBe("function")
+    expect(Array.isArray(options.toolContext.adoOrganizations)).toBe(true)
+  })
+
+  it("handleTeamsMessage works without TeamsMessageContext (backward compat)", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../channels/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    // No teamsContext parameter -- should still work
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
+    expect(runAgentFn).toHaveBeenCalled()
   })
 })
