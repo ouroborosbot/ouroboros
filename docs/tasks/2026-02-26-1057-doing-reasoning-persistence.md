@@ -214,7 +214,7 @@ This avoids the compile breakage that would occur if loadSession's return type c
 **Output**: Modified `src/mind/context.ts`, `src/engine/core.ts`, `src/channels/cli.ts`, `src/channels/teams.ts`
 **Acceptance**: All Unit 3c tests PASS (green), all existing tests still pass, no warnings, no compile errors
 
-### ⬜ Unit 3e: Shared postTurn function -- Tests
+### ✅ Unit 3e: Shared postTurn function -- Tests
 **What**: Write failing tests in `src/__tests__/mind/context.test.ts` for a new `postTurn(messages, sessPath, usage?)` function that encapsulates the post-turn trim+save logic. Tests cover:
 - When `usage` has `input_tokens` exceeding `maxTokens`, messages are trimmed and then saved with `lastUsage`
 - When `usage` is undefined (cold start), no trimming occurs but session is still saved
