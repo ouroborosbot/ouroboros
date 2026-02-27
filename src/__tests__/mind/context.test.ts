@@ -9,6 +9,11 @@ vi.mock("fs", () => ({
   unlinkSync: vi.fn(),
 }))
 
+// Mock config for postTurn tests
+vi.mock("../../config", () => ({
+  getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+}))
+
 import * as fs from "fs"
 
 // estimateTokens tests removed in Unit 3a -- estimateTokens is deleted
@@ -375,5 +380,125 @@ describe("deleteSession", () => {
       throw err
     })
     expect(() => deleteSession("/tmp/noperm.json")).toThrow("EPERM")
+  })
+})
+
+// --- Unit 3e: postTurn function ---
+
+describe("postTurn", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.mocked(fs.writeFileSync).mockReset()
+    vi.mocked(fs.mkdirSync).mockReset()
+  })
+
+  it("trims messages when usage.input_tokens exceeds maxTokens and saves with lastUsage", async () => {
+    const { getContextConfig } = await import("../../config")
+    vi.mocked(getContextConfig).mockReturnValue({ maxTokens: 80000, contextMargin: 20 })
+
+    const { postTurn } = await import("../../mind/context")
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "old" },
+      { role: "assistant", content: "old reply" },
+      { role: "user", content: "new" },
+      { role: "assistant", content: "new reply" },
+    ]
+    const usage = { input_tokens: 120000, output_tokens: 50, reasoning_tokens: 10, total_tokens: 120050 }
+    postTurn(messages, "/tmp/sess.json", usage)
+
+    // Messages should be trimmed (120000 > 80000)
+    expect(messages.length).toBeLessThan(5)
+    expect(messages[0].role).toBe("system")
+    // Session should be saved with lastUsage
+    expect(fs.writeFileSync).toHaveBeenCalledTimes(1)
+    const written = JSON.parse(vi.mocked(fs.writeFileSync).mock.calls[0][1] as string)
+    expect(written.lastUsage).toEqual(usage)
+  })
+
+  it("does not trim when usage is undefined (cold start) but still saves session", async () => {
+    const { getContextConfig } = await import("../../config")
+    vi.mocked(getContextConfig).mockReturnValue({ maxTokens: 80000, contextMargin: 20 })
+
+    const { postTurn } = await import("../../mind/context")
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "hi" },
+    ]
+    postTurn(messages, "/tmp/sess.json")
+
+    expect(messages.length).toBe(2)
+    expect(fs.writeFileSync).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not trim when usage.input_tokens is under maxTokens, saves with lastUsage", async () => {
+    const { getContextConfig } = await import("../../config")
+    vi.mocked(getContextConfig).mockReturnValue({ maxTokens: 80000, contextMargin: 20 })
+
+    const { postTurn } = await import("../../mind/context")
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "hi" },
+    ]
+    const usage = { input_tokens: 50000, output_tokens: 10, reasoning_tokens: 0, total_tokens: 50010 }
+    postTurn(messages, "/tmp/sess.json", usage)
+
+    expect(messages.length).toBe(2)
+    const written = JSON.parse(vi.mocked(fs.writeFileSync).mock.calls[0][1] as string)
+    expect(written.lastUsage).toEqual(usage)
+  })
+
+  it("mutates messages array in place (splice, not copy)", async () => {
+    const { getContextConfig } = await import("../../config")
+    vi.mocked(getContextConfig).mockReturnValue({ maxTokens: 100, contextMargin: 20 })
+
+    const { postTurn } = await import("../../mind/context")
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "a" },
+      { role: "assistant", content: "b" },
+      { role: "user", content: "c" },
+    ]
+    const originalRef = messages
+    const usage = { input_tokens: 10000, output_tokens: 10, reasoning_tokens: 0, total_tokens: 10010 }
+    postTurn(messages, "/tmp/sess.json", usage)
+
+    // Same reference, mutated in place
+    expect(messages).toBe(originalRef)
+    expect(messages.length).toBeLessThan(4)
+    expect(messages[0].role).toBe("system")
+  })
+
+  it("saves with (possibly trimmed) messages and usage", async () => {
+    const { getContextConfig } = await import("../../config")
+    vi.mocked(getContextConfig).mockReturnValue({ maxTokens: 80000, contextMargin: 20 })
+
+    const { postTurn } = await import("../../mind/context")
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "hi" },
+    ]
+    const usage = { input_tokens: 50000, output_tokens: 10, reasoning_tokens: 0, total_tokens: 50010 }
+    postTurn(messages, "/tmp/sess.json", usage)
+
+    const written = JSON.parse(vi.mocked(fs.writeFileSync).mock.calls[0][1] as string)
+    expect(written.version).toBe(1)
+    expect(written.messages).toEqual(messages)
+    expect(written.lastUsage).toEqual(usage)
+  })
+
+  it("handles empty messages array (only system prompt)", async () => {
+    const { getContextConfig } = await import("../../config")
+    vi.mocked(getContextConfig).mockReturnValue({ maxTokens: 80000, contextMargin: 20 })
+
+    const { postTurn } = await import("../../mind/context")
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+    ]
+    const usage = { input_tokens: 1000, output_tokens: 10, reasoning_tokens: 0, total_tokens: 1010 }
+    postTurn(messages, "/tmp/sess.json", usage)
+
+    expect(messages.length).toBe(1)
+    expect(fs.writeFileSync).toHaveBeenCalledTimes(1)
   })
 })
