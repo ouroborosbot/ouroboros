@@ -160,16 +160,13 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
     ? existing.messages
     : [{ role: "system", content: cachedBuildSystem("teams", buildSystem) }]
 
-  // Refresh system prompt
-  messages[0] = { role: "system", content: cachedBuildSystem("teams", buildSystem) }
-
   // Push user message
   messages.push({ role: "user", content: text })
 
   // Run agent
   const controller = new AbortController()
   const callbacks = createTeamsCallbacks(stream, controller)
-  const result = await runAgent(messages, callbacks, controller.signal)
+  const result = await runAgent(messages, callbacks, "teams", controller.signal)
 
   // Trim context and save session
   postTurn(messages, sessPath, result.usage)

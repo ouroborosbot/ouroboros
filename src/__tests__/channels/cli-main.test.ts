@@ -307,7 +307,7 @@ describe("agent.ts main()", () => {
     let callCount = 0
 
     setupBasic({ inputSequence: ["hello", "/exit"] })
-    mocks.runAgent.mockImplementation(async (_msgs: any, _cb: any, signal?: AbortSignal) => {
+    mocks.runAgent.mockImplementation(async (_msgs: any, _cb: any, _channel?: string, signal?: AbortSignal) => {
       callCount++
       if (callCount === 1) {
         agentSignal = signal
@@ -483,7 +483,7 @@ describe("agent.ts main() - session persistence", () => {
     expect(postTurnCalls[1][1]).toBe("/tmp/test-session.json")
   })
 
-  it("refreshes system prompt from cachedBuildSystem on each turn", async () => {
+  it("passes 'cli' channel to runAgent for system prompt refresh", async () => {
     const runAgentCalls: any[][] = []
     setupBasic({
       inputSequence: ["hello", "/exit"],
@@ -500,8 +500,8 @@ describe("agent.ts main() - session persistence", () => {
     await main()
 
     expect(runAgentCalls.length).toBe(1) // "hello" turn
-    const msgs = runAgentCalls[0][0]
-    expect(msgs[0].content).toBe("system prompt")
+    // channel is the 3rd argument (index 2)
+    expect(runAgentCalls[0][2]).toBe("cli")
   })
 
   it("unhandled slash command falls through to regular input", async () => {
