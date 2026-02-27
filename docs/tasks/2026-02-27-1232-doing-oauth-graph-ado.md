@@ -191,7 +191,7 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 - No regressions in existing test files
 - Coverage report saved to artifacts directory
 
-### ⬜ Unit 5: Phase 1 Manual Validation Gate
+### 🔄 Unit 5: Phase 1 Manual Validation Gate
 **What**: **STOP. Manual validation with user required.** Present the user with instructions to:
 1. Ensure Azure/Entra setup is complete per `docs/OAUTH-SETUP.md`
 2. Start dev tunnel: `devtunnel host --port-numbers 3978 --allow-anonymous`
