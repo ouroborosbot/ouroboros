@@ -82,7 +82,7 @@ describe("ChannelCallbacks interface", () => {
 })
 
 describe("runAgent", () => {
-  let runAgent: (messages: any[], callbacks: ChannelCallbacks) => Promise<void>
+  let runAgent: (messages: any[], callbacks: ChannelCallbacks, signal?: AbortSignal) => Promise<{ usage?: any }>
 
   // Helper to create an async iterable from chunks
   function makeStream(chunks: any[]) {
@@ -1705,6 +1705,103 @@ describe("runAgent", () => {
     const assistantMsg = messages.find((m: any) => m.role === "assistant")
     expect(assistantMsg).toBeDefined()
     expect(assistantMsg._reasoning_items).toBeUndefined()
+  })
+
+  // --- Unit 3c: runAgent returns { usage } ---
+
+  it("returns usage from single API call (no tool calls)", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk("hello"),
+        { choices: [{ delta: {} }], usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 } },
+      ])
+    )
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const result = await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(result.usage).toBeDefined()
+    expect(result.usage!.input_tokens).toBe(100)
+    expect(result.usage!.output_tokens).toBe(50)
+    expect(result.usage!.total_tokens).toBe(150)
+  })
+
+  it("returns usage from last API call when multiple tool rounds", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue("data")
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          makeChunk(undefined, [{ index: 0, id: "c1", function: { name: "read_file", arguments: '{"path":"a.txt"}' } }]),
+          { choices: [{ delta: {} }], usage: { prompt_tokens: 50, completion_tokens: 20, total_tokens: 70 } },
+        ])
+      }
+      return makeStream([
+        makeChunk("done"),
+        { choices: [{ delta: {} }], usage: { prompt_tokens: 200, completion_tokens: 100, total_tokens: 300 } },
+      ])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const result = await runAgent([{ role: "system", content: "test" }], callbacks)
+    // Should return usage from the LAST call (200/100/300), not the first (50/20/70)
+    expect(result.usage).toBeDefined()
+    expect(result.usage!.input_tokens).toBe(200)
+    expect(result.usage!.total_tokens).toBe(300)
+  })
+
+  it("returns undefined usage when no usage data available", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([makeChunk("hello")])
+    )
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const result = await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(result.usage).toBeUndefined()
+  })
+
+  it("returns undefined usage on error", async () => {
+    mockCreate.mockImplementation(() => { throw new Error("network fail") })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const result = await runAgent([{ role: "system", content: "test" }], callbacks)
+    expect(result.usage).toBeUndefined()
   })
 })
 
