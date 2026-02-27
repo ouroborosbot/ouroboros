@@ -2,7 +2,7 @@
   "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.25/MicrosoftTeams.schema.json",
   "manifestVersion": "1.25",
   "version": "1.0.0",
-  "id": "93b3681b-1565-4ff7-bf1f-1d370e247604",
+  "id": "7467201b-d9b4-4792-9b46-ce84494f9d09",
   "developer": {
     "name": "Ouroboros (with help from Ari)"
   },
@@ -21,7 +21,7 @@
   "accentColor": "#4464ee",
   "bots": [
     {
-      "botId": "93b3681b-1565-4ff7-bf1f-1d370e247604",
+      "botId": "7467201b-d9b4-4792-9b46-ce84494f9d09",
       "scopes": ["personal", "copilot"],
       "commandLists": [
         {
@@ -44,13 +44,13 @@
     "customEngineAgents": [
       {
         "type": "bot",
-        "id": "93b3681b-1565-4ff7-bf1f-1d370e247604"
+        "id": "7467201b-d9b4-4792-9b46-ce84494f9d09"
       }
     ]
   },
   "webApplicationInfo": {
-    "id": "93b3681b-1565-4ff7-bf1f-1d370e247604",
-    "resource": "api://botid-93b3681b-1565-4ff7-bf1f-1d370e247604"
+    "id": "7467201b-d9b4-4792-9b46-ce84494f9d09",
+    "resource": "api://botid-7467201b-d9b4-4792-9b46-ce84494f9d09"
   },
   "validDomains": ["xcbc4jjj-3978.usw2.devtunnels.ms"]
 }
