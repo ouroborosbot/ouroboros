@@ -89,7 +89,7 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 **Output**: Failing tests in `src/__tests__/engine/streaming.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `toResponsesInput` does not yet handle `_reasoning_items`
 
-### ⬜ Unit 1d: Restore reasoning items in toResponsesInput -- Implementation
+### ✅ Unit 1d: Restore reasoning items in toResponsesInput -- Implementation
 **What**: In `src/engine/streaming.ts` `toResponsesInput`, in the assistant message handler (line 29-46), check for `a._reasoning_items` and push each reasoning item to `input` before pushing content and function_calls.
 **Output**: Modified `src/engine/streaming.ts`
 **Acceptance**: All Unit 1c tests PASS (green), all existing tests still pass, no warnings
