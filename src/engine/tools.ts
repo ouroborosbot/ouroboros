@@ -236,6 +236,20 @@ const toolHandlers: Record<string, ToolHandler> = {
   },
 };
 
+export const finalAnswerTool: OpenAI.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "final_answer",
+    description:
+      "give your final text response. use this when tool_choice is required and you want to reply with text instead of calling another tool.",
+    parameters: {
+      type: "object",
+      properties: { answer: { type: "string" } },
+      required: ["answer"],
+    },
+  },
+};
+
 export async function execTool(name: string, args: any): Promise<string> {
   const h = toolHandlers[name];
   if (!h) return `unknown: ${name}`;
