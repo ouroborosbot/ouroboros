@@ -36,6 +36,8 @@ export function createTeamsCallbacks(
 ): ChannelCallbacks {
   let stopped = false // set when stream signals cancellation (403)
   let hadToolRun = false
+  let hadRealOutput = false // true once reasoning/tool output shown; suppresses phrases
+  let reasoningBuf = "" // accumulated reasoning text for status display
   let phraseTimer: NodeJS.Timeout | null = null
   let lastPhrase = ""
 
@@ -77,6 +79,7 @@ export function createTeamsCallbacks(
 
   return {
     onModelStart: () => {
+      if (hadRealOutput) return // real output already shown; don't overwrite with phrases
       const pool = hadToolRun ? FOLLOWUP_PHRASES : THINKING_PHRASES
       const first = pickPhrase(pool)
       lastPhrase = first
@@ -85,11 +88,14 @@ export function createTeamsCallbacks(
     },
     onModelStreamStart: () => {
       // No-op: don't stop rotation here — keep cycling phrases through
-      // the reasoning phase until actual text arrives in onTextChunk.
+      // the reasoning phase until actual content arrives.
     },
-    onReasoningChunk: () => {
-      // No-op: reasoning is internal model thought, not user-facing.
-      // Phrases keep cycling while the model reasons.
+    onReasoningChunk: (text: string) => {
+      if (stopped) return
+      stopPhraseRotation()
+      hadRealOutput = true
+      reasoningBuf += text
+      safeUpdate(reasoningBuf)
     },
     onTextChunk: (text: string) => {
       if (stopped) return
@@ -98,6 +104,7 @@ export function createTeamsCallbacks(
     },
     onToolStart: (name: string, args: Record<string, string>) => {
       stopPhraseRotation()
+      hadRealOutput = true
       const argSummary = Object.values(args).join(", ")
       safeUpdate(`running ${name} (${argSummary})...`)
       hadToolRun = true
@@ -183,6 +190,20 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   } : undefined
   const result = await runAgent(messages, callbacks, "teams", controller.signal, toolContext ? { toolContext } : undefined)
 
+  // After the agent loop, check if any tool returned AUTH_REQUIRED and trigger signin.
+  // This must happen after the stream is done so the OAuth card renders properly.
+  if (teamsContext) {
+    const allContent = messages.map(m => typeof m.content === "string" ? m.content : "").join("\n")
+    if (allContent.includes("AUTH_REQUIRED:graph")) {
+      console.log("[teams] detected AUTH_REQUIRED:graph, sending signin card")
+      await teamsContext.signin("graph")
+    }
+    if (allContent.includes("AUTH_REQUIRED:ado")) {
+      console.log("[teams] detected AUTH_REQUIRED:ado, sending signin card")
+      await teamsContext.signin("ado")
+    }
+  }
+
   // Trim context and save session
   postTurn(messages, sessPath, result.usage)
   // SDK auto-closes the stream after our handler returns (app.process.js)
@@ -225,6 +246,8 @@ export function startTeamsApp(): void {
     const userId = activity.from?.id || ""
     const channelId = activity.channelId || "msteams"
 
+    console.log(`[teams] message received: "${text.slice(0, 80)}" from=${userId} conv=${convId.slice(0, 40)}`)
+
     // Fetch tokens for both OAuth connections independently.
     // Failures are silently caught -- the tool handler will request signin if needed.
     let graphToken: string | undefined
@@ -232,16 +255,35 @@ export function startTeamsApp(): void {
     try {
       const graphRes = await api.users.token.get({ userId, connectionName: oauthConfig.graphConnectionName, channelId })
       graphToken = graphRes?.token
-    } catch { /* token not available yet */ }
+      console.log(`[teams] graph token: ${graphToken ? "present" : "missing"}`)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.log(`[teams] graph token fetch failed: ${msg.slice(0, 120)}`)
+    }
     try {
       const adoRes = await api.users.token.get({ userId, connectionName: oauthConfig.adoConnectionName, channelId })
       adoToken = adoRes?.token
-    } catch { /* token not available yet */ }
+      console.log(`[teams] ado token: ${adoToken ? "present" : "missing"}`)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.log(`[teams] ado token fetch failed: ${msg.slice(0, 120)}`)
+    }
 
     const teamsContext: TeamsMessageContext = {
       graphToken,
       adoToken,
-      signin: (connectionName: string) => signin({ connectionName }),
+      signin: async (connectionName: string) => {
+        console.log(`[teams] signin called for connection: ${connectionName}`)
+        try {
+          const result = await signin({ connectionName })
+          console.log(`[teams] signin result: ${result ?? "undefined"}`)
+          return result
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e)
+          console.log(`[teams] signin error: ${msg.slice(0, 120)}`)
+          return undefined
+        }
+      },
     }
 
     try {

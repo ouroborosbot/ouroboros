@@ -145,14 +145,13 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   // --- onReasoningChunk tests ---
 
-  it("onReasoningChunk is a no-op (reasoning is internal, phrases keep cycling)", async () => {
+  it("onReasoningChunk sends reasoning text via update()", async () => {
     vi.resetModules()
     const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onReasoningChunk("analyzing code")
-    // No-op: neither update nor emit called
-    expect(mockStream.update).not.toHaveBeenCalled()
+    expect(mockStream.update).toHaveBeenCalledWith("analyzing code")
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
@@ -177,16 +176,18 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     expect(mockStream.emit).toHaveBeenCalledWith("hello")
   })
 
-  it("text after reasoning emits only text (reasoning NOT included in final message)", async () => {
+  it("onReasoningChunk accumulates chunks into a single update()", async () => {
     vi.resetModules()
     const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onReasoningChunk("step 1")
     callbacks.onReasoningChunk(" step 2")
+    // Each chunk updates with the accumulated buffer
+    expect(mockStream.update).toHaveBeenCalledWith("step 1")
+    expect(mockStream.update).toHaveBeenCalledWith("step 1 step 2")
+    // Text emits only final answer, not reasoning
     callbacks.onTextChunk("answer")
-    // Reasoning was shown via update() during streaming,
-    // but only text is emitted into the final message
     expect(mockStream.emit).toHaveBeenCalledTimes(1)
     expect(mockStream.emit).toHaveBeenCalledWith("answer")
   })
@@ -1078,17 +1079,17 @@ describe("Teams adapter - phrase rotation", () => {
     callbacks.onTextChunk("done")
   })
 
-  it("onReasoningChunk does not stop phrase rotation", async () => {
+  it("onReasoningChunk stops phrase rotation and shows reasoning", async () => {
     vi.resetModules()
     const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onModelStart()
-    callbacks.onReasoningChunk("thinking hard") // no-op
+    callbacks.onReasoningChunk("thinking hard")
     mockStream.update.mockClear()
-    vi.advanceTimersByTime(1500)
-    // Phrases still cycling
-    expect(mockStream.update).toHaveBeenCalled()
+    vi.advanceTimersByTime(3000)
+    // No more phrase rotation after reasoning arrives
+    expect(mockStream.update).not.toHaveBeenCalled()
     // cleanup
     callbacks.onTextChunk("done")
   })
@@ -1107,7 +1108,7 @@ describe("Teams adapter - phrase rotation", () => {
     expect(mockStream.update).not.toHaveBeenCalled()
   })
 
-  it("uses FOLLOWUP_PHRASES after tool run", async () => {
+  it("onModelStart is suppressed after real output (tool run)", async () => {
     vi.resetModules()
     const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
@@ -1115,15 +1116,29 @@ describe("Teams adapter - phrase rotation", () => {
     // First model call
     callbacks.onModelStart()
     callbacks.onTextChunk("response") // stops rotation
-    // Tool run
+    // Tool run — sets hadRealOutput
     callbacks.onToolStart("read_file", { path: "x" })
     callbacks.onToolEnd("read_file", "x", true)
-    // Second model call
+    // Second model call — no phrases because real output was already shown
     mockStream.update.mockClear()
     callbacks.onModelStart()
-    const calledWith = mockStream.update.mock.calls[0][0] as string
-    const phrase = calledWith.replace(/\.\.\.$/, "")
-    expect(FOLLOWUP_PHRASES).toContain(phrase)
+    expect(mockStream.update).not.toHaveBeenCalled()
+
+    callbacks.onTextChunk("done") // cleanup
+  })
+
+  it("onModelStart is suppressed after reasoning output", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onModelStart()
+    callbacks.onReasoningChunk("deep thought") // sets hadRealOutput
+    callbacks.onTextChunk("answer")
+    // Second model call — no phrases
+    mockStream.update.mockClear()
+    callbacks.onModelStart()
+    expect(mockStream.update).not.toHaveBeenCalled()
 
     callbacks.onTextChunk("done") // cleanup
   })
