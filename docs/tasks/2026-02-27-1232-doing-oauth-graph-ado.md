@@ -56,7 +56,7 @@ Add OAuth/SSO authentication to the Ouroboros Teams bot so the LLM agent can cal
 
 ## Phase 1: Smoke Test
 
-### ⬜ Unit 1: OAuth Setup Documentation
+### ✅ Unit 1: OAuth Setup Documentation
 **What**: Write `docs/OAUTH-SETUP.md` covering the manual Azure/Entra setup steps the user must perform.
 **Output**: `docs/OAUTH-SETUP.md` file committed.
 **Acceptance**:
