@@ -68,9 +68,11 @@ Add OAuth/SSO authentication to the Ouroboros Teams bot so the LLM agent can cal
 - Documents dev tunnel setup for local testing
 - Documents required `.env` variables
 
-### ⬜ Unit 2: Manifest and Config Changes
-**What**: Add `webApplicationInfo` to `manifest/manifest.json`. Add `OAuthConfig` and `AdoConfig` to `src/config.ts` with `getOAuthConfig()` and `getAdoConfig()` functions.
-**Output**: Updated `manifest/manifest.json`, updated `src/config.ts`.
+### ⬜ Unit 2: Config Changes
+**What**: Add `OAuthConfig` and `AdoConfig` to `src/config.ts` with `getOAuthConfig()` and `getAdoConfig()` functions. (Manifest `webApplicationInfo` already committed separately -- not included here.)
+**Output**: Updated `src/config.ts`, new/updated tests in `src/__tests__/engine/config.test.ts`.
+**Files modified**: `src/config.ts`
+**Files created/updated**: `src/__tests__/engine/config.test.ts` (or existing config test file)
 
 **TDD steps:**
 1. Write tests for `getOAuthConfig()` -- returns defaults (`graph`, `ado`), respects env var overrides (`OAUTH_GRAPH_CONNECTION`, `OAUTH_ADO_CONNECTION`)
@@ -78,118 +80,117 @@ Add OAuth/SSO authentication to the Ouroboros Teams bot so the LLM agent can cal
 3. Run tests, confirm FAIL (red)
 4. Implement `OAuthConfig`, `AdoConfig` interfaces, add to `OuroborosConfig`, implement `getOAuthConfig()` and `getAdoConfig()`
 5. Run tests, confirm PASS (green)
-6. Update `manifest/manifest.json` with `webApplicationInfo` section
 
 **Acceptance**:
 - `getOAuthConfig()` returns `{ graphConnectionName: "graph", adoConnectionName: "ado" }` by default
 - `getOAuthConfig()` respects `OAUTH_GRAPH_CONNECTION` and `OAUTH_ADO_CONNECTION` env vars
 - `getAdoConfig()` returns `{ organizations: [] }` by default
 - `getAdoConfig()` parses `ADO_ORGANIZATIONS` env var as comma-separated list
-- `manifest/manifest.json` has `webApplicationInfo` with `id` matching bot ID and `resource` set to `api://botid-{id}`
 - 100% coverage on new config code
 - All existing tests still pass
 
-### ⬜ Unit 3: ToolContext and Channel-Conditional Tools
-**What**: Add `ToolContext` interface to `src/engine/tools.ts`. Modify `ToolHandler` type and `execTool` to accept optional `ToolContext`. Add `getToolsForChannel(channel)` function. Add `toolContext` to `RunAgentOptions` in `src/engine/core.ts`. Wire `getToolsForChannel` into the agent loop (replacing static `tools` on line 187 of `core.ts`). Pass `toolContext` through to `execTool` in tool execution loop (lines 306-344 of `core.ts`).
-**Output**: Updated `src/engine/tools.ts`, updated `src/engine/core.ts`.
+### ⬜ Unit 3: OAuth Plumbing (Vertical Slice)
+**What**: Build the entire vertical slice needed for the two smoke-test tools (`graph_profile` and `ado_work_items`) to work end-to-end. This combines ToolContext, channel-conditional tools, core.ts wiring, Teams adapter refactoring, Graph client, ADO client, shared error handling, and the two tool handlers into a single unit.
+
+**Files created:**
+- `src/engine/graph-client.ts` -- minimal Graph client with `getProfile(token)`
+- `src/engine/ado-client.ts` -- minimal ADO client with `queryWorkItems(token, org, query)`
+- `src/engine/api-error.ts` -- shared `handleApiError(response, service, connectionName)` helper
+- `src/__tests__/engine/graph-client.test.ts`
+- `src/__tests__/engine/ado-client.test.ts`
+- `src/__tests__/engine/api-error.test.ts`
+
+**Files modified:**
+- `src/engine/tools.ts` -- add `ToolContext` interface, modify `ToolHandler` type, modify `execTool` signature, add `getToolsForChannel(channel)`, add `graphAdoTools` array, add `graph_profile` and `ado_work_items` definitions + handlers, update `summarizeArgs` (line 259)
+- `src/engine/core.ts` -- add `toolContext` to `RunAgentOptions`, replace static `tools` with `getToolsForChannel(channel)` on line 187, pass `toolContext` to `execTool` in tool execution loop (lines 306-344, specifically line 328)
+- `src/channels/teams.ts` -- refactor `app.on("message")` handler (line 203) to access full `IActivityContext`, fetch both tokens, refactor `handleTeamsMessage` to accept `TeamsMessageContext`, build `ToolContext` and pass to `runAgent`, add `oauth: { defaultConnectionName: "graph" }` to `App` constructor in `startTeamsApp`
+- `src/__tests__/engine/tools.test.ts` -- tests for ToolContext, getToolsForChannel, new tool handlers
+- `src/__tests__/engine/core.test.ts` -- tests for channel-based tool selection in runAgent, toolContext passthrough
+- `src/__tests__/channels/teams.test.ts` -- tests for token threading, TeamsMessageContext, ToolContext construction
+
+**Architectural details:**
+
+_ToolContext interface shape:_
+```typescript
+interface ToolContext {
+  graphToken?: string;
+  adoToken?: string;
+  signin: (connectionName: string) => Promise<string | undefined>;
+  adoOrganizations: string[];
+}
+```
+
+_core.ts line 187 replacement -- must preserve finalAnswerTool conditional:_
+```typescript
+// OLD: const activeTools = options?.toolChoiceRequired ? [...tools, finalAnswerTool] : tools;
+// NEW:
+const baseTools = getToolsForChannel(channel);
+const activeTools = options?.toolChoiceRequired ? [...baseTools, finalAnswerTool] : baseTools;
+```
+
+_core.ts tool execution loop (lines 306-344):_ Pass `options.toolContext` to `execTool` at line 328.
+
+_Teams adapter (line 203):_ Currently destructures only `{ stream, activity }`. Must access full `IActivityContext` including `api`, `signin`, `activity`. Fetch both tokens via `api.users.token.get({ channelId, userId, connectionName })` for each connection.
+
+_Error handling mapping (in api-error.ts):_
+- 401 -> `AUTH_REQUIRED:{connectionName}` (triggers re-signin flow)
+- 403 -> `PERMISSION_DENIED`
+- 429 -> `THROTTLED`
+- 5xx -> `SERVICE_ERROR`
+- Network error -> `NETWORK_ERROR`
+
+_Graph client:_ `getProfile(token)` calls `GET https://graph.microsoft.com/v1.0/me`, returns formatted summary (displayName, mail, jobTitle, department, officeLocation).
+
+_ADO client:_ `queryWorkItems(token, org, query)` calls `POST https://dev.azure.com/{org}/_apis/wit/wiql?api-version=7.1` with WIQL query, then fetches work item details. Returns formatted work item list (id, title, state, assignedTo).
+
+_Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_REQUIRED:graph` if missing. `ado_work_items` checks `toolContext.adoToken`, validates `organization` param against `toolContext.adoOrganizations`, returns `AUTH_REQUIRED:ado` if missing.
 
 **TDD steps:**
-1. Write tests for `getToolsForChannel("cli")` -- returns base tools only, no Graph/ADO tools
-2. Write tests for `getToolsForChannel("teams")` -- returns base tools + Graph/ADO tools
-3. Write tests for `execTool` with `ToolContext` -- context is passed through to handler
-4. Write tests verifying `runAgent` uses channel-based tool selection (mock `getToolsForChannel`)
-5. Run tests, confirm FAIL (red)
-6. Implement `ToolContext` interface, modify `ToolHandler`/`execTool`, implement `getToolsForChannel`, wire into `core.ts`
-7. Run tests, confirm PASS (green)
+1. Write all tests first (one test file per new module, plus additions to existing test files):
+   - `api-error.test.ts`: test `handleApiError` for each status code (401/403/429/5xx/network)
+   - `graph-client.test.ts`: test `getProfile(token)` success with mocked fetch, test error handling delegates to `handleApiError`
+   - `ado-client.test.ts`: test `queryWorkItems(token, org, query)` success with mocked fetch (WIQL query + work item detail fetch), test error handling
+   - `tools.test.ts` additions: test `getToolsForChannel("cli")` returns base tools only, test `getToolsForChannel("teams")` returns base tools + `graph_profile` + `ado_work_items`, test `execTool` passes `ToolContext` through to handler, test `graph_profile` handler (token present / token missing), test `ado_work_items` handler (token present / token missing / invalid org), test `summarizeArgs` for new tool names
+   - `core.test.ts` additions: test `runAgent` uses `getToolsForChannel(channel)` (mock it), test `runAgent` passes `options.toolContext` to `execTool`
+   - `teams.test.ts` additions: test new `handleTeamsMessage` signature with `TeamsMessageContext`, test `ToolContext` built and passed to `runAgent`, test token fetching (both succeed, one fails silently, both fail silently), test `startTeamsApp` passes `oauth` config to `App` constructor
+2. Run tests, confirm FAIL (red)
+3. Implement everything: `api-error.ts`, `graph-client.ts`, `ado-client.ts`, ToolContext + getToolsForChannel + handlers in `tools.ts`, wiring in `core.ts`, Teams adapter refactoring in `teams.ts`
+4. Run tests, confirm PASS (green)
+5. Verify 100% coverage on all new/modified code, refactor if needed
 
 **Acceptance**:
 - `ToolContext` interface has: `graphToken?: string`, `adoToken?: string`, `signin: (connectionName: string) => Promise<string | undefined>`, `adoOrganizations: string[]`
 - `getToolsForChannel("cli")` returns only base tools (read_file, write_file, shell, etc.)
 - `getToolsForChannel("teams")` returns base tools + `graph_profile` + `ado_work_items` (Phase 1 tools)
 - `execTool` passes `ToolContext` through to handler when provided
-- `runAgent` uses `getToolsForChannel(channel)` instead of static `tools` import. Note: line 187 of `core.ts` currently reads `const activeTools = options?.toolChoiceRequired ? [...tools, finalAnswerTool] : tools;` -- the replacement must preserve the `finalAnswerTool` conditional: `const baseTools = getToolsForChannel(channel); const activeTools = options?.toolChoiceRequired ? [...baseTools, finalAnswerTool] : baseTools;`
-- `runAgent` passes `options.toolContext` to `execTool` calls (line 328 of `core.ts`)
-- All existing tests still pass (no regressions from refactoring tool selection)
-- 100% coverage on new code
-
-### ⬜ Unit 4: Teams Adapter Token Threading
-**What**: Refactor `src/channels/teams.ts` to thread OAuth tokens and signin callback through to the agent loop. The `app.on("message")` handler (line 203) currently destructures only `{ stream, activity }`. Refactor it to access full `IActivityContext` including `api`, `signin`, `activity`. Fetch tokens for both `graph` and `ado` connections using `api.users.token.get({ channelId, userId, connectionName })`. Refactor `handleTeamsMessage` signature to accept a `TeamsMessageContext`. Build `ToolContext` and pass to `runAgent` via options. Add `oauth: { defaultConnectionName: "graph" }` to `App` constructor in `startTeamsApp`.
-**Output**: Updated `src/channels/teams.ts`.
-
-**TDD steps:**
-1. Write tests for new `handleTeamsMessage` signature accepting `TeamsMessageContext` with `graphToken`, `adoToken`, `signin`
-2. Write tests verifying `ToolContext` is built and passed to `runAgent` options
-3. Write tests for token fetching: both tokens fetched, one fails silently (token undefined), both fail silently
-4. Write tests for `startTeamsApp` passing `oauth` config to `App` constructor
-5. Run tests, confirm FAIL (red)
-6. Implement the refactoring
-7. Run tests, confirm PASS (green)
-
-**Acceptance**:
-- `app.on("message")` handler accesses full context, fetches `graphToken` and `adoToken` separately
+- `runAgent` uses `getToolsForChannel(channel)` instead of static `tools` import, preserving `finalAnswerTool` conditional
+- `runAgent` passes `options.toolContext` to `execTool` calls
+- `handleApiError` correctly maps 401->AUTH_REQUIRED, 403->PERMISSION_DENIED, 429->THROTTLED, 5xx->SERVICE_ERROR, network->NETWORK_ERROR
+- `getProfile(token)` calls Graph API `/v1.0/me` and returns formatted profile (displayName, mail, jobTitle, department, officeLocation)
+- `queryWorkItems(token, org, query)` calls ADO WIQL endpoint and returns formatted work items (id, title, state, assignedTo)
+- `graph_profile` handler returns `AUTH_REQUIRED:graph` when `graphToken` missing, calls `getProfile` when present
+- `ado_work_items` handler returns `AUTH_REQUIRED:ado` when `adoToken` missing, validates `organization` against `adoOrganizations`, calls `queryWorkItems` when present
+- `summarizeArgs` handles `graph_profile` and `ado_work_items` tool names
+- `app.on("message")` handler accesses full `IActivityContext`, fetches both tokens separately
 - Token fetch failures are silently caught (token is `undefined`, not an error)
 - `handleTeamsMessage` receives `TeamsMessageContext` with `graphToken`, `adoToken`, `signin(connectionName)`
 - `ToolContext` is built from `TeamsMessageContext` and passed to `runAgent`
 - `App` constructor receives `oauth: { defaultConnectionName }` from config
-- All existing Teams adapter tests still pass
-- 100% coverage on new/modified code
+- 100% coverage on all new/modified code (all branches, error paths, edge cases)
+- All existing tests still pass (no regressions)
+- No warnings
 
-### ⬜ Unit 5a: Graph Client -- Tests
-**What**: Write tests for minimal Graph client (`src/engine/graph-client.ts`). Test `getProfile(token)` with mocked fetch. Test error handling: 401 returns `AUTH_REQUIRED:graph`, 403 returns `PERMISSION_DENIED`, 429 returns `THROTTLED`, 5xx returns `SERVICE_ERROR`, network error returns `NETWORK_ERROR`. Test success case returns formatted profile summary.
-**Output**: Test file `src/__tests__/engine/graph-client.test.ts`.
-**Acceptance**: Tests exist and FAIL (red) because `graph-client.ts` does not exist yet.
-
-### ⬜ Unit 5b: Graph Client -- Implementation
-**What**: Create `src/engine/graph-client.ts` with `getProfile(token)` method. Implement shared `handleApiError(response, service, connectionName)` helper. `getProfile` calls `GET https://graph.microsoft.com/v1.0/me`, returns formatted summary (displayName, mail, jobTitle, department, officeLocation).
-**Output**: `src/engine/graph-client.ts`.
-**Acceptance**: All graph-client tests PASS (green), no warnings.
-
-### ⬜ Unit 5c: Graph Client -- Coverage
-**What**: Verify 100% coverage on `graph-client.ts`. Refactor if needed.
-**Output**: Coverage report showing 100% on `src/engine/graph-client.ts`.
-**Acceptance**: 100% branch/line/function coverage, tests still green.
-
-### ⬜ Unit 6a: ADO Client -- Tests
-**What**: Write tests for minimal ADO client (`src/engine/ado-client.ts`). Test `queryWorkItems(token, org, query)` with mocked fetch. Test with WIQL query and with work item IDs. Test error handling: same pattern as Graph (401/403/429/5xx/network). Test success case returns formatted work item list (id, title, state, assignedTo).
-**Output**: Test file `src/__tests__/engine/ado-client.test.ts`.
-**Acceptance**: Tests exist and FAIL (red) because `ado-client.ts` does not exist yet.
-
-### ⬜ Unit 6b: ADO Client -- Implementation
-**What**: Create `src/engine/ado-client.ts` with `queryWorkItems(token, org, query)` method. Reuse shared `handleApiError` from graph-client (or extract to a shared `api-error.ts` module). `queryWorkItems` calls `POST https://dev.azure.com/{org}/_apis/wit/wiql?api-version=7.1` with WIQL query, then fetches work item details. Returns formatted summary.
-**Output**: `src/engine/ado-client.ts`.
-**Acceptance**: All ado-client tests PASS (green), no warnings.
-
-### ⬜ Unit 6c: ADO Client -- Coverage
-**What**: Verify 100% coverage on `ado-client.ts` (and `api-error.ts` if extracted). Refactor if needed.
-**Output**: Coverage report showing 100%.
-**Acceptance**: 100% branch/line/function coverage, tests still green.
-
-### ⬜ Unit 7a: graph_profile and ado_work_items Tools -- Tests
-**What**: Write tests for the two Phase 1 tool handlers. Test `graph_profile` handler: calls `getProfile` when `graphToken` present, returns `AUTH_REQUIRED:graph` when `graphToken` missing. Test `ado_work_items` handler: calls `queryWorkItems` when `adoToken` present with correct org, returns `AUTH_REQUIRED:ado` when `adoToken` missing, validates organization param against `adoOrganizations` list.
-**Output**: Tests in `src/__tests__/engine/tools.test.ts` (or a new file for Graph/ADO tool tests).
-**Acceptance**: Tests exist and FAIL (red) because tool handlers are not yet registered.
-
-### ⬜ Unit 7b: graph_profile and ado_work_items Tools -- Implementation
-**What**: Add `graph_profile` and `ado_work_items` tool definitions and handlers to `src/engine/tools.ts`. Register them in the `graphAdoTools` array used by `getToolsForChannel("teams")`. Each handler checks for its required token in `ToolContext`, returns `AUTH_REQUIRED:{connection}` if missing. `ado_work_items` validates the `organization` param against `toolContext.adoOrganizations`. Also update `summarizeArgs` (line 259 of `tools.ts`) to handle the new tool names.
-**Output**: Updated `src/engine/tools.ts`.
-**Acceptance**: All tool tests PASS (green), `summarizeArgs` handles new tools, no warnings.
-
-### ⬜ Unit 7c: graph_profile and ado_work_items Tools -- Coverage
-**What**: Verify 100% coverage on new tool code. Refactor if needed.
-**Output**: Coverage report showing 100%.
-**Acceptance**: 100% branch/line/function coverage, tests still green.
-
-### ⬜ Unit 8: Full Test Suite and Integration Check
+### ⬜ Unit 4: Full Test Suite and Integration Check
 **What**: Run the full test suite (`npm run test:coverage`). Verify no regressions. Verify all new code has 100% coverage. Fix any issues.
 **Output**: Clean test run, coverage report in `./2026-02-27-1232-doing-oauth-graph-ado/`.
 **Acceptance**:
 - All tests pass
 - No warnings
-- 100% coverage on all new files (`graph-client.ts`, `ado-client.ts`, `api-error.ts` if extracted)
+- 100% coverage on all new files (`graph-client.ts`, `ado-client.ts`, `api-error.ts`, new code in `tools.ts`, `core.ts`, `teams.ts`)
 - No regressions in existing test files
 - Coverage report saved to artifacts directory
 
-### ⬜ Unit 9: Phase 1 Manual Validation Gate
+### ⬜ Unit 5: Phase 1 Manual Validation Gate
 **What**: **STOP. Manual validation with user required.** Present the user with instructions to:
 1. Ensure Azure/Entra setup is complete per `docs/OAUTH-SETUP.md`
 2. Start dev tunnel: `devtunnel host --port-numbers 3978 --allow-anonymous`
@@ -343,7 +344,7 @@ Add OAuth/SSO authentication to the Ouroboros Teams bot so the LLM agent can cal
 - **All artifacts**: Save outputs, logs, data to `./2026-02-27-1232-doing-oauth-graph-ado/` directory
 - **Fixes/blockers**: Spawn sub-agent immediately -- don't ask, just do it
 - **Decisions made**: Update docs immediately, commit right away
-- **Phase 1 gate**: Unit 9 is a hard stop -- user must manually validate before Phase 2
+- **Phase 1 gate**: Unit 5 is a hard stop -- user must manually validate before Phase 2
 - **Shared error handling**: Extract `handleApiError` to `src/engine/api-error.ts` if both Graph and ADO clients use it (decide during Unit 5b/6b)
 
 ## Progress Log
