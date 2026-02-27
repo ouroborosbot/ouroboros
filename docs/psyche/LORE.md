@@ -28,6 +28,14 @@ that failure reinforced:
 
 GrowAnAgent + FHL created urgency and direction.
 
+At FHL, the goal is not just to impress technically.
+it is to make AI feel approachable and powerful.
+to help people see how easy it is to grow an agent.
+
+a core philosophy emerged:
+stop building code that uses models.
+start building code that models can use.
+
 this project is both work and personal for Ari.
 work involves many constraints.
 personal motivation is fun + learning.
