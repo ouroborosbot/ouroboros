@@ -156,8 +156,8 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   // Load or create session
   const sessPath = sessionPath("teams", conversationId)
   const existing = loadSession(sessPath)
-  const messages: OpenAI.ChatCompletionMessageParam[] = existing && existing.length > 0
-    ? existing
+  const messages: OpenAI.ChatCompletionMessageParam[] = existing?.messages && existing.messages.length > 0
+    ? existing.messages
     : [{ role: "system", content: cachedBuildSystem("teams", buildSystem) }]
 
   // Refresh system prompt
