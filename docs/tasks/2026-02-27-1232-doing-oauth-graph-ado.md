@@ -358,3 +358,4 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 - 2026-02-27 13:38 Phase 1 compression: Pass 2 granularity - no changes needed (all 5 units atomic/testable)
 - 2026-02-27 13:38 Phase 1 compression: Pass 3 validation - cross-checked all old units, no losses found
 - 2026-02-27 13:39 Phase 1 compression: Pass 4 quality - added Output line to Unit 3 for consistency
+- 2026-02-27 13:42 Unit 1 complete: docs/OAUTH-SETUP.md written covering app registration, API permissions, two OAuth connections (graph + ado), manifest webApplicationInfo, dev tunnel, env vars
