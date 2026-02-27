@@ -285,7 +285,7 @@ This eliminates the duplicated trim+save code in both adapters. Each adapter jus
 
 ### Feature 4: Context Overflow Auto-Recovery
 
-### ⬜ Unit 4a: Detect context overflow errors -- Tests
+### ✅ Unit 4a: Detect context overflow errors -- Tests
 **What**: Write failing tests in `src/__tests__/engine/core.test.ts` for context overflow detection and auto-recovery in `runAgent`. Tests cover:
 - Azure overflow: when streaming throws an error with `error.code === "context_length_exceeded"`, `runAgent` catches it, trims messages aggressively, and retries
 - Azure overflow (alternate): error message contains "context_length_exceeded"
