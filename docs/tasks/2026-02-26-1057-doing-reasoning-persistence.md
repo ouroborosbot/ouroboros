@@ -395,3 +395,4 @@ Call sites to update (source files only):
 - 2026-02-26 17:23 Unit 1a complete: failing tests for _reasoning_items on assistant messages (2 fail as expected, 3 pass for negative/preservation cases)
 - 2026-02-26 17:25 Feature 1 complete (Units 1a-1e): reasoning items persisted on assistant messages and restored in toResponsesInput. 100% coverage on core.ts, streaming.ts, context.ts.
 - 2026-02-26 17:28 Feature 2 complete (Units 2a-2e): Azure and MiniMax usage capture with UsageData type. 100% coverage on streaming.ts.
+- 2026-02-26 17:42 Unit 3g complete: CLI main tests updated for postTurn (no pre-call trimming), boot greeting removed, loadSessionReturn format updated. 10 tests fail (red).
