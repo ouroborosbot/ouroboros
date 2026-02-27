@@ -1,0 +1,177 @@
+# OAuth Setup for Graph API and Azure DevOps API
+
+This guide covers the manual Azure/Entra setup required for Ouroboros to call Microsoft Graph API and Azure DevOps API on behalf of users via OAuth SSO in Teams.
+
+## Prerequisites
+
+- An Azure subscription with access to Azure Portal
+- An existing Azure Bot resource (the one used by Ouroboros)
+- The app registration for the bot (matching `CLIENT_ID` in `.env`)
+- Admin access to the Azure AD (Entra ID) tenant
+- A dev tunnel for local testing
+
+## 1. Configure the App Registration
+
+### 1.1 Expose an API
+
+1. Go to **Azure Portal** > **App registrations** > select your bot's app registration.
+2. Go to **Expose an API**.
+3. Set the **Application ID URI** to:
+   ```
+   api://botid-{your-bot-id}
+   ```
+   where `{your-bot-id}` is the bot's app ID (same as `CLIENT_ID`).
+4. Add a scope:
+   - **Scope name**: `access_as_user`
+   - **Who can consent**: Admins and users
+   - **Admin consent display name**: Access Ouroboros as the user
+   - **Admin consent description**: Allows Ouroboros to access Microsoft Graph and Azure DevOps on behalf of the user.
+   - **State**: Enabled
+
+### 1.2 Pre-authorize Teams Client IDs
+
+Under **Expose an API** > **Authorized client applications**, add the following Teams client IDs and select the `access_as_user` scope for each:
+
+| Client ID | Application |
+|---|---|
+| `1fec8e78-bce4-4aaf-ab1b-5451cc387264` | Teams desktop / mobile |
+| `5e3ce6c0-2b1f-4285-8d4b-75ee78787346` | Teams web |
+
+### 1.3 Add API Permissions
+
+Go to **API permissions** > **Add a permission**.
+
+**Microsoft Graph (delegated permissions):**
+- `User.Read`
+- `Mail.ReadWrite`
+- `Calendars.ReadWrite`
+- `Files.ReadWrite.All`
+- `Chat.Read`
+- `Sites.ReadWrite.All`
+
+**Azure DevOps (delegated permissions):**
+1. Select **APIs my organization uses** > search for **Azure DevOps** (or **Visual Studio Team Services**).
+2. Add these delegated permissions:
+   - `vso.work_write`
+   - `vso.code_write`
+   - `vso.build`
+
+After adding all permissions, click **Grant admin consent for {tenant}** if you have admin rights (or ask your admin to do this).
+
+### 1.4 Add a Client Secret (if not already present)
+
+Go to **Certificates & secrets** > **Client secrets** > **New client secret**. Copy the value and set it as `CLIENT_SECRET` in your `.env` file.
+
+### 1.5 Authentication Redirect URI
+
+Go to **Authentication** > **Add a platform** > **Web**. Add the redirect URI:
+```
+https://token.botframework.com/.auth/web/redirect
+```
+
+## 2. Create OAuth Connection Settings on the Azure Bot Resource
+
+You need **two** OAuth connection settings on the Azure Bot resource -- one for Microsoft Graph and one for Azure DevOps. Each targets a different token audience.
+
+### 2.1 Graph Connection (`graph`)
+
+1. Go to **Azure Portal** > **Azure Bot** resource > **Configuration** > **OAuth Connection Settings** > **Add Setting**.
+2. Fill in:
+   - **Name**: `graph` (must match `OAUTH_GRAPH_CONNECTION` env var or the default)
+   - **Service Provider**: Azure Active Directory v2
+   - **Client ID**: your bot's app ID (`CLIENT_ID`)
+   - **Client Secret**: your bot's client secret (`CLIENT_SECRET`)
+   - **Token Exchange URL**: `api://botid-{your-bot-id}`
+   - **Tenant ID**: your tenant ID (`TENANT_ID`)
+   - **Scopes**: `User.Read Mail.ReadWrite Calendars.ReadWrite Files.ReadWrite.All Chat.Read Sites.ReadWrite.All`
+
+### 2.2 ADO Connection (`ado`)
+
+1. Same as above, add another OAuth connection setting.
+2. Fill in:
+   - **Name**: `ado` (must match `OAUTH_ADO_CONNECTION` env var or the default)
+   - **Service Provider**: Azure Active Directory v2
+   - **Client ID**: your bot's app ID (`CLIENT_ID`)
+   - **Client Secret**: your bot's client secret (`CLIENT_SECRET`)
+   - **Token Exchange URL**: `api://botid-{your-bot-id}`
+   - **Tenant ID**: your tenant ID (`TENANT_ID`)
+   - **Scopes**: `499b84ac-1321-427f-aa17-267ca6975798/.default` (this is the Azure DevOps resource ID; the `.default` scope requests all configured ADO permissions)
+
+> **Note**: The ADO scopes use the Azure DevOps resource ID (`499b84ac-1321-427f-aa17-267ca6975798`) rather than the `https://app.vso.com` audience. The `.default` scope requests all permissions configured on the app registration for that resource.
+
+## 3. Teams Manifest
+
+The manifest already includes `webApplicationInfo` (committed separately):
+
+```json
+{
+  "webApplicationInfo": {
+    "id": "93b3681b-1565-4ff7-bf1f-1d370e247604",
+    "resource": "api://botid-93b3681b-1565-4ff7-bf1f-1d370e247604"
+  }
+}
+```
+
+This tells Teams to enable SSO token exchange with the app registration. The `id` must match your bot's app ID and the `resource` must match the Application ID URI set in step 1.1.
+
+## 4. Dev Tunnel Setup (Local Testing)
+
+1. Install dev tunnels: `npm install -g @devtunnels/cli` (or use the VS Code extension).
+2. Start a tunnel:
+   ```bash
+   devtunnel host --port-numbers 3978 --allow-anonymous
+   ```
+3. Copy the tunnel URL (e.g., `https://xcbc4jjj-3978.usw2.devtunnels.ms`).
+4. Update the **Azure Bot** resource > **Configuration** > **Messaging endpoint** to:
+   ```
+   https://{tunnel-url}/api/messages
+   ```
+5. Add the tunnel domain to `manifest.json` `validDomains` array.
+6. Re-upload the app package to Teams if the manifest changed.
+
+## 5. Required Environment Variables
+
+Add these to your `.env` file:
+
+```bash
+# Existing bot credentials
+CLIENT_ID=your-bot-app-id
+CLIENT_SECRET=your-bot-client-secret
+TENANT_ID=your-tenant-id
+
+# OAuth connection names (optional, defaults shown)
+OAUTH_GRAPH_CONNECTION=graph
+OAUTH_ADO_CONNECTION=ado
+
+# Azure DevOps organizations (comma-separated)
+ADO_ORGANIZATIONS=org1,org2
+```
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `CLIENT_ID` | Yes | -- | Bot app registration ID |
+| `CLIENT_SECRET` | Yes | -- | Bot app registration client secret |
+| `TENANT_ID` | Yes | -- | Azure AD tenant ID |
+| `OAUTH_GRAPH_CONNECTION` | No | `graph` | Name of the Graph OAuth connection on Azure Bot |
+| `OAUTH_ADO_CONNECTION` | No | `ado` | Name of the ADO OAuth connection on Azure Bot |
+| `ADO_ORGANIZATIONS` | No | (empty) | Comma-separated list of ADO organizations the bot can access |
+
+## 6. Verification
+
+After completing the setup:
+
+1. Start the dev tunnel.
+2. Run `npm run teams`.
+3. In Teams, message the bot: "Who am I?"
+   - This triggers `graph_profile`, which may prompt for Graph signin.
+   - After signin, the bot should return your profile (name, email, job title).
+4. Ask the bot: "Show my work items in {org}"
+   - This triggers `ado_work_items`, which may prompt for ADO signin.
+   - After signin, the bot should return your recent work items.
+
+If signin fails, check:
+- OAuth connection names match between Azure Bot config and env vars
+- Client secret is valid and not expired
+- Scopes are correctly configured
+- Admin consent has been granted
+- Dev tunnel URL matches the messaging endpoint
