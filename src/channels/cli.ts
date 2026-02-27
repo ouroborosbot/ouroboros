@@ -3,8 +3,8 @@ import * as readline from "readline"
 import { runAgent, ChannelCallbacks } from "../engine/core"
 import { buildSystem } from "../mind/prompt"
 import { pickPhrase, THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "../repertoire/phrases"
-import { sessionPath, getContextConfig } from "../config"
-import { loadSession, saveSession, deleteSession, trimMessages, cachedBuildSystem } from "../mind/context"
+import { sessionPath } from "../config"
+import { loadSession, deleteSession, cachedBuildSystem, postTurn } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "../repertoire/commands"
 
 // spinner that only touches stderr, cleans up after itself
@@ -198,11 +198,6 @@ export function createCliCallbacks(): ChannelCallbacks {
   }
 }
 
-export async function bootGreeting(messages: OpenAI.ChatCompletionMessageParam[], callbacks: ChannelCallbacks, signal?: AbortSignal): Promise<void> {
-  messages.push({ role: "user", content: "hello" })
-  await runAgent(messages, callbacks, signal)
-}
-
 export async function main() {
   const sessPath = sessionPath("cli", "session")
   const registry = createCommandRegistry()
@@ -224,16 +219,6 @@ export async function main() {
   console.log("\nouroboros (type /commands for help)\n")
 
   const cliCallbacks = createCliCallbacks()
-
-  // Only run boot greeting for fresh sessions
-  if (!existing || existing.length === 0) {
-    const bootAbort = new AbortController()
-    ctrl.suppress(() => bootAbort.abort())
-    await bootGreeting(messages, cliCallbacks, bootAbort.signal).catch(() => {})
-    ctrl.restore()
-    process.stdout.write("\n\n")
-    saveSession(sessPath, messages)
-  }
 
   process.stdout.write("\x1b[36m> \x1b[0m")
 
@@ -297,16 +282,11 @@ export async function main() {
       // Refresh system prompt
       messages[0] = { role: "system", content: cachedBuildSystem("cli", buildSystem) }
 
-      // Trim context window
-      const { maxTokens, contextMargin } = getContextConfig()
-      const trimmed = trimMessages(messages, maxTokens, contextMargin)
-      messages.length = 0
-      messages.push(...trimmed)
-
       currentAbort = new AbortController()
       ctrl.suppress(() => currentAbort!.abort())
+      let result: { usage?: any } | undefined
       try {
-        await runAgent(messages, cliCallbacks, currentAbort.signal)
+        result = await runAgent(messages, cliCallbacks, currentAbort.signal)
       } catch {
         // AbortError — silently return to prompt
       }
@@ -314,7 +294,7 @@ export async function main() {
       currentAbort = null
       process.stdout.write("\n\n")
 
-      saveSession(sessPath, messages)
+      postTurn(messages, sessPath, result?.usage)
 
       if (closed) break
       process.stdout.write("\x1b[36m> \x1b[0m")

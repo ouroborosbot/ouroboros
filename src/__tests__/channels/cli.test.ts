@@ -415,39 +415,6 @@ describe("CLI adapter - onError", () => {
   })
 })
 
-describe("CLI adapter - bootGreeting", () => {
-  it("is exported from agent.ts", async () => {
-    vi.resetModules()
-    const agent = await import("../../channels/cli")
-    expect(typeof agent.bootGreeting).toBe("function")
-  })
-
-  it("pushes hello as first user message", async () => {
-    vi.resetModules()
-
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true)
-    vi.spyOn(process.stderr, "write").mockImplementation(() => true)
-
-    // We need to mock runAgent within core
-    const mockRunAgent = vi.fn()
-    vi.doMock("../../engine/core", () => ({
-      runAgent: mockRunAgent,
-      buildSystem: vi.fn().mockReturnValue("system prompt"),
-      summarizeArgs: vi.fn().mockReturnValue(""),
-    }))
-
-    const agent = await import("../../channels/cli")
-    const messages: any[] = [{ role: "system", content: "system prompt" }]
-    const callbacks = agent.createCliCallbacks()
-    await agent.bootGreeting(messages, callbacks)
-
-    expect(messages.some((m: any) => m.role === "user" && m.content === "hello")).toBe(true)
-    expect(mockRunAgent).toHaveBeenCalledWith(messages, callbacks, undefined)
-
-    vi.restoreAllMocks()
-  })
-})
-
 describe("CLI adapter - phrase rotation", () => {
   let stderrChunks: string[]
   let stderrSpy: ReturnType<typeof vi.spyOn>
