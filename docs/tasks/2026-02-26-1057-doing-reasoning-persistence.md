@@ -32,7 +32,8 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 - [ ] Retry succeeds after trimming (or surfaces the error if trimming can't help)
 - [ ] Within-turn reasoning accumulation in azureInput is preserved (existing behavior unchanged)
 - [ ] Boot greeting removed from CLI `main()` (sessions persist forever -- first-run experience addressed separately)
-- [ ] System prompt refresh preserved pre-call in both CLI and Teams adapters
+- [ ] System prompt refresh happens inside `runAgent`, not in adapters
+- [ ] No duplicate `cachedBuildSystem` calls in adapter code
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -225,12 +226,12 @@ This avoids the compile breakage that would occur if loadSession's return type c
 ### ⬜ Unit 3f: Move trimming to after runAgent in CLI -- Implementation
 **What**: In `src/channels/cli.ts` `main()`:
 - Remove the boot greeting block: delete the `if (!existing || existing.length === 0)` block that calls `bootGreeting` (lines 229-236). Add a TODO comment: `// TODO: first-run experience (greeting) -- addressed separately`. Keep the `bootGreeting` function itself (tests may reference it), just remove the call in `main()`.
-- **Preserve system prompt refresh pre-call**: the line `messages[0] = { role: "system", content: cachedBuildSystem("cli", buildSystem) }` (line 298) MUST remain before `runAgent`. Do NOT move or remove it when restructuring the trim flow.
 - Remove the pre-call `trimMessages` block (lines 301-304)
 - Capture the return value from `runAgent`: `const result = await runAgent(messages, cliCallbacks, currentAbort.signal)`
 - After runAgent, get context config and call `trimMessages(messages, maxTokens, contextMargin, result.usage?.input_tokens)`
 - Replace messages array contents with trimmed result
 - Update `saveSession` call to include `result.usage` as lastUsage
+- Leave the system prompt refresh line (`messages[0] = ...`) in place for now -- Feature 5 will move it into `runAgent`
 **Output**: Modified `src/channels/cli.ts`
 **Acceptance**: All Unit 3e tests PASS (green), existing tests still pass, no warnings
 
@@ -244,12 +245,12 @@ This avoids the compile breakage that would occur if loadSession's return type c
 
 ### ⬜ Unit 3h: Move trimming to after runAgent in Teams -- Implementation
 **What**: In `src/channels/teams.ts` `handleTeamsMessage()`:
-- **Preserve system prompt refresh pre-call**: the line `messages[0] = { role: "system", content: cachedBuildSystem("teams", buildSystem) }` (line 164) MUST remain before `runAgent`. Do NOT move or remove it when restructuring the trim flow.
 - Remove the pre-call `trimMessages` block (lines 170-173)
 - Capture the return value from `runAgent`: `const result = await runAgent(messages, callbacks, controller.signal)`
 - After runAgent, get context config and call `trimMessages(messages, maxTokens, contextMargin, result.usage?.input_tokens)`
 - Replace messages array contents with trimmed result
 - Update `saveSession` call to include `result.usage` as lastUsage
+- Leave the system prompt refresh line (`messages[0] = ...`) in place for now -- Feature 5 will move it into `runAgent`
 **Output**: Modified `src/channels/teams.ts`
 **Acceptance**: All Unit 3g tests PASS (green), existing tests still pass, no warnings
 
@@ -294,9 +295,60 @@ Note: With retroactive trimming after each turn (Feature 3), context overflow sh
 
 ---
 
+### Feature 5: Move System Prompt Refresh into runAgent
+
+### ⬜ Unit 5a: runAgent refreshes system prompt -- Tests
+**What**: Write failing tests in `src/__tests__/engine/core.test.ts` for `runAgent` accepting a `channel` parameter and refreshing the system prompt. Tests cover:
+- `runAgent` accepts a `channel: Channel` parameter (after `callbacks`, before `signal`): `runAgent(messages, callbacks, channel, signal?)`
+- At the start of `runAgent`, `messages[0]` is overwritten with a fresh system prompt via `cachedBuildSystem(channel, buildSystem)`
+- When `channel` is `"cli"`, the system prompt is built for CLI
+- When `channel` is `"teams"`, the system prompt is built for Teams
+- Existing test calls that do not pass `channel` still work (parameter is optional with a default, or tests are updated)
+
+Note: there are ~50 existing `runAgent` call sites in `core.test.ts` that use the current signature `runAgent(messages, callbacks, signal?)`. The tests should add `channel` parameter to the new tests. Existing tests can pass a default channel (e.g., `"cli"`) or the parameter can have a default value.
+**Output**: Failing tests in `src/__tests__/engine/core.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because `runAgent` does not yet accept `channel` or refresh the system prompt
+
+### ⬜ Unit 5b: Move system prompt refresh into runAgent -- Implementation
+**What**:
+**In `src/engine/core.ts`**:
+- Add `channel: Channel` parameter to `runAgent` signature: `runAgent(messages, callbacks, channel, signal?)`
+- At the top of the function (before the while loop), refresh the system prompt: `messages[0] = { role: "system", content: cachedBuildSystem(channel, buildSystem) }`
+- Import `Channel` from `../mind/prompt` (already re-exported from core.ts as `export type { Channel } from "../mind/prompt"`)
+- Import `cachedBuildSystem` from `../mind/context`
+- Import `buildSystem` from `../mind/prompt` (already re-exported from core.ts as `export { buildSystem } from "../mind/prompt"`)
+
+**In `src/channels/cli.ts`**:
+- Remove the system prompt refresh line `messages[0] = { role: "system", content: cachedBuildSystem("cli", buildSystem) }` from `main()` (it now happens inside `runAgent`)
+- Update `runAgent` call in `main()` to pass `"cli"` as channel: `runAgent(messages, cliCallbacks, "cli", currentAbort.signal)`
+- Update `bootGreeting` call (if still present) to pass `"cli"`: `runAgent(messages, callbacks, "cli", signal)`. If boot greeting was already removed in Unit 3f, skip this.
+- Remove `cachedBuildSystem` and `buildSystem` imports if they are no longer used in cli.ts (check if `loadSession` fallback still uses `cachedBuildSystem` for the initial system prompt -- if so, keep the import)
+
+**In `src/channels/teams.ts`**:
+- Remove the system prompt refresh line `messages[0] = { role: "system", content: cachedBuildSystem("teams", buildSystem) }` from `handleTeamsMessage()`
+- Update `runAgent` call to pass `"teams"` as channel: `runAgent(messages, callbacks, "teams", controller.signal)`
+- Remove `buildSystem` import if no longer used in teams.ts (check if `loadSession` fallback still uses `cachedBuildSystem` for the initial system prompt -- if so, keep the import)
+
+**In `src/__tests__/engine/core.test.ts`**:
+- Update all ~50 existing `runAgent` call sites to pass a channel parameter. Use `"cli"` as the default for existing tests. Alternatively, if `channel` has a default value in the signature, existing calls may not need updating.
+
+Call sites to update (source files only):
+- `src/channels/cli.ts`: `runAgent(messages, cliCallbacks, "cli", currentAbort.signal)` (line ~309)
+- `src/channels/cli.ts`: `bootGreeting` -> `runAgent(messages, callbacks, "cli", signal)` (line ~203, if still present)
+- `src/channels/teams.ts`: `runAgent(messages, callbacks, "teams", controller.signal)` (line ~178)
+**Output**: Modified `src/engine/core.ts`, `src/channels/cli.ts`, `src/channels/teams.ts`, `src/__tests__/engine/core.test.ts`
+**Acceptance**: All Unit 5a tests PASS (green), all existing tests still pass, no warnings, no duplicate `cachedBuildSystem` calls in adapter code
+
+### ⬜ Unit 5c: System prompt refresh -- Coverage & Refactor
+**What**: Verify 100% coverage on all Feature 5 changes. Run full test suite. Confirm no regressions. Verify that `cachedBuildSystem` is no longer called from adapter code (only from `runAgent` in core.ts).
+**Output**: Coverage report confirms 100% on new code
+**Acceptance**: 100% coverage on new code, all tests green, no warnings
+
+---
+
 ### Final
 
-### ⬜ Unit 5: Full integration verification
+### ⬜ Unit 6: Full integration verification
 **What**: Run the complete test suite. Verify all completion criteria are met. Verify no warnings. Run coverage report and confirm 100% on all new code.
 **Output**: All tests pass, coverage confirmed, no warnings
 **Acceptance**: All completion criteria checked off
@@ -316,3 +368,4 @@ Note: With retroactive trimming after each turn (Feature 3), context overflow sh
 - 2026-02-26 16:46 Validation pass: verified all line numbers, function signatures, event names, error shapes against actual source. Documented loadSession breaking change in Unit 3d with explicit migration notes in Units 3h/3j. Confirmed OpenAI SDK APIError.code property maps correctly for overflow detection.
 - 2026-02-26 16:47 Quality pass: all 25 units have acceptance criteria, emoji status markers, What/Output/Acceptance fields. No TBD items. Completion criteria testable. Code coverage requirements included. No changes needed.
 - 2026-02-26 16:57 Review pass: reordered Feature 3 units to avoid compile breakage (combined loadSession change + runAgent return type + adapter loadSession fixes into single atomic unit 3c/3d), noted stripLastToolCalls for overflow recovery, removed boot greeting from CLI main (sessions persist forever), preserved system prompt refresh pre-call in both adapters.
+- 2026-02-26 Added Feature 5: move system prompt refresh into runAgent to eliminate duplicated adapter code. Removed "preserve system prompt refresh" notes from Feature 3 units (Feature 5 handles it). Renumbered Final unit from 5 to 6.
