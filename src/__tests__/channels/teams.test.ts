@@ -565,11 +565,19 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
 
-    const mockRunAgent = vi.fn()
+    const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
     vi.doMock("../../engine/core", () => ({
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+      postTurn: vi.fn(),
     }))
 
     vi.spyOn(console, "log").mockImplementation(() => {})
@@ -608,11 +616,19 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
 
-    const mockRunAgent = vi.fn()
+    const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
     vi.doMock("../../engine/core", () => ({
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+      postTurn: vi.fn(),
     }))
 
     vi.spyOn(console, "log").mockImplementation(() => {})
