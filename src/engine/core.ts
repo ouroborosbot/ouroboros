@@ -2,7 +2,7 @@ import OpenAI, { AzureOpenAI } from "openai";
 import { getAzureConfig, getMinimaxConfig, getContextConfig } from "../config";
 import { tools, execTool, summarizeArgs, finalAnswerTool } from "./tools";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
-import { detectKick, hasToolIntent } from "./kicks";
+import { detectKick } from "./kicks";
 import type { TurnResult } from "./streaming";
 import type { UsageData } from "../mind/context";
 import { trimMessages, cachedBuildSystem } from "../mind/context";

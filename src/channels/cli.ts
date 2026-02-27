@@ -103,7 +103,7 @@ export class InputController {
 // Ctrl-C handling: returns "clear" if input was non-empty, "warn" on first empty press, "exit" on second
 let _ctrlCWarned = false
 
-export function handleSigint(rl: readline.Interface, currentInput: string): "clear" | "warn" | "exit" {
+export function handleSigint(_rl: readline.Interface, currentInput: string): "clear" | "warn" | "exit" {
   if (currentInput.length > 0) {
     _ctrlCWarned = false
     return "clear"
@@ -263,7 +263,7 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
       process.stdout.write(`\x1b[2m${text}\x1b[0m`)
       textDirty = text.length > 0 && !text.endsWith("\n")
     },
-    onToolStart: (name: string, _args: Record<string, string>) => {
+    onToolStart: (_name: string, _args: Record<string, string>) => {
       // Stop the model-start spinner: when the model returns only tool calls
       // (no content/reasoning), onModelStreamStart never fires, so the old
       // spinner's intervals would leak.
