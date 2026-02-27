@@ -1,6 +1,6 @@
 # Doing: Kick Mechanism & tool_choice Required Mode
 
-**Status**: pending
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-02-26 19:45
 **Planning**: ./2026-02-26-1909-planning-kick-and-tool-required.md
@@ -182,7 +182,7 @@ Fix the agent proactivity bug where the model narrates tool-use intent ("let me 
 
 ---
 
-### 🔄 Unit 4: Integration Testing & Cleanup
+### ✅ Unit 4: Integration Testing & Cleanup
 
 **What**: End-to-end scenarios combining kick + tool_choice required, edge cases, verify all tests pass with 100% coverage, and clean up.
 
@@ -235,3 +235,4 @@ Fix the agent proactivity bug where the model narrates tool-use intent ("let me 
 - 2026-02-26 20:09 Unit 1 complete: hasToolIntent + kick mechanism with 12 new tests, 100% line coverage on core.ts
 - 2026-02-26 20:13 Unit 2 complete: finalAnswerTool, tool_choice passthrough, final_answer interception with 13 new tests
 - 2026-02-26 20:18 Unit 3 complete: /tool-required command, onKick CLI callback, buildSystem tool behavior section, cachedBuildSystem cache key update
+- 2026-02-26 20:20 Unit 4 complete: 7 integration tests, cleanup unused variable, 100% line coverage on all files, 511 tests pass
