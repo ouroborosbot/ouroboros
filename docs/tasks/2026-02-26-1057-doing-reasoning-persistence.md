@@ -310,7 +310,7 @@ Note: With retroactive trimming after each turn (Feature 3), context overflow sh
 **Output**: Modified `src/engine/core.ts`
 **Acceptance**: All Unit 4a tests PASS (green), existing tests still pass, no warnings
 
-### ⬜ Unit 4c: Context overflow recovery -- Coverage & Refactor
+### ✅ Unit 4c: Context overflow recovery -- Coverage & Refactor
 **What**: Verify 100% coverage on all Feature 4 changes. Run full test suite. Edge cases: overflow on first call (cold start), overflow during tool execution mid-turn, overflow with only system message remaining (cannot trim further).
 **Output**: Coverage report confirms 100% on new code
 **Acceptance**: 100% coverage on new code, all tests green, no warnings
