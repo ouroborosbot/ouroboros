@@ -361,7 +361,7 @@ Call sites to update (source files only):
 **Output**: Modified `src/engine/core.ts`, `src/channels/cli.ts`, `src/channels/teams.ts`, `src/__tests__/engine/core.test.ts`
 **Acceptance**: All Unit 5a tests PASS (green), all existing tests still pass, no warnings, no duplicate `cachedBuildSystem` calls in adapter code
 
-### ⬜ Unit 5c: System prompt refresh -- Coverage & Refactor
+### ✅ Unit 5c: System prompt refresh -- Coverage & Refactor
 **What**: Verify 100% coverage on all Feature 5 changes. Run full test suite. Confirm no regressions. Verify that `cachedBuildSystem` is no longer called from adapter code (only from `runAgent` in core.ts).
 **Output**: Coverage report confirms 100% on new code
 **Acceptance**: 100% coverage on new code, all tests green, no warnings
