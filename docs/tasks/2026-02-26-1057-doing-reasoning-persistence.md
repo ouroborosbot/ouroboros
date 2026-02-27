@@ -94,7 +94,7 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 **Output**: Modified `src/engine/streaming.ts`
 **Acceptance**: All Unit 1c tests PASS (green), all existing tests still pass, no warnings
 
-### ⬜ Unit 1e: Reasoning persistence -- Coverage & Refactor
+### ✅ Unit 1e: Reasoning persistence -- Coverage & Refactor
 **What**: Verify 100% coverage on Units 1a-1d changes. Run full test suite. Refactor if needed. Verify edge cases: empty `_reasoning_items` array, `_reasoning_items` with only encrypted_content (no summary), session round-trip (save/load preserves `_reasoning_items` via JSON serialization).
 **Output**: Coverage report confirms 100% on new code, clean refactor
 **Acceptance**: 100% coverage on new code, all tests green, no warnings
