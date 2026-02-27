@@ -518,3 +518,27 @@ describe("tools array export", () => {
     expect(names).toContain("web_search")
   })
 })
+
+describe("finalAnswerTool", () => {
+  it("has correct name, description, and schema", async () => {
+    vi.resetModules()
+    const { finalAnswerTool } = await import("../../engine/tools")
+    expect(finalAnswerTool.type).toBe("function")
+    expect(finalAnswerTool.function.name).toBe("final_answer")
+    expect(finalAnswerTool.function.description).toBe(
+      "provide your final text response when you have no more tools to call"
+    )
+    expect(finalAnswerTool.function.parameters).toEqual({
+      type: "object",
+      properties: { answer: { type: "string" } },
+      required: ["answer"],
+    })
+  })
+
+  it("is NOT included in the default tools array", async () => {
+    vi.resetModules()
+    const { tools } = await import("../../engine/tools")
+    const names = tools.map((t) => t.function.name)
+    expect(names).not.toContain("final_answer")
+  })
+})

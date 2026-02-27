@@ -3185,3 +3185,402 @@ describe("kick mechanism", () => {
     delete process.env.AZURE_OPENAI_MODEL_NAME
   })
 })
+
+describe("tool_choice required and final_answer", () => {
+  let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal, options?: { toolChoiceRequired?: boolean; maxKicks?: number }) => Promise<{ usage?: any }>
+
+  function makeStream(chunks: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const chunk of chunks) {
+          yield chunk
+        }
+      },
+    }
+  }
+
+  function makeChunk(content?: string, toolCalls?: any[]) {
+    const delta: any = {}
+    if (content !== undefined) delta.content = content
+    if (toolCalls !== undefined) delta.tool_calls = toolCalls
+    return { choices: [{ delta }] }
+  }
+
+  function makeResponsesStream(events: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const event of events) {
+          yield event
+        }
+      },
+    }
+  }
+
+  beforeEach(async () => {
+    vi.resetModules()
+    delete process.env.AZURE_OPENAI_API_KEY
+    process.env.MINIMAX_API_KEY = "test-key"
+    process.env.MINIMAX_MODEL = "test-model"
+    mockCreate.mockReset()
+    mockResponsesCreate.mockReset()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+
+    const core = await import("../../engine/core")
+    runAgent = core.runAgent
+  })
+
+  it("passes tool_choice: required in MiniMax createParams when toolChoiceRequired is true", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"answer":"done"}' } },
+        ]),
+      ])
+    )
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks, undefined, undefined, { toolChoiceRequired: true })
+    const params = mockCreate.mock.calls[0][0]
+    expect(params.tool_choice).toBe("required")
+  })
+
+  it("passes tool_choice: required in Azure createParams when toolChoiceRequired is true", async () => {
+    vi.resetModules()
+    delete process.env.MINIMAX_API_KEY
+    delete process.env.MINIMAX_MODEL
+    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
+    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
+    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
+    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+
+    mockResponsesCreate.mockReturnValue(makeResponsesStream([
+      { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "final_answer", arguments: "" } },
+      { type: "response.function_call_arguments.delta", delta: '{"answer":"done"}' },
+      { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "final_answer", arguments: '{"answer":"done"}' } },
+    ]))
+
+    const core = await import("../../engine/core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await core.runAgent([{ role: "system", content: "test" }], callbacks, undefined, undefined, { toolChoiceRequired: true })
+    const params = mockResponsesCreate.mock.calls[0][0]
+    expect(params.tool_choice).toBe("required")
+
+    delete process.env.AZURE_OPENAI_API_KEY
+    delete process.env.AZURE_OPENAI_ENDPOINT
+    delete process.env.AZURE_OPENAI_DEPLOYMENT
+    delete process.env.AZURE_OPENAI_MODEL_NAME
+  })
+
+  it("includes final_answer tool in tools list when toolChoiceRequired is true", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"answer":"done"}' } },
+        ]),
+      ])
+    )
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks, undefined, undefined, { toolChoiceRequired: true })
+    const params = mockCreate.mock.calls[0][0]
+    const toolNames = params.tools.map((t: any) => t.function.name)
+    expect(toolNames).toContain("final_answer")
+  })
+
+  it("does NOT include final_answer tool when toolChoiceRequired is false/undefined", async () => {
+    mockCreate.mockReturnValue(makeStream([makeChunk("hello")]))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    const params = mockCreate.mock.calls[0][0]
+    const toolNames = params.tools.map((t: any) => t.function.name)
+    expect(toolNames).not.toContain("final_answer")
+  })
+
+  it("does NOT pass tool_choice when toolChoiceRequired is not set", async () => {
+    mockCreate.mockReturnValue(makeStream([makeChunk("hello")]))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks)
+    const params = mockCreate.mock.calls[0][0]
+    expect(params.tool_choice).toBeUndefined()
+  })
+
+  it("final_answer sole call: extracts answer text and terminates loop", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"answer":"the final response"}' } },
+        ]),
+      ])
+    )
+
+    const toolStarts: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: (name) => toolStarts.push(name),
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    // Should NOT have called any tools through onToolStart (final_answer is intercepted)
+    expect(toolStarts).toEqual([])
+    // The assistant message should have the extracted answer content, not tool_calls
+    const assistantMsg = messages.find((m: any) => m.role === "assistant")
+    expect(assistantMsg).toBeDefined()
+    expect(assistantMsg.content).toBe("the final response")
+    expect(assistantMsg.tool_calls).toBeUndefined()
+    // Only 1 API call (no loop continuation)
+    expect(mockCreate).toHaveBeenCalledTimes(1)
+  })
+
+  it("final_answer mixed with other tool calls: other tools execute, final_answer rejected, loop continues", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue("file data")
+
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          makeChunk(undefined, [
+            { index: 0, id: "call_1", function: { name: "read_file", arguments: '{"path":"a.txt"}' } },
+            { index: 1, id: "call_2", function: { name: "final_answer", arguments: '{"answer":"done"}' } },
+          ]),
+        ])
+      }
+      // Second call: model returns final_answer alone
+      return makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_3", function: { name: "final_answer", arguments: '{"answer":"the real answer"}' } },
+        ]),
+      ])
+    })
+
+    const toolStarts: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: (name) => toolStarts.push(name),
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    // read_file should have been executed, final_answer should NOT
+    expect(toolStarts).toEqual(["read_file"])
+    // Should have 2 API calls (mixed -> sole final_answer)
+    expect(callCount).toBe(2)
+    // The final assistant message should have the extracted answer
+    const lastAssistant = [...messages].reverse().find((m: any) => m.role === "assistant")
+    expect(lastAssistant.content).toBe("the real answer")
+    // There should be a rejection tool result for the mixed final_answer
+    const toolResults = messages.filter((m: any) => m.role === "tool")
+    const rejectionMsg = toolResults.find((m: any) => m.tool_call_id === "call_2")
+    expect(rejectionMsg).toBeDefined()
+    expect(rejectionMsg.content).toContain("rejected")
+    expect(rejectionMsg.content).toContain("final_answer must be the only tool call")
+  })
+
+  it("final_answer with empty answer arg: uses empty string", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{}' } },
+        ]),
+      ])
+    )
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    const assistantMsg = messages.find((m: any) => m.role === "assistant")
+    expect(assistantMsg).toBeDefined()
+    // Should use empty string or result.content as fallback
+    expect(typeof assistantMsg.content).toBe("string")
+  })
+
+  it("final_answer is never passed to execTool (intercepted before execution)", async () => {
+    // If final_answer were passed to execTool, it would return "unknown: final_answer"
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"answer":"done"}' } },
+        ]),
+      ])
+    )
+
+    const toolStarts: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: (name) => toolStarts.push(name),
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    // No tools should have been started (final_answer is intercepted)
+    expect(toolStarts).toHaveLength(0)
+    // No tool result messages in history
+    const toolResults = messages.filter((m: any) => m.role === "tool")
+    expect(toolResults).toHaveLength(0)
+  })
+
+  it("Azure: mixed final_answer rejection pushes to azureInput", async () => {
+    vi.resetModules()
+    delete process.env.MINIMAX_API_KEY
+    delete process.env.MINIMAX_MODEL
+    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
+    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
+    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
+    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+
+    vi.mocked(fs.readFileSync).mockReturnValue("file data")
+
+    const funcItem1 = { type: "function_call", id: "fc1", call_id: "c1", name: "read_file", arguments: '{"path":"a.txt"}', status: "completed" }
+    const funcItem2 = { type: "function_call", id: "fc2", call_id: "c2", name: "final_answer", arguments: '{"answer":"done"}', status: "completed" }
+
+    let callCount = 0
+    mockResponsesCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeResponsesStream([
+          { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "read_file", arguments: "" } },
+          { type: "response.function_call_arguments.delta", delta: '{"path":"a.txt"}' },
+          { type: "response.output_item.done", item: funcItem1 },
+          { type: "response.output_item.added", item: { type: "function_call", call_id: "c2", name: "final_answer", arguments: "" } },
+          { type: "response.function_call_arguments.delta", delta: '{"answer":"done"}' },
+          { type: "response.output_item.done", item: funcItem2 },
+        ])
+      }
+      // Second call: sole final_answer
+      return makeResponsesStream([
+        { type: "response.output_item.added", item: { type: "function_call", call_id: "c3", name: "final_answer", arguments: "" } },
+        { type: "response.function_call_arguments.delta", delta: '{"answer":"the real answer"}' },
+        { type: "response.output_item.done", item: { type: "function_call", call_id: "c3", name: "final_answer", arguments: '{"answer":"the real answer"}' } },
+      ])
+    })
+
+    const core = await import("../../engine/core")
+    const toolStarts: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: (name) => toolStarts.push(name),
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await core.runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    expect(callCount).toBe(2)
+    expect(toolStarts).toEqual(["read_file"])
+    // Final assistant message should have the extracted answer
+    const lastAssistant = [...messages].reverse().find((m: any) => m.role === "assistant")
+    expect(lastAssistant.content).toBe("the real answer")
+
+    delete process.env.AZURE_OPENAI_API_KEY
+    delete process.env.AZURE_OPENAI_ENDPOINT
+    delete process.env.AZURE_OPENAI_DEPLOYMENT
+    delete process.env.AZURE_OPENAI_MODEL_NAME
+  })
+
+  it("final_answer with invalid JSON arguments: falls back to result.content", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk("some content", [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: "not valid json{" } },
+        ]),
+      ])
+    )
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    const assistantMsg = messages.find((m: any) => m.role === "assistant")
+    expect(assistantMsg).toBeDefined()
+    expect(assistantMsg.content).toBe("some content")
+  })
+})

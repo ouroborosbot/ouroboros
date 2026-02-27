@@ -123,6 +123,19 @@ export const tools: OpenAI.ChatCompletionTool[] = [
   },
 ];
 
+export const finalAnswerTool: OpenAI.ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "final_answer",
+    description: "provide your final text response when you have no more tools to call",
+    parameters: {
+      type: "object",
+      properties: { answer: { type: "string" } },
+      required: ["answer"],
+    },
+  },
+};
+
 type ToolHandler = (args: any) => string | Promise<string>;
 
 const postIt = (msg: string) => `post-it from past you:\n${msg}`;
