@@ -1,13 +1,10 @@
 {
-  "$schema": "https://developer.microsoft.com/json-schemas/teams/vDevPreview/MicrosoftTeams.schema.json",
-  "manifestVersion": "devPreview",
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.25/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.25",
   "version": "1.0.0",
-  "id": "7467201b-d9b4-4792-9b46-ce84494f9d09",
+  "id": "93b3681b-1565-4ff7-bf1f-1d370e247604",
   "developer": {
-    "name": "Ouroboros",
-    "websiteUrl": "https://github.com/nicholasgasior/ouroboros",
-    "privacyUrl": "https://github.com/nicholasgasior/ouroboros",
-    "termsOfUseUrl": "https://github.com/nicholasgasior/ouroboros"
+    "name": "Ouroboros (with help from Ari)"
   },
   "name": {
     "short": "Ouroboros",
@@ -24,8 +21,8 @@
   "accentColor": "#4464ee",
   "bots": [
     {
-      "botId": "7467201b-d9b4-4792-9b46-ce84494f9d09",
-      "scopes": ["personal"],
+      "botId": "93b3681b-1565-4ff7-bf1f-1d370e247604",
+      "scopes": ["personal", "copilot"],
       "commandLists": [
         {
           "scopes": ["personal"],
@@ -47,9 +44,13 @@
     "customEngineAgents": [
       {
         "type": "bot",
-        "id": "7467201b-d9b4-4792-9b46-ce84494f9d09"
+        "id": "93b3681b-1565-4ff7-bf1f-1d370e247604"
       }
     ]
   },
-  "validDomains": []
+  "webApplicationInfo": {
+    "id": "93b3681b-1565-4ff7-bf1f-1d370e247604",
+    "resource": "api://botid-93b3681b-1565-4ff7-bf1f-1d370e247604"
+  },
+  "validDomains": ["xcbc4jjj-3978.usw2.devtunnels.ms"]
 }
