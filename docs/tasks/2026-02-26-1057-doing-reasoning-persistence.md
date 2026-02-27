@@ -393,3 +393,4 @@ Call sites to update (source files only):
 - 2026-02-26 17:06 Added Feature 5: move system prompt refresh into runAgent to eliminate duplicated adapter code. Removed "preserve system prompt refresh" notes from Feature 3 units (Feature 5 handles it). Renumbered Final unit from 5 to 6.
 - 2026-02-26 17:17 Review pass 2: deduped post-turn trim+save into shared `postTurn` function in context.ts (Units 3e/3f), updated adapter units to call `postTurn` instead of inline trim+save. Deleted `bootGreeting` function entirely in Unit 3h (dead code after Feature 5 changes runAgent signature). Renumbered Feature 3 units: 3e-3i -> 3e-3k.
 - 2026-02-26 17:23 Unit 1a complete: failing tests for _reasoning_items on assistant messages (2 fail as expected, 3 pass for negative/preservation cases)
+- 2026-02-26 17:25 Feature 1 complete (Units 1a-1e): reasoning items persisted on assistant messages and restored in toResponsesInput. 100% coverage on core.ts, streaming.ts, context.ts.
