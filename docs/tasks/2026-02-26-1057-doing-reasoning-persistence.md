@@ -396,3 +396,4 @@ Call sites to update (source files only):
 - 2026-02-26 17:25 Feature 1 complete (Units 1a-1e): reasoning items persisted on assistant messages and restored in toResponsesInput. 100% coverage on core.ts, streaming.ts, context.ts.
 - 2026-02-26 17:28 Feature 2 complete (Units 2a-2e): Azure and MiniMax usage capture with UsageData type. 100% coverage on streaming.ts.
 - 2026-02-26 17:42 Unit 3g complete: CLI main tests updated for postTurn (no pre-call trimming), boot greeting removed, loadSessionReturn format updated. 10 tests fail (red).
+- 2026-02-26 17:43 Unit 3h complete: deleted bootGreeting function and boot greeting block, removed pre-call trimMessages+saveSession, added postTurn after runAgent. Removed bootGreeting tests from cli.test.ts. 402 tests pass.
