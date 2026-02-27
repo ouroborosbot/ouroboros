@@ -269,6 +269,87 @@ describe("toResponsesInput", () => {
       { role: "user", content: "bye" },
     ])
   })
+
+  // --- Unit 1c: Restore reasoning items in toResponsesInput ---
+
+  it("restores _reasoning_items before assistant content in input", () => {
+    const reasoningItem = { type: "reasoning", id: "r1", summary: [{ text: "thought", type: "summary_text" }], encrypted_content: "enc1" }
+    const messages = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "answer", _reasoning_items: [reasoningItem] },
+    ]
+    const result = toResponsesInput(messages)
+    // reasoning item should come BEFORE assistant content
+    expect(result.input[0]).toEqual({ role: "user", content: "hi" })
+    expect(result.input[1]).toEqual(reasoningItem)
+    expect(result.input[2]).toEqual({ role: "assistant", content: "answer" })
+  })
+
+  it("does not modify input when assistant has no _reasoning_items", () => {
+    const messages = [
+      { role: "system", content: "sys" },
+      { role: "assistant", content: "hello" },
+    ]
+    const result = toResponsesInput(messages)
+    expect(result.input).toEqual([{ role: "assistant", content: "hello" }])
+  })
+
+  it("emits reasoning items as-is (not wrapped or modified)", () => {
+    const reasoningItem = { type: "reasoning", id: "r2", summary: [{ text: "deep thought", type: "summary_text" }], encrypted_content: "secretenc" }
+    const messages = [
+      { role: "assistant", content: "response", _reasoning_items: [reasoningItem] },
+    ]
+    const result = toResponsesInput(messages)
+    expect(result.input[0]).toBe(reasoningItem)
+  })
+
+  it("restores _reasoning_items for multiple assistant messages", () => {
+    const r1 = { type: "reasoning", id: "r1", summary: [], encrypted_content: "enc1" }
+    const r2 = { type: "reasoning", id: "r2", summary: [], encrypted_content: "enc2" }
+    const messages = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "q1" },
+      { role: "assistant", content: "a1", _reasoning_items: [r1] },
+      { role: "user", content: "q2" },
+      { role: "assistant", content: "a2", _reasoning_items: [r2] },
+    ]
+    const result = toResponsesInput(messages)
+    expect(result.input).toEqual([
+      { role: "user", content: "q1" },
+      r1,
+      { role: "assistant", content: "a1" },
+      { role: "user", content: "q2" },
+      r2,
+      { role: "assistant", content: "a2" },
+    ])
+  })
+
+  it("emits items in order: reasoning, then content, then function_calls", () => {
+    const r1 = { type: "reasoning", id: "r1", summary: [], encrypted_content: "enc" }
+    const messages = [
+      {
+        role: "assistant",
+        content: "let me check",
+        _reasoning_items: [r1],
+        tool_calls: [
+          { id: "tc1", type: "function", function: { name: "read_file", arguments: '{"path":"a.txt"}' } },
+        ],
+      },
+    ]
+    const result = toResponsesInput(messages)
+    expect(result.input).toEqual([
+      r1,
+      { role: "assistant", content: "let me check" },
+      {
+        type: "function_call",
+        call_id: "tc1",
+        name: "read_file",
+        arguments: '{"path":"a.txt"}',
+        status: "completed",
+      },
+    ])
+  })
 })
 
 describe("ChannelCallbacks interface", () => {
