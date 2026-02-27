@@ -62,6 +62,21 @@ describe("execTool", () => {
     expect(execSync).toHaveBeenCalledWith("echo hello", { encoding: "utf-8", timeout: 30000 })
   })
 
+  // ── gh_cli ──
+  it("gh_cli runs gh command and returns output", async () => {
+    vi.mocked(execSync).mockReturnValue("pr list output")
+    const result = await execTool("gh_cli", { command: "pr list" })
+    expect(result).toBe("pr list output")
+    expect(execSync).toHaveBeenCalledWith("gh pr list", { encoding: "utf-8", timeout: 60000 })
+  })
+
+  it("gh_cli returns error on exception", async () => {
+    vi.mocked(execSync).mockImplementation(() => { throw new Error("gh not found") })
+    const result = await execTool("gh_cli", { command: "pr list" })
+    expect(result).toContain("error:")
+    expect(result).toContain("gh not found")
+  })
+
   // ── list_directory ──
   it("list_directory lists entries with d/- prefix", async () => {
     vi.mocked(fs.readdirSync).mockReturnValue([
@@ -464,6 +479,15 @@ describe("summarizeArgs", () => {
     expect(summarizeArgs("git_commit", {})).toBe("")
   })
 
+  it("returns truncated command for gh_cli", () => {
+    const cmd = "a".repeat(50)
+    expect(summarizeArgs("gh_cli", { command: cmd })).toBe("a".repeat(40))
+  })
+
+  it("returns empty string for gh_cli with no command", () => {
+    expect(summarizeArgs("gh_cli", {})).toBe("")
+  })
+
   it("returns name for load_skill", () => {
     expect(summarizeArgs("load_skill", { name: "my-skill" })).toBe("my-skill")
   })
@@ -526,7 +550,7 @@ describe("finalAnswerTool", () => {
     expect(finalAnswerTool.type).toBe("function")
     expect(finalAnswerTool.function.name).toBe("final_answer")
     expect(finalAnswerTool.function.description).toBe(
-      "provide your final text response when you have no more tools to call"
+      "give your final text response. use this when tool_choice is required and you want to reply with text instead of calling another tool."
     )
     expect(finalAnswerTool.function.parameters).toEqual({
       type: "object",

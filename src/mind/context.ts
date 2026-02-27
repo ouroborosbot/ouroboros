@@ -44,15 +44,15 @@ export function trimMessages(
 
   const trimTarget = maxTokens * (1 - contextMargin / 100)
 
-  // Estimate per-message cost proportionally from actualTokenCount
-  const perMessageCost = actualTokenCount ? actualTokenCount / messages.length : 0
+  // actualTokenCount is guaranteed > maxTokens here (overTokens is true)
+  const perMessageCost = actualTokenCount! / messages.length
 
   let droppedTokens = 0
   let cutIndex = 1 // start after system prompt (index 0)
 
   // Drop oldest messages (after system prompt) until under budget
   while (cutIndex < messages.length) {
-    const remainingTokens = (actualTokenCount || 0) - droppedTokens
+    const remainingTokens = actualTokenCount! - droppedTokens
     if (remainingTokens <= trimTarget) break
     droppedTokens += perMessageCost
     cutIndex++
