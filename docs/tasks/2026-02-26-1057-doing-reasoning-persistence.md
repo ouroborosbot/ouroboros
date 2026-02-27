@@ -276,7 +276,7 @@ This eliminates the duplicated trim+save code in both adapters. Each adapter jus
 **Output**: Modified `src/channels/teams.ts`
 **Acceptance**: All Unit 3i tests PASS (green), existing tests still pass, no warnings
 
-### ⬜ Unit 3k: Retroactive trimming -- Coverage & Refactor
+### ✅ Unit 3k: Retroactive trimming -- Coverage & Refactor
 **What**: Verify 100% coverage on all Feature 3 changes. Run full test suite. Refactor if needed.
 **Output**: Coverage report confirms 100% on new code
 **Acceptance**: 100% coverage on new code, all tests green, no warnings
