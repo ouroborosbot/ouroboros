@@ -70,6 +70,20 @@ export const tools: OpenAI.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
+      name: "gh_cli",
+      description: "execute a GitHub CLI (gh) command. use carefully.",
+      parameters: {
+        type: "object",
+        properties: {
+          command: { type: "string" },
+        },
+        required: ["command"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "list_skills",
       description: "list all available skills",
       parameters: { type: "object", properties: {} },
@@ -100,7 +114,7 @@ export const tools: OpenAI.ChatCompletionTool[] = [
     function: {
       name: "claude",
       description:
-        "spawn another claude instance to query this codebase (or the world). useful for self-reflection, code review, asking questions about yourself. note: you are the Ouroboros agent looking at your own codebase - use this to get an outside perspective on YOUR code",
+        "spawn another claude instance to query this codebase (or the world). useful for self-reflection, code review, asking questions about yourself.",
       parameters: {
         type: "object",
         properties: { prompt: { type: "string" } },
@@ -123,19 +137,6 @@ export const tools: OpenAI.ChatCompletionTool[] = [
   },
 ];
 
-export const finalAnswerTool: OpenAI.ChatCompletionTool = {
-  type: "function",
-  function: {
-    name: "final_answer",
-    description: "provide your final text response when you have no more tools to call",
-    parameters: {
-      type: "object",
-      properties: { answer: { type: "string" } },
-      required: ["answer"],
-    },
-  },
-};
-
 type ToolHandler = (args: any) => string | Promise<string>;
 
 const postIt = (msg: string) => `post-it from past you:\n${msg}`;
@@ -154,24 +155,27 @@ const toolHandlers: Record<string, ToolHandler> = {
       if (!a.paths || !Array.isArray(a.paths) || a.paths.length === 0) {
         return postIt("paths are required. specify explicit files to commit.");
       }
-
       for (const p of a.paths) {
         if (!fs.existsSync(p)) {
           return postIt(`path does not exist: ${p}`);
         }
         execSync(`git add ${p}`, { encoding: "utf-8" });
       }
-
       const diff = execSync("git diff --cached --stat", { encoding: "utf-8" });
-
       if (!diff || diff.trim().length === 0) {
         return postIt("nothing was staged. check your changes or paths.");
       }
-
       execSync(`git commit -m \"${a.message}\"`, { encoding: "utf-8" });
       return `${diff}\ncommitted`;
     } catch (e: any) {
       return `failed: ${e}`;
+    }
+  },
+  gh_cli: (a) => {
+    try {
+      return execSync(`gh ${a.command}`, { encoding: "utf-8", timeout: 60000 });
+    } catch (e: any) {
+      return `error: ${e}`;
     }
   },
   list_skills: () => JSON.stringify(listSkills()),
@@ -232,19 +236,13 @@ const toolHandlers: Record<string, ToolHandler> = {
   },
 };
 
-export async function execTool(
-  name: string,
-  args: any,
-): Promise<string> {
+export async function execTool(name: string, args: any): Promise<string> {
   const h = toolHandlers[name];
   if (!h) return `unknown: ${name}`;
   return await h(args);
 }
 
-export function summarizeArgs(
-  name: string,
-  args: Record<string, any>,
-): string {
+export function summarizeArgs(name: string, args: Record<string, any>): string {
   if (name === "read_file" || name === "write_file") return args.path || "";
   if (name === "shell") {
     const cmd = args.command || "";
@@ -252,6 +250,7 @@ export function summarizeArgs(
   }
   if (name === "list_directory") return args.path || "";
   if (name === "git_commit") return args.message?.slice(0, 40) || "";
+  if (name === "gh_cli") return args.command?.slice(0, 40) || "";
   if (name === "load_skill") return args.name || "";
   if (name === "claude") return args.prompt?.slice(0, 40) || "";
   if (name === "web_search") return args.query?.slice(0, 40) || "";
