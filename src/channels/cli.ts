@@ -84,6 +84,8 @@ export class InputController {
       // All other input is swallowed
     }
     process.stdin.on("data", this.dataHandler)
+    // rl.pause() paused stdin — resume it so our data handler receives keypresses
+    process.stdin.resume()
   }
 
   restore() {

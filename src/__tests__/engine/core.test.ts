@@ -58,6 +58,51 @@ import type { ChannelCallbacks } from "../../engine/core"
 process.env.MINIMAX_API_KEY = "test-key"
 process.env.MINIMAX_MODEL = "test-model"
 
+describe("isTransientError", () => {
+  it("detects Node.js network error codes", async () => {
+    const { isTransientError } = await import("../../engine/core")
+    for (const code of ["ECONNRESET", "ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT", "EPIPE",
+                         "EAI_AGAIN", "EHOSTUNREACH", "ENETUNREACH", "ECONNABORTED"]) {
+      const err: any = new Error("fail")
+      err.code = code
+      expect(isTransientError(err)).toBe(true)
+    }
+  })
+
+  it("detects fetch/network errors by message", async () => {
+    const { isTransientError } = await import("../../engine/core")
+    expect(isTransientError(new Error("fetch failed"))).toBe(true)
+    expect(isTransientError(new Error("network error"))).toBe(true)
+    expect(isTransientError(new Error("socket hang up"))).toBe(true)
+    expect(isTransientError(new Error("getaddrinfo ENOTFOUND"))).toBe(true)
+  })
+
+  it("detects HTTP status codes 429 and 5xx", async () => {
+    const { isTransientError } = await import("../../engine/core")
+    for (const status of [429, 500, 502, 503, 504]) {
+      const err: any = new Error("server error")
+      err.status = status
+      expect(isTransientError(err)).toBe(true)
+    }
+  })
+
+  it("returns false for non-transient errors", async () => {
+    const { isTransientError } = await import("../../engine/core")
+    expect(isTransientError(new Error("invalid request"))).toBe(false)
+    expect(isTransientError(new Error("authentication failed"))).toBe(false)
+    expect(isTransientError("not an error")).toBe(false)
+    const err: any = new Error("bad request")
+    err.status = 400
+    expect(isTransientError(err)).toBe(false)
+  })
+
+  it("returns false for context overflow messages (not transient)", async () => {
+    const { isTransientError } = await import("../../engine/core")
+    expect(isTransientError(new Error("context_length_exceeded"))).toBe(false)
+    expect(isTransientError(new Error("context window exceeds limit"))).toBe(false)
+  })
+})
+
 describe("ChannelCallbacks interface", () => {
   it("accepts an object with all required callback signatures", () => {
     const callbacks: ChannelCallbacks = {
@@ -1788,7 +1833,7 @@ describe("runAgent", () => {
   })
 
   it("returns undefined usage on error", async () => {
-    mockCreate.mockImplementation(() => { throw new Error("network fail") })
+    mockCreate.mockImplementation(() => { throw new Error("invalid request") })
 
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
@@ -1936,7 +1981,7 @@ describe("runAgent", () => {
 
   it("does not catch non-overflow errors with overflow recovery", async () => {
     mockCreate.mockImplementation(() => {
-      throw new Error("network timeout")
+      throw new Error("invalid request format")
     })
 
     const errors: Error[] = []
@@ -1953,9 +1998,9 @@ describe("runAgent", () => {
     const messages: any[] = [{ role: "system", content: "sys" }]
     await runAgent(messages, callbacks)
 
-    // Should have exactly 1 error (the original network error), no retry
+    // Should have exactly 1 error (the original error), no retry
     expect(errors).toHaveLength(1)
-    expect(errors[0].message).toBe("network timeout")
+    expect(errors[0].message).toBe("invalid request format")
   })
 
   it("strips tool calls before trimming on mid-turn overflow", async () => {
@@ -2070,6 +2115,216 @@ describe("runAgent", () => {
     await runAgent(messages, callbacks)
 
     expect(callCount).toBe(2) // retry attempted
+  })
+
+  // ── transient network error retry ──
+
+  it("retries on transient network errors with backoff", async () => {
+    vi.useFakeTimers()
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount <= 2) {
+        const err: any = new Error("fetch failed")
+        throw err
+      }
+      return makeStream([makeChunk("recovered")])
+    })
+
+    const errors: Error[] = []
+    const chunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (t) => chunks.push(t),
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    const promise = runAgent(messages, callbacks)
+
+    // First retry: 2s delay
+    await vi.advanceTimersByTimeAsync(2100)
+    // Second retry: 4s delay
+    await vi.advanceTimersByTimeAsync(4100)
+    // Let setImmediate ticks process
+    await vi.advanceTimersByTimeAsync(100)
+
+    await promise
+
+    expect(callCount).toBe(3)
+    expect(chunks).toContain("recovered")
+    expect(errors.length).toBe(2) // two retry messages
+    expect(errors[0].message).toContain("retrying in 2s (1/3)")
+    expect(errors[1].message).toContain("retrying in 4s (2/3)")
+
+    vi.useRealTimers()
+  })
+
+  it("gives up after MAX_RETRIES transient failures", async () => {
+    vi.useFakeTimers()
+    mockCreate.mockImplementation(() => {
+      const err: any = new Error("connect failed")
+      err.code = "ECONNREFUSED"
+      throw err
+    })
+
+    const errors: Error[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    const promise = runAgent(messages, callbacks)
+
+    // Advance through all 3 retry delays: 2s, 4s, 8s
+    await vi.advanceTimersByTimeAsync(2100)
+    await vi.advanceTimersByTimeAsync(4100)
+    await vi.advanceTimersByTimeAsync(8100)
+    await vi.advanceTimersByTimeAsync(100)
+
+    await promise
+
+    // 3 retry messages + 1 final error
+    expect(errors.length).toBe(4)
+    expect(errors[0].message).toContain("retrying in 2s (1/3)")
+    expect(errors[1].message).toContain("retrying in 4s (2/3)")
+    expect(errors[2].message).toContain("retrying in 8s (3/3)")
+    expect(errors[3].message).toContain("connect failed")
+
+    vi.useRealTimers()
+  })
+
+  it("aborts retry wait on signal abort", async () => {
+    vi.useFakeTimers()
+    const controller = new AbortController()
+    mockCreate.mockImplementation(() => {
+      const err: any = new Error("fetch failed")
+      throw err
+    })
+
+    const errors: Error[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    const promise = runAgent(messages, callbacks, undefined, controller.signal)
+
+    // Let it start the first retry wait
+    await vi.advanceTimersByTimeAsync(100)
+    // Abort during wait
+    controller.abort()
+    await vi.advanceTimersByTimeAsync(100)
+
+    await promise
+
+    // Only 1 retry message, no final error (clean abort)
+    expect(errors.length).toBe(1)
+    expect(errors[0].message).toContain("retrying")
+
+    vi.useRealTimers()
+  })
+
+  it("resets retry count after successful call", async () => {
+    vi.useFakeTimers()
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      // First call: tool call
+      if (callCount === 1) {
+        return makeStream([
+          makeChunk(undefined, [{ index: 0, id: "tc1", function: { name: "search", arguments: '{"q":"test"}' } }]),
+        ])
+      }
+      // Second call: network error
+      if (callCount === 2) {
+        throw new Error("fetch failed")
+      }
+      // Third call: success after retry
+      return makeStream([makeChunk("done")])
+    })
+
+    const errors: Error[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    const promise = runAgent(messages, callbacks)
+
+    // Let first call (tool) + tool exec + second call (error) happen
+    await vi.advanceTimersByTimeAsync(100)
+    // First retry: 2s
+    await vi.advanceTimersByTimeAsync(2100)
+    await vi.advanceTimersByTimeAsync(100)
+
+    await promise
+
+    expect(callCount).toBe(3)
+    // retry message says (1/3) — counter was reset after first success
+    expect(errors.some(e => e.message.includes("1/3"))).toBe(true)
+
+    vi.useRealTimers()
+  })
+
+  it("detects HTTP 429 and 5xx as transient errors", async () => {
+    vi.useFakeTimers()
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        const err: any = new Error("rate limited")
+        err.status = 429
+        throw err
+      }
+      return makeStream([makeChunk("ok")])
+    })
+
+    const errors: Error[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    const promise = runAgent(messages, callbacks)
+
+    await vi.advanceTimersByTimeAsync(2100)
+    await vi.advanceTimersByTimeAsync(100)
+
+    await promise
+
+    expect(callCount).toBe(2)
+    expect(errors[0].message).toContain("retrying")
+
+    vi.useRealTimers()
   })
 
   // ── system prompt refresh (Feature 5) ──
