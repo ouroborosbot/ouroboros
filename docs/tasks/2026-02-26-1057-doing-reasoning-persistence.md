@@ -74,7 +74,7 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 **Output**: Failing tests in `src/__tests__/engine/core.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `_reasoning_items` is not yet stored on assistant messages
 
-### ⬜ Unit 1b: Store reasoning items on assistant messages -- Implementation
+### ✅ Unit 1b: Store reasoning items on assistant messages -- Implementation
 **What**: In `src/engine/core.ts` `runAgent`, after building the assistant message (line 144-154) and before `messages.push(msg)`, extract reasoning items from `result.outputItems` and store them as `msg._reasoning_items`. Filter for items where `item.type === "reasoning"`. Only set the field when there are reasoning items to store.
 **Output**: Modified `src/engine/core.ts`
 **Acceptance**: All Unit 1a tests PASS (green), existing tests still pass, no warnings
