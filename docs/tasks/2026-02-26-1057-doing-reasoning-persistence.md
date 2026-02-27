@@ -319,7 +319,7 @@ Note: With retroactive trimming after each turn (Feature 3), context overflow sh
 
 ### Feature 5: Move System Prompt Refresh into runAgent
 
-### ⬜ Unit 5a: runAgent refreshes system prompt -- Tests
+### ✅ Unit 5a: runAgent refreshes system prompt -- Tests
 **What**: Write failing tests in `src/__tests__/engine/core.test.ts` for `runAgent` accepting a `channel` parameter and refreshing the system prompt. Tests cover:
 - `runAgent` accepts a `channel: Channel` parameter (after `callbacks`, before `signal`): `runAgent(messages, callbacks, channel, signal?)`
 - At the start of `runAgent`, `messages[0]` is overwritten with a fresh system prompt via `cachedBuildSystem(channel, buildSystem)`
