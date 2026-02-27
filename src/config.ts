@@ -56,7 +56,7 @@ const DEFAULT_CONFIG: OuroborosConfig = {
   },
   context: {
     maxTokens: 80000,
-    contextMargin: 20,
+    contextMargin: 25,
   },
 }
 
