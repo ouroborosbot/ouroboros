@@ -103,7 +103,7 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 
 ### Feature 2: Capture Real API Usage, Delete estimateTokens
 
-### ⬜ Unit 2a: Add usage to TurnResult and capture Azure usage -- Tests
+### ✅ Unit 2a: Add usage to TurnResult and capture Azure usage -- Tests
 **What**: Write failing tests in `src/__tests__/engine/streaming.test.ts` for:
 - `TurnResult` interface includes a `usage` field: `{ input_tokens: number, output_tokens: number, reasoning_tokens: number, total_tokens: number } | undefined`
 - `streamResponsesApi` captures usage from `response.completed` event and returns it in `TurnResult.usage`
