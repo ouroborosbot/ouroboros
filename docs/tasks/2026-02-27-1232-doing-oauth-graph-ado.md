@@ -346,7 +346,7 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 - **Fixes/blockers**: Spawn sub-agent immediately -- don't ask, just do it
 - **Decisions made**: Update docs immediately, commit right away
 - **Phase 1 gate**: Unit 5 is a hard stop -- user must manually validate before Phase 2
-- **Shared error handling**: Extract `handleApiError` to `src/engine/api-error.ts` if both Graph and ADO clients use it (decide during Unit 5b/6b)
+- **Shared error handling**: `handleApiError` extracted to `src/engine/api-error.ts` (decided upfront, implemented in Unit 3)
 
 ## Progress Log
 - 2026-02-27 13:07 Created from planning doc (Pass 1: first draft)
