@@ -28,6 +28,9 @@ const envKeys = [
   "TENANT_ID",
   "OUROBOROS_MAX_TOKENS",
   "OUROBOROS_CONTEXT_MARGIN",
+  "OAUTH_GRAPH_CONNECTION",
+  "OAUTH_ADO_CONNECTION",
+  "ADO_ORGANIZATIONS",
 ]
 
 beforeEach(() => {
@@ -416,5 +419,151 @@ describe("sessionPath", () => {
     const p = sessionPath("teams", "a]conv/id:123")
 
     expect(p).toBe(path.join(os.homedir(), ".agentconfigs", "ouroboros", "sessions", "teams", "a]conv_id_123.json"))
+  })
+})
+
+describe("getOAuthConfig", () => {
+  beforeEach(async () => {
+    vi.resetModules()
+  })
+
+  it("returns default connection names", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { getOAuthConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const oauth = getOAuthConfig()
+
+    expect(oauth.graphConnectionName).toBe("graph")
+    expect(oauth.adoConnectionName).toBe("ado")
+  })
+
+  it("respects config.json values", async () => {
+    const configData = {
+      oauth: {
+        graphConnectionName: "custom-graph",
+        adoConnectionName: "custom-ado",
+      },
+    }
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(configData))
+
+    const { getOAuthConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const oauth = getOAuthConfig()
+
+    expect(oauth.graphConnectionName).toBe("custom-graph")
+    expect(oauth.adoConnectionName).toBe("custom-ado")
+  })
+
+  it("env vars override config.json values", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({ oauth: { graphConnectionName: "config-graph", adoConnectionName: "config-ado" } }),
+    )
+
+    process.env.OAUTH_GRAPH_CONNECTION = "env-graph"
+    process.env.OAUTH_ADO_CONNECTION = "env-ado"
+
+    const { getOAuthConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const oauth = getOAuthConfig()
+
+    expect(oauth.graphConnectionName).toBe("env-graph")
+    expect(oauth.adoConnectionName).toBe("env-ado")
+  })
+
+  it("env vars override defaults when no config.json", async () => {
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw new Error("ENOENT")
+    })
+
+    process.env.OAUTH_GRAPH_CONNECTION = "my-graph"
+
+    const { getOAuthConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const oauth = getOAuthConfig()
+
+    expect(oauth.graphConnectionName).toBe("my-graph")
+    expect(oauth.adoConnectionName).toBe("ado")
+  })
+})
+
+describe("getAdoConfig", () => {
+  beforeEach(async () => {
+    vi.resetModules()
+  })
+
+  it("returns empty organizations by default", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { getAdoConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const ado = getAdoConfig()
+
+    expect(ado.organizations).toEqual([])
+  })
+
+  it("respects config.json values", async () => {
+    const configData = {
+      ado: {
+        organizations: ["org1", "org2"],
+      },
+    }
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(configData))
+
+    const { getAdoConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const ado = getAdoConfig()
+
+    expect(ado.organizations).toEqual(["org1", "org2"])
+  })
+
+  it("parses ADO_ORGANIZATIONS env var as comma-separated list", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    process.env.ADO_ORGANIZATIONS = "orgA,orgB,orgC"
+
+    const { getAdoConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const ado = getAdoConfig()
+
+    expect(ado.organizations).toEqual(["orgA", "orgB", "orgC"])
+  })
+
+  it("trims whitespace from parsed organizations", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    process.env.ADO_ORGANIZATIONS = " org1 , org2 , org3 "
+
+    const { getAdoConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const ado = getAdoConfig()
+
+    expect(ado.organizations).toEqual(["org1", "org2", "org3"])
+  })
+
+  it("env var overrides config.json organizations", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({ ado: { organizations: ["config-org"] } }),
+    )
+
+    process.env.ADO_ORGANIZATIONS = "env-org1,env-org2"
+
+    const { getAdoConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const ado = getAdoConfig()
+
+    expect(ado.organizations).toEqual(["env-org1", "env-org2"])
+  })
+
+  it("handles empty ADO_ORGANIZATIONS env var", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    process.env.ADO_ORGANIZATIONS = ""
+
+    const { getAdoConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const ado = getAdoConfig()
+
+    expect(ado.organizations).toEqual([])
   })
 })
