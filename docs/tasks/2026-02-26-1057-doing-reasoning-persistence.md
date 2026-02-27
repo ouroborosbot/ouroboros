@@ -266,7 +266,7 @@ This eliminates the duplicated trim+save code in both adapters. Each adapter jus
 **Output**: Failing/updated tests in `src/__tests__/channels/teams.test.ts`
 **Acceptance**: Tests exist and FAIL (red)
 
-### ⬜ Unit 3j: Move trimming to after runAgent in Teams -- Implementation
+### ✅ Unit 3j: Move trimming to after runAgent in Teams -- Implementation
 **What**: In `src/channels/teams.ts` `handleTeamsMessage()`:
 - Remove the pre-call `trimMessages` block (lines 170-173)
 - Capture the return value from `runAgent`: `const result = await runAgent(messages, callbacks, controller.signal)`
