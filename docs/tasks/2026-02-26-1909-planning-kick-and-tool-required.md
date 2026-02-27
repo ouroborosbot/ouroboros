@@ -1,7 +1,7 @@
 # Planning: Kick Mechanism & tool_choice Required Mode
 
 **Status**: drafting
-**Created**: [pending initial commit]
+**Created**: 2026-02-26 19:10
 
 ## Goal
 Fix the agent proactivity bug where the model narrates tool-use intent ("let me read that file") but fails to produce actual `tool_calls`. Implement two complementary mechanisms: (1) a "kick" that detects narrated intent and re-prompts the model, and (2) an optional `tool_choice: "required"` mode with a sentinel "done" tool for graceful text-only responses.
@@ -87,3 +87,4 @@ For Azure Responses API, `tool_choice` maps to the `tool_choice` parameter in th
 The `final_answer` tool handler in `execTool` should never actually be called -- it should be intercepted in the `runAgent` loop before execution. This is a special sentinel, similar to how some frameworks handle "finish" tools.
 
 ## Progress Log
+- 2026-02-26 19:10 Created
