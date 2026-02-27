@@ -639,7 +639,8 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
 
     const stderrOutput = stderrChunks.join("")
     expect(stderrOutput).toContain("kick")
-    expect(stderrOutput).toContain("1/1")
+    // When attempt === maxKicks (1/1), counter is hidden
+    expect(stderrOutput).not.toContain("1/1")
   })
 
   it("onKick callback handles various attempt/maxKicks values", async () => {
@@ -657,6 +658,23 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
     const stderrOutput = stderrChunks.join("")
     expect(stderrOutput).toContain("1/2")
     expect(stderrOutput).toContain("2/2")
+  })
+
+  it("onKick emits newline before kick when textDirty", async () => {
+    setupBasic({ inputSequence: ["hello", "/exit"] })
+    mocks.runAgent.mockImplementation(async (_msgs: any, cb: any) => {
+      // Write text without trailing newline to set textDirty
+      if (cb.onTextChunk) cb.onTextChunk("partial output")
+      if (cb.onKick) cb.onKick(1, 1)
+      return { usage: undefined }
+    })
+
+    await main()
+
+    const stdoutOutput = stdoutChunks.join("")
+    // The partial text should be followed by a newline before kick clears textDirty
+    expect(stdoutOutput).toContain("partial output")
+    expect(stdoutOutput).toContain("\n")
   })
 
   it("passes toolChoiceRequired option to runAgent when toggle is on", async () => {
@@ -690,5 +708,18 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
     expect(runAgentCalls.length).toBe(1)
     // 5th argument (index 4) should have toolChoiceRequired: false
     expect(runAgentCalls[0][4]).toEqual({ toolChoiceRequired: false })
+  })
+
+  it("warns on stderr when assistant response is empty", async () => {
+    setupBasic({ inputSequence: ["hello", "/exit"] })
+    mocks.runAgent.mockImplementation(async (msgs: any[]) => {
+      msgs.push({ role: "assistant", content: "" })
+      return { usage: undefined }
+    })
+
+    await main()
+
+    const stderrOutput = stderrChunks.join("")
+    expect(stderrOutput).toContain("(empty response)")
   })
 })

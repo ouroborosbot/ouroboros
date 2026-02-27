@@ -21,14 +21,41 @@ const KICK_MESSAGES: Record<KickReason, string> = {
 };
 
 const TOOL_INTENT_PATTERNS = [
+  // Explicit intent — "let me", "I'll", "I will"
   /\blet me\b/i,
   /\bi'll\b/i,
   /\bi will\b/i,
+  /\bi would like to\b/i,
+  /\bi want to\b/i,
+
+  // "going to" variants
   /\bi'm going to\b/i,
   /\bgoing to\b/i,
   /\bi am going to\b/i,
-  /\bi would like to\b/i,
-  /\bi want to\b/i,
+
+  // Action announcements — "I need to", "I should", "I can"
+  /\bi need to\b/i,
+  /\bi should\b/i,
+  /\bi can\b/i,
+
+  // Gerund phase shifts — "entering", "starting", "proceeding", "switching"
+  /\bentering\b/i,
+  /\bstarting with\b/i,
+  /\bproceeding\b/i,
+  /\bswitching to\b/i,
+
+  // Temporal narration — "first", "now I", "next"
+  /\bfirst,?\s+i\b/i,
+  /\bnow i\b/i,
+  /\bnext,?\s+i\b/i,
+
+  // Hedged intent — "allow me to", "time to"
+  /\ballow me to\b/i,
+  /\btime to\b/i,
+
+  // Self-narration — "my next step", "my plan"
+  /\bmy next step\b/i,
+  /\bmy plan\b/i,
 ];
 
 // Normalize curly quotes/apostrophes to straight so patterns match consistently
