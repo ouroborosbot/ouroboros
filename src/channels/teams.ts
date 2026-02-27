@@ -4,8 +4,8 @@ import { DevtoolsPlugin } from "@microsoft/teams.dev"
 import { runAgent, ChannelCallbacks } from "../engine/core"
 import { buildSystem } from "../mind/prompt"
 import { pickPhrase, THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "../repertoire/phrases"
-import { sessionPath, getContextConfig, getTeamsConfig } from "../config"
-import { loadSession, saveSession, deleteSession, trimMessages, cachedBuildSystem } from "../mind/context"
+import { sessionPath, getTeamsConfig } from "../config"
+import { loadSession, deleteSession, cachedBuildSystem, postTurn } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "../repertoire/commands"
 
 // Stream interface matching IStreamer from @microsoft/teams.apps
@@ -166,19 +166,13 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   // Push user message
   messages.push({ role: "user", content: text })
 
-  // Trim context window
-  const { maxTokens, contextMargin } = getContextConfig()
-  const trimmed = trimMessages(messages, maxTokens, contextMargin)
-  messages.length = 0
-  messages.push(...trimmed)
-
   // Run agent
   const controller = new AbortController()
   const callbacks = createTeamsCallbacks(stream, controller)
-  await runAgent(messages, callbacks, controller.signal)
+  const result = await runAgent(messages, callbacks, controller.signal)
 
-  // Save session
-  saveSession(sessPath, messages)
+  // Trim context and save session
+  postTurn(messages, sessPath, result.usage)
   // SDK auto-closes the stream after our handler returns (app.process.js)
 }
 
