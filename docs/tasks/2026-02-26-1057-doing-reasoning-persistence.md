@@ -172,7 +172,7 @@ Note: `estimateTokens` deletion is deferred to Feature 3 where it is replaced at
 **Output**: Modified `src/mind/context.ts`
 **Acceptance**: All Unit 3a tests PASS (green), no warnings, no references to `estimateTokens` remain
 
-### ⬜ Unit 3c: Store lastUsage in session and runAgent return type -- Tests
+### ✅ Unit 3c: Store lastUsage in session and runAgent return type -- Tests
 **What**: Write failing tests covering three tightly coupled changes:
 
 **In `src/__tests__/mind/context.test.ts`** (saveSession/loadSession):
