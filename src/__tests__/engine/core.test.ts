@@ -1506,6 +1506,206 @@ describe("runAgent", () => {
     expect(mockCreate).toHaveBeenCalledTimes(1)
     expect(mockResponsesCreate).not.toHaveBeenCalled()
   })
+
+  // --- Unit 1a: Store reasoning items on assistant messages ---
+
+  it("Azure: stores reasoning items as _reasoning_items on assistant message", async () => {
+    vi.resetModules()
+    delete process.env.MINIMAX_API_KEY
+    delete process.env.MINIMAX_MODEL
+    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
+    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
+    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
+    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+
+    const reasoningItem = { type: "reasoning", id: "r1", summary: [{ text: "thought", type: "summary_text" }], encrypted_content: "enc123" }
+    mockResponsesCreate.mockReturnValue(makeResponsesStream([
+      { type: "response.output_item.done", item: reasoningItem },
+      { type: "response.output_text.delta", delta: "answer" },
+    ]))
+
+    const core = await import("../../engine/core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await core.runAgent(messages, callbacks)
+
+    const assistantMsg = messages.find((m: any) => m.role === "assistant")
+    expect(assistantMsg).toBeDefined()
+    expect(assistantMsg._reasoning_items).toEqual([reasoningItem])
+
+    delete process.env.AZURE_OPENAI_API_KEY
+    delete process.env.AZURE_OPENAI_ENDPOINT
+    delete process.env.AZURE_OPENAI_DEPLOYMENT
+    delete process.env.AZURE_OPENAI_MODEL_NAME
+  })
+
+  it("Azure: does not set _reasoning_items when outputItems has no reasoning items", async () => {
+    vi.resetModules()
+    delete process.env.MINIMAX_API_KEY
+    delete process.env.MINIMAX_MODEL
+    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
+    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
+    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
+    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+
+    const messageItem = { type: "message", id: "m1", content: [{ type: "output_text", text: "hello" }] }
+    mockResponsesCreate.mockReturnValue(makeResponsesStream([
+      { type: "response.output_text.delta", delta: "hello" },
+      { type: "response.output_item.done", item: messageItem },
+    ]))
+
+    const core = await import("../../engine/core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await core.runAgent(messages, callbacks)
+
+    const assistantMsg = messages.find((m: any) => m.role === "assistant")
+    expect(assistantMsg).toBeDefined()
+    expect(assistantMsg._reasoning_items).toBeUndefined()
+
+    delete process.env.AZURE_OPENAI_API_KEY
+    delete process.env.AZURE_OPENAI_ENDPOINT
+    delete process.env.AZURE_OPENAI_DEPLOYMENT
+    delete process.env.AZURE_OPENAI_MODEL_NAME
+  })
+
+  it("Azure: stores only reasoning items when outputItems has mixed types", async () => {
+    vi.resetModules()
+    delete process.env.MINIMAX_API_KEY
+    delete process.env.MINIMAX_MODEL
+    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
+    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
+    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
+    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+
+    const reasoningItem = { type: "reasoning", id: "r1", summary: [{ text: "thought", type: "summary_text" }], encrypted_content: "enc1" }
+    const messageItem = { type: "message", id: "m1", content: [{ type: "output_text", text: "hello" }] }
+    mockResponsesCreate.mockReturnValue(makeResponsesStream([
+      { type: "response.output_item.done", item: reasoningItem },
+      { type: "response.output_text.delta", delta: "hello" },
+      { type: "response.output_item.done", item: messageItem },
+    ]))
+
+    const core = await import("../../engine/core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await core.runAgent(messages, callbacks)
+
+    const assistantMsg = messages.find((m: any) => m.role === "assistant")
+    expect(assistantMsg._reasoning_items).toEqual([reasoningItem])
+    expect(assistantMsg._reasoning_items).toHaveLength(1)
+
+    delete process.env.AZURE_OPENAI_API_KEY
+    delete process.env.AZURE_OPENAI_ENDPOINT
+    delete process.env.AZURE_OPENAI_DEPLOYMENT
+    delete process.env.AZURE_OPENAI_MODEL_NAME
+  })
+
+  it("Azure: azureInput.push still happens for each outputItem (existing behavior preserved)", async () => {
+    vi.resetModules()
+    delete process.env.MINIMAX_API_KEY
+    delete process.env.MINIMAX_MODEL
+    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
+    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
+    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
+    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+
+    vi.mocked(fs.readFileSync).mockReturnValue("data")
+
+    const reasoningItem = { type: "reasoning", id: "r1", summary: [], encrypted_content: "enc1" }
+    const funcItem = { type: "function_call", id: "fc1", call_id: "c1", name: "read_file", arguments: '{"path":"a.txt"}', status: "completed" }
+    let callCount = 0
+    mockResponsesCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeResponsesStream([
+          { type: "response.output_item.done", item: reasoningItem },
+          { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "read_file", arguments: "" } },
+          { type: "response.function_call_arguments.delta", delta: '{"path":"a.txt"}' },
+          { type: "response.output_item.done", item: funcItem },
+        ])
+      }
+      return makeResponsesStream([
+        { type: "response.output_text.delta", delta: "done" },
+      ])
+    })
+
+    const core = await import("../../engine/core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }, { role: "user", content: "hi" }]
+    await core.runAgent(messages, callbacks)
+
+    // Verify the second call's input still contains reasoning + function_call items (azureInput.push preserved)
+    const secondCallInput = mockResponsesCreate.mock.calls[1][0].input
+    const reasoningIdx = secondCallInput.findIndex((i: any) => i.type === "reasoning")
+    const funcCallIdx = secondCallInput.findIndex((i: any) => i.type === "function_call")
+    expect(reasoningIdx).toBeGreaterThan(-1)
+    expect(funcCallIdx).toBeGreaterThan(reasoningIdx)
+
+    delete process.env.AZURE_OPENAI_API_KEY
+    delete process.env.AZURE_OPENAI_ENDPOINT
+    delete process.env.AZURE_OPENAI_DEPLOYMENT
+    delete process.env.AZURE_OPENAI_MODEL_NAME
+  })
+
+  it("MiniMax: does not set _reasoning_items (outputItems always empty)", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([makeChunk("hello")])
+    )
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks)
+
+    const assistantMsg = messages.find((m: any) => m.role === "assistant")
+    expect(assistantMsg).toBeDefined()
+    expect(assistantMsg._reasoning_items).toBeUndefined()
+  })
 })
 
 describe("getClient", () => {
