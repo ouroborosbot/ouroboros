@@ -119,6 +119,80 @@ describe("registerDefaultCommands", () => {
   })
 })
 
+describe("registerDefaultCommands includes tool-required", () => {
+  beforeEach(() => { vi.resetModules() })
+
+  it("/tool-required command toggles between ON and OFF", async () => {
+    const { createCommandRegistry, registerDefaultCommands } = await import("../../repertoire/commands")
+    const registry = createCommandRegistry()
+    registerDefaultCommands(registry)
+
+    // First call: should toggle ON
+    const result1 = registry.dispatch("tool-required", { channel: "cli" })
+    expect(result1.handled).toBe(true)
+    expect(result1.result!.action).toBe("response")
+    expect(result1.result!.message).toContain("ON")
+
+    // Second call: should toggle OFF
+    const result2 = registry.dispatch("tool-required", { channel: "cli" })
+    expect(result2.handled).toBe(true)
+    expect(result2.result!.action).toBe("response")
+    expect(result2.result!.message).toContain("OFF")
+  })
+
+  it("getToolChoiceRequired returns toggle state", async () => {
+    const { createCommandRegistry, registerDefaultCommands, getToolChoiceRequired, resetToolChoiceRequired } = await import("../../repertoire/commands")
+    resetToolChoiceRequired() // ensure clean state
+    const registry = createCommandRegistry()
+    registerDefaultCommands(registry)
+
+    expect(getToolChoiceRequired()).toBe(false)
+    registry.dispatch("tool-required", { channel: "cli" })
+    expect(getToolChoiceRequired()).toBe(true)
+    registry.dispatch("tool-required", { channel: "cli" })
+    expect(getToolChoiceRequired()).toBe(false)
+  })
+
+  it("resetToolChoiceRequired resets the toggle to false", async () => {
+    const { createCommandRegistry, registerDefaultCommands, getToolChoiceRequired, resetToolChoiceRequired } = await import("../../repertoire/commands")
+    const registry = createCommandRegistry()
+    registerDefaultCommands(registry)
+
+    registry.dispatch("tool-required", { channel: "cli" }) // toggle ON
+    expect(getToolChoiceRequired()).toBe(true)
+    resetToolChoiceRequired()
+    expect(getToolChoiceRequired()).toBe(false)
+  })
+
+  it("/tool-required is CLI-only", async () => {
+    const { createCommandRegistry, registerDefaultCommands } = await import("../../repertoire/commands")
+    const registry = createCommandRegistry()
+    registerDefaultCommands(registry)
+
+    const cmd = registry.get("tool-required")
+    expect(cmd).toBeDefined()
+    expect(cmd!.channels).toEqual(["cli"])
+  })
+
+  it("/tool-required appears in /commands for cli", async () => {
+    const { createCommandRegistry, registerDefaultCommands } = await import("../../repertoire/commands")
+    const registry = createCommandRegistry()
+    registerDefaultCommands(registry)
+
+    const result = registry.dispatch("commands", { channel: "cli" })
+    expect(result.result!.message).toContain("/tool-required")
+  })
+
+  it("/tool-required does NOT appear in /commands for teams", async () => {
+    const { createCommandRegistry, registerDefaultCommands } = await import("../../repertoire/commands")
+    const registry = createCommandRegistry()
+    registerDefaultCommands(registry)
+
+    const result = registry.dispatch("commands", { channel: "teams" })
+    expect(result.result!.message).not.toContain("/tool-required")
+  })
+})
+
 describe("parseSlashCommand", () => {
   beforeEach(() => { vi.resetModules() })
 

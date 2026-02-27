@@ -166,7 +166,7 @@ export async function runAgent(
 
   // Refresh system prompt at start of each turn when channel is provided
   if (channel) {
-    messages[0] = { role: "system", content: cachedBuildSystem(channel, buildSystem) };
+    messages[0] = { role: "system", content: cachedBuildSystem(channel, buildSystem, options) };
   }
 
   const maxKicks = options?.maxKicks ?? 1;

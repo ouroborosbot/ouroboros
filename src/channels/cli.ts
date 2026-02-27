@@ -5,7 +5,7 @@ import { buildSystem } from "../mind/prompt"
 import { pickPhrase, THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "../repertoire/phrases"
 import { sessionPath } from "../config"
 import { loadSession, deleteSession, cachedBuildSystem, postTurn } from "../mind/context"
-import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "../repertoire/commands"
+import { createCommandRegistry, registerDefaultCommands, parseSlashCommand, getToolChoiceRequired } from "../repertoire/commands"
 
 // spinner that only touches stderr, cleans up after itself
 // exported for direct testability (stop-without-start branch)
@@ -197,6 +197,9 @@ export function createCliCallbacks(): ChannelCallbacks {
       currentSpinner = null
       process.stderr.write(`\x1b[31m${error}\x1b[0m\n`)
     },
+    onKick: (attempt: number, maxKicks: number) => {
+      process.stderr.write(`\x1b[33mkick ${attempt}/${maxKicks}\x1b[0m\n`)
+    },
   }
 }
 
@@ -285,7 +288,7 @@ export async function main() {
       ctrl.suppress(() => currentAbort!.abort())
       let result: { usage?: any } | undefined
       try {
-        result = await runAgent(messages, cliCallbacks, "cli", currentAbort.signal)
+        result = await runAgent(messages, cliCallbacks, "cli", currentAbort.signal, { toolChoiceRequired: getToolChoiceRequired() })
       } catch {
         // AbortError — silently return to prompt
       }

@@ -101,7 +101,19 @@ function skillsSection(): string {
   return `## my skills (use load_skill to activate)\n${names.join(", ")}`;
 }
 
-export function buildSystem(channel: Channel = "cli"): string {
+export interface BuildSystemOptions {
+  toolChoiceRequired?: boolean;
+}
+
+function toolBehaviorSection(options?: BuildSystemOptions): string {
+  if (!options?.toolChoiceRequired) return "";
+  return `## tool behavior
+tool_choice is set to "required" — you MUST call a tool on every turn.
+when you have finished all work and want to give a text response, call the \`final_answer\` tool with your response text.
+\`final_answer\` must be the ONLY tool call in that turn. do not combine it with other tool calls.`;
+}
+
+export function buildSystem(channel: Channel = "cli", options?: BuildSystemOptions): string {
   return [
     soulSection(),
     identitySection(),
@@ -112,6 +124,7 @@ export function buildSystem(channel: Channel = "cli"): string {
     dateSection(),
     toolsSection(),
     skillsSection(),
+    toolBehaviorSection(options),
   ]
     .filter(Boolean)
     .join("\n\n");

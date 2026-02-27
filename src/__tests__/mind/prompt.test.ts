@@ -261,4 +261,29 @@ describe("buildSystem", () => {
     const result = buildSystem()
     expect(result).toContain("custom identity content")
   })
+
+  it("includes tool behavior section when toolChoiceRequired is true", async () => {
+    setupReadFileSync()
+    const { buildSystem } = await import("../../mind/prompt")
+    const result = buildSystem("cli", { toolChoiceRequired: true })
+    expect(result).toContain("## tool behavior")
+    expect(result).toContain("tool_choice is set to \"required\"")
+    expect(result).toContain("final_answer")
+    expect(result).toContain("ONLY tool call")
+  })
+
+  it("does NOT include tool behavior section when toolChoiceRequired is false", async () => {
+    setupReadFileSync()
+    const { buildSystem } = await import("../../mind/prompt")
+    const result = buildSystem("cli", { toolChoiceRequired: false })
+    expect(result).not.toContain("## tool behavior")
+    expect(result).not.toContain("final_answer")
+  })
+
+  it("does NOT include tool behavior section when options is undefined", async () => {
+    setupReadFileSync()
+    const { buildSystem } = await import("../../mind/prompt")
+    const result = buildSystem("cli")
+    expect(result).not.toContain("## tool behavior")
+  })
 })
