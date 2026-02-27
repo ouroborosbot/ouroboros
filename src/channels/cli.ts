@@ -294,6 +294,13 @@ export async function main() {
       }
       ctrl.restore()
       currentAbort = null
+
+      // Safety net: never silently swallow an empty response
+      const lastMsg = messages[messages.length - 1] as any
+      if (lastMsg?.role === "assistant" && !lastMsg.content?.trim()) {
+        process.stderr.write("\x1b[33m(empty response)\x1b[0m\n")
+      }
+
       process.stdout.write("\n\n")
 
       postTurn(messages, sessPath, result?.usage)

@@ -2,6 +2,7 @@ import OpenAI, { AzureOpenAI } from "openai";
 import { getAzureConfig, getMinimaxConfig, getContextConfig } from "../config";
 import { tools, execTool, summarizeArgs, finalAnswerTool } from "./tools";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
+import { detectKick, hasToolIntent } from "./kicks";
 import type { TurnResult } from "./streaming";
 import type { UsageData } from "../mind/context";
 import { trimMessages, cachedBuildSystem } from "../mind/context";
@@ -83,20 +84,8 @@ export interface RunAgentOptions {
   maxKicks?: number;
 }
 
-const TOOL_INTENT_PATTERNS = [
-  /\blet me\b/i,
-  /\bi'll\b/i,
-  /\bi will\b/i,
-  /\bi'm going to\b/i,
-  /\bgoing to\b/i,
-  /\bi am going to\b/i,
-  /\bi would like to\b/i,
-  /\bi want to\b/i,
-];
-
-export function hasToolIntent(text: string): boolean {
-  return TOOL_INTENT_PATTERNS.some((p) => p.test(text));
-}
+// Re-export kick utilities for backward compat
+export { hasToolIntent } from "./kicks";
 
 export const MAX_TOOL_ROUNDS = 10;
 
@@ -255,8 +244,10 @@ export async function runAgent(
         (msg as any)._reasoning_items = reasoningItems;
       }
       if (!result.toolCalls.length) {
-        // Check for kick: model narrated tool intent without producing tool calls
-        if (result.content && hasToolIntent(result.content) && kickCount < maxKicks) {
+        const kick = kickCount < maxKicks
+          ? detectKick(result.content, options)
+          : null;
+        if (kick) {
           // Do NOT push the malformed assistant message to history
           kickCount++;
           toolRounds++;
@@ -266,8 +257,8 @@ export async function runAgent(
             continue;
           }
           callbacks.onKick?.(kickCount, maxKicks);
-          // Inject self-correction user message
-          messages.push({ role: "user", content: "I narrated instead of acting. Calling the tool now." });
+          // Inject assistant-role self-correction message
+          messages.push({ role: "assistant", content: kick.message });
           // Remove output items from azureInput for kicked response
           if (azureInput) {
             for (const item of result.outputItems) {
