@@ -21,6 +21,15 @@ export interface TeamsConfig {
   tenantId: string
 }
 
+export interface OAuthConfig {
+  graphConnectionName: string
+  adoConnectionName: string
+}
+
+export interface AdoConfig {
+  organizations: string[]
+}
+
 export interface ContextConfig {
   maxTokens: number
   contextMargin: number
@@ -33,6 +42,8 @@ export interface OuroborosConfig {
     minimax: MinimaxProviderConfig
   }
   teams: TeamsConfig
+  oauth: OAuthConfig
+  ado: AdoConfig
   context: ContextConfig
 }
 
@@ -54,6 +65,13 @@ const DEFAULT_CONFIG: OuroborosConfig = {
     clientId: "",
     clientSecret: "",
     tenantId: "",
+  },
+  oauth: {
+    graphConnectionName: "graph",
+    adoConnectionName: "ado",
+  },
+  ado: {
+    organizations: [],
   },
   context: {
     maxTokens: 80000,
@@ -150,6 +168,28 @@ export function getContextConfig(): ContextConfig {
   if (process.env.OUROBOROS_MAX_TOOL_OUTPUT) ctx.maxToolOutputChars = parseInt(process.env.OUROBOROS_MAX_TOOL_OUTPUT, 10)
 
   return ctx
+}
+
+export function getOAuthConfig(): OAuthConfig {
+  const config = loadConfig()
+  const o = { ...config.oauth }
+
+  if (process.env.OAUTH_GRAPH_CONNECTION) o.graphConnectionName = process.env.OAUTH_GRAPH_CONNECTION
+  if (process.env.OAUTH_ADO_CONNECTION) o.adoConnectionName = process.env.OAUTH_ADO_CONNECTION
+
+  return o
+}
+
+export function getAdoConfig(): AdoConfig {
+  const config = loadConfig()
+  const a = { organizations: [...config.ado.organizations] }
+
+  if (process.env.ADO_ORGANIZATIONS) {
+    const raw = process.env.ADO_ORGANIZATIONS
+    a.organizations = raw === "" ? [] : raw.split(",").map((s) => s.trim())
+  }
+
+  return a
 }
 
 export function getSessionDir(): string {
