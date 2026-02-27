@@ -1,6 +1,6 @@
 # Doing: Reasoning Item Persistence and API-Reported Token Usage
 
-**Status**: drafting
+**Status**: READY_FOR_EXECUTION
 **Execution Mode**: direct
 **Created**: 2026-02-26 16:42
 **Planning**: ./2026-02-26-1057-planning-reasoning-persistence.md
@@ -305,3 +305,4 @@ Note: `estimateTokens` deletion is deferred to Feature 3 where it is replaced at
 - 2026-02-26 16:42 Created from planning doc
 - 2026-02-26 16:44 Granularity pass: extracted runAgent return type change into its own unit (3e/3f), deferred estimateTokens deletion to Feature 3 for atomic replacement, renumbered units
 - 2026-02-26 16:46 Validation pass: verified all line numbers, function signatures, event names, error shapes against actual source. Documented loadSession breaking change in Unit 3d with explicit migration notes in Units 3h/3j. Confirmed OpenAI SDK APIError.code property maps correctly for overflow detection.
+- 2026-02-26 Quality pass: all 25 units have acceptance criteria, emoji status markers, What/Output/Acceptance fields. No TBD items. Completion criteria testable. Code coverage requirements included. No changes needed.
