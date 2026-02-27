@@ -2982,10 +2982,11 @@ describe("kick mechanism", () => {
     expect(kicks).toHaveLength(1)
     expect(kicks[0]).toEqual({ attempt: 1, maxKicks: 1 })
     expect(callCount).toBe(2)
-    // Assistant messages: kick self-correction + real response (no malformed narration)
+    // Assistant messages: original narration + self-correction, then real response
     const assistantMessages = messages.filter((m: any) => m.role === "assistant")
     expect(assistantMessages).toHaveLength(2)
-    expect(assistantMessages[0].content).toBe("I narrated instead of acting. Calling the tool now.")
+    expect(assistantMessages[0].content).toContain("let me read that file for you")
+    expect(assistantMessages[0].content).toContain("I narrated instead of acting. Calling the tool now.")
     expect(assistantMessages[1].content).toBe("here is the result")
   })
 
@@ -3071,9 +3072,9 @@ describe("kick mechanism", () => {
     const messages: any[] = [{ role: "system", content: "test" }]
     await runAgent(messages, callbacks)
 
-    // The self-correction assistant message should be in the messages array
+    // The self-correction assistant message should contain original narration + kick message
     const assistantMessages = messages.filter((m: any) => m.role === "assistant")
-    expect(assistantMessages.some((m: any) => m.content === "I narrated instead of acting. Calling the tool now.")).toBe(true)
+    expect(assistantMessages.some((m: any) => m.content?.includes("let me check that") && m.content?.includes("I narrated instead of acting."))).toBe(true)
   })
 
   it("does not kick when maxKicks is set to 0 via options", async () => {
@@ -3184,14 +3185,12 @@ describe("kick mechanism", () => {
     const messages: any[] = [{ role: "system", content: "test" }]
     await runAgent(messages, callbacks)
 
-    // Should NOT have the malformed narration in assistant messages
+    // Assistant messages: original narration + self-correction, then real response
     const assistantMessages = messages.filter((m: any) => m.role === "assistant")
-    // 2 assistant messages: the kick self-correction + the real response
     expect(assistantMessages).toHaveLength(2)
-    expect(assistantMessages[0].content).toBe("I narrated instead of acting. Calling the tool now.")
+    expect(assistantMessages[0].content).toContain("I'm going to")
+    expect(assistantMessages[0].content).toContain("I narrated instead of acting. Calling the tool now.")
     expect(assistantMessages[1].content).toBe("the file says hello")
-    // The narrated content should never appear in any assistant message
-    expect(messages.some((m: any) => m.role === "assistant" && m.content?.includes("I'm going to"))).toBe(false)
   })
 
   it("Azure: kick cleans up azureInput output items and forces rebuild on retry", async () => {
@@ -3249,10 +3248,11 @@ describe("kick mechanism", () => {
 
     expect(kicks).toHaveLength(1)
     expect(callCount).toBe(2)
-    // Assistant messages: kick self-correction + real response (no malformed narration)
+    // Assistant messages: original narration + self-correction, then real response
     const assistantMessages = messages.filter((m: any) => m.role === "assistant")
     expect(assistantMessages).toHaveLength(2)
-    expect(assistantMessages[0].content).toBe("I narrated instead of acting. Calling the tool now.")
+    expect(assistantMessages[0].content).toContain("let me read that file")
+    expect(assistantMessages[0].content).toContain("I narrated instead of acting. Calling the tool now.")
     expect(assistantMessages[1].content).toBe("here is the answer")
 
     delete process.env.AZURE_OPENAI_API_KEY
