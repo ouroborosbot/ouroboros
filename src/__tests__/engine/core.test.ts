@@ -82,7 +82,7 @@ describe("ChannelCallbacks interface", () => {
 })
 
 describe("runAgent", () => {
-  let runAgent: (messages: any[], callbacks: ChannelCallbacks, signal?: AbortSignal) => Promise<{ usage?: any }>
+  let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal) => Promise<{ usage?: any }>
 
   // Helper to create an async iterable from chunks
   function makeStream(chunks: any[]) {
@@ -2070,6 +2070,79 @@ describe("runAgent", () => {
     await runAgent(messages, callbacks)
 
     expect(callCount).toBe(2) // retry attempted
+  })
+
+  // ── system prompt refresh (Feature 5) ──
+
+  it("refreshes system prompt at start of runAgent when channel is passed", async () => {
+    mockCreate.mockReturnValue(makeStream([makeChunk("hi")]))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [
+      { role: "system", content: "stale old prompt" },
+      { role: "user", content: "hello" },
+    ]
+    await runAgent(messages, callbacks, "cli")
+
+    // messages[0] should have been refreshed with cachedBuildSystem("cli", buildSystem)
+    expect(messages[0].content).not.toBe("stale old prompt")
+    expect(messages[0].role).toBe("system")
+  })
+
+  it("refreshes system prompt for teams channel", async () => {
+    mockCreate.mockReturnValue(makeStream([makeChunk("hi")]))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [
+      { role: "system", content: "stale old prompt" },
+      { role: "user", content: "hello" },
+    ]
+    await runAgent(messages, callbacks, "teams")
+
+    // messages[0] should have been refreshed
+    expect(messages[0].content).not.toBe("stale old prompt")
+    expect(messages[0].role).toBe("system")
+  })
+
+  it("still works without channel parameter (backward compatible)", async () => {
+    mockCreate.mockReturnValue(makeStream([makeChunk("hi")]))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [
+      { role: "system", content: "test" },
+      { role: "user", content: "hello" },
+    ]
+    // No channel parameter -- should still work
+    await runAgent(messages, callbacks)
+    // Messages should have an assistant reply
+    expect(messages.some((m: any) => m.role === "assistant")).toBe(true)
   })
 })
 
