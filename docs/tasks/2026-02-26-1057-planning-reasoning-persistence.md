@@ -83,4 +83,4 @@ Live API testing confirmed both providers return actual token counts in streamin
 
 ## Progress Log
 - 2026-02-26 15:42 Created
-- 2026-02-26 Live tested both providers -- both return streaming usage data. Azure via `response.completed` event, MiniMax via final chunk with `stream_options: { include_usage: true }`. Decision: delete estimateTokens, use real API counts.
+- 2026-02-26 16:20 Live tested both providers -- both return streaming usage data. Azure via `response.completed` event, MiniMax via final chunk with `stream_options: { include_usage: true }`. Decision: delete estimateTokens, use real API counts.
