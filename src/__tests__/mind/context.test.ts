@@ -76,6 +76,21 @@ describe("cachedBuildSystem", () => {
     expect(buildFn).toHaveBeenCalledWith("cli", undefined)
     expect(buildFn).toHaveBeenCalledWith("teams", undefined)
   })
+
+  it("uses separate cache key when toolChoiceRequired is true", async () => {
+    const { cachedBuildSystem, resetSystemPromptCache } = await import("../../mind/context")
+    resetSystemPromptCache()
+    const buildFn = vi.fn()
+      .mockReturnValueOnce("normal prompt")
+      .mockReturnValueOnce("tcr prompt")
+
+    const r1 = cachedBuildSystem("cli", buildFn)
+    const r2 = cachedBuildSystem("cli", buildFn, { toolChoiceRequired: true })
+
+    expect(r1).toBe("normal prompt")
+    expect(r2).toBe("tcr prompt")
+    expect(buildFn).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe("trimMessages", () => {

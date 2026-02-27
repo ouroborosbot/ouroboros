@@ -219,31 +219,12 @@ export class MarkdownStreamer {
         continue
       }
 
-      // No marker found — check for partial marker at end of buffer
-      if (!final) {
-        const held = this.partialSuffix()
-        if (held > 0) {
-          const safe = this.buf.slice(0, this.buf.length - held)
-          if (safe.length > 0) out += renderMarkdown(safe)
-          this.buf = this.buf.slice(this.buf.length - held)
-          break
-        }
-      }
-
       out += renderMarkdown(this.buf)
       this.buf = ""
       break
     }
 
     return out
-  }
-
-  private partialSuffix(): number {
-    for (let len = Math.min(this.buf.length, 3); len >= 1; len--) {
-      const tail = this.buf.slice(-len)
-      if (MARKERS.some(m => m.startsWith(tail) && m !== tail)) return len
-    }
-    return 0
   }
 }
 
@@ -314,7 +295,12 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
     onKick: (attempt: number, maxKicks: number) => {
       currentSpinner?.stop()
       currentSpinner = null
-      process.stderr.write(`\r\x1b[K\x1b[33m↻ kick ${attempt}/${maxKicks}\x1b[0m\n`)
+      if (textDirty) {
+        process.stdout.write("\n")
+        textDirty = false
+      }
+      const counter = maxKicks > 1 ? ` ${attempt}/${maxKicks}` : ""
+      process.stderr.write(`\x1b[33m↻ kick${counter}\x1b[0m\n`)
     },
     flushMarkdown: () => {
       const remaining = streamer.flush()

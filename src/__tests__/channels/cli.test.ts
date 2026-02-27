@@ -185,6 +185,16 @@ describe("CLI adapter - MarkdownStreamer", () => {
     expect(out2).toContain(" ok")
   })
 
+  it("holds back double backtick at end of chunk (prefix of ```)", () => {
+    const s = new MarkdownStreamer()
+    const out1 = s.push("code: ``")
+    // "code: " flushed, "``" held back (prefix of ```)
+    expect(out1).toBe("code: ")
+    const out2 = s.push("`\nconst x = 1\n```")
+    expect(out2).toContain("\x1b[2m")
+    expect(out2).toContain("const x = 1")
+  })
+
   it("flush renders remaining buffer literally on stream end", () => {
     const s = new MarkdownStreamer()
     s.push("unclosed **bold")
@@ -229,6 +239,15 @@ describe("CLI adapter - MarkdownStreamer", () => {
     const out = s.push("**a** then `b`")
     expect(out).toContain("\x1b[1ma\x1b[22m")
     expect(out).toContain("\x1b[36mb\x1b[39m")
+  })
+
+  it("holds back lone marker prefix that could start a longer marker", () => {
+    const s = new MarkdownStreamer()
+    // Buffer is just "*" — could be start of "**"
+    const out1 = s.push("*")
+    expect(out1).toBe("")
+    const out2 = s.push("*bold**")
+    expect(out2).toContain("\x1b[1mbold\x1b[22m")
   })
 
   it("consecutive pushes without markers accumulate nothing", () => {
@@ -499,6 +518,31 @@ describe("CLI adapter - onToolStart", () => {
 
     // Clean up
     callbacks.onToolEnd("read_file", "/tmp/test.txt", true)
+    vi.restoreAllMocks()
+  })
+
+  it("emits newline before spinner when text was streamed without trailing newline", async () => {
+    const stdoutChunks: string[] = []
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true)
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk: any) => {
+      stdoutChunks.push(chunk.toString())
+      return true
+    })
+
+    vi.resetModules()
+    const agent = await import("../../channels/cli")
+    const callbacks = agent.createCliCallbacks()
+
+    callbacks.onModelStart()
+    callbacks.onModelStreamStart()
+    callbacks.onTextChunk("some text")
+    callbacks.flushMarkdown()
+    stdoutChunks.length = 0
+    callbacks.onToolStart("read_file", { path: "x" })
+    // Should have emitted a \n to avoid spinner clobbering text
+    expect(stdoutChunks.join("")).toContain("\n")
+
+    callbacks.onToolEnd("read_file", "x", true)
     vi.restoreAllMocks()
   })
 })

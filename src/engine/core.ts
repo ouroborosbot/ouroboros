@@ -259,14 +259,8 @@ export async function runAgent(
           callbacks.onKick?.(kickCount, maxKicks);
           // Inject assistant-role self-correction message
           messages.push({ role: "assistant", content: kick.message });
-          // Remove output items from azureInput for kicked response
-          if (azureInput) {
-            for (const item of result.outputItems) {
-              const idx = azureInput.indexOf(item);
-              if (idx !== -1) azureInput.splice(idx, 1);
-            }
-            azureInput = null; // force rebuild on retry
-          }
+          // Discard azureInput so it's rebuilt from messages on retry
+          azureInput = null;
           continue;
         }
         messages.push(msg);
@@ -275,12 +269,12 @@ export async function runAgent(
         // Check for final_answer sole call: intercept before tool execution
         const isSoleFinalAnswer = result.toolCalls.length === 1 && result.toolCalls[0].name === "final_answer";
         if (isSoleFinalAnswer) {
-          let answer = "";
+          let answer: string;
           try {
             const parsed = JSON.parse(result.toolCalls[0].arguments);
-            answer = parsed.answer ?? result.content ?? "";
+            answer = parsed.answer ?? result.content;
           } catch {
-            answer = result.content ?? "";
+            answer = result.content;
           }
           // Push clean assistant message with extracted answer (no tool_calls)
           messages.push({ role: "assistant", content: answer } as OpenAI.ChatCompletionAssistantMessageParam);
