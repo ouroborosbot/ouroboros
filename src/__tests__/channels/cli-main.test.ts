@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   createCommandRegistry: vi.fn(),
   registerDefaultCommands: vi.fn(),
   parseSlashCommand: vi.fn().mockReturnValue(null),
+  getToolChoiceRequired: vi.fn().mockReturnValue(false),
   createInterface: vi.fn(),
   // per-test registry (rebuilt in beforeEach)
   registry: {
@@ -53,6 +54,7 @@ vi.mock("../../repertoire/commands", () => ({
   createCommandRegistry: (...a: any[]) => mocks.createCommandRegistry(...a),
   registerDefaultCommands: (...a: any[]) => mocks.registerDefaultCommands(...a),
   parseSlashCommand: (...a: any[]) => mocks.parseSlashCommand(...a),
+  getToolChoiceRequired: (...a: any[]) => mocks.getToolChoiceRequired(...a),
 }))
 
 import { main } from "../../channels/cli"
@@ -131,6 +133,7 @@ function resetMocks() {
   mocks.postTurn.mockReset()
   mocks.registerDefaultCommands.mockReset()
   mocks.parseSlashCommand.mockReset().mockReturnValue(null)
+  mocks.getToolChoiceRequired.mockReset().mockReturnValue(false)
 
   // Fresh registry each test
   mocks.registry = {
@@ -610,5 +613,82 @@ describe("agent.ts main() - session persistence", () => {
 
     const flatLogs = logCalls.flat()
     expect(flatLogs.some((l) => l.includes("/commands"))).toBe(true)
+  })
+})
+
+describe("agent.ts main() - onKick and toolChoiceRequired", () => {
+  beforeEach(() => {
+    resetMocks()
+    setupSpies()
+  })
+
+  afterEach(() => {
+    restoreSpies()
+    vi.restoreAllMocks()
+  })
+
+  it("onKick callback writes kick status to stderr", async () => {
+    setupBasic({ inputSequence: ["hello", "/exit"] })
+    mocks.runAgent.mockImplementation(async (_msgs: any, cb: any) => {
+      // Simulate kick callback
+      if (cb.onKick) cb.onKick(1, 1)
+      return { usage: undefined }
+    })
+
+    await main()
+
+    const stderrOutput = stderrChunks.join("")
+    expect(stderrOutput).toContain("kick")
+    expect(stderrOutput).toContain("1/1")
+  })
+
+  it("onKick callback handles various attempt/maxKicks values", async () => {
+    setupBasic({ inputSequence: ["hello", "/exit"] })
+    mocks.runAgent.mockImplementation(async (_msgs: any, cb: any) => {
+      if (cb.onKick) {
+        cb.onKick(1, 2)
+        cb.onKick(2, 2)
+      }
+      return { usage: undefined }
+    })
+
+    await main()
+
+    const stderrOutput = stderrChunks.join("")
+    expect(stderrOutput).toContain("1/2")
+    expect(stderrOutput).toContain("2/2")
+  })
+
+  it("passes toolChoiceRequired option to runAgent when toggle is on", async () => {
+    const runAgentCalls: any[][] = []
+    // After /tool-required dispatch, getToolChoiceRequired returns true
+    mocks.getToolChoiceRequired.mockReturnValue(true)
+    setupBasic({
+      inputSequence: ["/tool-required", "hello", "/exit"],
+      dispatchFn: (name: string) => {
+        if (name === "exit") return { handled: true, result: { action: "exit" } }
+        if (name === "tool-required") return { handled: true, result: { action: "response", message: "tool-required mode: ON" } }
+        return { handled: false }
+      },
+    })
+    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
+
+    await main()
+
+    expect(runAgentCalls.length).toBe(1)
+    // 5th argument (index 4) should be options with toolChoiceRequired: true
+    expect(runAgentCalls[0][4]).toEqual({ toolChoiceRequired: true })
+  })
+
+  it("passes toolChoiceRequired: false when toggle is off (default)", async () => {
+    const runAgentCalls: any[][] = []
+    setupBasic({ inputSequence: ["hello", "/exit"] })
+    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
+
+    await main()
+
+    expect(runAgentCalls.length).toBe(1)
+    // 5th argument (index 4) should have toolChoiceRequired: false
+    expect(runAgentCalls[0][4]).toEqual({ toolChoiceRequired: false })
   })
 })

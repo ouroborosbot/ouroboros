@@ -14,14 +14,15 @@ export interface UsageData {
 // System prompt cache: per channel, with 60s TTL
 const _promptCache = new Map<string, { value: string; timestamp: number }>()
 
-export function cachedBuildSystem(channel: Channel, buildFn: (ch: Channel) => string): string {
-  const cached = _promptCache.get(channel)
+export function cachedBuildSystem(channel: Channel, buildFn: (ch: Channel, opts?: any) => string, options?: { toolChoiceRequired?: boolean }): string {
+  const cacheKey = options?.toolChoiceRequired ? `${channel}:tcr` : channel
+  const cached = _promptCache.get(cacheKey)
   const now = Date.now()
   if (cached && now - cached.timestamp < 60000) {
     return cached.value
   }
-  const value = buildFn(channel)
-  _promptCache.set(channel, { value, timestamp: now })
+  const value = buildFn(channel, options)
+  _promptCache.set(cacheKey, { value, timestamp: now })
   return value
 }
 

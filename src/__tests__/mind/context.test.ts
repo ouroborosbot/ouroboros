@@ -27,7 +27,7 @@ describe("cachedBuildSystem", () => {
     const buildFn = vi.fn().mockReturnValue("system prompt v1")
     const result = cachedBuildSystem("cli", buildFn)
     expect(result).toBe("system prompt v1")
-    expect(buildFn).toHaveBeenCalledWith("cli")
+    expect(buildFn).toHaveBeenCalledWith("cli", undefined)
     expect(buildFn).toHaveBeenCalledTimes(1)
   })
 
@@ -73,8 +73,8 @@ describe("cachedBuildSystem", () => {
     expect(r1).toBe("cli prompt")
     expect(r2).toBe("teams prompt")
     expect(buildFn).toHaveBeenCalledTimes(2)
-    expect(buildFn).toHaveBeenCalledWith("cli")
-    expect(buildFn).toHaveBeenCalledWith("teams")
+    expect(buildFn).toHaveBeenCalledWith("cli", undefined)
+    expect(buildFn).toHaveBeenCalledWith("teams", undefined)
   })
 })
 

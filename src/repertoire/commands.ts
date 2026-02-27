@@ -49,6 +49,17 @@ export function createCommandRegistry(): CommandRegistry {
   }
 }
 
+// Module-level toggle for tool-required mode
+let _toolChoiceRequired = false
+
+export function getToolChoiceRequired(): boolean {
+  return _toolChoiceRequired
+}
+
+export function resetToolChoiceRequired(): void {
+  _toolChoiceRequired = false
+}
+
 export function registerDefaultCommands(registry: CommandRegistry): void {
   registry.register({
     name: "exit",
@@ -72,6 +83,16 @@ export function registerDefaultCommands(registry: CommandRegistry): void {
       const cmds = registry.list(ctx.channel)
       const lines = cmds.map((c) => `/${c.name} - ${c.description}`)
       return { action: "response", message: lines.join("\n") }
+    },
+  })
+
+  registry.register({
+    name: "tool-required",
+    description: "toggle tool_choice required mode (forces tool calls)",
+    channels: ["cli"],
+    handler: () => {
+      _toolChoiceRequired = !_toolChoiceRequired
+      return { action: "response", message: `tool-required mode: ${_toolChoiceRequired ? "ON" : "OFF"}` }
     },
   })
 }
