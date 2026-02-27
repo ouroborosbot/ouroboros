@@ -120,7 +120,7 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 **Output**: Modified `src/engine/streaming.ts`
 **Acceptance**: All Unit 2a tests PASS (green), existing tests still pass, no warnings
 
-### ⬜ Unit 2c: Capture MiniMax usage -- Tests
+### ✅ Unit 2c: Capture MiniMax usage -- Tests
 **What**: Write failing tests in `src/__tests__/engine/streaming.test.ts` for:
 - `streamChatCompletion` adds `stream_options: { include_usage: true }` to the create params
 - `streamChatCompletion` captures `chunk.usage` from the final streaming chunk and returns it in `TurnResult.usage`
