@@ -397,3 +397,4 @@ Call sites to update (source files only):
 - 2026-02-26 17:28 Feature 2 complete (Units 2a-2e): Azure and MiniMax usage capture with UsageData type. 100% coverage on streaming.ts.
 - 2026-02-26 17:42 Unit 3g complete: CLI main tests updated for postTurn (no pre-call trimming), boot greeting removed, loadSessionReturn format updated. 10 tests fail (red).
 - 2026-02-26 17:43 Unit 3h complete: deleted bootGreeting function and boot greeting block, removed pre-call trimMessages+saveSession, added postTurn after runAgent. Removed bootGreeting tests from cli.test.ts. 402 tests pass.
+- 2026-02-26 17:45 Unit 3i complete: Teams tests updated for postTurn (no pre-call trimming), loadSessionReturn format updated. 2 tests fail (red).
