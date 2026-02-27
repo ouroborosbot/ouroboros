@@ -601,6 +601,84 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     vi.restoreAllMocks()
   })
 
+  it("message handler fetches tokens and passes teamsContext to handleTeamsMessage", async () => {
+    vi.resetModules()
+    delete process.env.CLIENT_ID
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
+    vi.doMock("../../engine/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+      postTurn: vi.fn(),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../channels/teams")
+    teams.startTeamsApp()
+
+    // Simulate a full activity context with api.users.token.get and signin
+    const mockSignin = vi.fn().mockResolvedValue("token-from-signin")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: {
+        text: "test",
+        conversation: { id: "conv-test" },
+        from: { id: "user-123" },
+        channelId: "msteams",
+      },
+      api: {
+        users: {
+          token: {
+            get: vi.fn()
+              .mockResolvedValueOnce({ token: "graph-token-123" })
+              .mockResolvedValueOnce({ token: "ado-token-456" }),
+          },
+        },
+      },
+      signin: mockSignin,
+    })
+
+    // runAgent should have been called with toolContext containing both tokens
+    expect(mockRunAgent).toHaveBeenCalled()
+    const callArgs = mockRunAgent.mock.calls[0]
+    const options = callArgs[4]
+    expect(options).toBeDefined()
+    expect(options.toolContext).toBeDefined()
+    expect(options.toolContext.graphToken).toBe("graph-token-123")
+    expect(options.toolContext.adoToken).toBe("ado-token-456")
+    expect(typeof options.toolContext.signin).toBe("function")
+
+    // Test that the signin function proxies to ctx.signin with connectionName
+    await options.toolContext.signin("ado")
+    expect(mockSignin).toHaveBeenCalledWith({ connectionName: "ado" })
+
+    vi.restoreAllMocks()
+  })
+
   it("message handler handles missing activity.text", async () => {
     vi.resetModules()
     delete process.env.CLIENT_ID

@@ -1,0 +1,56 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90m/Users/microsoft/code/ouroboros[39m
+      [2mCoverage enabled with [22m[33mv8[39m
+
+ [32m✓[39m src/__tests__/repertoire/commands.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 153[2mms[22m[39m
+ [32m✓[39m src/__tests__/config.test.ts [2m([22m[2m31 tests[22m[2m)[22m[32m 158[2mms[22m[39m
+ [32m✓[39m src/__tests__/mind/context.test.ts [2m([22m[2m35 tests[22m[2m)[22m[32m 118[2mms[22m[39m
+ [32m✓[39m src/__tests__/engine/streaming.test.ts [2m([22m[2m64 tests[22m[2m)[22m[32m 164[2mms[22m[39m
+ [32m✓[39m src/__tests__/engine/tools.test.ts [2m([22m[2m70 tests[22m[2m)[22m[32m 96[2mms[22m[39m
+ [32m✓[39m src/__tests__/mind/prompt.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 109[2mms[22m[39m
+ [32m✓[39m src/__tests__/channels/cli-ux.test.ts [2m([22m[2m16 tests[22m[2m)[22m[33m 331[2mms[22m[39m
+ [32m✓[39m src/__tests__/channels/cli-main.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 117[2mms[22m[39m
+ [32m✓[39m src/__tests__/repertoire/skills.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/__tests__/engine/kicks.test.ts [2m([22m[2m45 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/__tests__/engine/ado-client.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/__tests__/repertoire/phrases.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/__tests__/engine/api-error.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/__tests__/engine/graph-client.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/__tests__/setup.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/__tests__/channels/cli.test.ts [2m([22m[2m55 tests[22m[2m)[22m[33m 343[2mms[22m[39m
+ [32m✓[39m src/__tests__/channels/teams.test.ts [2m([22m[2m72 tests[22m[2m)[22m[33m 450[2mms[22m[39m
+     [33m[2m✓[22m[39m exports createTeamsCallbacks [33m 307[2mms[22m[39m
+ [32m✓[39m src/__tests__/engine/core.test.ts [2m([22m[2m133 tests[22m[2m)[22m[33m 714[2mms[22m[39m
+     [33m[2m✓[22m[39m passes toolContext to execTool when calling graph/ado tools [33m 420[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m18 passed[39m[22m[90m (18)[39m
+[2m      Tests [22m [1m[32m646 passed[39m[22m[90m (646)[39m
+[2m   Start at [22m 13:56:36
+[2m   Duration [22m 1.23s[2m (transform 2.79s, setup 0ms, import 2.34s, tests 2.79s, environment 1ms)[22m
+
+[34m % [39m[2mCoverage report from [22m[33mv8[39m
+------------------|---------|----------|---------|---------|-------------------
+File              | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+------------------|---------|----------|---------|---------|-------------------
+All files         |   99.72 |    98.77 |     100 |   99.79 |                   
+ src              |   98.64 |    95.55 |     100 |     100 |                   
+  config.ts       |   98.64 |    95.55 |     100 |     100 | 168,189           
+ src/channels     |     100 |    99.41 |     100 |     100 |                   
+  cli.ts          |     100 |    99.16 |     100 |     100 | 416               
+  teams.ts        |     100 |      100 |     100 |     100 |                   
+ src/engine       |   99.61 |    98.67 |     100 |   99.55 |                   
+  ado-client.ts   |     100 |      100 |     100 |     100 |                   
+  api-error.ts    |     100 |      100 |     100 |     100 |                   
+  core.ts         |   99.07 |    99.25 |     100 |    98.9 | 339-340           
+  graph-client.ts |     100 |      100 |     100 |     100 |                   
+  kicks.ts        |     100 |      100 |     100 |     100 |                   
+  streaming.ts    |     100 |    96.63 |     100 |     100 | 65,72,85,106      
+  tools.ts        |     100 |      100 |     100 |     100 |                   
+ src/mind         |     100 |      100 |     100 |     100 |                   
+  context.ts      |     100 |      100 |     100 |     100 |                   
+  prompt.ts       |     100 |      100 |     100 |     100 |                   
+ src/repertoire   |     100 |      100 |     100 |     100 |                   
+  commands.ts     |     100 |      100 |     100 |     100 |                   
+  phrases.ts      |     100 |      100 |     100 |     100 |                   
+  skills.ts       |     100 |      100 |     100 |     100 |                   
+------------------|---------|----------|---------|---------|-------------------
