@@ -1,6 +1,6 @@
 # Planning: Kick Mechanism & tool_choice Required Mode
 
-**Status**: NEEDS_REVIEW
+**Status**: APPROVED
 **Created**: 2026-02-26 19:10
 
 ## Goal
@@ -17,7 +17,7 @@ Fix the agent proactivity bug where the model narrates tool-use intent ("let me 
   - New `onKick` callback in `ChannelCallbacks` so channels can display kick status
 - **Feature 2 -- `tool_choice: "required"` mode** (across engine):
   - Add a `final_answer` tool to `src/engine/tools.ts` that accepts `{ answer: string }` and signals the model wants to produce a text-only response
-  - Refactor `runAgent` to accept an options object: `runAgent(messages, callbacks, options?)` where options includes `channel`, `signal`, `toolChoiceRequired`, and `maxKicks`
+  - Add `options?` as a 5th parameter to `runAgent`: `runAgent(messages, callbacks, channel, signal, options?)` where options = `{ toolChoiceRequired?, maxKicks? }`. Keep `channel` and `signal` as positional args to minimize test-file churn.
   - Add `toolChoiceRequired` flag in the options object that toggles `tool_choice: "required"` on API calls
   - When enabled, pass `tool_choice: "required"` through both the Chat Completions path (MiniMax) and the Responses API path (Azure)
   - When `final_answer` is called, extract the answer text and treat it as a normal text response (push as assistant content, set `done = true`)
@@ -65,10 +65,11 @@ Fix the agent proactivity bug where the model narrates tool-use intent ("let me 
 - Both features are in `core.ts` (the agent loop) rather than in channel adapters, keeping the logic centralized.
 - Kick detection uses regex pattern matching on the response text, not an LLM call, to keep it fast and deterministic.
 - **Kick message text**: `"I narrated instead of acting. Calling the tool now."` -- short, forward-looking, user-role message.
-- **Intent phrases**: Hardcoded list (not configurable). Patterns: "let me", "I'll", "I will", "I'm going to", "going to", "I am going to", "I would like to", "I want to".
+- **Intent phrases**: Hardcoded list (not configurable). Patterns: "let me", "I'll", "I will", "I'm going to", "going to", "I am going to", "I would like to", "I want to". Note: broad patterns like "going to" may cause false-positive kicks, but the max-1-kick cap makes this harmless.
 - **`final_answer` tool visibility**: Only injected into the tools list when `tool_choice: "required"` mode is active. Keeps the tool list clean when mode is off.
-- **`runAgent` API**: Refactor to options object -- `runAgent(messages, callbacks, options?)` where options = `{ channel?, signal?, toolChoiceRequired?, maxKicks? }`. All callers updated.
+- **`runAgent` API**: Keep `channel` and `signal` as positional args, add `options?` as a 5th parameter -- `runAgent(messages, callbacks, channel, signal, options?)` where options = `{ toolChoiceRequired?, maxKicks? }`. This minimizes churn in the test file since existing call sites keep their positional args.
 - **Max kicks**: Default 1, configurable via `maxKicks` in the options object.
+- **`final_answer` + other tool calls edge case**: If the model returns `final_answer` alongside other tool calls in the same turn, execute all the other tool calls normally, but for `final_answer`, push a tool result that rejects it: "rejected: final_answer must be the only tool call. Finish your work first, then call final_answer alone." Don't set `done = true`. The loop continues naturally. Only when `final_answer` is the sole tool call do we extract the answer and terminate. No kick needed for this case -- the tool result mechanism handles the correction.
 
 ## Context / References
 - `src/engine/core.ts` -- `runAgent()` function, lines 205-206 is the termination check (`if (!result.toolCalls.length) done = true`), line 80 defines `MAX_TOOL_ROUNDS = 10`
@@ -86,7 +87,10 @@ For Azure Responses API, `tool_choice` maps to the `tool_choice` parameter in th
 
 The `final_answer` tool handler in `execTool` should never actually be called -- it should be intercepted in the `runAgent` loop before execution. This is a special sentinel, similar to how some frameworks handle "finish" tools.
 
-The `runAgent` refactor to options object touches: `cli.ts` (1 call site), `teams.ts` (1 call site), and all test files that call `runAgent`. This is a mechanical change but must be done carefully.
+The `runAgent` change to add an `options` 5th parameter touches: `cli.ts` (1 call site), `teams.ts` (1 call site), and test files that need the new options. Existing call sites don't need changes since `options` is optional.
+
+Azure Responses API `tool_choice` format note: The Responses API may use a different format for `tool_choice` than Chat Completions (e.g. `{ type: "required" }` vs string `"required"`). Verify the exact format during implementation.
 
 ## Progress Log
 - 2026-02-26 19:10 Created
+- 2026-02-26 19:35 Review feedback incorporated

@@ -29,10 +29,6 @@ export function resetSystemPromptCache(): void {
   _promptCache.clear()
 }
 
-// Hard cap on message array length to stay within API limits (e.g. 16K input items).
-// Applies even when actualTokenCount is under maxTokens.
-const MAX_MESSAGES = 200
-
 export function trimMessages(
   messages: OpenAI.ChatCompletionMessageParam[],
   maxTokens: number,
@@ -40,9 +36,8 @@ export function trimMessages(
   actualTokenCount?: number,
 ): OpenAI.ChatCompletionMessageParam[] {
   const overTokens = actualTokenCount ? actualTokenCount > maxTokens : false
-  const overCount = messages.length > MAX_MESSAGES
 
-  if (!overTokens && !overCount) {
+  if (!overTokens) {
     return [...messages]
   }
 
@@ -54,12 +49,10 @@ export function trimMessages(
   let droppedTokens = 0
   let cutIndex = 1 // start after system prompt (index 0)
 
-  // Drop oldest messages (after system prompt) until budget and count are satisfied
+  // Drop oldest messages (after system prompt) until under budget
   while (cutIndex < messages.length) {
-    const remainingCount = messages.length - cutIndex + 1 // +1 for system prompt
     const remainingTokens = (actualTokenCount || 0) - droppedTokens
-    const tokensSatisfied = !actualTokenCount || remainingTokens <= trimTarget
-    if (tokensSatisfied && remainingCount <= MAX_MESSAGES) break
+    if (remainingTokens <= trimTarget) break
     droppedTokens += perMessageCost
     cutIndex++
   }
