@@ -1,7 +1,7 @@
 # Planning: Fix Agent Proactivity Bug
 
 **Status**: drafting
-**Created**: (pending first commit)
+**Created**: 2026-02-26 18:17
 
 ## Goal
 Fix the bug where the agent narrates tool-call intentions ("let me read that file") but then fails to actually make the tool call, instead producing a text-only response. The agent should act rather than describe acting.
@@ -58,4 +58,4 @@ Fix the bug where the agent narrates tool-call intentions ("let me read that fil
 The current `buildSystem()` assembles: SOUL + IDENTITY + LORE + FRIENDS + selfAware + provider + date + tools + skills. The tools section only lists tool names and descriptions -- no behavioral guidance about when/how to use them. The fix likely involves adding a dedicated "tool-use behavior" section.
 
 ## Progress Log
-- (pending) Created
+- 2026-02-26 18:17 Created
