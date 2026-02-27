@@ -259,6 +259,52 @@ describe("agent.ts main()", () => {
     expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
   })
 
+  it("breaks at top of loop when closed flag is set while awaiting input", async () => {
+    let closeHandler: (() => void) | null = null
+    let inputCall = 0
+    let inputResolve: ((result: IteratorResult<string>) => void) | null = null
+
+    const mockRl: any = {
+      on: (event: string, handler: (...args: any[]) => void) => {
+        if (event === "close") closeHandler = handler
+        return mockRl
+      },
+      close: () => { if (closeHandler) closeHandler() },
+      pause: () => {},
+      resume: () => {},
+      line: "",
+      [Symbol.asyncIterator]: () => ({
+        next: (): Promise<IteratorResult<string>> => {
+          inputCall++
+          if (inputCall === 1) {
+            // First call: return a promise we control, and fire close before resolving
+            return new Promise((resolve) => { inputResolve = resolve })
+          }
+          return Promise.resolve({ value: undefined as any, done: true })
+        },
+      }),
+    }
+
+    mocks.createInterface.mockReturnValue(mockRl)
+
+    const mainPromise = main()
+
+    // Wait for main to register handlers and start awaiting input
+    await new Promise((r) => setTimeout(r, 50))
+
+    // Fire close while the for-await is waiting for input
+    if (closeHandler) closeHandler()
+    // Now resolve the pending input — closed is already true, so line 247 fires
+    if (inputResolve) inputResolve({ value: "stale input", done: false })
+
+    await mainPromise
+
+    const flatLogs = logCalls.flat()
+    expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
+    // runAgent should never be called (the input is discarded)
+    expect(mocks.runAgent).not.toHaveBeenCalled()
+  })
+
   it("breaks loop when closed flag is set during runAgent", async () => {
     let closeHandler: (() => void) | null = null
     let inputCall = 0
