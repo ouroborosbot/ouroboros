@@ -232,3 +232,4 @@ Fix the agent proactivity bug where the model narrates tool-use intent ("let me 
 
 ## Progress Log
 - 2026-02-26 19:45 Created from planning doc (4-unit breakdown)
+- 2026-02-26 20:09 Unit 1 complete: hasToolIntent + kick mechanism with 12 new tests, 100% line coverage on core.ts
