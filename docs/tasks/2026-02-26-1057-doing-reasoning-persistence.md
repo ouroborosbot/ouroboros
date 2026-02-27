@@ -1,0 +1,288 @@
+# Doing: Reasoning Item Persistence and API-Reported Token Usage
+
+**Status**: drafting
+**Execution Mode**: direct
+**Created**: 2026-02-26
+**Planning**: ./2026-02-26-1057-planning-reasoning-persistence.md
+**Artifacts**: ./2026-02-26-1057-doing-reasoning-persistence/
+
+## Execution Mode
+
+- **pending**: Awaiting user approval before each unit starts (interactive)
+- **spawn**: Spawn sub-agent for each unit (parallel/autonomous)
+- **direct**: Execute units sequentially in current session (default)
+
+## Objective
+Fix two bugs that cause the sliding context window to fail when using Azure Responses API reasoning models (gpt-5.2-chat) with `store: false`. Reasoning items are lost between turns (breaking reasoning continuity) and reasoning tokens are invisible to the token estimator (preventing context trimming from triggering). Replace the chars/4 token estimation heuristic with actual API-reported usage data from both providers. Add automatic context overflow recovery.
+
+## Completion Criteria
+- [ ] Reasoning items from `result.outputItems` are stored on assistant messages and persist through session save/load
+- [ ] `toResponsesInput` restores reasoning items when rebuilding azureInput from loaded session messages
+- [ ] Reasoning items emitted before assistant content in toResponsesInput (matching API item order)
+- [ ] `estimateTokens` is deleted; all callers replaced with API-reported usage
+- [ ] Azure streaming captures usage from `response.completed` event and returns it in `TurnResult`
+- [ ] MiniMax streaming captures usage from final chunk (with `stream_options: { include_usage: true }`) and returns it in `TurnResult`
+- [ ] `trimMessages` uses actual API-reported token count instead of estimated count
+- [ ] Trimming runs retroactively after API call returns (not before the call)
+- [ ] `lastUsage` is stored in session JSON alongside messages
+- [ ] Context trimming triggers correctly for sessions with large reasoning payloads
+- [ ] Cold start (no prior usage data) handled gracefully -- no pre-call trimming, API errors caught
+- [ ] Context overflow errors from both providers are caught and trigger automatic trim + retry
+- [ ] User is informed when auto-trim happens (log message, not an error)
+- [ ] Retry succeeds after trimming (or surfaces the error if trimming can't help)
+- [ ] Within-turn reasoning accumulation in azureInput is preserved (existing behavior unchanged)
+- [ ] 100% test coverage on all new code
+- [ ] All tests pass
+- [ ] No warnings
+
+## Code Coverage Requirements
+**MANDATORY: 100% coverage on all new code.**
+- No `[ExcludeFromCodeCoverage]` or equivalent on new code
+- All branches covered (if/else, switch, try/catch)
+- All error paths tested
+- Edge cases: null, empty, boundary values
+
+## TDD Requirements
+**Strict TDD -- no exceptions:**
+1. **Tests first**: Write failing tests BEFORE any implementation
+2. **Verify failure**: Run tests, confirm they FAIL (red)
+3. **Minimal implementation**: Write just enough code to pass
+4. **Verify pass**: Run tests, confirm they PASS (green)
+5. **Refactor**: Clean up, keep tests green
+6. **No skipping**: Never write implementation without failing test first
+
+## Work Units
+
+### Legend
+⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
+
+---
+
+### Feature 1: Persist Reasoning Items
+
+### ⬜ Unit 1a: Store reasoning items on assistant messages -- Tests
+**What**: Write failing tests in `src/__tests__/engine/core.test.ts` for storing reasoning items from `result.outputItems` on assistant messages as `_reasoning_items`. Tests cover:
+- When `result.outputItems` contains reasoning items (type: "reasoning"), they are stored as `_reasoning_items` on the assistant message pushed to `messages`
+- When `result.outputItems` contains no reasoning items, `_reasoning_items` is not set (or is empty array)
+- When `result.outputItems` contains a mix of reasoning and non-reasoning items (e.g., function_call, message), only reasoning items are stored in `_reasoning_items`
+- Existing behavior preserved: `azureInput.push(item)` for each outputItem still happens
+- Reasoning item structure: `{ type: "reasoning", id: "r1", summary: [{ text: "...", type: "summary_text" }], encrypted_content: "enc..." }`
+**Output**: Failing tests in `src/__tests__/engine/core.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because `_reasoning_items` is not yet stored on assistant messages
+
+### ⬜ Unit 1b: Store reasoning items on assistant messages -- Implementation
+**What**: In `src/engine/core.ts` `runAgent`, after building the assistant message (line 144-154) and before `messages.push(msg)`, extract reasoning items from `result.outputItems` and store them as `msg._reasoning_items`. Filter for items where `item.type === "reasoning"`. Only set the field when there are reasoning items to store.
+**Output**: Modified `src/engine/core.ts`
+**Acceptance**: All Unit 1a tests PASS (green), existing tests still pass, no warnings
+
+### ⬜ Unit 1c: Restore reasoning items in toResponsesInput -- Tests
+**What**: Write failing tests in `src/__tests__/engine/streaming.test.ts` for restoring `_reasoning_items` in `toResponsesInput`. Tests cover:
+- When an assistant message has `_reasoning_items`, those items are emitted into the `input` array BEFORE the assistant content and function_call items (matching API item order)
+- When an assistant message has no `_reasoning_items`, behavior is unchanged
+- Reasoning items are emitted as-is (not wrapped or modified)
+- Multiple assistant messages each with their own `_reasoning_items` are all restored in correct order
+- An assistant message with `_reasoning_items`, content, AND tool_calls emits items in order: reasoning items, then content, then function_calls
+**Output**: Failing tests in `src/__tests__/engine/streaming.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because `toResponsesInput` does not yet handle `_reasoning_items`
+
+### ⬜ Unit 1d: Restore reasoning items in toResponsesInput -- Implementation
+**What**: In `src/engine/streaming.ts` `toResponsesInput`, in the assistant message handler (line 29-46), check for `a._reasoning_items` and push each reasoning item to `input` before pushing content and function_calls.
+**Output**: Modified `src/engine/streaming.ts`
+**Acceptance**: All Unit 1c tests PASS (green), all existing tests still pass, no warnings
+
+### ⬜ Unit 1e: Reasoning persistence -- Coverage & Refactor
+**What**: Verify 100% coverage on Units 1a-1d changes. Run full test suite. Refactor if needed. Verify edge cases: empty `_reasoning_items` array, `_reasoning_items` with only encrypted_content (no summary), session round-trip (save/load preserves `_reasoning_items` via JSON serialization).
+**Output**: Coverage report confirms 100% on new code, clean refactor
+**Acceptance**: 100% coverage on new code, all tests green, no warnings
+
+---
+
+### Feature 2: Capture Real API Usage, Delete estimateTokens
+
+### ⬜ Unit 2a: Add usage to TurnResult and capture Azure usage -- Tests
+**What**: Write failing tests in `src/__tests__/engine/streaming.test.ts` for:
+- `TurnResult` interface includes a `usage` field: `{ input_tokens: number, output_tokens: number, reasoning_tokens: number, total_tokens: number } | undefined`
+- `streamResponsesApi` captures usage from `response.completed` event and returns it in `TurnResult.usage`
+- When no `response.completed` event fires, `usage` is undefined
+- Usage fields map correctly: `input_tokens`, `output_tokens`, `output_tokens_details.reasoning_tokens`, `total_tokens`
+**Output**: Failing tests in `src/__tests__/engine/streaming.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because `TurnResult` has no `usage` field and `streamResponsesApi` does not capture usage
+
+### ⬜ Unit 2b: Add usage to TurnResult and capture Azure usage -- Implementation
+**What**:
+- Add `usage` field to `TurnResult` interface in `src/engine/streaming.ts`: `usage?: { input_tokens: number; output_tokens: number; reasoning_tokens: number; total_tokens: number }`
+- In `streamResponsesApi`, add a `response.completed` event handler in the switch statement to capture usage data from `event.response.usage`. Map `output_tokens_details.reasoning_tokens` to `reasoning_tokens`.
+- Return `usage` in the TurnResult
+**Output**: Modified `src/engine/streaming.ts`
+**Acceptance**: All Unit 2a tests PASS (green), existing tests still pass, no warnings
+
+### ⬜ Unit 2c: Capture MiniMax usage -- Tests
+**What**: Write failing tests in `src/__tests__/engine/streaming.test.ts` for:
+- `streamChatCompletion` adds `stream_options: { include_usage: true }` to the create params
+- `streamChatCompletion` captures `chunk.usage` from the final streaming chunk and returns it in `TurnResult.usage`
+- Usage fields map correctly: `prompt_tokens` -> `input_tokens`, `completion_tokens` -> `output_tokens`, `completion_tokens_details.reasoning_tokens` -> `reasoning_tokens`, `total_tokens`
+- When no usage chunk arrives, `usage` is undefined
+**Output**: Failing tests in `src/__tests__/engine/streaming.test.ts`
+**Acceptance**: Tests exist and FAIL (red)
+
+### ⬜ Unit 2d: Capture MiniMax usage -- Implementation
+**What**:
+- In `streamChatCompletion` in `src/engine/streaming.ts`, inject `stream_options: { include_usage: true }` into `createParams` before calling `client.chat.completions.create`
+- In the streaming loop, check for `chunk.usage` on each chunk. When present (final chunk), extract and map the fields to the normalized usage format.
+- Return `usage` in the TurnResult
+**Output**: Modified `src/engine/streaming.ts`
+**Acceptance**: All Unit 2c tests PASS (green), existing tests still pass, no warnings
+
+### ⬜ Unit 2e: Delete estimateTokens -- Tests
+**What**: Remove all `estimateTokens` tests from `src/__tests__/mind/context.test.ts`. Verify that no other test files import or reference `estimateTokens`. Update any tests that previously relied on `estimateTokens` behavior (e.g., `trimMessages` tests that call `estimateTokens` internally -- these will be updated in Feature 3).
+**Output**: Updated `src/__tests__/mind/context.test.ts` with `estimateTokens` tests removed
+**Acceptance**: Tests compile (no import errors), but `trimMessages` tests may fail (expected -- they'll be reworked in Feature 3)
+
+### ⬜ Unit 2f: Delete estimateTokens -- Implementation
+**What**: Remove the `estimateTokens` function from `src/mind/context.ts`. Remove its export. Update any callers (currently only `trimMessages` in the same file -- that will be reworked in Feature 3).
+**Output**: Modified `src/mind/context.ts`
+**Acceptance**: No compile errors referencing `estimateTokens`, all non-trimMessages tests pass
+
+### ⬜ Unit 2g: API usage capture -- Coverage & Refactor
+**What**: Verify 100% coverage on Units 2a-2f changes. Run full test suite. Clean up any dead code from `estimateTokens` removal.
+**Output**: Coverage report confirms 100% on new code
+**Acceptance**: 100% coverage on new code, all tests green (except trimMessages tests which are reworked in Feature 3), no warnings
+
+---
+
+### Feature 3: Retroactive Trimming with Real Token Counts
+
+### ⬜ Unit 3a: Rework trimMessages to accept actual token count -- Tests
+**What**: Write failing tests in `src/__tests__/mind/context.test.ts` for the reworked `trimMessages`. The new signature: `trimMessages(messages, maxTokens, contextMargin, actualTokenCount)` where `actualTokenCount` is the API-reported `input_tokens` from the last turn. Tests cover:
+- When `actualTokenCount` exceeds `maxTokens`, messages are trimmed (oldest after system prompt dropped first)
+- When `actualTokenCount` is under `maxTokens`, no trimming occurs (returns copy of messages)
+- System prompt (index 0) is always preserved
+- Trimming targets `maxTokens * (1 - contextMargin / 100)` -- drops messages proportionally until estimated remaining tokens are under target
+- When `actualTokenCount` is 0 or undefined, no trimming occurs (cold start / first call)
+- MAX_MESSAGES hard cap (200) is still enforced regardless of token count
+- Edge cases: single message (system only), all messages would be trimmed (only system remains)
+**Output**: Failing tests in `src/__tests__/mind/context.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because `trimMessages` still uses the old signature
+
+### ⬜ Unit 3b: Rework trimMessages -- Implementation
+**What**: Rework `trimMessages` in `src/mind/context.ts`:
+- New signature: `trimMessages(messages, maxTokens, contextMargin, actualTokenCount?: number)`
+- When `actualTokenCount` is undefined or 0, skip token-based trimming (but still enforce MAX_MESSAGES)
+- When `actualTokenCount > maxTokens`: calculate `trimTarget = maxTokens * (1 - contextMargin / 100)`. Estimate per-message cost as `actualTokenCount / messages.length`. Drop oldest messages (after system prompt) until estimated remaining tokens <= trimTarget.
+- Keep the MAX_MESSAGES hard cap logic
+**Output**: Modified `src/mind/context.ts`
+**Acceptance**: All Unit 3a tests PASS (green), no warnings
+
+### ⬜ Unit 3c: Store lastUsage in session -- Tests
+**What**: Write failing tests in `src/__tests__/mind/context.test.ts` for `saveSession` and `loadSession` handling `lastUsage`:
+- `saveSession` accepts optional `lastUsage` parameter and includes it in the JSON envelope: `{ version: 1, messages, lastUsage }`
+- `loadSession` returns `{ messages, lastUsage }` (updated return type) instead of just messages
+- When `lastUsage` is undefined/not present in saved file, `loadSession` returns `lastUsage: undefined`
+- Backward compatibility: loading a session without `lastUsage` still works (returns messages, undefined lastUsage)
+**Output**: Failing tests in `src/__tests__/mind/context.test.ts`
+**Acceptance**: Tests exist and FAIL (red)
+
+### ⬜ Unit 3d: Store lastUsage in session -- Implementation
+**What**: Update `saveSession` and `loadSession` in `src/mind/context.ts`:
+- `saveSession(filePath, messages, lastUsage?)`: include `lastUsage` in the JSON envelope
+- `loadSession(filePath)`: return `{ messages, lastUsage }` object instead of just the messages array
+- Define a `UsageData` type: `{ input_tokens: number; output_tokens: number; reasoning_tokens: number; total_tokens: number }`
+- Define a `SessionData` return type: `{ messages: OpenAI.ChatCompletionMessageParam[]; lastUsage?: UsageData } | null`
+**Output**: Modified `src/mind/context.ts`
+**Acceptance**: All Unit 3c tests PASS (green), no warnings
+
+### ⬜ Unit 3e: Move trimming to after runAgent in CLI -- Tests
+**What**: Write/update failing tests in `src/__tests__/channels/cli-main.test.ts` for the new trim flow:
+- Trimming no longer happens before `runAgent` -- it happens after
+- After `runAgent` returns, `trimMessages` is called with the usage data from the turn result
+- `saveSession` is called with messages AND lastUsage
+- On cold start (first message, no prior usage), no trimming occurs before the API call
+**Output**: Failing/updated tests in `src/__tests__/channels/cli-main.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because CLI still trims before runAgent
+
+### ⬜ Unit 3f: Move trimming to after runAgent in CLI -- Implementation
+**What**: In `src/channels/cli.ts` `main()`:
+- Remove the pre-call `trimMessages` block (lines 301-304)
+- After `runAgent` returns, get usage data from the turn result (requires `runAgent` to return usage -- see below)
+- Call `trimMessages(messages, maxTokens, contextMargin, usage?.input_tokens)` after runAgent
+- Update `saveSession` call to include `lastUsage`
+- `runAgent` return type change: return `TurnResult['usage']` or store it. The simplest approach: `runAgent` returns the last `TurnResult.usage` from the final streaming call of the turn.
+
+Note: `runAgent` currently returns `Promise<void>`. It needs to return `Promise<{ usage?: TurnResult['usage'] }>` or similar. This is a cross-cutting change that affects both adapters. The implementation should update `runAgent`'s return type to include the last usage data.
+**Output**: Modified `src/channels/cli.ts`, modified `src/engine/core.ts` (runAgent return type)
+**Acceptance**: All Unit 3e tests PASS (green), existing tests still pass, no warnings
+
+### ⬜ Unit 3g: Move trimming to after runAgent in Teams -- Tests
+**What**: Write/update failing tests in `src/__tests__/channels/teams.test.ts` for the new trim flow:
+- Trimming no longer happens before `runAgent` -- it happens after
+- After `runAgent` returns, `trimMessages` is called with the usage data
+- `saveSession` is called with messages AND lastUsage
+**Output**: Failing/updated tests in `src/__tests__/channels/teams.test.ts`
+**Acceptance**: Tests exist and FAIL (red)
+
+### ⬜ Unit 3h: Move trimming to after runAgent in Teams -- Implementation
+**What**: In `src/channels/teams.ts` `handleTeamsMessage()`:
+- Remove the pre-call `trimMessages` block (lines 170-173)
+- After `runAgent` returns, get usage data from the turn result
+- Call `trimMessages(messages, maxTokens, contextMargin, usage?.input_tokens)` after runAgent
+- Update `saveSession` call to include `lastUsage`
+**Output**: Modified `src/channels/teams.ts`
+**Acceptance**: All Unit 3g tests PASS (green), existing tests still pass, no warnings
+
+### ⬜ Unit 3i: Retroactive trimming -- Coverage & Refactor
+**What**: Verify 100% coverage on all Feature 3 changes. Run full test suite. Refactor if needed.
+**Output**: Coverage report confirms 100% on new code
+**Acceptance**: 100% coverage on new code, all tests green, no warnings
+
+---
+
+### Feature 4: Context Overflow Auto-Recovery
+
+### ⬜ Unit 4a: Detect context overflow errors -- Tests
+**What**: Write failing tests in `src/__tests__/engine/core.test.ts` for context overflow detection and auto-recovery in `runAgent`. Tests cover:
+- Azure overflow: when streaming throws an error with `error.code === "context_length_exceeded"`, `runAgent` catches it, trims messages aggressively, and retries
+- Azure overflow (alternate): error message contains "context_length_exceeded"
+- MiniMax overflow: when streaming throws an error with message containing "context window exceeds limit", same recovery
+- After successful retry, `runAgent` completes normally (returns usage from retry)
+- When retry also fails with overflow, the error is surfaced via `callbacks.onError`
+- When the error is NOT a context overflow (e.g., network error), it is NOT caught by overflow recovery -- normal error handling applies
+- The log callback (`callbacks.onError` or a new callback) informs the user that trimming happened
+**Output**: Failing tests in `src/__tests__/engine/core.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because `runAgent` does not handle overflow errors
+
+### ⬜ Unit 4b: Implement context overflow auto-recovery
+**What**: In `src/engine/core.ts` `runAgent`, in the catch block (line 201-208):
+- Add overflow detection: check if the error matches Azure pattern (`error.code === "context_length_exceeded"` OR error message includes "context_length_exceeded") or MiniMax pattern (error message includes "context window exceeds limit")
+- On overflow: call `trimMessages(messages, maxTokens, contextMargin, maxTokens * 2)` to force aggressive trimming (passing a token count double the limit forces heavy trimming)
+- Log via `callbacks.onError(new Error("context trimmed, retrying..."))` or introduce a lighter callback
+- Reset the loop state (`azureInput = null` to force rebuild from trimmed messages) and `continue` the while loop to retry
+- Track retry count: only retry once. On second overflow, fall through to normal error handling.
+- Import `trimMessages` and `getContextConfig` in `core.ts`
+**Output**: Modified `src/engine/core.ts`
+**Acceptance**: All Unit 4a tests PASS (green), existing tests still pass, no warnings
+
+### ⬜ Unit 4c: Context overflow recovery -- Coverage & Refactor
+**What**: Verify 100% coverage on all Feature 4 changes. Run full test suite. Edge cases: overflow on first call (cold start), overflow during tool execution mid-turn, overflow with only system message remaining (cannot trim further).
+**Output**: Coverage report confirms 100% on new code
+**Acceptance**: 100% coverage on new code, all tests green, no warnings
+
+---
+
+### Final
+
+### ⬜ Unit 5: Full integration verification
+**What**: Run the complete test suite. Verify all completion criteria are met. Verify no warnings. Run coverage report and confirm 100% on all new code.
+**Output**: All tests pass, coverage confirmed, no warnings
+**Acceptance**: All completion criteria checked off
+
+## Execution
+- **TDD strictly enforced**: tests -> red -> implement -> green -> refactor
+- Commit after each phase (1a, 1b, 1c, etc.)
+- Push after each unit complete
+- Run full test suite before marking unit done
+- **All artifacts**: Save outputs, logs, data to `./2026-02-26-1057-doing-reasoning-persistence/` directory
+- **Fixes/blockers**: Spawn sub-agent immediately -- don't ask, just do it
+- **Decisions made**: Update docs immediately, commit right away
+
+## Progress Log
+- 2026-02-26 Created from planning doc
