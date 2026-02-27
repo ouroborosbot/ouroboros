@@ -182,7 +182,7 @@ Fix the agent proactivity bug where the model narrates tool-use intent ("let me 
 
 ---
 
-### ⬜ Unit 4: Integration Testing & Cleanup
+### 🔄 Unit 4: Integration Testing & Cleanup
 
 **What**: End-to-end scenarios combining kick + tool_choice required, edge cases, verify all tests pass with 100% coverage, and clean up.
 
