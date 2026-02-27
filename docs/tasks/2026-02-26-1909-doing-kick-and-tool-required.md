@@ -234,3 +234,4 @@ Fix the agent proactivity bug where the model narrates tool-use intent ("let me 
 - 2026-02-26 19:45 Created from planning doc (4-unit breakdown)
 - 2026-02-26 20:09 Unit 1 complete: hasToolIntent + kick mechanism with 12 new tests, 100% line coverage on core.ts
 - 2026-02-26 20:13 Unit 2 complete: finalAnswerTool, tool_choice passthrough, final_answer interception with 13 new tests
+- 2026-02-26 20:18 Unit 3 complete: /tool-required command, onKick CLI callback, buildSystem tool behavior section, cachedBuildSystem cache key update
