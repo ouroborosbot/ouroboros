@@ -248,7 +248,6 @@ export async function runAgent(
           ? detectKick(result.content, options)
           : null;
         if (kick) {
-          // Do NOT push the malformed assistant message to history
           kickCount++;
           toolRounds++;
           if (toolRounds >= MAX_TOOL_ROUNDS) {
@@ -257,8 +256,11 @@ export async function runAgent(
             continue;
           }
           callbacks.onKick?.(kickCount, maxKicks);
-          // Inject assistant-role self-correction message
-          messages.push({ role: "assistant", content: kick.message });
+          // Preserve original content with self-correction appended
+          const kickContent = result.content
+            ? result.content + "\n\n" + kick.message
+            : kick.message;
+          messages.push({ role: "assistant", content: kickContent });
           // Discard azureInput so it's rebuilt from messages on retry
           azureInput = null;
           continue;
