@@ -1068,12 +1068,18 @@ describe("runAgent", () => {
     expect(textChunks).toEqual(["answer"])
   })
 
-  it("calls onReasoningChunk for reasoning-only stream", async () => {
-    mockCreate.mockReturnValue(
-      makeStream([
-        { choices: [{ delta: { reasoning_content: "still thinking" } }] },
-      ])
-    )
+  it("calls onReasoningChunk for reasoning-only stream (kicks then gets real response)", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          { choices: [{ delta: { reasoning_content: "still thinking" } }] },
+        ])
+      }
+      // After kick for empty response, model responds with content
+      return makeStream([makeChunk("got it")])
+    })
 
     const reasoningChunks: string[] = []
     const textChunks: string[] = []
@@ -1089,7 +1095,7 @@ describe("runAgent", () => {
 
     await runAgent([{ role: "system", content: "test" }], callbacks)
     expect(reasoningChunks).toEqual(["still thinking"])
-    expect(textChunks).toEqual([])
+    expect(textChunks).toEqual(["got it"])
   })
 
   it("stops immediately when signal is pre-aborted", async () => {
@@ -1190,11 +1196,16 @@ describe("runAgent", () => {
   })
 
   it("fires onModelStreamStart on first reasoning_content token", async () => {
-    mockCreate.mockReturnValue(
-      makeStream([
-        { choices: [{ delta: { reasoning_content: "hmm" } }] },
-      ])
-    )
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          { choices: [{ delta: { reasoning_content: "hmm" } }] },
+        ])
+      }
+      return makeStream([makeChunk("ok")])
+    })
 
     const calls: string[] = []
     const callbacks: ChannelCallbacks = {
@@ -1208,16 +1219,22 @@ describe("runAgent", () => {
     }
 
     await runAgent([{ role: "system", content: "test" }], callbacks)
-    expect(calls).toEqual(["streamStart"])
+    // streamStart fires once for reasoning, once for retry
+    expect(calls).toEqual(["streamStart", "streamStart"])
   })
 
   it("calls onReasoningChunk for each reasoning chunk", async () => {
-    mockCreate.mockReturnValue(
-      makeStream([
-        { choices: [{ delta: { reasoning_content: "step 1" } }] },
-        { choices: [{ delta: { reasoning_content: "step 2" } }] },
-      ])
-    )
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          { choices: [{ delta: { reasoning_content: "step 1" } }] },
+          { choices: [{ delta: { reasoning_content: "step 2" } }] },
+        ])
+      }
+      return makeStream([makeChunk("done")])
+    })
 
     const reasoningChunks: string[] = []
     const callbacks: ChannelCallbacks = {
@@ -2910,10 +2927,11 @@ describe("kick mechanism", () => {
     expect(kicks).toHaveLength(1)
     expect(kicks[0]).toEqual({ attempt: 1, maxKicks: 1 })
     expect(callCount).toBe(2)
-    // The malformed message should NOT be in history
+    // Assistant messages: kick self-correction + real response (no malformed narration)
     const assistantMessages = messages.filter((m: any) => m.role === "assistant")
-    expect(assistantMessages).toHaveLength(1)
-    expect(assistantMessages[0].content).toBe("here is the result")
+    expect(assistantMessages).toHaveLength(2)
+    expect(assistantMessages[0].content).toBe("I narrated instead of acting. Calling the tool now.")
+    expect(assistantMessages[1].content).toBe("here is the result")
   })
 
   it("does not kick when maxKicks (default 1) is already exhausted", async () => {
@@ -2998,9 +3016,9 @@ describe("kick mechanism", () => {
     const messages: any[] = [{ role: "system", content: "test" }]
     await runAgent(messages, callbacks)
 
-    // The self-correction user message should be in the messages array
-    const userMessages = messages.filter((m: any) => m.role === "user")
-    expect(userMessages.some((m: any) => m.content === "I narrated instead of acting. Calling the tool now.")).toBe(true)
+    // The self-correction assistant message should be in the messages array
+    const assistantMessages = messages.filter((m: any) => m.role === "assistant")
+    expect(assistantMessages.some((m: any) => m.content === "I narrated instead of acting. Calling the tool now.")).toBe(true)
   })
 
   it("does not kick when maxKicks is set to 0 via options", async () => {
@@ -3113,8 +3131,10 @@ describe("kick mechanism", () => {
 
     // Should NOT have the malformed narration in assistant messages
     const assistantMessages = messages.filter((m: any) => m.role === "assistant")
-    expect(assistantMessages).toHaveLength(1)
-    expect(assistantMessages[0].content).toBe("the file says hello")
+    // 2 assistant messages: the kick self-correction + the real response
+    expect(assistantMessages).toHaveLength(2)
+    expect(assistantMessages[0].content).toBe("I narrated instead of acting. Calling the tool now.")
+    expect(assistantMessages[1].content).toBe("the file says hello")
     // The narrated content should never appear in any assistant message
     expect(messages.some((m: any) => m.role === "assistant" && m.content?.includes("I'm going to"))).toBe(false)
   })
@@ -3174,10 +3194,11 @@ describe("kick mechanism", () => {
 
     expect(kicks).toHaveLength(1)
     expect(callCount).toBe(2)
-    // Malformed message should NOT be in history
+    // Assistant messages: kick self-correction + real response (no malformed narration)
     const assistantMessages = messages.filter((m: any) => m.role === "assistant")
-    expect(assistantMessages).toHaveLength(1)
-    expect(assistantMessages[0].content).toBe("here is the answer")
+    expect(assistantMessages).toHaveLength(2)
+    expect(assistantMessages[0].content).toBe("I narrated instead of acting. Calling the tool now.")
+    expect(assistantMessages[1].content).toBe("here is the answer")
 
     delete process.env.AZURE_OPENAI_API_KEY
     delete process.env.AZURE_OPENAI_ENDPOINT
@@ -3761,8 +3782,17 @@ describe("integration: kick + tool_choice required combined", () => {
     }
   })
 
-  it("empty content with no tool_calls -- normal termination, no kick", async () => {
-    mockCreate.mockReturnValue(makeStream([{ choices: [{ delta: {} }] }]))
+  it("empty content with no tool_calls -- kicks (empty response is always wrong)", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        // Empty response
+        return makeStream([{ choices: [{ delta: {} }] }])
+      }
+      // After kick, model responds properly
+      return makeStream([makeChunk("here is your answer")])
+    })
 
     const kicks: number[] = []
     const callbacks: ChannelCallbacks = {
@@ -3779,8 +3809,14 @@ describe("integration: kick + tool_choice required combined", () => {
     const messages: any[] = [{ role: "system", content: "test" }]
     await runAgent(messages, callbacks)
 
-    expect(kicks).toHaveLength(0)
-    expect(mockCreate).toHaveBeenCalledTimes(1)
+    expect(kicks).toHaveLength(1)
+    expect(callCount).toBe(2)
+    // Empty-response kick uses different message than narration kick
+    const kickMsg = messages.find((m: any) => m.role === "assistant" && m.content.includes("empty"))
+    expect(kickMsg).toBeDefined()
+    expect(kickMsg.content).toBe("I sent an empty message by accident — let me try again.")
+    const lastAssistant = [...messages].reverse().find((m: any) => m.role === "assistant")
+    expect(lastAssistant.content).toBe("here is your answer")
   })
 
   it("intent phrase only in model content triggers kick, not in tool results", async () => {
@@ -3846,5 +3882,42 @@ describe("integration: kick + tool_choice required combined", () => {
     const assistantMsg = messages.find((m: any) => m.role === "assistant")
     expect(assistantMsg.content).toBe(longText)
     expect(assistantMsg.content.length).toBe(100000)
+  })
+
+  it("toolChoiceRequired kicks even when content is empty (reasoning-only response)", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        // Model returns empty content (reasoning went through separate channel), no tool calls
+        return makeStream([{ choices: [{ delta: {} }] }])
+      }
+      // After kick, model correctly calls final_answer
+      return makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"answer":"here you go"}' } },
+        ]),
+      ])
+    })
+
+    const kicks: number[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: (attempt: number) => kicks.push(attempt),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    expect(kicks).toHaveLength(1)
+    expect(callCount).toBe(2)
+    const lastAssistant = [...messages].reverse().find((m: any) => m.role === "assistant")
+    expect(lastAssistant.content).toBe("here you go")
   })
 })
