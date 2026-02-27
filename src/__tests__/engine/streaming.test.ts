@@ -557,6 +557,15 @@ describe("streamChatCompletion", () => {
     const result = await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
     expect(result.usage).toBeUndefined()
   })
+
+  it("defaults reasoning_tokens to 0 when completion_tokens_details is missing", async () => {
+    const client = { chat: { completions: { create: vi.fn().mockReturnValue(makeStream([
+      { choices: [{ delta: {} }], usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 } },
+    ])) } } }
+    const callbacks = makeCallbacks()
+    const result = await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
+    expect(result.usage!.reasoning_tokens).toBe(0)
+  })
 })
 
 describe("streamResponsesApi", () => {
@@ -897,5 +906,16 @@ describe("streamResponsesApi", () => {
     expect(result.usage!.output_tokens).toBe(200)
     expect(result.usage!.reasoning_tokens).toBe(80)
     expect(result.usage!.total_tokens).toBe(700)
+  })
+
+  it("defaults reasoning_tokens to 0 when output_tokens_details is missing", async () => {
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.completed", response: {
+        usage: { input_tokens: 100, output_tokens: 50, total_tokens: 150 },
+      }},
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(result.usage!.reasoning_tokens).toBe(0)
   })
 })
