@@ -91,6 +91,7 @@ Add OAuth/SSO authentication to the Ouroboros Teams bot so the LLM agent can cal
 
 ### ⬜ Unit 3: OAuth Plumbing (Vertical Slice)
 **What**: Build the entire vertical slice needed for the two smoke-test tools (`graph_profile` and `ado_work_items`) to work end-to-end. This combines ToolContext, channel-conditional tools, core.ts wiring, Teams adapter refactoring, Graph client, ADO client, shared error handling, and the two tool handlers into a single unit.
+**Output**: 3 new source files, 3 new test files, 3 modified source files, 3 modified test files (see below).
 
 **Files created:**
 - `src/engine/graph-client.ts` -- minimal Graph client with `getProfile(token)`
