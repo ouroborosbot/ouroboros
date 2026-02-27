@@ -1,5 +1,6 @@
 import type OpenAI from "openai"
 import type { Channel } from "./prompt"
+import { getContextConfig } from "../config"
 import * as fs from "fs"
 import * as path from "path"
 
@@ -82,6 +83,17 @@ export function loadSession(filePath: string): { messages: OpenAI.ChatCompletion
   } catch {
     return null
   }
+}
+
+export function postTurn(
+  messages: OpenAI.ChatCompletionMessageParam[],
+  sessPath: string,
+  usage?: UsageData,
+): void {
+  const { maxTokens, contextMargin } = getContextConfig()
+  const trimmed = trimMessages(messages, maxTokens, contextMargin, usage?.input_tokens)
+  messages.splice(0, messages.length, ...trimmed)
+  saveSession(sessPath, messages, usage)
 }
 
 export function deleteSession(filePath: string): void {
