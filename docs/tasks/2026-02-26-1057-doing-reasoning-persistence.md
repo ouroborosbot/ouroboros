@@ -235,7 +235,7 @@ This eliminates the duplicated trim+save code in both adapters. Each adapter jus
 **Output**: Modified `src/mind/context.ts`
 **Acceptance**: All Unit 3e tests PASS (green), no warnings
 
-### ⬜ Unit 3g: Move trimming to after runAgent in CLI -- Tests
+### ✅ Unit 3g: Move trimming to after runAgent in CLI -- Tests
 **What**: Write/update failing tests in `src/__tests__/channels/cli-main.test.ts` for the new trim flow:
 - Trimming no longer happens before `runAgent` -- it happens after
 - After `runAgent` returns, `postTurn` is called with messages, sessPath, and `result.usage`
