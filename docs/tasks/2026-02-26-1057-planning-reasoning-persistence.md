@@ -1,6 +1,6 @@
 # Planning: Reasoning Item Persistence and API-Reported Token Usage
 
-**Status**: drafting
+**Status**: approved
 **Created**: 2026-02-26 15:42
 
 ## Goal
