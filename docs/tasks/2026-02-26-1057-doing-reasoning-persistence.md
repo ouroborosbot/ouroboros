@@ -297,7 +297,7 @@ This eliminates the duplicated trim+save code in both adapters. Each adapter jus
 **Output**: Failing tests in `src/__tests__/engine/core.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `runAgent` does not handle overflow errors
 
-### ⬜ Unit 4b: Implement context overflow auto-recovery
+### ✅ Unit 4b: Implement context overflow auto-recovery
 **What**: In `src/engine/core.ts` `runAgent`, in the catch block (line 201-208):
 - Add overflow detection: check if the error matches Azure pattern (`error.code === "context_length_exceeded"` OR error message includes "context_length_exceeded") or MiniMax pattern (error message includes "context window exceeds limit")
 - On overflow: call `stripLastToolCalls(messages)` first (clean up any partial tool state from mid-turn overflow), then call `trimMessages(messages, maxTokens, contextMargin, maxTokens * 2)` to force aggressive trimming (passing a token count double the limit forces heavy trimming)
