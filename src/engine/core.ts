@@ -1,9 +1,10 @@
 import OpenAI, { AzureOpenAI } from "openai";
-import { getAzureConfig, getMinimaxConfig } from "../config";
+import { getAzureConfig, getMinimaxConfig, getContextConfig } from "../config";
 import { tools, execTool, summarizeArgs } from "./tools";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
 import type { TurnResult } from "./streaming";
 import type { UsageData } from "../mind/context";
+import { trimMessages } from "../mind/context";
 
 let _client: OpenAI | null = null;
 let _model: string | null = null;
@@ -95,6 +96,17 @@ export function stripLastToolCalls(
   }
 }
 
+// Detect context overflow errors from Azure or MiniMax
+function isContextOverflow(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const code = (err as any).code;
+  const msg = err.message || "";
+  if (code === "context_length_exceeded") return true;
+  if (msg.includes("context_length_exceeded")) return true;
+  if (msg.includes("context window exceeds limit")) return true;
+  return false;
+}
+
 export async function runAgent(
   messages: OpenAI.ChatCompletionMessageParam[],
   callbacks: ChannelCallbacks,
@@ -106,6 +118,7 @@ export async function runAgent(
   let done = false;
   let toolRounds = 0;
   let lastUsage: UsageData | undefined;
+  let overflowRetried = false;
 
   // For Azure Responses API: maintain native input array with original output
   // items (reasoning, function_calls) in correct order.  Initialized from CC
@@ -225,6 +238,17 @@ export async function runAgent(
       if (signal?.aborted) {
         stripLastToolCalls(messages);
         break;
+      }
+      // Context overflow: trim aggressively and retry once
+      if (isContextOverflow(e) && !overflowRetried) {
+        overflowRetried = true;
+        stripLastToolCalls(messages);
+        const { maxTokens, contextMargin } = getContextConfig();
+        const trimmed = trimMessages(messages, maxTokens, contextMargin, maxTokens * 2);
+        messages.splice(0, messages.length, ...trimmed);
+        azureInput = null; // force rebuild from trimmed messages
+        callbacks.onError(new Error("context trimmed, retrying..."));
+        continue;
       }
       callbacks.onError(e instanceof Error ? e : new Error(String(e)));
       stripLastToolCalls(messages);
