@@ -1,6 +1,6 @@
 import OpenAI, { AzureOpenAI } from "openai";
 import { getAzureConfig, getMinimaxConfig, getContextConfig } from "../config";
-import { tools, execTool, summarizeArgs } from "./tools";
+import { tools, execTool, summarizeArgs, finalAnswerTool } from "./tools";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
 import type { TurnResult } from "./streaming";
 import type { UsageData } from "../mind/context";
@@ -187,6 +187,8 @@ export async function runAgent(
   // Prevent MaxListenersExceeded warning — each iteration adds a listener
   try { require("events").setMaxListeners(MAX_TOOL_ROUNDS + 5, signal); } catch { /* unsupported */ }
 
+  const activeTools = options?.toolChoiceRequired ? [...tools, finalAnswerTool] : tools;
+
   while (!done) {
     // Yield so pending I/O (stdin Ctrl-C) can be processed between iterations
     await new Promise((r) => setImmediate(r));
@@ -203,18 +205,20 @@ export async function runAgent(
           azureInput = input;
           azureInstructions = instructions;
         }
+        const azureParams: any = {
+          model,
+          input: azureInput,
+          instructions: azureInstructions,
+          tools: toResponsesTools(activeTools),
+          reasoning: { effort: "medium", summary: "detailed" },
+          stream: true,
+          store: false,
+          include: ["reasoning.encrypted_content"],
+        };
+        if (options?.toolChoiceRequired) azureParams.tool_choice = "required";
         result = await streamResponsesApi(
           client,
-          {
-            model,
-            input: azureInput,
-            instructions: azureInstructions,
-            tools: toResponsesTools(tools),
-            reasoning: { effort: "medium", summary: "detailed" },
-            stream: true,
-            store: false,
-            include: ["reasoning.encrypted_content"],
-          },
+          azureParams,
           callbacks,
           signal,
         );
@@ -223,8 +227,9 @@ export async function runAgent(
           azureInput.push(item);
         }
       } else {
-        const createParams: any = { messages, tools, stream: true };
+        const createParams: any = { messages, tools: activeTools, stream: true };
         if (model) createParams.model = model;
+        if (options?.toolChoiceRequired) createParams.tool_choice = "required";
         result = await streamChatCompletion(client, createParams, callbacks, signal);
       }
 
@@ -276,6 +281,22 @@ export async function runAgent(
         messages.push(msg);
         done = true;
       } else {
+        // Check for final_answer sole call: intercept before tool execution
+        const isSoleFinalAnswer = result.toolCalls.length === 1 && result.toolCalls[0].name === "final_answer";
+        if (isSoleFinalAnswer) {
+          let answer = "";
+          try {
+            const parsed = JSON.parse(result.toolCalls[0].arguments);
+            answer = parsed.answer ?? result.content ?? "";
+          } catch {
+            answer = result.content ?? "";
+          }
+          // Push clean assistant message with extracted answer (no tool_calls)
+          messages.push({ role: "assistant", content: answer } as OpenAI.ChatCompletionAssistantMessageParam);
+          done = true;
+          continue;
+        }
+
         messages.push(msg);
         toolRounds++;
         if (toolRounds >= MAX_TOOL_ROUNDS) {
@@ -286,9 +307,20 @@ export async function runAgent(
           done = true;
           break;
         }
+        // Check for mixed final_answer: reject it, execute other tools normally
+        const hasMixedFinalAnswer = result.toolCalls.some((tc) => tc.name === "final_answer");
         // SHARED: execute tools
         for (const tc of result.toolCalls) {
           if (signal?.aborted) break;
+          // Intercept final_answer in mixed call: reject it
+          if (tc.name === "final_answer") {
+            const rejection = "rejected: final_answer must be the only tool call. Finish your work first, then call final_answer alone.";
+            messages.push({ role: "tool", tool_call_id: tc.id, content: rejection });
+            if (azureInput) {
+              azureInput.push({ type: "function_call_output", call_id: tc.id, output: rejection });
+            }
+            continue;
+          }
           let args: Record<string, string> = {};
           try {
             args = JSON.parse(tc.arguments);
