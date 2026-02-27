@@ -28,6 +28,12 @@ export function toResponsesInput(
 
     if (msg.role === "assistant") {
       const a = msg as any;
+      // Restore reasoning items before content (matching API item order)
+      if (a._reasoning_items) {
+        for (const ri of a._reasoning_items) {
+          input.push(ri);
+        }
+      }
       if (a.content) {
         input.push({ role: "assistant", content: a.content });
       }
