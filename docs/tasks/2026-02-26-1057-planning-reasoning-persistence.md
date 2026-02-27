@@ -106,7 +106,7 @@ Context overflow testing: both providers return distinct error shapes on overflo
 - 2026-02-26 15:42 Created
 - 2026-02-26 16:20 Live tested both providers -- both return streaming usage data. Azure via `response.completed` event, MiniMax via final chunk with `stream_options: { include_usage: true }`. Decision: delete estimateTokens, use real API counts.
 - 2026-02-26 16:23 Resolved cold-start and trim-timing questions. Trim retroactively after API responds, during user typing dead time. No pre-call estimation needed. Store usage in session for observability.
-- 2026-02-26 Sent actual CLI session to Azure API. estimateTokens reported 44,195; actual was 58,566 (1.33x off, undercounting by 14K tokens).
-- 2026-02-26 Tested context overflow errors on both providers. Azure: context_length_exceeded. MiniMax: "context window exceeds limit" (code 2013). Neither returns usage data on overflow.
-- 2026-02-26 Root cause clarification: the "out of juice" incident was the model getting stuck in a text-only loop (3/10 tool rounds used), not context overflow. MAX_NO_TOOL_TURNS addresses this. But underlying estimation/persistence bugs remain.
-- 2026-02-26 Added context overflow auto-recovery to scope: catch overflow error, trim, retry transparently.
+- 2026-02-26 16:36 Sent actual CLI session to Azure API. estimateTokens reported 44,195; actual was 58,566 (1.33x off, undercounting by 14K tokens).
+- 2026-02-26 16:36 Tested context overflow errors on both providers. Azure: context_length_exceeded. MiniMax: "context window exceeds limit" (code 2013). Neither returns usage data on overflow.
+- 2026-02-26 16:36 Root cause clarification: the "out of juice" incident was the model getting stuck in a text-only loop (3/10 tool rounds used), not context overflow. MAX_NO_TOOL_TURNS addresses this. But underlying estimation/persistence bugs remain.
+- 2026-02-26 16:36 Added context overflow auto-recovery to scope: catch overflow error, trim, retry transparently.
