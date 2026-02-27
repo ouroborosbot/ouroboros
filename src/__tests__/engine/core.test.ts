@@ -127,7 +127,7 @@ describe("ChannelCallbacks interface", () => {
 })
 
 describe("runAgent", () => {
-  let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal) => Promise<{ usage?: any }>
+  let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal, options?: { toolChoiceRequired?: boolean; maxKicks?: number }) => Promise<{ usage?: any }>
 
   // Helper to create an async iterable from chunks
   function makeStream(chunks: any[]) {
@@ -2816,5 +2816,372 @@ describe("getClient config integration", () => {
     expect(mockExit).toHaveBeenCalledWith(1)
     mockExit.mockRestore()
     mockError.mockRestore()
+  })
+})
+
+describe("hasToolIntent", () => {
+  it("returns true for each intent phrase", async () => {
+    const { hasToolIntent } = await import("../../engine/core")
+    expect(hasToolIntent("let me read that file")).toBe(true)
+    expect(hasToolIntent("I'll read that file")).toBe(true)
+    expect(hasToolIntent("I will read that file")).toBe(true)
+    expect(hasToolIntent("I'm going to read that file")).toBe(true)
+    expect(hasToolIntent("going to read that file")).toBe(true)
+    expect(hasToolIntent("I am going to read that file")).toBe(true)
+    expect(hasToolIntent("I would like to read that file")).toBe(true)
+    expect(hasToolIntent("I want to read that file")).toBe(true)
+  })
+
+  it("returns false for text without intent phrases", async () => {
+    const { hasToolIntent } = await import("../../engine/core")
+    expect(hasToolIntent("Hello")).toBe(false)
+    expect(hasToolIntent("Here is the result")).toBe(false)
+    expect(hasToolIntent("The file contains data")).toBe(false)
+    expect(hasToolIntent("")).toBe(false)
+  })
+
+  it("is case-insensitive", async () => {
+    const { hasToolIntent } = await import("../../engine/core")
+    expect(hasToolIntent("LET ME read that file")).toBe(true)
+    expect(hasToolIntent("i'll do that")).toBe(true)
+    expect(hasToolIntent("I WILL check")).toBe(true)
+    expect(hasToolIntent("GOING TO run it")).toBe(true)
+  })
+})
+
+describe("kick mechanism", () => {
+  let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal, options?: { toolChoiceRequired?: boolean; maxKicks?: number }) => Promise<{ usage?: any }>
+
+  function makeStream(chunks: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const chunk of chunks) {
+          yield chunk
+        }
+      },
+    }
+  }
+
+  function makeChunk(content?: string, toolCalls?: any[]) {
+    const delta: any = {}
+    if (content !== undefined) delta.content = content
+    if (toolCalls !== undefined) delta.tool_calls = toolCalls
+    return { choices: [{ delta }] }
+  }
+
+  beforeEach(async () => {
+    vi.resetModules()
+    delete process.env.AZURE_OPENAI_API_KEY
+    process.env.MINIMAX_API_KEY = "test-key"
+    process.env.MINIMAX_MODEL = "test-model"
+    mockCreate.mockReset()
+    mockResponsesCreate.mockReset()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+
+    const core = await import("../../engine/core")
+    runAgent = core.runAgent
+  })
+
+  it("fires onKick when model narrates intent without tool calls, then retries", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([makeChunk("let me read that file for you")])
+      }
+      return makeStream([makeChunk("here is the result")])
+    })
+
+    const kicks: { attempt: number; maxKicks: number }[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: (attempt: number, maxKicks: number) => kicks.push({ attempt, maxKicks }),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks)
+
+    expect(kicks).toHaveLength(1)
+    expect(kicks[0]).toEqual({ attempt: 1, maxKicks: 1 })
+    expect(callCount).toBe(2)
+    // The malformed message should NOT be in history
+    const assistantMessages = messages.filter((m: any) => m.role === "assistant")
+    expect(assistantMessages).toHaveLength(1)
+    expect(assistantMessages[0].content).toBe("here is the result")
+  })
+
+  it("does not kick when maxKicks (default 1) is already exhausted", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      // Both calls narrate intent
+      return makeStream([makeChunk("I'll read the file now")])
+    })
+
+    const kicks: number[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: (attempt: number) => kicks.push(attempt),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks)
+
+    // First narration triggers kick, second narration does NOT (exhausted)
+    expect(kicks).toHaveLength(1)
+    expect(callCount).toBe(2) // original + 1 retry, then normal termination
+  })
+
+  it("kick increments toolRounds and respects MAX_TOOL_ROUNDS", async () => {
+    // Use maxKicks=15 to allow many kicks, but MAX_TOOL_ROUNDS should cap at 10
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      return makeStream([makeChunk("I will do that now")])
+    })
+
+    const errors: string[] = []
+    const kicks: number[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err.message),
+      onKick: (attempt: number) => kicks.push(attempt),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { maxKicks: 15 })
+
+    // Kicks should be capped by MAX_TOOL_ROUNDS (10)
+    expect(callCount).toBeLessThanOrEqual(11) // initial + up to 10 kicks
+    expect(errors.some(e => e.includes("tool loop limit"))).toBe(true)
+  })
+
+  it("pushes self-correction message before retry", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation((params: any) => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([makeChunk("let me check that")])
+      }
+      // On retry, verify the self-correction message is present
+      return makeStream([makeChunk("done")])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks)
+
+    // The self-correction user message should be in the messages array
+    const userMessages = messages.filter((m: any) => m.role === "user")
+    expect(userMessages.some((m: any) => m.content === "I narrated instead of acting. Calling the tool now.")).toBe(true)
+  })
+
+  it("does not kick when maxKicks is set to 0 via options", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      return makeStream([makeChunk("let me read the file")])
+    })
+
+    const kicks: number[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: (attempt: number) => kicks.push(attempt),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { maxKicks: 0 })
+
+    expect(kicks).toHaveLength(0)
+    expect(callCount).toBe(1)
+  })
+
+  it("allows up to 2 kicks when maxKicks is set to 2", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount <= 2) {
+        return makeStream([makeChunk("I'll do that now")])
+      }
+      return makeStream([makeChunk("here is the result")])
+    })
+
+    const kicks: { attempt: number; maxKicks: number }[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: (attempt: number, maxKicks: number) => kicks.push({ attempt, maxKicks }),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { maxKicks: 2 })
+
+    expect(kicks).toHaveLength(2)
+    expect(kicks[0]).toEqual({ attempt: 1, maxKicks: 2 })
+    expect(kicks[1]).toEqual({ attempt: 2, maxKicks: 2 })
+    expect(callCount).toBe(3) // original + 2 retries
+  })
+
+  it("onKick callback is optional (no crash if not provided)", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([makeChunk("let me read that")])
+      }
+      return makeStream([makeChunk("done")])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      // onKick intentionally NOT provided
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    // Should not throw
+    await runAgent(messages, callbacks)
+    expect(callCount).toBe(2)
+  })
+
+  it("malformed assistant message is NOT in history after kick", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([makeChunk("I'm going to read the file")])
+      }
+      return makeStream([makeChunk("the file says hello")])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks)
+
+    // Should NOT have the malformed narration in assistant messages
+    const assistantMessages = messages.filter((m: any) => m.role === "assistant")
+    expect(assistantMessages).toHaveLength(1)
+    expect(assistantMessages[0].content).toBe("the file says hello")
+    // The narrated content should never appear in any assistant message
+    expect(messages.some((m: any) => m.role === "assistant" && m.content?.includes("I'm going to"))).toBe(false)
+  })
+
+  it("Azure: kick cleans up azureInput output items and forces rebuild on retry", async () => {
+    vi.resetModules()
+    delete process.env.MINIMAX_API_KEY
+    delete process.env.MINIMAX_MODEL
+    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
+    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
+    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
+    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+
+    function makeResponsesStream(events: any[]) {
+      return {
+        [Symbol.asyncIterator]: async function* () {
+          for (const event of events) {
+            yield event
+          }
+        },
+      }
+    }
+
+    const reasoningItem = { type: "reasoning", id: "r1", summary: [{ text: "thought", type: "summary_text" }], encrypted_content: "enc1" }
+    const textItem = { type: "message", id: "msg1", role: "assistant", content: [{ type: "output_text", text: "let me read that file" }] }
+
+    let callCount = 0
+    mockResponsesCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeResponsesStream([
+          { type: "response.output_item.done", item: reasoningItem },
+          { type: "response.output_text.delta", delta: "let me read that file" },
+          { type: "response.output_item.done", item: textItem },
+        ])
+      }
+      return makeResponsesStream([
+        { type: "response.output_text.delta", delta: "here is the answer" },
+      ])
+    })
+
+    const core = await import("../../engine/core")
+    const kicks: number[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: (attempt: number) => kicks.push(attempt),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await core.runAgent(messages, callbacks)
+
+    expect(kicks).toHaveLength(1)
+    expect(callCount).toBe(2)
+    // Malformed message should NOT be in history
+    const assistantMessages = messages.filter((m: any) => m.role === "assistant")
+    expect(assistantMessages).toHaveLength(1)
+    expect(assistantMessages[0].content).toBe("here is the answer")
+
+    delete process.env.AZURE_OPENAI_API_KEY
+    delete process.env.AZURE_OPENAI_ENDPOINT
+    delete process.env.AZURE_OPENAI_DEPLOYMENT
+    delete process.env.AZURE_OPENAI_MODEL_NAME
   })
 })

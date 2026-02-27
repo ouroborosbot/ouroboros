@@ -75,6 +75,27 @@ export interface ChannelCallbacks {
   onToolStart(name: string, args: Record<string, string>): void;
   onToolEnd(name: string, summary: string, success: boolean): void;
   onError(error: Error): void;
+  onKick?(attempt: number, maxKicks: number): void;
+}
+
+export interface RunAgentOptions {
+  toolChoiceRequired?: boolean;
+  maxKicks?: number;
+}
+
+const TOOL_INTENT_PATTERNS = [
+  /\blet me\b/i,
+  /\bi'll\b/i,
+  /\bi will\b/i,
+  /\bi'm going to\b/i,
+  /\bgoing to\b/i,
+  /\bi am going to\b/i,
+  /\bi would like to\b/i,
+  /\bi want to\b/i,
+];
+
+export function hasToolIntent(text: string): boolean {
+  return TOOL_INTENT_PATTERNS.some((p) => p.test(text));
 }
 
 export const MAX_TOOL_ROUNDS = 10;
@@ -137,6 +158,7 @@ export async function runAgent(
   callbacks: ChannelCallbacks,
   channel?: Channel,
   signal?: AbortSignal,
+  options?: RunAgentOptions,
 ): Promise<{ usage?: UsageData }> {
   const client = getClient();
   const provider = getProvider();
@@ -147,6 +169,8 @@ export async function runAgent(
     messages[0] = { role: "system", content: cachedBuildSystem(channel, buildSystem) };
   }
 
+  const maxKicks = options?.maxKicks ?? 1;
+  let kickCount = 0;
   let done = false;
   let toolRounds = 0;
   let lastUsage: UsageData | undefined;
@@ -225,11 +249,34 @@ export async function runAgent(
       if (reasoningItems.length > 0) {
         (msg as any)._reasoning_items = reasoningItems;
       }
-      messages.push(msg);
-
       if (!result.toolCalls.length) {
+        // Check for kick: model narrated tool intent without producing tool calls
+        if (result.content && hasToolIntent(result.content) && kickCount < maxKicks) {
+          // Do NOT push the malformed assistant message to history
+          kickCount++;
+          toolRounds++;
+          if (toolRounds >= MAX_TOOL_ROUNDS) {
+            callbacks.onError(new Error(`tool loop limit reached (${MAX_TOOL_ROUNDS} rounds)`));
+            done = true;
+            continue;
+          }
+          callbacks.onKick?.(kickCount, maxKicks);
+          // Inject self-correction user message
+          messages.push({ role: "user", content: "I narrated instead of acting. Calling the tool now." });
+          // Remove output items from azureInput for kicked response
+          if (azureInput) {
+            for (const item of result.outputItems) {
+              const idx = azureInput.indexOf(item);
+              if (idx !== -1) azureInput.splice(idx, 1);
+            }
+            azureInput = null; // force rebuild on retry
+          }
+          continue;
+        }
+        messages.push(msg);
         done = true;
       } else {
+        messages.push(msg);
         toolRounds++;
         if (toolRounds >= MAX_TOOL_ROUNDS) {
           // Strip tool_calls from the assistant message we just pushed so the
