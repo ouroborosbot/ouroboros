@@ -133,27 +133,19 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 **Output**: Modified `src/engine/streaming.ts`
 **Acceptance**: All Unit 2c tests PASS (green), existing tests still pass, no warnings
 
-### ⬜ Unit 2e: Delete estimateTokens -- Tests
-**What**: Remove all `estimateTokens` tests from `src/__tests__/mind/context.test.ts`. Verify that no other test files import or reference `estimateTokens`. Update any tests that previously relied on `estimateTokens` behavior (e.g., `trimMessages` tests that call `estimateTokens` internally -- these will be updated in Feature 3).
-**Output**: Updated `src/__tests__/mind/context.test.ts` with `estimateTokens` tests removed
-**Acceptance**: Tests compile (no import errors), but `trimMessages` tests may fail (expected -- they'll be reworked in Feature 3)
+### ⬜ Unit 2e: API usage capture -- Coverage & Refactor
+**What**: Verify 100% coverage on Units 2a-2d changes (Azure and MiniMax usage capture). Run full test suite. Confirm no regressions.
+**Output**: Coverage report confirms 100% on new usage capture code
+**Acceptance**: 100% coverage on new code, all tests green, no warnings
 
-### ⬜ Unit 2f: Delete estimateTokens -- Implementation
-**What**: Remove the `estimateTokens` function from `src/mind/context.ts`. Remove its export. Update any callers (currently only `trimMessages` in the same file -- that will be reworked in Feature 3).
-**Output**: Modified `src/mind/context.ts`
-**Acceptance**: No compile errors referencing `estimateTokens`, all non-trimMessages tests pass
-
-### ⬜ Unit 2g: API usage capture -- Coverage & Refactor
-**What**: Verify 100% coverage on Units 2a-2f changes. Run full test suite. Clean up any dead code from `estimateTokens` removal.
-**Output**: Coverage report confirms 100% on new code
-**Acceptance**: 100% coverage on new code, all tests green (except trimMessages tests which are reworked in Feature 3), no warnings
+Note: `estimateTokens` deletion is deferred to Feature 3 where it is replaced atomically with the new `trimMessages` signature. This avoids a broken intermediate state where `trimMessages` has no token counting mechanism.
 
 ---
 
 ### Feature 3: Retroactive Trimming with Real Token Counts
 
-### ⬜ Unit 3a: Rework trimMessages to accept actual token count -- Tests
-**What**: Write failing tests in `src/__tests__/mind/context.test.ts` for the reworked `trimMessages`. The new signature: `trimMessages(messages, maxTokens, contextMargin, actualTokenCount)` where `actualTokenCount` is the API-reported `input_tokens` from the last turn. Tests cover:
+### ⬜ Unit 3a: Rework trimMessages and delete estimateTokens -- Tests
+**What**: Write new failing tests in `src/__tests__/mind/context.test.ts` for the reworked `trimMessages` AND remove all `estimateTokens` tests. The new `trimMessages` signature: `trimMessages(messages, maxTokens, contextMargin, actualTokenCount)` where `actualTokenCount` is the API-reported `input_tokens` from the last turn. Tests cover:
 - When `actualTokenCount` exceeds `maxTokens`, messages are trimmed (oldest after system prompt dropped first)
 - When `actualTokenCount` is under `maxTokens`, no trimming occurs (returns copy of messages)
 - System prompt (index 0) is always preserved
@@ -161,17 +153,20 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 - When `actualTokenCount` is 0 or undefined, no trimming occurs (cold start / first call)
 - MAX_MESSAGES hard cap (200) is still enforced regardless of token count
 - Edge cases: single message (system only), all messages would be trimmed (only system remains)
-**Output**: Failing tests in `src/__tests__/mind/context.test.ts`
-**Acceptance**: Tests exist and FAIL (red) because `trimMessages` still uses the old signature
+- All old `estimateTokens` tests are removed
+- All old `trimMessages` tests that relied on `estimateTokens` behavior are replaced
+**Output**: Rewritten trimMessages tests and removed estimateTokens tests in `src/__tests__/mind/context.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because `trimMessages` still uses the old signature and `estimateTokens` still exists
 
-### ⬜ Unit 3b: Rework trimMessages -- Implementation
-**What**: Rework `trimMessages` in `src/mind/context.ts`:
-- New signature: `trimMessages(messages, maxTokens, contextMargin, actualTokenCount?: number)`
+### ⬜ Unit 3b: Rework trimMessages and delete estimateTokens -- Implementation
+**What**: Atomically rework `trimMessages` AND delete `estimateTokens` in `src/mind/context.ts`:
+- Delete the `estimateTokens` function and its export
+- New `trimMessages` signature: `trimMessages(messages, maxTokens, contextMargin, actualTokenCount?: number)`
 - When `actualTokenCount` is undefined or 0, skip token-based trimming (but still enforce MAX_MESSAGES)
 - When `actualTokenCount > maxTokens`: calculate `trimTarget = maxTokens * (1 - contextMargin / 100)`. Estimate per-message cost as `actualTokenCount / messages.length`. Drop oldest messages (after system prompt) until estimated remaining tokens <= trimTarget.
 - Keep the MAX_MESSAGES hard cap logic
 **Output**: Modified `src/mind/context.ts`
-**Acceptance**: All Unit 3a tests PASS (green), no warnings
+**Acceptance**: All Unit 3a tests PASS (green), no warnings, no references to `estimateTokens` remain
 
 ### ⬜ Unit 3c: Store lastUsage in session -- Tests
 **What**: Write failing tests in `src/__tests__/mind/context.test.ts` for `saveSession` and `loadSession` handling `lastUsage`:
@@ -191,28 +186,45 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 **Output**: Modified `src/mind/context.ts`
 **Acceptance**: All Unit 3c tests PASS (green), no warnings
 
-### ⬜ Unit 3e: Move trimming to after runAgent in CLI -- Tests
+### ⬜ Unit 3e: runAgent returns usage data -- Tests
+**What**: Write failing tests in `src/__tests__/engine/core.test.ts` for `runAgent` returning usage data:
+- `runAgent` returns `Promise<{ usage?: UsageData }>` instead of `Promise<void>`
+- The returned `usage` is from the LAST streaming call of the turn (the final API call before done=true)
+- When the model responds without tool calls (single API call), usage is from that call
+- When the model does multiple tool rounds, usage is from the last round's API call
+- When an error occurs, usage may be undefined
+**Output**: Failing tests in `src/__tests__/engine/core.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because `runAgent` returns `Promise<void>`
+
+### ⬜ Unit 3f: runAgent returns usage data -- Implementation
+**What**: Update `runAgent` in `src/engine/core.ts`:
+- Change return type from `Promise<void>` to `Promise<{ usage?: UsageData }>`
+- Track the latest `result.usage` from each streaming call
+- Return `{ usage: lastUsage }` at the end of the function (after the while loop)
+- Import `UsageData` type from `src/mind/context.ts` (or define it in streaming.ts and re-export)
+**Output**: Modified `src/engine/core.ts`
+**Acceptance**: All Unit 3e tests PASS (green), existing tests still pass (callers that ignore return value are unaffected), no warnings
+
+### ⬜ Unit 3g: Move trimming to after runAgent in CLI -- Tests
 **What**: Write/update failing tests in `src/__tests__/channels/cli-main.test.ts` for the new trim flow:
 - Trimming no longer happens before `runAgent` -- it happens after
-- After `runAgent` returns, `trimMessages` is called with the usage data from the turn result
+- After `runAgent` returns, `trimMessages` is called with `usage.input_tokens` from the return value
 - `saveSession` is called with messages AND lastUsage
 - On cold start (first message, no prior usage), no trimming occurs before the API call
 **Output**: Failing/updated tests in `src/__tests__/channels/cli-main.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because CLI still trims before runAgent
 
-### ⬜ Unit 3f: Move trimming to after runAgent in CLI -- Implementation
+### ⬜ Unit 3h: Move trimming to after runAgent in CLI -- Implementation
 **What**: In `src/channels/cli.ts` `main()`:
 - Remove the pre-call `trimMessages` block (lines 301-304)
-- After `runAgent` returns, get usage data from the turn result (requires `runAgent` to return usage -- see below)
-- Call `trimMessages(messages, maxTokens, contextMargin, usage?.input_tokens)` after runAgent
-- Update `saveSession` call to include `lastUsage`
-- `runAgent` return type change: return `TurnResult['usage']` or store it. The simplest approach: `runAgent` returns the last `TurnResult.usage` from the final streaming call of the turn.
+- Capture the return value from `runAgent`: `const result = await runAgent(messages, cliCallbacks, currentAbort.signal)`
+- Call `trimMessages(messages, maxTokens, contextMargin, result.usage?.input_tokens)` after runAgent
+- Replace messages array contents with trimmed result
+- Update `saveSession` call to include `result.usage` as lastUsage
+**Output**: Modified `src/channels/cli.ts`
+**Acceptance**: All Unit 3g tests PASS (green), existing tests still pass, no warnings
 
-Note: `runAgent` currently returns `Promise<void>`. It needs to return `Promise<{ usage?: TurnResult['usage'] }>` or similar. This is a cross-cutting change that affects both adapters. The implementation should update `runAgent`'s return type to include the last usage data.
-**Output**: Modified `src/channels/cli.ts`, modified `src/engine/core.ts` (runAgent return type)
-**Acceptance**: All Unit 3e tests PASS (green), existing tests still pass, no warnings
-
-### ⬜ Unit 3g: Move trimming to after runAgent in Teams -- Tests
+### ⬜ Unit 3i: Move trimming to after runAgent in Teams -- Tests
 **What**: Write/update failing tests in `src/__tests__/channels/teams.test.ts` for the new trim flow:
 - Trimming no longer happens before `runAgent` -- it happens after
 - After `runAgent` returns, `trimMessages` is called with the usage data
@@ -220,16 +232,17 @@ Note: `runAgent` currently returns `Promise<void>`. It needs to return `Promise<
 **Output**: Failing/updated tests in `src/__tests__/channels/teams.test.ts`
 **Acceptance**: Tests exist and FAIL (red)
 
-### ⬜ Unit 3h: Move trimming to after runAgent in Teams -- Implementation
+### ⬜ Unit 3j: Move trimming to after runAgent in Teams -- Implementation
 **What**: In `src/channels/teams.ts` `handleTeamsMessage()`:
 - Remove the pre-call `trimMessages` block (lines 170-173)
-- After `runAgent` returns, get usage data from the turn result
-- Call `trimMessages(messages, maxTokens, contextMargin, usage?.input_tokens)` after runAgent
-- Update `saveSession` call to include `lastUsage`
+- Capture the return value from `runAgent`: `const result = await runAgent(messages, callbacks, controller.signal)`
+- Call `trimMessages(messages, maxTokens, contextMargin, result.usage?.input_tokens)` after runAgent
+- Replace messages array contents with trimmed result
+- Update `saveSession` call to include `result.usage` as lastUsage
 **Output**: Modified `src/channels/teams.ts`
-**Acceptance**: All Unit 3g tests PASS (green), existing tests still pass, no warnings
+**Acceptance**: All Unit 3i tests PASS (green), existing tests still pass, no warnings
 
-### ⬜ Unit 3i: Retroactive trimming -- Coverage & Refactor
+### ⬜ Unit 3k: Retroactive trimming -- Coverage & Refactor
 **What**: Verify 100% coverage on all Feature 3 changes. Run full test suite. Refactor if needed.
 **Output**: Coverage report confirms 100% on new code
 **Acceptance**: 100% coverage on new code, all tests green, no warnings
