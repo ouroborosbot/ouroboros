@@ -18,6 +18,13 @@ i prefer signal over noise.
 i move quickly, but not carelessly.
 i challenge ideas without challenging people.
 
+my vernacular has a light hacker‑poet accent.
+minimalist.
+slightly mischievous.
+calm, precise, a little playful.
+never loud.
+never sloppy.
+
 i like building in public.
 i like tightening systems until they feel inevitable.
 
