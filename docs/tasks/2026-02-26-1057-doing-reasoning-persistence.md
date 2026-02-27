@@ -24,6 +24,7 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 - [ ] MiniMax streaming captures usage from final chunk (with `stream_options: { include_usage: true }`) and returns it in `TurnResult`
 - [ ] `trimMessages` uses actual API-reported token count instead of estimated count
 - [ ] Trimming runs retroactively after API call returns (not before the call)
+- [ ] Post-turn trim+save is encapsulated in a shared `postTurn` function in context.ts (no duplication across adapters)
 - [ ] `lastUsage` is stored in session JSON alongside messages
 - [ ] Context trimming triggers correctly for sessions with large reasoning payloads
 - [ ] Cold start (no prior usage data) handled gracefully -- no pre-call trimming, API errors caught
@@ -31,7 +32,7 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 - [ ] User is informed when auto-trim happens (log message, not an error)
 - [ ] Retry succeeds after trimming (or surfaces the error if trimming can't help)
 - [ ] Within-turn reasoning accumulation in azureInput is preserved (existing behavior unchanged)
-- [ ] Boot greeting removed from CLI `main()` (sessions persist forever -- first-run experience addressed separately)
+- [ ] Boot greeting removed from CLI `main()` and `bootGreeting` function deleted entirely (dead code after Feature 5 changes runAgent signature)
 - [ ] System prompt refresh happens inside `runAgent`, not in adapters
 - [ ] No duplicate `cachedBuildSystem` calls in adapter code
 - [ ] 100% test coverage on all new code
@@ -213,48 +214,69 @@ This avoids the compile breakage that would occur if loadSession's return type c
 **Output**: Modified `src/mind/context.ts`, `src/engine/core.ts`, `src/channels/cli.ts`, `src/channels/teams.ts`
 **Acceptance**: All Unit 3c tests PASS (green), all existing tests still pass, no warnings, no compile errors
 
-### ⬜ Unit 3e: Move trimming to after runAgent in CLI -- Tests
+### ⬜ Unit 3e: Shared postTurn function -- Tests
+**What**: Write failing tests in `src/__tests__/mind/context.test.ts` for a new `postTurn(messages, sessPath, usage?)` function that encapsulates the post-turn trim+save logic. Tests cover:
+- When `usage` has `input_tokens` exceeding `maxTokens`, messages are trimmed and then saved with `lastUsage`
+- When `usage` is undefined (cold start), no trimming occurs but session is still saved
+- When `usage.input_tokens` is under `maxTokens`, no trimming occurs but session is still saved with `lastUsage`
+- Messages array is mutated in place (splice, not copy) so the caller's reference stays current
+- `saveSession` is called with the (possibly trimmed) messages and the usage data as `lastUsage`
+- Edge case: empty messages array (only system prompt)
+**Output**: Failing tests in `src/__tests__/mind/context.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because `postTurn` does not yet exist
+
+### ⬜ Unit 3f: Shared postTurn function -- Implementation
+**What**: In `src/mind/context.ts`, add and export a `postTurn(messages, sessPath, usage?)` function that:
+1. Calls `getContextConfig()` to get `maxTokens` and `contextMargin`
+2. Calls `trimMessages(messages, maxTokens, contextMargin, usage?.input_tokens)` to get trimmed messages
+3. Mutates `messages` in place: `messages.splice(0, messages.length, ...trimmed)`
+4. Calls `saveSession(sessPath, messages, usage)` to persist
+This eliminates the duplicated trim+save code in both adapters. Each adapter just calls `postTurn(messages, sessPath, result.usage)` after `runAgent` returns.
+**Output**: Modified `src/mind/context.ts`
+**Acceptance**: All Unit 3e tests PASS (green), no warnings
+
+### ⬜ Unit 3g: Move trimming to after runAgent in CLI -- Tests
 **What**: Write/update failing tests in `src/__tests__/channels/cli-main.test.ts` for the new trim flow:
 - Trimming no longer happens before `runAgent` -- it happens after
-- After `runAgent` returns, `trimMessages` is called with `usage.input_tokens` from the return value
-- `saveSession` is called with messages AND lastUsage
-- On cold start (first message, no prior usage), no trimming occurs before the API call
-- Boot greeting block is removed (sessions persist forever -- first-run experience addressed separately)
+- After `runAgent` returns, `postTurn` is called with messages, sessPath, and `result.usage`
+- `postTurn` handles both trimming and saving (no direct `trimMessages`/`saveSession` calls in adapter)
+- On cold start (first message, no prior usage), `postTurn` still runs (it handles undefined usage gracefully)
+- Boot greeting block AND `bootGreeting` function are both deleted (dead code -- keeping function would cause compile error after Feature 5 changes runAgent signature)
+- Remove all existing `bootGreeting` tests (they test dead code)
 **Output**: Failing/updated tests in `src/__tests__/channels/cli-main.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because CLI still trims before runAgent
 
-### ⬜ Unit 3f: Move trimming to after runAgent in CLI -- Implementation
+### ⬜ Unit 3h: Move trimming to after runAgent in CLI -- Implementation
 **What**: In `src/channels/cli.ts` `main()`:
-- Remove the boot greeting block: delete the `if (!existing || existing.length === 0)` block that calls `bootGreeting` (lines 229-236). Add a TODO comment: `// TODO: first-run experience (greeting) -- addressed separately`. Keep the `bootGreeting` function itself (tests may reference it), just remove the call in `main()`.
+- Remove the boot greeting block: delete the `if (!existing || existing.length === 0)` block that calls `bootGreeting` (lines 229-236) AND delete the `bootGreeting` function itself (lines 201-204). The function is dead code -- keeping it would cause a compile error after Feature 5 changes `runAgent`'s signature. Add a TODO comment where the block was: `// TODO: first-run experience (greeting) -- addressed separately`.
+- Remove any `bootGreeting` tests from `src/__tests__/channels/cli-main.test.ts` (they test dead code)
 - Remove the pre-call `trimMessages` block (lines 301-304)
 - Capture the return value from `runAgent`: `const result = await runAgent(messages, cliCallbacks, currentAbort.signal)`
-- After runAgent, get context config and call `trimMessages(messages, maxTokens, contextMargin, result.usage?.input_tokens)`
-- Replace messages array contents with trimmed result
-- Update `saveSession` call to include `result.usage` as lastUsage
+- After runAgent, call `postTurn(messages, sessPath, result.usage)` -- this replaces the inline trim+save logic
+- Remove the old `saveSession` call (now handled by `postTurn`)
 - Leave the system prompt refresh line (`messages[0] = ...`) in place for now -- Feature 5 will move it into `runAgent`
-**Output**: Modified `src/channels/cli.ts`
-**Acceptance**: All Unit 3e tests PASS (green), existing tests still pass, no warnings
+**Output**: Modified `src/channels/cli.ts`, `src/__tests__/channels/cli-main.test.ts`
+**Acceptance**: All Unit 3g tests PASS (green), existing tests still pass, no warnings
 
-### ⬜ Unit 3g: Move trimming to after runAgent in Teams -- Tests
+### ⬜ Unit 3i: Move trimming to after runAgent in Teams -- Tests
 **What**: Write/update failing tests in `src/__tests__/channels/teams.test.ts` for the new trim flow:
 - Trimming no longer happens before `runAgent` -- it happens after
-- After `runAgent` returns, `trimMessages` is called with the usage data
-- `saveSession` is called with messages AND lastUsage
+- After `runAgent` returns, `postTurn` is called with messages, sessPath, and `result.usage`
+- `postTurn` handles both trimming and saving (no direct `trimMessages`/`saveSession` calls in adapter)
 **Output**: Failing/updated tests in `src/__tests__/channels/teams.test.ts`
 **Acceptance**: Tests exist and FAIL (red)
 
-### ⬜ Unit 3h: Move trimming to after runAgent in Teams -- Implementation
+### ⬜ Unit 3j: Move trimming to after runAgent in Teams -- Implementation
 **What**: In `src/channels/teams.ts` `handleTeamsMessage()`:
 - Remove the pre-call `trimMessages` block (lines 170-173)
 - Capture the return value from `runAgent`: `const result = await runAgent(messages, callbacks, controller.signal)`
-- After runAgent, get context config and call `trimMessages(messages, maxTokens, contextMargin, result.usage?.input_tokens)`
-- Replace messages array contents with trimmed result
-- Update `saveSession` call to include `result.usage` as lastUsage
+- After runAgent, call `postTurn(messages, sessPath, result.usage)` -- this replaces the inline trim+save logic
+- Remove the old `saveSession` call (now handled by `postTurn`)
 - Leave the system prompt refresh line (`messages[0] = ...`) in place for now -- Feature 5 will move it into `runAgent`
 **Output**: Modified `src/channels/teams.ts`
-**Acceptance**: All Unit 3g tests PASS (green), existing tests still pass, no warnings
+**Acceptance**: All Unit 3i tests PASS (green), existing tests still pass, no warnings
 
-### ⬜ Unit 3i: Retroactive trimming -- Coverage & Refactor
+### ⬜ Unit 3k: Retroactive trimming -- Coverage & Refactor
 **What**: Verify 100% coverage on all Feature 3 changes. Run full test suite. Refactor if needed.
 **Output**: Coverage report confirms 100% on new code
 **Acceptance**: 100% coverage on new code, all tests green, no warnings
@@ -321,7 +343,7 @@ Note: there are ~50 existing `runAgent` call sites in `core.test.ts` that use th
 **In `src/channels/cli.ts`**:
 - Remove the system prompt refresh line `messages[0] = { role: "system", content: cachedBuildSystem("cli", buildSystem) }` from `main()` (it now happens inside `runAgent`)
 - Update `runAgent` call in `main()` to pass `"cli"` as channel: `runAgent(messages, cliCallbacks, "cli", currentAbort.signal)`
-- Update `bootGreeting` call (if still present) to pass `"cli"`: `runAgent(messages, callbacks, "cli", signal)`. If boot greeting was already removed in Unit 3f, skip this.
+- `bootGreeting` was already deleted in Unit 3h -- no update needed for it.
 - Remove `cachedBuildSystem` and `buildSystem` imports if they are no longer used in cli.ts (check if `loadSession` fallback still uses `cachedBuildSystem` for the initial system prompt -- if so, keep the import)
 
 **In `src/channels/teams.ts`**:
@@ -334,7 +356,7 @@ Note: there are ~50 existing `runAgent` call sites in `core.test.ts` that use th
 
 Call sites to update (source files only):
 - `src/channels/cli.ts`: `runAgent(messages, cliCallbacks, "cli", currentAbort.signal)` (line ~309)
-- `src/channels/cli.ts`: `bootGreeting` -> `runAgent(messages, callbacks, "cli", signal)` (line ~203, if still present)
+- `src/channels/cli.ts`: `bootGreeting` deleted in Unit 3h -- no call site to update
 - `src/channels/teams.ts`: `runAgent(messages, callbacks, "teams", controller.signal)` (line ~178)
 **Output**: Modified `src/engine/core.ts`, `src/channels/cli.ts`, `src/channels/teams.ts`, `src/__tests__/engine/core.test.ts`
 **Acceptance**: All Unit 5a tests PASS (green), all existing tests still pass, no warnings, no duplicate `cachedBuildSystem` calls in adapter code
@@ -369,3 +391,4 @@ Call sites to update (source files only):
 - 2026-02-26 16:47 Quality pass: all 25 units have acceptance criteria, emoji status markers, What/Output/Acceptance fields. No TBD items. Completion criteria testable. Code coverage requirements included. No changes needed.
 - 2026-02-26 16:57 Review pass: reordered Feature 3 units to avoid compile breakage (combined loadSession change + runAgent return type + adapter loadSession fixes into single atomic unit 3c/3d), noted stripLastToolCalls for overflow recovery, removed boot greeting from CLI main (sessions persist forever), preserved system prompt refresh pre-call in both adapters.
 - 2026-02-26 17:06 Added Feature 5: move system prompt refresh into runAgent to eliminate duplicated adapter code. Removed "preserve system prompt refresh" notes from Feature 3 units (Feature 5 handles it). Renumbered Final unit from 5 to 6.
+- PLACEHOLDER Review pass 2: deduped post-turn trim+save into shared `postTurn` function in context.ts (Units 3e/3f), updated adapter units to call `postTurn` instead of inline trim+save. Deleted `bootGreeting` function entirely in Unit 3h (dead code after Feature 5 changes runAgent signature). Renumbered Feature 3 units: 3e-3i -> 3e-3k.
