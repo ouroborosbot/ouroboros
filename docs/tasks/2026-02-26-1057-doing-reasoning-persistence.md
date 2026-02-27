@@ -79,7 +79,7 @@ Fix two bugs that cause the sliding context window to fail when using Azure Resp
 **Output**: Modified `src/engine/core.ts`
 **Acceptance**: All Unit 1a tests PASS (green), existing tests still pass, no warnings
 
-### ⬜ Unit 1c: Restore reasoning items in toResponsesInput -- Tests
+### ✅ Unit 1c: Restore reasoning items in toResponsesInput -- Tests
 **What**: Write failing tests in `src/__tests__/engine/streaming.test.ts` for restoring `_reasoning_items` in `toResponsesInput`. Tests cover:
 - When an assistant message has `_reasoning_items`, those items are emitted into the `input` array BEFORE the assistant content and function_call items (matching API item order)
 - When an assistant message has no `_reasoning_items`, behavior is unchanged
