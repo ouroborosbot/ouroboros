@@ -91,7 +91,7 @@ Fix the agent proactivity bug where the model narrates tool-use intent ("let me 
 
 ---
 
-### 🔄 Unit 2: final_answer Tool & tool_choice Required Plumbing
+### ✅ Unit 2: final_answer Tool & tool_choice Required Plumbing
 
 **What**: Add the `final_answer` sentinel tool, plumb `tool_choice: "required"` through both streaming paths, and handle `final_answer` interception in the agent loop.
 
