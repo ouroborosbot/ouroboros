@@ -2895,6 +2895,7 @@ describe("hasToolIntent", () => {
     // Temporal narration
     expect(hasToolIntent("first, I will check the logs")).toBe(true)
     expect(hasToolIntent("now I will investigate")).toBe(true)
+    expect(hasToolIntent("next turn will be strict TDD repair")).toBe(true)
     expect(hasToolIntent("next, I should look at the code")).toBe(true)
     // Hedged intent
     expect(hasToolIntent("allow me to take a look")).toBe(true)
@@ -2902,6 +2903,7 @@ describe("hasToolIntent", () => {
     // Self-narration
     expect(hasToolIntent("my next step is to read the file")).toBe(true)
     expect(hasToolIntent("my plan is to refactor this")).toBe(true)
+    expect(hasToolIntent("tool calls only from here on")).toBe(true)
   })
 
   it("returns false for text without intent phrases", async () => {
