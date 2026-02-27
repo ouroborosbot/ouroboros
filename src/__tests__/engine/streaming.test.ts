@@ -512,6 +512,51 @@ describe("streamChatCompletion", () => {
     const callbacks = makeCallbacks()
     await expect(streamChatCompletion(client, { messages: [], stream: true }, callbacks)).rejects.toThrow("API down")
   })
+
+  // --- Unit 2c: Capture MiniMax usage ---
+
+  it("adds stream_options: { include_usage: true } to create params", async () => {
+    const createMock = vi.fn().mockReturnValue(makeStream([makeChunk("hello")]))
+    const client = { chat: { completions: { create: createMock } } }
+    const callbacks = makeCallbacks()
+    await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
+    const passedParams = createMock.mock.calls[0][0]
+    expect(passedParams.stream_options).toEqual({ include_usage: true })
+  })
+
+  it("captures usage from final chunk with chunk.usage", async () => {
+    const client = { chat: { completions: { create: vi.fn().mockReturnValue(makeStream([
+      makeChunk("hello"),
+      { choices: [{ delta: {} }], usage: { prompt_tokens: 100, completion_tokens: 50, completion_tokens_details: { reasoning_tokens: 10 }, total_tokens: 150 } },
+    ])) } } }
+    const callbacks = makeCallbacks()
+    const result = await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
+    expect(result.usage).toEqual({
+      input_tokens: 100,
+      output_tokens: 50,
+      reasoning_tokens: 10,
+      total_tokens: 150,
+    })
+  })
+
+  it("maps MiniMax usage fields correctly", async () => {
+    const client = { chat: { completions: { create: vi.fn().mockReturnValue(makeStream([
+      { choices: [{ delta: {} }], usage: { prompt_tokens: 500, completion_tokens: 200, completion_tokens_details: { reasoning_tokens: 80 }, total_tokens: 700 } },
+    ])) } } }
+    const callbacks = makeCallbacks()
+    const result = await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
+    expect(result.usage!.input_tokens).toBe(500)
+    expect(result.usage!.output_tokens).toBe(200)
+    expect(result.usage!.reasoning_tokens).toBe(80)
+    expect(result.usage!.total_tokens).toBe(700)
+  })
+
+  it("returns undefined usage when no usage chunk arrives", async () => {
+    const client = { chat: { completions: { create: vi.fn().mockReturnValue(makeStream([makeChunk("hello")])) } } }
+    const callbacks = makeCallbacks()
+    const result = await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
+    expect(result.usage).toBeUndefined()
+  })
 })
 
 describe("streamResponsesApi", () => {
