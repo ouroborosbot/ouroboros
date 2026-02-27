@@ -256,6 +256,31 @@ describe("saveSession", () => {
 
     expect(fs.mkdirSync).toHaveBeenCalledWith("/a/b/c", { recursive: true })
   })
+
+  // --- Unit 3c: saveSession with lastUsage ---
+
+  it("includes lastUsage in JSON envelope when provided", async () => {
+    const { saveSession } = await import("../../mind/context")
+    const msgs: OpenAI.ChatCompletionMessageParam[] = [
+      { role: "system", content: "sys" },
+    ]
+    const usage = { input_tokens: 100, output_tokens: 50, reasoning_tokens: 10, total_tokens: 150 }
+    saveSession("/tmp/session.json", msgs, usage)
+
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      "/tmp/session.json",
+      JSON.stringify({ version: 1, messages: msgs, lastUsage: usage }, null, 2),
+    )
+  })
+
+  it("omits lastUsage from envelope when not provided", async () => {
+    const { saveSession } = await import("../../mind/context")
+    saveSession("/tmp/session.json", [])
+
+    const written = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string
+    const parsed = JSON.parse(written)
+    expect(parsed.lastUsage).toBeUndefined()
+  })
 })
 
 describe("loadSession", () => {
@@ -264,14 +289,27 @@ describe("loadSession", () => {
     vi.mocked(fs.readFileSync).mockReset()
   })
 
-  it("returns messages array from valid session file", async () => {
+  // --- Unit 3c: loadSession returns { messages, lastUsage } ---
+
+  it("returns { messages, lastUsage } from valid session file", async () => {
     const { loadSession } = await import("../../mind/context")
     const msgs = [{ role: "system", content: "sys" }, { role: "user", content: "hi" }]
+    const usage = { input_tokens: 100, output_tokens: 50, reasoning_tokens: 10, total_tokens: 150 }
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({ version: 1, messages: msgs, lastUsage: usage }),
+    )
+    const result = loadSession("/tmp/session.json")
+    expect(result).toEqual({ messages: msgs, lastUsage: usage })
+  })
+
+  it("returns lastUsage: undefined when not present in saved file", async () => {
+    const { loadSession } = await import("../../mind/context")
+    const msgs = [{ role: "system", content: "sys" }]
     vi.mocked(fs.readFileSync).mockReturnValue(
       JSON.stringify({ version: 1, messages: msgs }),
     )
     const result = loadSession("/tmp/session.json")
-    expect(result).toEqual(msgs)
+    expect(result).toEqual({ messages: msgs, lastUsage: undefined })
   })
 
   it("returns null when file is missing (ENOENT)", async () => {
