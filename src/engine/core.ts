@@ -3,6 +3,7 @@ import { getAzureConfig, getMinimaxConfig } from "../config";
 import { tools, execTool, summarizeArgs } from "./tools";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
 import type { TurnResult } from "./streaming";
+import type { UsageData } from "../mind/context";
 
 let _client: OpenAI | null = null;
 let _model: string | null = null;
@@ -98,12 +99,13 @@ export async function runAgent(
   messages: OpenAI.ChatCompletionMessageParam[],
   callbacks: ChannelCallbacks,
   signal?: AbortSignal,
-): Promise<void> {
+): Promise<{ usage?: UsageData }> {
   const client = getClient();
   const provider = getProvider();
   const model = getModel();
   let done = false;
   let toolRounds = 0;
+  let lastUsage: UsageData | undefined;
 
   // For Azure Responses API: maintain native input array with original output
   // items (reasoning, function_calls) in correct order.  Initialized from CC
@@ -155,6 +157,9 @@ export async function runAgent(
         if (model) createParams.model = model;
         result = await streamChatCompletion(client, createParams, callbacks, signal);
       }
+
+      // Track usage from the latest API call
+      if (result.usage) lastUsage = result.usage;
 
       // SHARED: build CC-format assistant message from TurnResult
       const msg: OpenAI.ChatCompletionAssistantMessageParam = {
@@ -226,4 +231,5 @@ export async function runAgent(
       done = true;
     }
   }
+  return { usage: lastUsage };
 }

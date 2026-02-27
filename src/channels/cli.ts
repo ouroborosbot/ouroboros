@@ -210,8 +210,8 @@ export async function main() {
 
   // Load existing session or start fresh
   const existing = loadSession(sessPath)
-  const messages: OpenAI.ChatCompletionMessageParam[] = existing && existing.length > 0
-    ? existing
+  const messages: OpenAI.ChatCompletionMessageParam[] = existing?.messages && existing.messages.length > 0
+    ? existing.messages
     : [{ role: "system", content: cachedBuildSystem("cli", buildSystem) }]
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true })

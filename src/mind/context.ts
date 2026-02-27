@@ -3,6 +3,13 @@ import type { Channel } from "./prompt"
 import * as fs from "fs"
 import * as path from "path"
 
+export interface UsageData {
+  input_tokens: number
+  output_tokens: number
+  reasoning_tokens: number
+  total_tokens: number
+}
+
 // System prompt cache: per channel, with 60s TTL
 const _promptCache = new Map<string, { value: string; timestamp: number }>()
 
@@ -59,17 +66,19 @@ export function trimMessages(
   return [messages[0], ...messages.slice(cutIndex)]
 }
 
-export function saveSession(filePath: string, messages: OpenAI.ChatCompletionMessageParam[]): void {
+export function saveSession(filePath: string, messages: OpenAI.ChatCompletionMessageParam[], lastUsage?: UsageData): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true })
-  fs.writeFileSync(filePath, JSON.stringify({ version: 1, messages }, null, 2))
+  const envelope: any = { version: 1, messages }
+  if (lastUsage) envelope.lastUsage = lastUsage
+  fs.writeFileSync(filePath, JSON.stringify(envelope, null, 2))
 }
 
-export function loadSession(filePath: string): OpenAI.ChatCompletionMessageParam[] | null {
+export function loadSession(filePath: string): { messages: OpenAI.ChatCompletionMessageParam[]; lastUsage?: UsageData } | null {
   try {
     const raw = fs.readFileSync(filePath, "utf-8")
     const data = JSON.parse(raw)
     if (data.version !== 1) return null
-    return data.messages
+    return { messages: data.messages, lastUsage: data.lastUsage }
   } catch {
     return null
   }
