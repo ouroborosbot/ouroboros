@@ -162,7 +162,7 @@ Total: 23 references to remove, 1 to keep (OUROBOROS_CONFIG_PATH).
 **Files**: `src/__tests__/config.test.ts`
 **Acceptance**: 100% coverage on all 6 getters, all tests green.
 
-### ⬜ Unit 4a: prompt.ts providerSection -- Tests
+### ✅ Unit 4a: prompt.ts providerSection -- Tests
 **What**: Update prompt.test.ts tests for providerSection() to use setTestConfig() instead of process.env.AZURE_OPENAI_API_KEY / process.env.AZURE_OPENAI_DEPLOYMENT manipulation. Tests should set azure config via setTestConfig({ providers: { azure: { apiKey: ..., deployment: ... } } }).
 **Env vars covered**: process.env.AZURE_OPENAI_API_KEY (line 80), process.env.AZURE_OPENAI_DEPLOYMENT (line 81).
 **Files**: `src/__tests__/mind/prompt.test.ts`
@@ -298,3 +298,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 10:42 Unit 3a complete: removed 10 env var override tests from 6 getters (44->34 tests)
 - 2026-02-28 10:43 Unit 3b complete: all 6 getters now return shallow copies directly, 18 env var references removed from config.ts
 - 2026-02-28 10:43 Unit 3c complete: config.ts at 100% stmt/branch/func/line coverage
+- 2026-02-28 10:45 Unit 4a complete: prompt.test.ts migrated from env vars to setTestConfig, 2 azure tests fail (red)
