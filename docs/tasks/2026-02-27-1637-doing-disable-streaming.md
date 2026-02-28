@@ -2,7 +2,7 @@
 
 **Status**: drafting
 **Execution Mode**: direct
-**Created**: (pending first commit)
+**Created**: 2026-02-27 16:44
 **Planning**: ./2026-02-27-1637-planning-disable-streaming.md
 **Artifacts**: ./2026-02-27-1637-doing-disable-streaming/
 
@@ -88,7 +88,7 @@ Add a `--disable-streaming` flag to `npm run teams` that buffers the final AI te
 ### ⬜ Unit 2b: handleTeamsMessage threading -- Implementation
 **What**: Add `disableStreaming?: boolean` parameter to `handleTeamsMessage()` in `src/channels/teams.ts`. Thread it to `createTeamsCallbacks()`. Call `callbacks.flush()` after `runAgent()` returns and before `postTurn()`.
 **Files**: `src/channels/teams.ts`
-**Acceptance**: All Unit 2a tests PASS (green), no warnings
+**Acceptance**: All Unit 2a tests PASS (green), all existing `handleTeamsMessage` tests still pass (backward compat), no warnings
 
 ### ⬜ Unit 2c: handleTeamsMessage threading -- Coverage & Refactor
 **What**: Verify 100% coverage on `handleTeamsMessage()` changes, refactor if needed
@@ -130,4 +130,4 @@ Add a `--disable-streaming` flag to `npm run teams` that buffers the final AI te
 - **Decisions made**: Update docs immediately, commit right away
 
 ## Progress Log
-- (pending first commit)
+- 2026-02-27 16:44 Created from planning doc (Pass 1 -- First Draft)
