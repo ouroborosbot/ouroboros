@@ -270,6 +270,7 @@ describe("Teams adapter - message handling", () => {
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
     }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(null),
@@ -541,10 +542,14 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
-
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ teamsChannel: { port: 4000 } })
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 4000 }),
+    }))
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
 
@@ -1162,6 +1167,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       getTeamsConfig: vi.fn().mockReturnValue({ clientId, clientSecret, tenantId }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
     }))
   }
 
@@ -1521,6 +1527,7 @@ describe("Teams adapter - session persistence", () => {
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
     }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(loadSessionReturn),
@@ -1829,10 +1836,37 @@ describe("Teams adapter - session persistence", () => {
   it("skipConfirmation=true in teamsChannel config sets skipConfirmation in agent options", async () => {
     vi.resetModules()
     const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
-    mockTeamsDeps({ runAgentFn })
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ teamsChannel: { skipConfirmation: true } })
+    // Use mockTeamsDeps first (sets base config mock), then override getTeamsChannelConfig
+    vi.doMock("../../engine/core", () => ({
+      runAgent: runAgentFn,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: true, disableStreaming: false, port: 3978 }),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("cached teams prompt"),
+      postTurn: vi.fn(),
+    }))
+    vi.doMock("../../repertoire/commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockReturnValue({ handled: false }),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockReturnValue(null),
+    }))
     const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
 
@@ -1846,8 +1880,6 @@ describe("Teams adapter - session persistence", () => {
     vi.resetModules()
     const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDeps({ runAgentFn })
-    const { resetConfigCache } = await import("../../config")
-    resetConfigCache()
     const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
 
@@ -2109,6 +2141,7 @@ describe("Teams adapter - handleTeamsMessage with disableStreaming", () => {
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
     }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(loadSessionReturn),
@@ -2344,10 +2377,14 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
-
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ teamsChannel: { disableStreaming: true } })
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: true, port: 3978 }),
+    }))
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
 
@@ -2363,7 +2400,6 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
 
   it("when --disable-streaming is NOT in argv, handleTeamsMessage is called without disableStreaming", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
     process.argv = ["node", "teams-entry.ts"]
 
     let capturedHandler: ((args: any) => Promise<void>) | null = null
@@ -2390,6 +2426,14 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
     }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(null),
@@ -2422,7 +2466,6 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
 
   it("logs 'streaming: enabled' when flag is absent", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
     delete process.env.npm_config_disable_streaming
     process.argv = ["node", "teams-entry.ts"]
 
@@ -2441,6 +2484,14 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
     }))
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
@@ -2481,6 +2532,7 @@ describe("Teams adapter - confirmation callback", () => {
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
     }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(loadSessionReturn),
@@ -2682,6 +2734,7 @@ describe("Teams adapter - confirmation callback", () => {
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
     }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(null),

@@ -6,7 +6,7 @@ import type { ToolContext } from "../engine/tools"
 import { getOAuthConfig, getAdoConfig } from "../config"
 import { buildSystem } from "../mind/prompt"
 import { pickPhrase, THINKING_PHRASES, FOLLOWUP_PHRASES } from "../repertoire/phrases"
-import { sessionPath, getTeamsConfig } from "../config"
+import { sessionPath, getTeamsConfig, getTeamsChannelConfig } from "../config"
 import { loadSession, deleteSession, cachedBuildSystem, postTurn } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "../repertoire/commands"
 
@@ -256,7 +256,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   const agentOptions: RunAgentOptions = { maxKicks: 3 }
   if (toolContext) agentOptions.toolContext = toolContext
   if (disableStreaming) agentOptions.disableStreaming = true
-  if (process.env.OUROBOROS_SKIP_CONFIRMATION === "1") agentOptions.skipConfirmation = true
+  if (getTeamsChannelConfig().skipConfirmation) agentOptions.skipConfirmation = true
   const result = await runAgent(messages, callbacks, "teams", controller.signal, agentOptions)
 
   // Flush any buffered text (when disableStreaming is true, text was accumulated
@@ -283,9 +283,9 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
 export function startTeamsApp(): void {
   // npm run teams:no-stream  → passes --disable-streaming via process.argv
   // npm run teams -- --disable-streaming → also works via process.argv
-  // DISABLE_STREAMING=1 npm run teams → works via env var
+  // teamsChannel.disableStreaming in config.json → also works
   const disableStreaming = process.argv.includes("--disable-streaming")
-    || process.env.DISABLE_STREAMING === "1"
+    || getTeamsChannelConfig().disableStreaming
   const mentionStripping = { activity: { mentions: { stripText: true as const } } }
   const teamsConfig = getTeamsConfig()
 
@@ -390,7 +390,7 @@ export function startTeamsApp(): void {
     console.error(`[teams] app error: ${msg}`)
   })
 
-  const port = parseInt(process.env.PORT || "3978", 10)
+  const port = getTeamsChannelConfig().port
   app.start(port)
   console.log(`Teams bot started on port ${port} with ${mode} (streaming: ${disableStreaming ? "disabled" : "enabled"})`)
 }
