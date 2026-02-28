@@ -32,6 +32,18 @@ function ensureApiVersion(path: string): string {
   return path.includes("?") ? `${path}&${DEFAULT_API_VERSION}` : `${path}?${DEFAULT_API_VERSION}`
 }
 
+// Determine correct Content-Type for ADO requests.
+function resolveContentType(method: string, path: string): string {
+  const upper = method.toUpperCase()
+  const isWorkItemMutation =
+    (upper === "POST" || upper === "PATCH") &&
+    path.toLowerCase().includes("/_apis/wit/workitems/")
+
+  return isWorkItemMutation
+    ? "application/json-patch+json"
+    : "application/json"
+}
+
 // Generic ADO API request. Returns response body as pretty-printed JSON string.
 export async function adoRequest(
   token: string,
@@ -43,13 +55,17 @@ export async function adoRequest(
   try {
     const fullPath = ensureApiVersion(path)
     const url = `${ADO_BASE}/${org}${fullPath}`
+
+    const contentType = resolveContentType(method, path)
+
     const opts: RequestInit = {
       method,
       headers: {
         Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+        "Content-Type": contentType,
       },
     }
+
     if (body) opts.body = body
 
     const res = await fetch(url, opts)
