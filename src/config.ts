@@ -145,6 +145,18 @@ export function resetConfigCache(): void {
   _cachedConfig = null
 }
 
+export type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P]
+}
+
+export function setTestConfig(partial: DeepPartial<OuroborosConfig>): void {
+  loadConfig() // ensure _cachedConfig exists
+  _cachedConfig = deepMerge(
+    _cachedConfig as unknown as Record<string, unknown>,
+    partial as unknown as Record<string, unknown>,
+  ) as unknown as OuroborosConfig
+}
+
 export function getAzureConfig(): AzureProviderConfig {
   const config = loadConfig()
   const az = { ...config.providers.azure }
