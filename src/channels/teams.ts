@@ -29,6 +29,7 @@ export function stripMentions(text: string): string {
 // Options for createTeamsCallbacks controlling streaming behavior.
 export interface TeamsCallbackOptions {
   disableStreaming?: boolean
+  conversationId?: string
 }
 
 // Extended callbacks type that includes flush() for buffered streaming mode.
@@ -145,6 +146,16 @@ export function createTeamsCallbacks(
       if (stopped) return
       safeEmit(`Error: ${error.message}`)
     },
+    onConfirmAction: options?.conversationId
+      ? async (name: string, args: Record<string, string>) => {
+          const convId = options.conversationId!
+          const argsDesc = Object.entries(args).map(([k, v]) => `${k}: ${v}`).join(", ")
+          safeUpdate(`Confirm action: ${name} (${argsDesc}) -- reply "yes" to confirm or "no" to cancel`)
+          return new Promise<"confirmed" | "denied">((resolve) => {
+            _pendingConfirmations.set(convId, resolve)
+          })
+        }
+      : undefined,
     flush: () => {
       if (textBuffer) {
         safeEmit(textBuffer)
@@ -152,6 +163,27 @@ export function createTeamsCallbacks(
       }
     },
   }
+}
+
+// Per-conversation pending confirmation resolvers.
+// When a mutate tool needs confirmation, the resolver is stored here.
+// The next message from the same conversation resolves it.
+const _pendingConfirmations = new Map<string, (decision: "confirmed" | "denied") => void>()
+
+// Confirmation response words (case-insensitive)
+const CONFIRM_WORDS = new Set(["yes", "confirm", "go", "y", "ok", "approve", "proceed"])
+
+export function resolvePendingConfirmation(convId: string, text: string): boolean {
+  const resolver = _pendingConfirmations.get(convId)
+  if (!resolver) return false
+  _pendingConfirmations.delete(convId)
+  const word = text.trim().toLowerCase()
+  if (CONFIRM_WORDS.has(word)) {
+    resolver("confirmed")
+  } else {
+    resolver("denied")
+  }
+  return true
 }
 
 // Per-conversation lock to serialize messages for the same conversation
@@ -173,6 +205,14 @@ export interface TeamsMessageContext {
 
 // Handle an incoming Teams message
 export async function handleTeamsMessage(text: string, stream: TeamsStream, conversationId: string, teamsContext?: TeamsMessageContext, disableStreaming?: boolean): Promise<void> {
+  // Check for pending confirmation before anything else.
+  // If a mutate tool is waiting for confirmation, resolve it with this message.
+  if (resolvePendingConfirmation(conversationId, text)) {
+    const isConfirm = CONFIRM_WORDS.has(text.trim().toLowerCase())
+    stream.emit(isConfirm ? "Confirmed." : "Cancelled.")
+    return
+  }
+
   // Send first thinking phrase immediately so the user sees feedback
   // before sync I/O (session load, trim) blocks the event loop.
   stream.update(pickPhrase(THINKING_PHRASES) + "...")
@@ -210,7 +250,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
 
   // Run agent
   const controller = new AbortController()
-  const callbacks = createTeamsCallbacks(stream, controller, { disableStreaming })
+  const callbacks = createTeamsCallbacks(stream, controller, { disableStreaming, conversationId })
   const toolContext: ToolContext | undefined = teamsContext ? {
     graphToken: teamsContext.graphToken,
     adoToken: teamsContext.adoToken,
