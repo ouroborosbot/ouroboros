@@ -14,6 +14,8 @@ Add a `--disable-streaming` flag to `npm run teams` that buffers the final AI te
 - Status updates (`stream.update()`) still fire during processing even when streaming is disabled (thinking phrases, tool status)
 - Reasoning chunks still shown as status updates when streaming is disabled
 - Threading the `disableStreaming` flag from entrypoint through to `handleTeamsMessage()` and `createTeamsCallbacks()`
+- System prompt flag awareness: when `--disable-streaming` is active, the system prompt tells ouroboros that streaming is disabled and why
+- Rationale documentation: code comments and prompt text explaining devtunnel limitations (nginx relay buffering, 60s timeout, no HTTP/2, Teams 1 req/sec throttle)
 - Full test coverage for all new code paths
 
 ### Out of Scope
@@ -34,6 +36,8 @@ Add a `--disable-streaming` flag to `npm run teams` that buffers the final AI te
 - [ ] Error messages still emitted immediately via `stream.emit()`
 - [ ] Default behavior (no flag) is unchanged -- streaming works exactly as before
 - [ ] Console log at startup indicates streaming mode (e.g., "streaming: disabled")
+- [ ] System prompt tells ouroboros when streaming is disabled and why (flag awareness)
+- [ ] Rationale for `--disable-streaming` is documented in code comments (devtunnel limitations)
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -53,18 +57,21 @@ Add a `--disable-streaming` flag to `npm run teams` that buffers the final AI te
 - Teams-level buffering only -- API calls still use `stream: true` so tool loops and reasoning work incrementally; only the bot-to-Teams text emission (`stream.emit()`) is buffered and sent once at the end
 - Status updates (`stream.update()`) still fire during processing -- thinking phrases, tool status, and reasoning chunks are still shown so the user sees activity
 - Error messages still emitted immediately (not buffered) so the user sees failures right away
-- No changes to the engine layer (`runAgent`, `streamChatCompletion`, `streamResponsesApi`) -- all changes are in the Teams channel adapter layer
+- No behavioral changes to the engine layer (`runAgent`, `streamChatCompletion`, `streamResponsesApi`) -- streaming behavior unchanged; only informational `disableStreaming` flag added to `RunAgentOptions` and `BuildSystemOptions` interfaces so it flows to the system prompt
 
 ## Context / References
 - `src/teams-entry.ts` (line 7) - thin entrypoint, calls `startTeamsApp()`
 - `src/channels/teams.ts` - Teams adapter with `createTeamsCallbacks()`, `handleTeamsMessage()`, `startTeamsApp()`
-- `src/engine/core.ts` - `runAgent()` sets `stream: true` at lines 215 and 231
+- `src/engine/core.ts` - `runAgent()` sets `stream: true` at lines 215 and 231; `RunAgentOptions` interface at line 85
 - `src/engine/streaming.ts` - `streamChatCompletion()` and `streamResponsesApi()` handle streaming API calls
+- `src/mind/prompt.ts` - `buildSystem()` composes the system prompt; `BuildSystemOptions` interface at line 105; `selfAwareSection()` at line 43 shows the channel-awareness pattern
+- `src/mind/context.ts` - `cachedBuildSystem()` at line 18 caches system prompts with cache key based on channel + options
 - `src/config.ts` - configuration pattern (config.json + env var overrides)
 - `package.json` line 10 - `"teams": "tsc && node dist/teams-entry.js"`
 - Two streaming layers: (1) API-to-bot streaming via OpenAI SDK, (2) bot-to-Teams streaming via Teams SDK `stream.emit()`/`stream.update()`
 - Teams SDK `stream.emit(text)` sends text deltas; `stream.update(text)` sends status/informative updates
 - The `ChannelCallbacks` interface in core.ts (line 74) is the contract between engine and channel adapters
+- Devtunnel research: microsoft/dev-tunnels#518 (nginx relay buffering), 60s hard timeout, no HTTP/2 support, Teams 1 req/sec streaming throttle
 
 ## Notes
 The slowness comes from the bot-to-Teams streaming layer: each `stream.emit()` call over devtunnel is an HTTP round-trip back to Teams, and with many small token-level deltas this compounds significantly. The fix buffers text deltas in the callbacks and emits once after the agent loop finishes. The API still streams so the agent loop (tool calls, reasoning, status) works normally -- only the final text delivery to Teams is batched.
