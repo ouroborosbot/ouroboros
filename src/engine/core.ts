@@ -88,6 +88,7 @@ export interface RunAgentOptions {
   toolChoiceRequired?: boolean;
   disableStreaming?: boolean;
   maxKicks?: number;
+  skipConfirmation?: boolean;
   toolContext?: ToolContext;
 }
 
@@ -329,7 +330,7 @@ export async function runAgent(
           }
           const argSummary = summarizeArgs(tc.name, args);
           // Confirmation check for mutate tools
-          if (confirmationRequired.has(tc.name)) {
+          if (confirmationRequired.has(tc.name) && !options?.skipConfirmation) {
             let decision: "confirmed" | "denied" = "denied";
             if (callbacks.onConfirmAction) {
               decision = await callbacks.onConfirmAction(tc.name, args);

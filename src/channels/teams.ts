@@ -256,6 +256,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   const agentOptions: RunAgentOptions = { maxKicks: 3 }
   if (toolContext) agentOptions.toolContext = toolContext
   if (disableStreaming) agentOptions.disableStreaming = true
+  if (process.env.OUROBOROS_SKIP_CONFIRMATION === "1") agentOptions.skipConfirmation = true
   const result = await runAgent(messages, callbacks, "teams", controller.signal, agentOptions)
 
   // Flush any buffered text (when disableStreaming is true, text was accumulated

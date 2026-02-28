@@ -4420,6 +4420,51 @@ describe("confirmation system", () => {
     delete process.env.AZURE_OPENAI_MODEL_NAME
   })
 
+  it("skipConfirmation bypasses confirmation for mutate tools", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          makeChunk(undefined, [
+            { index: 0, id: "tc_mut", function: { name: "graph_mutate", arguments: '{"method":"POST","path":"/me/sendMail","body":"{}"}' } },
+          ]),
+        ])
+      }
+      return makeStream([makeChunk("done")])
+    })
+
+    const onConfirmAction = vi.fn().mockResolvedValue("denied")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onConfirmAction,
+    }
+
+    const toolContext = {
+      graphToken: "test-token",
+      adoToken: undefined,
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, "teams", undefined, { toolContext, skipConfirmation: true })
+
+    // onConfirmAction should NOT have been called — confirmation was skipped
+    expect(onConfirmAction).not.toHaveBeenCalled()
+
+    // Tool should have been executed (not cancelled)
+    const toolMsg = messages.find((m: any) => m.role === "tool" && m.tool_call_id === "tc_mut")
+    expect(toolMsg).toBeDefined()
+    expect(toolMsg.content).not.toContain("cancelled")
+  })
+
   it("truncates tool output exceeding maxToolOutputChars", async () => {
     process.env.OUROBOROS_MAX_TOOL_OUTPUT = "50"
 

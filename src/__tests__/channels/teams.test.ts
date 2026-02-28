@@ -1824,6 +1824,36 @@ describe("Teams adapter - session persistence", () => {
     expect(runAgentFn).toHaveBeenCalled()
   })
 
+  it("OUROBOROS_SKIP_CONFIRMATION=1 sets skipConfirmation in agent options", async () => {
+    vi.resetModules()
+    process.env.OUROBOROS_SKIP_CONFIRMATION = "1"
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../channels/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123", { graphToken: "t", adoToken: "t", signin: vi.fn() })
+    expect(runAgentFn).toHaveBeenCalled()
+    const options = runAgentFn.mock.calls[0][4]
+    expect(options.skipConfirmation).toBe(true)
+
+    delete process.env.OUROBOROS_SKIP_CONFIRMATION
+  })
+
+  it("skipConfirmation not set when OUROBOROS_SKIP_CONFIRMATION is absent", async () => {
+    vi.resetModules()
+    delete process.env.OUROBOROS_SKIP_CONFIRMATION
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../channels/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123", { graphToken: "t", adoToken: "t", signin: vi.fn() })
+    expect(runAgentFn).toHaveBeenCalled()
+    const options = runAgentFn.mock.calls[0][4]
+    expect(options.skipConfirmation).toBeUndefined()
+  })
+
   it("triggers signin for AUTH_REQUIRED:graph after agent loop", async () => {
     vi.resetModules()
     const runAgentFn = vi.fn().mockImplementation(async (msgs: any[]) => {
