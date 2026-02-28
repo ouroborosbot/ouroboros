@@ -2618,4 +2618,107 @@ describe("Teams adapter - confirmation callback", () => {
     const result = await confirmPromise!
     expect(result).toBe("denied")
   })
+
+  it("pre-lock confirmation resolves before conversation lock (no deadlock)", async () => {
+    vi.resetModules()
+    delete process.env.CLIENT_ID
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    let confirmPromise: Promise<"confirmed" | "denied"> | null = null
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      if (callbacks.onConfirmAction) {
+        confirmPromise = callbacks.onConfirmAction("graph_mutate", { method: "POST", path: "/me/sendMail" })
+        // The agent loop would await this promise, so we do too
+        await confirmPromise
+      }
+      return { usage: undefined }
+    })
+
+    vi.doMock("../../engine/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("cached prompt"),
+      postTurn: vi.fn(),
+    }))
+    vi.doMock("../../repertoire/commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockReturnValue({ handled: false }),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockReturnValue(null),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+    vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const teams = await import("../../channels/teams")
+    teams.startTeamsApp()
+    expect(capturedHandler).not.toBeNull()
+
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const convId = "conv-prelock-confirm"
+
+    // First message triggers the agent which triggers confirmation
+    const firstMsg = capturedHandler!({
+      stream: mockStream,
+      activity: { text: "send email", conversation: { id: convId }, from: { id: "user1" }, channelId: "msteams" },
+      api: { users: { token: { get: vi.fn().mockResolvedValue({ token: "graph-tok" }) } } },
+      signin: vi.fn(),
+    })
+
+    // Wait for the confirmation to be set
+    await new Promise(r => setTimeout(r, 50))
+
+    // Second message "yes" resolves the confirmation via pre-lock path
+    const secondMsg = capturedHandler!({
+      stream: mockStream,
+      activity: { text: "yes", conversation: { id: convId }, from: { id: "user1" }, channelId: "msteams" },
+      api: { users: { token: { get: vi.fn().mockResolvedValue(null) } } },
+      signin: vi.fn(),
+    })
+
+    await Promise.all([firstMsg, secondMsg])
+
+    // The confirmation should have resolved as "confirmed"
+    expect(confirmPromise).not.toBeNull()
+    const result = await confirmPromise!
+    expect(result).toBe("confirmed")
+
+    // "Confirmed." emitted via the pre-lock path
+    const emitCalls = mockStream.emit.mock.calls.map((c: any) => c[0] as string)
+    expect(emitCalls).toContain("Confirmed.")
+
+    vi.restoreAllMocks()
+  })
 })

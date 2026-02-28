@@ -356,6 +356,15 @@ export function startTeamsApp(): void {
       },
     }
 
+    // Resolve pending confirmations BEFORE acquiring the conversation lock.
+    // The original message holds the lock while awaiting confirmation, so
+    // trying to lock here would deadlock.
+    if (resolvePendingConfirmation(convId, text)) {
+      const isConfirm = CONFIRM_WORDS.has(text.trim().toLowerCase())
+      stream.emit(isConfirm ? "Confirmed." : "Cancelled.")
+      return
+    }
+
     try {
       await withConversationLock(convId, () => handleTeamsMessage(text, stream, convId, teamsContext, disableStreaming))
     } catch (err: unknown) {

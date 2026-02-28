@@ -4171,6 +4171,16 @@ describe("confirmation system", () => {
     return { choices: [{ delta }] }
   }
 
+  function makeResponsesStream(events: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const event of events) {
+          yield event
+        }
+      },
+    }
+  }
+
   beforeEach(async () => {
     vi.resetModules()
     delete process.env.AZURE_OPENAI_API_KEY
@@ -4355,5 +4365,98 @@ describe("confirmation system", () => {
     const toolMsg = messages.find((m: any) => m.role === "tool" && m.tool_call_id === "tc_read")
     expect(toolMsg).toBeDefined()
     expect(toolMsg.content).toBe("file data")
+  })
+
+  it("Azure: confirmation denied pushes cancelled to azureInput", async () => {
+    vi.resetModules()
+    delete process.env.MINIMAX_API_KEY
+    delete process.env.MINIMAX_MODEL
+    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
+    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
+    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
+    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+
+    let callCount = 0
+    mockResponsesCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeResponsesStream([
+          { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "graph_mutate", arguments: "" } },
+          { type: "response.function_call_arguments.delta", delta: '{"method":"POST","path":"/me/sendMail"}' },
+          { type: "response.output_item.done", item: { type: "function_call", id: "fc1", call_id: "c1", name: "graph_mutate", arguments: '{"method":"POST","path":"/me/sendMail"}', status: "completed" } },
+        ])
+      }
+      return makeResponsesStream([
+        { type: "response.output_text.delta", delta: "ok" },
+      ])
+    })
+
+    const onConfirmAction = vi.fn().mockResolvedValue("denied")
+    const core = await import("../../engine/core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onConfirmAction,
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }, { role: "user", content: "send email" }]
+    await core.runAgent(messages, callbacks, "teams", undefined, {
+      toolContext: { graphToken: "tok", adoToken: undefined, signin: vi.fn(), adoOrganizations: [] },
+    })
+
+    // Second call's input should contain function_call_output with cancelled message
+    const secondInput = mockResponsesCreate.mock.calls[1][0].input
+    const cancelledItem = secondInput.find((i: any) => i.type === "function_call_output" && i.output?.includes("cancelled"))
+    expect(cancelledItem).toBeDefined()
+
+    delete process.env.AZURE_OPENAI_API_KEY
+    delete process.env.AZURE_OPENAI_ENDPOINT
+    delete process.env.AZURE_OPENAI_DEPLOYMENT
+    delete process.env.AZURE_OPENAI_MODEL_NAME
+  })
+
+  it("truncates tool output exceeding maxToolOutputChars", async () => {
+    process.env.OUROBOROS_MAX_TOOL_OUTPUT = "50"
+
+    const hugeOutput = "x".repeat(100)
+    vi.mocked(fs.readFileSync).mockReturnValue(hugeOutput)
+
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          makeChunk(undefined, [
+            { index: 0, id: "tc1", function: { name: "read_file", arguments: '{"path":"big.txt"}' } },
+          ]),
+        ])
+      }
+      return makeStream([makeChunk("done")])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks)
+
+    const toolMsg = messages.find((m: any) => m.role === "tool" && m.tool_call_id === "tc1")
+    expect(toolMsg).toBeDefined()
+    expect(toolMsg.content).toContain("output too large")
+    expect(toolMsg.content).toContain("100 chars")
+
+    delete process.env.OUROBOROS_MAX_TOOL_OUTPUT
   })
 })
