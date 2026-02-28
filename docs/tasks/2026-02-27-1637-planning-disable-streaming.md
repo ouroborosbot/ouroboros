@@ -73,3 +73,4 @@ The slowness comes from the bot-to-Teams streaming layer: each `stream.emit()` c
 - 2026-02-27 16:37 Created
 - 2026-02-27 16:40 Incorporated user decisions: CLI arg only, Teams-level buffering only, status updates still fire
 - 2026-02-27 16:43 Approved, beginning conversion to doing doc
+- 2026-02-27 16:46 Doing doc created (all 4 passes complete)
