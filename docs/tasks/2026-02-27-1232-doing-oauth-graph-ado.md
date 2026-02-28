@@ -215,7 +215,7 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 **Files modified**: `src/engine/tools.ts` (now facade only)
 **Acceptance**: 647 tests pass, 100% coverage, no regressions.
 
-### ⬜ Unit 7: Generic API Clients
+### ✅ Unit 7: Generic API Clients
 **What**: Replace the single-purpose `getProfile()` and `queryWorkItems()` with generic request functions that can hit any endpoint. Rewrite both client files. TDD.
 **Files modified**:
 - `src/engine/graph-client.ts` — replace `getProfile(token)` with `graphRequest(token, method, path, body?)`. Returns raw JSON response as string. Keeps `getProfile` as a thin wrapper for backward compat (calls `graphRequest` internally).
