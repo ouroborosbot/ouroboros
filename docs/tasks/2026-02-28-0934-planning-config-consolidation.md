@@ -1,15 +1,15 @@
-# Planning: Remove Dead Env Var Fallback Code from Config
+# Planning: Remove Redundant Env Var Fallback Paths from Config
 
 **Status**: NEEDS_REVIEW
 **Created**: 2026-02-28 09:34
 
 ## Goal
-config.json (~/.agentconfigs/ouroboros/config.json) is already the sole source of truth with all real values populated (Azure, MiniMax, Teams, context). The env var override paths in config.ts getters are dead code -- they were fallbacks that are never exercised in production. Three additional env var reads in teams.ts, one in tools-base.ts, and two in prompt.ts are similarly unnecessary. The .env file duplicates Teams credentials already in config.json. Remove all dead env var fallback paths and the redundant .env file.
+Every config getter in config.ts reads config.json then checks process.env.* as a fallback override. Three more env var reads live in teams.ts, one in tools-base.ts, and two in prompt.ts. config.json already has all real values populated, so the env var paths never trigger in practice -- but they are functional code that would execute if someone set env vars. Having two ways to configure the same thing creates confusion and makes it unclear which source wins. Remove the env var fallback paths so config.json is the ONLY way to configure the system. Also delete the .env file, which duplicates Teams credentials already in config.json.
 
 ## Scope
 
 ### In Scope
-- Remove all process.env.* override lines from the 6 existing config getters in config.ts (they are dead code -- config.json already has all values)
+- Remove all process.env.* fallback override lines from the 6 existing config getters in config.ts (redundant -- config.json already has all values, and having two config paths creates confusion)
 - Add TeamsChannelConfig and IntegrationsConfig interfaces + getters to config.ts (for settings that currently only exist as env vars in teams.ts and tools-base.ts)
 - Add setTestConfig() helper to config.ts for test-friendly config injection (replaces tests that manipulated process.env)
 - Fix prompt.ts providerSection() to use config getters instead of process.env
@@ -56,7 +56,7 @@ config.json (~/.agentconfigs/ouroboros/config.json) is already the sole source o
 - (none)
 
 ## Decisions Made
-- This is a cleanup/simplification, NOT a migration. config.json already has all real values; env var overrides are dead code.
+- This is removing a redundant code path, not a migration. config.json already has all real values. The env var overrides are functional fallbacks that would fire if set, but having two ways to configure the same thing creates confusion. We want exactly one path: config.json.
 - The .env file is redundant -- it duplicates Teams credentials (CLIENT_ID, CLIENT_SECRET, TENANT_ID) already present in config.json. Delete it.
 - OUROBOROS_CONFIG_PATH is the only env var kept (meta-config pointing to where config.json lives)
 - TeamsChannelConfig defaults: { skipConfirmation: false, disableStreaming: false, port: 3978 }
@@ -70,7 +70,7 @@ config.json (~/.agentconfigs/ouroboros/config.json) is already the sole source o
 - .env file only contains CLIENT_ID, CLIENT_SECRET, TENANT_ID -- all duplicated in config.json teams section
 - teams-entry.ts comment on line 5 says "with env var overrides" -- needs update
 - Existing plan: ~/.claude/plans/jazzy-pondering-salamander.md
-- src/config.ts: 6 getter functions with dead env var override code (lines 128-193)
+- src/config.ts: 6 getter functions with redundant env var fallback overrides (lines 128-193)
 - src/mind/prompt.ts: providerSection() reads process.env.AZURE_OPENAI_API_KEY and AZURE_OPENAI_DEPLOYMENT (lines 80-83)
 - src/channels/teams.ts: reads OUROBOROS_SKIP_CONFIRMATION (line 259), DISABLE_STREAMING (line 288), PORT (line 393)
 - src/engine/tools-base.ts: reads PERPLEXITY_API_KEY (line 222)
@@ -110,4 +110,4 @@ setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" 
 
 ## Progress Log
 - 2026-02-28 09:34 Created
-- 2026-02-28 10:05 Reframed: cleanup of dead env var fallbacks, not migration. Added .env deletion, updated context with config.json reality.
+- 2026-02-28 10:05 Reframed as removing redundant fallback paths, not migration. Added .env deletion, updated context with config.json reality.
