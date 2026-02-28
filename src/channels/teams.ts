@@ -112,7 +112,10 @@ export function createTeamsCallbacks(
       stopPhraseRotation()
       hadRealOutput = true
       reasoningBuf += text
-      safeUpdate(reasoningBuf)
+      // When streaming is disabled, skip per-token reasoning updates — each one
+      // is an HTTP round-trip through devtunnel. The phrase rotation and tool
+      // status updates still fire (those are infrequent).
+      if (!buffered) safeUpdate(reasoningBuf)
     },
     onTextChunk: (text: string) => {
       if (stopped) return
@@ -125,7 +128,6 @@ export function createTeamsCallbacks(
     },
     onToolStart: (name: string, args: Record<string, string>) => {
       stopPhraseRotation()
-      hadRealOutput = true
       const argSummary = Object.values(args).join(", ")
       safeUpdate(`running ${name} (${argSummary})...`)
       hadToolRun = true

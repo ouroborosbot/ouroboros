@@ -1404,18 +1404,36 @@ describe("Teams adapter - phrase rotation", () => {
     expect(mockStream.update).not.toHaveBeenCalled()
   })
 
-  it("onModelStart is suppressed after real output (tool run)", async () => {
+  it("onModelStart uses FOLLOWUP_PHRASES after a tool run (no prior text)", async () => {
     vi.resetModules()
     const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
-    // First model call
+    // First model call — goes straight to tool without text/reasoning
     callbacks.onModelStart()
-    callbacks.onTextChunk("response") // stops rotation
-    // Tool run — sets hadRealOutput
     callbacks.onToolStart("read_file", { path: "x" })
     callbacks.onToolEnd("read_file", "x", true)
-    // Second model call — no phrases because real output was already shown
+    // Second model call — hadToolRun is true, hadRealOutput is false
+    mockStream.update.mockClear()
+    callbacks.onModelStart()
+    expect(mockStream.update).toHaveBeenCalled()
+    const phrase = (mockStream.update.mock.calls[0][0] as string).replace(/\.\.\.$/, "")
+    expect(FOLLOWUP_PHRASES).toContain(phrase)
+
+    callbacks.onTextChunk("done") // cleanup
+  })
+
+  it("onModelStart is suppressed after reasoning output even with tool run", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onModelStart()
+    callbacks.onReasoningChunk("thinking") // sets hadRealOutput
+    callbacks.onTextChunk("response")
+    callbacks.onToolStart("read_file", { path: "x" })
+    callbacks.onToolEnd("read_file", "x", true)
+    // hadRealOutput is true (from reasoning), so onModelStart is suppressed
     mockStream.update.mockClear()
     callbacks.onModelStart()
     expect(mockStream.update).not.toHaveBeenCalled()
@@ -1911,12 +1929,14 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
-  it("onReasoningChunk still calls stream.update() when disableStreaming is true", async () => {
+  it("onReasoningChunk skips stream.update() when disableStreaming is true", async () => {
     vi.resetModules()
     const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, { disableStreaming: true })
     callbacks.onReasoningChunk("analyzing")
-    expect(mockStream.update).toHaveBeenCalledWith("analyzing")
+    callbacks.onReasoningChunk(" more")
+    // Reasoning updates are suppressed when streaming is disabled (too many HTTP round-trips)
+    expect(mockStream.update).not.toHaveBeenCalled()
   })
 
   it("onModelStart still calls stream.update() with thinking phrases when disableStreaming is true", async () => {
