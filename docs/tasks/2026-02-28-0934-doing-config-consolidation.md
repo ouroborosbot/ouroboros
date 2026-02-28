@@ -146,7 +146,7 @@ Total: 23 references to remove, 1 to keep (OUROBOROS_CONFIG_PATH).
 **Files**: `src/__tests__/config.test.ts`
 **Acceptance**: All "env vars override" tests removed. Remaining config tests still pass.
 
-### ⬜ Unit 3b: Strip env var fallbacks from 6 getters -- Implementation
+### ✅ Unit 3b: Strip env var fallbacks from 6 getters -- Implementation
 **What**: Remove all process.env.* override lines from all 6 getters. After this change:
 - `getAzureConfig()` returns `{ ...config.providers.azure }` (removes 5 env var lines: AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_DEPLOYMENT, AZURE_OPENAI_MODEL_NAME, AZURE_OPENAI_API_VERSION)
 - `getMinimaxConfig()` returns `{ ...config.providers.minimax }` (removes 2: MINIMAX_API_KEY, MINIMAX_MODEL)
@@ -296,3 +296,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 10:40 Unit 2b complete: setTestConfig() with DeepPartial type added to config.ts
 - 2026-02-28 10:41 Unit 2c complete: 100% line/function coverage on setTestConfig
 - 2026-02-28 10:42 Unit 3a complete: removed 10 env var override tests from 6 getters (44->34 tests)
+- 2026-02-28 10:43 Unit 3b complete: all 6 getters now return shallow copies directly, 18 env var references removed from config.ts
