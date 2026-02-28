@@ -1,6 +1,6 @@
 # Doing: Remove Redundant Env Var Fallback Paths from Config
 
-**Status**: drafting
+**Status**: READY_FOR_EXECUTION
 **Execution Mode**: direct
 **Created**: 2026-02-28 10:28
 **Planning**: ./tasks/2026-02-28-0934-planning-config-consolidation.md
@@ -210,3 +210,4 @@ Also update the comment on line 286 to remove the DISABLE_STREAMING=1 env var re
 ## Progress Log
 - 2026-02-28 10:28 Created from planning doc (Pass 1 -- first draft)
 - 2026-02-28 10:29 Pass 2 -- granularity: broke Unit 8 into 6 per-file sub-units (8a-8f)
+- 2026-02-28 10:31 Pass 3 -- validation: verified import paths, confirmed getAzureConfig not re-exported from core.ts, confirmed no tests assert on core.ts error message, confirmed .env is gitignored/untracked, added .gitignore cleanup to Unit 9
