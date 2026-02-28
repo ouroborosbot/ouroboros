@@ -1,33 +1,39 @@
 # Planning: Disable Streaming Flag for Teams
 
-**Status**: drafting
+**Status**: NEEDS_REVIEW
 **Created**: 2026-02-27 16:37
 
 ## Goal
-Add a `--disable-streaming` flag to `npm run teams` that makes the bot collect the full AI response before sending it to Teams as a single message, bypassing the Teams SDK streaming protocol (emit/update) which is extremely slow over devtunnel+local.
+Add a `--disable-streaming` flag to `npm run teams` that buffers the final AI text output and sends it to Teams as a single `emit()` call instead of many small deltas, bypassing the Teams SDK streaming protocol which is extremely slow over devtunnel+local. API-level streaming (`stream: true`) is kept so tool loops and reasoning work incrementally; only the bot-to-Teams text emission is buffered.
 
 ## Scope
 
 ### In Scope
-- CLI argument parsing for `--disable-streaming` in teams-entry.ts
-- Non-streaming Teams callbacks that buffer all output and send once at the end
-- Non-streaming API calls (stream: false) to Azure/MiniMax when flag is active
-- New non-streaming API response handler in streaming.ts (complement to streamChatCompletion / streamResponsesApi)
-- Passing the disable-streaming flag through to runAgent so it sets stream: false
+- CLI argument parsing for `--disable-streaming` in teams-entry.ts (passed to `startTeamsApp()`)
+- Buffered Teams callbacks variant of `createTeamsCallbacks()` that accumulates `onTextChunk` deltas and sends one `emit()` at the end
+- Status updates (`stream.update()`) still fire during processing even when streaming is disabled (thinking phrases, tool status)
+- Reasoning chunks still shown as status updates when streaming is disabled
+- Threading the `disableStreaming` flag from entrypoint through to `handleTeamsMessage()` and `createTeamsCallbacks()`
 - Full test coverage for all new code paths
 
 ### Out of Scope
 - Changing the CLI adapter's streaming behavior
 - Changing default behavior (streaming remains the default)
+- Config.json or env var for this flag (CLI arg only)
+- API-level streaming changes (API calls still use `stream: true` regardless of flag)
+- Changes to `runAgent()`, `streamChatCompletion()`, or `streamResponsesApi()` in the engine
 - Performance profiling of devtunnel
 - Any changes to the Teams SDK itself
 
 ## Completion Criteria
 - [ ] `npm run teams -- --disable-streaming` starts the bot in non-streaming mode
-- [ ] In non-streaming mode, the bot sends a single complete message to Teams (no incremental emit/update)
-- [ ] In non-streaming mode, API calls use `stream: false` to avoid streaming overhead
+- [ ] In non-streaming mode, `onTextChunk` deltas are buffered and sent as a single `stream.emit()` after the agent loop completes
+- [ ] API calls still use `stream: true` (engine layer unchanged)
 - [ ] Status phrases ("thinking...", tool names) still display via `stream.update()` during processing
+- [ ] Reasoning chunks still shown via `stream.update()` during processing
+- [ ] Error messages still emitted immediately via `stream.emit()`
 - [ ] Default behavior (no flag) is unchanged -- streaming works exactly as before
+- [ ] Console log at startup indicates streaming mode (e.g., "streaming: disabled")
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -40,12 +46,14 @@ Add a `--disable-streaming` flag to `npm run teams` that makes the bot collect t
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [ ] Should the flag also be settable via config.json or env var (e.g., `OUROBOROS_DISABLE_STREAMING=true`) in addition to CLI arg?
-- [ ] When streaming is disabled, should reasoning chunks still be shown as status updates, or only thinking phrases?
-- [ ] Should the non-streaming path use `stream: false` on the API call (truly non-streaming) or still use streaming from the API but buffer before sending to Teams? (The former is simpler; the latter still gets incremental status but buffers the final text.)
+- (all resolved)
 
 ## Decisions Made
-- (none yet)
+- CLI arg only (`--disable-streaming`), no config.json or env var -- simplest for quick toggling during dev
+- Teams-level buffering only -- API calls still use `stream: true` so tool loops and reasoning work incrementally; only the bot-to-Teams text emission (`stream.emit()`) is buffered and sent once at the end
+- Status updates (`stream.update()`) still fire during processing -- thinking phrases, tool status, and reasoning chunks are still shown so the user sees activity
+- Error messages still emitted immediately (not buffered) so the user sees failures right away
+- No changes to the engine layer (`runAgent`, `streamChatCompletion`, `streamResponsesApi`) -- all changes are in the Teams channel adapter layer
 
 ## Context / References
 - `src/teams-entry.ts` (line 7) - thin entrypoint, calls `startTeamsApp()`
@@ -59,7 +67,7 @@ Add a `--disable-streaming` flag to `npm run teams` that makes the bot collect t
 - The `ChannelCallbacks` interface in core.ts (line 74) is the contract between engine and channel adapters
 
 ## Notes
-The slowness likely comes from the bot-to-Teams streaming layer: each `stream.emit()` call over devtunnel is an HTTP round-trip back to Teams, and with many small deltas this compounds. Disabling both layers (API streaming + Teams streaming) is the cleanest approach.
+The slowness comes from the bot-to-Teams streaming layer: each `stream.emit()` call over devtunnel is an HTTP round-trip back to Teams, and with many small token-level deltas this compounds significantly. The fix buffers text deltas in the callbacks and emits once after the agent loop finishes. The API still streams so the agent loop (tool calls, reasoning, status) works normally -- only the final text delivery to Teams is batched.
 
 ## Progress Log
 - 2026-02-27 16:37 Created
