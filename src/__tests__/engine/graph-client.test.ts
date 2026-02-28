@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 const mockFetch = vi.fn()
 vi.stubGlobal("fetch", mockFetch)
 
-import { getProfile } from "../../engine/graph-client"
+import { getProfile, graphRequest } from "../../engine/graph-client"
 
 describe("getProfile", () => {
   beforeEach(() => {
@@ -103,5 +103,179 @@ describe("getProfile", () => {
 
     const result = await getProfile("token")
     expect(result).toContain("NETWORK_ERROR")
+  })
+})
+
+describe("graphRequest", () => {
+  beforeEach(() => {
+    mockFetch.mockReset()
+  })
+
+  it("makes GET request and returns formatted JSON string", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ displayName: "Jane", mail: "jane@contoso.com" }),
+    })
+
+    const result = await graphRequest("test-token", "GET", "/me")
+
+    expect(mockFetch).toHaveBeenCalledWith("https://graph.microsoft.com/v1.0/me", {
+      method: "GET",
+      headers: {
+        Authorization: "Bearer test-token",
+        "Content-Type": "application/json",
+      },
+    })
+    const parsed = JSON.parse(result)
+    expect(parsed.displayName).toBe("Jane")
+    expect(parsed.mail).toBe("jane@contoso.com")
+  })
+
+  it("makes POST request with body", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: "msg-123", subject: "Hello" }),
+    })
+
+    const body = JSON.stringify({ subject: "Hello", body: { content: "Hi" } })
+    const result = await graphRequest("test-token", "POST", "/me/messages", body)
+
+    expect(mockFetch).toHaveBeenCalledWith("https://graph.microsoft.com/v1.0/me/messages", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer test-token",
+        "Content-Type": "application/json",
+      },
+      body,
+    })
+    const parsed = JSON.parse(result)
+    expect(parsed.id).toBe("msg-123")
+  })
+
+  it("makes PATCH request with body", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: "event-1", subject: "Updated" }),
+    })
+
+    const body = JSON.stringify({ subject: "Updated" })
+    const result = await graphRequest("test-token", "PATCH", "/me/events/event-1", body)
+
+    expect(mockFetch).toHaveBeenCalledWith("https://graph.microsoft.com/v1.0/me/events/event-1", {
+      method: "PATCH",
+      headers: {
+        Authorization: "Bearer test-token",
+        "Content-Type": "application/json",
+      },
+      body,
+    })
+    const parsed = JSON.parse(result)
+    expect(parsed.subject).toBe("Updated")
+  })
+
+  it("makes DELETE request without body", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    })
+
+    await graphRequest("test-token", "DELETE", "/me/messages/msg-123")
+
+    expect(mockFetch).toHaveBeenCalledWith("https://graph.microsoft.com/v1.0/me/messages/msg-123", {
+      method: "DELETE",
+      headers: {
+        Authorization: "Bearer test-token",
+        "Content-Type": "application/json",
+      },
+    })
+  })
+
+  it("handles paths with query parameters", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ value: [] }),
+    })
+
+    await graphRequest("test-token", "GET", "/me/messages?$top=5&$select=subject")
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://graph.microsoft.com/v1.0/me/messages?$top=5&$select=subject",
+      expect.any(Object),
+    )
+  })
+
+  it("returns formatted JSON (pretty printed)", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ key: "value" }),
+    })
+
+    const result = await graphRequest("test-token", "GET", "/me")
+    // Should be pretty-printed JSON
+    expect(result).toContain("\n")
+    expect(JSON.parse(result)).toEqual({ key: "value" })
+  })
+
+  it("returns error string on 401", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 401,
+      statusText: "Unauthorized",
+    })
+
+    const result = await graphRequest("bad-token", "GET", "/me")
+    expect(result).toBe("AUTH_REQUIRED:graph")
+  })
+
+  it("returns error string on 403", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 403,
+      statusText: "Forbidden",
+    })
+
+    const result = await graphRequest("token", "GET", "/me")
+    expect(result).toContain("PERMISSION_DENIED")
+  })
+
+  it("returns error string on 429", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 429,
+      statusText: "Too Many Requests",
+    })
+
+    const result = await graphRequest("token", "GET", "/me")
+    expect(result).toContain("THROTTLED")
+  })
+
+  it("returns error string on 500", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: "Internal Server Error",
+    })
+
+    const result = await graphRequest("token", "GET", "/me")
+    expect(result).toContain("SERVICE_ERROR")
+  })
+
+  it("returns NETWORK_ERROR on fetch failure", async () => {
+    mockFetch.mockRejectedValue(new Error("network error"))
+
+    const result = await graphRequest("token", "GET", "/me")
+    expect(result).toContain("NETWORK_ERROR")
+  })
+
+  it("returns error string on generic 4xx", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      statusText: "Bad Request",
+    })
+
+    const result = await graphRequest("token", "POST", "/me/messages", "{bad json")
+    expect(result).toContain("ERROR")
+    expect(result).toContain("400")
   })
 })
