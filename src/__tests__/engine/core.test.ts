@@ -54,9 +54,34 @@ import * as fs from "fs"
 import { execSync, spawnSync } from "child_process"
 import type { ChannelCallbacks } from "../../engine/core"
 
-// Set env var before importing core
-process.env.MINIMAX_API_KEY = "test-key"
-process.env.MINIMAX_MODEL = "test-model"
+// Dynamic config helpers -- must be re-imported after vi.resetModules()
+async function setupMinimax(apiKey = "test-key", model = "test-model") {
+  const config = await import("../../config")
+  config.resetConfigCache()
+  config.setTestConfig({ providers: { minimax: { apiKey, model } } })
+}
+
+async function setupAzure(
+  apiKey = "azure-test-key",
+  endpoint = "https://test.openai.azure.com",
+  deployment = "test-deployment",
+  modelName = "gpt-5.2-chat",
+) {
+  const config = await import("../../config")
+  config.resetConfigCache()
+  config.setTestConfig({ providers: { azure: { apiKey, endpoint, deployment, modelName } } })
+}
+
+async function setupConfig(partial: Record<string, unknown>) {
+  const config = await import("../../config")
+  config.resetConfigCache()
+  config.setTestConfig(partial as any)
+}
+
+async function resetConfig() {
+  const config = await import("../../config")
+  config.resetConfigCache()
+}
 
 describe("isTransientError", () => {
   it("detects Node.js network error codes", async () => {
@@ -163,13 +188,11 @@ describe("runAgent", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    delete process.env.AZURE_OPENAI_API_KEY
-    process.env.MINIMAX_API_KEY = "test-key"
-    process.env.MINIMAX_MODEL = "test-model"
     mockCreate.mockReset()
     mockResponsesCreate.mockReset()
     // Restore default readFileSync so prompt.ts module-level psyche file loads work
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
 
     const core = await import("../../engine/core")
     runAgent = core.runAgent
@@ -1026,8 +1049,8 @@ describe("runAgent", () => {
     expect(toolStarts).toContain("get_current_time")
   })
 
-  it("uses MINIMAX_MODEL env var when set", async () => {
-    process.env.MINIMAX_MODEL = "custom-model"
+  it("uses minimax model from config when set", async () => {
+    await setupConfig({ providers: { minimax: { apiKey: "test-key", model: "custom-model" } } })
     mockCreate.mockReturnValue(makeStream([makeChunk("hi")]))
 
     const callbacks: ChannelCallbacks = {
@@ -1043,7 +1066,6 @@ describe("runAgent", () => {
     await runAgent([{ role: "system", content: "test" }], callbacks)
     const callArgs = mockCreate.mock.calls[0][0]
     expect(callArgs.model).toBe("custom-model")
-    delete process.env.MINIMAX_MODEL
   })
 
   it("calls onReasoningChunk for reasoning_content", async () => {
@@ -1282,12 +1304,8 @@ describe("runAgent", () => {
 
   it("Azure provider calls mockResponsesCreate with Responses API params", async () => {
     vi.resetModules()
-    delete process.env.MINIMAX_API_KEY
-    delete process.env.MINIMAX_MODEL
-    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
-    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
-    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
-    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
 
     mockResponsesCreate.mockReturnValue(makeResponsesStream([
       { type: "response.output_text.delta", delta: "hello" },
@@ -1316,20 +1334,13 @@ describe("runAgent", () => {
     expect(params.instructions).toBe("test")
     expect(params.tools).toBeDefined()
 
-    delete process.env.AZURE_OPENAI_API_KEY
-    delete process.env.AZURE_OPENAI_ENDPOINT
-    delete process.env.AZURE_OPENAI_DEPLOYMENT
-    delete process.env.AZURE_OPENAI_MODEL_NAME
+    // config cleanup handled by resetConfigCache in beforeEach
   })
 
   it("Azure text-only response: assistant message pushed in CC format, loop ends", async () => {
     vi.resetModules()
-    delete process.env.MINIMAX_API_KEY
-    delete process.env.MINIMAX_MODEL
-    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
-    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
-    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
-    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
 
     mockResponsesCreate.mockReturnValue(makeResponsesStream([
       { type: "response.output_text.delta", delta: "hello azure" },
@@ -1352,20 +1363,13 @@ describe("runAgent", () => {
     expect(assistantMsg).toBeDefined()
     expect(assistantMsg.content).toBe("hello azure")
 
-    delete process.env.AZURE_OPENAI_API_KEY
-    delete process.env.AZURE_OPENAI_ENDPOINT
-    delete process.env.AZURE_OPENAI_DEPLOYMENT
-    delete process.env.AZURE_OPENAI_MODEL_NAME
+    // config cleanup handled by resetConfigCache in beforeEach
   })
 
   it("Azure tool-use turn: tool executed, result pushed, loop continues", async () => {
     vi.resetModules()
-    delete process.env.MINIMAX_API_KEY
-    delete process.env.MINIMAX_MODEL
-    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
-    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
-    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
-    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
 
     vi.mocked(fs.readFileSync).mockReturnValue("file contents")
 
@@ -1404,20 +1408,13 @@ describe("runAgent", () => {
     expect(toolMsg).toBeDefined()
     expect(toolMsg.content).toBe("file contents")
 
-    delete process.env.AZURE_OPENAI_API_KEY
-    delete process.env.AZURE_OPENAI_ENDPOINT
-    delete process.env.AZURE_OPENAI_DEPLOYMENT
-    delete process.env.AZURE_OPENAI_MODEL_NAME
+    // config cleanup handled by resetConfigCache in beforeEach
   })
 
   it("Azure native input: output items + function_call_output in correct order", async () => {
     vi.resetModules()
-    delete process.env.MINIMAX_API_KEY
-    delete process.env.MINIMAX_MODEL
-    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
-    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
-    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
-    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
 
     vi.mocked(fs.readFileSync).mockReturnValue("data")
 
@@ -1470,20 +1467,13 @@ describe("runAgent", () => {
     expect(secondCallInput[funcOutputIdx].call_id).toBe("c1")
     expect(secondCallInput[funcOutputIdx].output).toBe("data")
 
-    delete process.env.AZURE_OPENAI_API_KEY
-    delete process.env.AZURE_OPENAI_ENDPOINT
-    delete process.env.AZURE_OPENAI_DEPLOYMENT
-    delete process.env.AZURE_OPENAI_MODEL_NAME
+    // config cleanup handled by resetConfigCache in beforeEach
   })
 
   it("Azure native input: same array reference reused across iterations", async () => {
     vi.resetModules()
-    delete process.env.MINIMAX_API_KEY
-    delete process.env.MINIMAX_MODEL
-    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
-    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
-    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
-    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
 
     vi.mocked(fs.readFileSync).mockReturnValue("data")
 
@@ -1526,10 +1516,7 @@ describe("runAgent", () => {
     // It IS the same array reference (mutated in place, not rebuilt)
     expect(mockResponsesCreate.mock.calls[0][0].input).toBe(mockResponsesCreate.mock.calls[1][0].input)
 
-    delete process.env.AZURE_OPENAI_API_KEY
-    delete process.env.AZURE_OPENAI_ENDPOINT
-    delete process.env.AZURE_OPENAI_DEPLOYMENT
-    delete process.env.AZURE_OPENAI_MODEL_NAME
+    // config cleanup handled by resetConfigCache in beforeEach
   })
 
   it("does not pass reasoning params for MiniMax provider", async () => {
@@ -1576,12 +1563,8 @@ describe("runAgent", () => {
 
   it("Azure: stores reasoning items as _reasoning_items on assistant message", async () => {
     vi.resetModules()
-    delete process.env.MINIMAX_API_KEY
-    delete process.env.MINIMAX_MODEL
-    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
-    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
-    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
-    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
 
     const reasoningItem = { type: "reasoning", id: "r1", summary: [{ text: "thought", type: "summary_text" }], encrypted_content: "enc123" }
     mockResponsesCreate.mockReturnValue(makeResponsesStream([
@@ -1607,20 +1590,13 @@ describe("runAgent", () => {
     expect(assistantMsg).toBeDefined()
     expect(assistantMsg._reasoning_items).toEqual([reasoningItem])
 
-    delete process.env.AZURE_OPENAI_API_KEY
-    delete process.env.AZURE_OPENAI_ENDPOINT
-    delete process.env.AZURE_OPENAI_DEPLOYMENT
-    delete process.env.AZURE_OPENAI_MODEL_NAME
+    // config cleanup handled by resetConfigCache in beforeEach
   })
 
   it("Azure: does not set _reasoning_items when outputItems has no reasoning items", async () => {
     vi.resetModules()
-    delete process.env.MINIMAX_API_KEY
-    delete process.env.MINIMAX_MODEL
-    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
-    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
-    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
-    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
 
     const messageItem = { type: "message", id: "m1", content: [{ type: "output_text", text: "hello" }] }
     mockResponsesCreate.mockReturnValue(makeResponsesStream([
@@ -1646,20 +1622,13 @@ describe("runAgent", () => {
     expect(assistantMsg).toBeDefined()
     expect(assistantMsg._reasoning_items).toBeUndefined()
 
-    delete process.env.AZURE_OPENAI_API_KEY
-    delete process.env.AZURE_OPENAI_ENDPOINT
-    delete process.env.AZURE_OPENAI_DEPLOYMENT
-    delete process.env.AZURE_OPENAI_MODEL_NAME
+    // config cleanup handled by resetConfigCache in beforeEach
   })
 
   it("Azure: stores only reasoning items when outputItems has mixed types", async () => {
     vi.resetModules()
-    delete process.env.MINIMAX_API_KEY
-    delete process.env.MINIMAX_MODEL
-    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
-    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
-    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
-    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
 
     const reasoningItem = { type: "reasoning", id: "r1", summary: [{ text: "thought", type: "summary_text" }], encrypted_content: "enc1" }
     const messageItem = { type: "message", id: "m1", content: [{ type: "output_text", text: "hello" }] }
@@ -1687,20 +1656,13 @@ describe("runAgent", () => {
     expect(assistantMsg._reasoning_items).toEqual([reasoningItem])
     expect(assistantMsg._reasoning_items).toHaveLength(1)
 
-    delete process.env.AZURE_OPENAI_API_KEY
-    delete process.env.AZURE_OPENAI_ENDPOINT
-    delete process.env.AZURE_OPENAI_DEPLOYMENT
-    delete process.env.AZURE_OPENAI_MODEL_NAME
+    // config cleanup handled by resetConfigCache in beforeEach
   })
 
   it("Azure: azureInput.push still happens for each outputItem (existing behavior preserved)", async () => {
     vi.resetModules()
-    delete process.env.MINIMAX_API_KEY
-    delete process.env.MINIMAX_MODEL
-    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
-    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
-    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
-    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
 
     vi.mocked(fs.readFileSync).mockReturnValue("data")
 
@@ -1743,10 +1705,7 @@ describe("runAgent", () => {
     expect(reasoningIdx).toBeGreaterThan(-1)
     expect(funcCallIdx).toBeGreaterThan(reasoningIdx)
 
-    delete process.env.AZURE_OPENAI_API_KEY
-    delete process.env.AZURE_OPENAI_ENDPOINT
-    delete process.env.AZURE_OPENAI_DEPLOYMENT
-    delete process.env.AZURE_OPENAI_MODEL_NAME
+    // config cleanup handled by resetConfigCache in beforeEach
   })
 
   it("MiniMax: does not set _reasoning_items (outputItems always empty)", async () => {
@@ -2502,36 +2461,30 @@ describe("getClient", () => {
     mockError.mockRestore()
   })
 
-  it("uses MiniMax when MINIMAX vars are set", async () => {
+  it("uses MiniMax when minimax config is set", async () => {
     vi.resetModules()
-    process.env.MINIMAX_API_KEY = "mm-key"
-    process.env.MINIMAX_MODEL = "MiniMax-M2.5"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax("mm-key", "MiniMax-M2.5")
 
     const core = await import("../../engine/core")
     expect(core.getModel()).toBe("MiniMax-M2.5")
     expect(core.getProvider()).toBe("minimax")
   })
 
-  it("prefers Azure when all Azure vars are set", async () => {
+  it("prefers Azure when all Azure config is set", async () => {
     vi.resetModules()
-    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
-    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
-    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
-    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-4o"
-    process.env.MINIMAX_API_KEY = "mm-key"
-    process.env.MINIMAX_MODEL = "MiniMax-M2.5"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({ providers: { azure: { apiKey: "azure-test-key", endpoint: "https://test.openai.azure.com", deployment: "test-deployment", modelName: "gpt-4o" }, minimax: { apiKey: "mm-key", model: "MiniMax-M2.5" } } })
 
     const core = await import("../../engine/core")
     expect(core.getModel()).toBe("gpt-4o")
     expect(core.getProvider()).toBe("azure")
   })
 
-  it("falls back to MiniMax when Azure vars are incomplete", async () => {
+  it("falls back to MiniMax when Azure config is incomplete", async () => {
     vi.resetModules()
-    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
-    // Missing endpoint/deployment/model
-    process.env.MINIMAX_API_KEY = "mm-key"
-    process.env.MINIMAX_MODEL = "MiniMax-M2.5"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({ providers: { azure: { apiKey: "azure-test-key" }, minimax: { apiKey: "mm-key", model: "MiniMax-M2.5" } } })
 
     const core = await import("../../engine/core")
     expect(core.getModel()).toBe("MiniMax-M2.5")
@@ -2540,8 +2493,8 @@ describe("getClient", () => {
 
   it("caches client across multiple runAgent invocations", async () => {
     vi.resetModules()
-    process.env.MINIMAX_API_KEY = "mm-key"
-    process.env.MINIMAX_MODEL = "cached-model"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax("mm-key", "cached-model")
 
     mockCreate.mockReset()
     mockCreate.mockReturnValue({
@@ -2572,8 +2525,8 @@ describe("getClient", () => {
 
   it("omits model param in createParams when model is empty", async () => {
     vi.resetModules()
-    process.env.MINIMAX_API_KEY = "mm-key"
-    process.env.MINIMAX_MODEL = ""
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax("mm-key", "")
 
     mockCreate.mockReset()
     mockCreate.mockReturnValue({
@@ -2601,24 +2554,16 @@ describe("getClient", () => {
 })
 
 describe("getClient config integration", () => {
-  const saved: Record<string, string | undefined> = {}
-  const allVars = [
-    "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT",
-    "AZURE_OPENAI_DEPLOYMENT", "AZURE_OPENAI_MODEL_NAME",
-    "AZURE_OPENAI_API_VERSION", "MINIMAX_API_KEY", "MINIMAX_MODEL",
-    "OUROBOROS_CONFIG_PATH",
-  ]
+  const savedConfigPath = process.env.OUROBOROS_CONFIG_PATH
 
   beforeEach(() => {
-    for (const v of allVars) { saved[v] = process.env[v]; delete process.env[v] }
+    delete process.env.OUROBOROS_CONFIG_PATH
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
   })
 
   afterEach(() => {
-    for (const v of allVars) {
-      if (saved[v] !== undefined) process.env[v] = saved[v]
-      else delete process.env[v]
-    }
+    if (savedConfigPath !== undefined) process.env.OUROBOROS_CONFIG_PATH = savedConfigPath
+    else delete process.env.OUROBOROS_CONFIG_PATH
   })
 
   it("uses azure config from config.json when apiKey is present", async () => {
@@ -2639,8 +2584,7 @@ describe("getClient config integration", () => {
       return JSON.stringify({ name: "other" })
     })
 
-    const { resetConfigCache } = await import("../../config")
-    resetConfigCache()
+    await resetConfig()
     const core = await import("../../engine/core")
     expect(core.getModel()).toBe("config-model")
     expect(core.getProvider()).toBe("azure")
@@ -2662,8 +2606,7 @@ describe("getClient config integration", () => {
       return JSON.stringify({ name: "other" })
     })
 
-    const { resetConfigCache } = await import("../../config")
-    resetConfigCache()
+    await resetConfig()
     const core = await import("../../engine/core")
     expect(core.getModel()).toBe("config-mm-model")
     expect(core.getProvider()).toBe("minimax")
@@ -2691,39 +2634,25 @@ describe("getClient config integration", () => {
       return JSON.stringify({ name: "other" })
     })
 
-    const { resetConfigCache } = await import("../../config")
-    resetConfigCache()
+    await resetConfig()
     const core = await import("../../engine/core")
     expect(core.getProvider()).toBe("azure")
   })
 
-  it("env vars override config.json for provider selection", async () => {
+  it("config.json is the sole source for provider selection", async () => {
     vi.resetModules()
-    // Config has no providers
-    process.env.OUROBOROS_CONFIG_PATH = "/tmp/test-config.json"
-    vi.mocked(fs.readFileSync).mockImplementation((p: any) => {
-      if (p === "/tmp/test-config.json") return JSON.stringify({})
-      return JSON.stringify({ name: "other" })
-    })
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax("config-mm-key", "config-mm-model")
 
-    // But env vars set minimax
-    process.env.MINIMAX_API_KEY = "env-mm-key"
-    process.env.MINIMAX_MODEL = "env-mm-model"
-
-    const { resetConfigCache } = await import("../../config")
-    resetConfigCache()
     const core = await import("../../engine/core")
-    expect(core.getModel()).toBe("env-mm-model")
+    expect(core.getModel()).toBe("config-mm-model")
     expect(core.getProvider()).toBe("minimax")
   })
 
   it("stripLastToolCalls pops trailing tool messages", async () => {
     vi.resetModules()
-    delete process.env.AZURE_OPENAI_API_KEY
-    process.env.MINIMAX_API_KEY = "test-key"
-    process.env.MINIMAX_MODEL = "test-model"
-    const { resetConfigCache } = await import("../../config")
-    resetConfigCache()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
     const { stripLastToolCalls } = await import("../../engine/core")
 
     const messages: any[] = [
@@ -2742,11 +2671,8 @@ describe("getClient config integration", () => {
 
   it("stripLastToolCalls removes empty assistant after stripping tool_calls", async () => {
     vi.resetModules()
-    delete process.env.AZURE_OPENAI_API_KEY
-    process.env.MINIMAX_API_KEY = "test-key"
-    process.env.MINIMAX_MODEL = "test-model"
-    const { resetConfigCache } = await import("../../config")
-    resetConfigCache()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
     const { stripLastToolCalls } = await import("../../engine/core")
 
     const messages: any[] = [
@@ -2763,11 +2689,8 @@ describe("getClient config integration", () => {
 
   it("stripLastToolCalls is a no-op when no trailing tools", async () => {
     vi.resetModules()
-    delete process.env.AZURE_OPENAI_API_KEY
-    process.env.MINIMAX_API_KEY = "test-key"
-    process.env.MINIMAX_MODEL = "test-model"
-    const { resetConfigCache } = await import("../../config")
-    resetConfigCache()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
     const { stripLastToolCalls } = await import("../../engine/core")
 
     const messages: any[] = [
@@ -2782,14 +2705,10 @@ describe("getClient config integration", () => {
 
   it("fires onError when tool loop limit is reached", async () => {
     vi.resetModules()
-    delete process.env.AZURE_OPENAI_API_KEY
-    process.env.MINIMAX_API_KEY = "test-key"
-    process.env.MINIMAX_MODEL = "test-model"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
 
     vi.mocked(fs.readFileSync).mockReturnValue("data")
-
-    const { resetConfigCache } = await import("../../config")
-    resetConfigCache()
 
     // Make every API call return a tool call (never text-only)
     mockCreate.mockReset()
@@ -2832,21 +2751,16 @@ describe("getClient config integration", () => {
     expect(callCount).toBe(core.MAX_TOOL_ROUNDS)
   })
 
-  it("exits when neither provider configured in config or env", async () => {
+  it("exits when neither provider configured in config", async () => {
     vi.resetModules()
-    process.env.OUROBOROS_CONFIG_PATH = "/tmp/test-config.json"
-    vi.mocked(fs.readFileSync).mockImplementation((p: any) => {
-      if (p === "/tmp/test-config.json") return JSON.stringify({})
-      return JSON.stringify({ name: "other" })
-    })
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    // Empty config -- no providers at all (defaults have empty strings)
+    await resetConfig()
 
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
     }) as any)
     const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
-
-    const { resetConfigCache } = await import("../../config")
-    resetConfigCache()
 
     try {
       const core = await import("../../engine/core")
@@ -2945,9 +2859,8 @@ describe("kick mechanism", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    delete process.env.AZURE_OPENAI_API_KEY
-    process.env.MINIMAX_API_KEY = "test-key"
-    process.env.MINIMAX_MODEL = "test-model"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
     mockCreate.mockReset()
     mockResponsesCreate.mockReset()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
@@ -3197,12 +3110,8 @@ describe("kick mechanism", () => {
 
   it("Azure: kick cleans up azureInput output items and forces rebuild on retry", async () => {
     vi.resetModules()
-    delete process.env.MINIMAX_API_KEY
-    delete process.env.MINIMAX_MODEL
-    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
-    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
-    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
-    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
 
     function makeResponsesStream(events: any[]) {
       return {
@@ -3257,10 +3166,7 @@ describe("kick mechanism", () => {
     expect(assistantMessages[0].content).toContain("I narrated instead of acting. Calling the tool now.")
     expect(assistantMessages[1].content).toBe("here is the answer")
 
-    delete process.env.AZURE_OPENAI_API_KEY
-    delete process.env.AZURE_OPENAI_ENDPOINT
-    delete process.env.AZURE_OPENAI_DEPLOYMENT
-    delete process.env.AZURE_OPENAI_MODEL_NAME
+    // config cleanup handled by resetConfigCache in beforeEach
   })
 })
 
@@ -3296,9 +3202,8 @@ describe("tool_choice required and final_answer", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    delete process.env.AZURE_OPENAI_API_KEY
-    process.env.MINIMAX_API_KEY = "test-key"
-    process.env.MINIMAX_MODEL = "test-model"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
     mockCreate.mockReset()
     mockResponsesCreate.mockReset()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
@@ -3333,12 +3238,8 @@ describe("tool_choice required and final_answer", () => {
 
   it("passes tool_choice: required in Azure createParams when toolChoiceRequired is true", async () => {
     vi.resetModules()
-    delete process.env.MINIMAX_API_KEY
-    delete process.env.MINIMAX_MODEL
-    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
-    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
-    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
-    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
 
     mockResponsesCreate.mockReturnValue(makeResponsesStream([
       { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "final_answer", arguments: "" } },
@@ -3361,10 +3262,7 @@ describe("tool_choice required and final_answer", () => {
     const params = mockResponsesCreate.mock.calls[0][0]
     expect(params.tool_choice).toBe("required")
 
-    delete process.env.AZURE_OPENAI_API_KEY
-    delete process.env.AZURE_OPENAI_ENDPOINT
-    delete process.env.AZURE_OPENAI_DEPLOYMENT
-    delete process.env.AZURE_OPENAI_MODEL_NAME
+    // config cleanup handled by resetConfigCache in beforeEach
   })
 
   it("includes final_answer tool in tools list when toolChoiceRequired is true", async () => {
@@ -3575,12 +3473,8 @@ describe("tool_choice required and final_answer", () => {
 
   it("Azure: mixed final_answer rejection pushes to azureInput", async () => {
     vi.resetModules()
-    delete process.env.MINIMAX_API_KEY
-    delete process.env.MINIMAX_MODEL
-    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
-    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
-    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
-    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
 
     vi.mocked(fs.readFileSync).mockReturnValue("file data")
 
@@ -3629,10 +3523,7 @@ describe("tool_choice required and final_answer", () => {
     const lastAssistant = [...messages].reverse().find((m: any) => m.role === "assistant")
     expect(lastAssistant.content).toBe("the real answer")
 
-    delete process.env.AZURE_OPENAI_API_KEY
-    delete process.env.AZURE_OPENAI_ENDPOINT
-    delete process.env.AZURE_OPENAI_DEPLOYMENT
-    delete process.env.AZURE_OPENAI_MODEL_NAME
+    // config cleanup handled by resetConfigCache in beforeEach
   })
 
   it("final_answer with invalid JSON arguments: falls back to result.content", async () => {
@@ -3766,9 +3657,8 @@ describe("integration: kick + tool_choice required combined", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    delete process.env.AZURE_OPENAI_API_KEY
-    process.env.MINIMAX_API_KEY = "test-key"
-    process.env.MINIMAX_MODEL = "test-model"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
     mockCreate.mockReset()
     mockResponsesCreate.mockReset()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
@@ -4183,9 +4073,8 @@ describe("confirmation system", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    delete process.env.AZURE_OPENAI_API_KEY
-    process.env.MINIMAX_API_KEY = "test-key"
-    process.env.MINIMAX_MODEL = "test-model"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
     mockCreate.mockReset()
     mockResponsesCreate.mockReset()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
@@ -4369,12 +4258,8 @@ describe("confirmation system", () => {
 
   it("Azure: confirmation denied pushes cancelled to azureInput", async () => {
     vi.resetModules()
-    delete process.env.MINIMAX_API_KEY
-    delete process.env.MINIMAX_MODEL
-    process.env.AZURE_OPENAI_API_KEY = "azure-test-key"
-    process.env.AZURE_OPENAI_ENDPOINT = "https://test.openai.azure.com"
-    process.env.AZURE_OPENAI_DEPLOYMENT = "test-deployment"
-    process.env.AZURE_OPENAI_MODEL_NAME = "gpt-5.2-chat"
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
 
     let callCount = 0
     mockResponsesCreate.mockImplementation(() => {
@@ -4414,10 +4299,7 @@ describe("confirmation system", () => {
     const cancelledItem = secondInput.find((i: any) => i.type === "function_call_output" && i.output?.includes("cancelled"))
     expect(cancelledItem).toBeDefined()
 
-    delete process.env.AZURE_OPENAI_API_KEY
-    delete process.env.AZURE_OPENAI_ENDPOINT
-    delete process.env.AZURE_OPENAI_DEPLOYMENT
-    delete process.env.AZURE_OPENAI_MODEL_NAME
+    // config cleanup handled by resetConfigCache in beforeEach
   })
 
   it("skipConfirmation bypasses confirmation for mutate tools", async () => {
@@ -4466,7 +4348,7 @@ describe("confirmation system", () => {
   })
 
   it("truncates tool output exceeding maxToolOutputChars", async () => {
-    process.env.OUROBOROS_MAX_TOOL_OUTPUT = "50"
+    await setupConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } }, context: { maxToolOutputChars: 50 } })
 
     const hugeOutput = "x".repeat(100)
     vi.mocked(fs.readFileSync).mockReturnValue(hugeOutput)
@@ -4501,7 +4383,5 @@ describe("confirmation system", () => {
     expect(toolMsg).toBeDefined()
     expect(toolMsg.content).toContain("output too large")
     expect(toolMsg.content).toContain("100 chars")
-
-    delete process.env.OUROBOROS_MAX_TOOL_OUTPUT
   })
 })
