@@ -242,7 +242,7 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 **Files**: `src/__tests__/channels/teams.test.ts`
 **Acceptance**: All teams tests pass. No process.env references remain.
 
-### ⬜ Unit 8e: Migrate remaining tools.test.ts to setTestConfig()
+### ✅ Unit 8e: Migrate remaining tools.test.ts to setTestConfig()
 **What**: Migrate any remaining process.env.* references in tools.test.ts not already handled in Unit 6a (23 total, some handled in 6a).
 **Files**: `src/__tests__/engine/tools.test.ts`
 **Acceptance**: All tools tests pass. No process.env references remain.
@@ -312,3 +312,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 11:05 Unit 8b complete: streaming.test.ts migrated 4 beforeEach blocks from process.env to setTestConfig, 64 tests pass
 - 2026-02-28 11:06 Unit 8c complete: prompt.test.ts already fully migrated in Unit 4a, no process.env references remain
 - 2026-02-28 11:07 Unit 8d complete: teams.test.ts all process.env references removed (CLIENT_ID, CLIENT_SECRET, TENANT_ID, PORT, AZURE_OPENAI_API_KEY, DISABLE_STREAMING), 112 tests pass
+- 2026-02-28 11:07 Unit 8e complete: tools.test.ts already fully migrated in Unit 6a, no process.env references remain
