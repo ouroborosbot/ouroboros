@@ -36,6 +36,16 @@ export interface ContextConfig {
   maxToolOutputChars: number
 }
 
+export interface TeamsChannelConfig {
+  skipConfirmation: boolean
+  disableStreaming: boolean
+  port: number
+}
+
+export interface IntegrationsConfig {
+  perplexityApiKey: string
+}
+
 export interface OuroborosConfig {
   providers: {
     azure: AzureProviderConfig
@@ -45,6 +55,8 @@ export interface OuroborosConfig {
   oauth: OAuthConfig
   ado: AdoConfig
   context: ContextConfig
+  teamsChannel: TeamsChannelConfig
+  integrations: IntegrationsConfig
 }
 
 const DEFAULT_CONFIG: OuroborosConfig = {
@@ -77,6 +89,14 @@ const DEFAULT_CONFIG: OuroborosConfig = {
     maxTokens: 80000,
     contextMargin: 20,
     maxToolOutputChars: 20000,
+  },
+  teamsChannel: {
+    skipConfirmation: false,
+    disableStreaming: false,
+    port: 3978,
+  },
+  integrations: {
+    perplexityApiKey: "",
   },
 }
 
@@ -190,6 +210,16 @@ export function getAdoConfig(): AdoConfig {
   }
 
   return a
+}
+
+export function getTeamsChannelConfig(): TeamsChannelConfig {
+  const config = loadConfig()
+  return { ...config.teamsChannel }
+}
+
+export function getIntegrationsConfig(): IntegrationsConfig {
+  const config = loadConfig()
+  return { ...config.integrations }
 }
 
 export function getSessionDir(): string {
