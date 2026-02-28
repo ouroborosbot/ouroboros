@@ -2,6 +2,7 @@ import OpenAI, { AzureOpenAI } from "openai";
 import { getAzureConfig, getMinimaxConfig, getContextConfig } from "../config";
 import { execTool, summarizeArgs, finalAnswerTool, getToolsForChannel } from "./tools";
 import type { ToolContext } from "./tools";
+import { confirmationRequired } from "./tools-teams";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
 import type { AssistantMessageWithReasoning, ResponseItem } from "./streaming";
 import { detectKick } from "./kicks";
@@ -80,6 +81,7 @@ export interface ChannelCallbacks {
   onToolEnd(name: string, summary: string, success: boolean): void;
   onError(error: Error): void;
   onKick?(attempt: number, maxKicks: number): void;
+  onConfirmAction?(name: string, args: Record<string, string>): Promise<"confirmed" | "denied">;
 }
 
 export interface RunAgentOptions {
@@ -326,6 +328,23 @@ export async function runAgent(
             /* ignore */
           }
           const argSummary = summarizeArgs(tc.name, args);
+          // Confirmation check for mutate tools
+          if (confirmationRequired.has(tc.name)) {
+            let decision: "confirmed" | "denied" = "denied";
+            if (callbacks.onConfirmAction) {
+              decision = await callbacks.onConfirmAction(tc.name, args);
+            }
+            if (decision !== "confirmed") {
+              const cancelled = "Action cancelled by user.";
+              callbacks.onToolStart(tc.name, args);
+              callbacks.onToolEnd(tc.name, argSummary, false);
+              messages.push({ role: "tool", tool_call_id: tc.id, content: cancelled });
+              if (azureInput) {
+                azureInput.push({ type: "function_call_output", call_id: tc.id, output: cancelled });
+              }
+              continue;
+            }
+          }
           callbacks.onToolStart(tc.name, args);
           let toolResult: string;
           let success: boolean;
