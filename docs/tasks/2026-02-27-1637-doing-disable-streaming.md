@@ -51,7 +51,7 @@ Add a `--disable-streaming` flag to `npm run teams` that buffers the final AI te
 ### Legend
 ⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
-### ⬜ Unit 1a: Buffered callbacks -- Tests
+### ✅ Unit 1a: Buffered callbacks -- Tests
 **What**: Write failing tests for `createTeamsCallbacks()` when `disableStreaming: true` is passed. Tests should verify:
 - `onTextChunk` accumulates text internally (does NOT call `stream.emit()`)
 - `onReasoningChunk` still calls `stream.update()` (not buffered)
