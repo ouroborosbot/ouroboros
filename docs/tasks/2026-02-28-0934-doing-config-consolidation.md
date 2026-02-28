@@ -176,7 +176,7 @@ Rewritten function: check `getProvider() === "azure"`, then use `getAzureConfig(
 **Files**: `src/mind/prompt.ts`
 **Acceptance**: All prompt.test.ts tests pass. No process.env references in prompt.ts.
 
-### ⬜ Unit 4c: prompt.ts providerSection -- Coverage
+### ✅ Unit 4c: prompt.ts providerSection -- Coverage
 **What**: Verify 100% coverage on providerSection. Both azure and minimax paths must be tested.
 **Files**: `src/__tests__/mind/prompt.test.ts`
 **Acceptance**: 100% coverage on providerSection, all tests green.
@@ -300,3 +300,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 10:43 Unit 3c complete: config.ts at 100% stmt/branch/func/line coverage
 - 2026-02-28 10:45 Unit 4a complete: prompt.test.ts migrated from env vars to setTestConfig, 2 azure tests fail (red)
 - 2026-02-28 10:46 Unit 4b complete: providerSection() uses getProvider/getAzureConfig, no process.env in prompt.ts
+- 2026-02-28 10:47 Unit 4c complete: prompt.ts at 100% coverage
