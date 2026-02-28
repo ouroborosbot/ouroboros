@@ -140,7 +140,7 @@ In `src/mind/context.ts`:
 - Update `cachedBuildSystem` cache key to include `disableStreaming` flag (e.g., append `:ds` when true)
 
 In `src/channels/teams.ts`:
-- Pass `disableStreaming` in the `runAgent()` options object in `handleTeamsMessage()` so it flows through to the system prompt
+- Pass `disableStreaming` in the `runAgent()` options object in `handleTeamsMessage()` so it flows through to the system prompt. Note: the current call `runAgent(..., toolContext ? { toolContext } : undefined)` must be refactored to always build the options object when either `toolContext` or `disableStreaming` is present (e.g., build an options object first, pass it or `undefined`)
 **Files**: `src/mind/prompt.ts`, `src/engine/core.ts`, `src/mind/context.ts`, `src/channels/teams.ts`
 **Acceptance**: All Unit 4a tests PASS (green), no warnings
 
@@ -186,3 +186,4 @@ In `src/channels/teams.ts`:
 - 2026-02-27 16:45 Pass 2 -- Granularity: tightened Unit 2b backward compat acceptance
 - 2026-02-27 16:45 Pass 3 -- Validation: verified file paths, function signatures, call sites against codebase; fixed flush() placement to go before AUTH_REQUIRED check
 - 2026-02-27 16:46 Pass 4 -- Quality: all units have acceptance criteria, emoji headers, no TBDs; set READY_FOR_EXECUTION
+- 2026-02-27 16:57 Added Units 4a-5c for system prompt flag awareness and rationale documentation; validated against prompt.ts, context.ts, core.ts; quality checked all 16 unit headers
