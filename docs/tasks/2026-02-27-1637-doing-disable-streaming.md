@@ -187,3 +187,4 @@ In `src/channels/teams.ts`:
 - 2026-02-27 16:45 Pass 3 -- Validation: verified file paths, function signatures, call sites against codebase; fixed flush() placement to go before AUTH_REQUIRED check
 - 2026-02-27 16:46 Pass 4 -- Quality: all units have acceptance criteria, emoji headers, no TBDs; set READY_FOR_EXECUTION
 - 2026-02-27 16:57 Added Units 4a-5c for system prompt flag awareness and rationale documentation; validated against prompt.ts, context.ts, core.ts; quality checked all 16 unit headers
+- 2026-02-27 17:02 Unit 1a complete: 13 failing tests for createTeamsCallbacks disableStreaming option (buffering, flush, stop-streaming, backward compat)
