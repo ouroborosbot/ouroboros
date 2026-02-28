@@ -260,7 +260,7 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 **Files**: `.env` (delete), `.gitignore` (remove .env line), `src/teams-entry.ts` (update comment)
 **Acceptance**: .env file gone. .gitignore no longer mentions .env. teams-entry.ts comment updated. All tests still pass.
 
-### ⬜ Unit 10: Final verification
+### ⬜ Unit 10a: Final verification
 **What**: Run full test suite, check coverage, run the grep verification command from completion criteria.
 **Output**: All tests pass, 100% coverage on new code, grep returns nothing.
 **Acceptance**:
@@ -268,6 +268,13 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - `npx vitest run --coverage` -- 100% on all files
 - `grep -r 'process\.env\.' src/ --include='*.ts' | grep -v '__tests__' | grep -v 'OUROBOROS_CONFIG_PATH' | grep -v 'process\.argv'` -- returns nothing
 - All 23 env var references from the manifest are gone
+
+### ⬜ Unit 10b: CLI smoke test
+**What**: Run the CLI adapter end-to-end to verify config loads correctly from config.json without any env vars. Launch `npx tsx src/cli-entry.ts`, send a test message, confirm the bot responds (provider initializes, model replies, no crashes). This catches any runtime issues that unit tests might miss (e.g. config not loading at startup, import order problems, missing fields in real config.json).
+**Acceptance**:
+- CLI starts without errors
+- Bot responds to a test prompt (proves provider config loaded from config.json)
+- No "process.env" or "env var" related warnings/errors in output
 
 ## Execution
 - **TDD strictly enforced**: tests -> red -> implement -> green -> refactor
