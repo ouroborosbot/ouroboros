@@ -91,6 +91,42 @@ describe("cachedBuildSystem", () => {
     expect(r2).toBe("tcr prompt")
     expect(buildFn).toHaveBeenCalledTimes(2)
   })
+
+  it("uses separate cache key when disableStreaming is true", async () => {
+    const { cachedBuildSystem, resetSystemPromptCache } = await import("../../mind/context")
+    resetSystemPromptCache()
+    const buildFn = vi.fn()
+      .mockReturnValueOnce("normal prompt")
+      .mockReturnValueOnce("ds prompt")
+
+    const r1 = cachedBuildSystem("teams", buildFn)
+    const r2 = cachedBuildSystem("teams", buildFn, { disableStreaming: true })
+
+    expect(r1).toBe("normal prompt")
+    expect(r2).toBe("ds prompt")
+    expect(buildFn).toHaveBeenCalledTimes(2)
+  })
+
+  it("cache key distinguishes toolChoiceRequired and disableStreaming combinations", async () => {
+    const { cachedBuildSystem, resetSystemPromptCache } = await import("../../mind/context")
+    resetSystemPromptCache()
+    const buildFn = vi.fn()
+      .mockReturnValueOnce("plain")
+      .mockReturnValueOnce("ds only")
+      .mockReturnValueOnce("tcr only")
+      .mockReturnValueOnce("both")
+
+    const r1 = cachedBuildSystem("teams", buildFn)
+    const r2 = cachedBuildSystem("teams", buildFn, { disableStreaming: true })
+    const r3 = cachedBuildSystem("teams", buildFn, { toolChoiceRequired: true })
+    const r4 = cachedBuildSystem("teams", buildFn, { toolChoiceRequired: true, disableStreaming: true })
+
+    expect(r1).toBe("plain")
+    expect(r2).toBe("ds only")
+    expect(r3).toBe("tcr only")
+    expect(r4).toBe("both")
+    expect(buildFn).toHaveBeenCalledTimes(4)
+  })
 })
 
 describe("trimMessages", () => {
