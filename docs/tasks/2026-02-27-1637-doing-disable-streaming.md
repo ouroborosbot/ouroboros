@@ -78,7 +78,7 @@ Add a `--disable-streaming` flag to `npm run teams` that buffers the final AI te
 **What**: Verify 100% coverage on `createTeamsCallbacks()` changes, refactor if needed
 **Acceptance**: 100% coverage on new code, tests still green
 
-### ⬜ Unit 2a: handleTeamsMessage threading -- Tests
+### ✅ Unit 2a: handleTeamsMessage threading -- Tests
 **What**: Write failing tests for `handleTeamsMessage()` when `disableStreaming: true` is passed. Tests should verify:
 - The `disableStreaming` flag is forwarded to `createTeamsCallbacks()`
 - After `runAgent()` completes, `flush()` is called on the callbacks
@@ -190,3 +190,4 @@ In `src/channels/teams.ts`:
 - 2026-02-27 17:02 Unit 1a complete: 13 failing tests for createTeamsCallbacks disableStreaming option (buffering, flush, stop-streaming, backward compat)
 - 2026-02-27 17:03 Unit 1b complete: implemented disableStreaming option with text buffering, flush(), TeamsCallbacksWithFlush type; all 662 tests pass
 - 2026-02-27 17:04 Unit 1c complete: 100% coverage on new code verified; uncovered lines 292-305,316-324 are existing startTeamsApp code
+- 2026-02-27 17:05 Unit 2a complete: 4 tests for handleTeamsMessage disableStreaming threading; 1 fails as expected (red)
