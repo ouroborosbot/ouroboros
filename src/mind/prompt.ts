@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { getModel } from "../engine/core";
-import { tools, finalAnswerTool } from "../engine/tools";
+import { finalAnswerTool, getToolsForChannel } from "../engine/tools";
 import { listSkills } from "../repertoire/skills";
 
 // Load psyche files at module scope (once, at startup)
@@ -88,8 +88,9 @@ function dateSection(): string {
   return `current date: ${today}`;
 }
 
-function toolsSection(options?: BuildSystemOptions): string {
-  const activeTools = options?.toolChoiceRequired ? [...tools, finalAnswerTool] : tools;
+function toolsSection(channel: Channel, options?: BuildSystemOptions): string {
+  const channelTools = getToolsForChannel(channel);
+  const activeTools = options?.toolChoiceRequired ? [...channelTools, finalAnswerTool] : channelTools;
   const list = activeTools
     .map((t) => `- ${t.function.name}: ${t.function.description}`)
     .join("\n");
@@ -146,7 +147,7 @@ export function buildSystem(channel: Channel = "cli", options?: BuildSystemOptio
     flagsSection(channel, options),
     providerSection(),
     dateSection(),
-    toolsSection(options),
+    toolsSection(channel, options),
     skillsSection(),
     toolBehaviorSection(options),
   ]
