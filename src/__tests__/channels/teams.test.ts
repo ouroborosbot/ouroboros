@@ -1765,3 +1765,141 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     expect(controller.signal.aborted).toBe(true)
   })
 })
+
+describe("Teams adapter - handleTeamsMessage with disableStreaming", () => {
+  beforeEach(() => {
+    delete process.env.AZURE_OPENAI_API_KEY
+  })
+
+  function mockTeamsDeps2(overrides: {
+    runAgentFn?: any
+    loadSessionReturn?: any
+    postTurnCalls?: any[][]
+    deleteSessionCalls?: string[]
+    parseSlashCommandFn?: any
+    dispatchFn?: any
+  } = {}) {
+    const {
+      runAgentFn = vi.fn().mockResolvedValue({ usage: undefined }),
+      loadSessionReturn = null,
+      postTurnCalls = [],
+      deleteSessionCalls = [],
+      parseSlashCommandFn = (() => null),
+      dispatchFn = (() => ({ handled: false })),
+    } = overrides
+
+    vi.doMock("../../engine/core", () => ({
+      runAgent: runAgentFn,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(loadSessionReturn),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn().mockImplementation((...args: any[]) => { deleteSessionCalls.push(args[0]) }),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("cached teams prompt"),
+      postTurn: vi.fn().mockImplementation((...args: any[]) => { postTurnCalls.push(args) }),
+    }))
+    vi.doMock("../../repertoire/commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockImplementation(dispatchFn),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockImplementation(parseSlashCommandFn),
+    }))
+  }
+
+  it("disableStreaming flag is forwarded to createTeamsCallbacks - text is buffered", async () => {
+    vi.resetModules()
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      // Simulate agent producing text chunks
+      callbacks.onTextChunk("Hello")
+      callbacks.onTextChunk(" world")
+      return { usage: undefined }
+    })
+    mockTeamsDeps2({ runAgentFn: mockRunAgent })
+
+    const teams = await import("../../channels/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("test", mockStream as any, "conv-123", undefined, true)
+
+    // Text should have been emitted once via flush() after runAgent completes (not twice via streaming)
+    const emitCalls = mockStream.emit.mock.calls.filter((c: any) => !c[0].startsWith("Error"))
+    expect(emitCalls).toHaveLength(1)
+    expect(emitCalls[0][0]).toBe("Hello world")
+  })
+
+  it("flush() is called after runAgent completes", async () => {
+    vi.resetModules()
+    let emitCalledDuringAgent = false
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      callbacks.onTextChunk("buffered text")
+      return { usage: undefined }
+    })
+    mockTeamsDeps2({ runAgentFn: mockRunAgent })
+
+    const teams = await import("../../channels/teams")
+    const mockStream = {
+      emit: vi.fn(),
+      update: vi.fn(),
+      close: vi.fn(),
+    }
+    await teams.handleTeamsMessage("test", mockStream as any, "conv-123", undefined, true)
+
+    // The emit should have been called (by flush after runAgent)
+    expect(mockStream.emit).toHaveBeenCalledWith("buffered text")
+  })
+
+  it("when disableStreaming is false/undefined, behavior is unchanged (no buffering)", async () => {
+    vi.resetModules()
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      callbacks.onTextChunk("Hello")
+      callbacks.onTextChunk(" world")
+      return { usage: undefined }
+    })
+    mockTeamsDeps2({ runAgentFn: mockRunAgent })
+
+    const teams = await import("../../channels/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("test", mockStream as any, "conv-123")
+
+    // Text emitted directly (not buffered), so two emit calls
+    const textEmits = mockStream.emit.mock.calls.filter((c: any) => !c[0].startsWith("Error"))
+    expect(textEmits).toHaveLength(2)
+    expect(textEmits[0][0]).toBe("Hello")
+    expect(textEmits[1][0]).toBe(" world")
+  })
+
+  it("slash command /new does NOT call flush (emits directly)", async () => {
+    vi.resetModules()
+    const deleteSessionCalls: string[] = []
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps2({
+      runAgentFn,
+      deleteSessionCalls,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => {
+        if (name === "new") return { handled: true, result: { action: "new" } }
+        return { handled: false }
+      },
+    })
+    const teams = await import("../../channels/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("/new", mockStream as any, "conv-123", undefined, true)
+
+    // Slash command emits directly, runAgent not called
+    expect(deleteSessionCalls.length).toBe(1)
+    expect(mockStream.emit).toHaveBeenCalledWith("session cleared")
+    expect(runAgentFn).not.toHaveBeenCalled()
+  })
+})
