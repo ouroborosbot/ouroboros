@@ -24,6 +24,8 @@ Add a `--disable-streaming` flag to `npm run teams` that buffers the final AI te
 - [ ] Error messages still emitted immediately via `stream.emit()`
 - [ ] Default behavior (no flag) is unchanged -- streaming works exactly as before
 - [ ] Console log at startup indicates streaming mode (e.g., "streaming: disabled")
+- [ ] System prompt tells ouroboros when streaming is disabled and why (flag awareness)
+- [ ] Rationale for `--disable-streaming` is documented in code comments (devtunnel limitations)
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -115,8 +117,58 @@ Add a `--disable-streaming` flag to `npm run teams` that buffers the final AI te
 **What**: Verify 100% coverage on `startTeamsApp()` changes, refactor if needed
 **Acceptance**: 100% coverage on new code, tests still green
 
-### ⬜ Unit 4: Full integration validation
-**What**: Run full test suite (`npm test`), verify 100% coverage (`npm run test:coverage`), verify build (`npm run build`), verify no warnings. Confirm all existing tests still pass unchanged.
+### ⬜ Unit 4a: System prompt flag awareness -- Tests
+**What**: Write failing tests for `buildSystem()` in `src/mind/prompt.ts` verifying that when `disableStreaming: true` is passed in options:
+- The system prompt includes a section explaining that streaming is disabled
+- The section mentions the reason: devtunnel relay buffering causes streaming to be slow
+- When `disableStreaming` is false/undefined, no streaming section appears in the prompt
+- The section only appears for the `"teams"` channel (not `"cli"`)
+- Test the `cachedBuildSystem` cache key includes the `disableStreaming` flag (so cached prompts with/without the flag don't collide)
+**Files**: `src/__tests__/mind/prompt.test.ts`, `src/__tests__/mind/context.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because `buildSystem` does not yet handle `disableStreaming`
+
+### ⬜ Unit 4b: System prompt flag awareness -- Implementation
+**What**: In `src/mind/prompt.ts`:
+- Add `disableStreaming?: boolean` to `BuildSystemOptions` interface
+- Add a new `flagsSection(channel, options)` function that returns a `## my flags` section when `disableStreaming` is true AND channel is `"teams"`. Content should tell ouroboros: streaming to Teams is disabled because devtunnel relay buffering makes SSE/chunked streaming extremely slow; responses are buffered and sent as one message; the user will not see incremental text output, only status updates
+- Include the section in `buildSystem()` output (between `selfAwareSection` and `providerSection`)
+
+In `src/engine/core.ts`:
+- Add `disableStreaming?: boolean` to `RunAgentOptions` interface (informational -- already flows to `cachedBuildSystem` via `options`)
+
+In `src/mind/context.ts`:
+- Update `cachedBuildSystem` cache key to include `disableStreaming` flag (e.g., append `:ds` when true)
+
+In `src/channels/teams.ts`:
+- Pass `disableStreaming` in the `runAgent()` options object in `handleTeamsMessage()` so it flows through to the system prompt
+**Files**: `src/mind/prompt.ts`, `src/engine/core.ts`, `src/mind/context.ts`, `src/channels/teams.ts`
+**Acceptance**: All Unit 4a tests PASS (green), no warnings
+
+### ⬜ Unit 4c: System prompt flag awareness -- Coverage & Refactor
+**What**: Verify 100% coverage on all prompt/context/options changes, refactor if needed
+**Acceptance**: 100% coverage on new code, tests still green
+
+### ⬜ Unit 5a: Rationale documentation -- Tests
+**What**: Write a test that verifies the `flagsSection()` output includes the key rationale points as code-level documentation:
+- Devtunnel nginx relay buffers responses (reference: microsoft/dev-tunnels#518)
+- 60-second hard timeout on web-forwarded connections
+- No HTTP/2 support on devtunnels.ms
+- Teams throttles streaming updates to 1 req/sec
+- Buffering avoids compounding latency through a known-slow tunnel
+**Files**: `src/__tests__/mind/prompt.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because `flagsSection` does not yet include the rationale detail
+
+### ⬜ Unit 5b: Rationale documentation -- Implementation
+**What**: Update the `flagsSection()` function in `src/mind/prompt.ts` to include the rationale in the system prompt text. Also add a code comment block at the top of the `flagsSection` function documenting the research findings (devtunnel limitations, Teams throttling, the GitHub issue reference). The system prompt text should be concise but informative for the agent; the code comment should be detailed for developers.
+**Files**: `src/mind/prompt.ts`
+**Acceptance**: All Unit 5a tests PASS (green), no warnings
+
+### ⬜ Unit 5c: Rationale documentation -- Coverage & Refactor
+**What**: Verify 100% coverage on rationale additions, refactor if needed
+**Acceptance**: 100% coverage on new code, tests still green
+
+### ⬜ Unit 6: Full integration validation
+**What**: Run full test suite (`npm test`), verify 100% coverage (`npm run test:coverage`), verify build (`npm run build`), verify no warnings. Confirm all existing tests still pass unchanged. Verify that the system prompt contains the flags section when `disableStreaming` is active.
 **Output**: Clean test run, coverage report showing 100% on all modified files
 **Acceptance**: All tests pass, no warnings, 100% coverage on new code, build succeeds
 
