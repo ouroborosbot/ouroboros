@@ -1629,3 +1629,139 @@ describe("Teams adapter - session persistence", () => {
     expect(runAgentFn).toHaveBeenCalled()
   })
 })
+
+describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
+  let mockStream: { emit: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> }
+  let controller: AbortController
+
+  beforeEach(() => {
+    mockStream = {
+      emit: vi.fn(),
+      update: vi.fn(),
+      close: vi.fn(),
+    }
+    controller = new AbortController()
+  })
+
+  it("onTextChunk buffers text instead of calling stream.emit() when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, { disableStreaming: true })
+    callbacks.onTextChunk("Hello")
+    callbacks.onTextChunk(" world")
+    // Text should NOT be emitted yet (buffered internally)
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  it("onReasoningChunk still calls stream.update() when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, { disableStreaming: true })
+    callbacks.onReasoningChunk("analyzing")
+    expect(mockStream.update).toHaveBeenCalledWith("analyzing")
+  })
+
+  it("onModelStart still calls stream.update() with thinking phrases when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, { disableStreaming: true })
+    callbacks.onModelStart()
+    expect(mockStream.update).toHaveBeenCalled()
+    const calledWith = mockStream.update.mock.calls[0][0] as string
+    expect(calledWith).toMatch(/\.\.\.$/)
+    // Clean up timer
+    callbacks.onTextChunk("done")
+  })
+
+  it("onToolStart still calls stream.update() when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, { disableStreaming: true })
+    callbacks.onToolStart("read_file", { path: "test.txt" })
+    expect(mockStream.update).toHaveBeenCalledWith("running read_file (test.txt)...")
+  })
+
+  it("onToolEnd still calls stream.update() when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, { disableStreaming: true })
+    callbacks.onToolEnd("read_file", "test.txt", true)
+    expect(mockStream.update).toHaveBeenCalledWith("test.txt")
+  })
+
+  it("onError still calls stream.emit() immediately when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, { disableStreaming: true })
+    callbacks.onError(new Error("something broke"))
+    expect(mockStream.emit).toHaveBeenCalledWith("Error: something broke")
+  })
+
+  it("flush() emits entire buffered text as a single stream.emit() call", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, { disableStreaming: true })
+    callbacks.onTextChunk("Hello")
+    callbacks.onTextChunk(" world")
+    callbacks.onTextChunk("!")
+    expect(mockStream.emit).not.toHaveBeenCalled()
+    callbacks.flush()
+    expect(mockStream.emit).toHaveBeenCalledTimes(1)
+    expect(mockStream.emit).toHaveBeenCalledWith("Hello world!")
+  })
+
+  it("flush() with empty buffer does not call stream.emit()", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, { disableStreaming: true })
+    callbacks.flush()
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  it("when disableStreaming is false, onTextChunk emits directly (no buffering)", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, { disableStreaming: false })
+    callbacks.onTextChunk("Hello")
+    expect(mockStream.emit).toHaveBeenCalledWith("Hello")
+  })
+
+  it("when disableStreaming is undefined, behavior is identical to current (no buffering)", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onTextChunk("Hello")
+    expect(mockStream.emit).toHaveBeenCalledWith("Hello")
+  })
+
+  it("flush() exists and is a no-op when disableStreaming is false", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, { disableStreaming: false })
+    callbacks.onTextChunk("Hello")
+    mockStream.emit.mockClear()
+    callbacks.flush()
+    // flush() should not emit anything extra when not buffering
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  it("stop-streaming (403) still works when disableStreaming is true: emit error aborts controller", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    // flush() will trigger the emit which throws 403
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, { disableStreaming: true })
+    callbacks.onTextChunk("data")
+    mockStream.emit.mockImplementation(() => { throw new Error("403 Forbidden") })
+    callbacks.flush()
+    expect(controller.signal.aborted).toBe(true)
+  })
+
+  it("stop-streaming (403) via update still aborts when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    mockStream.update.mockImplementation(() => { throw new Error("403 Forbidden") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, { disableStreaming: true })
+    callbacks.onToolStart("read_file", { path: "test.txt" })
+    expect(controller.signal.aborted).toBe(true)
+  })
+})
