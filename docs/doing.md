@@ -2,7 +2,7 @@
 
 **Status**: drafting
 **Execution Mode**: direct
-**Created**: (pending commit)
+**Created**: 2026-02-28 10:28
 **Planning**: ./tasks/2026-02-28-0934-planning-config-consolidation.md
 **Artifacts**: ./doing-config-consolidation/
 
@@ -149,16 +149,35 @@ Every config getter in config.ts reads config.json then checks process.env.* as 
 **Files**: `src/engine/core.ts`, `src/__tests__/engine/core.test.ts`
 **Acceptance**: Error message updated. Any tests asserting on this message updated to match. All tests pass.
 
-### ⬜ Unit 8: Migrate remaining test files to setTestConfig()
-**What**: Migrate all remaining process.env.* manipulation in test files to setTestConfig() calls:
-- `src/__tests__/engine/core.test.ts` (~185 process.env references)
-- `src/__tests__/engine/streaming.test.ts` (8 process.env references)
-- `src/__tests__/mind/prompt.test.ts` (any remaining after Unit 4a)
-- `src/__tests__/channels/teams.test.ts` (any remaining after Unit 5a)
-- `src/__tests__/engine/tools.test.ts` (any remaining after Unit 6a)
-- `src/__tests__/config.test.ts` (any remaining after Unit 3a, except OUROBOROS_CONFIG_PATH tests)
-**Files**: All test files listed above.
-**Acceptance**: All tests pass. Only OUROBOROS_CONFIG_PATH references remain in test process.env usage.
+### ⬜ Unit 8a: Migrate core.test.ts to setTestConfig()
+**What**: Migrate all process.env.* manipulation in core.test.ts (~185 references) to setTestConfig() calls. This is the largest test file. Replace env var setup/teardown blocks with setTestConfig + resetConfigCache patterns.
+**Files**: `src/__tests__/engine/core.test.ts`
+**Acceptance**: All core tests pass. No process.env references remain except OUROBOROS_CONFIG_PATH.
+
+### ⬜ Unit 8b: Migrate streaming.test.ts to setTestConfig()
+**What**: Migrate all process.env.* manipulation in streaming.test.ts (8 references, 4 blocks of MINIMAX env var setup) to setTestConfig() calls.
+**Files**: `src/__tests__/engine/streaming.test.ts`
+**Acceptance**: All streaming tests pass. No process.env references remain.
+
+### ⬜ Unit 8c: Migrate remaining prompt.test.ts to setTestConfig()
+**What**: Migrate any remaining process.env.* references in prompt.test.ts that were not already handled in Unit 4a (~26 total, some handled in 4a).
+**Files**: `src/__tests__/mind/prompt.test.ts`
+**Acceptance**: All prompt tests pass. No process.env references remain.
+
+### ⬜ Unit 8d: Migrate remaining teams.test.ts to setTestConfig()
+**What**: Migrate any remaining process.env.* references in teams.test.ts that were not already handled in Unit 5a (~47 total, some handled in 5a).
+**Files**: `src/__tests__/channels/teams.test.ts`
+**Acceptance**: All teams tests pass. No process.env references remain.
+
+### ⬜ Unit 8e: Migrate remaining tools.test.ts to setTestConfig()
+**What**: Migrate any remaining process.env.* references in tools.test.ts that were not already handled in Unit 6a (~23 total, some handled in 6a).
+**Files**: `src/__tests__/engine/tools.test.ts`
+**Acceptance**: All tools tests pass. No process.env references remain.
+
+### ⬜ Unit 8f: Migrate remaining config.test.ts to setTestConfig()
+**What**: Migrate any remaining process.env.* references in config.test.ts that were not already handled in Unit 3a (~20 total, some handled in 3a). OUROBOROS_CONFIG_PATH tests keep their process.env usage (that env var is intentionally kept).
+**Files**: `src/__tests__/config.test.ts`
+**Acceptance**: All config tests pass. Only OUROBOROS_CONFIG_PATH process.env references remain.
 
 ### ⬜ Unit 9: Cleanup -- delete .env, update comments
 **What**: Delete the .env file. Update teams-entry.ts line 5 comment from "with env var overrides" to remove that phrase. Verify no other comments reference env var configuration.
@@ -182,3 +201,4 @@ Every config getter in config.ts reads config.json then checks process.env.* as 
 - **Decisions made**: Update docs immediately, commit right away
 
 ## Progress Log
+- 2026-02-28 10:28 Created from planning doc (Pass 1 -- first draft)
