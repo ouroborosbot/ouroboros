@@ -1903,3 +1903,205 @@ describe("Teams adapter - handleTeamsMessage with disableStreaming", () => {
     expect(runAgentFn).not.toHaveBeenCalled()
   })
 })
+
+describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
+  let savedArgv: string[]
+
+  beforeEach(() => {
+    savedArgv = [...process.argv]
+  })
+
+  afterEach(() => {
+    process.argv = savedArgv
+    delete process.env.CLIENT_ID
+    delete process.env.CLIENT_SECRET
+    delete process.env.TENANT_ID
+    delete process.env.PORT
+  })
+
+  it("when --disable-streaming is in argv, threads disableStreaming to handleTeamsMessage", async () => {
+    vi.resetModules()
+    delete process.env.CLIENT_ID
+    process.argv = ["node", "teams-entry.ts", "--disable-streaming"]
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      callbacks.onTextChunk("Hello")
+      callbacks.onTextChunk(" world")
+      return { usage: undefined }
+    })
+    vi.doMock("../../engine/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+      postTurn: vi.fn(),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../channels/teams")
+    teams.startTeamsApp()
+
+    expect(capturedHandler).not.toBeNull()
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: { text: "hello" },
+    })
+
+    // With --disable-streaming, two text chunks should be buffered and emitted as ONE call via flush()
+    const textEmits = mockStream.emit.mock.calls.filter((c: any) => !c[0].startsWith("Error"))
+    expect(textEmits).toHaveLength(1)
+    expect(textEmits[0][0]).toBe("Hello world")
+
+    vi.restoreAllMocks()
+  })
+
+  it("logs 'streaming: disabled' at startup when --disable-streaming is present", async () => {
+    vi.resetModules()
+    delete process.env.CLIENT_ID
+    process.argv = ["node", "teams-entry.ts", "--disable-streaming"]
+
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../engine/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../channels/teams")
+    teams.startTeamsApp()
+
+    const logCalls = consoleSpy.mock.calls.map((c: any) => c[0])
+    expect(logCalls.some((msg: string) => msg.includes("streaming: disabled"))).toBe(true)
+
+    consoleSpy.mockRestore()
+    vi.restoreAllMocks()
+  })
+
+  it("when --disable-streaming is NOT in argv, handleTeamsMessage is called without disableStreaming", async () => {
+    vi.resetModules()
+    delete process.env.CLIENT_ID
+    process.argv = ["node", "teams-entry.ts"]
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      callbacks.onTextChunk("Hello")
+      callbacks.onTextChunk(" world")
+      return { usage: undefined }
+    })
+    vi.doMock("../../engine/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+      postTurn: vi.fn(),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../channels/teams")
+    teams.startTeamsApp()
+
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: { text: "hello" },
+    })
+
+    // Without --disable-streaming, text should be streamed directly (two emits)
+    const textEmits = mockStream.emit.mock.calls.filter((c: any) => !c[0].startsWith("Error"))
+    expect(textEmits).toHaveLength(2)
+    expect(textEmits[0][0]).toBe("Hello")
+    expect(textEmits[1][0]).toBe(" world")
+
+    vi.restoreAllMocks()
+  })
+
+  it("does NOT log 'streaming: disabled' when flag is absent", async () => {
+    vi.resetModules()
+    delete process.env.CLIENT_ID
+    process.argv = ["node", "teams-entry.ts"]
+
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../engine/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../channels/teams")
+    teams.startTeamsApp()
+
+    const logCalls = consoleSpy.mock.calls.map((c: any) => c[0])
+    expect(logCalls.some((msg: string) => msg.includes("streaming: disabled"))).toBe(false)
+
+    consoleSpy.mockRestore()
+    vi.restoreAllMocks()
+  })
+})
