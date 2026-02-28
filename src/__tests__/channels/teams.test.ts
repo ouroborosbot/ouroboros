@@ -2422,3 +2422,200 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
     vi.restoreAllMocks()
   })
 })
+
+describe("Teams adapter - confirmation callback", () => {
+  beforeEach(() => {
+    delete process.env.AZURE_OPENAI_API_KEY
+  })
+
+  function mockTeamsDepsForConfirmation(overrides: {
+    runAgentFn?: any
+    loadSessionReturn?: any
+  } = {}) {
+    const {
+      runAgentFn = vi.fn().mockResolvedValue({ usage: undefined }),
+      loadSessionReturn = null,
+    } = overrides
+
+    vi.doMock("../../engine/core", () => ({
+      runAgent: runAgentFn,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(loadSessionReturn),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("cached teams prompt"),
+      postTurn: vi.fn(),
+    }))
+    vi.doMock("../../repertoire/commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockReturnValue({ handled: false }),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockReturnValue(null),
+    }))
+  }
+
+  it("onConfirmAction sends descriptive message via stream.update", async () => {
+    vi.resetModules()
+
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      if (callbacks.onConfirmAction) {
+        // Start confirmation but don't await -- we'll resolve it after checking the update
+        const confirmPromise = callbacks.onConfirmAction("graph_mutate", { method: "POST", path: "/me/sendMail" })
+        // Resolve it immediately so the test can finish
+        // Use resolvePendingConfirmation to resolve it
+        const teams = await import("../../channels/teams")
+        teams.resolvePendingConfirmation("conv-desc-1", "no")
+        await confirmPromise
+      }
+      return { usage: undefined }
+    })
+
+    mockTeamsDepsForConfirmation({ runAgentFn: mockRunAgent })
+
+    const teams = await import("../../channels/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    await teams.handleTeamsMessage("do something", mockStream as any, "conv-desc-1", {
+      graphToken: "token",
+      adoToken: undefined,
+      signin: vi.fn(),
+    })
+
+    // The confirmation prompt should have been sent via stream.update
+    const updateCalls = mockStream.update.mock.calls.map((c: any) => c[0] as string)
+    const confirmMsg = updateCalls.find((msg: string) => msg.includes("graph_mutate") || msg.includes("Confirm"))
+    expect(confirmMsg).toBeDefined()
+  })
+
+  it("'yes' response resolves confirmed", async () => {
+    vi.resetModules()
+
+    let confirmPromise: Promise<"confirmed" | "denied"> | null = null
+
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      if (callbacks.onConfirmAction) {
+        confirmPromise = callbacks.onConfirmAction("graph_mutate", { method: "POST", path: "/me/sendMail" })
+      }
+      return { usage: undefined }
+    })
+
+    mockTeamsDepsForConfirmation({ runAgentFn: mockRunAgent })
+
+    const teams = await import("../../channels/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    // Start the first message (which triggers the confirmation)
+    const firstMsg = teams.handleTeamsMessage("do something", mockStream as any, "conv-confirm-yes", {
+      graphToken: "token",
+      adoToken: undefined,
+      signin: vi.fn(),
+    })
+
+    // Wait a tick for the first message to start running
+    await new Promise(r => setTimeout(r, 50))
+
+    // Send "yes" as the next message in the same conversation
+    const secondMsg = teams.handleTeamsMessage("yes", mockStream as any, "conv-confirm-yes", {
+      graphToken: "token",
+      adoToken: undefined,
+      signin: vi.fn(),
+    })
+
+    await Promise.all([firstMsg, secondMsg])
+
+    // The confirmation should have resolved as "confirmed"
+    expect(confirmPromise).not.toBeNull()
+    const result = await confirmPromise!
+    expect(result).toBe("confirmed")
+  })
+
+  it("'no' response resolves denied", async () => {
+    vi.resetModules()
+
+    let confirmPromise: Promise<"confirmed" | "denied"> | null = null
+
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      if (callbacks.onConfirmAction) {
+        confirmPromise = callbacks.onConfirmAction("graph_mutate", { method: "DELETE", path: "/me/messages/1" })
+      }
+      return { usage: undefined }
+    })
+
+    mockTeamsDepsForConfirmation({ runAgentFn: mockRunAgent })
+
+    const teams = await import("../../channels/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const firstMsg = teams.handleTeamsMessage("delete my email", mockStream as any, "conv-confirm-no", {
+      graphToken: "token",
+      adoToken: undefined,
+      signin: vi.fn(),
+    })
+
+    await new Promise(r => setTimeout(r, 50))
+
+    const secondMsg = teams.handleTeamsMessage("no", mockStream as any, "conv-confirm-no", {
+      graphToken: "token",
+      adoToken: undefined,
+      signin: vi.fn(),
+    })
+
+    await Promise.all([firstMsg, secondMsg])
+
+    expect(confirmPromise).not.toBeNull()
+    const result = await confirmPromise!
+    expect(result).toBe("denied")
+  })
+
+  it("unrelated message resolves denied", async () => {
+    vi.resetModules()
+
+    let confirmPromise: Promise<"confirmed" | "denied"> | null = null
+
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      if (callbacks.onConfirmAction) {
+        confirmPromise = callbacks.onConfirmAction("ado_mutate", { method: "PATCH", organization: "myorg", path: "/_apis/wit/workitems/1" })
+      }
+      return { usage: undefined }
+    })
+
+    mockTeamsDepsForConfirmation({ runAgentFn: mockRunAgent })
+
+    const teams = await import("../../channels/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const firstMsg = teams.handleTeamsMessage("update work item", mockStream as any, "conv-confirm-other", {
+      graphToken: undefined,
+      adoToken: "token",
+      signin: vi.fn(),
+    })
+
+    await new Promise(r => setTimeout(r, 50))
+
+    const secondMsg = teams.handleTeamsMessage("something else entirely", mockStream as any, "conv-confirm-other", {
+      graphToken: undefined,
+      adoToken: "token",
+      signin: vi.fn(),
+    })
+
+    await Promise.all([firstMsg, secondMsg])
+
+    expect(confirmPromise).not.toBeNull()
+    const result = await confirmPromise!
+    expect(result).toBe("denied")
+  })
+})
