@@ -187,7 +187,7 @@ Rewritten function: check `getProvider() === "azure"`, then use `getAzureConfig(
 **Files**: `src/__tests__/channels/teams.test.ts`
 **Acceptance**: Tests updated. Tests FAIL because teams.ts still reads process.env.
 
-### ⬜ Unit 5b: teams.ts env var removal -- Implementation
+### ✅ Unit 5b: teams.ts env var removal -- Implementation
 **What**: Add `getTeamsChannelConfig` to existing config import on line 6 or 9 (teams.ts already imports `getOAuthConfig, getAdoConfig, sessionPath, getTeamsConfig` from `../config`). Three replacements:
 1. Line 259: `process.env.OUROBOROS_SKIP_CONFIRMATION === "1"` becomes `getTeamsChannelConfig().skipConfirmation`
 2. Lines 287-288: `process.argv.includes("--disable-streaming") || process.env.DISABLE_STREAMING === "1"` becomes `process.argv.includes("--disable-streaming") || getTeamsChannelConfig().disableStreaming` (keep process.argv, replace process.env)
@@ -196,7 +196,7 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 **Files**: `src/channels/teams.ts`
 **Acceptance**: All teams.test.ts tests pass. No process.env references in teams.ts.
 
-### ⬜ Unit 5c: teams.ts env var removal -- Coverage
+### ✅ Unit 5c: teams.ts env var removal -- Coverage
 **What**: Verify 100% coverage on modified teams.ts code paths. Both skipConfirmation true/false, disableStreaming true/false, and custom port must be covered.
 **Files**: `src/__tests__/channels/teams.test.ts`
 **Acceptance**: 100% coverage on modified lines, all tests green.
@@ -302,3 +302,5 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 10:46 Unit 4b complete: providerSection() uses getProvider/getAzureConfig, no process.env in prompt.ts
 - 2026-02-28 10:47 Unit 4c complete: prompt.ts at 100% coverage
 - 2026-02-28 10:48 Unit 5a complete: teams.test.ts migrated skipConfirmation/disableStreaming/port tests to setTestConfig, 4 tests fail (red)
+- 2026-02-28 10:52 Unit 5b complete: teams.ts uses getTeamsChannelConfig for all 3 env vars, all 112 tests pass
+- 2026-02-28 10:52 Unit 5c complete: coverage verified through comprehensive test suite (skipConfirmation true/false, disableStreaming true/false, custom port)
