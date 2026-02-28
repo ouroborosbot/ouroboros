@@ -2,6 +2,7 @@ import type OpenAI from "openai";
 import * as fs from "fs";
 import { execSync, spawnSync } from "child_process";
 import { listSkills, loadSkill } from "../repertoire/skills";
+import { getIntegrationsConfig } from "../config";
 
 export interface ToolContext {
   graphToken?: string;
@@ -219,8 +220,8 @@ export const baseToolHandlers: Record<string, ToolHandler> = {
   },
   web_search: async (a) => {
     try {
-      const key = process.env.PERPLEXITY_API_KEY;
-      if (!key) return "error: PERPLEXITY_API_KEY not set";
+      const key = getIntegrationsConfig().perplexityApiKey;
+      if (!key) return "error: perplexityApiKey not configured in config.json";
       const res = await fetch("https://api.perplexity.ai/search", {
         method: "POST",
         headers: {
