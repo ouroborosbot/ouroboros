@@ -16,7 +16,9 @@ export interface UsageData {
 const _promptCache = new Map<string, { value: string; timestamp: number }>()
 
 export function cachedBuildSystem(channel: Channel, buildFn: (ch: Channel, opts?: BuildSystemOptions) => string, options?: BuildSystemOptions): string {
-  const cacheKey = options?.toolChoiceRequired ? `${channel}:tcr` : channel
+  let cacheKey = channel as string
+  if (options?.toolChoiceRequired) cacheKey += ":tcr"
+  if (options?.disableStreaming) cacheKey += ":ds"
   const cached = _promptCache.get(cacheKey)
   const now = Date.now()
   if (cached && now - cached.timestamp < 60000) {
