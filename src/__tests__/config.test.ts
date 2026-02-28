@@ -567,3 +567,112 @@ describe("getAdoConfig", () => {
     expect(ado.organizations).toEqual([])
   })
 })
+
+describe("getTeamsChannelConfig", () => {
+  beforeEach(async () => {
+    vi.resetModules()
+  })
+
+  it("returns default teamsChannel config when not specified", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { getTeamsChannelConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const tc = getTeamsChannelConfig()
+
+    expect(tc.skipConfirmation).toBe(false)
+    expect(tc.disableStreaming).toBe(false)
+    expect(tc.port).toBe(3978)
+  })
+
+  it("returns teamsChannel config from config.json", async () => {
+    const configData = {
+      teamsChannel: {
+        skipConfirmation: true,
+        disableStreaming: true,
+        port: 4000,
+      },
+    }
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(configData))
+
+    const { getTeamsChannelConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const tc = getTeamsChannelConfig()
+
+    expect(tc.skipConfirmation).toBe(true)
+    expect(tc.disableStreaming).toBe(true)
+    expect(tc.port).toBe(4000)
+  })
+
+  it("returns a shallow copy (not the same reference)", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { getTeamsChannelConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const tc1 = getTeamsChannelConfig()
+    const tc2 = getTeamsChannelConfig()
+
+    expect(tc1).toEqual(tc2)
+    expect(tc1).not.toBe(tc2)
+  })
+
+  it("merges partial teamsChannel config with defaults", async () => {
+    const configData = {
+      teamsChannel: {
+        port: 5000,
+      },
+    }
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(configData))
+
+    const { getTeamsChannelConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const tc = getTeamsChannelConfig()
+
+    expect(tc.skipConfirmation).toBe(false)
+    expect(tc.disableStreaming).toBe(false)
+    expect(tc.port).toBe(5000)
+  })
+})
+
+describe("getIntegrationsConfig", () => {
+  beforeEach(async () => {
+    vi.resetModules()
+  })
+
+  it("returns default integrations config when not specified", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { getIntegrationsConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const ic = getIntegrationsConfig()
+
+    expect(ic.perplexityApiKey).toBe("")
+  })
+
+  it("returns integrations config from config.json", async () => {
+    const configData = {
+      integrations: {
+        perplexityApiKey: "pplx-key-123",
+      },
+    }
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(configData))
+
+    const { getIntegrationsConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const ic = getIntegrationsConfig()
+
+    expect(ic.perplexityApiKey).toBe("pplx-key-123")
+  })
+
+  it("returns a shallow copy (not the same reference)", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { getIntegrationsConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const ic1 = getIntegrationsConfig()
+    const ic2 = getIntegrationsConfig()
+
+    expect(ic1).toEqual(ic2)
+    expect(ic1).not.toBe(ic2)
+  })
+})
