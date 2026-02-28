@@ -26,18 +26,35 @@ export function stripMentions(text: string): string {
   return text.replace(/<at>[^<]*<\/at>/g, "").trim()
 }
 
+// Options for createTeamsCallbacks controlling streaming behavior.
+export interface TeamsCallbackOptions {
+  disableStreaming?: boolean
+}
+
+// Extended callbacks type that includes flush() for buffered streaming mode.
+export type TeamsCallbacksWithFlush = ChannelCallbacks & { flush(): void }
+
 // Create Teams-specific callbacks for the agent loop.
 // The SDK handles cumulative text, debouncing (500ms), and the streaming
 // protocol (streamSequence, streamId, informative/streaming/final types).
 // We just send deltas and let the SDK do the rest.
+//
+// When disableStreaming is true, onTextChunk buffers text internally instead
+// of calling stream.emit(). Call flush() after the agent loop to emit the
+// entire buffer as a single stream.emit() call. Status updates (stream.update)
+// still fire normally. This is useful when the devtunnel relay buffers
+// responses, causing chunked streaming to be extremely slow.
 export function createTeamsCallbacks(
   stream: TeamsStream,
   controller: AbortController,
-): ChannelCallbacks {
+  options?: TeamsCallbackOptions,
+): TeamsCallbacksWithFlush {
+  const buffered = options?.disableStreaming === true
   let stopped = false // set when stream signals cancellation (403)
   let hadToolRun = false
   let hadRealOutput = false // true once reasoning/tool output shown; suppresses phrases
   let reasoningBuf = "" // accumulated reasoning text for status display
+  let textBuffer = "" // accumulated text output when disableStreaming is true
   let phraseTimer: NodeJS.Timeout | null = null
   let lastPhrase = ""
 
@@ -100,7 +117,11 @@ export function createTeamsCallbacks(
     onTextChunk: (text: string) => {
       if (stopped) return
       stopPhraseRotation()
-      safeEmit(text)
+      if (buffered) {
+        textBuffer += text
+      } else {
+        safeEmit(text)
+      }
     },
     onToolStart: (name: string, args: Record<string, string>) => {
       stopPhraseRotation()
@@ -121,6 +142,12 @@ export function createTeamsCallbacks(
       stopPhraseRotation()
       if (stopped) return
       safeEmit(`Error: ${error.message}`)
+    },
+    flush: () => {
+      if (textBuffer) {
+        safeEmit(textBuffer)
+        textBuffer = ""
+      }
     },
   }
 }
