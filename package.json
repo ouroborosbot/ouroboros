@@ -8,6 +8,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "teams": "tsc && node dist/teams-entry.js",
+    "teams:no-stream": "tsc && node dist/teams-entry.js --disable-streaming",
     "manifest:package": "cd manifest && zip -r ../manifest.zip manifest.json color.png outline.png"
   },
   "dependencies": {

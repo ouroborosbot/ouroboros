@@ -243,7 +243,11 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
 // Supports --disable-streaming CLI flag to buffer text output instead of streaming it.
 // Rationale: devtunnel nginx relay buffers chunked responses, causing compounding latency.
 export function startTeamsApp(): void {
+  // npm run teams:no-stream  → passes --disable-streaming via process.argv
+  // npm run teams -- --disable-streaming → also works via process.argv
+  // DISABLE_STREAMING=1 npm run teams → works via env var
   const disableStreaming = process.argv.includes("--disable-streaming")
+    || process.env.DISABLE_STREAMING === "1"
   const mentionStripping = { activity: { mentions: { stripText: true as const } } }
   const teamsConfig = getTeamsConfig()
 
@@ -338,6 +342,5 @@ export function startTeamsApp(): void {
 
   const port = parseInt(process.env.PORT || "3978", 10)
   app.start(port)
-  console.log(`Teams bot started on port ${port} with ${mode}`)
-  if (disableStreaming) console.log("streaming: disabled")
+  console.log(`Teams bot started on port ${port} with ${mode} (streaming: ${disableStreaming ? "disabled" : "enabled"})`)
 }

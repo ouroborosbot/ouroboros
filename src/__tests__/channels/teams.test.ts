@@ -781,6 +781,48 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     vi.restoreAllMocks()
   })
 
+  it("message handler catches non-Error thrown values", async () => {
+    vi.resetModules()
+    delete process.env.CLIENT_ID
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    vi.doMock("../../engine/core", () => ({
+      runAgent: vi.fn().mockRejectedValue("string-crash"),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const teams = await import("../../channels/teams")
+    teams.startTeamsApp()
+
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await expect(capturedHandler!({
+      stream: mockStream,
+      activity: { text: "test" },
+    })).resolves.not.toThrow()
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("string-crash"))
+
+    vi.restoreAllMocks()
+  })
+
   it("signin wrapper catches errors and returns undefined", async () => {
     vi.resetModules()
     delete process.env.CLIENT_ID
@@ -848,6 +890,133 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     vi.restoreAllMocks()
   })
 
+  it("signin wrapper logs 'no token' when signin returns falsy", async () => {
+    vi.resetModules()
+    delete process.env.CLIENT_ID
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
+    vi.doMock("../../engine/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+      postTurn: vi.fn(),
+    }))
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../channels/teams")
+    teams.startTeamsApp()
+
+    const mockSignin = vi.fn().mockResolvedValue(undefined)
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: {
+        text: "test",
+        conversation: { id: "conv-no-token" },
+        from: { id: "user-123" },
+        channelId: "msteams",
+      },
+      api: {
+        users: { token: { get: vi.fn().mockRejectedValue(new Error("no token")) } },
+      },
+      signin: mockSignin,
+    })
+
+    const opts = mockRunAgent.mock.calls[0][4]
+    const result = await opts.toolContext.signin("graph")
+    expect(result).toBeUndefined()
+    expect(logSpy).toHaveBeenCalledWith("[teams] signin(graph): no token")
+
+    vi.restoreAllMocks()
+  })
+
+  it("signin wrapper handles non-Error thrown values", async () => {
+    vi.resetModules()
+    delete process.env.CLIENT_ID
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
+    vi.doMock("../../engine/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+      postTurn: vi.fn(),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const teams = await import("../../channels/teams")
+    teams.startTeamsApp()
+
+    const mockSignin = vi.fn().mockRejectedValue("string-error")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: {
+        text: "test",
+        conversation: { id: "conv-str-err" },
+        from: { id: "user-123" },
+        channelId: "msteams",
+      },
+      api: {
+        users: { token: { get: vi.fn().mockRejectedValue(new Error("no token")) } },
+      },
+      signin: mockSignin,
+    })
+
+    const opts = mockRunAgent.mock.calls[0][4]
+    const result = await opts.toolContext.signin("graph")
+    expect(result).toBeUndefined()
+    expect(errorSpy).toHaveBeenCalledWith("[teams] signin(graph) failed: string-error")
+
+    vi.restoreAllMocks()
+  })
+
   it("app.event error handler logs error message", async () => {
     vi.resetModules()
     delete process.env.CLIENT_ID
@@ -881,6 +1050,10 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     expect(capturedEventHandler).toBeDefined()
     capturedEventHandler!({ error: new Error("SDK blew up") })
     expect(errorSpy).toHaveBeenCalledWith("[teams] app error: SDK blew up")
+
+    // Cover non-Error branch
+    capturedEventHandler!({ error: "string error" })
+    expect(errorSpy).toHaveBeenCalledWith("[teams] app error: string error")
 
     vi.restoreAllMocks()
   })
@@ -929,6 +1102,10 @@ describe("Teams adapter - unhandledRejection guard", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
     ;(ouroboros as Function)(new Error("test rejection"))
     expect(errorSpy).toHaveBeenCalledWith("[teams] unhandled rejection: test rejection")
+
+    // Cover non-Error branch
+    ;(ouroboros as Function)("string rejection")
+    expect(errorSpy).toHaveBeenCalledWith("[teams] unhandled rejection: string rejection")
 
     vi.restoreAllMocks()
   })
@@ -1628,6 +1805,87 @@ describe("Teams adapter - session persistence", () => {
     await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
     expect(runAgentFn).toHaveBeenCalled()
   })
+
+  it("triggers signin for AUTH_REQUIRED:graph after agent loop", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockImplementation(async (msgs: any[]) => {
+      msgs.push({ role: "assistant", content: "AUTH_REQUIRED:graph" })
+      return { usage: undefined }
+    })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../channels/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const signinFn = vi.fn()
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-auth", {
+      graphToken: undefined,
+      adoToken: undefined,
+      signin: signinFn,
+    })
+
+    expect(signinFn).toHaveBeenCalledWith("graph")
+  })
+
+  it("triggers signin for AUTH_REQUIRED:ado after agent loop", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockImplementation(async (msgs: any[]) => {
+      msgs.push({ role: "assistant", content: "AUTH_REQUIRED:ado" })
+      return { usage: undefined }
+    })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../channels/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const signinFn = vi.fn()
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-auth-ado", {
+      graphToken: undefined,
+      adoToken: undefined,
+      signin: signinFn,
+    })
+
+    expect(signinFn).toHaveBeenCalledWith("ado")
+  })
+
+  it("does not trigger signin when no AUTH_REQUIRED in messages", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockImplementation(async (msgs: any[]) => {
+      msgs.push({ role: "assistant", content: "all good" })
+      return { usage: undefined }
+    })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../channels/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const signinFn = vi.fn()
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-no-auth", {
+      graphToken: "token",
+      adoToken: "token",
+      signin: signinFn,
+    })
+
+    expect(signinFn).not.toHaveBeenCalled()
+  })
+
+  it("handles non-string message content in AUTH_REQUIRED check", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockImplementation(async (msgs: any[]) => {
+      msgs.push({ role: "assistant", content: [{ type: "text", text: "complex" }] })
+      return { usage: undefined }
+    })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../channels/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const signinFn = vi.fn()
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-complex", {
+      graphToken: undefined,
+      adoToken: undefined,
+      signin: signinFn,
+    })
+
+    // Non-string content should be treated as empty, not crash
+    expect(signinFn).not.toHaveBeenCalled()
+  })
 })
 
 describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
@@ -1917,6 +2175,7 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
     delete process.env.CLIENT_SECRET
     delete process.env.TENANT_ID
     delete process.env.PORT
+    delete process.env.DISABLE_STREAMING
   })
 
   it("when --disable-streaming is in argv, threads disableStreaming to handleTeamsMessage", async () => {
@@ -2012,6 +2271,42 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
     vi.restoreAllMocks()
   })
 
+  it("detects --disable-streaming via DISABLE_STREAMING=1 env var", async () => {
+    vi.resetModules()
+    delete process.env.CLIENT_ID
+    process.argv = ["node", "teams-entry.ts"]
+    process.env.DISABLE_STREAMING = "1"
+
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../engine/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../channels/teams")
+    teams.startTeamsApp()
+
+    const logCalls = consoleSpy.mock.calls.map((c: any) => c[0])
+    expect(logCalls.some((msg: string) => msg.includes("streaming: disabled"))).toBe(true)
+
+    delete process.env.DISABLE_STREAMING
+    consoleSpy.mockRestore()
+    vi.restoreAllMocks()
+  })
+
   it("when --disable-streaming is NOT in argv, handleTeamsMessage is called without disableStreaming", async () => {
     vi.resetModules()
     delete process.env.CLIENT_ID
@@ -2071,9 +2366,10 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
     vi.restoreAllMocks()
   })
 
-  it("does NOT log 'streaming: disabled' when flag is absent", async () => {
+  it("logs 'streaming: enabled' when flag is absent", async () => {
     vi.resetModules()
     delete process.env.CLIENT_ID
+    delete process.env.npm_config_disable_streaming
     process.argv = ["node", "teams-entry.ts"]
 
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -2099,6 +2395,7 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
     teams.startTeamsApp()
 
     const logCalls = consoleSpy.mock.calls.map((c: any) => c[0])
+    expect(logCalls.some((msg: string) => msg.includes("streaming: enabled"))).toBe(true)
     expect(logCalls.some((msg: string) => msg.includes("streaming: disabled"))).toBe(false)
 
     consoleSpy.mockRestore()
