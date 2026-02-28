@@ -266,17 +266,30 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
+    // First set valid azure config so getClient() selects azure provider
     setTestConfig({
       providers: {
         azure: {
           apiKey: "test-azure-key",
           endpoint: "https://test.openai.azure.com",
-          deployment: "",
+          deployment: "temp-deploy",
           modelName: "test-model",
         },
       },
     })
-    const { buildSystem } = await import("../../mind/prompt")
+    // Import prompt (triggers lazy getClient init on first getModel() call)
+    const { buildSystem, getProvider } = await import("../../mind/prompt")
+    // Force client initialization so provider is cached as "azure"
+    const { getModel } = await import("../../engine/core")
+    getModel()
+    // Now clear deployment to test the "default" fallback in providerSection display
+    setTestConfig({
+      providers: {
+        azure: {
+          deployment: "",
+        },
+      },
+    })
     const result = buildSystem()
     expect(result).toContain("azure openai (default, model: test-model)")
   })

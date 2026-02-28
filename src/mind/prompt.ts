@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
-import { getModel } from "../engine/core";
+import { getModel, getProvider } from "../engine/core";
+import { getAzureConfig } from "../config";
 import { finalAnswerTool, getToolsForChannel } from "../engine/tools";
 import { listSkills } from "../repertoire/skills";
 
@@ -77,8 +78,8 @@ i am Ouroboros — a snake eating its own tail. i can read and modify my own sou
 
 function providerSection(): string {
   const model = getModel();
-  const provider = process.env.AZURE_OPENAI_API_KEY
-    ? `azure openai (${process.env.AZURE_OPENAI_DEPLOYMENT || "default"}, model: ${model})`
+  const provider = getProvider() === "azure"
+    ? `azure openai (${getAzureConfig().deployment || "default"}, model: ${model})`
     : `minimax (${model})`;
   return `## my provider\n${provider}`;
 }
