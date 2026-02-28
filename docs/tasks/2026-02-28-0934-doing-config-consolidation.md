@@ -140,7 +140,7 @@ Total: 23 references to remove, 1 to keep (OUROBOROS_CONFIG_PATH).
 **Files**: `src/__tests__/config.test.ts`
 **Acceptance**: 100% coverage on setTestConfig, all tests green.
 
-### ⬜ Unit 3a: Strip env var fallbacks from 6 getters -- Tests
+### ✅ Unit 3a: Strip env var fallbacks from 6 getters -- Tests
 **What**: Remove the "env vars override config.json values" test cases from config.test.ts for all 6 getters (getAzureConfig, getMinimaxConfig, getTeamsConfig, getContextConfig, getOAuthConfig, getAdoConfig). Also remove the "parses ADO_ORGANIZATIONS env var" and "handles empty ADO_ORGANIZATIONS env var" tests. Verify existing non-env-var tests still reference the right behavior.
 **Env vars covered**: All 18 process.env references in config.ts getters (lines 132-189).
 **Files**: `src/__tests__/config.test.ts`
@@ -295,3 +295,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 10:40 Unit 2a complete: 6 failing tests for setTestConfig()
 - 2026-02-28 10:40 Unit 2b complete: setTestConfig() with DeepPartial type added to config.ts
 - 2026-02-28 10:41 Unit 2c complete: 100% line/function coverage on setTestConfig
+- 2026-02-28 10:42 Unit 3a complete: removed 10 env var override tests from 6 getters (44->34 tests)
