@@ -96,7 +96,7 @@ Add a `--disable-streaming` flag to `npm run teams` that buffers the final AI te
 **What**: Verify 100% coverage on `handleTeamsMessage()` changes, refactor if needed
 **Acceptance**: 100% coverage on new code, tests still green
 
-### ⬜ Unit 3a: CLI arg parsing and startTeamsApp threading -- Tests
+### ✅ Unit 3a: CLI arg parsing and startTeamsApp threading -- Tests
 **What**: Write failing tests for:
 - `startTeamsApp()` reads `process.argv` for `--disable-streaming` and threads it to `handleTeamsMessage()`
 - Console log at startup includes streaming mode indicator (e.g., "streaming: disabled")
@@ -193,3 +193,4 @@ In `src/channels/teams.ts`:
 - 2026-02-27 17:05 Unit 2a complete: 4 tests for handleTeamsMessage disableStreaming threading; 1 fails as expected (red)
 - 2026-02-27 17:05 Unit 2b complete: threaded disableStreaming param through handleTeamsMessage, flush() called after runAgent; all 666 tests pass
 - 2026-02-27 17:06 Unit 2c complete: 100% coverage on new handleTeamsMessage code verified
+- 2026-02-27 17:07 Unit 3a complete: 4 tests for startTeamsApp --disable-streaming; 2 fail as expected (flag threading, startup log)
