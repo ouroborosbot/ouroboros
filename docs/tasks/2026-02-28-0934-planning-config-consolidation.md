@@ -110,3 +110,4 @@ setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" 
 
 ## Progress Log
 - 2026-02-28 09:34 Created
+- 2026-02-28 10:05 Reframed: cleanup of dead env var fallbacks, not migration. Added .env deletion, updated context with config.json reality.
