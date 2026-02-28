@@ -1,6 +1,6 @@
 # Planning: Multi-Agent Harness Reorganization
 
-**Status**: drafting
+**Status**: NEEDS_REVIEW
 **Created**: 2026-02-28
 
 ## Goal
@@ -80,4 +80,4 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 The existing doing doc at `ouroboros/docs/tasks/2026-02-28-doing-multi-agent-harness.md` contains detailed work units with file signatures and line numbers. This content will be validated and used during conversion to the official doing doc.
 
 ## Progress Log
-- 2026-02-28 Created from existing plan at steady-gliding-taco.md
+- 2026-02-28 09:39 Created from existing plan at steady-gliding-taco.md
