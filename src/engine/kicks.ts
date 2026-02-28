@@ -33,10 +33,30 @@ const TOOL_INTENT_PATTERNS = [
   /\bgoing to\b/i,
   /\bi am going to\b/i,
 
+  // Present continuous — "i'm checking", "i am querying"
+  /\bi'm \w+ing\b/i,
+  /\bi am \w+ing\b/i,
+
   // Action announcements — "I need to", "I should", "I can"
   /\bi need to\b/i,
   /\bi should\b/i,
   /\bi can\b/i,
+
+  // Obligation — "I have to", "I must"
+  /\bi have to\b/i,
+  /\bwe have to\b/i,
+  /\bi must\b/i,
+  /\bwe must\b/i,
+
+  // First person plural intent
+  /\bwe need to\b/i,
+  /\bwe should\b/i,
+  /\bwe can\b/i,
+  /\bwe'll\b/i,
+  /\bwe will\b/i,
+  /\bwe're going to\b/i,
+  /\bwe are going to\b/i,
+  /\blet's\b/i,
 
   // Gerund phase shifts — "entering", "starting", "proceeding", "switching"
   /\bentering\b/i,
@@ -44,19 +64,39 @@ const TOOL_INTENT_PATTERNS = [
   /\bproceeding\b/i,
   /\bswitching to\b/i,
 
-  // Temporal narration — "first", "now I", "next turn", "next, I"
+  // Temporal narration — "first", "now I/we", "next turn", "next, I"
   /\bfirst,?\s+i\b/i,
   /\bnow i\b/i,
+  /\bnow we\b/i,
   /\bnext turn\b/i,
   /\bnext,?\s+i\b/i,
+  /\bnext,?\s+we\b/i,
+
+  // Sequential narration — "then I/we", "after that", "once I/we", "before I/we"
+  /\bthen i\b/i,
+  /\bthen we\b/i,
+  /\bafter that\b/i,
+  /\bonce i\b/i,
+  /\bonce we\b/i,
+  /\bbefore i\b/i,
+  /\bbefore we\b/i,
+
+  // Future intent — "about to", "gonna"
+  /\babout to\b/i,
+  /\bgonna\b/i,
 
   // Hedged intent — "allow me to", "time to"
   /\ballow me to\b/i,
   /\btime to\b/i,
 
-  // Self-narration — "my next step", "my plan", "tool calls only"
+  // Movement narration — "moving on", "moving to"
+  /\bmoving on\b/i,
+  /\bmoving to\b/i,
+
+  // Self-narration — "my next step", "my plan", "the plan is", "tool calls only"
   /\bmy next step\b/i,
   /\bmy plan\b/i,
+  /\bthe plan is\b/i,
   /\btool calls only\b/i,
 ];
 
