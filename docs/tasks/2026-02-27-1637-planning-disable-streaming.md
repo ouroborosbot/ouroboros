@@ -1,7 +1,7 @@
 # Planning: Disable Streaming Flag for Teams
 
 **Status**: drafting
-**Created**: (pending first commit)
+**Created**: 2026-02-27 16:37
 
 ## Goal
 Add a `--disable-streaming` flag to `npm run teams` that makes the bot collect the full AI response before sending it to Teams as a single message, bypassing the Teams SDK streaming protocol (emit/update) which is extremely slow over devtunnel+local.
@@ -62,4 +62,4 @@ Add a `--disable-streaming` flag to `npm run teams` that makes the bot collect t
 The slowness likely comes from the bot-to-Teams streaming layer: each `stream.emit()` call over devtunnel is an HTTP round-trip back to Teams, and with many small deltas this compounds. Disabling both layers (API streaming + Teams streaming) is the cleanest approach.
 
 ## Progress Log
-- (pending first commit)
+- 2026-02-27 16:37 Created
