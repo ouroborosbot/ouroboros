@@ -247,7 +247,7 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 **Note**: Mutate tools are marked `requiresConfirmation` as metadata only in this unit. Enforcement happens in Unit 11.
 **Acceptance**: All tests pass, 100% coverage, `getToolsForChannel("teams")` returns base tools + 4 generic teams tools (+ 2 convenience aliases = 6 teams tools total).
 
-### ⬜ Unit 9: Endpoint Documentation Tools
+### ✅ Unit 9: Endpoint Documentation Tools
 **What**: Add `graph_docs` and `ado_docs` tools that let the model look up API endpoint documentation before making calls. Uses static JSON indexes shipped with the codebase. TDD.
 **Files created**:
 - `src/engine/data/graph-endpoints.json` — index of ~30 common Graph API endpoints: path, method, description, common params, required scopes. Covers: profile, messages, calendar, files, teams chat, sites, contacts, search, send mail, create event, upload file, etc.
