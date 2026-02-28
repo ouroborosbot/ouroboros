@@ -1,0 +1,122 @@
+[
+  {
+    "path": "/_apis/wit/wiql",
+    "method": "POST",
+    "description": "Run a WIQL query to search for work items (read-only, use ado_query)",
+    "params": "query (WIQL string)"
+  },
+  {
+    "path": "/_apis/wit/workitems/{id}",
+    "method": "GET",
+    "description": "Get a single work item by ID",
+    "params": "$expand, fields, asOf"
+  },
+  {
+    "path": "/_apis/wit/workitems?ids={ids}",
+    "method": "GET",
+    "description": "Get multiple work items by IDs (comma-separated)",
+    "params": "ids, fields, $expand, asOf"
+  },
+  {
+    "path": "/{project}/_apis/wit/workitems/${type}",
+    "method": "POST",
+    "description": "Create a new work item of the given type (Bug, Task, User Story, etc.)",
+    "params": "JSON Patch array: [{op, path, value}] for fields like /fields/System.Title"
+  },
+  {
+    "path": "/_apis/wit/workitems/{id}",
+    "method": "PATCH",
+    "description": "Update an existing work item (change title, state, assigned to, etc.)",
+    "params": "JSON Patch array: [{op: replace, path: /fields/System.Title, value: ...}]"
+  },
+  {
+    "path": "/_apis/wit/workitems/{id}",
+    "method": "DELETE",
+    "description": "Delete a work item (moves to recycle bin)",
+    "params": "destroy (boolean, permanently delete)"
+  },
+  {
+    "path": "/_apis/git/repositories",
+    "method": "GET",
+    "description": "List all Git repositories in the organization or project",
+    "params": "project (optional path prefix: /{project}/_apis/git/repositories)"
+  },
+  {
+    "path": "/_apis/git/repositories/{repositoryId}",
+    "method": "GET",
+    "description": "Get a specific Git repository by ID or name",
+    "params": ""
+  },
+  {
+    "path": "/_apis/git/repositories/{repositoryId}/refs",
+    "method": "GET",
+    "description": "List branches and tags for a repository",
+    "params": "filter (e.g. heads/ for branches only), $top"
+  },
+  {
+    "path": "/_apis/git/repositories/{repositoryId}/commits",
+    "method": "GET",
+    "description": "List commits for a repository",
+    "params": "searchCriteria.itemVersion.version (branch), $top, searchCriteria.fromDate, searchCriteria.toDate"
+  },
+  {
+    "path": "/_apis/git/repositories/{repositoryId}/pullrequests",
+    "method": "GET",
+    "description": "List pull requests for a repository",
+    "params": "searchCriteria.status (active/completed/abandoned), searchCriteria.creatorId, $top"
+  },
+  {
+    "path": "/_apis/git/repositories/{repositoryId}/pullrequests",
+    "method": "POST",
+    "description": "Create a new pull request",
+    "params": "sourceRefName, targetRefName, title, description"
+  },
+  {
+    "path": "/_apis/git/repositories/{repositoryId}/pullrequests/{pullRequestId}",
+    "method": "GET",
+    "description": "Get a specific pull request by ID",
+    "params": ""
+  },
+  {
+    "path": "/_apis/git/repositories/{repositoryId}/pullrequests/{pullRequestId}",
+    "method": "PATCH",
+    "description": "Update a pull request (change title, description, status, auto-complete)",
+    "params": "title, description, status (active/abandoned/completed), autoCompleteSetBy"
+  },
+  {
+    "path": "/_apis/build/builds",
+    "method": "GET",
+    "description": "List builds (pipeline runs)",
+    "params": "definitions (pipeline ID), statusFilter, resultFilter, $top, branchName"
+  },
+  {
+    "path": "/_apis/build/builds",
+    "method": "POST",
+    "description": "Queue a new build (trigger a pipeline)",
+    "params": "definition.id, sourceBranch, parameters"
+  },
+  {
+    "path": "/_apis/build/builds/{buildId}",
+    "method": "GET",
+    "description": "Get a specific build by ID",
+    "params": ""
+  },
+  {
+    "path": "/_apis/pipelines",
+    "method": "GET",
+    "description": "List pipelines (definitions)",
+    "params": "$top, orderBy"
+  },
+  {
+    "path": "/_apis/pipelines/{pipelineId}/runs",
+    "method": "POST",
+    "description": "Run a pipeline",
+    "params": "resources.repositories.self.refName (branch), templateParameters"
+  },
+  {
+    "path": "/{project}/_apis/wit/queries",
+    "method": "GET",
+    "description": "List saved work item queries (shared and personal)",
+    "params": "$depth, $expand"
+  }
+]

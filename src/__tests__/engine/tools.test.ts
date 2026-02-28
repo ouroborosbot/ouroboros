@@ -613,8 +613,8 @@ describe("getToolsForChannel", () => {
     // Should have convenience aliases
     expect(names).toContain("graph_profile")
     expect(names).toContain("ado_work_items")
-    // Should be longer than base tools (base + 6 teams tools)
-    expect(teamsTools.length).toBe(tools.length + 6)
+    // Should be longer than base tools (base + 8 teams tools: 4 generic + 2 aliases + 2 docs)
+    expect(teamsTools.length).toBe(tools.length + 8)
   })
 
   it("returns base tools for undefined channel", async () => {
@@ -1146,5 +1146,143 @@ describe("confirmationRequired export", () => {
     expect(confirmationRequired.has("ado_query")).toBe(false)
     expect(confirmationRequired.has("graph_profile")).toBe(false)
     expect(confirmationRequired.has("ado_work_items")).toBe(false)
+  })
+})
+
+describe("execTool for docs tools", () => {
+  it("graph_docs returns matching endpoints for a query", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+
+    const result = await execTool("graph_docs", { query: "send email" })
+    expect(result).toContain("send")
+    // Should be valid, non-empty output
+    expect(result.length).toBeGreaterThan(10)
+  })
+
+  it("graph_docs returns matching endpoints for calendar", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+
+    const result = await execTool("graph_docs", { query: "calendar events" })
+    expect(result).toContain("calendar")
+  })
+
+  it("graph_docs returns no results message for non-matching query", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+
+    const result = await execTool("graph_docs", { query: "zzzyyyxxx_nonexistent" })
+    expect(result).toContain("No matching")
+  })
+
+  it("graph_docs returns top 5 results max", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+
+    // A broad query that should match many endpoints
+    const result = await execTool("graph_docs", { query: "me" })
+    const sections = result.split("\n\n").filter((s: string) => s.trim().length > 0)
+    expect(sections.length).toBeLessThanOrEqual(5)
+  })
+
+  it("graph_docs is case-insensitive", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+
+    const lower = await execTool("graph_docs", { query: "messages" })
+    const upper = await execTool("graph_docs", { query: "MESSAGES" })
+    expect(lower).toBe(upper)
+  })
+
+  it("ado_docs returns matching endpoints for a query", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+
+    const result = await execTool("ado_docs", { query: "work items" })
+    expect(result).toContain("work")
+    expect(result.length).toBeGreaterThan(10)
+  })
+
+  it("ado_docs returns matching endpoints for pull requests", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+
+    const result = await execTool("ado_docs", { query: "pull request" })
+    expect(result).toContain("pull")
+  })
+
+  it("ado_docs returns no results message for non-matching query", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+
+    const result = await execTool("ado_docs", { query: "zzzyyyxxx_nonexistent" })
+    expect(result).toContain("No matching")
+  })
+
+  it("ado_docs returns top 5 results max", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+
+    const result = await execTool("ado_docs", { query: "api" })
+    const sections = result.split("\n\n").filter((s: string) => s.trim().length > 0)
+    expect(sections.length).toBeLessThanOrEqual(5)
+  })
+
+  it("ado_docs is case-insensitive", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+
+    const lower = await execTool("ado_docs", { query: "pipeline" })
+    const upper = await execTool("ado_docs", { query: "PIPELINE" })
+    expect(lower).toBe(upper)
+  })
+})
+
+describe("getToolsForChannel includes docs tools", () => {
+  it("teams channel includes graph_docs and ado_docs", async () => {
+    vi.resetModules()
+    const { getToolsForChannel, tools } = await import("../../engine/tools")
+    const teamsTools = getToolsForChannel("teams")
+    const names = teamsTools.map((t) => t.function.name)
+    expect(names).toContain("graph_docs")
+    expect(names).toContain("ado_docs")
+    // base tools + 8 teams tools (4 generic + 2 aliases + 2 docs)
+    expect(teamsTools.length).toBe(tools.length + 8)
+  })
+
+  it("cli channel does NOT include graph_docs or ado_docs", async () => {
+    vi.resetModules()
+    const { getToolsForChannel } = await import("../../engine/tools")
+    const cliTools = getToolsForChannel("cli")
+    const names = cliTools.map((t) => t.function.name)
+    expect(names).not.toContain("graph_docs")
+    expect(names).not.toContain("ado_docs")
+  })
+})
+
+describe("summarizeArgs for docs tools", () => {
+  let summarizeArgs: (name: string, args: Record<string, any>) => string
+
+  beforeEach(async () => {
+    vi.resetModules()
+    const tools = await import("../../engine/tools")
+    summarizeArgs = tools.summarizeArgs
+  })
+
+  it("returns query for graph_docs", () => {
+    expect(summarizeArgs("graph_docs", { query: "send email" })).toBe("send email")
+  })
+
+  it("returns empty string for graph_docs with no query", () => {
+    expect(summarizeArgs("graph_docs", {})).toBe("")
+  })
+
+  it("returns query for ado_docs", () => {
+    expect(summarizeArgs("ado_docs", { query: "work items" })).toBe("work items")
+  })
+
+  it("returns empty string for ado_docs with no query", () => {
+    expect(summarizeArgs("ado_docs", {})).toBe("")
   })
 })

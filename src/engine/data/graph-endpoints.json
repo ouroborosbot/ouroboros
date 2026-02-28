@@ -1,0 +1,212 @@
+[
+  {
+    "path": "/me",
+    "method": "GET",
+    "description": "Get current user's profile (displayName, mail, jobTitle, department, officeLocation)",
+    "params": "$select",
+    "scopes": "User.Read"
+  },
+  {
+    "path": "/me/messages",
+    "method": "GET",
+    "description": "List messages in the signed-in user's mailbox",
+    "params": "$top, $filter, $select, $orderby, $search",
+    "scopes": "Mail.Read"
+  },
+  {
+    "path": "/me/messages/{id}",
+    "method": "GET",
+    "description": "Get a specific message by ID",
+    "params": "$select",
+    "scopes": "Mail.Read"
+  },
+  {
+    "path": "/me/sendMail",
+    "method": "POST",
+    "description": "Send an email message on behalf of the signed-in user",
+    "params": "message (with subject, body, toRecipients), saveToSentItems",
+    "scopes": "Mail.Send"
+  },
+  {
+    "path": "/me/messages/{id}",
+    "method": "PATCH",
+    "description": "Update a message (e.g. mark as read, change category)",
+    "params": "isRead, categories, importance",
+    "scopes": "Mail.ReadWrite"
+  },
+  {
+    "path": "/me/messages/{id}",
+    "method": "DELETE",
+    "description": "Delete a message",
+    "params": "",
+    "scopes": "Mail.ReadWrite"
+  },
+  {
+    "path": "/me/events",
+    "method": "GET",
+    "description": "List calendar events for the signed-in user",
+    "params": "$top, $filter, $select, $orderby, startDateTime, endDateTime",
+    "scopes": "Calendars.Read"
+  },
+  {
+    "path": "/me/events",
+    "method": "POST",
+    "description": "Create a new calendar event",
+    "params": "subject, body, start, end, attendees, location, isOnlineMeeting",
+    "scopes": "Calendars.ReadWrite"
+  },
+  {
+    "path": "/me/events/{id}",
+    "method": "PATCH",
+    "description": "Update an existing calendar event",
+    "params": "subject, body, start, end, attendees, location",
+    "scopes": "Calendars.ReadWrite"
+  },
+  {
+    "path": "/me/events/{id}",
+    "method": "DELETE",
+    "description": "Delete a calendar event",
+    "params": "",
+    "scopes": "Calendars.ReadWrite"
+  },
+  {
+    "path": "/me/calendarView",
+    "method": "GET",
+    "description": "Get calendar view (events in a time range, expands recurring events)",
+    "params": "startDateTime (required), endDateTime (required), $top, $select",
+    "scopes": "Calendars.Read"
+  },
+  {
+    "path": "/me/drive/root/children",
+    "method": "GET",
+    "description": "List files and folders in the user's OneDrive root",
+    "params": "$top, $select, $filter",
+    "scopes": "Files.Read"
+  },
+  {
+    "path": "/me/drive/items/{id}",
+    "method": "GET",
+    "description": "Get metadata for a specific file or folder in OneDrive",
+    "params": "$select",
+    "scopes": "Files.Read"
+  },
+  {
+    "path": "/me/drive/items/{id}/content",
+    "method": "GET",
+    "description": "Download file content from OneDrive",
+    "params": "",
+    "scopes": "Files.Read"
+  },
+  {
+    "path": "/me/drive/root:/{path}:/content",
+    "method": "PUT",
+    "description": "Upload a file to OneDrive by path (small files up to 4MB)",
+    "params": "request body is file content",
+    "scopes": "Files.ReadWrite"
+  },
+  {
+    "path": "/me/drive/items/{id}",
+    "method": "DELETE",
+    "description": "Delete a file or folder from OneDrive",
+    "params": "",
+    "scopes": "Files.ReadWrite"
+  },
+  {
+    "path": "/me/chats",
+    "method": "GET",
+    "description": "List chats for the signed-in user",
+    "params": "$top, $filter, $expand",
+    "scopes": "Chat.Read"
+  },
+  {
+    "path": "/me/chats/{id}/messages",
+    "method": "GET",
+    "description": "List messages in a specific chat",
+    "params": "$top, $filter",
+    "scopes": "Chat.Read"
+  },
+  {
+    "path": "/me/chats/{id}/messages",
+    "method": "POST",
+    "description": "Send a message to a specific chat",
+    "params": "body (with content, contentType)",
+    "scopes": "Chat.ReadWrite"
+  },
+  {
+    "path": "/sites/{siteId}",
+    "method": "GET",
+    "description": "Get a SharePoint site by ID",
+    "params": "$select",
+    "scopes": "Sites.Read.All"
+  },
+  {
+    "path": "/sites/{siteId}/lists",
+    "method": "GET",
+    "description": "List SharePoint lists in a site",
+    "params": "$top, $select",
+    "scopes": "Sites.Read.All"
+  },
+  {
+    "path": "/sites/{siteId}/lists/{listId}/items",
+    "method": "GET",
+    "description": "List items in a SharePoint list",
+    "params": "$top, $filter, $expand, $select",
+    "scopes": "Sites.Read.All"
+  },
+  {
+    "path": "/sites/{siteId}/lists/{listId}/items",
+    "method": "POST",
+    "description": "Create a new item in a SharePoint list",
+    "params": "fields (object with column values)",
+    "scopes": "Sites.ReadWrite.All"
+  },
+  {
+    "path": "/me/contacts",
+    "method": "GET",
+    "description": "List contacts for the signed-in user",
+    "params": "$top, $filter, $select, $orderby",
+    "scopes": "Contacts.Read"
+  },
+  {
+    "path": "/me/contacts",
+    "method": "POST",
+    "description": "Create a new contact",
+    "params": "givenName, surname, emailAddresses, businessPhones, companyName",
+    "scopes": "Contacts.ReadWrite"
+  },
+  {
+    "path": "/search/query",
+    "method": "POST",
+    "description": "Search across Microsoft 365 (messages, files, events, sites)",
+    "params": "requests (array with entityTypes, query.queryString)",
+    "scopes": "Mail.Read, Files.Read, Calendars.Read"
+  },
+  {
+    "path": "/users",
+    "method": "GET",
+    "description": "List users in the organization",
+    "params": "$top, $filter, $select, $search",
+    "scopes": "User.Read.All"
+  },
+  {
+    "path": "/users/{id}",
+    "method": "GET",
+    "description": "Get a specific user's profile by ID or UPN",
+    "params": "$select",
+    "scopes": "User.Read.All"
+  },
+  {
+    "path": "/me/memberOf",
+    "method": "GET",
+    "description": "List groups and directory roles the user is a member of",
+    "params": "$top, $filter",
+    "scopes": "Directory.Read.All"
+  },
+  {
+    "path": "/me/photo/$value",
+    "method": "GET",
+    "description": "Get the signed-in user's profile photo (binary)",
+    "params": "",
+    "scopes": "User.Read"
+  }
+]
