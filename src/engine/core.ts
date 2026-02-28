@@ -43,7 +43,7 @@ function getClient(): OpenAI {
       _provider = "minimax";
     } else {
       console.error(
-        "no provider configured. set azure or minimax credentials in config.json or env vars.",
+        "no provider configured. set azure or minimax credentials in config.json.",
       );
       process.exit(1);
     }
