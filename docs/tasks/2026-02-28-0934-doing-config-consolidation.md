@@ -207,7 +207,7 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 **Files**: `src/__tests__/engine/tools.test.ts`
 **Acceptance**: Tests updated. Tests FAIL because tools-base.ts still reads process.env.
 
-### ⬜ Unit 6b: tools-base.ts env var removal -- Implementation
+### ✅ Unit 6b: tools-base.ts env var removal -- Implementation
 **What**: Add new import: `import { getIntegrationsConfig } from "../config"` (tools-base.ts currently has NO config import). Replace `process.env.PERPLEXITY_API_KEY` (line 222) with `getIntegrationsConfig().perplexityApiKey`. Update error message on line 223 from "PERPLEXITY_API_KEY not set" to "perplexityApiKey not configured in config.json".
 **Files**: `src/engine/tools-base.ts`
 **Acceptance**: All tools.test.ts tests pass. No process.env references in tools-base.ts.
@@ -305,3 +305,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 10:52 Unit 5b complete: teams.ts uses getTeamsChannelConfig for all 3 env vars, all 112 tests pass
 - 2026-02-28 10:52 Unit 5c complete: coverage verified through comprehensive test suite (skipConfirmation true/false, disableStreaming true/false, custom port)
 - 2026-02-28 10:55 Unit 6a complete: web_search tests migrated from process.env to setTestConfig, 2 tests fail (red)
+- 2026-02-28 10:56 Unit 6b complete: tools-base.ts uses getIntegrationsConfig().perplexityApiKey, all 114 tools tests pass
