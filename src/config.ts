@@ -159,69 +159,32 @@ export function setTestConfig(partial: DeepPartial<OuroborosConfig>): void {
 
 export function getAzureConfig(): AzureProviderConfig {
   const config = loadConfig()
-  const az = { ...config.providers.azure }
-
-  if (process.env.AZURE_OPENAI_API_KEY) az.apiKey = process.env.AZURE_OPENAI_API_KEY
-  if (process.env.AZURE_OPENAI_ENDPOINT) az.endpoint = process.env.AZURE_OPENAI_ENDPOINT
-  if (process.env.AZURE_OPENAI_DEPLOYMENT) az.deployment = process.env.AZURE_OPENAI_DEPLOYMENT
-  if (process.env.AZURE_OPENAI_MODEL_NAME) az.modelName = process.env.AZURE_OPENAI_MODEL_NAME
-  if (process.env.AZURE_OPENAI_API_VERSION) az.apiVersion = process.env.AZURE_OPENAI_API_VERSION
-
-  return az
+  return { ...config.providers.azure }
 }
 
 export function getMinimaxConfig(): MinimaxProviderConfig {
   const config = loadConfig()
-  const mm = { ...config.providers.minimax }
-
-  if (process.env.MINIMAX_API_KEY) mm.apiKey = process.env.MINIMAX_API_KEY
-  if (process.env.MINIMAX_MODEL) mm.model = process.env.MINIMAX_MODEL
-
-  return mm
+  return { ...config.providers.minimax }
 }
 
 export function getTeamsConfig(): TeamsConfig {
   const config = loadConfig()
-  const t = { ...config.teams }
-
-  if (process.env.CLIENT_ID) t.clientId = process.env.CLIENT_ID
-  if (process.env.CLIENT_SECRET) t.clientSecret = process.env.CLIENT_SECRET
-  if (process.env.TENANT_ID) t.tenantId = process.env.TENANT_ID
-
-  return t
+  return { ...config.teams }
 }
 
 export function getContextConfig(): ContextConfig {
   const config = loadConfig()
-  const ctx = { ...config.context }
-
-  if (process.env.OUROBOROS_MAX_TOKENS) ctx.maxTokens = parseInt(process.env.OUROBOROS_MAX_TOKENS, 10)
-  if (process.env.OUROBOROS_CONTEXT_MARGIN) ctx.contextMargin = parseInt(process.env.OUROBOROS_CONTEXT_MARGIN, 10)
-  if (process.env.OUROBOROS_MAX_TOOL_OUTPUT) ctx.maxToolOutputChars = parseInt(process.env.OUROBOROS_MAX_TOOL_OUTPUT, 10)
-
-  return ctx
+  return { ...config.context }
 }
 
 export function getOAuthConfig(): OAuthConfig {
   const config = loadConfig()
-  const o = { ...config.oauth }
-
-  if (process.env.OAUTH_GRAPH_CONNECTION) o.graphConnectionName = process.env.OAUTH_GRAPH_CONNECTION
-  if (process.env.OAUTH_ADO_CONNECTION) o.adoConnectionName = process.env.OAUTH_ADO_CONNECTION
-
-  return o
+  return { ...config.oauth }
 }
 
 export function getAdoConfig(): AdoConfig {
   const config = loadConfig()
-  const a = { organizations: [...config.ado.organizations] }
-
-  if (process.env.ADO_ORGANIZATIONS) {
-    const raw = process.env.ADO_ORGANIZATIONS
-    a.organizations = raw === "" ? [] : raw.split(",").map((s) => s.trim())
-  }
-
-  return a
+  return { organizations: [...config.ado.organizations] }
 }
 
 export function getTeamsChannelConfig(): TeamsChannelConfig {
