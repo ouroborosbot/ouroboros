@@ -191,7 +191,7 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 - No regressions in existing test files
 - Coverage report saved to artifacts directory
 
-### 🔄 Unit 5: Phase 1 Manual Validation Gate
+### ✅ Unit 5: Phase 1 Manual Validation Gate
 **What**: **STOP. Manual validation with user required.** Present the user with instructions to:
 1. Ensure Azure/Entra setup is complete per `docs/OAUTH-SETUP.md`
 2. Start dev tunnel: `devtunnel host --port-numbers 3978 --allow-anonymous`
@@ -207,6 +207,17 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 ---
 
 ## Phase 2: Full Read Tools
+
+### ⬜ Unit 6: Restructure -- Move Graph/ADO out of engine/
+**What**: Move all Teams-only OAuth/integration code out of `src/engine/` into `src/integrations/`. These tools require SSO tokens and only work on the Teams channel.
+**Move**:
+- `src/engine/graph-client.ts` → `src/integrations/graph-client.ts`
+- `src/engine/ado-client.ts` → `src/integrations/ado-client.ts`
+- `src/engine/api-error.ts` → `src/integrations/api-error.ts`
+- Extract `graphAdoTools`, `graphAdoToolHandlers`, `ToolContext` from `src/engine/tools.ts` → `src/integrations/tools.ts`
+- Move corresponding test files to `src/__tests__/integrations/`
+- Update all imports
+**Acceptance**: `npm run test:coverage` passes, 100% coverage, no regressions, `src/engine/tools.ts` has only base tools.
 
 ### ⬜ Unit 10a: Graph Client Read Methods -- Tests
 **What**: Write tests for remaining Graph client read methods: `getEmails(token, params)`, `getCalendar(token, params)`, `getFiles(token, params)`, `getTeamsMessages(token, params)`, `search(token, params)`. Test success cases with mocked responses, test error handling (reuses shared handler), test parameter handling (folder, query, count, date ranges, etc.).
