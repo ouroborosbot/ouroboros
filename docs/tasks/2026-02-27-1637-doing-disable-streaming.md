@@ -163,7 +163,7 @@ In `src/channels/teams.ts`:
 **Files**: `src/mind/prompt.ts`
 **Acceptance**: All Unit 5a tests PASS (green), no warnings
 
-### ⬜ Unit 5c: Rationale documentation -- Coverage & Refactor
+### ✅ Unit 5c: Rationale documentation -- Coverage & Refactor
 **What**: Verify 100% coverage on rationale additions, refactor if needed
 **Acceptance**: 100% coverage on new code, tests still green
 
@@ -201,3 +201,4 @@ In `src/channels/teams.ts`:
 - 2026-02-27 17:11 Unit 4c complete: 100% coverage on prompt.ts, context.ts; teams.ts new code fully covered
 - 2026-02-27 17:11 Unit 5a complete: 5 failing tests for flagsSection rationale (devtunnel, timeout, HTTP/2, throttle, latency)
 - 2026-02-27 17:12 Unit 5b complete: detailed rationale in flagsSection prompt text + developer code comment; all 681 tests pass
+- 2026-02-27 17:12 Unit 5c complete: 100% coverage on prompt.ts rationale additions verified
