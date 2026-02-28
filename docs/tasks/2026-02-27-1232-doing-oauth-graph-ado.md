@@ -21,12 +21,13 @@ Add OAuth/SSO authentication to the Ouroboros Teams bot so the LLM agent can cal
 - [ ] Two OAuth connection names (`graph`, `ado`) configurable via config.json / env vars
 - [ ] ADO organizations configurable as a list in config.json / env vars
 - [ ] `graphToken` and `adoToken` available to tool handlers independently
-- [ ] All 16 tools defined and functional (10 read, 6 write)
+- [ ] Generic API tools: `graph_query`, `graph_mutate`, `ado_query`, `ado_mutate` + convenience aliases
+- [ ] Documentation tools: `graph_docs`, `ado_docs` with static endpoint indexes
 - [ ] Graph/ADO tools only available on Teams channel, not CLI
 - [ ] On-demand signin flow works per connection
 - [ ] Error handling: 401 triggers re-signin, 403 reports permission denied, 429 reports throttled
-- [ ] Harness-level confirmation system blocks all write tools until user confirms
-- [ ] Confirmation system enforced in agent loop, state persisted via SDK IStorage
+- [ ] Confirmation system blocks mutate tools (`graph_mutate`, `ado_mutate`) until user confirms
+- [ ] Confirmation enforced in agent loop, Teams callback with text prompt
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -208,143 +209,104 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 
 ## Phase 2: Full Read Tools
 
-### ⬜ Unit 6: Restructure -- Move Graph/ADO out of engine/
-**What**: Move all Teams-only OAuth/integration code out of `src/engine/` into `src/integrations/`. These tools require SSO tokens and only work on the Teams channel.
-**Move**:
-- `src/engine/graph-client.ts` → `src/integrations/graph-client.ts`
-- `src/engine/ado-client.ts` → `src/integrations/ado-client.ts`
-- `src/engine/api-error.ts` → `src/integrations/api-error.ts`
-- Extract `graphAdoTools`, `graphAdoToolHandlers`, `ToolContext` from `src/engine/tools.ts` → `src/integrations/tools.ts`
-- Move corresponding test files to `src/__tests__/integrations/`
-- Update all imports
-**Acceptance**: `npm run test:coverage` passes, 100% coverage, no regressions, `src/engine/tools.ts` has only base tools.
+### ✅ Unit 6: Restructure -- Split tools by channel
+**What**: Split `src/engine/tools.ts` into `tools-base.ts` (shared base tools, types, handlers) and `tools-teams.ts` (Teams-only Graph/ADO tool definitions + handlers). `tools.ts` is now a thin facade that combines them via `getToolsForChannel()`. Graph/ADO clients and api-error stay in `src/engine/` alongside the tools that use them.
+**Files created**: `src/engine/tools-base.ts`, `src/engine/tools-teams.ts`
+**Files modified**: `src/engine/tools.ts` (now facade only)
+**Acceptance**: 647 tests pass, 100% coverage, no regressions.
 
-### ⬜ Unit 10a: Graph Client Read Methods -- Tests
-**What**: Write tests for remaining Graph client read methods: `getEmails(token, params)`, `getCalendar(token, params)`, `getFiles(token, params)`, `getTeamsMessages(token, params)`, `search(token, params)`. Test success cases with mocked responses, test error handling (reuses shared handler), test parameter handling (folder, query, count, date ranges, etc.).
-**Output**: Additional tests in `src/__tests__/engine/graph-client.test.ts`.
-**Acceptance**: Tests exist and FAIL (red).
+### ⬜ Unit 7: Generic API Clients
+**What**: Replace the single-purpose `getProfile()` and `queryWorkItems()` with generic request functions that can hit any endpoint. Rewrite both client files. TDD.
+**Files modified**:
+- `src/engine/graph-client.ts` — replace `getProfile(token)` with `graphRequest(token, method, path, body?)`. Returns raw JSON response as string. Keeps `getProfile` as a thin wrapper for backward compat (calls `graphRequest` internally).
+- `src/engine/ado-client.ts` — replace `queryWorkItems(token, org, query)` with `adoRequest(token, method, org, path, body?)`. Returns raw JSON response as string. Keeps `queryWorkItems` as a thin wrapper for backward compat.
+- `src/__tests__/engine/graph-client.test.ts` — tests for `graphRequest`: GET success, POST success, error handling via `handleApiError`, various paths
+- `src/__tests__/engine/ado-client.test.ts` — tests for `adoRequest`: GET success, POST success (WIQL), error handling, various paths
 
-### ⬜ Unit 10b: Graph Client Read Methods -- Implementation
-**What**: Add `getEmails`, `getCalendar`, `getFiles`, `getTeamsMessages`, `search` methods to `src/engine/graph-client.ts`. Each calls the appropriate Graph API endpoint, formats results as human-readable summaries.
-**Output**: Updated `src/engine/graph-client.ts`.
-**Acceptance**: All graph-client tests PASS (green), no warnings.
+**Design notes**:
+- `graphRequest(token, method, path, body?)`: base URL `https://graph.microsoft.com/v1.0`, path is everything after (e.g. `/me/messages?$top=5`). Returns response body as formatted JSON string for the LLM.
+- `adoRequest(token, method, org, path, body?)`: base URL `https://dev.azure.com/{org}`, path is everything after (e.g. `/_apis/wit/wiql?api-version=7.1`). Appends `api-version=7.1` if not present. Returns response body as formatted JSON string.
+- Both use `handleApiError` from `api-error.ts` for error responses.
+- Existing `getProfile` and `queryWorkItems` become thin wrappers calling the generic functions (no behavior change, existing tests stay green).
 
-### ⬜ Unit 10c: Graph Client Read Methods -- Coverage
-**What**: Verify 100% coverage. Refactor if needed.
-**Output**: Coverage report.
-**Acceptance**: 100% coverage, tests green.
+**Acceptance**: All tests pass, 100% coverage, no regressions. Both generic functions tested with multiple methods/paths.
 
-### ⬜ Unit 11a: ADO Client Read Methods -- Tests
-**What**: Write tests for remaining ADO client read methods: `getRepos(token, org, params)`, `getPullRequests(token, org, params)`, `getPipelines(token, org, params)`. Test success, error handling, parameter handling.
-**Output**: Additional tests in `src/__tests__/engine/ado-client.test.ts`.
-**Acceptance**: Tests exist and FAIL (red).
+### ⬜ Unit 8: Generic Tool Definitions
+**What**: Replace `graph_profile` and `ado_work_items` with 4 generic tools in `tools-teams.ts`. TDD.
+**Tools**:
+- `graph_query` — GET any Graph API path. Params: `path` (required). Uses `graphRequest(token, "GET", path)`.
+- `graph_mutate` — POST/PATCH/DELETE any Graph API path. Params: `method` (required, one of POST/PATCH/DELETE), `path` (required), `body` (optional JSON string). Marked `requiresConfirmation: true`.
+- `ado_query` — GET or POST any ADO API path (POST for WIQL is read-only). Params: `organization` (required), `path` (required), `method` (optional, defaults GET), `body` (optional JSON string). Uses `adoRequest`.
+- `ado_mutate` — POST/PATCH/DELETE any ADO API path for actual mutations. Params: `organization` (required), `method` (required), `path` (required), `body` (optional JSON string). Marked `requiresConfirmation: true`.
 
-### ⬜ Unit 11b: ADO Client Read Methods -- Implementation
-**What**: Add `getRepos`, `getPullRequests`, `getPipelines` methods to `src/engine/ado-client.ts`. Each calls the appropriate ADO REST API endpoint, formats results.
-**Output**: Updated `src/engine/ado-client.ts`.
-**Acceptance**: All ado-client tests PASS (green), no warnings.
+**Files modified**:
+- `src/engine/tools-teams.ts` — replace `teamsTools` array and `teamsToolHandlers` with new 4 tools. Update `summarizeTeamsArgs`. Keep existing tool names (`graph_profile`, `ado_work_items`) as convenience aliases that internally call the generic functions.
+- `src/engine/tools.ts` — no changes needed (facade auto-imports)
+- `src/__tests__/engine/tools.test.ts` — tests for all 4 new tool handlers: token present/missing, parameter validation, method validation for mutate tools, org validation for ADO tools, `getToolsForChannel("teams")` returns correct count, `summarizeTeamsArgs` handles all tool names
 
-### ⬜ Unit 11c: ADO Client Read Methods -- Coverage
-**What**: Verify 100% coverage. Refactor if needed.
-**Output**: Coverage report.
-**Acceptance**: 100% coverage, tests green.
+**Note**: Mutate tools are marked `requiresConfirmation` as metadata only in this unit. Enforcement happens in Unit 11.
+**Acceptance**: All tests pass, 100% coverage, `getToolsForChannel("teams")` returns base tools + 4 generic teams tools (+ 2 convenience aliases = 6 teams tools total).
 
-### ⬜ Unit 12a: Remaining Read Tools -- Tests
-**What**: Write tests for 8 remaining read tool handlers: `graph_emails`, `graph_calendar`, `graph_files`, `graph_teams_messages`, `graph_search`, `ado_repos`, `ado_pull_requests`, `ado_pipelines`. Test token-present/missing for each, test parameter passthrough, test `getToolsForChannel("teams")` now includes all 10 read tools.
-**Output**: Additional tests.
-**Acceptance**: Tests exist and FAIL (red).
+### ⬜ Unit 9: Endpoint Documentation Tools
+**What**: Add `graph_docs` and `ado_docs` tools that let the model look up API endpoint documentation before making calls. Uses static JSON indexes shipped with the codebase. TDD.
+**Files created**:
+- `src/engine/data/graph-endpoints.json` — index of ~30 common Graph API endpoints: path, method, description, common params, required scopes. Covers: profile, messages, calendar, files, teams chat, sites, contacts, search, send mail, create event, upload file, etc.
+- `src/engine/data/ado-endpoints.json` — index of ~20 common ADO API endpoints: path pattern, method, description, common params. Covers: WIQL, work items CRUD, repos, pull requests, pipelines, builds, branches, commits, etc.
 
-### ⬜ Unit 12b: Remaining Read Tools -- Implementation
-**What**: Add 8 read tool definitions and handlers. Register in `graphAdoTools`. Update `getToolsForChannel("teams")` to include all 10. Update `summarizeArgs` to handle all new tool names.
-**Output**: Updated `src/engine/tools.ts`.
-**Acceptance**: All tests PASS (green), `summarizeArgs` handles all 10 tools, no warnings.
+**Tools**:
+- `graph_docs` — search the Graph endpoint index. Params: `query` (required, e.g. "send email" or "calendar events"). Returns matching endpoints with path, method, description, params.
+- `ado_docs` — search the ADO endpoint index. Params: `query` (required). Returns matching endpoints.
 
-### ⬜ Unit 12c: Remaining Read Tools -- Coverage
-**What**: Verify 100% coverage on all new tool code. Full test suite passes.
-**Output**: Coverage report.
-**Acceptance**: 100% coverage, all tests green, no warnings.
+**Search**: Simple case-insensitive substring match on description + path. Returns top 5 matches.
+
+**Files modified**:
+- `src/engine/tools-teams.ts` — add `graph_docs` and `ado_docs` to `teamsTools` + handlers + `summarizeTeamsArgs`
+- `src/__tests__/engine/tools.test.ts` — tests for docs tools: query match, no match, multiple matches
+
+**Acceptance**: All tests pass, 100% coverage. Model can chain `graph_docs("create calendar event")` → gets endpoint info → `graph_mutate(method: "POST", path: "/me/events", body: "...")`.
+
+### ⬜ Unit 10: Full Suite + Coverage Check
+**What**: Run full test suite. Verify 100% coverage on all new/modified code. Fix any issues.
+**Acceptance**: All tests pass, no warnings, 100% coverage.
 
 ---
 
-## Phase 3: Write Tools + Muscle Memory
+## Phase 3: Confirmation System
 
-### ⬜ Unit 13a: Confirmation System in Agent Loop -- Tests
-**What**: Write tests for the harness-level confirmation system in `src/engine/core.ts`. Test: when a tool with `requiresConfirmation` flag is called, `callbacks.onConfirmAction` is invoked with tool name and args. Test: if confirmed, tool executes normally. Test: if denied, tool returns "cancelled by user". Test: if no `onConfirmAction` callback, tool is rejected with error. Test: non-confirmation tools execute normally (no change). Test: confirmation state serialization for session persistence.
-**Output**: Additional tests in `src/__tests__/engine/core.test.ts`.
-**Acceptance**: Tests exist and FAIL (red).
+### ⬜ Unit 11: Confirmation System in Agent Loop
+**What**: Add confirmation support to the agent loop so mutate tools require user approval before executing. TDD.
+**Design**: Tools marked with `requiresConfirmation: true` trigger a callback before execution. The callback is async — it asks the user and waits for a response.
+**Files modified**:
+- `src/engine/core.ts`:
+  - Add optional `onConfirmAction?(name: string, args: Record<string, string>): Promise<"confirmed" | "denied">` to `ChannelCallbacks` (line 74).
+  - In tool execution loop (before `execTool` at line 333): check if tool name is in a `requiresConfirmation` set (exported from `tools-teams.ts`). If so, call `callbacks.onConfirmAction`. If confirmed, proceed. If denied or callback missing, push tool result "Action cancelled by user" and skip `execTool`.
+- `src/engine/tools-teams.ts`:
+  - Export `const confirmationRequired: Set<string>` containing mutate tool names (`graph_mutate`, `ado_mutate`).
+- `src/__tests__/engine/core.test.ts`:
+  - Test: confirmation tool + confirmed → executes normally
+  - Test: confirmation tool + denied → returns "cancelled by user"
+  - Test: confirmation tool + no callback → returns "cancelled" (safe default)
+  - Test: non-confirmation tool → executes normally (no callback invoked)
 
-### ⬜ Unit 13b: Confirmation System in Agent Loop -- Implementation
-**What**: Add `onConfirmAction` to `ChannelCallbacks` interface. In the tool execution loop (lines 306-344 of `core.ts`), before calling `execTool`, check if the tool has `requiresConfirmation`. If so, call `callbacks.onConfirmAction(name, args)` which returns `"confirmed" | "denied" | "timeout"`. If confirmed, proceed with `execTool`. If denied/timeout, push a tool result message saying "cancelled by user" / "cancelled (no response)". Add `requiresConfirmation` metadata to tool definitions (extend the tool type or use a separate registry).
-**Output**: Updated `src/engine/core.ts`, updated `src/engine/tools.ts`.
-**Acceptance**: All confirmation tests PASS (green), no warnings, no regressions.
+**Acceptance**: All tests pass, 100% coverage, no regressions.
 
-### ⬜ Unit 13c: Confirmation System -- Coverage
-**What**: Verify 100% coverage on confirmation system code. Refactor if needed.
-**Output**: Coverage report.
-**Acceptance**: 100% coverage, tests green.
+### ⬜ Unit 12: Teams Confirmation Callback
+**What**: Implement `onConfirmAction` for the Teams channel. TDD.
+**Design**: When a mutate tool needs confirmation, send an informative message to the user describing what will happen, then use an Adaptive Card with Confirm/Deny buttons (or fall back to text prompt). For Phase 1, use a simple text prompt approach — emit a message asking for confirmation and resolve based on the next user message.
+**Files modified**:
+- `src/channels/teams.ts`:
+  - Add `onConfirmAction` to `createTeamsCallbacks`. When invoked: emit a message describing the action via `stream.update`, return a Promise that resolves when the user responds. Use a per-conversation pending-confirmation map (similar to `_convLocks`).
+  - In `handleTeamsMessage`: before running agent, check if there's a pending confirmation for this conversation. If yes and user says "yes"/"confirm"/"go"→ resolve confirmed. If "no"/"cancel"/"deny" → resolve denied. Otherwise → resolve denied and process message normally.
+- `src/__tests__/channels/teams.test.ts`:
+  - Test: onConfirmAction sends descriptive message
+  - Test: "yes" response resolves confirmed
+  - Test: "no" response resolves denied
+  - Test: unrelated message resolves denied and processes normally
 
-### ⬜ Unit 14a: Teams Confirmation Callback -- Tests
-**What**: Write tests for the Teams channel implementation of `onConfirmAction` in `createTeamsCallbacks`. Test: sends confirmation message via stream. Test: persists pending state to SDK `IStorage`. Test: next message handler checks for pending confirmation. Test: "yes" response triggers tool execution. Test: "no" response clears pending state. Test: unrelated message clears pending state and processes normally.
-**Output**: Additional tests in `src/__tests__/channels/teams.test.ts`.
-**Acceptance**: Tests exist and FAIL (red).
+**Acceptance**: All tests pass, 100% coverage, no regressions.
 
-### ⬜ Unit 14b: Teams Confirmation Callback -- Implementation
-**What**: Implement `onConfirmAction` in `createTeamsCallbacks`. Use SDK `IStorage` (via `ctx.storage`) to persist pending confirmation keyed by conversation ID. In `handleTeamsMessage`, check for pending confirmation before running agent. If pending and user says yes/no, resolve accordingly. If pending and user says something else, clear pending and process normally.
-**Output**: Updated `src/channels/teams.ts`.
-**Acceptance**: All Teams confirmation tests PASS (green), no warnings.
-
-### ⬜ Unit 14c: Teams Confirmation Callback -- Coverage
-**What**: Verify 100% coverage. Refactor if needed.
-**Output**: Coverage report.
-**Acceptance**: 100% coverage, tests green.
-
-### ⬜ Unit 15a: Graph Write Methods -- Tests
-**What**: Write tests for Graph client write methods: `sendEmail(token, params)`, `createEvent(token, params)`, `uploadFile(token, params)`. Test success, error handling, parameter validation.
-**Output**: Additional tests in `src/__tests__/engine/graph-client.test.ts`.
-**Acceptance**: Tests exist and FAIL (red).
-
-### ⬜ Unit 15b: Graph Write Methods -- Implementation
-**What**: Add `sendEmail`, `createEvent`, `uploadFile` to `src/engine/graph-client.ts`.
-**Output**: Updated `src/engine/graph-client.ts`.
-**Acceptance**: All tests PASS (green).
-
-### ⬜ Unit 15c: Graph Write Methods -- Coverage
-**What**: Verify 100% coverage.
-**Output**: Coverage report.
-**Acceptance**: 100% coverage, tests green.
-
-### ⬜ Unit 16a: ADO Write Methods -- Tests
-**What**: Write tests for ADO client write methods: `createWorkItem(token, org, params)`, `updateWorkItem(token, org, params)`, `createPrComment(token, org, params)`. Test success, error handling, parameter validation.
-**Output**: Additional tests in `src/__tests__/engine/ado-client.test.ts`.
-**Acceptance**: Tests exist and FAIL (red).
-
-### ⬜ Unit 16b: ADO Write Methods -- Implementation
-**What**: Add `createWorkItem`, `updateWorkItem`, `createPrComment` to `src/engine/ado-client.ts`.
-**Output**: Updated `src/engine/ado-client.ts`.
-**Acceptance**: All tests PASS (green).
-
-### ⬜ Unit 16c: ADO Write Methods -- Coverage
-**What**: Verify 100% coverage.
-**Output**: Coverage report.
-**Acceptance**: 100% coverage, tests green.
-
-### ⬜ Unit 17a: Write Tool Definitions -- Tests
-**What**: Write tests for 6 write tool handlers: `graph_send_email`, `graph_create_event`, `graph_upload_file`, `ado_create_work_item`, `ado_update_work_item`, `ado_create_pr_comment`. Test each has `requiresConfirmation` flag. Test token-present/missing. Test parameter passthrough to client methods. Test `getToolsForChannel("teams")` includes all 16 tools.
-**Output**: Additional tests.
-**Acceptance**: Tests exist and FAIL (red).
-
-### ⬜ Unit 17b: Write Tool Definitions -- Implementation
-**What**: Add 6 write tool definitions with `requiresConfirmation: true` metadata. Add handlers. Register in `graphAdoTools`. Update `summarizeArgs` to handle all 16 tool names.
-**Output**: Updated `src/engine/tools.ts`.
-**Acceptance**: All tests PASS (green), `summarizeArgs` handles all 16 tools.
-
-### ⬜ Unit 17c: Write Tool Definitions -- Coverage
-**What**: Verify 100% coverage on all write tool code.
-**Output**: Coverage report.
-**Acceptance**: 100% coverage, tests green.
-
-### ⬜ Unit 18: Final Full Suite and Phase 3 Validation
-**What**: Run full test suite (`npm run test:coverage`). Verify all tests pass, no warnings, 100% coverage on all new code. Save coverage report to artifacts directory.
+### ⬜ Unit 13: Final Full Suite and Validation
+**What**: Run full test suite (`npx vitest run --coverage`). Verify all tests pass, no warnings, 100% coverage on all new code.
 **Output**: Clean test run, coverage report.
 **Acceptance**: All tests pass, no warnings, 100% coverage on all new files.
 
@@ -357,7 +319,8 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 - **Fixes/blockers**: Spawn sub-agent immediately -- don't ask, just do it
 - **Decisions made**: Update docs immediately, commit right away
 - **Phase 1 gate**: Unit 5 is a hard stop -- user must manually validate before Phase 2
-- **Shared error handling**: `handleApiError` extracted to `src/engine/api-error.ts` (decided upfront, implemented in Unit 3)
+- **Shared error handling**: `handleApiError` in `src/engine/api-error.ts` (implemented in Unit 3)
+- **Tool file split**: Base tools in `tools-base.ts`, Teams tools in `tools-teams.ts`, facade in `tools.ts` (restructured in Unit 6)
 
 ## Progress Log
 - 2026-02-27 13:07 Created from planning doc (Pass 1: first draft)
