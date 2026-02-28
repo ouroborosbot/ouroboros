@@ -336,3 +336,4 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 - 2026-02-27 13:43 Unit 2 complete: OAuthConfig + AdoConfig interfaces, getOAuthConfig() + getAdoConfig() with env var overrides, 10 new tests all green, 599 total tests passing
 - 2026-02-27 13:55 Unit 3 complete: full vertical slice -- api-error.ts, graph-client.ts, ado-client.ts, ToolContext, getToolsForChannel, graph_profile + ado_work_items handlers, core.ts wiring, teams.ts token threading. 645 tests passing, no warnings, no TS errors
 - 2026-02-27 13:56 Unit 4 complete: 646 tests passing, 100% coverage on all new files (ado-client.ts, api-error.ts, graph-client.ts, tools.ts, teams.ts), no warnings, coverage report saved to artifacts
+- 2026-02-27 18:23 Unit 7 complete: graphRequest(token, method, path, body?) and adoRequest(token, method, org, path, body?) added. getProfile/queryWorkItems kept as thin wrappers. 715 tests passing, 100% coverage.
