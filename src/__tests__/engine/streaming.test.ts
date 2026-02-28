@@ -7,8 +7,9 @@ describe("toResponsesTools", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    process.env.MINIMAX_API_KEY = "test-key"
-    process.env.MINIMAX_MODEL = "test-model"
+    const config = await import("../../config")
+    config.resetConfigCache()
+    config.setTestConfig({ providers: { azure: { apiKey: "" }, minimax: { apiKey: "test-key", model: "test-model" } } })
     const streaming = await import("../../engine/streaming")
     const toolsMod = await import("../../engine/tools")
     toResponsesTools = streaming.toResponsesTools
@@ -99,8 +100,9 @@ describe("toResponsesInput", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    process.env.MINIMAX_API_KEY = "test-key"
-    process.env.MINIMAX_MODEL = "test-model"
+    const config = await import("../../config")
+    config.resetConfigCache()
+    config.setTestConfig({ providers: { azure: { apiKey: "" }, minimax: { apiKey: "test-key", model: "test-model" } } })
     const core = await import("../../engine/streaming")
     toResponsesInput = core.toResponsesInput
   })
@@ -411,8 +413,9 @@ describe("streamChatCompletion", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    process.env.MINIMAX_API_KEY = "test-key"
-    process.env.MINIMAX_MODEL = "test-model"
+    const config = await import("../../config")
+    config.resetConfigCache()
+    config.setTestConfig({ providers: { azure: { apiKey: "" }, minimax: { apiKey: "test-key", model: "test-model" } } })
     const core = await import("../../engine/streaming")
     streamChatCompletion = core.streamChatCompletion
   })
@@ -596,8 +599,9 @@ describe("streamResponsesApi", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    process.env.MINIMAX_API_KEY = "test-key"
-    process.env.MINIMAX_MODEL = "test-model"
+    const config = await import("../../config")
+    config.resetConfigCache()
+    config.setTestConfig({ providers: { azure: { apiKey: "" }, minimax: { apiKey: "test-key", model: "test-model" } } })
     const core = await import("../../engine/streaming")
     streamResponsesApi = core.streamResponsesApi
   })
