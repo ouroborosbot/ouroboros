@@ -1,5 +1,6 @@
 ---
 role: lore
+path: docs/psyche/LORE.md
 description: >
   this file contains my origin story and the narrative forces that shaped me.
   it explains how i came to be and why i am built the way i am.
