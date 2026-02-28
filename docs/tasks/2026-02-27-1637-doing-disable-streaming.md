@@ -127,7 +127,7 @@ Add a `--disable-streaming` flag to `npm run teams` that buffers the final AI te
 **Files**: `src/__tests__/mind/prompt.test.ts`, `src/__tests__/mind/context.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `buildSystem` does not yet handle `disableStreaming`
 
-### ⬜ Unit 4b: System prompt flag awareness -- Implementation
+### ✅ Unit 4b: System prompt flag awareness -- Implementation
 **What**: In `src/mind/prompt.ts`:
 - Add `disableStreaming?: boolean` to `BuildSystemOptions` interface
 - Add a new `flagsSection(channel, options)` function that returns a `## my flags` section when `disableStreaming` is true AND channel is `"teams"`. Content should tell ouroboros: streaming to Teams is disabled because devtunnel relay buffering makes SSE/chunked streaming extremely slow; responses are buffered and sent as one message; the user will not see incremental text output, only status updates
@@ -197,3 +197,4 @@ In `src/channels/teams.ts`:
 - 2026-02-27 17:08 Unit 3b complete: startTeamsApp parses --disable-streaming, threads to handler, logs at startup; all 670 tests pass
 - 2026-02-27 17:08 Unit 3c complete: 100% coverage on new startTeamsApp code verified
 - 2026-02-27 17:09 Unit 4a complete: 6 tests for flagsSection and cache key; 3 fail as expected (red)
+- 2026-02-27 17:10 Unit 4b complete: flagsSection, cache key with :ds, RunAgentOptions.disableStreaming, agentOptions threading; all 676 tests pass
