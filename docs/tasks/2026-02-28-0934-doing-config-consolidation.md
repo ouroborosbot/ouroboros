@@ -217,7 +217,7 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 **Files**: `src/__tests__/engine/tools.test.ts`
 **Acceptance**: 100% coverage on web_search, all tests green.
 
-### ⬜ Unit 7: core.ts error message update
+### ✅ Unit 7: core.ts error message update
 **What**: Update error message at line 46 of core.ts from `"no provider configured. set azure or minimax credentials in config.json or env vars."` to `"no provider configured. set azure or minimax credentials in config.json."` (remove " or env vars"). No tests assert on this message text, so only the source file changes.
 **Files**: `src/engine/core.ts`
 **Acceptance**: Error message updated. All tests pass.
@@ -307,3 +307,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 10:55 Unit 6a complete: web_search tests migrated from process.env to setTestConfig, 2 tests fail (red)
 - 2026-02-28 10:56 Unit 6b complete: tools-base.ts uses getIntegrationsConfig().perplexityApiKey, all 114 tools tests pass
 - 2026-02-28 10:56 Unit 6c complete: tools-base.ts at 100% stmt/branch/func/line coverage
+- 2026-02-28 10:57 Unit 7 complete: core.ts error message updated, removed "or env vars"
