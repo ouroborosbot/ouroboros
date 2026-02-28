@@ -1,6 +1,6 @@
 # Planning: Disable Streaming Flag for Teams
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-02-27 16:37
 
 ## Goal
