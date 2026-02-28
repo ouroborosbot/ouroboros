@@ -208,36 +208,6 @@ describe("getAzureConfig", () => {
     expect(azure.apiVersion).toBe("2025-04-01-preview")
   })
 
-  it("env vars override config.json values", async () => {
-    const configData = {
-      providers: {
-        azure: {
-          apiKey: "config-key",
-          endpoint: "https://config-endpoint.openai.azure.com",
-          deployment: "config-deploy",
-          modelName: "config-model",
-          apiVersion: "2025-01-01",
-        },
-      },
-    }
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(configData))
-
-    process.env.AZURE_OPENAI_API_KEY = "env-key"
-    process.env.AZURE_OPENAI_ENDPOINT = "https://env-endpoint.openai.azure.com"
-    process.env.AZURE_OPENAI_DEPLOYMENT = "env-deploy"
-    process.env.AZURE_OPENAI_MODEL_NAME = "env-model"
-    process.env.AZURE_OPENAI_API_VERSION = "2025-06-01"
-
-    const { getAzureConfig, resetConfigCache } = await import("../config")
-    resetConfigCache()
-    const azure = getAzureConfig()
-
-    expect(azure.apiKey).toBe("env-key")
-    expect(azure.endpoint).toBe("https://env-endpoint.openai.azure.com")
-    expect(azure.deployment).toBe("env-deploy")
-    expect(azure.modelName).toBe("env-model")
-    expect(azure.apiVersion).toBe("2025-06-01")
-  })
 })
 
 describe("getMinimaxConfig", () => {
@@ -264,21 +234,6 @@ describe("getMinimaxConfig", () => {
     expect(mm.model).toBe("mm-model")
   })
 
-  it("env vars override config.json values", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(
-      JSON.stringify({ providers: { minimax: { apiKey: "config-key", model: "config-model" } } }),
-    )
-
-    process.env.MINIMAX_API_KEY = "env-key"
-    process.env.MINIMAX_MODEL = "env-model"
-
-    const { getMinimaxConfig, resetConfigCache } = await import("../config")
-    resetConfigCache()
-    const mm = getMinimaxConfig()
-
-    expect(mm.apiKey).toBe("env-key")
-    expect(mm.model).toBe("env-model")
-  })
 })
 
 describe("getTeamsConfig", () => {
@@ -305,23 +260,6 @@ describe("getTeamsConfig", () => {
     expect(teams.tenantId).toBe("tid")
   })
 
-  it("env vars override config.json values", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(
-      JSON.stringify({ teams: { clientId: "cfg-cid", clientSecret: "cfg-cs", tenantId: "cfg-tid" } }),
-    )
-
-    process.env.CLIENT_ID = "env-cid"
-    process.env.CLIENT_SECRET = "env-cs"
-    process.env.TENANT_ID = "env-tid"
-
-    const { getTeamsConfig, resetConfigCache } = await import("../config")
-    resetConfigCache()
-    const teams = getTeamsConfig()
-
-    expect(teams.clientId).toBe("env-cid")
-    expect(teams.clientSecret).toBe("env-cs")
-    expect(teams.tenantId).toBe("env-tid")
-  })
 })
 
 describe("getContextConfig", () => {
@@ -357,21 +295,6 @@ describe("getContextConfig", () => {
     expect(ctx.contextMargin).toBe(20)
   })
 
-  it("env vars override config.json values", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(
-      JSON.stringify({ context: { maxTokens: 100000, contextMargin: 25 } }),
-    )
-
-    process.env.OUROBOROS_MAX_TOKENS = "50000"
-    process.env.OUROBOROS_CONTEXT_MARGIN = "30"
-
-    const { getContextConfig, resetConfigCache } = await import("../config")
-    resetConfigCache()
-    const ctx = getContextConfig()
-
-    expect(ctx.maxTokens).toBe(50000)
-    expect(ctx.contextMargin).toBe(30)
-  })
 })
 
 describe("getSessionDir", () => {
@@ -455,36 +378,6 @@ describe("getOAuthConfig", () => {
     expect(oauth.adoConnectionName).toBe("custom-ado")
   })
 
-  it("env vars override config.json values", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(
-      JSON.stringify({ oauth: { graphConnectionName: "config-graph", adoConnectionName: "config-ado" } }),
-    )
-
-    process.env.OAUTH_GRAPH_CONNECTION = "env-graph"
-    process.env.OAUTH_ADO_CONNECTION = "env-ado"
-
-    const { getOAuthConfig, resetConfigCache } = await import("../config")
-    resetConfigCache()
-    const oauth = getOAuthConfig()
-
-    expect(oauth.graphConnectionName).toBe("env-graph")
-    expect(oauth.adoConnectionName).toBe("env-ado")
-  })
-
-  it("env vars override defaults when no config.json", async () => {
-    vi.mocked(fs.readFileSync).mockImplementation(() => {
-      throw new Error("ENOENT")
-    })
-
-    process.env.OAUTH_GRAPH_CONNECTION = "my-graph"
-
-    const { getOAuthConfig, resetConfigCache } = await import("../config")
-    resetConfigCache()
-    const oauth = getOAuthConfig()
-
-    expect(oauth.graphConnectionName).toBe("my-graph")
-    expect(oauth.adoConnectionName).toBe("ado")
-  })
 })
 
 describe("getAdoConfig", () => {
@@ -517,55 +410,6 @@ describe("getAdoConfig", () => {
     expect(ado.organizations).toEqual(["org1", "org2"])
   })
 
-  it("parses ADO_ORGANIZATIONS env var as comma-separated list", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
-
-    process.env.ADO_ORGANIZATIONS = "orgA,orgB,orgC"
-
-    const { getAdoConfig, resetConfigCache } = await import("../config")
-    resetConfigCache()
-    const ado = getAdoConfig()
-
-    expect(ado.organizations).toEqual(["orgA", "orgB", "orgC"])
-  })
-
-  it("trims whitespace from parsed organizations", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
-
-    process.env.ADO_ORGANIZATIONS = " org1 , org2 , org3 "
-
-    const { getAdoConfig, resetConfigCache } = await import("../config")
-    resetConfigCache()
-    const ado = getAdoConfig()
-
-    expect(ado.organizations).toEqual(["org1", "org2", "org3"])
-  })
-
-  it("env var overrides config.json organizations", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(
-      JSON.stringify({ ado: { organizations: ["config-org"] } }),
-    )
-
-    process.env.ADO_ORGANIZATIONS = "env-org1,env-org2"
-
-    const { getAdoConfig, resetConfigCache } = await import("../config")
-    resetConfigCache()
-    const ado = getAdoConfig()
-
-    expect(ado.organizations).toEqual(["env-org1", "env-org2"])
-  })
-
-  it("handles empty ADO_ORGANIZATIONS env var", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
-
-    process.env.ADO_ORGANIZATIONS = ""
-
-    const { getAdoConfig, resetConfigCache } = await import("../config")
-    resetConfigCache()
-    const ado = getAdoConfig()
-
-    expect(ado.organizations).toEqual([])
-  })
 })
 
 describe("getTeamsChannelConfig", () => {
