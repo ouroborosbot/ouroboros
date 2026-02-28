@@ -157,7 +157,7 @@ Total: 23 references to remove, 1 to keep (OUROBOROS_CONFIG_PATH).
 **Files**: `src/config.ts`
 **Acceptance**: All config.test.ts tests pass. Only OUROBOROS_CONFIG_PATH remains in config.ts process.env usage.
 
-### ⬜ Unit 3c: Strip env var fallbacks from 6 getters -- Coverage
+### ✅ Unit 3c: Strip env var fallbacks from 6 getters -- Coverage
 **What**: Verify 100% coverage on simplified getters. Getters are now trivial one-liners so coverage should be automatic from existing tests.
 **Files**: `src/__tests__/config.test.ts`
 **Acceptance**: 100% coverage on all 6 getters, all tests green.
@@ -297,3 +297,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 10:41 Unit 2c complete: 100% line/function coverage on setTestConfig
 - 2026-02-28 10:42 Unit 3a complete: removed 10 env var override tests from 6 getters (44->34 tests)
 - 2026-02-28 10:43 Unit 3b complete: all 6 getters now return shallow copies directly, 18 env var references removed from config.ts
+- 2026-02-28 10:43 Unit 3c complete: config.ts at 100% stmt/branch/func/line coverage
