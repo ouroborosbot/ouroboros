@@ -227,7 +227,7 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 **Files**: `src/__tests__/engine/core.test.ts`
 **Acceptance**: All core tests pass. No process.env references remain except OUROBOROS_CONFIG_PATH.
 
-### ⬜ Unit 8b: Migrate streaming.test.ts to setTestConfig()
+### ✅ Unit 8b: Migrate streaming.test.ts to setTestConfig()
 **What**: Migrate all process.env.* manipulation in streaming.test.ts (8 references, 4 blocks of MINIMAX env var setup) to setTestConfig() calls.
 **Files**: `src/__tests__/engine/streaming.test.ts`
 **Acceptance**: All streaming tests pass. No process.env references remain.
@@ -309,3 +309,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 10:56 Unit 6c complete: tools-base.ts at 100% stmt/branch/func/line coverage
 - 2026-02-28 10:57 Unit 7 complete: core.ts error message updated, removed "or env vars"
 - 2026-02-28 11:04 Unit 8a complete: core.test.ts migrated from process.env to dynamic setupMinimax/setupAzure/setupConfig helpers, 140 tests pass
+- 2026-02-28 11:05 Unit 8b complete: streaming.test.ts migrated 4 beforeEach blocks from process.env to setTestConfig, 64 tests pass
