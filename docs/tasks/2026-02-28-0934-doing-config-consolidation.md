@@ -252,7 +252,7 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 **Files**: `src/__tests__/config.test.ts`
 **Acceptance**: All config tests pass. Only OUROBOROS_CONFIG_PATH process.env references remain.
 
-### ⬜ Unit 9: Cleanup -- delete .env, update .gitignore, update comments
+### ✅ Unit 9: Cleanup -- delete .env, update .gitignore, update comments
 **What**: Three cleanup items:
 1. Delete `.env` file (untracked/gitignored, contains only CLIENT_ID/CLIENT_SECRET/TENANT_ID which are in config.json)
 2. Remove the `.env` line from `.gitignore` (line 4, no longer needed)
@@ -314,3 +314,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 11:07 Unit 8d complete: teams.test.ts all process.env references removed (CLIENT_ID, CLIENT_SECRET, TENANT_ID, PORT, AZURE_OPENAI_API_KEY, DISABLE_STREAMING), 112 tests pass
 - 2026-02-28 11:07 Unit 8e complete: tools.test.ts already fully migrated in Unit 6a, no process.env references remain
 - 2026-02-28 11:08 Unit 8f complete: config.test.ts only OUROBOROS_CONFIG_PATH remains (intentionally kept)
+- 2026-02-28 11:08 Unit 9 complete: .env deleted, .gitignore updated, teams-entry.ts comment updated
