@@ -236,7 +236,10 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
 
 // Start the Teams app in DevtoolsPlugin mode (local dev) or Bot Service mode (real Teams).
 // Mode is determined by getTeamsConfig().clientId.
+// Supports --disable-streaming CLI flag to buffer text output instead of streaming it.
+// Rationale: devtunnel nginx relay buffers chunked responses, causing compounding latency.
 export function startTeamsApp(): void {
+  const disableStreaming = process.argv.includes("--disable-streaming")
   const mentionStripping = { activity: { mentions: { stripText: true as const } } }
   const teamsConfig = getTeamsConfig()
 
@@ -304,7 +307,7 @@ export function startTeamsApp(): void {
     }
 
     try {
-      await withConversationLock(convId, () => handleTeamsMessage(text, stream, convId, teamsContext))
+      await withConversationLock(convId, () => handleTeamsMessage(text, stream, convId, teamsContext, disableStreaming))
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       console.error(`[teams] handler error: ${msg.slice(0, 200)}`)
@@ -332,4 +335,5 @@ export function startTeamsApp(): void {
   const port = parseInt(process.env.PORT || "3978", 10)
   app.start(port)
   console.log(`Teams bot started on port ${port} with ${mode}`)
+  if (disableStreaming) console.log("streaming: disabled")
 }
