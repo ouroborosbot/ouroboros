@@ -84,6 +84,7 @@ export interface ChannelCallbacks {
 
 export interface RunAgentOptions {
   toolChoiceRequired?: boolean;
+  disableStreaming?: boolean;
   maxKicks?: number;
   toolContext?: ToolContext;
 }

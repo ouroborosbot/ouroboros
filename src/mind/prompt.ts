@@ -104,6 +104,15 @@ function skillsSection(): string {
 
 export interface BuildSystemOptions {
   toolChoiceRequired?: boolean;
+  disableStreaming?: boolean;
+}
+
+// Returns a "## my flags" section when runtime flags alter agent behavior.
+// Currently only handles disableStreaming for the Teams channel.
+export function flagsSection(channel: Channel, options?: BuildSystemOptions): string {
+  if (!options?.disableStreaming || channel !== "teams") return "";
+  return `## my flags
+streaming to Teams is disabled. my text responses are buffered and sent as a single message after i finish generating. the user will not see incremental text output, only status updates (thinking phrases, tool names). this is because the devtunnel relay buffers chunked responses, making streaming extremely slow.`;
 }
 
 function toolBehaviorSection(options?: BuildSystemOptions): string {
@@ -121,6 +130,7 @@ export function buildSystem(channel: Channel = "cli", options?: BuildSystemOptio
     loreSection(),
     friendsSection(),
     selfAwareSection(channel),
+    flagsSection(channel, options),
     providerSection(),
     dateSection(),
     toolsSection(options),

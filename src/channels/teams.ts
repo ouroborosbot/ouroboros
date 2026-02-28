@@ -215,7 +215,11 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
     signin: teamsContext.signin,
     adoOrganizations: getAdoConfig().organizations,
   } : undefined
-  const result = await runAgent(messages, callbacks, "teams", controller.signal, toolContext ? { toolContext } : undefined)
+  const agentOptions: Record<string, unknown> = {}
+  if (toolContext) agentOptions.toolContext = toolContext
+  if (disableStreaming) agentOptions.disableStreaming = true
+  const result = await runAgent(messages, callbacks, "teams", controller.signal,
+    Object.keys(agentOptions).length > 0 ? agentOptions as any : undefined)
 
   // Flush any buffered text (when disableStreaming is true, text was accumulated
   // instead of streamed; flush emits it as a single message to Teams)
