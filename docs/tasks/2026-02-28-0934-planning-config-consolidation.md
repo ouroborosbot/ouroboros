@@ -1,6 +1,6 @@
 # Planning: Remove Redundant Env Var Fallback Paths from Config
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-02-28 09:34
 
 ## Goal
