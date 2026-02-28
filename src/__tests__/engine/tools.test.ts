@@ -33,6 +33,7 @@ import { listSkills, loadSkill } from "../../repertoire/skills"
 
 describe("execTool", () => {
   let execTool: (name: string, args: any) => Promise<string>
+  let setTestConfig: (partial: any) => void
 
   beforeEach(async () => {
     vi.resetModules()
@@ -44,6 +45,9 @@ describe("execTool", () => {
     vi.mocked(spawnSync).mockReset()
     vi.mocked(listSkills).mockReset()
     vi.mocked(loadSkill).mockReset()
+    const config = await import("../../config")
+    config.resetConfigCache()
+    setTestConfig = config.setTestConfig
     const tools = await import("../../engine/tools")
     execTool = tools.execTool
   })
@@ -311,19 +315,15 @@ describe("execTool", () => {
   })
 
   // ── web_search ──
-  it("web_search returns error when PERPLEXITY_API_KEY not set", async () => {
-    const origKey = process.env.PERPLEXITY_API_KEY
-    delete process.env.PERPLEXITY_API_KEY
+  it("web_search returns error when perplexityApiKey not configured", async () => {
+    setTestConfig({ integrations: { perplexityApiKey: "" } })
 
     const result = await execTool("web_search", { query: "test" })
-    expect(result).toBe("error: PERPLEXITY_API_KEY not set")
-
-    if (origKey) process.env.PERPLEXITY_API_KEY = origKey
+    expect(result).toBe("error: perplexityApiKey not configured in config.json")
   })
 
   it("web_search returns results on success", async () => {
-    const origKey = process.env.PERPLEXITY_API_KEY
-    process.env.PERPLEXITY_API_KEY = "test-key"
+    setTestConfig({ integrations: { perplexityApiKey: "test-key" } })
 
     const mockResults = {
       results: [
@@ -355,14 +355,11 @@ describe("execTool", () => {
       }),
     )
 
-    process.env.PERPLEXITY_API_KEY = origKey || ""
-    if (!origKey) delete process.env.PERPLEXITY_API_KEY
     vi.unstubAllGlobals()
   })
 
   it("web_search returns error on non-ok response", async () => {
-    const origKey = process.env.PERPLEXITY_API_KEY
-    process.env.PERPLEXITY_API_KEY = "test-key"
+    setTestConfig({ integrations: { perplexityApiKey: "test-key" } })
 
     const mockFetch = vi.fn().mockResolvedValue({
       ok: false,
@@ -374,14 +371,11 @@ describe("execTool", () => {
     const result = await execTool("web_search", { query: "test" })
     expect(result).toBe("error: 429 Too Many Requests")
 
-    process.env.PERPLEXITY_API_KEY = origKey || ""
-    if (!origKey) delete process.env.PERPLEXITY_API_KEY
     vi.unstubAllGlobals()
   })
 
   it("web_search returns 'no results found' when results array is empty", async () => {
-    const origKey = process.env.PERPLEXITY_API_KEY
-    process.env.PERPLEXITY_API_KEY = "test-key"
+    setTestConfig({ integrations: { perplexityApiKey: "test-key" } })
 
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -392,14 +386,11 @@ describe("execTool", () => {
     const result = await execTool("web_search", { query: "test" })
     expect(result).toBe("no results found")
 
-    process.env.PERPLEXITY_API_KEY = origKey || ""
-    if (!origKey) delete process.env.PERPLEXITY_API_KEY
     vi.unstubAllGlobals()
   })
 
   it("web_search returns 'no results found' when results is undefined", async () => {
-    const origKey = process.env.PERPLEXITY_API_KEY
-    process.env.PERPLEXITY_API_KEY = "test-key"
+    setTestConfig({ integrations: { perplexityApiKey: "test-key" } })
 
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -410,14 +401,11 @@ describe("execTool", () => {
     const result = await execTool("web_search", { query: "test" })
     expect(result).toBe("no results found")
 
-    process.env.PERPLEXITY_API_KEY = origKey || ""
-    if (!origKey) delete process.env.PERPLEXITY_API_KEY
     vi.unstubAllGlobals()
   })
 
   it("web_search catches fetch exceptions", async () => {
-    const origKey = process.env.PERPLEXITY_API_KEY
-    process.env.PERPLEXITY_API_KEY = "test-key"
+    setTestConfig({ integrations: { perplexityApiKey: "test-key" } })
 
     const mockFetch = vi.fn().mockRejectedValue(new Error("network error"))
     vi.stubGlobal("fetch", mockFetch)
@@ -426,8 +414,6 @@ describe("execTool", () => {
     expect(result).toContain("error:")
     expect(result).toContain("network error")
 
-    process.env.PERPLEXITY_API_KEY = origKey || ""
-    if (!origKey) delete process.env.PERPLEXITY_API_KEY
     vi.unstubAllGlobals()
   })
 
