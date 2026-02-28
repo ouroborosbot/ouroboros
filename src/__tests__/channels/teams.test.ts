@@ -521,9 +521,8 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     vi.restoreAllMocks()
   })
 
-  it("uses PORT env var when set", async () => {
+  it("uses teamsChannel.port config when set", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
 
     const mockStart = vi.fn()
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -543,7 +542,10 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
 
-    process.env.PORT = "4000"
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ teamsChannel: { port: 4000 } })
+
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
 
     const teams = await import("../../channels/teams")
@@ -1824,11 +1826,13 @@ describe("Teams adapter - session persistence", () => {
     expect(runAgentFn).toHaveBeenCalled()
   })
 
-  it("OUROBOROS_SKIP_CONFIRMATION=1 sets skipConfirmation in agent options", async () => {
+  it("skipConfirmation=true in teamsChannel config sets skipConfirmation in agent options", async () => {
     vi.resetModules()
-    process.env.OUROBOROS_SKIP_CONFIRMATION = "1"
     const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDeps({ runAgentFn })
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ teamsChannel: { skipConfirmation: true } })
     const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
 
@@ -1836,15 +1840,14 @@ describe("Teams adapter - session persistence", () => {
     expect(runAgentFn).toHaveBeenCalled()
     const options = runAgentFn.mock.calls[0][4]
     expect(options.skipConfirmation).toBe(true)
-
-    delete process.env.OUROBOROS_SKIP_CONFIRMATION
   })
 
-  it("skipConfirmation not set when OUROBOROS_SKIP_CONFIRMATION is absent", async () => {
+  it("skipConfirmation not set when teamsChannel.skipConfirmation is false (default)", async () => {
     vi.resetModules()
-    delete process.env.OUROBOROS_SKIP_CONFIRMATION
     const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDeps({ runAgentFn })
+    const { resetConfigCache } = await import("../../config")
+    resetConfigCache()
     const teams = await import("../../channels/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
 
@@ -2321,11 +2324,9 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
     vi.restoreAllMocks()
   })
 
-  it("detects --disable-streaming via DISABLE_STREAMING=1 env var", async () => {
+  it("detects disableStreaming via teamsChannel config", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
     process.argv = ["node", "teams-entry.ts"]
-    process.env.DISABLE_STREAMING = "1"
 
     vi.doMock("@microsoft/teams.apps", () => ({
       App: class MockApp {
@@ -2344,6 +2345,10 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
 
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ teamsChannel: { disableStreaming: true } })
+
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
 
     const teams = await import("../../channels/teams")
@@ -2352,7 +2357,6 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
     const logCalls = consoleSpy.mock.calls.map((c: any) => c[0])
     expect(logCalls.some((msg: string) => msg.includes("streaming: disabled"))).toBe(true)
 
-    delete process.env.DISABLE_STREAMING
     consoleSpy.mockRestore()
     vi.restoreAllMocks()
   })
