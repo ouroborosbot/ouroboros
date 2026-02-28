@@ -222,7 +222,7 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 **Files**: `src/engine/core.ts`
 **Acceptance**: Error message updated. All tests pass.
 
-### ⬜ Unit 8a: Migrate core.test.ts to setTestConfig()
+### ✅ Unit 8a: Migrate core.test.ts to setTestConfig()
 **What**: Migrate all process.env.* manipulation in core.test.ts (185 references) to setTestConfig() calls. This is the largest test file. Replace env var setup/teardown blocks with setTestConfig + resetConfigCache patterns.
 **Files**: `src/__tests__/engine/core.test.ts`
 **Acceptance**: All core tests pass. No process.env references remain except OUROBOROS_CONFIG_PATH.
@@ -308,3 +308,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 10:56 Unit 6b complete: tools-base.ts uses getIntegrationsConfig().perplexityApiKey, all 114 tools tests pass
 - 2026-02-28 10:56 Unit 6c complete: tools-base.ts at 100% stmt/branch/func/line coverage
 - 2026-02-28 10:57 Unit 7 complete: core.ts error message updated, removed "or env vars"
+- 2026-02-28 11:04 Unit 8a complete: core.test.ts migrated from process.env to dynamic setupMinimax/setupAzure/setupConfig helpers, 140 tests pass
