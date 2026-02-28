@@ -19,10 +19,12 @@ vi.mock("../../repertoire/skills", () => ({
 
 vi.mock("../../engine/graph-client", () => ({
   getProfile: vi.fn(),
+  graphRequest: vi.fn(),
 }))
 
 vi.mock("../../engine/ado-client", () => ({
   queryWorkItems: vi.fn(),
+  adoRequest: vi.fn(),
 }))
 
 import * as fs from "fs"
@@ -587,11 +589,15 @@ describe("getToolsForChannel", () => {
     // Should NOT have graph/ado tools
     expect(names).not.toContain("graph_profile")
     expect(names).not.toContain("ado_work_items")
+    expect(names).not.toContain("graph_query")
+    expect(names).not.toContain("graph_mutate")
+    expect(names).not.toContain("ado_query")
+    expect(names).not.toContain("ado_mutate")
     // Same length as base tools
     expect(cliTools.length).toBe(tools.length)
   })
 
-  it("returns base tools plus graph/ado tools for teams channel", async () => {
+  it("returns base tools plus all teams tools for teams channel", async () => {
     vi.resetModules()
     const { getToolsForChannel, tools } = await import("../../engine/tools")
     const teamsTools = getToolsForChannel("teams")
@@ -599,11 +605,16 @@ describe("getToolsForChannel", () => {
     // Should have all base tools
     expect(names).toContain("read_file")
     expect(names).toContain("shell")
-    // Should have graph/ado tools
+    // Should have generic tools
+    expect(names).toContain("graph_query")
+    expect(names).toContain("graph_mutate")
+    expect(names).toContain("ado_query")
+    expect(names).toContain("ado_mutate")
+    // Should have convenience aliases
     expect(names).toContain("graph_profile")
     expect(names).toContain("ado_work_items")
-    // Should be longer than base tools
-    expect(teamsTools.length).toBeGreaterThan(tools.length)
+    // Should be longer than base tools (base + 6 teams tools)
+    expect(teamsTools.length).toBe(tools.length + 6)
   })
 
   it("returns base tools for undefined channel", async () => {
@@ -791,5 +802,349 @@ describe("summarizeArgs for graph/ado tools", () => {
 
   it("returns empty string for ado_work_items with no organization", () => {
     expect(summarizeArgs("ado_work_items", {})).toBe("")
+  })
+
+  it("returns path for graph_query", () => {
+    expect(summarizeArgs("graph_query", { path: "/me/messages" })).toBe("/me/messages")
+  })
+
+  it("returns empty string for graph_query with no path", () => {
+    expect(summarizeArgs("graph_query", {})).toBe("")
+  })
+
+  it("returns method + path for graph_mutate", () => {
+    expect(summarizeArgs("graph_mutate", { method: "POST", path: "/me/messages" })).toBe("POST /me/messages")
+  })
+
+  it("returns empty string for graph_mutate with no method/path", () => {
+    expect(summarizeArgs("graph_mutate", {})).toBe(" ")
+  })
+
+  it("returns org + path for ado_query", () => {
+    expect(summarizeArgs("ado_query", { organization: "myorg", path: "/_apis/git/repos" })).toBe("myorg /_apis/git/repos")
+  })
+
+  it("returns empty string parts for ado_query with no args", () => {
+    expect(summarizeArgs("ado_query", {})).toBe(" ")
+  })
+
+  it("returns method + org + path for ado_mutate", () => {
+    expect(summarizeArgs("ado_mutate", { method: "PATCH", organization: "myorg", path: "/_apis/wit/workitems/1" })).toBe("PATCH myorg /_apis/wit/workitems/1")
+  })
+
+  it("returns empty string parts for ado_mutate with no args", () => {
+    expect(summarizeArgs("ado_mutate", {})).toBe("  ")
+  })
+})
+
+describe("execTool for generic Graph tools", () => {
+  it("graph_query calls graphRequest with GET", async () => {
+    vi.resetModules()
+    const { graphRequest } = await import("../../engine/graph-client")
+    vi.mocked(graphRequest).mockResolvedValue('{"value": []}')
+
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: "test-token",
+      adoToken: undefined,
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const result = await execTool("graph_query", { path: "/me/messages?$top=5" }, ctx)
+    expect(result).toBe('{"value": []}')
+    expect(graphRequest).toHaveBeenCalledWith("test-token", "GET", "/me/messages?$top=5")
+  })
+
+  it("graph_query returns AUTH_REQUIRED when graphToken missing", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: undefined,
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const result = await execTool("graph_query", { path: "/me" }, ctx)
+    expect(result).toContain("AUTH_REQUIRED:graph")
+  })
+
+  it("graph_query returns AUTH_REQUIRED when no ToolContext", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+
+    const result = await execTool("graph_query", { path: "/me" })
+    expect(result).toContain("AUTH_REQUIRED:graph")
+  })
+
+  it("graph_mutate calls graphRequest with specified method and body", async () => {
+    vi.resetModules()
+    const { graphRequest } = await import("../../engine/graph-client")
+    vi.mocked(graphRequest).mockResolvedValue('{"id": "msg-1"}')
+
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: "test-token",
+      adoToken: undefined,
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const body = '{"subject": "Hello"}'
+    const result = await execTool("graph_mutate", { method: "POST", path: "/me/messages", body }, ctx)
+    expect(result).toBe('{"id": "msg-1"}')
+    expect(graphRequest).toHaveBeenCalledWith("test-token", "POST", "/me/messages", body)
+  })
+
+  it("graph_mutate calls graphRequest with PATCH method", async () => {
+    vi.resetModules()
+    const { graphRequest } = await import("../../engine/graph-client")
+    vi.mocked(graphRequest).mockResolvedValue('{"updated": true}')
+
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: "test-token",
+      adoToken: undefined,
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const result = await execTool("graph_mutate", { method: "PATCH", path: "/me/events/1", body: '{"subject":"Updated"}' }, ctx)
+    expect(result).toBe('{"updated": true}')
+    expect(graphRequest).toHaveBeenCalledWith("test-token", "PATCH", "/me/events/1", '{"subject":"Updated"}')
+  })
+
+  it("graph_mutate calls graphRequest with DELETE method (no body)", async () => {
+    vi.resetModules()
+    const { graphRequest } = await import("../../engine/graph-client")
+    vi.mocked(graphRequest).mockResolvedValue('{}')
+
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: "test-token",
+      adoToken: undefined,
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const result = await execTool("graph_mutate", { method: "DELETE", path: "/me/messages/msg-1" }, ctx)
+    expect(result).toBe('{}')
+    expect(graphRequest).toHaveBeenCalledWith("test-token", "DELETE", "/me/messages/msg-1", undefined)
+  })
+
+  it("graph_mutate rejects invalid method", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: "test-token",
+      adoToken: undefined,
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const result = await execTool("graph_mutate", { method: "GET", path: "/me" }, ctx)
+    expect(result).toContain("Invalid method")
+    expect(result).toContain("POST, PATCH, DELETE")
+  })
+
+  it("graph_mutate returns AUTH_REQUIRED when graphToken missing", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: undefined,
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const result = await execTool("graph_mutate", { method: "POST", path: "/me/messages" }, ctx)
+    expect(result).toContain("AUTH_REQUIRED:graph")
+  })
+})
+
+describe("execTool for generic ADO tools", () => {
+  it("ado_query calls adoRequest with GET by default", async () => {
+    vi.resetModules()
+    const { adoRequest } = await import("../../engine/ado-client")
+    vi.mocked(adoRequest).mockResolvedValue('{"value": []}')
+
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+      adoOrganizations: ["myorg"],
+    }
+
+    const result = await execTool("ado_query", { organization: "myorg", path: "/_apis/git/repositories" }, ctx)
+    expect(result).toBe('{"value": []}')
+    expect(adoRequest).toHaveBeenCalledWith("test-token", "GET", "myorg", "/_apis/git/repositories", undefined)
+  })
+
+  it("ado_query calls adoRequest with POST for WIQL", async () => {
+    vi.resetModules()
+    const { adoRequest } = await import("../../engine/ado-client")
+    vi.mocked(adoRequest).mockResolvedValue('{"workItems": []}')
+
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const body = '{"query": "SELECT [System.Id] FROM WorkItems"}'
+    const result = await execTool("ado_query", { organization: "myorg", path: "/_apis/wit/wiql", method: "POST", body }, ctx)
+    expect(result).toBe('{"workItems": []}')
+    expect(adoRequest).toHaveBeenCalledWith("test-token", "POST", "myorg", "/_apis/wit/wiql", body)
+  })
+
+  it("ado_query returns AUTH_REQUIRED when adoToken missing", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: undefined,
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const result = await execTool("ado_query", { organization: "myorg", path: "/_apis/projects" }, ctx)
+    expect(result).toContain("AUTH_REQUIRED:ado")
+  })
+
+  it("ado_query returns AUTH_REQUIRED when no ToolContext", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+
+    const result = await execTool("ado_query", { organization: "myorg", path: "/_apis/projects" })
+    expect(result).toContain("AUTH_REQUIRED:ado")
+  })
+
+  it("ado_query rejects invalid organization", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+      adoOrganizations: ["org1", "org2"],
+    }
+
+    const result = await execTool("ado_query", { organization: "bad-org", path: "/_apis/projects" }, ctx)
+    expect(result).toContain("not in the configured organizations")
+    expect(result).toContain("org1")
+  })
+
+  it("ado_query allows any org when adoOrganizations is empty", async () => {
+    vi.resetModules()
+    const { adoRequest } = await import("../../engine/ado-client")
+    vi.mocked(adoRequest).mockResolvedValue('{"value": []}')
+
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const result = await execTool("ado_query", { organization: "any-org", path: "/_apis/projects" }, ctx)
+    expect(result).toBe('{"value": []}')
+  })
+
+  it("ado_mutate calls adoRequest with specified method and body", async () => {
+    vi.resetModules()
+    const { adoRequest } = await import("../../engine/ado-client")
+    vi.mocked(adoRequest).mockResolvedValue('{"id": 456}')
+
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+      adoOrganizations: ["myorg"],
+    }
+
+    const body = '[{"op": "replace", "path": "/fields/System.Title", "value": "Updated"}]'
+    const result = await execTool("ado_mutate", { method: "PATCH", organization: "myorg", path: "/_apis/wit/workitems/456", body }, ctx)
+    expect(result).toBe('{"id": 456}')
+    expect(adoRequest).toHaveBeenCalledWith("test-token", "PATCH", "myorg", "/_apis/wit/workitems/456", body)
+  })
+
+  it("ado_mutate rejects invalid method", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+      adoOrganizations: ["myorg"],
+    }
+
+    const result = await execTool("ado_mutate", { method: "GET", organization: "myorg", path: "/_apis/projects" }, ctx)
+    expect(result).toContain("Invalid method")
+    expect(result).toContain("POST, PATCH, DELETE")
+  })
+
+  it("ado_mutate returns AUTH_REQUIRED when adoToken missing", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: undefined,
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const result = await execTool("ado_mutate", { method: "POST", organization: "myorg", path: "/_apis/wit/workitems" }, ctx)
+    expect(result).toContain("AUTH_REQUIRED:ado")
+  })
+
+  it("ado_mutate rejects invalid organization", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+      adoOrganizations: ["org1"],
+    }
+
+    const result = await execTool("ado_mutate", { method: "POST", organization: "bad-org", path: "/_apis/wit/workitems" }, ctx)
+    expect(result).toContain("not in the configured organizations")
+  })
+
+  it("ado_mutate allows any org when adoOrganizations is empty", async () => {
+    vi.resetModules()
+    const { adoRequest } = await import("../../engine/ado-client")
+    vi.mocked(adoRequest).mockResolvedValue('{"id": 1}')
+
+    const { execTool } = await import("../../engine/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const result = await execTool("ado_mutate", { method: "POST", organization: "any-org", path: "/_apis/wit/workitems", body: '{}' }, ctx)
+    expect(result).toBe('{"id": 1}')
+  })
+})
+
+describe("confirmationRequired export", () => {
+  it("exports confirmationRequired set from tools-teams", async () => {
+    vi.resetModules()
+    const { confirmationRequired } = await import("../../engine/tools-teams")
+    expect(confirmationRequired).toBeInstanceOf(Set)
+    expect(confirmationRequired.has("graph_mutate")).toBe(true)
+    expect(confirmationRequired.has("ado_mutate")).toBe(true)
+    expect(confirmationRequired.has("graph_query")).toBe(false)
+    expect(confirmationRequired.has("ado_query")).toBe(false)
+    expect(confirmationRequired.has("graph_profile")).toBe(false)
+    expect(confirmationRequired.has("ado_work_items")).toBe(false)
   })
 })
