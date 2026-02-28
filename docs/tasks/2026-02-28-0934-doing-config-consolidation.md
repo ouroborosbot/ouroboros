@@ -168,7 +168,7 @@ Total: 23 references to remove, 1 to keep (OUROBOROS_CONFIG_PATH).
 **Files**: `src/__tests__/mind/prompt.test.ts`
 **Acceptance**: Tests updated. Tests FAIL because prompt.ts still reads process.env directly.
 
-### ⬜ Unit 4b: prompt.ts providerSection -- Implementation
+### ✅ Unit 4b: prompt.ts providerSection -- Implementation
 **What**: Rewrite providerSection() to use getProvider() and getAzureConfig().deployment instead of process.env. Two import changes needed:
 1. Add `getProvider` to existing import from `../engine/core` (currently imports only `getModel`)
 2. Add new import: `import { getAzureConfig } from "../config"` (getAzureConfig is NOT re-exported from core.ts)
@@ -299,3 +299,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 10:43 Unit 3b complete: all 6 getters now return shallow copies directly, 18 env var references removed from config.ts
 - 2026-02-28 10:43 Unit 3c complete: config.ts at 100% stmt/branch/func/line coverage
 - 2026-02-28 10:45 Unit 4a complete: prompt.test.ts migrated from env vars to setTestConfig, 2 azure tests fail (red)
+- 2026-02-28 10:46 Unit 4b complete: providerSection() uses getProvider/getAzureConfig, no process.env in prompt.ts
