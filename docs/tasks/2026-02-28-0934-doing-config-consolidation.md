@@ -247,7 +247,7 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 **Files**: `src/__tests__/engine/tools.test.ts`
 **Acceptance**: All tools tests pass. No process.env references remain.
 
-### ⬜ Unit 8f: Migrate remaining config.test.ts to setTestConfig()
+### ✅ Unit 8f: Migrate remaining config.test.ts to setTestConfig()
 **What**: Migrate any remaining process.env.* references in config.test.ts not already handled in Unit 3a (20 total, some handled in 3a). OUROBOROS_CONFIG_PATH tests keep their process.env usage (that env var is intentionally kept).
 **Files**: `src/__tests__/config.test.ts`
 **Acceptance**: All config tests pass. Only OUROBOROS_CONFIG_PATH process.env references remain.
@@ -313,3 +313,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 11:06 Unit 8c complete: prompt.test.ts already fully migrated in Unit 4a, no process.env references remain
 - 2026-02-28 11:07 Unit 8d complete: teams.test.ts all process.env references removed (CLIENT_ID, CLIENT_SECRET, TENANT_ID, PORT, AZURE_OPENAI_API_KEY, DISABLE_STREAMING), 112 tests pass
 - 2026-02-28 11:07 Unit 8e complete: tools.test.ts already fully migrated in Unit 6a, no process.env references remain
+- 2026-02-28 11:08 Unit 8f complete: config.test.ts only OUROBOROS_CONFIG_PATH remains (intentionally kept)
