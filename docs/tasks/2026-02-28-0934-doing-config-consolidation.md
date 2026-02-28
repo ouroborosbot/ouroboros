@@ -232,7 +232,7 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 **Files**: `src/__tests__/engine/streaming.test.ts`
 **Acceptance**: All streaming tests pass. No process.env references remain.
 
-### ⬜ Unit 8c: Migrate remaining prompt.test.ts to setTestConfig()
+### ✅ Unit 8c: Migrate remaining prompt.test.ts to setTestConfig()
 **What**: Migrate any remaining process.env.* references in prompt.test.ts not already handled in Unit 4a (26 total, some handled in 4a).
 **Files**: `src/__tests__/mind/prompt.test.ts`
 **Acceptance**: All prompt tests pass. No process.env references remain.
@@ -310,3 +310,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 10:57 Unit 7 complete: core.ts error message updated, removed "or env vars"
 - 2026-02-28 11:04 Unit 8a complete: core.test.ts migrated from process.env to dynamic setupMinimax/setupAzure/setupConfig helpers, 140 tests pass
 - 2026-02-28 11:05 Unit 8b complete: streaming.test.ts migrated 4 beforeEach blocks from process.env to setTestConfig, 64 tests pass
+- 2026-02-28 11:06 Unit 8c complete: prompt.test.ts already fully migrated in Unit 4a, no process.env references remain
