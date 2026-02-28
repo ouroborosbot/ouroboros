@@ -105,7 +105,7 @@ Every config getter in config.ts reads config.json then checks process.env.* as 
 **Acceptance**: All prompt tests that previously set process.env.AZURE_OPENAI_API_KEY or process.env.AZURE_OPENAI_DEPLOYMENT now use setTestConfig(). Tests FAIL because prompt.ts still reads process.env.
 
 ### ⬜ Unit 4b: prompt.ts providerSection -- Implementation
-**What**: Rewrite providerSection() in prompt.ts to use getProvider() and getAzureConfig().deployment instead of process.env.AZURE_OPENAI_API_KEY and process.env.AZURE_OPENAI_DEPLOYMENT. Import getProvider and getAzureConfig from config.ts (or from core.ts where getProvider lives).
+**What**: Rewrite providerSection() in prompt.ts to use getProvider() and getAzureConfig().deployment instead of process.env.AZURE_OPENAI_API_KEY and process.env.AZURE_OPENAI_DEPLOYMENT. Import getProvider from `../engine/core` (add to existing getModel import) and getAzureConfig from `../config` (new import line). getAzureConfig is NOT re-exported from core.ts, so it must come from config directly.
 **Files**: `src/mind/prompt.ts`
 **Acceptance**: All prompt.test.ts tests pass. No process.env references in prompt.ts.
 
@@ -120,9 +120,13 @@ Every config getter in config.ts reads config.json then checks process.env.* as 
 **Acceptance**: All teams tests that previously set these 3 env vars now use setTestConfig(). Tests FAIL because teams.ts still reads process.env.
 
 ### ⬜ Unit 5b: teams.ts env var removal -- Implementation
-**What**: Import getTeamsChannelConfig from config.ts. Replace process.env.OUROBOROS_SKIP_CONFIRMATION check (line 259) with getTeamsChannelConfig().skipConfirmation. Replace process.env.DISABLE_STREAMING check (line 288) with getTeamsChannelConfig().disableStreaming. Replace process.env.PORT (line 393) with getTeamsChannelConfig().port. Keep process.argv.includes("--disable-streaming") as-is.
+**What**: Add `getTeamsChannelConfig` to existing config import (teams.ts already imports `getOAuthConfig, getAdoConfig, sessionPath, getTeamsConfig` from `../config`). Three replacements:
+1. Line 259: `process.env.OUROBOROS_SKIP_CONFIRMATION === "1"` becomes `getTeamsChannelConfig().skipConfirmation`
+2. Lines 287-288: `process.argv.includes("--disable-streaming") || process.env.DISABLE_STREAMING === "1"` becomes `process.argv.includes("--disable-streaming") || getTeamsChannelConfig().disableStreaming` (keep process.argv, replace process.env)
+3. Line 393: `parseInt(process.env.PORT || "3978", 10)` becomes `getTeamsChannelConfig().port`
+Also update the comment on line 286 to remove the DISABLE_STREAMING=1 env var reference.
 **Files**: `src/channels/teams.ts`
-**Acceptance**: All teams.test.ts tests pass. No process.env references in teams.ts (except process.argv which is out of scope).
+**Acceptance**: All teams.test.ts tests pass. No process.env references in teams.ts.
 
 ### ⬜ Unit 5c: teams.ts env var removal -- Coverage
 **What**: Verify 100% coverage on modified teams.ts code paths. Both skipConfirmation true/false, disableStreaming true/false, and custom port must be covered.
@@ -135,7 +139,7 @@ Every config getter in config.ts reads config.json then checks process.env.* as 
 **Acceptance**: All tools tests that previously set PERPLEXITY_API_KEY now use setTestConfig(). Tests FAIL because tools-base.ts still reads process.env.
 
 ### ⬜ Unit 6b: tools-base.ts env var removal -- Implementation
-**What**: Import getIntegrationsConfig from config.ts. Replace process.env.PERPLEXITY_API_KEY (line 222) with getIntegrationsConfig().perplexityApiKey. Update the error message on line 223 if it references env vars.
+**What**: Add `import { getIntegrationsConfig } from "../config"` (new import -- tools-base.ts has no config import yet). Replace `process.env.PERPLEXITY_API_KEY` (line 222) with `getIntegrationsConfig().perplexityApiKey`. Update error message on line 223 from "PERPLEXITY_API_KEY not set" to "perplexityApiKey not configured in config.json".
 **Files**: `src/engine/tools-base.ts`
 **Acceptance**: All tools.test.ts tests pass. No process.env references in tools-base.ts.
 
@@ -145,9 +149,9 @@ Every config getter in config.ts reads config.json then checks process.env.* as 
 **Acceptance**: 100% coverage on web_search, all tests green.
 
 ### ⬜ Unit 7: core.ts error message update
-**What**: Update the error message at line 46 of core.ts from "set azure or minimax credentials in config.json or env vars." to "set azure or minimax credentials in config.json." Remove "or env vars".
-**Files**: `src/engine/core.ts`, `src/__tests__/engine/core.test.ts`
-**Acceptance**: Error message updated. Any tests asserting on this message updated to match. All tests pass.
+**What**: Update the error message at line 46 of core.ts from "set azure or minimax credentials in config.json or env vars." to "set azure or minimax credentials in config.json." (remove " or env vars"). No tests assert on this message text, so only the source file changes.
+**Files**: `src/engine/core.ts`
+**Acceptance**: Error message updated. All tests pass.
 
 ### ⬜ Unit 8a: Migrate core.test.ts to setTestConfig()
 **What**: Migrate all process.env.* manipulation in core.test.ts (~185 references) to setTestConfig() calls. This is the largest test file. Replace env var setup/teardown blocks with setTestConfig + resetConfigCache patterns.
@@ -179,10 +183,13 @@ Every config getter in config.ts reads config.json then checks process.env.* as 
 **Files**: `src/__tests__/config.test.ts`
 **Acceptance**: All config tests pass. Only OUROBOROS_CONFIG_PATH process.env references remain.
 
-### ⬜ Unit 9: Cleanup -- delete .env, update comments
-**What**: Delete the .env file. Update teams-entry.ts line 5 comment from "with env var overrides" to remove that phrase. Verify no other comments reference env var configuration.
-**Files**: `.env`, `src/teams-entry.ts`
-**Acceptance**: .env file gone. teams-entry.ts comment updated. All tests still pass.
+### ⬜ Unit 9: Cleanup -- delete .env, update comments, update .gitignore
+**What**: Three cleanup items:
+1. Delete `.env` file (untracked/gitignored, contains only CLIENT_ID/CLIENT_SECRET/TENANT_ID which are in config.json)
+2. Remove the `.env` line from `.gitignore` (no longer needed since we don't use .env files)
+3. Update `src/teams-entry.ts` line 5 comment: change "All config now comes from ~/.agentconfigs/ouroboros/config.json (with env var overrides)." to "All config comes from ~/.agentconfigs/ouroboros/config.json."
+**Files**: `.env` (delete), `.gitignore` (remove .env line), `src/teams-entry.ts` (update comment)
+**Acceptance**: .env file gone. .gitignore no longer mentions .env. teams-entry.ts comment updated. All tests still pass.
 
 ### ⬜ Unit 10: Final verification
 **What**: Run full test suite, check coverage, run the grep verification command from completion criteria.
@@ -202,3 +209,4 @@ Every config getter in config.ts reads config.json then checks process.env.* as 
 
 ## Progress Log
 - 2026-02-28 10:28 Created from planning doc (Pass 1 -- first draft)
+- 2026-02-28 10:29 Pass 2 -- granularity: broke Unit 8 into 6 per-file sub-units (8a-8f)
