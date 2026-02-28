@@ -111,3 +111,4 @@ setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" 
 ## Progress Log
 - 2026-02-28 09:34 Created
 - 2026-02-28 10:05 Reframed as removing redundant fallback paths, not migration. Added .env deletion, updated context with config.json reality.
+- 2026-02-28 10:26 Fixed framing: env var overrides are functional redundant fallbacks, not dead code. Consistent language throughout.
