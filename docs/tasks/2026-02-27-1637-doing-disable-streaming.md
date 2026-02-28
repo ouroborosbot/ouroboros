@@ -158,7 +158,7 @@ In `src/channels/teams.ts`:
 **Files**: `src/__tests__/mind/prompt.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `flagsSection` does not yet include the rationale detail
 
-### ⬜ Unit 5b: Rationale documentation -- Implementation
+### ✅ Unit 5b: Rationale documentation -- Implementation
 **What**: Update the `flagsSection()` function in `src/mind/prompt.ts` to include the rationale in the system prompt text. Also add a code comment block at the top of the `flagsSection` function documenting the research findings (devtunnel limitations, Teams throttling, the GitHub issue reference). The system prompt text should be concise but informative for the agent; the code comment should be detailed for developers.
 **Files**: `src/mind/prompt.ts`
 **Acceptance**: All Unit 5a tests PASS (green), no warnings
@@ -200,3 +200,4 @@ In `src/channels/teams.ts`:
 - 2026-02-27 17:10 Unit 4b complete: flagsSection, cache key with :ds, RunAgentOptions.disableStreaming, agentOptions threading; all 676 tests pass
 - 2026-02-27 17:11 Unit 4c complete: 100% coverage on prompt.ts, context.ts; teams.ts new code fully covered
 - 2026-02-27 17:11 Unit 5a complete: 5 failing tests for flagsSection rationale (devtunnel, timeout, HTTP/2, throttle, latency)
+- 2026-02-27 17:12 Unit 5b complete: detailed rationale in flagsSection prompt text + developer code comment; all 681 tests pass
