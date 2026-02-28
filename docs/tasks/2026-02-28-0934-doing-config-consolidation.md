@@ -120,7 +120,7 @@ Total: 23 references to remove, 1 to keep (OUROBOROS_CONFIG_PATH).
 **Files**: `src/config.ts`
 **Acceptance**: Unit 1a tests PASS (green). New interfaces and getters exported.
 
-### ⬜ Unit 1c: New interfaces and getters -- Coverage
+### ✅ Unit 1c: New interfaces and getters -- Coverage
 **What**: Verify 100% coverage on new code. Add edge case tests if needed (missing sections, partial config).
 **Files**: `src/__tests__/config.test.ts`
 **Acceptance**: 100% coverage on new interfaces/getters, all tests green.
@@ -291,3 +291,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 10:35 Pass 4 -- quality: all 21 units have acceptance criteria, no TBD items, all emoji prefixes present, env var manifest complete (23 to remove, 1 to keep), status set to READY_FOR_EXECUTION
 - 2026-02-28 10:38 Unit 1a complete: 7 failing tests for getTeamsChannelConfig and getIntegrationsConfig
 - 2026-02-28 10:39 Unit 1b complete: TeamsChannelConfig, IntegrationsConfig interfaces and getters added to config.ts
+- 2026-02-28 10:39 Unit 1c complete: 100% line/function coverage on new getters, no additional tests needed
