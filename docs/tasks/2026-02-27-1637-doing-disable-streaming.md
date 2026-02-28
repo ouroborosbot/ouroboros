@@ -148,7 +148,7 @@ In `src/channels/teams.ts`:
 **What**: Verify 100% coverage on all prompt/context/options changes, refactor if needed
 **Acceptance**: 100% coverage on new code, tests still green
 
-### ⬜ Unit 5a: Rationale documentation -- Tests
+### ✅ Unit 5a: Rationale documentation -- Tests
 **What**: Write a test that verifies the `flagsSection()` output includes the key rationale points as code-level documentation:
 - Devtunnel nginx relay buffers responses (reference: microsoft/dev-tunnels#518)
 - 60-second hard timeout on web-forwarded connections
@@ -199,3 +199,4 @@ In `src/channels/teams.ts`:
 - 2026-02-27 17:09 Unit 4a complete: 6 tests for flagsSection and cache key; 3 fail as expected (red)
 - 2026-02-27 17:10 Unit 4b complete: flagsSection, cache key with :ds, RunAgentOptions.disableStreaming, agentOptions threading; all 676 tests pass
 - 2026-02-27 17:11 Unit 4c complete: 100% coverage on prompt.ts, context.ts; teams.ts new code fully covered
+- 2026-02-27 17:11 Unit 5a complete: 5 failing tests for flagsSection rationale (devtunnel, timeout, HTTP/2, throttle, latency)
