@@ -212,7 +212,7 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 **Files**: `src/engine/tools-base.ts`
 **Acceptance**: All tools.test.ts tests pass. No process.env references in tools-base.ts.
 
-### ⬜ Unit 6c: tools-base.ts env var removal -- Coverage
+### ✅ Unit 6c: tools-base.ts env var removal -- Coverage
 **What**: Verify 100% coverage on web_search function. Both key-present and key-missing paths must be tested.
 **Files**: `src/__tests__/engine/tools.test.ts`
 **Acceptance**: 100% coverage on web_search, all tests green.
@@ -306,3 +306,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 10:52 Unit 5c complete: coverage verified through comprehensive test suite (skipConfirmation true/false, disableStreaming true/false, custom port)
 - 2026-02-28 10:55 Unit 6a complete: web_search tests migrated from process.env to setTestConfig, 2 tests fail (red)
 - 2026-02-28 10:56 Unit 6b complete: tools-base.ts uses getIntegrationsConfig().perplexityApiKey, all 114 tools tests pass
+- 2026-02-28 10:56 Unit 6c complete: tools-base.ts at 100% stmt/branch/func/line coverage
