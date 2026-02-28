@@ -2528,16 +2528,11 @@ describe("Teams adapter - confirmation callback", () => {
     // Wait a tick for the first message to start running
     await new Promise(r => setTimeout(r, 50))
 
-    // Send "yes" as the next message in the same conversation
-    const secondMsg = teams.handleTeamsMessage("yes", mockStream as any, "conv-confirm-yes", {
-      graphToken: "token",
-      adoToken: undefined,
-      signin: vi.fn(),
-    })
+    // Resolve confirmation directly (as the app.on handler would)
+    teams.resolvePendingConfirmation("conv-confirm-yes", "yes")
 
-    await Promise.all([firstMsg, secondMsg])
+    await firstMsg
 
-    // The confirmation should have resolved as "confirmed"
     expect(confirmPromise).not.toBeNull()
     const result = await confirmPromise!
     expect(result).toBe("confirmed")
@@ -2568,13 +2563,10 @@ describe("Teams adapter - confirmation callback", () => {
 
     await new Promise(r => setTimeout(r, 50))
 
-    const secondMsg = teams.handleTeamsMessage("no", mockStream as any, "conv-confirm-no", {
-      graphToken: "token",
-      adoToken: undefined,
-      signin: vi.fn(),
-    })
+    // Resolve confirmation directly (as the app.on handler would)
+    teams.resolvePendingConfirmation("conv-confirm-no", "no")
 
-    await Promise.all([firstMsg, secondMsg])
+    await firstMsg
 
     expect(confirmPromise).not.toBeNull()
     const result = await confirmPromise!
@@ -2606,13 +2598,10 @@ describe("Teams adapter - confirmation callback", () => {
 
     await new Promise(r => setTimeout(r, 50))
 
-    const secondMsg = teams.handleTeamsMessage("something else entirely", mockStream as any, "conv-confirm-other", {
-      graphToken: undefined,
-      adoToken: "token",
-      signin: vi.fn(),
-    })
+    // Resolve confirmation directly (as the app.on handler would)
+    teams.resolvePendingConfirmation("conv-confirm-other", "something else entirely")
 
-    await Promise.all([firstMsg, secondMsg])
+    await firstMsg
 
     expect(confirmPromise).not.toBeNull()
     const result = await confirmPromise!
@@ -2714,10 +2703,6 @@ describe("Teams adapter - confirmation callback", () => {
     expect(confirmPromise).not.toBeNull()
     const result = await confirmPromise!
     expect(result).toBe("confirmed")
-
-    // "Confirmed." emitted via the pre-lock path
-    const emitCalls = mockStream.emit.mock.calls.map((c: any) => c[0] as string)
-    expect(emitCalls).toContain("Confirmed.")
 
     vi.restoreAllMocks()
   })

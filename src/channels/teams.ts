@@ -1,7 +1,7 @@
 import OpenAI from "openai"
 import { App } from "@microsoft/teams.apps"
 import { DevtoolsPlugin } from "@microsoft/teams.dev"
-import { runAgent, ChannelCallbacks } from "../engine/core"
+import { runAgent, ChannelCallbacks, RunAgentOptions } from "../engine/core"
 import type { ToolContext } from "../engine/tools"
 import { getOAuthConfig, getAdoConfig } from "../config"
 import { buildSystem } from "../mind/prompt"
@@ -205,13 +205,9 @@ export interface TeamsMessageContext {
 
 // Handle an incoming Teams message
 export async function handleTeamsMessage(text: string, stream: TeamsStream, conversationId: string, teamsContext?: TeamsMessageContext, disableStreaming?: boolean): Promise<void> {
-  // Check for pending confirmation before anything else.
-  // If a mutate tool is waiting for confirmation, resolve it with this message.
-  if (resolvePendingConfirmation(conversationId, text)) {
-    const isConfirm = CONFIRM_WORDS.has(text.trim().toLowerCase())
-    stream.emit(isConfirm ? "Confirmed." : "Cancelled.")
-    return
-  }
+  // NOTE: Confirmation resolution is handled in the app.on("message") handler
+  // BEFORE the conversation lock.  By the time we get here, any pending
+  // confirmation has already been resolved and the reply consumed.
 
   // Send first thinking phrase immediately so the user sees feedback
   // before sync I/O (session load, trim) blocks the event loop.
@@ -257,11 +253,10 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
     signin: teamsContext.signin,
     adoOrganizations: getAdoConfig().organizations,
   } : undefined
-  const agentOptions: Record<string, unknown> = {}
+  const agentOptions: RunAgentOptions = { maxKicks: 3 }
   if (toolContext) agentOptions.toolContext = toolContext
   if (disableStreaming) agentOptions.disableStreaming = true
-  const result = await runAgent(messages, callbacks, "teams", controller.signal,
-    Object.keys(agentOptions).length > 0 ? agentOptions as any : undefined)
+  const result = await runAgent(messages, callbacks, "teams", controller.signal, agentOptions)
 
   // Flush any buffered text (when disableStreaming is true, text was accumulated
   // instead of streamed; flush emits it as a single message to Teams)
@@ -326,6 +321,18 @@ export function startTeamsApp(): void {
 
     console.log(`[teams] msg from=${userId.slice(0, 12)} conv=${convId.slice(0, 20)}`)
 
+    // Resolve pending confirmations IMMEDIATELY — before token fetches or
+    // the conversation lock.  The original message holds the lock while
+    // awaiting confirmation, so acquiring it here would deadlock.  Token
+    // fetches are also unnecessary (and slow) for a simple yes/no reply.
+    if (resolvePendingConfirmation(convId, text)) {
+      // Don't emit on this stream — the original message's stream is still
+      // active.  Opening a second streaming response in the same conversation
+      // can corrupt the first.  The original stream will show tool progress
+      // once the confirmation Promise resolves.
+      return
+    }
+
     // Fetch tokens for both OAuth connections independently.
     // Failures are silently caught -- the tool handler will request signin if needed.
     let graphToken: string | undefined
@@ -354,15 +361,6 @@ export function startTeamsApp(): void {
           return undefined
         }
       },
-    }
-
-    // Resolve pending confirmations BEFORE acquiring the conversation lock.
-    // The original message holds the lock while awaiting confirmation, so
-    // trying to lock here would deadlock.
-    if (resolvePendingConfirmation(convId, text)) {
-      const isConfirm = CONFIRM_WORDS.has(text.trim().toLowerCase())
-      stream.emit(isConfirm ? "Confirmed." : "Cancelled.")
-      return
     }
 
     try {
