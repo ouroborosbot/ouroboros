@@ -109,10 +109,23 @@ export interface BuildSystemOptions {
 
 // Returns a "## my flags" section when runtime flags alter agent behavior.
 // Currently only handles disableStreaming for the Teams channel.
+//
+// Rationale for --disable-streaming (research findings):
+// - devtunnel nginx relay buffers chunked/SSE responses (microsoft/dev-tunnels#518)
+// - 60-second hard timeout on web-forwarded connections via devtunnels.ms
+// - No HTTP/2 support on devtunnels.ms (falls back to HTTP/1.1)
+// - Teams SDK throttles streaming update() calls to 1 req/sec
+// - Combined, these limitations cause chunked streaming to be extremely slow
+//   over devtunnel: each chunk waits for relay buffering + throttle, compounding
+//   into multi-minute latencies for even short responses
+// - Buffering all text and sending as a single emit() avoids the compounding
+//   latency entirely, delivering responses in seconds instead of minutes
 export function flagsSection(channel: Channel, options?: BuildSystemOptions): string {
   if (!options?.disableStreaming || channel !== "teams") return "";
   return `## my flags
-streaming to Teams is disabled. my text responses are buffered and sent as a single message after i finish generating. the user will not see incremental text output, only status updates (thinking phrases, tool names). this is because the devtunnel relay buffers chunked responses, making streaming extremely slow.`;
+streaming to Teams is disabled. my text responses are buffered and sent as a single message after i finish generating. the user will not see incremental text output, only status updates (thinking phrases, tool names).
+
+**why**: the devtunnel nginx relay buffers chunked/SSE responses (microsoft/dev-tunnels#518), there is a 60-second hard timeout on web-forwarded connections, no HTTP/2 support on devtunnels.ms, and Teams throttles streaming updates to 1 req/sec. combined, these cause compounding latency that makes chunked streaming extremely slow over devtunnel. buffering avoids this entirely.`;
 }
 
 function toolBehaviorSection(options?: BuildSystemOptions): string {
