@@ -144,7 +144,7 @@ In `src/channels/teams.ts`:
 **Files**: `src/mind/prompt.ts`, `src/engine/core.ts`, `src/mind/context.ts`, `src/channels/teams.ts`
 **Acceptance**: All Unit 4a tests PASS (green), no warnings
 
-### ⬜ Unit 4c: System prompt flag awareness -- Coverage & Refactor
+### ✅ Unit 4c: System prompt flag awareness -- Coverage & Refactor
 **What**: Verify 100% coverage on all prompt/context/options changes, refactor if needed
 **Acceptance**: 100% coverage on new code, tests still green
 
@@ -198,3 +198,4 @@ In `src/channels/teams.ts`:
 - 2026-02-27 17:08 Unit 3c complete: 100% coverage on new startTeamsApp code verified
 - 2026-02-27 17:09 Unit 4a complete: 6 tests for flagsSection and cache key; 3 fail as expected (red)
 - 2026-02-27 17:10 Unit 4b complete: flagsSection, cache key with :ds, RunAgentOptions.disableStreaming, agentOptions threading; all 676 tests pass
+- 2026-02-27 17:11 Unit 4c complete: 100% coverage on prompt.ts, context.ts; teams.ts new code fully covered
