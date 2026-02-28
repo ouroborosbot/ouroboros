@@ -290,7 +290,7 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 
 **Acceptance**: All tests pass, 100% coverage, no regressions.
 
-### ⬜ Unit 12: Teams Confirmation Callback
+### ✅ Unit 12: Teams Confirmation Callback
 **What**: Implement `onConfirmAction` for the Teams channel. TDD.
 **Design**: When a mutate tool needs confirmation, send an informative message to the user describing what will happen, then use an Adaptive Card with Confirm/Deny buttons (or fall back to text prompt). For Phase 1, use a simple text prompt approach — emit a message asking for confirmation and resolve based on the next user message.
 **Files modified**:
