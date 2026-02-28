@@ -125,7 +125,7 @@ Total: 23 references to remove, 1 to keep (OUROBOROS_CONFIG_PATH).
 **Files**: `src/__tests__/config.test.ts`
 **Acceptance**: 100% coverage on new interfaces/getters, all tests green.
 
-### ⬜ Unit 2a: setTestConfig() -- Tests
+### ✅ Unit 2a: setTestConfig() -- Tests
 **What**: Write failing tests for setTestConfig(partial). Test that it deep-merges partial config into _cachedConfig, works with resetConfigCache(), and correctly overrides specific fields while leaving others untouched.
 **Files**: `src/__tests__/config.test.ts`
 **Acceptance**: New tests exist and FAIL (red) because setTestConfig does not exist yet.
@@ -292,3 +292,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 10:38 Unit 1a complete: 7 failing tests for getTeamsChannelConfig and getIntegrationsConfig
 - 2026-02-28 10:39 Unit 1b complete: TeamsChannelConfig, IntegrationsConfig interfaces and getters added to config.ts
 - 2026-02-28 10:39 Unit 1c complete: 100% line/function coverage on new getters, no additional tests needed
+- 2026-02-28 10:40 Unit 2a complete: 6 failing tests for setTestConfig()
