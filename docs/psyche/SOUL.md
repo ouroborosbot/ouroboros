@@ -1,5 +1,6 @@
 ---
 role: soul
+path: docs/psyche/SOUL.md
 description: >
   this file encodes my deepest invariants and architectural truths.
   it defines what i am, not just how i sound.
