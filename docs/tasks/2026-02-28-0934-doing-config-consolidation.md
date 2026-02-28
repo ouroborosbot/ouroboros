@@ -201,7 +201,7 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 **Files**: `src/__tests__/channels/teams.test.ts`
 **Acceptance**: 100% coverage on modified lines, all tests green.
 
-### ⬜ Unit 6a: tools-base.ts env var removal -- Tests
+### ✅ Unit 6a: tools-base.ts env var removal -- Tests
 **What**: Update tools.test.ts tests that set PERPLEXITY_API_KEY to use setTestConfig() with the integrations config section instead: `setTestConfig({ integrations: { perplexityApiKey: "..." } })`.
 **Env vars covered**: PERPLEXITY_API_KEY (line 222).
 **Files**: `src/__tests__/engine/tools.test.ts`
