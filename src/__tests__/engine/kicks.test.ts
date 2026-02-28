@@ -14,10 +14,29 @@ describe("hasToolIntent", () => {
     "I'm going to run the command",
     "going to check the logs",
     "I am going to investigate",
+    // Present continuous
+    "i'm querying project capabilities next",
+    "i'm checking the database now",
+    "I am running the tests",
+    "I'm investigating the error",
     // Action announcements
     "I need to check the database",
     "I should look at the logs",
     "I can help with that",
+    // Obligation
+    "I have to check the logs first",
+    "we have to investigate this error",
+    "I must verify the configuration",
+    "we must check the API response",
+    // First person plural intent
+    "we need to know which process it uses",
+    "we should check the endpoint",
+    "we can query the API for that",
+    "we'll figure it out",
+    "we will check that next",
+    "we're going to need the project id",
+    "we are going to query the capabilities",
+    "let's check the logs",
     // Gerund phase shifts
     "entering execution mode.",
     "starting with the first file",
@@ -27,15 +46,34 @@ describe("hasToolIntent", () => {
     "first, I will check the logs",
     "first I need to read the file",
     "now I will investigate",
+    "now we need to know which process it uses",
     "next turn will be strict TDD repair",
     "next, I should look at the code",
     "next I will check the tests",
+    "next, we should verify",
+    "next we query the API",
+    // Sequential narration
+    "then I check the database",
+    "then we query the project capabilities",
+    "after that we can create the work item",
+    "once I have the data I can proceed",
+    "once we know the process template",
+    "before I do that, a quick check",
+    "before we proceed, one more thing",
+    // Future intent
+    "I'm about to call the API",
+    "we're about to find out",
+    "gonna check the logs real quick",
     // Hedged intent
     "allow me to take a look",
     "time to check the logs",
+    // Movement narration
+    "moving on to the next step",
+    "moving to phase 2",
     // Self-narration
     "my next step is to read the file",
     "my plan is to refactor this",
+    "the plan is to query each endpoint",
     "tool calls only from here on",
   ])("returns true for intent phrase: %s", (text) => {
     expect(hasToolIntent(text)).toBe(true)
@@ -50,9 +88,9 @@ describe("hasToolIntent", () => {
   })
 
   it.each([
-    "I\u2019ll read that file",      // curly apostrophe '
-    "I\u2018m going to check",       // curly apostrophe '
-    "I\u2032ll do that",             // prime ′
+    "I\u2019ll read that file",      // curly apostrophe \u2019
+    "I\u2018m going to check",       // curly apostrophe \u2018
+    "I\u2032ll do that",             // prime \u2032
   ])("handles curly quotes/apostrophes: %s", (text) => {
     expect(hasToolIntent(text)).toBe(true)
   })
@@ -62,6 +100,14 @@ describe("hasToolIntent", () => {
     "Here is the result",
     "The file contains data",
     "",
+    "the tenant supports all four system processes.",
+    "we persist.",
+    "done. the work item has been created.",
+    "the error is on line 42",
+    "I found 3 matching files",
+    "everything looks good",
+    "that completed successfully",
+    "the answer is 42",
   ])("returns false for non-intent text: %s", (text) => {
     expect(hasToolIntent(text)).toBe(false)
   })
