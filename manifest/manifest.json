@@ -1,7 +1,7 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.25/MicrosoftTeams.schema.json",
   "manifestVersion": "1.25",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "id": "7467201b-d9b4-4792-9b46-ce84494f9d09",
   "developer": {
     "name": "Ouroboros (with help from Ari)",
@@ -37,6 +37,19 @@
             {
               "title": "/commands",
               "description": "List available slash commands"
+            }
+          ]
+        },
+        {
+          "scopes": ["copilot"],
+          "commands": [
+            {
+              "title": "Review my code",
+              "description": "Read and review code in the repo"
+            },
+            {
+              "title": "What can you do?",
+              "description": "List your capabilities"
             }
           ]
         }
