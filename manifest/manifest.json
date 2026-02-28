@@ -1,10 +1,13 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.25/MicrosoftTeams.schema.json",
   "manifestVersion": "1.25",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "id": "7467201b-d9b4-4792-9b46-ce84494f9d09",
   "developer": {
-    "name": "Ouroboros (with help from Ari)"
+    "name": "Ouroboros (with help from Ari)",
+    "websiteUrl": "https://microsoft.com",
+    "privacyUrl": "https://go.microsoft.com/fwlink/?LinkId=521839",
+    "termsOfUseUrl": "https://go.microsoft.com/fwlink/?LinkID=206977"
   },
   "name": {
     "short": "Ouroboros",
@@ -52,5 +55,5 @@
     "id": "7467201b-d9b4-4792-9b46-ce84494f9d09",
     "resource": "api://botid-7467201b-d9b4-4792-9b46-ce84494f9d09"
   },
-  "validDomains": ["xcbc4jjj-3978.usw2.devtunnels.ms"]
+  "validDomains": ["xcbc4jjj-3978.usw2.devtunnels.ms", "token.botframework.com"]
 }
