@@ -130,7 +130,7 @@ Total: 23 references to remove, 1 to keep (OUROBOROS_CONFIG_PATH).
 **Files**: `src/__tests__/config.test.ts`
 **Acceptance**: New tests exist and FAIL (red) because setTestConfig does not exist yet.
 
-### ⬜ Unit 2b: setTestConfig() -- Implementation
+### ✅ Unit 2b: setTestConfig() -- Implementation
 **What**: Add setTestConfig(partial: DeepPartial<OuroborosConfig>) that calls loadConfig() (to ensure _cachedConfig exists), then deep-merges the partial into _cachedConfig. Export the function. Also export/define DeepPartial type.
 **Files**: `src/config.ts`
 **Acceptance**: Unit 2a tests PASS (green). setTestConfig exported.
@@ -293,3 +293,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 10:39 Unit 1b complete: TeamsChannelConfig, IntegrationsConfig interfaces and getters added to config.ts
 - 2026-02-28 10:39 Unit 1c complete: 100% line/function coverage on new getters, no additional tests needed
 - 2026-02-28 10:40 Unit 2a complete: 6 failing tests for setTestConfig()
+- 2026-02-28 10:40 Unit 2b complete: setTestConfig() with DeepPartial type added to config.ts
