@@ -286,4 +286,34 @@ describe("buildSystem", () => {
     const result = buildSystem("cli")
     expect(result).not.toContain("## tool behavior")
   })
+
+  it("includes flags section when disableStreaming is true and channel is teams", async () => {
+    setupReadFileSync()
+    const { buildSystem } = await import("../../mind/prompt")
+    const result = buildSystem("teams", { disableStreaming: true })
+    expect(result).toContain("## my flags")
+    expect(result).toContain("streaming")
+    expect(result).toContain("disabled")
+  })
+
+  it("does NOT include flags section when disableStreaming is true but channel is cli", async () => {
+    setupReadFileSync()
+    const { buildSystem } = await import("../../mind/prompt")
+    const result = buildSystem("cli", { disableStreaming: true })
+    expect(result).not.toContain("## my flags")
+  })
+
+  it("does NOT include flags section when disableStreaming is false", async () => {
+    setupReadFileSync()
+    const { buildSystem } = await import("../../mind/prompt")
+    const result = buildSystem("teams", { disableStreaming: false })
+    expect(result).not.toContain("## my flags")
+  })
+
+  it("does NOT include flags section when disableStreaming is undefined", async () => {
+    setupReadFileSync()
+    const { buildSystem } = await import("../../mind/prompt")
+    const result = buildSystem("teams")
+    expect(result).not.toContain("## my flags")
+  })
 })
