@@ -4150,3 +4150,210 @@ describe("integration: kick + tool_choice required combined", () => {
     expect(toolMessage.content).not.toContain("unknown")
   })
 })
+
+describe("confirmation system", () => {
+  let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal, options?: any) => Promise<{ usage?: any }>
+
+  function makeStream(chunks: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const chunk of chunks) {
+          yield chunk
+        }
+      },
+    }
+  }
+
+  function makeChunk(content?: string, toolCalls?: any[]) {
+    const delta: any = {}
+    if (content !== undefined) delta.content = content
+    if (toolCalls !== undefined) delta.tool_calls = toolCalls
+    return { choices: [{ delta }] }
+  }
+
+  beforeEach(async () => {
+    vi.resetModules()
+    delete process.env.AZURE_OPENAI_API_KEY
+    process.env.MINIMAX_API_KEY = "test-key"
+    process.env.MINIMAX_MODEL = "test-model"
+    mockCreate.mockReset()
+    mockResponsesCreate.mockReset()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+
+    const core = await import("../../engine/core")
+    runAgent = core.runAgent
+  })
+
+  it("confirmation tool + confirmed executes normally", async () => {
+    // graph_mutate is in confirmationRequired set
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          makeChunk(undefined, [
+            { index: 0, id: "tc_mut", function: { name: "graph_mutate", arguments: '{"method":"POST","path":"/me/sendMail","body":"{}"}' } },
+          ]),
+        ])
+      }
+      return makeStream([makeChunk("done")])
+    })
+
+    const onConfirmAction = vi.fn().mockResolvedValue("confirmed")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onConfirmAction,
+    }
+
+    const toolContext = {
+      graphToken: "test-token",
+      adoToken: undefined,
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, "teams", undefined, { toolContext })
+
+    // onConfirmAction should have been called with the tool name and args
+    expect(onConfirmAction).toHaveBeenCalledWith("graph_mutate", expect.objectContaining({ method: "POST", path: "/me/sendMail" }))
+
+    // Tool should have been executed (not cancelled)
+    const toolMsg = messages.find((m: any) => m.role === "tool" && m.tool_call_id === "tc_mut")
+    expect(toolMsg).toBeDefined()
+    expect(toolMsg.content).not.toContain("cancelled")
+  })
+
+  it("confirmation tool + denied returns cancelled message", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          makeChunk(undefined, [
+            { index: 0, id: "tc_mut", function: { name: "ado_mutate", arguments: '{"method":"PATCH","organization":"myorg","path":"/_apis/wit/workitems/1"}' } },
+          ]),
+        ])
+      }
+      return makeStream([makeChunk("understood")])
+    })
+
+    const onConfirmAction = vi.fn().mockResolvedValue("denied")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onConfirmAction,
+    }
+
+    const toolContext = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+      adoOrganizations: ["myorg"],
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, "teams", undefined, { toolContext })
+
+    // onConfirmAction should have been called
+    expect(onConfirmAction).toHaveBeenCalledWith("ado_mutate", expect.objectContaining({ method: "PATCH" }))
+
+    // Tool result should indicate cancellation
+    const toolMsg = messages.find((m: any) => m.role === "tool" && m.tool_call_id === "tc_mut")
+    expect(toolMsg).toBeDefined()
+    expect(toolMsg.content).toContain("cancelled")
+  })
+
+  it("confirmation tool + no callback returns cancelled (safe default)", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          makeChunk(undefined, [
+            { index: 0, id: "tc_mut", function: { name: "graph_mutate", arguments: '{"method":"DELETE","path":"/me/messages/123"}' } },
+          ]),
+        ])
+      }
+      return makeStream([makeChunk("ok")])
+    })
+
+    // No onConfirmAction callback
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const toolContext = {
+      graphToken: "test-token",
+      adoToken: undefined,
+      signin: vi.fn(),
+      adoOrganizations: [],
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, "teams", undefined, { toolContext })
+
+    // Tool result should indicate cancellation (safe default)
+    const toolMsg = messages.find((m: any) => m.role === "tool" && m.tool_call_id === "tc_mut")
+    expect(toolMsg).toBeDefined()
+    expect(toolMsg.content).toContain("cancelled")
+  })
+
+  it("non-confirmation tool executes normally without invoking callback", async () => {
+    // graph_query is NOT in confirmationRequired set
+    vi.mocked(fs.readFileSync).mockReturnValue("file data")
+
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          makeChunk(undefined, [
+            { index: 0, id: "tc_read", function: { name: "read_file", arguments: '{"path":"/tmp/test.txt"}' } },
+          ]),
+        ])
+      }
+      return makeStream([makeChunk("done")])
+    })
+
+    const onConfirmAction = vi.fn().mockResolvedValue("confirmed")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onConfirmAction,
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks)
+
+    // onConfirmAction should NOT have been called for read_file
+    expect(onConfirmAction).not.toHaveBeenCalled()
+
+    // Tool should have executed normally
+    const toolMsg = messages.find((m: any) => m.role === "tool" && m.tool_call_id === "tc_read")
+    expect(toolMsg).toBeDefined()
+    expect(toolMsg.content).toBe("file data")
+  })
+})
