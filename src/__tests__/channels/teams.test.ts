@@ -431,6 +431,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       App: class MockApp {
         constructor(opts: any) { capturedOpts = opts }
         on = mockOn
+        event = vi.fn()
         start = mockStart
       },
     }))
@@ -464,6 +465,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       App: class MockApp {
         constructor(_opts: any) {}
         on = vi.fn()
+        event = vi.fn()
         start = vi.fn()
       },
     }))
@@ -496,6 +498,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       App: class MockApp {
         constructor(opts: any) { capturedOpts = opts }
         on = vi.fn()
+        event = vi.fn()
         start = vi.fn()
       },
     }))
@@ -527,6 +530,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       App: class MockApp {
         constructor(_opts: any) {}
         on = vi.fn()
+        event = vi.fn()
         start = mockStart
       },
     }))
@@ -562,6 +566,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
         on = vi.fn().mockImplementation((_event: string, handler: any) => {
           capturedHandler = handler
         })
+        event = vi.fn()
         start = vi.fn()
       },
     }))
@@ -613,6 +618,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
         on = vi.fn().mockImplementation((_event: string, handler: any) => {
           capturedHandler = handler
         })
+        event = vi.fn()
         start = vi.fn()
       },
     }))
@@ -691,6 +697,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
         on = vi.fn().mockImplementation((_event: string, handler: any) => {
           capturedHandler = handler
         })
+        event = vi.fn()
         start = vi.fn()
       },
     }))
@@ -743,6 +750,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
         on = vi.fn().mockImplementation((_event: string, handler: any) => {
           capturedHandler = handler
         })
+        event = vi.fn()
         start = vi.fn()
       },
     }))
@@ -772,6 +780,110 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
     vi.restoreAllMocks()
   })
+
+  it("signin wrapper catches errors and returns undefined", async () => {
+    vi.resetModules()
+    delete process.env.CLIENT_ID
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    // runAgent calls graph_profile which returns AUTH_REQUIRED, triggering signin
+    const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
+    vi.doMock("../../engine/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+      postTurn: vi.fn(),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const teams = await import("../../channels/teams")
+    teams.startTeamsApp()
+
+    const failingSignin = vi.fn().mockRejectedValue(new Error("signin failed"))
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: {
+        text: "test",
+        conversation: { id: "conv-test" },
+        from: { id: "user-123" },
+        channelId: "msteams",
+      },
+      api: {
+        users: { token: { get: vi.fn().mockRejectedValue(new Error("no token")) } },
+      },
+      signin: failingSignin,
+    })
+
+    // Grab the teamsContext.signin that was constructed and call it
+    const handleCall = mockRunAgent.mock.calls[0]
+    const opts = handleCall[4]
+    const result = await opts.toolContext.signin("graph")
+    expect(result).toBeUndefined()
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("signin(graph) failed"))
+
+    vi.restoreAllMocks()
+  })
+
+  it("app.event error handler logs error message", async () => {
+    vi.resetModules()
+    delete process.env.CLIENT_ID
+
+    let capturedEventHandler: ((args: any) => void) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        event = vi.fn().mockImplementation((_name: string, handler: any) => {
+          capturedEventHandler = handler
+        })
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../engine/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const teams = await import("../../channels/teams")
+    teams.startTeamsApp()
+
+    expect(capturedEventHandler).toBeDefined()
+    capturedEventHandler!({ error: new Error("SDK blew up") })
+    expect(errorSpy).toHaveBeenCalledWith("[teams] app error: SDK blew up")
+
+    vi.restoreAllMocks()
+  })
 })
 
 describe("Teams adapter - unhandledRejection guard", () => {
@@ -791,6 +903,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
       App: class MockApp {
         constructor(_opts: any) {}
         on = vi.fn()
+        event = vi.fn()
         start = vi.fn()
       },
     }))
@@ -815,7 +928,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
     // Invoke the handler to cover the console.error line
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
     ;(ouroboros as Function)(new Error("test rejection"))
-    expect(errorSpy).toHaveBeenCalledWith("Unhandled rejection (non-fatal):", expect.any(Error))
+    expect(errorSpy).toHaveBeenCalledWith("[teams] unhandled rejection: test rejection")
 
     vi.restoreAllMocks()
   })
@@ -828,6 +941,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
       App: class MockApp {
         constructor(_opts: any) {}
         on = vi.fn()
+        event = vi.fn()
         start = vi.fn()
       },
     }))
@@ -880,6 +994,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       App: class MockApp {
         constructor(opts: any) { capturedOpts = opts }
         on = vi.fn()
+        event = vi.fn()
         start = vi.fn()
       },
     }))
@@ -911,6 +1026,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       App: class MockApp {
         constructor(opts: any) { capturedOpts = opts }
         on = vi.fn()
+        event = vi.fn()
         start = vi.fn()
       },
     }))
@@ -943,6 +1059,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       App: class MockApp {
         constructor(opts: any) { capturedOpts = opts }
         on = vi.fn()
+        event = vi.fn()
         start = vi.fn()
       },
     }))
@@ -972,6 +1089,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       App: class MockApp {
         constructor(_opts: any) {}
         on = vi.fn()
+        event = vi.fn()
         start = vi.fn()
       },
     }))
@@ -1003,6 +1121,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       App: class MockApp {
         constructor(_opts: any) {}
         on = mockOn
+        event = vi.fn()
         start = vi.fn()
       },
     }))

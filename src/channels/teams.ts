@@ -194,14 +194,8 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   // This must happen after the stream is done so the OAuth card renders properly.
   if (teamsContext) {
     const allContent = messages.map(m => typeof m.content === "string" ? m.content : "").join("\n")
-    if (allContent.includes("AUTH_REQUIRED:graph")) {
-      console.log("[teams] detected AUTH_REQUIRED:graph, sending signin card")
-      await teamsContext.signin("graph")
-    }
-    if (allContent.includes("AUTH_REQUIRED:ado")) {
-      console.log("[teams] detected AUTH_REQUIRED:ado, sending signin card")
-      await teamsContext.signin("ado")
-    }
+    if (allContent.includes("AUTH_REQUIRED:graph")) await teamsContext.signin("graph")
+    if (allContent.includes("AUTH_REQUIRED:ado")) await teamsContext.signin("ado")
   }
 
   // Trim context and save session
@@ -246,7 +240,7 @@ export function startTeamsApp(): void {
     const userId = activity.from?.id || ""
     const channelId = activity.channelId || "msteams"
 
-    console.log(`[teams] message received: "${text.slice(0, 80)}" from=${userId} conv=${convId.slice(0, 40)}`)
+    console.log(`[teams] msg from=${userId.slice(0, 12)} conv=${convId.slice(0, 20)}`)
 
     // Fetch tokens for both OAuth connections independently.
     // Failures are silently caught -- the tool handler will request signin if needed.
@@ -255,32 +249,24 @@ export function startTeamsApp(): void {
     try {
       const graphRes = await api.users.token.get({ userId, connectionName: oauthConfig.graphConnectionName, channelId })
       graphToken = graphRes?.token
-      console.log(`[teams] graph token: ${graphToken ? "present" : "missing"}`)
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      console.log(`[teams] graph token fetch failed: ${msg.slice(0, 120)}`)
-    }
+    } catch { /* no token yet — tool handler will trigger signin */ }
     try {
       const adoRes = await api.users.token.get({ userId, connectionName: oauthConfig.adoConnectionName, channelId })
       adoToken = adoRes?.token
-      console.log(`[teams] ado token: ${adoToken ? "present" : "missing"}`)
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      console.log(`[teams] ado token fetch failed: ${msg.slice(0, 120)}`)
-    }
+    } catch { /* no token yet — tool handler will trigger signin */ }
+    console.log(`[teams] tokens: graph=${graphToken ? "yes" : "no"} ado=${adoToken ? "yes" : "no"}`)
 
     const teamsContext: TeamsMessageContext = {
       graphToken,
       adoToken,
-      signin: async (connectionName: string) => {
-        console.log(`[teams] signin called for connection: ${connectionName}`)
+      signin: async (cn: string) => {
         try {
-          const result = await signin({ connectionName })
-          console.log(`[teams] signin result: ${result ?? "undefined"}`)
+          const result = await signin({ connectionName: cn })
+          console.log(`[teams] signin(${cn}): ${result ? "token received" : "no token"}`)
           return result
         } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : String(e)
-          console.log(`[teams] signin error: ${msg.slice(0, 120)}`)
+          console.error(`[teams] signin(${cn}) failed: ${msg.slice(0, 100)}`)
           return undefined
         }
       },
@@ -288,8 +274,9 @@ export function startTeamsApp(): void {
 
     try {
       await withConversationLock(convId, () => handleTeamsMessage(text, stream, convId, teamsContext))
-    } catch (err) {
-      console.error("Message handler error:", err)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[teams] handler error: ${msg.slice(0, 200)}`)
     }
   })
 
@@ -298,10 +285,18 @@ export function startTeamsApp(): void {
   // Guard: only register once even if startTeamsApp is called multiple times.
   interface OuroborosHandler { (...args: unknown[]): void; __ouroboros?: boolean }
   if (!process.listeners("unhandledRejection").some((l) => (l as OuroborosHandler).__ouroboros)) {
-    const handler: OuroborosHandler = (err: unknown) => { console.error("Unhandled rejection (non-fatal):", err) }
+    const handler: OuroborosHandler = (err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[teams] unhandled rejection: ${msg.slice(0, 200)}`)
+    }
     handler.__ouroboros = true
     process.on("unhandledRejection", handler)
   }
+
+  app.event("error", ({ error }) => {
+    const msg = error instanceof Error ? error.message : String(error)
+    console.error(`[teams] app error: ${msg}`)
+  })
 
   const port = parseInt(process.env.PORT || "3978", 10)
   app.start(port)
