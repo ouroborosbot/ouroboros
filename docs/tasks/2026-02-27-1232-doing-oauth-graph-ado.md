@@ -340,3 +340,4 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 - 2026-02-27 18:25 Unit 8 complete: graph_query, graph_mutate, ado_query, ado_mutate tools added. Mutate tools have requiresConfirmation metadata. Convenience aliases kept. confirmationRequired Set exported. 743 tests passing.
 - 2026-02-27 18:28 Unit 9 complete: graph_docs and ado_docs tools with static JSON endpoint indexes (30 Graph, 20 ADO). Case-insensitive substring search, top 5 results. resolveJsonModule enabled. 759 tests passing.
 - 2026-02-27 18:29 Unit 10 complete: 759 tests passing, 100% coverage on all new files, 99.75% overall. Coverage report saved to artifacts.
+- 2026-02-27 18:31 Unit 11 complete: onConfirmAction? added to ChannelCallbacks. confirmationRequired set checked in tool loop. Denied/missing callback returns "Action cancelled by user." 763 tests passing.
