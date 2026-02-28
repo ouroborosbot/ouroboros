@@ -2,6 +2,8 @@ import type OpenAI from "openai";
 import type { ToolHandler } from "./tools-base";
 import { getProfile, graphRequest } from "./graph-client";
 import { queryWorkItems, adoRequest } from "./ado-client";
+import graphEndpoints from "./data/graph-endpoints.json";
+import adoEndpoints from "./data/ado-endpoints.json";
 
 // Tools that require user confirmation before execution (mutate operations).
 // Enforcement happens in the agent loop (Unit 11); this is metadata only.
@@ -103,6 +105,35 @@ export const teamsTools: OpenAI.ChatCompletionTool[] = [
       },
     },
   },
+  // -- Documentation tools --
+  {
+    type: "function",
+    function: {
+      name: "graph_docs",
+      description: "Search the Microsoft Graph API endpoint index. Use before calling graph_query or graph_mutate to find the correct path, method, and required scopes.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query, e.g. 'send email' or 'calendar events'" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "ado_docs",
+      description: "Search the Azure DevOps API endpoint index. Use before calling ado_query or ado_mutate to find the correct path, method, and parameters.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query, e.g. 'work items' or 'pull requests'" },
+        },
+        required: ["query"],
+      },
+    },
+  },
 ];
 
 const DEFAULT_ADO_QUERY = "SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo] FROM WorkItems WHERE [System.AssignedTo] = @Me AND [System.State] <> 'Closed' ORDER BY [System.ChangedDate] DESC";
@@ -154,6 +185,13 @@ export const teamsToolHandlers: Record<string, ToolHandler> = {
     if (orgError) return orgError;
     return adoRequest(ctx.adoToken, args.method, args.organization, args.path, args.body);
   },
+  // -- Documentation tools --
+  graph_docs: (args) => {
+    return searchEndpoints(graphEndpoints as EndpointEntry[], args.query || "");
+  },
+  ado_docs: (args) => {
+    return searchEndpoints(adoEndpoints as EndpointEntry[], args.query || "");
+  },
   // -- Convenience aliases --
   graph_profile: async (_args, ctx) => {
     if (!ctx?.graphToken) {
@@ -173,6 +211,38 @@ export const teamsToolHandlers: Record<string, ToolHandler> = {
   },
 };
 
+// Search endpoint index by case-insensitive substring match on description + path.
+// Returns top 5 matches formatted for the LLM.
+interface EndpointEntry {
+  path: string;
+  method: string;
+  description: string;
+  params: string;
+  scopes?: string;
+}
+
+function searchEndpoints(entries: EndpointEntry[], query: string): string {
+  const q = query.toLowerCase();
+  const matches = entries.filter((e) => {
+    const haystack = `${e.description} ${e.path}`.toLowerCase();
+    return haystack.includes(q);
+  });
+
+  if (matches.length === 0) {
+    return `No matching endpoints found for "${query}". Try a broader search term.`;
+  }
+
+  return matches.slice(0, 5).map((e) => {
+    const lines = [
+      `${e.method} ${e.path}`,
+      `  ${e.description}`,
+      `  Params: ${e.params || "none"}`,
+    ];
+    if (e.scopes) lines.push(`  Scopes: ${e.scopes}`);
+    return lines.join("\n");
+  }).join("\n\n");
+}
+
 export function summarizeTeamsArgs(name: string, args: Record<string, string>): string | undefined {
   if (name === "graph_profile") return "";
   if (name === "ado_work_items") return args.organization || "";
@@ -180,5 +250,7 @@ export function summarizeTeamsArgs(name: string, args: Record<string, string>): 
   if (name === "graph_mutate") return `${args.method || ""} ${args.path || ""}`;
   if (name === "ado_query") return `${args.organization || ""} ${args.path || ""}`;
   if (name === "ado_mutate") return `${args.method || ""} ${args.organization || ""} ${args.path || ""}`;
+  if (name === "graph_docs") return args.query || "";
+  if (name === "ado_docs") return args.query || "";
   return undefined;
 }
