@@ -110,7 +110,7 @@ Total: 23 references to remove, 1 to keep (OUROBOROS_CONFIG_PATH).
 **Files**: `src/__tests__/config.test.ts`
 **Acceptance**: New tests exist and FAIL (red) because getTeamsChannelConfig/getIntegrationsConfig do not exist yet.
 
-### ⬜ Unit 1b: New interfaces and getters -- Implementation
+### ✅ Unit 1b: New interfaces and getters -- Implementation
 **What**: Add to config.ts:
 - `TeamsChannelConfig` interface: `{ skipConfirmation: boolean, disableStreaming: boolean, port: number }`
 - `IntegrationsConfig` interface: `{ perplexityApiKey: string }`
@@ -290,3 +290,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 10:35 Pass 3 -- validation: verified all 23 env var references match manifest, confirmed import paths (getAzureConfig not re-exported from core.ts, tools-base.ts has no config import, teams.ts has two config imports), confirmed .env untracked/gitignored, no changes needed
 - 2026-02-28 10:35 Pass 4 -- quality: all 21 units have acceptance criteria, no TBD items, all emoji prefixes present, env var manifest complete (23 to remove, 1 to keep), status set to READY_FOR_EXECUTION
 - 2026-02-28 10:38 Unit 1a complete: 7 failing tests for getTeamsChannelConfig and getIntegrationsConfig
+- 2026-02-28 10:39 Unit 1b complete: TeamsChannelConfig, IntegrationsConfig interfaces and getters added to config.ts
