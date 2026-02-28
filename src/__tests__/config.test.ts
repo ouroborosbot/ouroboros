@@ -676,3 +676,104 @@ describe("getIntegrationsConfig", () => {
     expect(ic1).not.toBe(ic2)
   })
 })
+
+describe("setTestConfig", () => {
+  beforeEach(async () => {
+    vi.resetModules()
+  })
+
+  it("deep-merges partial config into cached config", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { setTestConfig, resetConfigCache, getAzureConfig } = await import("../config")
+    resetConfigCache()
+    setTestConfig({ providers: { azure: { apiKey: "test-key" } } })
+    const azure = getAzureConfig()
+
+    expect(azure.apiKey).toBe("test-key")
+    // Other fields should remain as defaults
+    expect(azure.endpoint).toBe("")
+    expect(azure.apiVersion).toBe("2025-04-01-preview")
+  })
+
+  it("overrides specific fields while leaving others untouched", async () => {
+    const configData = {
+      providers: {
+        azure: {
+          apiKey: "original-key",
+          endpoint: "https://original.openai.azure.com",
+          deployment: "gpt-4",
+          modelName: "gpt-4",
+          apiVersion: "2025-01-01",
+        },
+      },
+    }
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(configData))
+
+    const { setTestConfig, resetConfigCache, getAzureConfig } = await import("../config")
+    resetConfigCache()
+    setTestConfig({ providers: { azure: { apiKey: "overridden-key" } } })
+    const azure = getAzureConfig()
+
+    expect(azure.apiKey).toBe("overridden-key")
+    expect(azure.endpoint).toBe("https://original.openai.azure.com")
+    expect(azure.deployment).toBe("gpt-4")
+  })
+
+  it("works with resetConfigCache to restore defaults", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { setTestConfig, resetConfigCache, getContextConfig } = await import("../config")
+    resetConfigCache()
+    setTestConfig({ context: { maxTokens: 99999 } })
+
+    expect(getContextConfig().maxTokens).toBe(99999)
+
+    resetConfigCache()
+    expect(getContextConfig().maxTokens).toBe(80000)
+  })
+
+  it("handles empty partial (no-op)", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { setTestConfig, resetConfigCache, getContextConfig } = await import("../config")
+    resetConfigCache()
+    setTestConfig({})
+    const ctx = getContextConfig()
+
+    expect(ctx.maxTokens).toBe(80000)
+    expect(ctx.contextMargin).toBe(20)
+  })
+
+  it("can set nested config sections (teamsChannel, integrations)", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { setTestConfig, resetConfigCache, getTeamsChannelConfig, getIntegrationsConfig } = await import("../config")
+    resetConfigCache()
+    setTestConfig({
+      teamsChannel: { skipConfirmation: true, port: 5000 },
+      integrations: { perplexityApiKey: "pplx-test" },
+    })
+
+    const tc = getTeamsChannelConfig()
+    expect(tc.skipConfirmation).toBe(true)
+    expect(tc.port).toBe(5000)
+    expect(tc.disableStreaming).toBe(false) // default preserved
+
+    const ic = getIntegrationsConfig()
+    expect(ic.perplexityApiKey).toBe("pplx-test")
+  })
+
+  it("can overwrite then reset then overwrite again", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { setTestConfig, resetConfigCache, getMinimaxConfig } = await import("../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "first" } } })
+    expect(getMinimaxConfig().apiKey).toBe("first")
+
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "second" } } })
+    expect(getMinimaxConfig().apiKey).toBe("second")
+  })
+})
