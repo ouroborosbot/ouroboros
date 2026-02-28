@@ -279,3 +279,5 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 
 ## Progress Log
 - 2026-02-28 10:35 Created from planning doc (Pass 1 -- first draft)
+- 2026-02-28 10:35 Pass 2 -- granularity: all units appropriately sized, no changes needed
+- 2026-02-28 10:35 Pass 3 -- validation: verified all 23 env var references match manifest, confirmed import paths (getAzureConfig not re-exported from core.ts, tools-base.ts has no config import, teams.ts has two config imports), confirmed .env untracked/gitignored, no changes needed
