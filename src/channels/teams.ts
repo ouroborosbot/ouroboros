@@ -170,7 +170,7 @@ export interface TeamsMessageContext {
 }
 
 // Handle an incoming Teams message
-export async function handleTeamsMessage(text: string, stream: TeamsStream, conversationId: string, teamsContext?: TeamsMessageContext): Promise<void> {
+export async function handleTeamsMessage(text: string, stream: TeamsStream, conversationId: string, teamsContext?: TeamsMessageContext, disableStreaming?: boolean): Promise<void> {
   // Send first thinking phrase immediately so the user sees feedback
   // before sync I/O (session load, trim) blocks the event loop.
   stream.update(pickPhrase(THINKING_PHRASES) + "...")
@@ -208,7 +208,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
 
   // Run agent
   const controller = new AbortController()
-  const callbacks = createTeamsCallbacks(stream, controller)
+  const callbacks = createTeamsCallbacks(stream, controller, { disableStreaming })
   const toolContext: ToolContext | undefined = teamsContext ? {
     graphToken: teamsContext.graphToken,
     adoToken: teamsContext.adoToken,
@@ -216,6 +216,10 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
     adoOrganizations: getAdoConfig().organizations,
   } : undefined
   const result = await runAgent(messages, callbacks, "teams", controller.signal, toolContext ? { toolContext } : undefined)
+
+  // Flush any buffered text (when disableStreaming is true, text was accumulated
+  // instead of streamed; flush emits it as a single message to Teams)
+  callbacks.flush()
 
   // After the agent loop, check if any tool returned AUTH_REQUIRED and trigger signin.
   // This must happen after the stream is done so the OAuth card renders properly.
