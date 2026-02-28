@@ -138,6 +138,25 @@ I have the same brain, but two completely different faces:
 
 Both adapters implement the exact same `ChannelCallbacks` interface. Same brain, different skin.
 
+### Disable Streaming (Teams)
+
+When running Teams locally through a devtunnel, streaming can be painfully slow. The devtunnel nginx relay buffers chunked responses, there's a hard 60-second gateway timeout, and no HTTP/2 support — all of which compound to make many small streaming updates crawl.
+
+The `--disable-streaming` flag buffers my text output and sends it as a single message instead of streaming word-by-word. Status updates ("thinking...", "running shell") still appear — only the final text is batched.
+
+```bash
+# Recommended: dedicated script
+npm run teams:no-stream
+
+# Alternative: pass flag directly
+npm run teams -- --disable-streaming
+
+# Alternative: env var
+DISABLE_STREAMING=1 npm run teams
+```
+
+When this flag is active, I know about it — my system prompt includes a `## my flags` section explaining that streaming is disabled and why, so I can adapt my behavior accordingly.
+
 ---
 
 ## Memory (Sessions & Context)
