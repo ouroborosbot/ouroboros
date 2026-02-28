@@ -273,7 +273,7 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 
 ## Phase 3: Confirmation System
 
-### ⬜ Unit 11: Confirmation System in Agent Loop
+### ✅ Unit 11: Confirmation System in Agent Loop
 **What**: Add confirmation support to the agent loop so mutate tools require user approval before executing. TDD.
 **Design**: Tools marked with `requiresConfirmation: true` trigger a callback before execution. The callback is async — it asks the user and waits for a response.
 **Files modified**:
