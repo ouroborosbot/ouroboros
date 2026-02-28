@@ -231,7 +231,7 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 
 **Acceptance**: All tests pass, 100% coverage, no regressions. Both generic functions tested with multiple methods/paths.
 
-### ⬜ Unit 8: Generic Tool Definitions
+### ✅ Unit 8: Generic Tool Definitions
 **What**: Replace `graph_profile` and `ado_work_items` with 4 generic tools in `tools-teams.ts`. TDD.
 **Tools**:
 - `graph_query` — GET any Graph API path. Params: `path` (required). Uses `graphRequest(token, "GET", path)`.
