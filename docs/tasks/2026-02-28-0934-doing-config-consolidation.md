@@ -105,7 +105,7 @@ Total: 23 references to remove, 1 to keep (OUROBOROS_CONFIG_PATH).
 ### Legend
 ⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
-### ⬜ Unit 1a: New interfaces and getters -- Tests
+### ✅ Unit 1a: New interfaces and getters -- Tests
 **What**: Write failing tests for TeamsChannelConfig, IntegrationsConfig interfaces and their getters (getTeamsChannelConfig, getIntegrationsConfig). Test that getters return correct values from config.json, including defaults when sections are missing.
 **Files**: `src/__tests__/config.test.ts`
 **Acceptance**: New tests exist and FAIL (red) because getTeamsChannelConfig/getIntegrationsConfig do not exist yet.
