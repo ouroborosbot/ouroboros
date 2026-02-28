@@ -4,11 +4,8 @@ import { THINKING_PHRASES, FOLLOWUP_PHRASES } from "../../repertoire/phrases"
 
 // Tests for src/teams.ts Teams channel adapter.
 
-// AzureOpenAI requires endpoint env var when AZURE_OPENAI_API_KEY is set.
-// Ensure Azure path isn't triggered during tests that only need MiniMax.
-const _savedAzureKey = process.env.AZURE_OPENAI_API_KEY
-beforeEach(() => { delete process.env.AZURE_OPENAI_API_KEY })
-afterEach(() => { if (_savedAzureKey) process.env.AZURE_OPENAI_API_KEY = _savedAzureKey })
+// Config is now loaded from config.json only (no env var fallbacks).
+// No env var save/restore needed.
 
 describe("Teams adapter - exports", () => {
   it("exports createTeamsCallbacks", async () => {
@@ -415,15 +412,12 @@ describe("Teams adapter - stripMentions", () => {
 
 describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
   afterEach(() => {
-    delete process.env.CLIENT_ID
-    delete process.env.CLIENT_SECRET
-    delete process.env.TENANT_ID
-    delete process.env.PORT
+    // Config is loaded from config.json only, no env vars to clear
   })
 
   it("creates App with DevtoolsPlugin when CLIENT_ID is not set", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
+    // no env vars to clear
 
     let capturedOpts: any = null
     const mockOn = vi.fn()
@@ -460,7 +454,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
   it("logs 'with DevtoolsPlugin' in DevtoolsPlugin mode", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
+    // no env vars to clear
 
     vi.doMock("@microsoft/teams.apps", () => ({
       App: class MockApp {
@@ -492,7 +486,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
   it("passes activity.mentions.stripText in DevtoolsPlugin mode", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
+    // no env vars to clear
 
     let capturedOpts: any = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -564,7 +558,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
   it("message handler calls handleTeamsMessage with text and stream", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
+    // no env vars to clear
 
     let capturedHandler: ((args: any) => Promise<void>) | null = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -616,7 +610,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
   it("message handler fetches tokens and passes teamsContext to handleTeamsMessage", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
+    // no env vars to clear
 
     let capturedHandler: ((args: any) => Promise<void>) | null = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -695,7 +689,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
   it("message handler handles missing activity.text", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
+    // no env vars to clear
 
     let capturedHandler: ((args: any) => Promise<void>) | null = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -748,7 +742,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
   it("message handler catches errors without crashing", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
+    // no env vars to clear
 
     let capturedHandler: ((args: any) => Promise<void>) | null = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -790,7 +784,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
   it("message handler catches non-Error thrown values", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
+    // no env vars to clear
 
     let capturedHandler: ((args: any) => Promise<void>) | null = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -832,7 +826,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
   it("signin wrapper catches errors and returns undefined", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
+    // no env vars to clear
 
     let capturedHandler: ((args: any) => Promise<void>) | null = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -899,7 +893,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
   it("signin wrapper logs 'no token' when signin returns falsy", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
+    // no env vars to clear
 
     let capturedHandler: ((args: any) => Promise<void>) | null = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -962,7 +956,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
   it("signin wrapper handles non-Error thrown values", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
+    // no env vars to clear
 
     let capturedHandler: ((args: any) => Promise<void>) | null = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -1026,7 +1020,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
   it("app.event error handler logs error message", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
+    // no env vars to clear
 
     let capturedEventHandler: ((args: any) => void) | null = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -1077,7 +1071,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
 
   it("registers unhandledRejection handler with __ouroboros marker", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
+    // no env vars to clear
 
     vi.doMock("@microsoft/teams.apps", () => ({
       App: class MockApp {
@@ -1119,7 +1113,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
 
   it("does not register duplicate handler on second call", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
+    // no env vars to clear
 
     vi.doMock("@microsoft/teams.apps", () => ({
       App: class MockApp {
@@ -1154,10 +1148,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
 
 describe("Teams adapter - startTeamsApp (Bot mode)", () => {
   afterEach(() => {
-    delete process.env.CLIENT_ID
-    delete process.env.CLIENT_SECRET
-    delete process.env.TENANT_ID
-    delete process.env.PORT
+    // Config is loaded from config.json only, no env vars to clear
   })
 
   function mockBotConfig(clientId: string, clientSecret: string, tenantId: string) {
@@ -1493,7 +1484,7 @@ describe("Teams adapter - phrase rotation", () => {
 
 describe("Teams adapter - session persistence", () => {
   beforeEach(() => {
-    delete process.env.AZURE_OPENAI_API_KEY
+    // no env vars to clear
   })
 
   function mockTeamsDeps(overrides: {
@@ -2111,7 +2102,7 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
 
 describe("Teams adapter - handleTeamsMessage with disableStreaming", () => {
   beforeEach(() => {
-    delete process.env.AZURE_OPENAI_API_KEY
+    // no env vars to clear
   })
 
   function mockTeamsDeps2(overrides: {
@@ -2257,16 +2248,13 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
 
   afterEach(() => {
     process.argv = savedArgv
-    delete process.env.CLIENT_ID
-    delete process.env.CLIENT_SECRET
-    delete process.env.TENANT_ID
-    delete process.env.PORT
-    delete process.env.DISABLE_STREAMING
+    // Config is loaded from config.json only, no env vars to clear
+    // no env vars to clear
   })
 
   it("when --disable-streaming is in argv, threads disableStreaming to handleTeamsMessage", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
+    // no env vars to clear
     process.argv = ["node", "teams-entry.ts", "--disable-streaming"]
 
     let capturedHandler: ((args: any) => Promise<void>) | null = null
@@ -2325,7 +2313,7 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
 
   it("logs 'streaming: disabled' at startup when --disable-streaming is present", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
+    // no env vars to clear
     process.argv = ["node", "teams-entry.ts", "--disable-streaming"]
 
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -2466,7 +2454,7 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
 
   it("logs 'streaming: enabled' when flag is absent", async () => {
     vi.resetModules()
-    delete process.env.npm_config_disable_streaming
+    // no env vars to clear
     process.argv = ["node", "teams-entry.ts"]
 
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -2510,7 +2498,7 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
 
 describe("Teams adapter - confirmation callback", () => {
   beforeEach(() => {
-    delete process.env.AZURE_OPENAI_API_KEY
+    // no env vars to clear
   })
 
   function mockTeamsDepsForConfirmation(overrides: {
@@ -2696,7 +2684,7 @@ describe("Teams adapter - confirmation callback", () => {
 
   it("pre-lock confirmation resolves before conversation lock (no deadlock)", async () => {
     vi.resetModules()
-    delete process.env.CLIENT_ID
+    // no env vars to clear
 
     let capturedHandler: ((args: any) => Promise<void>) | null = null
     vi.doMock("@microsoft/teams.apps", () => ({
