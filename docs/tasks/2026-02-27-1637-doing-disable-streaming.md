@@ -65,7 +65,7 @@ Add a `--disable-streaming` flag to `npm run teams` that buffers the final AI te
 **Files**: `src/__tests__/channels/teams.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `createTeamsCallbacks` does not yet accept the option or return `flush()`
 
-### ⬜ Unit 1b: Buffered callbacks -- Implementation
+### ✅ Unit 1b: Buffered callbacks -- Implementation
 **What**: Modify `createTeamsCallbacks()` in `src/channels/teams.ts` to accept an options object `{ disableStreaming?: boolean }`. When `disableStreaming` is true:
 - `onTextChunk`: append text to an internal buffer instead of calling `safeEmit()`
 - All other callbacks unchanged (status updates, reasoning, tools, errors still work)
@@ -188,3 +188,4 @@ In `src/channels/teams.ts`:
 - 2026-02-27 16:46 Pass 4 -- Quality: all units have acceptance criteria, emoji headers, no TBDs; set READY_FOR_EXECUTION
 - 2026-02-27 16:57 Added Units 4a-5c for system prompt flag awareness and rationale documentation; validated against prompt.ts, context.ts, core.ts; quality checked all 16 unit headers
 - 2026-02-27 17:02 Unit 1a complete: 13 failing tests for createTeamsCallbacks disableStreaming option (buffering, flush, stop-streaming, backward compat)
+- 2026-02-27 17:03 Unit 1b complete: implemented disableStreaming option with text buffering, flush(), TeamsCallbacksWithFlush type; all 662 tests pass
