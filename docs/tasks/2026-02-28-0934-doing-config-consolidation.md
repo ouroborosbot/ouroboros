@@ -181,7 +181,7 @@ Rewritten function: check `getProvider() === "azure"`, then use `getAzureConfig(
 **Files**: `src/__tests__/mind/prompt.test.ts`
 **Acceptance**: 100% coverage on providerSection, all tests green.
 
-### ⬜ Unit 5a: teams.ts env var removal -- Tests
+### ✅ Unit 5a: teams.ts env var removal -- Tests
 **What**: Update teams.test.ts tests that set OUROBOROS_SKIP_CONFIRMATION, DISABLE_STREAMING, or PORT to use setTestConfig() with the teamsChannel config section instead.
 **Env vars covered**: OUROBOROS_SKIP_CONFIRMATION (line 259), DISABLE_STREAMING (line 288), PORT (line 393).
 **Files**: `src/__tests__/channels/teams.test.ts`
@@ -301,3 +301,4 @@ Also update comment on line 286: remove "DISABLE_STREAMING=1 npm run teams" env 
 - 2026-02-28 10:45 Unit 4a complete: prompt.test.ts migrated from env vars to setTestConfig, 2 azure tests fail (red)
 - 2026-02-28 10:46 Unit 4b complete: providerSection() uses getProvider/getAzureConfig, no process.env in prompt.ts
 - 2026-02-28 10:47 Unit 4c complete: prompt.ts at 100% coverage
+- 2026-02-28 10:48 Unit 5a complete: teams.test.ts migrated skipConfirmation/disableStreaming/port tests to setTestConfig, 4 tests fail (red)
