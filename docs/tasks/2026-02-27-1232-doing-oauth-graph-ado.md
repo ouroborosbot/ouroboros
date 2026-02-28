@@ -265,7 +265,7 @@ _Tool handlers:_ `graph_profile` checks `toolContext.graphToken`, returns `AUTH_
 
 **Acceptance**: All tests pass, 100% coverage. Model can chain `graph_docs("create calendar event")` → gets endpoint info → `graph_mutate(method: "POST", path: "/me/events", body: "...")`.
 
-### ⬜ Unit 10: Full Suite + Coverage Check
+### ✅ Unit 10: Full Suite + Coverage Check
 **What**: Run full test suite. Verify 100% coverage on all new/modified code. Fix any issues.
 **Acceptance**: All tests pass, no warnings, 100% coverage.
 
