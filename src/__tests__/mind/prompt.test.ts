@@ -317,3 +317,49 @@ describe("buildSystem", () => {
     expect(result).not.toContain("## my flags")
   })
 })
+
+describe("flagsSection rationale", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    delete process.env.AZURE_OPENAI_API_KEY
+    process.env.MINIMAX_API_KEY = "test-key"
+    process.env.MINIMAX_MODEL = "test-model"
+  })
+
+  it("mentions devtunnel relay buffering (microsoft/dev-tunnels#518)", async () => {
+    setupReadFileSync()
+    const { flagsSection } = await import("../../mind/prompt")
+    const result = flagsSection("teams", { disableStreaming: true })
+    expect(result).toContain("devtunnel")
+    expect(result).toContain("dev-tunnels#518")
+  })
+
+  it("mentions 60-second hard timeout", async () => {
+    setupReadFileSync()
+    const { flagsSection } = await import("../../mind/prompt")
+    const result = flagsSection("teams", { disableStreaming: true })
+    expect(result).toContain("60")
+    expect(result.toLowerCase()).toContain("timeout")
+  })
+
+  it("mentions no HTTP/2 support on devtunnels", async () => {
+    setupReadFileSync()
+    const { flagsSection } = await import("../../mind/prompt")
+    const result = flagsSection("teams", { disableStreaming: true })
+    expect(result).toContain("HTTP/2")
+  })
+
+  it("mentions Teams throttles streaming updates to 1 req/sec", async () => {
+    setupReadFileSync()
+    const { flagsSection } = await import("../../mind/prompt")
+    const result = flagsSection("teams", { disableStreaming: true })
+    expect(result).toContain("1 req/sec")
+  })
+
+  it("mentions buffering avoids compounding latency", async () => {
+    setupReadFileSync()
+    const { flagsSection } = await import("../../mind/prompt")
+    const result = flagsSection("teams", { disableStreaming: true })
+    expect(result.toLowerCase()).toContain("latency")
+  })
+})
