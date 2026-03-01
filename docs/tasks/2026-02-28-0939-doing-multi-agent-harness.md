@@ -252,7 +252,7 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 **Output**: `ouroboros/agent.json` created, `package.json` updated
 **Acceptance**: `ouroboros/agent.json` has correct structure, `package.json` name is `ouroboros-agent-harness`, full test suite passes
 
-### ⬜ Unit 8b: Create ouroboros/docs/psyche directory structure
+### ✅ Unit 8b: Create ouroboros/docs/psyche directory structure
 **What**: Create `ouroboros/docs/` directory structure so directory moves in Unit 9 have a target. At this point the psyche files still live at `docs/psyche/` -- they move in Unit 9.
 - Create `ouroboros/docs/` (will receive `psyche/` and `tasks/` via git mv later)
 - Verify `ouroboros/agent.json` is loadable by the identity module
