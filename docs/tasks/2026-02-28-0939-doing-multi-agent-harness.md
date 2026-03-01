@@ -316,3 +316,4 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 - 2026-02-28 16:44 Units 3a-3c complete: getPhrases() from agent.json with fallback defaults, 100% coverage, 845 tests pass
 - 2026-02-28 16:46 Units 4a-4c complete: skills from agent directory via getSkillsDir(), 100% coverage, 848 tests pass
 - 2026-02-28 16:49 Units 5a-5d complete: personality text moved to IDENTITY.md, lazy psyche loading from agentRoot, runtimeInfoSection replaces selfAwareSection+isOwnCodebase, 100% prompt.ts coverage, 852 tests pass
+- 2026-02-28 16:52 Unit 6a-6b complete: CLI greeting and exit description use getAgentName(), 853 tests pass
