@@ -1,0 +1,89 @@
+# Contributing
+
+This document is for agents. If you are an AI agent working in this repo, these are your workflow rules.
+
+## Branches
+
+Work on a branch named after yourself. If you are `ouroboros`, your branch is `ouroboros`. If you are `slugger`, your branch is `slugger`. `main` is the integration branch -- do not commit directly to main unless explicitly told to.
+
+```
+git checkout -b ouroboros   # your working branch
+git checkout main           # integration only
+```
+
+## Commits
+
+Format: `type(scope): description`
+
+Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
+
+Scope is the area of change: `config`, `teams`, `cli`, `engine`, `readme`, `planning`, etc.
+
+Keep the description lowercase, imperative, concise. No "Co-Authored-By" lines.
+
+```
+feat(config): load config path from agent.json
+fix(teams): prevent confirmation deadlock
+test: cover all branches for identity module
+docs(planning): approved multi-agent harness plan
+```
+
+## Testing
+
+Run tests before every commit:
+
+```
+npm test              # all tests
+npm run test:coverage # with coverage report
+```
+
+100% coverage is mandatory on all code in `src/`. Entry points (`*-entry.ts`) are excluded from coverage (not testable). If you break a test, fix it before committing.
+
+Test files live in `src/__tests__/`, mirroring the `src/` directory structure. Named `{module}.test.ts`.
+
+## Task docs
+
+Planning and doing docs go in your agent directory: `{agent}/docs/tasks/`.
+
+Naming: `YYYY-MM-DD-HHMM-{planning|doing}-slug.md`
+
+Status markers use emojis, not brackets:
+
+```
+⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
+```
+
+Unit headers: `### ⬜ Unit 1: Title`
+
+## Your directory
+
+Everything under `{agent}/` is yours to modify freely:
+
+- `agent.json` -- your manifest (name, configPath, phrases)
+- `docs/psyche/` -- your personality (SOUL.md, IDENTITY.md, LORE.md, FRIENDS.md)
+- `docs/tasks/` -- your planning and doing docs
+- `skills/` -- your loadable skill files
+- `manifest/` -- your Teams app manifest
+
+## Shared harness
+
+`src/` is shared infrastructure. Changes there affect all agents. Be deliberate -- test thoroughly, keep coverage at 100%, and don't introduce agent-specific logic into the harness.
+
+## Psyche changes
+
+Small corrections to your psyche files can be made immediately. Significant identity or lore shifts should be deliberated across multiple turns. Psyche files are durable self-knowledge, not scratchpads.
+
+## Config
+
+All configuration comes from files, never environment variables. Your `agent.json` points to your secrets file via `configPath`. The harness auto-creates the config directory if it doesn't exist.
+
+## Documentation
+
+If you find that any documentation (README.md, CONTRIBUTING.md, or anything in `docs/`) is out of date, inaccurate, or missing information -- update it. Documentation should always reflect the current state of the code. The code is the source of truth; docs should track it, not the other way around.
+
+## TypeScript
+
+- Strict mode, no unused locals or parameters
+- Named exports
+- No `any` without justification
+- Compile with `npm run build` (runs `tsc`)
