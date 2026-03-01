@@ -271,7 +271,7 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 **Output**: Directories moved, all paths working
 **Acceptance**: All tests PASS (green), `git status` shows clean renames, `docs/OAUTH-SETUP.md` still at `docs/`
 
-### ⬜ Unit 10: Full integration verification
+### ✅ Unit 10: Full integration verification
 **What**: Final verification pass:
 - Run `npx vitest run` -- all 816+ tests pass
 - Run `npx vitest run --coverage` -- 100% coverage
