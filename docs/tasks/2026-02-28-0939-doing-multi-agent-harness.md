@@ -81,7 +81,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 **Output**: Coverage report showing 100% on `src/identity.ts`
 **Acceptance**: 100% coverage on `src/identity.ts`, tests still green
 
-### ⬜ Unit 2a: Config path from agent.json -- Tests
+### ✅ Unit 2a: Config path from agent.json -- Tests
 **What**: Update `src/__tests__/config.test.ts` with failing tests:
 - `loadConfig()` uses config path from `loadAgentConfig().configPath` instead of env var
 - `defaultConfigPath()` removed or made to read from identity module
