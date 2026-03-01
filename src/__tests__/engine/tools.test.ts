@@ -1223,6 +1223,22 @@ describe("execTool for docs tools", () => {
     const upper = await execTool("ado_docs", { query: "PIPELINE" })
     expect(lower).toBe(upper)
   })
+
+  it("graph_docs handles missing query arg", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+
+    const result = await execTool("graph_docs", {})
+    expect(typeof result).toBe("string")
+  })
+
+  it("ado_docs handles missing query arg", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../engine/tools")
+
+    const result = await execTool("ado_docs", {})
+    expect(typeof result).toBe("string")
+  })
 })
 
 describe("getToolsForChannel includes docs tools", () => {

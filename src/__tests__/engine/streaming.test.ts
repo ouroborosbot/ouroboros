@@ -272,6 +272,39 @@ describe("toResponsesInput", () => {
     ])
   })
 
+  it("handles non-string content in system message", () => {
+    const messages = [
+      { role: "system", content: [{ type: "text", text: "sys" }] },
+      { role: "user", content: "hi" },
+    ]
+    const result = toResponsesInput(messages)
+    expect(result.instructions).toBe("")
+  })
+
+  it("handles non-string content in user message", () => {
+    const messages = [
+      { role: "user", content: [{ type: "text", text: "hi" }] },
+    ]
+    const result = toResponsesInput(messages)
+    expect(result.input).toEqual([{ role: "user", content: "" }])
+  })
+
+  it("handles non-string content in assistant message", () => {
+    const messages = [
+      { role: "assistant", content: [{ type: "text", text: "reply" }] },
+    ]
+    const result = toResponsesInput(messages)
+    expect(result.input).toEqual([{ role: "assistant", content: "" }])
+  })
+
+  it("handles non-string content in tool message", () => {
+    const messages = [
+      { role: "tool", tool_call_id: "tc1", content: [{ type: "text", text: "data" }] },
+    ]
+    const result = toResponsesInput(messages)
+    expect(result.input).toEqual([{ type: "function_call_output", call_id: "tc1", output: "" }])
+  })
+
   // --- Unit 1c: Restore reasoning items in toResponsesInput ---
 
   it("restores _reasoning_items before assistant content in input", () => {
