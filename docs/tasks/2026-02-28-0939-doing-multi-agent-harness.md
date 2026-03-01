@@ -130,7 +130,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 **Output**: Coverage report showing 100% on `src/repertoire/phrases.ts`, updated consumer files
 **Acceptance**: 100% coverage, all consumers updated, tests still green
 
-### ⬜ Unit 4a: Skills from agent directory -- Tests
+### ✅ Unit 4a: Skills from agent directory -- Tests
 **What**: Update `src/__tests__/repertoire/skills.test.ts` with failing tests:
 - `SKILLS_DIR` now comes from `getAgentRoot()/skills/` instead of project-root `skills/`
 - `listSkills()` reads from `{agentRoot}/skills/`
