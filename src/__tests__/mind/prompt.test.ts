@@ -5,6 +5,7 @@ vi.mock("fs", () => ({
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   readdirSync: vi.fn(),
+  mkdirSync: vi.fn(),
 }))
 
 vi.mock("child_process", () => ({
@@ -15,6 +16,17 @@ vi.mock("child_process", () => ({
 vi.mock("../../repertoire/skills", () => ({
   listSkills: vi.fn(),
   loadSkill: vi.fn(),
+}))
+
+vi.mock("../../identity", () => ({
+  loadAgentConfig: vi.fn(() => ({
+    name: "testagent",
+    configPath: "~/.agentconfigs/testagent/config.json",
+  })),
+  getAgentName: vi.fn(() => "testagent"),
+  getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
+  getRepoRoot: vi.fn(() => "/mock/repo"),
+  resetIdentity: vi.fn(),
 }))
 
 vi.mock("openai", () => {

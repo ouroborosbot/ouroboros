@@ -1,6 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import type { ChannelCallbacks } from "../../engine/core"
 
+vi.mock("../../identity", () => ({
+  loadAgentConfig: vi.fn(() => ({
+    name: "testagent",
+    configPath: "~/.agentconfigs/testagent/config.json",
+  })),
+  getAgentName: vi.fn(() => "testagent"),
+  getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
+  getRepoRoot: vi.fn(() => "/mock/repo"),
+  resetIdentity: vi.fn(),
+}))
+
 describe("toResponsesTools", () => {
   let toResponsesTools: (ccTools: any[]) => any[]
   let tools: any[]

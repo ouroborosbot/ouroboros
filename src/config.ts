@@ -1,6 +1,7 @@
 import * as fs from "fs"
 import * as path from "path"
 import * as os from "os"
+import { loadAgentConfig, getAgentName } from "./identity"
 
 export interface AzureProviderConfig {
   apiKey: string
@@ -102,8 +103,12 @@ const DEFAULT_CONFIG: OuroborosConfig = {
 
 let _cachedConfig: OuroborosConfig | null = null
 
-function defaultConfigPath(): string {
-  return path.join(os.homedir(), ".agentconfigs", "ouroboros", "config.json")
+function resolveConfigPath(): string {
+  const raw = loadAgentConfig().configPath
+  if (raw.startsWith("~")) {
+    return path.join(os.homedir(), raw.slice(1))
+  }
+  return raw
 }
 
 function deepMerge(defaults: Record<string, unknown>, partial: Record<string, unknown>): Record<string, unknown> {
@@ -127,7 +132,11 @@ function deepMerge(defaults: Record<string, unknown>, partial: Record<string, un
 export function loadConfig(): OuroborosConfig {
   if (_cachedConfig) return _cachedConfig
 
-  const configPath = process.env.OUROBOROS_CONFIG_PATH || defaultConfigPath()
+  const configPath = resolveConfigPath()
+
+  // Auto-create config directory if it doesn't exist
+  const configDir = path.dirname(configPath)
+  fs.mkdirSync(configDir, { recursive: true })
 
   let fileData: Record<string, unknown> = {}
   try {
@@ -198,7 +207,7 @@ export function getIntegrationsConfig(): IntegrationsConfig {
 }
 
 export function getSessionDir(): string {
-  return path.join(os.homedir(), ".agentconfigs", "ouroboros", "sessions")
+  return path.join(os.homedir(), ".agentconfigs", getAgentName(), "sessions")
 }
 
 function sanitizeKey(key: string): string {

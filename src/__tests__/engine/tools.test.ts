@@ -5,6 +5,7 @@ vi.mock("fs", () => ({
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   readdirSync: vi.fn(),
+  mkdirSync: vi.fn(),
 }))
 
 vi.mock("child_process", () => ({
@@ -25,6 +26,17 @@ vi.mock("../../engine/graph-client", () => ({
 vi.mock("../../engine/ado-client", () => ({
   queryWorkItems: vi.fn(),
   adoRequest: vi.fn(),
+}))
+
+vi.mock("../../identity", () => ({
+  loadAgentConfig: vi.fn(() => ({
+    name: "testagent",
+    configPath: "~/.agentconfigs/testagent/config.json",
+  })),
+  getAgentName: vi.fn(() => "testagent"),
+  getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
+  getRepoRoot: vi.fn(() => "/mock/repo"),
+  resetIdentity: vi.fn(),
 }))
 
 import * as fs from "fs"
