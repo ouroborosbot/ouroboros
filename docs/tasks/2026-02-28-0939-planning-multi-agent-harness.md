@@ -1,6 +1,6 @@
 # Planning: Multi-Agent Harness Reorganization
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-02-28
 **Updated**: 2026-02-28 (post env-var consolidation)
 
@@ -47,7 +47,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 - [ ] `teams-entry.ts` comment updated to be generic
 - [ ] `package.json` name is `ouroboros-agent-harness`
 - [ ] Directory moves complete: `docs/psyche/`, `docs/tasks/`, `skills/`, `manifest/` under `ouroboros/`
-- [ ] README.md rewritten: what it is, why it exists, why the name, project structure, architecture overview
+- [ ] README.md rewritten: agent-first (onboarding + runtime understanding), human-readable intro
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass (816+ tests)
 - [ ] No warnings
@@ -61,6 +61,9 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 
 ## Open Questions
 - (none -- all resolved in prior planning)
+
+## Implementation Notes
+- `getRepoRoot()` must work from both `src/` (dev via tsx) and `dist/` (compiled JS). `__dirname` differs — handle both paths.
 
 ## Decisions Made
 - `AGENT_NAME` env var is required with no default -- harness errors if unset
@@ -102,13 +105,22 @@ src/teams-entry.ts:5       comment referencing ouroboros config path
 
 ## README.md
 
-Delete existing README and rewrite. Short, evergreen — code is the truth.
+Delete existing README and rewrite. The primary audience is agents — this is the first file an agent reads when pointed at the harness. Humans can read it fine too; agents just need different information, not different language.
 
-Hints (research the codebase and psyche docs to expand):
-- What this is and why it exists — two Ouroboroses (harness vs agent)
+Structure:
+1. **Brief intro for anyone** — what this is, why it exists, why the name (both Ouroboroses), project structure. Short, evergreen.
+2. **Agent onboarding** — the bulk. Everything a new agent needs to set itself up and understand its own runtime.
+
+Hints for intro (research codebase and psyche docs to expand):
 - The name: self-reference, self-modification, context window as tail-eating (session trim/rebuild), persistence through layered memory
-- Project structure: `src/` (harness), `{agent}/` (personality), `agent.json`, secrets
-- Architecture: engine loop, channels, psyche system, kicks, context management
+- Two Ouroboroses: the harness and its first agent
+
+Hints for agent onboarding:
+- Your directory: `agent.json`, `docs/psyche/`, `skills/`, `manifest/`, `docs/tasks/`
+- The psyche system: what each file does (SOUL, IDENTITY, LORE, FRIENDS), how they load into the prompt, how to write your own (the existing ones are examples, not templates)
+- Your runtime: engine loop, channels, tools, kicks, context/session management — so the agent understands its own mechanics
+- What you can modify (your `{agent}/` dir) vs shared harness (`src/`)
+- Self-contained — no cross-referencing needed
 
 ## Progress Log
 - 2026-02-28 09:39 Created from existing plan at steady-gliding-taco.md
