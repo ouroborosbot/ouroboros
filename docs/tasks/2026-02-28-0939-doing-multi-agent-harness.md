@@ -103,7 +103,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 **Output**: Updated `src/config.ts` passing all tests
 **Acceptance**: All tests PASS (green), no warnings, zero `process.env` in `src/config.ts`
 
-### ⬜ Unit 2c: Config -- Coverage & Refactor
+### ✅ Unit 2c: Config -- Coverage & Refactor
 **What**: Verify 100% coverage on `src/config.ts` changes, add any missing branch tests
 **Output**: Coverage report showing 100% on `src/config.ts`
 **Acceptance**: 100% coverage on config changes, tests still green
