@@ -7,6 +7,7 @@ import { sessionPath } from "../config"
 import { loadSession, deleteSession, cachedBuildSystem, postTurn } from "../mind/context"
 import type { UsageData } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand, getToolChoiceRequired } from "../repertoire/commands"
+import { getAgentName } from "../identity"
 
 // readline.Interface exposes undocumented mutable line/cursor for in-progress input
 type ReadlineInternals = readline.Interface & { line: string; cursor: number }
@@ -335,7 +336,7 @@ export async function main() {
   let closed = false
   rl.on("close", () => { closed = true })
 
-  console.log("\nouroboros (type /commands for help)\n")
+  console.log(`\n${getAgentName()} (type /commands for help)\n`)
 
   const cliCallbacks = createCliCallbacks()
 
