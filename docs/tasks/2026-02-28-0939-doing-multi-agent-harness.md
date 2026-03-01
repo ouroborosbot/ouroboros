@@ -93,7 +93,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 **Output**: Updated `src/__tests__/config.test.ts` and `src/__tests__/engine/core.test.ts` with new/updated failing tests
 **Acceptance**: New tests exist and FAIL (red)
 
-### ⬜ Unit 2b: Config path from agent.json -- Implementation
+### ✅ Unit 2b: Config path from agent.json -- Implementation
 **What**: Update `src/config.ts`:
 - Import `loadAgentConfig`, `getAgentName` from `./identity`
 - Replace `defaultConfigPath()` to use `loadAgentConfig().configPath` (resolve `~` to `os.homedir()`)
