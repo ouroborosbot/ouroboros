@@ -222,7 +222,7 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 **Output**: Coverage report showing 100% on `src/channels/cli.ts` and `src/repertoire/commands.ts`
 **Acceptance**: 100% coverage, tests still green
 
-### ⬜ Unit 7a: Teams adapter rename -- Tests
+### ✅ Unit 7a: Teams adapter rename -- Tests
 **What**: Update `src/__tests__/channels/teams.test.ts` with failing tests:
 - `OuroborosHandler` renamed to `AgentHandler` / `__agentHandler`
 - Tests currently reference `__ouroboros` marker (lines 1065-1143) -- update to `__agentHandler`
