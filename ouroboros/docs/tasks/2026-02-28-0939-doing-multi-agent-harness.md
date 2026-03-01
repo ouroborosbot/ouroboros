@@ -1,6 +1,6 @@
 # Doing: Multi-Agent Harness Reorganization
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-02-28
 **Planning**: ./2026-02-28-0939-planning-multi-agent-harness.md
@@ -281,7 +281,7 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 **Output**: Clean test run, coverage report
 **Acceptance**: All tests pass, 100% coverage, no warnings, zero env vars in src
 
-### ⬜ Unit 11: README rewrite
+### ✅ Unit 11: README rewrite
 **What**: Delete existing `README.md` and rewrite from scratch. The work-doer should research the codebase and psyche docs thoroughly when writing it. Structure:
 1. **Brief intro for anyone** -- what this is, why it exists, why the name (both Ouroboroses), project structure. Short, evergreen.
 2. **Agent onboarding** -- the bulk. Everything a new agent needs to set itself up and understand its own runtime:
@@ -320,3 +320,4 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 - 2026-02-28 16:54 Units 6c, 7a-7c complete: CLI/commands 100% coverage, teams adapter renamed OuroborosHandler->AgentHandler and __ouroboros->__agentHandler, teams-entry.ts comment genericized, 853 tests pass
 - 2026-02-28 16:56 Units 8a-8b complete: ouroboros/agent.json created, package.json renamed to ouroboros-agent-harness, --agent ouroboros in scripts, entry points validate --agent, ouroboros/docs/ ready for moves
 - 2026-02-28 16:57 Unit 9 complete: git mv docs/psyche, docs/tasks, skills, manifest under ouroboros/, all 853 tests pass, docs/OAUTH-SETUP.md stays at docs/
+- 2026-02-28 16:59 Units 10-11 complete: full integration verified (853 tests, 100% coverage, zero process.env in src/), README rewritten for multi-agent harness
