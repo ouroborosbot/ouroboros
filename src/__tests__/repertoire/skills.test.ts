@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
+import * as path from "path"
 
 // Mock fs before importing skills
 vi.mock("fs", () => ({
@@ -8,7 +9,23 @@ vi.mock("fs", () => ({
   writeFileSync: vi.fn(),
 }))
 
+// Mock identity -- skills will use getAgentRoot() for skills directory
+vi.mock("../../identity", () => ({
+  getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
+}))
+
 import * as fs from "fs"
+
+describe("skills - getSkillsDir", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it("returns skills directory under agent root", async () => {
+    const { getSkillsDir } = await import("../../repertoire/skills")
+    expect(getSkillsDir()).toBe(path.join("/mock/repo/testagent", "skills"))
+  })
+})
 
 describe("skills - listSkills", () => {
   beforeEach(() => {
@@ -51,6 +68,15 @@ describe("skills - listSkills", () => {
     const { listSkills } = await import("../../repertoire/skills")
     expect(listSkills()).toEqual(["self-edit"])
   })
+
+  it("reads from agent root skills directory", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readdirSync).mockReturnValue(["test.md"] as any)
+    const { listSkills } = await import("../../repertoire/skills")
+    listSkills()
+    const expectedDir = path.join("/mock/repo/testagent", "skills")
+    expect(fs.existsSync).toHaveBeenCalledWith(expectedDir)
+  })
 })
 
 describe("skills - loadSkill", () => {
@@ -91,6 +117,15 @@ describe("skills - loadSkill", () => {
     loadSkill("dup-skill")
     const loaded = getLoadedSkills()
     expect(loaded.filter((s) => s === "dup-skill")).toHaveLength(1)
+  })
+
+  it("loads from agent root skills directory", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readFileSync).mockReturnValue("content")
+    const { loadSkill } = await import("../../repertoire/skills")
+    loadSkill("my-skill")
+    const expectedPath = path.join("/mock/repo/testagent", "skills", "my-skill.md")
+    expect(fs.existsSync).toHaveBeenCalledWith(expectedPath)
   })
 })
 
