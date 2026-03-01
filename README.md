@@ -47,6 +47,7 @@ ouroboros/                        # repo root
       tasks/                      # planning and doing docs
     skills/                       # markdown skill plugins
     manifest/                     # Teams app manifest
+  subagents/                      # sub-agent definitions (work-planner, work-doer)
   docs/
     OAUTH-SETUP.md                # shared OAuth infrastructure docs
   package.json
