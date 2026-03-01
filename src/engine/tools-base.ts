@@ -124,7 +124,7 @@ export const tools: OpenAI.ChatCompletionTool[] = [
     function: {
       name: "claude",
       description:
-        "spawn another claude instance to query this codebase (or the world). useful for self-reflection, code review, asking questions about yourself.",
+        "use claude code to query this codebase or get an outside perspective. useful for code review, second opinions, and asking questions about your own source.",
       parameters: {
         type: "object",
         properties: { prompt: { type: "string" } },
