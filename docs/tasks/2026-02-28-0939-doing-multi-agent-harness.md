@@ -237,7 +237,7 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 **Output**: Updated files passing all tests
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 7c: Teams adapter -- Coverage & Refactor
+### ✅ Unit 7c: Teams adapter -- Coverage & Refactor
 **What**: Verify 100% coverage on teams changes
 **Output**: Coverage report showing 100% on `src/channels/teams.ts`
 **Acceptance**: 100% coverage, tests still green
