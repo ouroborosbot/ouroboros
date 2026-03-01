@@ -4,11 +4,12 @@ This document is for agents. If you are an AI agent working in this repo, these 
 
 ## Branches
 
-Work on a branch named after yourself. If you are `ouroboros`, your branch is `ouroboros`. If you are `slugger`, your branch is `slugger`. `main` is the integration branch -- do not commit directly to main unless explicitly told to.
+Work on a branch named after yourself, optionally suffixed with the feature you're working on. `main` is the integration branch -- do not commit directly to main unless explicitly told to.
 
 ```
-git checkout -b ouroboros   # your working branch
-git checkout main           # integration only
+git checkout -b ouroboros                # general work
+git checkout -b ouroboros/oauth-setup    # feature-specific
+git checkout main                        # integration only
 ```
 
 ## Commits
