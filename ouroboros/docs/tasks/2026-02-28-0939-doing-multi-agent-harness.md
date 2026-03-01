@@ -319,3 +319,4 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 - 2026-02-28 16:52 Unit 6a-6b complete: CLI greeting and exit description use getAgentName(), 853 tests pass
 - 2026-02-28 16:54 Units 6c, 7a-7c complete: CLI/commands 100% coverage, teams adapter renamed OuroborosHandler->AgentHandler and __ouroboros->__agentHandler, teams-entry.ts comment genericized, 853 tests pass
 - 2026-02-28 16:56 Units 8a-8b complete: ouroboros/agent.json created, package.json renamed to ouroboros-agent-harness, --agent ouroboros in scripts, entry points validate --agent, ouroboros/docs/ ready for moves
+- 2026-02-28 16:57 Unit 9 complete: git mv docs/psyche, docs/tasks, skills, manifest under ouroboros/, all 853 tests pass, docs/OAUTH-SETUP.md stays at docs/
