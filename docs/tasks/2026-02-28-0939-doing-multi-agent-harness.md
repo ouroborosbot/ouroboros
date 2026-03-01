@@ -138,7 +138,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 **Output**: Updated skills test file with new failing tests
 **Acceptance**: New tests exist and FAIL (red)
 
-### ⬜ Unit 4b: Skills from agent directory -- Implementation
+### ✅ Unit 4b: Skills from agent directory -- Implementation
 **What**: Update `src/repertoire/skills.ts`:
 - Import `getAgentRoot` from `../identity`
 - Replace module-level `SKILLS_DIR` constant with a function `getSkillsDir()` that returns `path.join(getAgentRoot(), "skills")`
