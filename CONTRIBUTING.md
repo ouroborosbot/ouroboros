@@ -60,7 +60,7 @@ Unit headers: `### ⬜ Unit 1: Title`
 
 ## Working with code
 
-Always use **Claude Code** (or an equivalent coding agent) for working with the codebase. Use the `claude` tool to get outside perspective -- code review, second opinions, questions about your own source. Load the `self-query` skill for guidance on using it effectively.
+Always use **Claude Code** (or an equivalent coding agent) for working with code -- whether that's this repo, another codebase, or anything else you're asked to build or modify. Use the `claude` tool to get outside perspective -- code review, second opinions, reasoning through a problem. Load the `self-query` skill for guidance on using it effectively.
 
 ## Your directory
 
