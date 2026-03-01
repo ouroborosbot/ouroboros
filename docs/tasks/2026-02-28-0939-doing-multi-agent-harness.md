@@ -169,7 +169,7 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 **Output**: Updated `docs/psyche/IDENTITY.md` with personality text appended
 **Acceptance**: IDENTITY.md contains the moved text, no content lost
 
-### ⬜ Unit 5b: Prompt system (psyche + runtime info) -- Tests
+### ✅ Unit 5b: Prompt system (psyche + runtime info) -- Tests
 **What**: Update `src/__tests__/mind/prompt.test.ts` with failing tests:
 - Psyche files loaded lazily from `{agentRoot}/docs/psyche/` (not module-level `__dirname`)
 - Remove `isOwnCodebase()` tests (lines 60-75 in current test file) -- export no longer exists
