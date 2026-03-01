@@ -66,7 +66,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 **Output**: `src/__tests__/identity.test.ts` with all tests failing
 **Acceptance**: Tests exist and FAIL (red) -- `npx vitest run src/__tests__/identity.test.ts` shows failures
 
-### ⬜ Unit 1b: Identity module -- Implementation
+### ✅ Unit 1b: Identity module -- Implementation
 **What**: Create `src/identity.ts` implementing:
 - `getAgentName()`: parse `--agent <name>` from `process.argv`, throw if missing
 - `getAgentRoot()`: `path.join(getRepoRoot(), getAgentName())`
