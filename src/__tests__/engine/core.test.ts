@@ -2554,37 +2554,15 @@ describe("getClient", () => {
 })
 
 describe("getClient config integration", () => {
-  const savedConfigPath = process.env.OUROBOROS_CONFIG_PATH
-
   beforeEach(() => {
-    delete process.env.OUROBOROS_CONFIG_PATH
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
-  })
-
-  afterEach(() => {
-    if (savedConfigPath !== undefined) process.env.OUROBOROS_CONFIG_PATH = savedConfigPath
-    else delete process.env.OUROBOROS_CONFIG_PATH
   })
 
   it("uses azure config from config.json when apiKey is present", async () => {
     vi.resetModules()
-    const configData = {
-      providers: {
-        azure: {
-          apiKey: "config-az-key",
-          endpoint: "https://config.openai.azure.com",
-          deployment: "config-deploy",
-          modelName: "config-model",
-        },
-      },
-    }
-    process.env.OUROBOROS_CONFIG_PATH = "/tmp/test-config.json"
-    vi.mocked(fs.readFileSync).mockImplementation((p: any) => {
-      if (p === "/tmp/test-config.json") return JSON.stringify(configData)
-      return JSON.stringify({ name: "other" })
-    })
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure("config-az-key", "https://config.openai.azure.com", "config-deploy", "config-model")
 
-    await resetConfig()
     const core = await import("../../engine/core")
     expect(core.getModel()).toBe("config-model")
     expect(core.getProvider()).toBe("azure")
@@ -2592,21 +2570,9 @@ describe("getClient config integration", () => {
 
   it("uses minimax config from config.json when apiKey is present", async () => {
     vi.resetModules()
-    const configData = {
-      providers: {
-        minimax: {
-          apiKey: "config-mm-key",
-          model: "config-mm-model",
-        },
-      },
-    }
-    process.env.OUROBOROS_CONFIG_PATH = "/tmp/test-config.json"
-    vi.mocked(fs.readFileSync).mockImplementation((p: any) => {
-      if (p === "/tmp/test-config.json") return JSON.stringify(configData)
-      return JSON.stringify({ name: "other" })
-    })
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax("config-mm-key", "config-mm-model")
 
-    await resetConfig()
     const core = await import("../../engine/core")
     expect(core.getModel()).toBe("config-mm-model")
     expect(core.getProvider()).toBe("minimax")
@@ -2614,7 +2580,8 @@ describe("getClient config integration", () => {
 
   it("prefers azure when both providers are configured in config.json", async () => {
     vi.resetModules()
-    const configData = {
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
       providers: {
         azure: {
           apiKey: "az-key",
@@ -2627,14 +2594,8 @@ describe("getClient config integration", () => {
           model: "mm-model",
         },
       },
-    }
-    process.env.OUROBOROS_CONFIG_PATH = "/tmp/test-config.json"
-    vi.mocked(fs.readFileSync).mockImplementation((p: any) => {
-      if (p === "/tmp/test-config.json") return JSON.stringify(configData)
-      return JSON.stringify({ name: "other" })
     })
 
-    await resetConfig()
     const core = await import("../../engine/core")
     expect(core.getProvider()).toBe("azure")
   })
