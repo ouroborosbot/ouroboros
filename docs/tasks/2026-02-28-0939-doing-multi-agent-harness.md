@@ -318,3 +318,4 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 - 2026-02-28 16:49 Units 5a-5d complete: personality text moved to IDENTITY.md, lazy psyche loading from agentRoot, runtimeInfoSection replaces selfAwareSection+isOwnCodebase, 100% prompt.ts coverage, 852 tests pass
 - 2026-02-28 16:52 Unit 6a-6b complete: CLI greeting and exit description use getAgentName(), 853 tests pass
 - 2026-02-28 16:54 Units 6c, 7a-7c complete: CLI/commands 100% coverage, teams adapter renamed OuroborosHandler->AgentHandler and __ouroboros->__agentHandler, teams-entry.ts comment genericized, 853 tests pass
+- 2026-02-28 16:56 Units 8a-8b complete: ouroboros/agent.json created, package.json renamed to ouroboros-agent-harness, --agent ouroboros in scripts, entry points validate --agent, ouroboros/docs/ ready for moves
