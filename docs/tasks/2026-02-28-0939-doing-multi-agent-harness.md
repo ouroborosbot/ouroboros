@@ -116,7 +116,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 **Output**: Updated phrases test file with new failing tests
 **Acceptance**: New tests exist and FAIL (red)
 
-### ⬜ Unit 3b: Phrases from agent.json -- Implementation
+### ✅ Unit 3b: Phrases from agent.json -- Implementation
 **What**: Update `src/repertoire/phrases.ts`:
 - Import `loadAgentConfig` from `../identity`
 - Replace hardcoded `THINKING_PHRASES`, `TOOL_PHRASES`, `FOLLOWUP_PHRASES` exports with functions that read from `loadAgentConfig().phrases`
