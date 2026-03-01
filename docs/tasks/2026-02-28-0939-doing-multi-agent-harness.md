@@ -151,7 +151,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 **Output**: Coverage report showing 100% on `src/repertoire/skills.ts`
 **Acceptance**: 100% coverage on skills changes, tests still green
 
-### ⬜ Unit 5a: Move personality text to psyche docs
+### ✅ Unit 5a: Move personality text to psyche docs
 **What**: Before changing `prompt.ts`, move the personality text currently in `selfAwareSection()` (lines 56-73 of `src/mind/prompt.ts`) into `docs/psyche/IDENTITY.md` (append to existing file). This is the "i am in my own codebase" block:
 ```
 i am Ouroboros -- a snake eating its own tail. i can read and modify my own source code...
