@@ -181,7 +181,7 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 **Output**: Updated prompt test file with new failing tests
 **Acceptance**: New tests exist and FAIL (red)
 
-### ⬜ Unit 5c: Prompt system -- Implementation
+### ✅ Unit 5c: Prompt system -- Implementation
 **What**: Update `src/mind/prompt.ts`:
 - Import `getAgentRoot` from `../identity`
 - Replace module-scope `fs.readFileSync` calls with lazy-loading function `loadPsyche()` that reads from `path.join(getAgentRoot(), "docs", "psyche")`
