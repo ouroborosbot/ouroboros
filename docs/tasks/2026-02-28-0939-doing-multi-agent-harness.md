@@ -230,7 +230,7 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 **Output**: Updated test file with new failing tests
 **Acceptance**: New tests exist and FAIL (red)
 
-### ⬜ Unit 7b: Teams adapter rename -- Implementation
+### ✅ Unit 7b: Teams adapter rename -- Implementation
 **What**: Update:
 - `src/channels/teams.ts`: rename `OuroborosHandler` interface to `AgentHandler`, rename `__ouroboros` marker to `__agentHandler`
 - `src/teams-entry.ts`: update comment from `~/.agentconfigs/ouroboros/config.json` to generic `config.json path from agent.json`
