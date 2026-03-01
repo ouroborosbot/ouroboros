@@ -259,7 +259,7 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 **Output**: Directory structure ready for moves
 **Acceptance**: `ouroboros/` directory exists with `agent.json` and `docs/` subdirectory, full test suite passes
 
-### ⬜ Unit 9: Directory moves
+### ✅ Unit 9: Directory moves
 **What**: Use `git mv` to move agent-specific directories under `ouroboros/`:
 - `git mv docs/psyche ouroboros/docs/psyche`
 - `git mv docs/tasks ouroboros/docs/tasks`
