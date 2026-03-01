@@ -1,4 +1,5 @@
 import type { Channel } from "../mind/prompt"
+import { getAgentName } from "../identity"
 
 export interface CommandContext {
   channel: Channel
@@ -63,7 +64,7 @@ export function resetToolChoiceRequired(): void {
 export function registerDefaultCommands(registry: CommandRegistry): void {
   registry.register({
     name: "exit",
-    description: "quit ouroboros",
+    description: `quit ${getAgentName()}`,
     channels: ["cli"],
     handler: () => ({ action: "exit" }),
   })
