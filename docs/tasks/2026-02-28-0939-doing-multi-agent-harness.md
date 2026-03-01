@@ -1,6 +1,6 @@
 # Doing: Multi-Agent Harness Reorganization
 
-**Status**: drafting
+**Status**: READY_FOR_EXECUTION
 **Execution Mode**: direct
 **Created**: 2026-02-28
 **Planning**: ./2026-02-28-0939-planning-multi-agent-harness.md
@@ -78,6 +78,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 
 ### ⬜ Unit 1c: Identity module -- Coverage & Refactor
 **What**: Verify 100% coverage on `src/identity.ts`, add any missing branch tests, refactor if needed
+**Output**: Coverage report showing 100% on `src/identity.ts`
 **Acceptance**: 100% coverage on `src/identity.ts`, tests still green
 
 ### ⬜ Unit 2a: Config path from agent.json -- Tests
@@ -104,6 +105,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 
 ### ⬜ Unit 2c: Config -- Coverage & Refactor
 **What**: Verify 100% coverage on `src/config.ts` changes, add any missing branch tests
+**Output**: Coverage report showing 100% on `src/config.ts`
 **Acceptance**: 100% coverage on config changes, tests still green
 
 ### ⬜ Unit 3a: Phrases from agent.json -- Tests
@@ -125,6 +127,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 
 ### ⬜ Unit 3c: Phrases -- Coverage & Refactor
 **What**: Verify 100% coverage on phrases changes. Update all consumers of the old phrase exports (`src/channels/cli.ts`, `src/channels/teams.ts`) to use the new API.
+**Output**: Coverage report showing 100% on `src/repertoire/phrases.ts`, updated consumer files
 **Acceptance**: 100% coverage, all consumers updated, tests still green
 
 ### ⬜ Unit 4a: Skills from agent directory -- Tests
@@ -145,6 +148,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 
 ### ⬜ Unit 4c: Skills -- Coverage & Refactor
 **What**: Verify 100% coverage on skills changes, add any missing branch tests
+**Output**: Coverage report showing 100% on `src/repertoire/skills.ts`
 **Acceptance**: 100% coverage on skills changes, tests still green
 
 ### ⬜ Unit 5a: Move personality text to psyche docs
@@ -192,6 +196,7 @@ The content must be preserved -- not deleted -- so the agent's personality survi
 
 ### ⬜ Unit 5d: Prompt system -- Coverage & Refactor
 **What**: Verify 100% coverage on prompt changes, add any missing branch tests. Ensure all psyche loading paths (success, missing file, malformed) are covered.
+**Output**: Coverage report showing 100% on `src/mind/prompt.ts`
 **Acceptance**: 100% coverage on prompt changes, tests still green
 
 ### ⬜ Unit 6a: CLI dynamic greeting and exit command -- Tests
@@ -211,6 +216,7 @@ The content must be preserved -- not deleted -- so the agent's personality survi
 
 ### ⬜ Unit 6c: CLI and commands -- Coverage & Refactor
 **What**: Verify 100% coverage on CLI and commands changes
+**Output**: Coverage report showing 100% on `src/channels/cli.ts` and `src/repertoire/commands.ts`
 **Acceptance**: 100% coverage, tests still green
 
 ### ⬜ Unit 7a: Teams adapter rename -- Tests
@@ -230,6 +236,7 @@ The content must be preserved -- not deleted -- so the agent's personality survi
 
 ### ⬜ Unit 7c: Teams adapter -- Coverage & Refactor
 **What**: Verify 100% coverage on teams changes
+**Output**: Coverage report showing 100% on `src/channels/teams.ts`
 **Acceptance**: 100% coverage, tests still green
 
 ### ⬜ Unit 8a: Create ouroboros/agent.json and update package.json
@@ -292,4 +299,7 @@ The content must be preserved -- not deleted -- so the agent's personality survi
 - **Decisions made**: Update docs immediately, commit right away
 
 ## Progress Log
-- 2026-02-28 Created from planning doc
+- 2026-02-28 16:25 Created from planning doc (Pass 1: first draft)
+- 2026-02-28 16:26 Pass 2: granularity -- split Unit 5 to separate psyche move, tightened Unit 8
+- 2026-02-28 16:27 Pass 3: validation -- verified all file paths, line numbers, test references against codebase
+- 2026-02-28 16:28 Pass 4: quality -- added Output fields to all coverage units, verified emoji headers
