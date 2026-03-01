@@ -197,7 +197,7 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 **Output**: Updated `src/mind/prompt.ts` passing all tests
 **Acceptance**: All tests PASS (green), no warnings, `isOwnCodebase` gone
 
-### ⬜ Unit 5d: Prompt system -- Coverage & Refactor
+### ✅ Unit 5d: Prompt system -- Coverage & Refactor
 **What**: Verify 100% coverage on prompt changes, add any missing branch tests. Ensure all psyche loading paths (success, missing file, malformed) are covered.
 **Output**: Coverage report showing 100% on `src/mind/prompt.ts`
 **Acceptance**: 100% coverage on prompt changes, tests still green
