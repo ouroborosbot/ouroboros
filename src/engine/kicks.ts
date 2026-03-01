@@ -1,8 +1,12 @@
 // TODO: Kicks enforce "any action" but not "meaningful action". After a narration
 // kick, the model can satisfy the constraint by calling a no-op tool like
 // get_current_time({}). We need to detect trivial compliance and either re-kick
-// or discount the tool call. See ouroboros' observation: "i'm not chickening out.
-// i'm satisfying a crude constraint. poorly."
+// or discount the tool call. Ideally, the kick message would suggest a specific
+// tool call based on conversation context (what the user asked, what tools are
+// relevant) rather than just saying "call a tool". That's a bigger piece of work —
+// it requires the kick system to be context-aware.
+// See ouroboros' observation: "i'm not chickening out. i'm satisfying a crude
+// constraint. poorly."
 //
 // A kick is a self-correction. When the harness detects a malformed response,
 // it injects an assistant-role message as if the model caught its own mistake.
