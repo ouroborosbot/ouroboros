@@ -55,7 +55,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 ### Legend
 ⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
-### ⬜ Unit 1a: Identity module -- Tests
+### ✅ Unit 1a: Identity module -- Tests
 **What**: Create `src/__tests__/identity.test.ts` with failing tests for the new `src/identity.ts` module. Test:
 - `getAgentName()` parses `--agent <name>` from `process.argv`; errors when missing
 - `getAgentRoot()` returns `path.join(repoRoot, agentName)`
