@@ -125,3 +125,4 @@ Hints for agent onboarding:
 ## Progress Log
 - 2026-02-28 09:39 Created from existing plan at steady-gliding-taco.md
 - 2026-02-28 11:15 Updated post env-var consolidation: removed stale env var rename scope (already done), updated test count to 816, added prerequisite status, added current hardcoded reference audit
+- 2026-02-28 16:21 Status approved, proceeding to doing doc conversion
