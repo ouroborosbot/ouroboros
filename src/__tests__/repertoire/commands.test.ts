@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
+vi.mock("../../identity", () => ({
+  getAgentName: vi.fn(() => "testagent"),
+}))
+
 describe("createCommandRegistry", () => {
   beforeEach(() => { vi.resetModules() })
 
@@ -107,6 +111,16 @@ describe("registerDefaultCommands", () => {
     expect(result.handled).toBe(true)
     expect(result.result!.message).not.toContain("/exit")
     expect(result.result!.message).toContain("/new")
+  })
+
+  it("/exit description uses agent name", async () => {
+    const { createCommandRegistry, registerDefaultCommands } = await import("../../repertoire/commands")
+    const registry = createCommandRegistry()
+    registerDefaultCommands(registry)
+
+    const cmd = registry.get("exit")
+    expect(cmd).toBeDefined()
+    expect(cmd!.description).toContain("testagent")
   })
 
   it("/exit is NOT available in teams channel list", async () => {
