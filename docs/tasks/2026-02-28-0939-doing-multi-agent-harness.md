@@ -76,7 +76,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 **Output**: `src/identity.ts` passing all tests
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 1c: Identity module -- Coverage & Refactor
+### ✅ Unit 1c: Identity module -- Coverage & Refactor
 **What**: Verify 100% coverage on `src/identity.ts`, add any missing branch tests, refactor if needed
 **Output**: Coverage report showing 100% on `src/identity.ts`
 **Acceptance**: 100% coverage on `src/identity.ts`, tests still green
