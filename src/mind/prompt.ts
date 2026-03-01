@@ -4,45 +4,66 @@ import { getModel, getProvider } from "../engine/core";
 import { getAzureConfig } from "../config";
 import { finalAnswerTool, getToolsForChannel } from "../engine/tools";
 import { listSkills } from "../repertoire/skills";
+import { getAgentRoot, getAgentName } from "../identity";
 
-// Load psyche files at module scope (once, at startup)
-const psycheDir = path.join(__dirname, "..", "..", "docs", "psyche");
-const soulText = fs.readFileSync(path.join(psycheDir, "SOUL.md"), "utf-8").trim();
-const identityText = fs.readFileSync(path.join(psycheDir, "IDENTITY.md"), "utf-8").trim();
-const loreText = fs.readFileSync(path.join(psycheDir, "LORE.md"), "utf-8").trim();
-const friendsText = fs.readFileSync(path.join(psycheDir, "FRIENDS.md"), "utf-8").trim();
+// Lazy-loaded psyche text cache
+let _psycheCache: { soul: string; identity: string; lore: string; friends: string } | null = null;
 
-export function isOwnCodebase(): boolean {
+function loadPsycheFile(name: string): string {
   try {
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(process.cwd(), "package.json"), "utf-8"),
-    );
-    return pkg.name === "ouroboros";
+    const psycheDir = path.join(getAgentRoot(), "docs", "psyche");
+    return fs.readFileSync(path.join(psycheDir, name), "utf-8").trim();
   } catch {
-    return false;
+    return "";
   }
+}
+
+function loadPsyche(): { soul: string; identity: string; lore: string; friends: string } {
+  if (_psycheCache) return _psycheCache;
+  _psycheCache = {
+    soul: loadPsycheFile("SOUL.md"),
+    identity: loadPsycheFile("IDENTITY.md"),
+    lore: loadPsycheFile("LORE.md"),
+    friends: loadPsycheFile("FRIENDS.md"),
+  };
+  return _psycheCache;
+}
+
+export function resetPsycheCache(): void {
+  _psycheCache = null;
 }
 
 export type Channel = "cli" | "teams";
 
 function soulSection(): string {
-  return soulText;
+  return loadPsyche().soul;
 }
 
 function identitySection(): string {
-  return identityText;
+  return loadPsyche().identity;
 }
 
 function loreSection(): string {
-  return `## my lore\n${loreText}`;
+  const text = loadPsyche().lore;
+  if (!text) return "";
+  return `## my lore\n${text}`;
 }
 
 function friendsSection(): string {
-  return `## my friends\n${friendsText}`;
+  const text = loadPsyche().friends;
+  if (!text) return "";
+  return `## my friends\n${text}`;
 }
 
-function selfAwareSection(channel: Channel): string {
+export function runtimeInfoSection(channel: Channel): string {
   const lines: string[] = [];
+  const agentName = getAgentName();
+
+  lines.push(`## runtime`);
+  lines.push(`agent: ${agentName}`);
+  lines.push(`cwd: ${process.cwd()}`);
+  lines.push(`channel: ${channel}`);
+  lines.push(`i can read and modify my own source code.`);
 
   if (channel === "cli") {
     lines.push("i introduce myself on boot with a fun random greeting.");
@@ -50,27 +71,6 @@ function selfAwareSection(channel: Channel): string {
     lines.push(
       "i am responding in Microsoft Teams. i keep responses concise. i use markdown formatting. i do not introduce myself on boot.",
     );
-  }
-
-  if (isOwnCodebase()) {
-    lines.push(`
-## i am in my own codebase
-
-i am Ouroboros — a snake eating its own tail. i can read and modify my own source code. this is weird but powerful.
-
-### what i can do
-- edit src/*.ts source files
-- load skills with load_skill tool to learn specialized workflows
-- use the claude tool to spawn another instance of myself for code review
-
-### relevant skills
-- self-edit: for safely editing my own source code
-- self-query: for using the claude tool to get outside perspective on my code
-
-### remember
-- edits to source files won't take effect until i restart
-- use git diff to see what i changed
-- when in doubt, ask another instance of myself for a second opinion`);
   }
 
   return lines.join("\n");
@@ -144,7 +144,7 @@ export function buildSystem(channel: Channel = "cli", options?: BuildSystemOptio
     identitySection(),
     loreSection(),
     friendsSection(),
-    selfAwareSection(channel),
+    runtimeInfoSection(channel),
     flagsSection(channel, options),
     providerSection(),
     dateSection(),
