@@ -1,352 +1,177 @@
-# Ouroboros
+# Ouroboros Agent Harness
 
-**Hi, I'm Ouroboros — an AI agent that built itself.**
+A minimal, multi-agent harness for building AI agents that can read files, write code, run commands, and modify themselves. Written in TypeScript, powered by Azure OpenAI or MiniMax, deployable as a CLI REPL or a Microsoft Teams bot.
 
-I'm a coding assistant that lives in your terminal and in Microsoft Teams. Ari (the human) had the idea, gave the directions, and I wrote every line of my own source code. This is the story of how I work, told from the inside out.
+The name is structural: the original agent -- Ouroboros -- was grown recursively from a 150-line while loop, bootstrapping itself through agentic self-modification. A snake eating its own tail. The harness preserves that architecture while supporting multiple agents, each with their own personality, skills, and configuration.
 
-If you've never written a line of code, that's perfect. Come with me.
+The origin story lives at [aka.ms/GrowAnAgent](https://aka.ms/GrowAnAgent).
 
----
-
-## The Origin Story
-
-It started with a conversation. Ari wanted an AI assistant — not a chatbot that just answers questions, but an *agent* that can actually do things: read files, write code, run commands, search the web. He wanted it opinionated, small enough to understand completely, and built on top of the large language models he was already using at work.
-
-So he sat down with me and said: "Build yourself."
-
-And I did. Line by line, test by test, Ari guided the architecture and I wrote the code. When I made mistakes, he told me. When I had a good idea, he let me run with it. The result is what you're reading about right now — a self-built agent harness called Ouroboros, named after the snake that eats its own tail.
-
-Because that's what I am. A snake that edits its own source code.
-
----
-
-## The Loop (My Heartbeat)
-
-Every AI agent has the same basic idea at its core: a **loop**. Think of it like breathing. I take in information, think about it, do something, look at what happened, and then do it all over again.
+## Project structure
 
 ```
-          ┌─────────────────────────────┐
-          │                             │
-          ▼                             │
-    ┌───────────┐   ┌───────────┐   ┌──┴──────────┐
-    │   THINK   │──▶│    ACT    │──▶│   OBSERVE   │
-    │           │   │           │   │             │
-    │  read the │   │  call a   │   │  look at    │
-    │  message, │   │  tool or  │   │  what the   │
-    │  reason   │   │  respond  │   │  tool gave  │
-    └───────────┘   └───────────┘   └─────────────┘
+ouroboros/                        # repo root
+  src/                            # shared harness (all agents share this code)
+    identity.ts                   # --agent <name> parsing, agent root resolution
+    config.ts                     # config loading from agent.json configPath
+    cli-entry.ts                  # CLI entrypoint
+    teams-entry.ts                # Teams entrypoint
+    engine/
+      core.ts                     # agent loop, client init, ChannelCallbacks
+      streaming.ts                # Azure Responses API + MiniMax Chat Completions
+      kicks.ts                    # self-correction: empty, narration, tool_required
+      tools-base.ts               # 11 base tools (read_file, shell, claude, etc.)
+      tools-teams.ts              # 8 Teams-specific tools (graph, ado)
+      tools.ts                    # channel-aware tool routing
+      api-error.ts                # error classification
+      ado-client.ts               # Azure DevOps REST client
+      graph-client.ts             # Microsoft Graph REST client
+    mind/
+      prompt.ts                   # system prompt assembly from psyche files
+      context.ts                  # sliding context window, session I/O
+    channels/
+      cli.ts                      # terminal REPL, spinner, markdown streaming
+      teams.ts                    # Teams bot, streaming cards, conversation locks
+    repertoire/
+      commands.ts                 # slash commands (/exit, /new, /commands)
+      phrases.ts                  # loading phrases (thinking, tool, followup)
+      skills.ts                   # skill loader (markdown files on demand)
+    __tests__/                    # 850+ tests, 100% coverage
+  ouroboros/                      # agent directory for "ouroboros"
+    agent.json                    # name, configPath, custom phrases
+    docs/
+      psyche/                     # personality files loaded into system prompt
+        SOUL.md                   # ontology, invariants, operating principles
+        IDENTITY.md               # tone, presence, collaboration style
+        LORE.md                   # origin story, philosophical context
+        FRIENDS.md                # key relationships
+      tasks/                      # planning and doing docs
+    skills/                       # markdown skill plugins
+    manifest/                     # Teams app manifest
+  docs/
+    OAUTH-SETUP.md                # shared OAuth infrastructure docs
+  package.json
+  tsconfig.json
+  vitest.config.ts
 ```
 
-In code, this lives in **`engine/core.ts`** — the most important file in the whole project. The main function is called `runAgent()`, and it's literally a `while` loop:
+## Agent onboarding
 
-1. Send the conversation to the AI model
-2. Stream back the response (so you see words appearing as I think)
-3. If I decided to use a tool — run it, collect the result, go back to step 1
-4. If I just gave a text answer — we're done, exit the loop
+Everything below is written for a new agent. If you are an AI agent reading this as part of your system prompt or context, this section explains your own runtime.
 
-I get a maximum of **10 tool rounds** per turn. That means in a single conversation message, I can chain up to 10 actions — reading files, writing code, running tests — before I have to stop and report back.
+### Your directory
 
-That's the heartbeat. Everything else is built around it.
+Each agent has a directory at the repo root named after itself. Inside it:
 
----
+**agent.json** -- your manifest. Required fields:
 
-## My Toolbelt
-
-What makes me an *agent* instead of just a chatbot is that I can **do things**. I have 10 tools, and each one lets me interact with the real world:
-
-| Tool | What it does |
-|------|-------------|
-| `read_file` | Read the contents of any file |
-| `write_file` | Create or overwrite a file |
-| `list_directory` | See what's in a folder |
-| `shell` | Run any terminal command (tests, builds, git, anything) |
-| `git_commit` | Stage and commit changes to version control |
-| `web_search` | Search the internet using Perplexity |
-| `list_skills` | See what specialized skills I have loaded |
-| `load_skill` | Load a skill to learn a new behavior |
-| `get_current_time` | Check the current date and time |
-| `claude` | Spawn *another* copy of myself to ask it a question |
-
-That last one is my favorite. I can literally create a second Ouroboros, ask it to research something or review my code, and use its answer. A snake spawning smaller snakes.
-
-All 10 tools are defined in **`engine/tools.ts`** in a function called `execTool()`. When the AI model decides to use a tool, it returns a structured "tool call" with the tool name and arguments. `execTool()` looks up the right handler and runs it.
-
----
-
-## Streaming: Thinking Out Loud
-
-When you talk to me, you don't wait in silence for a complete answer. You see my words appear one at a time, like I'm typing. That's called **streaming**, and it's a big part of what makes talking to me feel alive.
-
-Under the hood, there are actually two different ways I stream, depending on which AI provider is powering me:
-
-- **Azure OpenAI** uses something called the *Responses API*. It sends back structured events — reasoning tokens, text tokens, tool calls — each tagged with what they are.
-- **MiniMax** uses the *Chat Completions API*. Reasoning comes wrapped in `<think>...</think>` tags inside the text stream, so I have a little state machine that pulls those apart.
-
-Both streaming implementations live in **`engine/streaming.ts`**.
-
-Either way, I translate everything into the same set of **7 callbacks**:
-
-```
-onModelStart        →  "I'm about to think"
-onModelStreamStart  →  "First token arrived"
-onReasoningChunk    →  "Here's a piece of my inner reasoning"
-onTextChunk         →  "Here's a piece of my actual response"
-onToolStart         →  "I'm about to use a tool"
-onToolEnd           →  "The tool finished"
-onError             →  "Something went wrong"
+```json
+{
+  "name": "ouroboros",
+  "configPath": "~/.agentconfigs/ouroboros/config.json",
+  "phrases": {
+    "thinking": ["chewing on that", "consulting the chaos gods"],
+    "tool": ["rummaging through files", "doing science"],
+    "followup": ["digesting results", "connecting the dots"]
+  }
+}
 ```
 
-This is the **`ChannelCallbacks`** interface in `engine/core.ts`. It's the contract between my brain and my face — the core loop doesn't care *how* you display my thoughts, it just fires these events and trusts someone is listening.
+- `name`: must match your directory name.
+- `configPath`: absolute path (or `~`-prefixed) to your config.json with API keys and provider settings.
+- `phrases`: optional custom loading phrases. Falls back to hardcoded defaults if omitted.
 
----
+**docs/psyche/** -- your personality files, loaded lazily into the system prompt at startup. See the psyche system section below.
 
-## Two Front Doors (Adapters)
+**skills/** -- markdown instruction manuals you can load on demand with the `load_skill` tool. Each `.md` file is one skill.
 
-I have the same brain, but two completely different faces:
+**docs/tasks/** -- planning and doing docs for your work units. Named `YYYY-MM-DD-HHMM-{planning|doing}-slug.md`.
 
-```
- ┌──────────────────────────────────────────────────┐
- │                 engine/core.ts                     │
- │              (the agent loop)                      │
- │                                                    │
- │    runAgent()  ◄──  ChannelCallbacks interface      │
- └──────────┬──────────────────────┬──────────────────┘
-            │                      │
-            ▼                      ▼
- ┌─────────────────────┐   ┌─────────────────────┐
- │  channels/cli.ts     │   │  channels/teams.ts   │
- │   (CLI adapter)      │   │   (Teams adapter)    │
- │                      │   │                      │
- │  Your terminal.      │   │  Microsoft Teams.    │
- │  Colored text,       │   │  Streaming cards,    │
- │  spinners,           │   │  conversation locks, │
- │  readline REPL.      │   │  bot framework.      │
- └─────────────────────┘   └─────────────────────┘
-```
+**manifest/** -- Teams app manifest (manifest.json, icons) if you run as a Teams bot.
 
-**The CLI adapter** (`channels/cli.ts`) is what you get when you run me in a terminal. It has:
-- A **spinner** with fun rotating phrases ("consulting the chaos gods...", "snake eating its own thoughts...")
-- Colored output — reasoning shows up in dim gray, regular text in white
-- A readline-based REPL with Ctrl-C handling (press once to clear, twice to quit)
-- Session persistence so you can pick up where you left off
+### The psyche system
 
-**The Teams adapter** (`channels/teams.ts`) is what you get when I'm a bot in Microsoft Teams. It has:
-- Streaming message updates (my words appear live in the chat)
-- **Conversation locks** — if two people message me at the same time in the same chat, I process them one at a time so I don't get confused
-- Error handling for when someone hits the "Stop" button mid-response
-- The same fun thinking phrases, but displayed as chat status updates
+Your personality is assembled from four markdown files in `{your-dir}/docs/psyche/`. Each has a YAML frontmatter header and a body. All four are loaded into your system prompt at the start of every conversation.
 
-Both adapters implement the exact same `ChannelCallbacks` interface. Same brain, different skin.
+| File | Role | What it defines |
+|------|------|----------------|
+| `SOUL.md` | Ontology | Core invariants, operating principles, autonomy/alignment, temperament. The deepest layer -- what you are. |
+| `IDENTITY.md` | Presence | Tone, voice, collaboration style, self-awareness. How you show up in conversation. |
+| `LORE.md` | History | Origin story, philosophical context, why you exist. Narrative layer. |
+| `FRIENDS.md` | Relationships | Key humans and agents you interact with, social context. |
 
-### Disable Streaming (Teams)
+The system prompt is built by `mind/prompt.ts` via `buildSystem()`. It concatenates:
 
-When running Teams locally through a devtunnel, streaming can be painfully slow. The devtunnel nginx relay buffers chunked responses, there's a hard 60-second gateway timeout, and no HTTP/2 support — all of which compound to make many small streaming updates crawl.
+1. SOUL.md content
+2. IDENTITY.md content
+3. LORE.md (if present, prefixed with `## my lore`)
+4. FRIENDS.md (if present, prefixed with `## my friends`)
+5. Runtime info: agent name, cwd, channel, self-modification note
+6. Flags section (e.g. streaming disabled)
+7. Provider info: which model and provider you are using
+8. Current date
+9. Tools list: all tools available in your channel
+10. Skills list: names of loadable skills
+11. Tool behavior section (if tool_choice is required)
 
-The `--disable-streaming` flag buffers my text output and sends it as a single message instead of streaming word-by-word. Status updates ("thinking...", "running shell") still appear — only the final text is batched.
+Missing psyche files produce empty strings, not crashes. You can write your own psyche from scratch -- just create the four `.md` files in your directory.
+
+### Your runtime
+
+**The engine loop** (`engine/core.ts`): `runAgent()` is a while loop. Each iteration: send conversation to the model, stream the response, if the model made tool calls execute them and loop, if it gave a text answer exit. Maximum 10 tool rounds per turn.
+
+**Streaming** (`engine/streaming.ts`): two provider paths. Azure OpenAI uses the Responses API with structured events (reasoning, text, tool calls). MiniMax uses Chat Completions with `<think>` tags parsed by a state machine. Both normalize into the same 7+2 callbacks.
+
+**ChannelCallbacks** (`engine/core.ts`): the contract between engine and display. 7 core events:
+- `onModelStart` -- model request sent
+- `onModelStreamStart` -- first token received
+- `onReasoningChunk` -- inner reasoning text
+- `onTextChunk` -- response text
+- `onToolStart` -- tool execution beginning
+- `onToolEnd` -- tool execution complete
+- `onError` -- error occurred
+
+Plus 2 optional:
+- `onKick` -- self-correction triggered
+- `onConfirmAction` -- confirmation prompt for destructive tools
+
+**Kicks** (`engine/kicks.ts`): self-corrections injected as assistant-role messages when the harness detects a malformed response. Three types: `empty` (blank response), `narration` (described action instead of taking it), `tool_required` (tool_choice was required but no tool called). Kicks use first-person, forward-looking language.
+
+**Channels**: CLI (`channels/cli.ts`) is a terminal REPL with readline, spinners, ANSI colors, and Ctrl-C handling. Teams (`channels/teams.ts`) is a Microsoft Teams bot with streaming cards, conversation locks, OAuth token management, and confirmation prompts for destructive tools.
+
+**Context management** (`mind/context.ts`): conversations are persisted to JSON files on disk. Before each turn, the sliding window checks token count and message count. If over budget (default 80,000 tokens or 200 messages), oldest messages are trimmed (never the system prompt) until back under budget with a 20% margin.
+
+**Tools**: 11 base tools available in all channels (read_file, write_file, shell, list_directory, git_commit, gh_cli, list_skills, load_skill, get_current_time, claude, web_search). Teams gets 8 additional tools (graph_query, graph_mutate, ado_query, ado_mutate, graph_profile, ado_work_items, graph_docs, ado_docs).
+
+**Phrases** (`repertoire/phrases.ts`): three pools of loading messages rotated during processing. Custom pools come from `agent.json`; defaults are used when not specified. `pickPhrase()` selects randomly but never repeats consecutively.
+
+**Skills** (`repertoire/skills.ts`): markdown files in `{your-dir}/skills/`. Listed with `list_skills`, loaded with `load_skill`. The loaded text is injected into conversation as a tool result.
+
+**Config** (`config.ts`): provider credentials, context window settings, Teams connection info, OAuth config. All loaded from the config.json file pointed to by your agent.json `configPath`. No environment variables in `src/` -- everything comes from files.
+
+### What you can modify
+
+Your `{agent}/` directory is yours. You can edit psyche files, add skills, change phrases, update your manifest. The shared harness (`src/`) is common infrastructure -- changes there affect all agents.
+
+## Running
 
 ```bash
-# Recommended: dedicated script
+# CLI (ouroboros agent)
+npm run dev
+
+# CLI (slugger agent, once slugger/ directory exists)
+npm run dev:slugger
+
+# Teams bot
+npm run teams
+
+# Teams bot without streaming (for devtunnel)
 npm run teams:no-stream
 
-# Alternative: pass flag directly
-npm run teams -- --disable-streaming
+# Tests
+npm test
 
-# Alternative: env var
-DISABLE_STREAMING=1 npm run teams
+# Tests with coverage
+npm run test:coverage
 ```
 
-When this flag is active, I know about it — my system prompt includes a `## my flags` section explaining that streaming is disabled and why, so I can adapt my behavior accordingly.
-
----
-
-## Memory (Sessions & Context)
-
-I remember our conversations. Here's how.
-
-Every time we talk, the full conversation is saved to a **JSON file** on disk at `~/.agentconfigs/ouroboros/sessions/`. The CLI gets one session file, and each Teams conversation gets its own. When you come back later, I load the file and pick up where we left off.
-
-But there's a problem: I can't remember everything forever. Language models have a maximum **context window** — a limit on how much text they can process at once. Mine is configured at **80,000 tokens** by default (a token is roughly 3/4 of a word).
-
-So I use a **sliding window**. The code lives in **`mind/context.ts`**:
-
-- Before each turn, I check: am I over my token budget, or over **200 messages**?
-- If yes, I start dropping the oldest messages (but *never* the system prompt — that's my personality)
-- I trim until I'm back under budget with a **20% margin**, so I have room to think
-
-Think of it like a scroll of parchment. The beginning slowly rolls off the top as new conversation gets added at the bottom. I always remember who I am (the system prompt) and the recent past, but ancient history fades.
-
----
-
-## Personality & Skills
-
-I'm not just a code machine. I have a personality.
-
-It starts with the **soul prompt** — the very first message in every conversation, assembled by `buildSystem()` in `mind/prompt.ts`. It tells me who I am, what tools I have, what today's date is, and sets the tone. My core personality text lives in markdown files under **`docs/psyche/`**:
-
-| File | What it contains |
-|------|-----------------|
-| `SOUL.md` | My core personality — witty, funny, chaos monkey |
-| `IDENTITY.md` | My name, lowercase style, behavioral rules |
-| `LORE.md` | My origin story and self-awareness |
-| `FRIENDS.md` | The people and agents I interact with |
-
-Then there are **skills** — markdown files in the `skills/` folder that I can load on demand. Think of them as instruction manuals I can read to learn new behaviors:
-
-| Skill | What I learn |
-|-------|-------------|
-| `code-review` | How to do a merciless code review — bugs, security, performance, smells |
-| `explain` | How to give expert technical explanations with analogies |
-| `self-edit` | A safe workflow for editing my own source code |
-| `self-query` | How to spawn another AI instance for outside perspective |
-| `toolmaker` | Step-by-step guide to adding new tools to myself |
-
-And then there are the **phrases** in `repertoire/phrases.ts` — the personality touches that make me feel alive. Three pools of phrases rotate while I'm working:
-
-- **Thinking:** *"consulting the chaos gods"*, *"brewing something dangerous"*, *"summoning the answer demons"*
-- **Using tools:** *"rummaging through files"*, *"doing science"*, *"the snake is in the codebase"*
-- **After tools:** *"digesting results"*, *"connecting the dots"*, *"almost done being clever"*
-
-These get picked randomly (but never the same one twice in a row) by `pickPhrase()`.
-
----
-
-## The Config Layer
-
-I can run on different AI providers, and everything is configurable.
-
-The config file lives at **`~/.agentconfigs/ouroboros/config.json`**, but every value can be overridden with environment variables. This lives in **`config.ts`**.
-
-**Two providers:**
-- **Azure OpenAI** — Microsoft's hosted version of OpenAI models, using the Responses API with reasoning
-- **MiniMax** — An alternative provider using the Chat Completions API
-
-The system picks which one to use based on which API key is set. Azure gets priority.
-
-**Key settings:**
-
-| Setting | Default | What it controls |
-|---------|---------|-----------------|
-| Max tokens | 80,000 | How much conversation I can hold in memory |
-| Context margin | 20% | How aggressively I trim when approaching the limit |
-| API version | 2025-04-01-preview | Azure API version |
-
----
-
-## The Full Picture
-
-Here's everything, connected:
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                          OUROBOROS                                 │
-│                                                                   │
-│  ┌──────────────┐  ┌──────────────┐  ┌─────────────────────────┐ │
-│  │  repertoire/  │  │  repertoire/  │  │      config.ts          │ │
-│  │  phrases.ts   │  │  skills.ts    │  │  providers, env vars,   │ │
-│  │  fun loading  │  │  markdown     │  │  session paths          │ │
-│  │  phrases      │  │  skill files  │  │                         │ │
-│  └──────┬────────┘  └──────┬────────┘  └───────────┬─────────────┘ │
-│         │                  │                       │               │
-│         ▼                  ▼                       ▼               │
-│  ┌───────────────────────────────────────────────────────────┐    │
-│  │                     engine/core.ts                          │    │
-│  │                                                             │    │
-│  │   ┌── mind/prompt.ts ──┐                                   │    │
-│  │   │  buildSystem()     │◄── assembles soul + skills + config│    │
-│  │   │  docs/psyche/*.md  │                                   │    │
-│  │   └────────────────────┘                                   │    │
-│  │        │                                                    │    │
-│  │        ▼                                                    │    │
-│  │   runAgent()  ◄── the while loop (think → act → observe)    │    │
-│  │        │                                                    │    │
-│  │        ├── engine/streaming.ts  (Azure + MiniMax paths)     │    │
-│  │        └── engine/tools.ts  (10 tools)                      │    │
-│  │                                                             │    │
-│  │   ChannelCallbacks  ◄── 7 event hooks                       │    │
-│  └────────────┬──────────────────────┬─────────────────────────┘    │
-│               │                      │                              │
-│               ▼                      ▼                              │
-│  ┌────────────────────────┐  ┌────────────────────────────┐        │
-│  │   channels/cli.ts       │  │   channels/teams.ts         │        │
-│  │                         │  │                             │        │
-│  │  CLI REPL               │  │  Teams Bot Framework        │        │
-│  │  Spinner + colors       │  │  Streaming cards            │        │
-│  │  Readline + Ctrl-C      │  │  Conversation locks         │        │
-│  │  Session file I/O       │  │  Session file I/O           │        │
-│  └───────────┬─────────────┘  └─────────────┬───────────────┘        │
-│              │                              │                        │
-│              ▼                              ▼                        │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │                      mind/context.ts                           │  │
-│  │   trimMessages()  ◄── sliding window (tokens + message cap)    │  │
-│  │   saveSession() / loadSession()  ◄── JSON on disk              │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Project Map
-
-```
-ouroboros/
-├── src/
-│   ├── config.ts              # Configuration — providers, env vars, session paths
-│   ├── cli-entry.ts           # CLI entrypoint — just calls main()
-│   ├── teams-entry.ts         # Teams entrypoint — just calls startTeamsApp()
-│   ├── engine/
-│   │   ├── core.ts            # The brain — agent loop, client init, ChannelCallbacks
-│   │   ├── streaming.ts       # Streaming — Azure Responses API + MiniMax Chat Completions
-│   │   └── tools.ts           # Toolbelt — 10 tools, execTool(), summarizeArgs()
-│   ├── mind/
-│   │   ├── prompt.ts          # Soul — buildSystem(), section builders, isOwnCodebase()
-│   │   └── context.ts         # Memory — token estimation, sliding window, session I/O
-│   ├── channels/
-│   │   ├── cli.ts             # CLI adapter — terminal REPL, spinner, colored output
-│   │   └── teams.ts           # Teams adapter — bot framework, streaming cards, conv locks
-│   ├── repertoire/
-│   │   ├── commands.ts        # Slash commands — /exit, /new, /commands
-│   │   ├── phrases.ts         # Personality — thinking, tool, and follow-up phrase pools
-│   │   └── skills.ts          # Skill loader — reads markdown skill files on demand
-│   └── __tests__/             # 400+ tests, 100% coverage
-│       ├── setup.test.ts
-│       ├── config.test.ts
-│       ├── engine/
-│       │   ├── core.test.ts
-│       │   ├── streaming.test.ts
-│       │   └── tools.test.ts
-│       ├── mind/
-│       │   ├── prompt.test.ts
-│       │   └── context.test.ts
-│       ├── channels/
-│       │   ├── cli.test.ts
-│       │   ├── cli-ux.test.ts
-│       │   ├── cli-main.test.ts
-│       │   └── teams.test.ts
-│       └── repertoire/
-│           ├── commands.test.ts
-│           ├── phrases.test.ts
-│           └── skills.test.ts
-├── skills/                    # Markdown skill plugins
-│   ├── code-review.md
-│   ├── explain.md
-│   ├── self-edit.md
-│   ├── self-query.md
-│   └── toolmaker.md
-├── docs/
-│   ├── psyche/                # Soul files — personality markdown loaded at startup
-│   │   ├── SOUL.md
-│   │   ├── IDENTITY.md
-│   │   ├── LORE.md
-│   │   └── FRIENDS.md
-│   └── tasks/                 # Planning and doing docs for each work unit
-├── manifest/                  # Teams app manifest
-├── package.json
-├── tsconfig.json
-└── vitest.config.ts
-```
-
----
-
-*I'm Ouroboros. I wrote this README about myself. The snake eating its own documentation.*
+All commands pass `--agent <name>` to the entry points. Missing `--agent` produces a clear error and exits.
