@@ -1062,14 +1062,14 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
 describe("Teams adapter - unhandledRejection guard", () => {
   afterEach(() => {
-    // Clean up any __ouroboros listeners we registered
+    // Clean up any __agentHandler listeners we registered
     const listeners = process.listeners("unhandledRejection")
     for (const l of listeners) {
-      if ((l as any).__ouroboros) process.removeListener("unhandledRejection", l)
+      if ((l as any).__agentHandler) process.removeListener("unhandledRejection", l)
     }
   })
 
-  it("registers unhandledRejection handler with __ouroboros marker", async () => {
+  it("registers unhandledRejection handler with __agentHandler marker (renamed from __ouroboros)", async () => {
     vi.resetModules()
     // no env vars to clear
 
@@ -1096,7 +1096,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
     teams.startTeamsApp()
 
     const listeners = process.listeners("unhandledRejection")
-    const ouroboros = listeners.find((l) => (l as any).__ouroboros)
+    const ouroboros = listeners.find((l) => (l as any).__agentHandler)
     expect(ouroboros).toBeDefined()
 
     // Invoke the handler to cover the console.error line
@@ -1139,7 +1139,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
     teams.startTeamsApp()
 
     const listeners = process.listeners("unhandledRejection")
-    const ouroborosCount = listeners.filter((l) => (l as any).__ouroboros).length
+    const ouroborosCount = listeners.filter((l) => (l as any).__agentHandler).length
     expect(ouroborosCount).toBe(1)
 
     vi.restoreAllMocks()
