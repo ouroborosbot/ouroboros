@@ -125,7 +125,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 **Output**: Updated `src/repertoire/phrases.ts` passing all tests
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 3c: Phrases -- Coverage & Refactor
+### ✅ Unit 3c: Phrases -- Coverage & Refactor
 **What**: Verify 100% coverage on phrases changes. Update all consumers of the old phrase exports (`src/channels/cli.ts`, `src/channels/teams.ts`) to use the new API.
 **Output**: Coverage report showing 100% on `src/repertoire/phrases.ts`, updated consumer files
 **Acceptance**: 100% coverage, all consumers updated, tests still green
