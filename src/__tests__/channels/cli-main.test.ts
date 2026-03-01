@@ -56,6 +56,13 @@ vi.mock("../../repertoire/commands", () => ({
   parseSlashCommand: (...a: any[]) => mocks.parseSlashCommand(...a),
   getToolChoiceRequired: (...a: any[]) => mocks.getToolChoiceRequired(...a),
 }))
+vi.mock("../../identity", () => ({
+  getAgentName: vi.fn(() => "testagent"),
+  loadAgentConfig: vi.fn(() => ({
+    name: "testagent",
+    configPath: "~/.agentconfigs/testagent/config.json",
+  })),
+}))
 
 import { main } from "../../channels/cli"
 
@@ -194,7 +201,7 @@ describe("agent.ts main()", () => {
     await main()
 
     const flatLogs = logCalls.flat()
-    expect(flatLogs.some((l) => l.includes("ouroboros") || l.includes("/commands"))).toBe(true)
+    expect(flatLogs.some((l) => l.includes("testagent") || l.includes("/commands"))).toBe(true)
     expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
     expect(runAgentCalls.length).toBe(1) // "hello world" only (no boot greeting)
   })
