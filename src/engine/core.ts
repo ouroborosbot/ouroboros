@@ -69,7 +69,7 @@ export { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponses
 export type { TurnResult } from "./streaming";
 
 // Re-export prompt functions for backward compat
-export { isOwnCodebase, buildSystem } from "../mind/prompt";
+export { buildSystem } from "../mind/prompt";
 export type { Channel } from "../mind/prompt";
 
 export interface ChannelCallbacks {
