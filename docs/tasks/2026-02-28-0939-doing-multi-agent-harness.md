@@ -146,7 +146,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 **Output**: Updated `src/repertoire/skills.ts` passing all tests
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 4c: Skills -- Coverage & Refactor
+### ✅ Unit 4c: Skills -- Coverage & Refactor
 **What**: Verify 100% coverage on skills changes, add any missing branch tests
 **Output**: Coverage report showing 100% on `src/repertoire/skills.ts`
 **Acceptance**: 100% coverage on skills changes, tests still green
