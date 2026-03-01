@@ -242,7 +242,7 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 **Output**: Coverage report showing 100% on `src/channels/teams.ts`
 **Acceptance**: 100% coverage, tests still green
 
-### ⬜ Unit 8a: Create ouroboros/agent.json and update package.json
+### ✅ Unit 8a: Create ouroboros/agent.json and update package.json
 **What**:
 - Create `ouroboros/agent.json` with name, configPath, and phrases (copy current hardcoded phrase arrays from `phrases.ts`)
 - Update `package.json`: name to `ouroboros-agent-harness`, scripts add `--agent ouroboros` to dev/teams commands, add `dev:slugger` script
