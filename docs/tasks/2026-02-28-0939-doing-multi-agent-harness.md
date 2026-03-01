@@ -314,3 +314,4 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 - 2026-02-28 16:42 Unit 2b complete: config.ts uses identity module, all 842 tests pass, zero process.env in config.ts
 - 2026-02-28 16:43 Unit 2c complete: config.ts 100% coverage verified
 - 2026-02-28 16:44 Units 3a-3c complete: getPhrases() from agent.json with fallback defaults, 100% coverage, 845 tests pass
+- 2026-02-28 16:46 Units 4a-4c complete: skills from agent directory via getSkillsDir(), 100% coverage, 848 tests pass
