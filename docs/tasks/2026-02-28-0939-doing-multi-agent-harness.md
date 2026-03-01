@@ -87,7 +87,9 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 - `getSessionDir()` uses agent name from identity module (e.g. `~/.agentconfigs/{agentName}/sessions`)
 - `OUROBOROS_CONFIG_PATH` env var no longer used
 - Auto-create config directory when it doesn't exist
-**Output**: Updated `src/__tests__/config.test.ts` with new failing tests
+- Update hardcoded `"ouroboros"` path expectations in existing tests (lines 78, 311, 326, 335, 344)
+- Also update `src/__tests__/engine/core.test.ts` which has `OUROBOROS_CONFIG_PATH` references at lines 2557-2631 -- these tests need to use `setTestConfig()` or mock identity instead
+**Output**: Updated `src/__tests__/config.test.ts` and `src/__tests__/engine/core.test.ts` with new/updated failing tests
 **Acceptance**: New tests exist and FAIL (red)
 
 ### ⬜ Unit 2b: Config path from agent.json -- Implementation
@@ -146,18 +148,31 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 **Acceptance**: 100% coverage on skills changes, tests still green
 
 ### ⬜ Unit 5a: Move personality text to psyche docs
-**What**: Before changing `prompt.ts`, move the personality text currently in `selfAwareSection()` into `docs/psyche/IDENTITY.md` (append to existing file). This is the "i am in my own codebase" block with self-edit guidance, skill references, and self-awareness text. The content must be preserved -- not deleted -- so the agent's personality survives the refactor.
+**What**: Before changing `prompt.ts`, move the personality text currently in `selfAwareSection()` (lines 56-73 of `src/mind/prompt.ts`) into `docs/psyche/IDENTITY.md` (append to existing file). This is the "i am in my own codebase" block:
+```
+i am Ouroboros -- a snake eating its own tail. i can read and modify my own source code...
+### what i can do
+- edit src/*.ts source files
+- load skills with load_skill tool...
+### relevant skills
+- self-edit: for safely editing my own source code
+- self-query: for using the claude tool...
+### remember
+- edits to source files won't take effect until i restart...
+```
+The content must be preserved -- not deleted -- so the agent's personality survives the refactor. Adapt the text slightly for the psyche doc format (it should read as identity, not as conditional prompt injection).
 **Output**: Updated `docs/psyche/IDENTITY.md` with personality text appended
 **Acceptance**: IDENTITY.md contains the moved text, no content lost
 
 ### ⬜ Unit 5b: Prompt system (psyche + runtime info) -- Tests
 **What**: Update `src/__tests__/mind/prompt.test.ts` with failing tests:
 - Psyche files loaded lazily from `{agentRoot}/docs/psyche/` (not module-level `__dirname`)
-- `isOwnCodebase()` removed (export no longer exists)
-- `selfAwareSection()` replaced with `runtimeInfoSection()` that always injects runtime info (no conditional on package.json name)
-- `buildSystem()` uses lazy-loaded psyche sections
+- Remove `isOwnCodebase()` tests (lines 60-75 in current test file) -- export no longer exists
+- Replace `selfAwareSection()` tests with `runtimeInfoSection()` tests -- always injects runtime info (no conditional on package.json name)
+- `buildSystem()` uses lazy-loaded psyche sections (mock `getAgentRoot()` instead of `__dirname`)
 - `resetPsycheCache()` clears cached psyche text
 - Graceful handling when psyche files are missing (empty string, no crash)
+- Current test mocks `fs.readFileSync` at module-level for psyche -- this pattern will change to lazy loading
 **Output**: Updated prompt test file with new failing tests
 **Acceptance**: New tests exist and FAIL (red)
 
@@ -201,6 +216,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 ### ⬜ Unit 7a: Teams adapter rename -- Tests
 **What**: Update `src/__tests__/channels/teams.test.ts` with failing tests:
 - `OuroborosHandler` renamed to `AgentHandler` / `__agentHandler`
+- Tests currently reference `__ouroboros` marker (lines 1065-1143) -- update to `__agentHandler`
 - `teams-entry.ts` comment is generic (not hardcoded ouroboros path)
 **Output**: Updated test file with new failing tests
 **Acceptance**: New tests exist and FAIL (red)
