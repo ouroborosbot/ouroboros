@@ -1,5 +1,7 @@
 // Shared phrase pools for fun loading messages.
-// Phrases have NO trailing "..." — adapters add that.
+// Phrases have NO trailing "..." -- adapters add that.
+
+import { loadAgentConfig } from "../identity"
 
 export const THINKING_PHRASES = [
   "chewing on that",
@@ -27,6 +29,22 @@ export const FOLLOWUP_PHRASES = [
   "connecting the dots",
   "almost done being clever",
 ]
+
+export interface PhrasePools {
+  thinking: string[]
+  tool: string[]
+  followup: string[]
+}
+
+// Returns phrase pools from agent.json, falling back to hardcoded defaults.
+export function getPhrases(): PhrasePools {
+  const config = loadAgentConfig()
+  return {
+    thinking: config.phrases?.thinking ?? THINKING_PHRASES,
+    tool: config.phrases?.tool ?? TOOL_PHRASES,
+    followup: config.phrases?.followup ?? FOLLOWUP_PHRASES,
+  }
+}
 
 // Pick a random phrase from a pool, avoiding immediate repeats.
 export function pickPhrase(pool: readonly string[], lastUsed?: string): string {
