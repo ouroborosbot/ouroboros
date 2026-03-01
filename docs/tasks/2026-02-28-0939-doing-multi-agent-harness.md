@@ -202,7 +202,7 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 **Output**: Coverage report showing 100% on `src/mind/prompt.ts`
 **Acceptance**: 100% coverage on prompt changes, tests still green
 
-### ⬜ Unit 6a: CLI dynamic greeting and exit command -- Tests
+### ✅ Unit 6a: CLI dynamic greeting and exit command -- Tests
 **What**: Update `src/__tests__/channels/cli-main.test.ts` and `src/__tests__/repertoire/commands.test.ts` with failing tests:
 - CLI greeting uses agent name: `"{agentName} (type /commands for help)"`
 - Exit command description uses agent name: `"quit {agentName}"`
