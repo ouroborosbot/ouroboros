@@ -94,7 +94,7 @@ starting Unit Xa: [name]
 1. Write minimal code to make tests pass
 2. **Do NOT modify tests** — implementation must satisfy existing tests
 3. Run tests — **must PASS (green)**
-4. **Run `npm run build`** — TypeScript must compile with no errors. Tests alone are not sufficient (vitest handles imports differently than tsc).
+4. **Run the build** (e.g. `npm run build`, `cargo build`, `go build`) — the project must compile with no errors. Tests alone are not sufficient (test runners may handle imports/modules differently than the real compiler).
 5. No warnings allowed
 6. Commit: `git commit -m "feat(scope): Unit Xb - [description]"`
 7. Push
@@ -105,7 +105,7 @@ starting Unit Xa: [name]
 3. Check edge cases: null, empty, boundary values
 4. Check all error paths tested
 5. Refactor if needed, keep tests green
-6. **Run `npm run build`** — verify TypeScript compiles clean
+6. **Run the build** — verify the project compiles clean
 7. Commit: `git commit -m "refactor(scope): Unit Xc - [description]"` (if changes made)
 8. Push
 
@@ -225,4 +225,4 @@ When all units are `✅`:
 13. **/compact proactively** — preserve context between units
 14. **No warnings** — treat warnings as errors
 15. **Run full test suite** — before marking unit complete, not just new tests
-16. **Always compile** — `npm run build` after every implementation/refactor unit. Tests passing is necessary but not sufficient.
+16. **Always compile** — run the project's build command after every implementation/refactor unit. Tests passing is necessary but not sufficient.
