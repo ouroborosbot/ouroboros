@@ -5,14 +5,15 @@
 **Updated**: 2026-02-28 (post env-var consolidation)
 
 ## Goal
-Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can share the harness (`src/`) while keeping personality, docs, skills, and manifest in separate `{agent}/` directories. The harness dynamically loads identity, psyche, phrases, skills, and config paths based on a required `AGENT_NAME` env var.
+Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can share the harness (`src/`) while keeping personality, docs, skills, and manifest in separate `{agent}/` directories. The harness dynamically loads identity, psyche, phrases, skills, and config paths based on a required `--agent` CLI argument.
 
 ## Scope
 
 ### In Scope
 - New `src/identity.ts` module: `getAgentName()`, `getAgentRoot()`, `loadAgentConfig()`, `resetIdentity()`, `getRepoRoot()`
-- Agent-aware config paths in `src/config.ts`: `~/.agentconfigs/{AGENT_NAME}/config.json` with auto-create
-- Remove `OUROBOROS_CONFIG_PATH` env var — config path comes from `agent.json` `configPath` field instead
+- Agent name passed via `--agent <name>` CLI argument (parsed from `process.argv`), no env vars
+- Agent-aware config paths in `src/config.ts`: config path from `agent.json` `configPath` field, with auto-create of target directory
+- Remove `OUROBOROS_CONFIG_PATH` env var entirely — zero env vars in the harness
 - Rename `OuroborosHandler` to `AgentHandler` / `__agentHandler` in `src/channels/teams.ts`
 - Update `src/teams-entry.ts` comment to be generic (not hardcoded ouroboros path)
 - Phrases loaded from `{agent}/agent.json` with fallback to defaults
@@ -21,8 +22,8 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 - Move ouroboros personality text from `selfAwareSection()` into psyche docs
 - CLI dynamic greeting and exit using agent name
 - Directory moves via `git mv`: `docs/psyche/`, `docs/tasks/`, `skills/`, `manifest/` into `ouroboros/`
-- Create `ouroboros/agent.json` with name and phrases
-- `package.json`: name becomes `ouroboros-agent-harness`, scripts include `AGENT_NAME=ouroboros`
+- Create `ouroboros/agent.json` with name, configPath, and phrases
+- `package.json`: name becomes `ouroboros-agent-harness`, scripts use `--agent ouroboros`
 - Delete existing README.md and rewrite from scratch (short, evergreen — code is the truth)
 - Full test coverage on all new/modified code
 
@@ -34,15 +35,15 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 - Teams adapter logic changes (only greeting/marker cosmetics affected)
 
 ## Completion Criteria
-- [ ] `AGENT_NAME=ouroboros npm run dev` loads ouroboros psyche, phrases, skills, sessions
-- [ ] `AGENT_NAME=slugger npm run dev` loads slugger psyche, phrases, skills (once slugger dir exists)
-- [ ] Missing `AGENT_NAME` produces a clear error message at startup
+- [ ] `npm run dev` (which runs `--agent ouroboros`) loads ouroboros psyche, phrases, skills, sessions
+- [ ] `npm run dev:slugger` (which runs `--agent slugger`) loads slugger config (once slugger dir exists)
+- [ ] Missing `--agent` argument produces a clear error message at startup
+- [ ] Zero `process.env` references in `src/` (excluding tests)
 - [ ] Personality text from `selfAwareSection()` moved to psyche docs, not deleted
 - [ ] `isOwnCodebase()` replaced with always-on runtime info section
 - [ ] Phrases loaded from `{agent}/agent.json`, not hardcoded
 - [ ] Skills loaded from `{agent}/skills/`, not root `skills/`
-- [ ] Config path uses `~/.agentconfigs/{AGENT_NAME}/`
-- [ ] `OUROBOROS_CONFIG_PATH` env var removed — config path from `agent.json` `configPath` field
+- [ ] Config path from `agent.json` `configPath` field (e.g. `~/.agentconfigs/ouroboros/config.json`)
 - [ ] `OuroborosHandler` renamed to `AgentHandler` in teams.ts
 - [ ] `teams-entry.ts` comment updated to be generic
 - [ ] `package.json` name is `ouroboros-agent-harness`
@@ -64,15 +65,17 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 
 ## Implementation Notes
 - `getRepoRoot()` must work from both `src/` (dev via tsx) and `dist/` (compiled JS). `__dirname` differs — handle both paths.
+- `getAgentName()` parses `--agent <name>` from `process.argv`, not from env vars
+- Entry points (`cli-entry.ts`, `teams-entry.ts`) pass `--agent` through to the harness; npm scripts bake in the agent name
 
 ## Decisions Made
-- `AGENT_NAME` env var is required with no default -- harness errors if unset
+- `--agent` CLI argument is required with no default -- harness errors if missing
 - `agent.json` in repo for non-secret config (name, configPath, phrases); secrets at the path specified by `configPath`
 - Package name: `ouroboros-agent-harness` (the harness is named after the agent that built it)
-- Env var consolidation complete: all `OUROBOROS_*` env vars removed except `OUROBOROS_CONFIG_PATH`. Remove it — config path comes from `agent.json` `configPath` field.
+- Env var consolidation complete: all env vars removed. `OUROBOROS_CONFIG_PATH` also removed — config path comes from `agent.json` `configPath` field. Zero env vars in the harness.
 - `OuroborosConfig` interface name stays (internal, not user-facing)
 - `isOwnCodebase()` is deleted and replaced with `runtimeInfoSection()` that always injects runtime info
-- Auto-create `~/.agentconfigs/{AGENT_NAME}/` directory on first run
+- Auto-create config directory (from `configPath` in `agent.json`) on first run
 - `docs/OAUTH-SETUP.md` stays at `docs/` (shared infrastructure documentation)
 
 ## Context / References
@@ -88,7 +91,7 @@ The env var consolidation task (`docs/tasks/2026-02-28-0934-doing-config-consoli
 - `setTestConfig()` exists for test setup (no more `process.env` manipulation in tests)
 - `getTeamsChannelConfig()` added (skipConfirmation, disableStreaming, port)
 - `getIntegrationsConfig()` added (perplexityApiKey)
-- Only remaining env var: `OUROBOROS_CONFIG_PATH` in `src/config.ts:130`
+- Only remaining env var: `OUROBOROS_CONFIG_PATH` in `src/config.ts:130` (to be removed in this task)
 - 816 tests passing, 100% coverage
 
 ## Current Hardcoded "ouroboros" References in src/
@@ -126,3 +129,4 @@ Hints for agent onboarding:
 - 2026-02-28 09:39 Created from existing plan at steady-gliding-taco.md
 - 2026-02-28 11:15 Updated post env-var consolidation: removed stale env var rename scope (already done), updated test count to 816, added prerequisite status, added current hardcoded reference audit
 - 2026-02-28 16:21 Status approved, proceeding to doing doc conversion
+- 2026-02-28 16:30 Replaced AGENT_NAME env var with --agent CLI argument — zero env vars in harness

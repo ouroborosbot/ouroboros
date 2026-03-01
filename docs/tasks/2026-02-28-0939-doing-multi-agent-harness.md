@@ -60,7 +60,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 - `getAgentName()` parses `--agent <name>` from `process.argv`; errors when missing
 - `getAgentRoot()` returns `path.join(repoRoot, agentName)`
 - `loadAgentConfig()` reads `{agentRoot}/agent.json`, returns parsed config (name, configPath, phrases)
-- `loadAgentConfig()` returns defaults when `agent.json` missing or malformed
+- `loadAgentConfig()` throws descriptive error when `agent.json` missing or has invalid JSON
 - `resetIdentity()` clears cached state
 - `getRepoRoot()` works from both `src/` (dev via tsx) and `dist/` (compiled JS)
 **Output**: `src/__tests__/identity.test.ts` with all tests failing
@@ -70,7 +70,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 **What**: Create `src/identity.ts` implementing:
 - `getAgentName()`: parse `--agent <name>` from `process.argv`, throw if missing
 - `getAgentRoot()`: `path.join(getRepoRoot(), getAgentName())`
-- `loadAgentConfig()`: read `{agentRoot}/agent.json`, deep-merge with defaults (name, configPath, phrases with thinking/tool/followup arrays)
+- `loadAgentConfig()`: read `{agentRoot}/agent.json`, parse JSON, throw descriptive error if missing or malformed. Interface `AgentConfig` has `name: string`, `configPath: string`, `phrases?: { thinking?: string[]; tool?: string[]; followup?: string[] }`
 - `resetIdentity()`: clear all cached module state
 - `getRepoRoot()`: resolve repo root from `__dirname`, handling both `src/` and `dist/` paths
 **Output**: `src/identity.ts` passing all tests
@@ -165,6 +165,7 @@ i am Ouroboros -- a snake eating its own tail. i can read and modify my own sour
 - edits to source files won't take effect until i restart...
 ```
 The content must be preserved -- not deleted -- so the agent's personality survives the refactor. Adapt the text slightly for the psyche doc format (it should read as identity, not as conditional prompt injection).
+Note: psyche files are still at `docs/psyche/` at this point — they move to `ouroboros/docs/psyche/` in Unit 9.
 **Output**: Updated `docs/psyche/IDENTITY.md` with personality text appended
 **Acceptance**: IDENTITY.md contains the moved text, no content lost
 
@@ -187,9 +188,11 @@ The content must be preserved -- not deleted -- so the agent's personality survi
 - Cache loaded psyche text, export `resetPsycheCache()` for test cleanup
 - Remove `isOwnCodebase()` function entirely
 - Replace `selfAwareSection(channel)` with `runtimeInfoSection(channel)` that always includes:
-  - Channel behavior (cli vs teams)
-  - Self-awareness info (can read/modify source, load skills, spawn instances)
-  - Relevant skills list
+  - `process.cwd()` (absolute path to codebase)
+  - Agent name (from `getAgentName()`)
+  - Channel (cli/teams)
+  - Note: "i can read and modify my own source code"
+  - Channel-specific behavior (cli: introduce on boot; teams: concise, markdown, no intro)
 - Handle missing psyche files gracefully (return empty string)
 **Output**: Updated `src/mind/prompt.ts` passing all tests
 **Acceptance**: All tests PASS (green), no warnings, `isOwnCodebase` gone
@@ -243,6 +246,7 @@ The content must be preserved -- not deleted -- so the agent's personality survi
 **What**:
 - Create `ouroboros/agent.json` with name, configPath, and phrases (copy current hardcoded phrase arrays from `phrases.ts`)
 - Update `package.json`: name to `ouroboros-agent-harness`, scripts add `--agent ouroboros` to dev/teams commands, add `dev:slugger` script
+- Update entry points (`src/cli-entry.ts`, `src/teams-entry.ts`): ensure `--agent` is in `process.argv` before any `src/` code calls `getAgentName()`. Entry points should validate early and fail fast with a clear message if `--agent` is missing.
 - This unit does not follow TDD pattern -- it's configuration file creation
 - Validation: run full test suite to confirm identity module can load the new `agent.json`
 **Output**: `ouroboros/agent.json` created, `package.json` updated
