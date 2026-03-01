@@ -152,6 +152,8 @@ Plus 2 optional:
 
 Your `{agent}/` directory is yours. You can edit psyche files, add skills, change phrases, update your manifest. The shared harness (`src/`) is common infrastructure -- changes there affect all agents.
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for repo workflow conventions (branching, commits, testing, task docs).
+
 ## Running
 
 ```bash
