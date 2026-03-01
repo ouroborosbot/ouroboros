@@ -14,18 +14,18 @@ git checkout main                        # integration only
 
 ## Commits
 
-Format: `type(scope): description`
+Format: `type(scope): description` or `type(scope): feature - description`
 
 Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
 
-Scope is the area of change: `config`, `teams`, `cli`, `engine`, `readme`, `planning`, etc.
+Scope is the area of change: `config`, `teams`, `cli`, `engine`, `readme`, `planning`, etc. When working on a specific feature or task, include its name after the colon.
 
 Keep the description lowercase, imperative, concise. No "Co-Authored-By" lines.
 
 ```
 feat(config): load config path from agent.json
-fix(teams): prevent confirmation deadlock
-test: cover all branches for identity module
+fix(teams): oauth - prevent confirmation deadlock
+test: multi-agent harness - cover all branches for identity module
 docs(planning): approved multi-agent harness plan
 ```
 
