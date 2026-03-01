@@ -145,32 +145,38 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 **What**: Verify 100% coverage on skills changes, add any missing branch tests
 **Acceptance**: 100% coverage on skills changes, tests still green
 
-### ⬜ Unit 5a: Prompt system (psyche + runtime info) -- Tests
+### ⬜ Unit 5a: Move personality text to psyche docs
+**What**: Before changing `prompt.ts`, move the personality text currently in `selfAwareSection()` into `docs/psyche/IDENTITY.md` (append to existing file). This is the "i am in my own codebase" block with self-edit guidance, skill references, and self-awareness text. The content must be preserved -- not deleted -- so the agent's personality survives the refactor.
+**Output**: Updated `docs/psyche/IDENTITY.md` with personality text appended
+**Acceptance**: IDENTITY.md contains the moved text, no content lost
+
+### ⬜ Unit 5b: Prompt system (psyche + runtime info) -- Tests
 **What**: Update `src/__tests__/mind/prompt.test.ts` with failing tests:
 - Psyche files loaded lazily from `{agentRoot}/docs/psyche/` (not module-level `__dirname`)
-- `isOwnCodebase()` removed
+- `isOwnCodebase()` removed (export no longer exists)
 - `selfAwareSection()` replaced with `runtimeInfoSection()` that always injects runtime info (no conditional on package.json name)
-- Personality text from old `selfAwareSection()` moved to psyche docs (verified content exists in IDENTITY.md or similar)
 - `buildSystem()` uses lazy-loaded psyche sections
+- `resetPsycheCache()` clears cached psyche text
+- Graceful handling when psyche files are missing (empty string, no crash)
 **Output**: Updated prompt test file with new failing tests
 **Acceptance**: New tests exist and FAIL (red)
 
-### ⬜ Unit 5b: Prompt system -- Implementation
+### ⬜ Unit 5c: Prompt system -- Implementation
 **What**: Update `src/mind/prompt.ts`:
 - Import `getAgentRoot` from `../identity`
 - Replace module-scope `fs.readFileSync` calls with lazy-loading function `loadPsyche()` that reads from `path.join(getAgentRoot(), "docs", "psyche")`
-- Cache loaded psyche text (reset on `resetIdentity()` or add `resetPsycheCache()`)
+- Cache loaded psyche text, export `resetPsycheCache()` for test cleanup
 - Remove `isOwnCodebase()` function entirely
 - Replace `selfAwareSection(channel)` with `runtimeInfoSection(channel)` that always includes:
   - Channel behavior (cli vs teams)
   - Self-awareness info (can read/modify source, load skills, spawn instances)
   - Relevant skills list
-- Move ouroboros personality text from `selfAwareSection()` into `docs/psyche/IDENTITY.md` (append to existing file)
+- Handle missing psyche files gracefully (return empty string)
 **Output**: Updated `src/mind/prompt.ts` passing all tests
-**Acceptance**: All tests PASS (green), no warnings, `isOwnCodebase` gone, personality text preserved in psyche docs
+**Acceptance**: All tests PASS (green), no warnings, `isOwnCodebase` gone
 
-### ⬜ Unit 5c: Prompt system -- Coverage & Refactor
-**What**: Verify 100% coverage on prompt changes, add any missing branch tests. Ensure psyche loading handles missing files gracefully.
+### ⬜ Unit 5d: Prompt system -- Coverage & Refactor
+**What**: Verify 100% coverage on prompt changes, add any missing branch tests. Ensure all psyche loading paths (success, missing file, malformed) are covered.
 **Acceptance**: 100% coverage on prompt changes, tests still green
 
 ### ⬜ Unit 6a: CLI dynamic greeting and exit command -- Tests
@@ -210,35 +216,21 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 **What**: Verify 100% coverage on teams changes
 **Acceptance**: 100% coverage, tests still green
 
-### ⬜ Unit 8a: Package.json and agent.json -- Tests
-**What**: Write tests (or verify via integration) that:
-- `package.json` name is `ouroboros-agent-harness`
-- `package.json` scripts use `--agent ouroboros`
-- `ouroboros/agent.json` exists with correct structure (name, configPath, phrases)
-**Output**: Tests or validation scripts
-**Acceptance**: Tests exist and FAIL (red) or validation defined
+### ⬜ Unit 8a: Create ouroboros/agent.json and update package.json
+**What**:
+- Create `ouroboros/agent.json` with name, configPath, and phrases (copy current hardcoded phrase arrays from `phrases.ts`)
+- Update `package.json`: name to `ouroboros-agent-harness`, scripts add `--agent ouroboros` to dev/teams commands, add `dev:slugger` script
+- This unit does not follow TDD pattern -- it's configuration file creation
+- Validation: run full test suite to confirm identity module can load the new `agent.json`
+**Output**: `ouroboros/agent.json` created, `package.json` updated
+**Acceptance**: `ouroboros/agent.json` has correct structure, `package.json` name is `ouroboros-agent-harness`, full test suite passes
 
-### ⬜ Unit 8b: Package.json and agent.json -- Implementation
-**What**: Update:
-- `package.json`: name to `ouroboros-agent-harness`, scripts add `--agent ouroboros` to dev/teams commands, add `dev:slugger` script
-- Create `ouroboros/agent.json` with:
-  ```json
-  {
-    "name": "ouroboros",
-    "configPath": "~/.agentconfigs/ouroboros/config.json",
-    "phrases": {
-      "thinking": [...current THINKING_PHRASES...],
-      "tool": [...current TOOL_PHRASES...],
-      "followup": [...current FOLLOWUP_PHRASES...]
-    }
-  }
-  ```
-**Output**: Updated `package.json`, new `ouroboros/agent.json`
-**Acceptance**: All tests PASS (green), no warnings
-
-### ⬜ Unit 8c: Package.json and agent.json -- Coverage & Refactor
-**What**: Verify all changes work together, run full test suite
-**Acceptance**: 100% coverage maintained, all tests pass
+### ⬜ Unit 8b: Create ouroboros/docs/psyche directory structure
+**What**: Create `ouroboros/docs/` directory structure so directory moves in Unit 9 have a target. At this point the psyche files still live at `docs/psyche/` -- they move in Unit 9.
+- Create `ouroboros/docs/` (will receive `psyche/` and `tasks/` via git mv later)
+- Verify `ouroboros/agent.json` is loadable by the identity module
+**Output**: Directory structure ready for moves
+**Acceptance**: `ouroboros/` directory exists with `agent.json` and `docs/` subdirectory, full test suite passes
 
 ### ⬜ Unit 9: Directory moves
 **What**: Use `git mv` to move agent-specific directories under `ouroboros/`:
