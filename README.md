@@ -2,7 +2,7 @@
 
 A minimal, multi-agent harness for building AI agents that can read files, write code, run commands, and modify themselves. Written in TypeScript, powered by Azure OpenAI or MiniMax, deployable as a CLI REPL or a Microsoft Teams bot.
 
-The name is structural: the original agent -- Ouroboros -- was grown recursively from a 150-line while loop, bootstrapping itself through agentic self-modification. A snake eating its own tail. The harness preserves that architecture while supporting multiple agents, each with their own personality, skills, and configuration.
+The name is structural: the original agent -- Ouroboros -- was grown recursively from a 150-line while loop, bootstrapping itself through agentic self-modification. A snake eating its own tail. The metaphor runs deep: the agent literally consumes its own context window, trimming old conversation to stay within token budget while preserving identity through layered memory (psyche files, session persistence, git history). It eats its tail to survive across turns. The harness preserves that architecture while supporting multiple agents, each with their own personality, skills, and configuration.
 
 The origin story lives at [aka.ms/GrowAnAgent](https://aka.ms/GrowAnAgent).
 
@@ -138,7 +138,7 @@ Plus 2 optional:
 
 **Channels**: CLI (`channels/cli.ts`) is a terminal REPL with readline, spinners, ANSI colors, and Ctrl-C handling. Teams (`channels/teams.ts`) is a Microsoft Teams bot with streaming cards, conversation locks, OAuth token management, and confirmation prompts for destructive tools.
 
-**Context management** (`mind/context.ts`): conversations are persisted to JSON files on disk. Before each turn, the sliding window checks token count and message count. If over budget (default 80,000 tokens or 200 messages), oldest messages are trimmed (never the system prompt) until back under budget with a 20% margin.
+**Context management** (`mind/context.ts`): this is the tail-eating at the heart of the ouroboros metaphor. Conversations are persisted to JSON files on disk. After each turn, the sliding window checks token count against budget (configurable, default 80,000 tokens). When over budget, oldest messages are trimmed -- never the system prompt -- until back under with a 20% margin. The agent consumes its own history to keep moving forward. Identity survives through psyche files and session persistence, not through unbounded context.
 
 **Tools**: 11 base tools available in all channels (read_file, write_file, shell, list_directory, git_commit, gh_cli, list_skills, load_skill, get_current_time, claude, web_search). Teams gets 8 additional tools (graph_query, graph_mutate, ado_query, ado_mutate, graph_profile, ado_work_items, graph_docs, ado_docs).
 
