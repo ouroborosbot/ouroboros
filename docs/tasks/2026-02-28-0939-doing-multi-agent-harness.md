@@ -108,7 +108,7 @@ Reorganize the ouroboros codebase so two agents (ouroboros and slugger) can shar
 **Output**: Coverage report showing 100% on `src/config.ts`
 **Acceptance**: 100% coverage on config changes, tests still green
 
-### ⬜ Unit 3a: Phrases from agent.json -- Tests
+### ✅ Unit 3a: Phrases from agent.json -- Tests
 **What**: Update `src/__tests__/repertoire/phrases.test.ts` with failing tests:
 - Phrase pools loaded from `loadAgentConfig().phrases` (thinking, tool, followup arrays)
 - Fallback to current hardcoded defaults when agent.json has no phrases
