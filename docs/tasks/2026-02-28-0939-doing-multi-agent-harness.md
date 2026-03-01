@@ -217,7 +217,7 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 **Output**: Updated files passing all tests
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 6c: CLI and commands -- Coverage & Refactor
+### ✅ Unit 6c: CLI and commands -- Coverage & Refactor
 **What**: Verify 100% coverage on CLI and commands changes
 **Output**: Coverage report showing 100% on `src/channels/cli.ts` and `src/repertoire/commands.ts`
 **Acceptance**: 100% coverage, tests still green
