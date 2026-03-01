@@ -722,4 +722,17 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
     const stderrOutput = stderrChunks.join("")
     expect(stderrOutput).toContain("(empty response)")
   })
+
+  it("warns on stderr when assistant response has non-string content", async () => {
+    setupBasic({ inputSequence: ["hello", "/exit"] })
+    mocks.runAgent.mockImplementation(async (msgs: any[]) => {
+      msgs.push({ role: "assistant", content: [{ type: "text", text: "" }] })
+      return { usage: undefined }
+    })
+
+    await main()
+
+    const stderrOutput = stderrChunks.join("")
+    expect(stderrOutput).toContain("(empty response)")
+  })
 })
