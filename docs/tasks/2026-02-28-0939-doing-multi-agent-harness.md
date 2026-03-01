@@ -210,7 +210,7 @@ Note: psyche files are still at `docs/psyche/` at this point — they move to `o
 **Output**: Updated test files with new failing tests
 **Acceptance**: New tests exist and FAIL (red)
 
-### ⬜ Unit 6b: CLI dynamic greeting and exit command -- Implementation
+### ✅ Unit 6b: CLI dynamic greeting and exit command -- Implementation
 **What**: Update:
 - `src/channels/cli.ts` line 338: change `"ouroboros (type /commands for help)"` to use `getAgentName()`
 - `src/repertoire/commands.ts` line 66: change `"quit ouroboros"` to use `getAgentName()`
