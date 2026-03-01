@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
+import * as path from "path"
 
 vi.mock("fs", () => ({
   existsSync: vi.fn(),
@@ -43,68 +44,26 @@ vi.mock("openai", () => {
 
 import * as fs from "fs"
 import { listSkills } from "../../repertoire/skills"
+import * as identity from "../../identity"
 
 // Default psyche file contents used by the mock
 const MOCK_SOUL = "i am a witty, funny, competent chaos monkey coding assistant.\ni get things done, crack jokes, embrace chaos, deliver quality."
-const MOCK_IDENTITY = "i am Ouroboros.\ni use lowercase in my responses to the user except for proper nouns. no periods unless necessary. i never apply lowercase to code, file paths, environment variables, or tool arguments — only to natural language output."
-const MOCK_LORE = "i am named after the ouroboros — the ancient symbol of a serpent eating its own tail."
+const MOCK_IDENTITY = "i am Ouroboros.\ni use lowercase in my responses to the user except for proper nouns. no periods unless necessary. i never apply lowercase to code, file paths, environment variables, or tool arguments -- only to natural language output."
+const MOCK_LORE = "i am named after the ouroboros -- the ancient symbol of a serpent eating its own tail."
 const MOCK_FRIENDS = "my creator works at microsoft and talks to me through the CLI and Teams."
 
-// Helper: configure readFileSync to return psyche files by path and package.json
-function setupReadFileSync(pkgName: string = "other") {
+// Helper: configure readFileSync to return psyche files by path
+function setupReadFileSync() {
   vi.mocked(fs.readFileSync).mockImplementation((filePath: any, _encoding?: any) => {
     const p = String(filePath)
     if (p.endsWith("SOUL.md")) return MOCK_SOUL
     if (p.endsWith("IDENTITY.md")) return MOCK_IDENTITY
     if (p.endsWith("LORE.md")) return MOCK_LORE
     if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
-    if (p.endsWith("package.json")) return JSON.stringify({ name: pkgName })
     if (p.endsWith("config.json")) return JSON.stringify({})
     return ""
   })
 }
-
-describe("isOwnCodebase", () => {
-  beforeEach(() => {
-    vi.resetModules()
-  })
-
-  it("returns true when package.json has name 'ouroboros'", async () => {
-    setupReadFileSync("ouroboros")
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { isOwnCodebase } = await import("../../mind/prompt")
-    expect(isOwnCodebase()).toBe(true)
-  })
-
-  it("returns false when package.json has a different name", async () => {
-    setupReadFileSync("other-project")
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { isOwnCodebase } = await import("../../mind/prompt")
-    expect(isOwnCodebase()).toBe(false)
-  })
-
-  it("returns false when readFileSync throws for package.json", async () => {
-    // Set up psyche files normally but make package.json throw
-    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, _encoding?: any) => {
-      const p = String(filePath)
-      if (p.endsWith("SOUL.md")) return MOCK_SOUL
-      if (p.endsWith("IDENTITY.md")) return MOCK_IDENTITY
-      if (p.endsWith("LORE.md")) return MOCK_LORE
-      if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
-      if (p.endsWith("config.json")) return JSON.stringify({})
-      throw new Error("ENOENT")
-    })
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { isOwnCodebase } = await import("../../mind/prompt")
-    expect(isOwnCodebase()).toBe(false)
-  })
-})
 
 describe("buildSystem", () => {
   beforeEach(() => {
@@ -116,7 +75,8 @@ describe("buildSystem", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem()
     expect(result).toContain("chaos monkey coding assistant")
     expect(result).toContain("crack jokes")
@@ -127,7 +87,8 @@ describe("buildSystem", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem()
     expect(result).toContain("i am Ouroboros")
     expect(result).toContain("i use lowercase")
@@ -138,7 +99,8 @@ describe("buildSystem", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem()
     expect(result).toContain("## my lore")
     expect(result).toContain("ouroboros")
@@ -149,28 +111,33 @@ describe("buildSystem", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem()
     expect(result).toContain("## my friends")
     expect(result).toContain("microsoft")
   })
 
-  it("includes boot greeting for cli channel", async () => {
+  it("includes runtime info section for cli channel", async () => {
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem("cli")
     expect(result).toContain("i introduce myself on boot")
+    expect(result).toContain("testagent") // agent name from identity mock
+    expect(result).toContain("i can read and modify my own source code")
   })
 
-  it("includes Teams context for teams channel", async () => {
+  it("includes runtime info section for teams channel", async () => {
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem("teams")
     expect(result).toContain("Microsoft Teams")
     expect(result).toContain("i keep responses concise")
@@ -182,7 +149,8 @@ describe("buildSystem", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem()
     expect(result).toContain("i introduce myself on boot")
   })
@@ -192,7 +160,8 @@ describe("buildSystem", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem()
     const today = new Date().toISOString().slice(0, 10)
     expect(result).toContain(`current date: ${today}`)
@@ -203,7 +172,8 @@ describe("buildSystem", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem()
     expect(result).toContain("## my tools")
     expect(result).toContain("- read_file:")
@@ -217,7 +187,8 @@ describe("buildSystem", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem()
     expect(result).toContain("## my skills (use load_skill to activate)")
     expect(result).toContain("code-review, self-edit, self-query")
@@ -229,30 +200,19 @@ describe("buildSystem", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem()
     expect(result).not.toContain("## my skills")
   })
 
-  it("includes self-aware section when in own codebase", async () => {
-    setupReadFileSync("ouroboros")
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
-    const result = buildSystem()
-    expect(result).toContain("i am in my own codebase")
-    expect(result).toContain("snake eating its own tail")
-  })
-
-  it("omits self-aware section when not in own codebase", async () => {
+  it("does NOT export isOwnCodebase (removed)", async () => {
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
-    const result = buildSystem()
-    expect(result).not.toContain("i am in my own codebase")
+    const prompt = await import("../../mind/prompt")
+    expect("isOwnCodebase" in prompt).toBe(false)
   })
 
   it("includes azure provider string when azure config is set", async () => {
@@ -269,7 +229,8 @@ describe("buildSystem", () => {
         },
       },
     })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem()
     expect(result).toContain("azure openai (gpt-4o-deploy, model: test-model)")
   })
@@ -278,7 +239,6 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
-    // First set valid azure config so getClient() selects azure provider
     setTestConfig({
       providers: {
         azure: {
@@ -289,12 +249,10 @@ describe("buildSystem", () => {
         },
       },
     })
-    // Import prompt (triggers lazy getClient init on first getModel() call)
-    const { buildSystem, getProvider } = await import("../../mind/prompt")
-    // Force client initialization so provider is cached as "azure"
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const { getModel } = await import("../../engine/core")
     getModel()
-    // Now clear deployment to test the "default" fallback in providerSection display
     setTestConfig({
       providers: {
         azure: {
@@ -313,14 +271,14 @@ describe("buildSystem", () => {
       if (p.endsWith("IDENTITY.md")) return MOCK_IDENTITY
       if (p.endsWith("LORE.md")) return MOCK_LORE
       if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
-      if (p.endsWith("package.json")) return JSON.stringify({ name: "other" })
       if (p.endsWith("config.json")) return JSON.stringify({})
       return ""
     })
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem()
     expect(result).toContain("custom soul content")
   })
@@ -332,14 +290,14 @@ describe("buildSystem", () => {
       if (p.endsWith("IDENTITY.md")) return "custom identity content"
       if (p.endsWith("LORE.md")) return MOCK_LORE
       if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
-      if (p.endsWith("package.json")) return JSON.stringify({ name: "other" })
       if (p.endsWith("config.json")) return JSON.stringify({})
       return ""
     })
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem()
     expect(result).toContain("custom identity content")
   })
@@ -349,7 +307,8 @@ describe("buildSystem", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem("cli", { toolChoiceRequired: true })
     expect(result).toContain("## tool behavior")
     expect(result).toContain("tool_choice is set to \"required\"")
@@ -362,7 +321,8 @@ describe("buildSystem", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem("cli", { toolChoiceRequired: false })
     expect(result).not.toContain("## tool behavior")
     expect(result).not.toContain("final_answer")
@@ -373,7 +333,8 @@ describe("buildSystem", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem("cli")
     expect(result).not.toContain("## tool behavior")
   })
@@ -383,7 +344,8 @@ describe("buildSystem", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem("teams", { disableStreaming: true })
     expect(result).toContain("## my flags")
     expect(result).toContain("streaming")
@@ -395,7 +357,8 @@ describe("buildSystem", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem("cli", { disableStreaming: true })
     expect(result).not.toContain("## my flags")
   })
@@ -405,7 +368,8 @@ describe("buildSystem", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem("teams", { disableStreaming: false })
     expect(result).not.toContain("## my flags")
   })
@@ -415,9 +379,132 @@ describe("buildSystem", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem } = await import("../../mind/prompt")
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = buildSystem("teams")
     expect(result).not.toContain("## my flags")
+  })
+})
+
+describe("runtimeInfoSection", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it("always includes agent name and cwd", async () => {
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = runtimeInfoSection("cli")
+    expect(result).toContain("testagent")
+    expect(result).toContain(process.cwd())
+  })
+
+  it("includes note about self-modification", async () => {
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = runtimeInfoSection("cli")
+    expect(result).toContain("i can read and modify my own source code")
+  })
+
+  it("cli channel includes boot greeting", async () => {
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = runtimeInfoSection("cli")
+    expect(result).toContain("i introduce myself on boot")
+  })
+
+  it("teams channel includes concise behavior", async () => {
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = runtimeInfoSection("teams")
+    expect(result).toContain("Microsoft Teams")
+    expect(result).toContain("concise")
+  })
+})
+
+describe("psyche loading", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it("loads psyche files from agentRoot/docs/psyche/", async () => {
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    buildSystem()
+    // Check that readFileSync was called with paths under the mock agent root
+    const calls = vi.mocked(fs.readFileSync).mock.calls.map(c => String(c[0]))
+    const psycheCalls = calls.filter(p => p.includes("psyche"))
+    expect(psycheCalls.length).toBeGreaterThan(0)
+    for (const p of psycheCalls) {
+      expect(p).toContain(path.join("/mock/repo/testagent", "docs", "psyche"))
+    }
+  })
+
+  it("handles missing psyche files gracefully (empty string, no crash)", async () => {
+    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, _encoding?: any) => {
+      const p = String(filePath)
+      if (p.endsWith("config.json")) return JSON.stringify({})
+      throw new Error("ENOENT: no such file or directory")
+    })
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    // Should not throw
+    const result = buildSystem()
+    expect(typeof result).toBe("string")
+  })
+
+  it("caches psyche text after first load", async () => {
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    buildSystem()
+    const callCount1 = vi.mocked(fs.readFileSync).mock.calls.length
+    buildSystem()
+    const callCount2 = vi.mocked(fs.readFileSync).mock.calls.length
+    // Second call should not trigger more readFileSync calls for psyche files
+    expect(callCount2).toBe(callCount1)
+  })
+
+  it("resetPsycheCache clears cached psyche text", async () => {
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    buildSystem()
+    const callCount1 = vi.mocked(fs.readFileSync).mock.calls.length
+    resetPsycheCache()
+    buildSystem()
+    const callCount2 = vi.mocked(fs.readFileSync).mock.calls.length
+    // After reset, psyche files should be re-read
+    expect(callCount2).toBeGreaterThan(callCount1)
   })
 })
 
@@ -431,7 +518,8 @@ describe("flagsSection rationale", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { flagsSection } = await import("../../mind/prompt")
+    const { flagsSection, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = flagsSection("teams", { disableStreaming: true })
     expect(result).toContain("devtunnel")
     expect(result).toContain("dev-tunnels#518")
@@ -442,7 +530,8 @@ describe("flagsSection rationale", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { flagsSection } = await import("../../mind/prompt")
+    const { flagsSection, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = flagsSection("teams", { disableStreaming: true })
     expect(result).toContain("60")
     expect(result.toLowerCase()).toContain("timeout")
@@ -453,7 +542,8 @@ describe("flagsSection rationale", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { flagsSection } = await import("../../mind/prompt")
+    const { flagsSection, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = flagsSection("teams", { disableStreaming: true })
     expect(result).toContain("HTTP/2")
   })
@@ -463,7 +553,8 @@ describe("flagsSection rationale", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { flagsSection } = await import("../../mind/prompt")
+    const { flagsSection, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = flagsSection("teams", { disableStreaming: true })
     expect(result).toContain("1 req/sec")
   })
@@ -473,7 +564,8 @@ describe("flagsSection rationale", () => {
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { flagsSection } = await import("../../mind/prompt")
+    const { flagsSection, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
     const result = flagsSection("teams", { disableStreaming: true })
     expect(result.toLowerCase()).toContain("latency")
   })
