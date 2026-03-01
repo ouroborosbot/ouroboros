@@ -1,15 +1,16 @@
 {
-  "name": "ouroboros",
+  "name": "ouroboros-agent-harness",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "build": "tsc",
-    "dev": "tsc && node dist/cli-entry.js",
+    "dev": "tsc && node dist/cli-entry.js --agent ouroboros",
+    "dev:slugger": "tsc && node dist/cli-entry.js --agent slugger",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "teams": "tsc && node dist/teams-entry.js",
-    "teams:no-stream": "tsc && node dist/teams-entry.js --disable-streaming",
-    "manifest:package": "cd manifest && zip -r ../manifest.zip manifest.json color.png outline.png"
+    "teams": "tsc && node dist/teams-entry.js --agent ouroboros",
+    "teams:no-stream": "tsc && node dist/teams-entry.js --agent ouroboros --disable-streaming",
+    "manifest:package": "cd ouroboros/manifest && zip -r ../../manifest.zip manifest.json color.png outline.png"
   },
   "dependencies": {
     "@microsoft/teams.apps": "^2.0.5",
