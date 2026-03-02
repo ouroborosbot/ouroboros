@@ -83,7 +83,7 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 **Output**: Validation record at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-2c-verify.md`.
 **Acceptance**: CI gate behavior is documented and workflow references valid paths/scripts.
 
-### ⬜ Unit 3a: Cross-Agent Testing Conventions — Red
+### ✅ Unit 3a: Cross-Agent Testing Conventions — Red
 **What**: Capture missing convention content by diffing current contributor guidance against required migration testing conventions.
 **Output**: Content gap matrix at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-3a-gap-matrix.md`.
 **Acceptance**: Matrix identifies all mandatory sections needed in `docs/cross-agent/testing-conventions.md`.
@@ -147,3 +147,4 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - [2026-03-02 14:37] Unit 2b blocked: remote rejected push for `.github/workflows/coverage.yml` (OAuth token missing `workflow` scope)
 - [2026-03-02 14:46] Unit 2b unblocked: push succeeded after credential refresh with `workflow` scope
 - [2026-03-02 14:47] Unit 2c complete: CI workflow verification recorded
+- [PENDING_UNIT3A_TS] Unit 3a complete: cross-agent testing conventions gap matrix recorded
