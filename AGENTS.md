@@ -26,6 +26,12 @@ Task docs go in `docs/<agent>/tasks/` with naming scheme `YYYY-MM-DD-HHMM-{plann
 4. **Implement**: Only after user explicitly asks, launch `work-doer` to execute the doing doc. Never implement inside `work-planner`.
 5. **Never self-approve**: Do not say "looks good" and proceed. The user reviews every planning and doing doc.
 
+### Decision Collaboration (Required)
+
+- Decisions that affect scope, structure, naming, ownership, or workflow must be discussed with the user before being finalized.
+- Do not make unilateral choices for unresolved planning decisions; present options and capture explicit user direction.
+- If a decision remains unresolved, keep it in `Open Questions`, set status to `NEEDS_REVIEW`, and stop at the gate.
+
 ### Git Discipline
 
 - When a logical unit of work is complete and committable, commit immediately.
