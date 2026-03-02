@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import type { ChannelCallbacks } from "../../engine/core"
-import { THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "../../repertoire/phrases"
+import { THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "../../wardrobe/phrases"
 
 // These imports will fail until agent.ts is refactored to export them.
 // That's exactly the point -- tests must FAIL (red) for Unit 2a.
