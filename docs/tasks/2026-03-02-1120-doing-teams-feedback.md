@@ -447,3 +447,4 @@ Wiring:
   - Dependencies added across units
   - Prerequisites section added (build before Unit 0, Unit 5 breaking change coordination)
 - 2026-03-02 15:36 Unit 1a complete: Added 10 failing tests for bare "Continuing.", sentence-final "continues.", and "Next up" patterns plus 4 false-negative guards
+- 2026-03-02 15:36 Unit 1b complete: Added 3 patterns to TOOL_INTENT_PATTERNS — all 100 tests pass, build clean
