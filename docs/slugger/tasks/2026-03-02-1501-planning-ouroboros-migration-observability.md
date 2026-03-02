@@ -64,4 +64,4 @@ Model consumption is primary: logs should be stable, structured, and parseable f
 ## Progress Log
 - [2026-03-02 15:01] Created
 - [2026-03-02 15:24] Resolved Open Question #1 with cross-channel output vs observability contract
-- [PENDING_Q2_TS] Resolved Open Question #2 with machine-first json logging config (level configurable, stderr sink only)
+- [2026-03-02 15:32] Resolved Open Question #2 with machine-first json logging config (level configurable, stderr sink only)
