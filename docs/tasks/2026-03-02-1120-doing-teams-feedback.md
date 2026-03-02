@@ -175,7 +175,7 @@ Update tests in `src/__tests__/wardrobe/phrases.test.ts`:
 **Output**: Failing tests
 **Acceptance**: Tests exist and FAIL (red)
 
-### ⬜ Unit 3b: Phrases required in agent config -- Implementation
+### ✅ Unit 3b: Phrases required in agent config -- Implementation
 **What**:
 - In `src/identity.ts`: make `phrases` and its children required in `AgentConfig` interface:
   ```typescript
@@ -451,3 +451,4 @@ Wiring:
 - 2026-03-02 15:37 Unit 1c complete: kicks.ts 100% coverage (Stmts/Branch/Funcs/Lines), full suite 874 tests pass
 - 2026-03-02 15:38 Unit 2 complete: phrases.ts moved to src/wardrobe/, all 6 import sites updated, 874 tests pass, build clean
 - 2026-03-02 15:40 Unit 3a complete: 3 failing tests — identity auto-fill placeholders, warn+write, phrases no hardcoded exports
+- 2026-03-02 15:45 Unit 3b complete: AgentConfig.phrases required, auto-fill in loadAgentConfig, getPhrases() simplified, consumers updated (cli.ts, teams.ts), identity mocks added to cli.test.ts/teams.test.ts, 872 tests pass
