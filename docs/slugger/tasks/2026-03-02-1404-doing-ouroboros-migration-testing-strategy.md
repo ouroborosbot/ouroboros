@@ -2,7 +2,7 @@
 
 **Status**: drafting
 **Execution Mode**: direct
-**Created**: PENDING_CREATED_TS
+**Created**: 2026-03-02 14:27
 **Planning**: ./2026-03-02-1404-planning-ouroboros-migration-testing-strategy.md
 **Artifacts**: ./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/
 
@@ -113,10 +113,15 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 **Output**: Validation note at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-4c-verify.md`.
 **Acceptance**: Link resolves and entry-point guidance is unambiguous.
 
-### ⬜ Unit 5: Final Verification
-**What**: Run final regression checks and ensure completion criteria are fully satisfied before handoff.
-**Output**: Final verification summary at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/final-verification.md`.
-**Acceptance**: All completion criteria checked, all tests pass, no warnings, and documentation/CI/config changes are internally consistent.
+### ⬜ Unit 5a: Final Suite Verification
+**What**: Run full regression checks (`npm run test` and `npm run test:coverage`) after all changes are in place.
+**Output**: Final run logs at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/final-test.log` and `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/final-coverage.log`.
+**Acceptance**: Full suite and coverage commands pass with no warnings.
+
+### ⬜ Unit 5b: Completion Criteria Audit
+**What**: Perform a line-by-line audit against planning completion criteria and code coverage requirements before handoff.
+**Output**: Audit checklist at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/final-verification.md`.
+**Acceptance**: Every completion criterion is explicitly marked met with linked evidence/artifact paths.
 
 ## Execution
 - **TDD strictly enforced**: tests → red → implement → green → refactor
@@ -128,4 +133,5 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - **Decisions made**: Update docs immediately, commit right away
 
 ## Progress Log
-- [PENDING_CREATED_TS] Created from planning doc
+- [2026-03-02 14:27] Created from planning doc
+- [PENDING_GRANULARITY_TS] Granularity pass: split final verification into atomic units and stamped created timestamp
