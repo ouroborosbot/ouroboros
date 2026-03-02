@@ -164,6 +164,68 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     expect(mockStream.update).not.toHaveBeenCalled()
   })
 
+  // --- async (Promise-based) error handling ---
+
+  it("when emit returns a rejected Promise, controller is aborted", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    mockStream.emit.mockReturnValue(Promise.reject(new Error("403 Forbidden")))
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onTextChunk("data")
+    // Let the microtask (Promise rejection handler) run
+    await new Promise(r => setTimeout(r, 0))
+    expect(controller.signal.aborted).toBe(true)
+  })
+
+  it("when update returns a rejected Promise, controller is aborted", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    mockStream.update.mockReturnValue(Promise.reject(new Error("403 Forbidden")))
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onToolStart("read_file", { path: "test.txt" })
+    await new Promise(r => setTimeout(r, 0))
+    expect(controller.signal.aborted).toBe(true)
+  })
+
+  it("after async abort via emit, phrase rotation stops", async () => {
+    vi.useFakeTimers()
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    mockStream.emit.mockReturnValue(Promise.reject(new Error("403")))
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    // Start phrase rotation
+    callbacks.onModelStart()
+    mockStream.update.mockClear()
+
+    // Emit triggers async abort
+    callbacks.onTextChunk("data")
+    await vi.advanceTimersByTimeAsync(0) // flush microtasks
+
+    // Phrase timer should have been cleared — advancing time should not produce updates
+    mockStream.update.mockClear()
+    vi.advanceTimersByTime(3000)
+    expect(mockStream.update).not.toHaveBeenCalled()
+
+    vi.useRealTimers()
+  })
+
+  it("markStopped is idempotent — second async rejection does not abort twice", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    // Both emit and update return rejected Promises
+    mockStream.emit.mockReturnValue(Promise.reject(new Error("403")))
+    mockStream.update.mockReturnValue(Promise.reject(new Error("403")))
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onTextChunk("data")       // first async rejection
+    callbacks.onToolStart("x", {})      // second async rejection (markStopped early-returns)
+    await new Promise(r => setTimeout(r, 0))
+    expect(controller.signal.aborted).toBe(true)
+  })
+
   it("onTextChunk calls stream.emit() directly (no think-tag processing)", async () => {
     vi.resetModules()
     const teams = await import("../../channels/teams")
@@ -2680,6 +2742,89 @@ describe("Teams adapter - confirmation callback", () => {
     expect(confirmPromise).not.toBeNull()
     const result = await confirmPromise!
     expect(result).toBe("denied")
+  })
+
+  it("confirmation auto-denies after timeout (120s)", async () => {
+    vi.useFakeTimers()
+    vi.resetModules()
+
+    let confirmPromise: Promise<"confirmed" | "denied"> | null = null
+
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      if (callbacks.onConfirmAction) {
+        confirmPromise = callbacks.onConfirmAction("ado_mutate", { method: "POST", organization: "myorg", path: "/_apis/wit/workitems" })
+      }
+      return { usage: undefined }
+    })
+
+    mockTeamsDepsForConfirmation({ runAgentFn: mockRunAgent })
+
+    const teams = await import("../../channels/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const msgPromise = teams.handleTeamsMessage("create work item", mockStream as any, "conv-timeout", {
+      graphToken: undefined,
+      adoToken: "token",
+      signin: vi.fn(),
+    })
+
+    // Let the handler start and set up the confirmation
+    await vi.advanceTimersByTimeAsync(50)
+
+    expect(confirmPromise).not.toBeNull()
+
+    // Advance past the 120s timeout
+    await vi.advanceTimersByTimeAsync(120_000)
+
+    await msgPromise
+
+    const result = await confirmPromise!
+    expect(result).toBe("denied")
+
+    vi.useRealTimers()
+  })
+
+  it("confirmation timeout is a no-op when already resolved", async () => {
+    vi.useFakeTimers()
+    vi.resetModules()
+
+    let confirmPromise: Promise<"confirmed" | "denied"> | null = null
+
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      if (callbacks.onConfirmAction) {
+        confirmPromise = callbacks.onConfirmAction("ado_mutate", { method: "POST", organization: "myorg", path: "/_apis/wit/workitems" })
+      }
+      return { usage: undefined }
+    })
+
+    mockTeamsDepsForConfirmation({ runAgentFn: mockRunAgent })
+
+    const teams = await import("../../channels/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const msgPromise = teams.handleTeamsMessage("create item", mockStream as any, "conv-timeout-noop", {
+      graphToken: undefined,
+      adoToken: "token",
+      signin: vi.fn(),
+    })
+
+    await vi.advanceTimersByTimeAsync(50)
+
+    // Resolve BEFORE the timeout fires
+    teams.resolvePendingConfirmation("conv-timeout-noop", "yes")
+
+    await vi.advanceTimersByTimeAsync(0)
+    await msgPromise
+
+    const result = await confirmPromise!
+    expect(result).toBe("confirmed")
+
+    // Advance past the 120s timeout — should be a no-op (no double-resolve)
+    await vi.advanceTimersByTimeAsync(120_000)
+    // Still confirmed — not overwritten to denied
+    expect(await confirmPromise!).toBe("confirmed")
+
+    vi.useRealTimers()
   })
 
   it("pre-lock confirmation resolves before conversation lock (no deadlock)", async () => {

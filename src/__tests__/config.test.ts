@@ -455,7 +455,7 @@ describe("getTeamsChannelConfig", () => {
     resetConfigCache()
     const tc = getTeamsChannelConfig()
 
-    expect(tc.skipConfirmation).toBe(false)
+    expect(tc.skipConfirmation).toBe(true)
     expect(tc.disableStreaming).toBe(false)
     expect(tc.port).toBe(3978)
   })
@@ -503,7 +503,7 @@ describe("getTeamsChannelConfig", () => {
     resetConfigCache()
     const tc = getTeamsChannelConfig()
 
-    expect(tc.skipConfirmation).toBe(false)
+    expect(tc.skipConfirmation).toBe(true)
     expect(tc.disableStreaming).toBe(false)
     expect(tc.port).toBe(5000)
   })
