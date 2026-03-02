@@ -56,7 +56,7 @@ Fix three Teams bot channel issues and improve the presentation architecture: (1
 
 ## Prerequisites / Notes
 
-**Deploy earlier bug fixes first**: Commits `cf4ec1c` through `66453f8` from this session contain independent fixes (async stream error handling, confirmation timeout, skipConfirmation default to true, AGENTS.md). These should be deployed before starting this task so the bot is in a stable state for Unit 0 manual testing.
+**Earlier bug fixes must be built first**: Commits `cf4ec1c` through `66453f8` from this session contain independent fixes (async stream error handling, confirmation timeout, skipConfirmation default to true, AGENTS.md). These are already on main — just ensure `npm run build` is run before Unit 0 manual testing so the bot picks them up.
 
 **Unit 5 is a coordinated breaking change**: The `onError` signature change (`error` → `error, severity`) touches the `ChannelCallbacks` interface, all 5 call sites in core.ts, both channel implementations, and ~128 test mocks. All must update in a single commit to keep the build green.
 
