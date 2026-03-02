@@ -296,7 +296,7 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
       }
       currentSpinner = null
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _severity: "transient" | "terminal") => {
       currentSpinner?.fail("request failed")
       currentSpinner = null
       process.stderr.write(`\x1b[31m${error}\x1b[0m\n`)

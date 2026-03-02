@@ -124,7 +124,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
     callbacks.onTextChunk("data") // triggers abort
     mockStream.emit.mockClear()
-    callbacks.onError(new Error("connection lost"))
+    callbacks.onError(new Error("connection lost"), "terminal")
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
@@ -326,7 +326,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     vi.resetModules()
     const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
-    callbacks.onError(new Error("something broke"))
+    callbacks.onError(new Error("something broke"), "terminal")
     expect(mockStream.emit).toHaveBeenCalledWith("Error: something broke")
   })
 })
@@ -1538,7 +1538,7 @@ describe("Teams adapter - phrase rotation", () => {
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onModelStart()
-    callbacks.onError(new Error("boom"))
+    callbacks.onError(new Error("boom"), "terminal")
     mockStream.update.mockClear()
     vi.advanceTimersByTime(3000)
     expect(mockStream.update).not.toHaveBeenCalled()
@@ -2103,7 +2103,7 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     vi.resetModules()
     const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, { disableStreaming: true })
-    callbacks.onError(new Error("something broke"))
+    callbacks.onError(new Error("something broke"), "terminal")
     expect(mockStream.emit).toHaveBeenCalledWith("Error: something broke")
   })
 

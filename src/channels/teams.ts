@@ -157,7 +157,7 @@ export function createTeamsCallbacks(
         safeUpdate(`${name} failed: ${summary}`)
       }
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _severity: "transient" | "terminal") => {
       stopPhraseRotation()
       if (stopped) return
       safeEmit(`Error: ${error.message}`)

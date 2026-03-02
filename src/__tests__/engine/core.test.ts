@@ -152,7 +152,7 @@ describe("ChannelCallbacks interface", () => {
       onReasoningChunk: (_text: string) => {},
       onToolStart: (_name: string, _args: Record<string, string>) => {},
       onToolEnd: (_name: string, _summary: string, _success: boolean) => {},
-      onError: (_error: Error) => {},
+      onError: (_error: Error, _severity: "transient" | "terminal") => {},
     }
     // Type check passes if this compiles
     expect(callbacks).toBeDefined()
@@ -677,24 +677,25 @@ describe("runAgent", () => {
     expect(callCount).toBe(2)
   })
 
-  it("fires onError on API errors and ends loop", async () => {
+  it("fires onError on API errors with terminal severity and ends loop", async () => {
     mockCreate.mockImplementation(() => {
       throw new Error("API rate limit")
     })
 
-    const errors: Error[] = []
+    const errors: { error: Error; severity: string }[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
       onTextChunk: () => {},
       onToolStart: () => {},
       onToolEnd: () => {},
-      onError: (err) => errors.push(err),
+      onError: (err, severity) => errors.push({ error: err, severity }),
     }
 
     await runAgent([{ role: "system", content: "test" }], callbacks)
     expect(errors).toHaveLength(1)
-    expect(errors[0].message).toBe("API rate limit")
+    expect(errors[0].error.message).toBe("API rate limit")
+    expect(errors[0].severity).toBe("terminal")
   })
 
   it("pushes assistant message with content onto messages array", async () => {
@@ -1854,7 +1855,7 @@ describe("runAgent", () => {
       return makeStream([makeChunk("recovered")])
     })
 
-    const errors: Error[] = []
+    const errors: { error: Error; severity: string }[] = []
     const chunks: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
@@ -1863,7 +1864,7 @@ describe("runAgent", () => {
       onReasoningChunk: () => {},
       onToolStart: () => {},
       onToolEnd: () => {},
-      onError: (err) => errors.push(err),
+      onError: (err, severity) => errors.push({ error: err, severity }),
     }
 
     const messages: any[] = [
@@ -1877,8 +1878,9 @@ describe("runAgent", () => {
     // Should have retried and succeeded
     expect(callCount).toBe(2)
     expect(chunks).toContain("recovered")
-    // Should have logged a trim info message
-    expect(errors.some(e => e.message.includes("trimm"))).toBe(true)
+    // Should have logged a trim info message with transient severity
+    expect(errors.some(e => e.error.message.includes("trimm"))).toBe(true)
+    expect(errors[0].severity).toBe("transient")
   })
 
   it("recovers from Azure overflow via error message (no .code)", async () => {
@@ -2110,7 +2112,7 @@ describe("runAgent", () => {
 
   // ── transient network error retry ──
 
-  it("retries on transient network errors with backoff", async () => {
+  it("retries on transient network errors with backoff and transient severity", async () => {
     vi.useFakeTimers()
     let callCount = 0
     mockCreate.mockImplementation(() => {
@@ -2122,7 +2124,7 @@ describe("runAgent", () => {
       return makeStream([makeChunk("recovered")])
     })
 
-    const errors: Error[] = []
+    const errors: { error: Error; severity: string }[] = []
     const chunks: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
@@ -2131,7 +2133,7 @@ describe("runAgent", () => {
       onReasoningChunk: () => {},
       onToolStart: () => {},
       onToolEnd: () => {},
-      onError: (err) => errors.push(err),
+      onError: (err, severity) => errors.push({ error: err, severity }),
     }
 
     const messages: any[] = [{ role: "system", content: "test" }]
@@ -2149,13 +2151,15 @@ describe("runAgent", () => {
     expect(callCount).toBe(3)
     expect(chunks).toContain("recovered")
     expect(errors.length).toBe(2) // two retry messages
-    expect(errors[0].message).toContain("retrying in 2s (1/3)")
-    expect(errors[1].message).toContain("retrying in 4s (2/3)")
+    expect(errors[0].error.message).toContain("retrying in 2s (1/3)")
+    expect(errors[0].severity).toBe("transient")
+    expect(errors[1].error.message).toContain("retrying in 4s (2/3)")
+    expect(errors[1].severity).toBe("transient")
 
     vi.useRealTimers()
   })
 
-  it("gives up after MAX_RETRIES transient failures", async () => {
+  it("gives up after MAX_RETRIES transient failures with terminal final error", async () => {
     vi.useFakeTimers()
     mockCreate.mockImplementation(() => {
       const err: any = new Error("connect failed")
@@ -2163,7 +2167,7 @@ describe("runAgent", () => {
       throw err
     })
 
-    const errors: Error[] = []
+    const errors: { error: Error; severity: string }[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -2171,7 +2175,7 @@ describe("runAgent", () => {
       onReasoningChunk: () => {},
       onToolStart: () => {},
       onToolEnd: () => {},
-      onError: (err) => errors.push(err),
+      onError: (err, severity) => errors.push({ error: err, severity }),
     }
 
     const messages: any[] = [{ role: "system", content: "test" }]
@@ -2187,10 +2191,14 @@ describe("runAgent", () => {
 
     // 3 retry messages + 1 final error
     expect(errors.length).toBe(4)
-    expect(errors[0].message).toContain("retrying in 2s (1/3)")
-    expect(errors[1].message).toContain("retrying in 4s (2/3)")
-    expect(errors[2].message).toContain("retrying in 8s (3/3)")
-    expect(errors[3].message).toContain("connect failed")
+    expect(errors[0].error.message).toContain("retrying in 2s (1/3)")
+    expect(errors[0].severity).toBe("transient")
+    expect(errors[1].error.message).toContain("retrying in 4s (2/3)")
+    expect(errors[1].severity).toBe("transient")
+    expect(errors[2].error.message).toContain("retrying in 8s (3/3)")
+    expect(errors[2].severity).toBe("transient")
+    expect(errors[3].error.message).toContain("connect failed")
+    expect(errors[3].severity).toBe("terminal")
 
     vi.useRealTimers()
   })
@@ -2705,7 +2713,7 @@ describe("getClient config integration", () => {
       }
     })
 
-    const errors: Error[] = []
+    const errors: { error: Error; severity: string }[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -2713,14 +2721,15 @@ describe("getClient config integration", () => {
       onReasoningChunk: () => {},
       onToolStart: () => {},
       onToolEnd: () => {},
-      onError: (err) => errors.push(err),
+      onError: (err, severity) => errors.push({ error: err, severity }),
     }
 
     const core = await import("../../engine/core")
     await core.runAgent([{ role: "system", content: "test" }], callbacks)
 
     expect(errors.length).toBe(1)
-    expect(errors[0].message).toContain("tool loop limit reached")
+    expect(errors[0].error.message).toContain("tool loop limit reached")
+    expect(errors[0].severity).toBe("terminal")
     expect(callCount).toBe(core.MAX_TOOL_ROUNDS)
   })
 

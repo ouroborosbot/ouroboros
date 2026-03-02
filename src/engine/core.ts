@@ -79,7 +79,7 @@ export interface ChannelCallbacks {
   onReasoningChunk(text: string): void;
   onToolStart(name: string, args: Record<string, string>): void;
   onToolEnd(name: string, summary: string, success: boolean): void;
-  onError(error: Error): void;
+  onError(error: Error, severity: "transient" | "terminal"): void;
   onKick?(attempt: number, maxKicks: number): void;
   onConfirmAction?(name: string, args: Record<string, string>): Promise<"confirmed" | "denied">;
 }
@@ -267,7 +267,7 @@ export async function runAgent(
           kickCount++;
           toolRounds++;
           if (toolRounds >= MAX_TOOL_ROUNDS) {
-            callbacks.onError(new Error(`tool loop limit reached (${MAX_TOOL_ROUNDS} rounds)`));
+            callbacks.onError(new Error(`tool loop limit reached (${MAX_TOOL_ROUNDS} rounds)`), "terminal");
             done = true;
             continue;
           }
@@ -306,7 +306,7 @@ export async function runAgent(
           // Strip tool_calls from the assistant message we just pushed so the
           // conversation stays valid (every tool_call needs a tool response).
           stripLastToolCalls(messages);
-          callbacks.onError(new Error(`tool loop limit reached (${MAX_TOOL_ROUNDS} rounds)`));
+          callbacks.onError(new Error(`tool loop limit reached (${MAX_TOOL_ROUNDS} rounds)`), "terminal");
           done = true;
           break;
         }
@@ -382,14 +382,14 @@ export async function runAgent(
         const trimmed = trimMessages(messages, maxTokens, contextMargin, maxTokens * 2);
         messages.splice(0, messages.length, ...trimmed);
         azureInput = null; // force rebuild from trimmed messages
-        callbacks.onError(new Error("context trimmed, retrying..."));
+        callbacks.onError(new Error("context trimmed, retrying..."), "transient");
         continue;
       }
       // Transient network errors: retry with exponential backoff
       if (isTransientError(e) && retryCount < MAX_RETRIES) {
         retryCount++;
         const delay = RETRY_BASE_MS * Math.pow(2, retryCount - 1);
-        callbacks.onError(new Error(`network error, retrying in ${delay / 1000}s (${retryCount}/${MAX_RETRIES})...`));
+        callbacks.onError(new Error(`network error, retrying in ${delay / 1000}s (${retryCount}/${MAX_RETRIES})...`), "transient");
         // Wait with abort support
         const aborted = await new Promise<boolean>((resolve) => {
           const timer = setTimeout(() => resolve(false), delay);
@@ -403,7 +403,7 @@ export async function runAgent(
         azureInput = null; // force rebuild on retry
         continue;
       }
-      callbacks.onError(e instanceof Error ? e : new Error(String(e)));
+      callbacks.onError(e instanceof Error ? e : new Error(String(e)), "terminal");
       stripLastToolCalls(messages);
       done = true;
     }
