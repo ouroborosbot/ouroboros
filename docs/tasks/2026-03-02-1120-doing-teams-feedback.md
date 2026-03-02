@@ -131,7 +131,7 @@ Fix three Teams bot channel issues and improve the presentation architecture: (1
 **Output**: Failing tests in `src/__tests__/engine/kicks.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because patterns not yet added
 
-### ⬜ Unit 1b: Kick pattern gaps -- Implementation
+### ✅ Unit 1b: Kick pattern gaps -- Implementation
 **What**: Add three patterns to the `TOOL_INTENT_PATTERNS` array in `src/engine/kicks.ts`:
 - `/^continuing\.?$/i` — bare "Continuing." / "continuing"
 - `/\bcontinues\.\s*$/i` — sentence-final "continues." (e.g., "Backlog theatre continues.")
