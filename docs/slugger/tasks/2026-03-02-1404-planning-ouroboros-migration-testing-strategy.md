@@ -1,7 +1,7 @@
 # Planning: Ouroboros Migration — Testing Strategy (Phase 1)
 
-**Status**: drafting
-**Created**: PENDING_GIT_TIMESTAMP
+**Status**: NEEDS_REVIEW
+**Created**: 
 
 ## Goal
 Establish and enforce the testing baseline for the ouroboros migration by formalizing Vitest coverage thresholds and test conventions so all subsequent migration work ships with consistent, verifiable quality controls.
@@ -55,4 +55,4 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 Current baseline already uses Vitest with V8 coverage and reporters configured; threshold enforcement values are not yet set in `vitest.config.ts`.
 
 ## Progress Log
-- [PENDING_GIT_TIMESTAMP] Created
+- [] Created
