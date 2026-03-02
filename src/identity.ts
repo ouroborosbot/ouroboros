@@ -4,10 +4,10 @@ import * as path from "path"
 export interface AgentConfig {
   name: string
   configPath: string
-  phrases?: {
-    thinking?: string[]
-    tool?: string[]
-    followup?: string[]
+  phrases: {
+    thinking: string[]
+    tool: string[]
+    followup: string[]
   }
 }
 
@@ -69,14 +69,39 @@ export function loadAgentConfig(): AgentConfig {
     )
   }
 
+  let parsed: Record<string, unknown>
   try {
-    _cachedAgentConfig = JSON.parse(raw) as AgentConfig
+    parsed = JSON.parse(raw) as Record<string, unknown>
   } catch {
     throw new Error(
       `Invalid JSON in agent.json at ${configFile}. Check syntax.`
     )
   }
 
+  const PLACEHOLDER_PHRASES = {
+    thinking: ["working"],
+    tool: ["running tool"],
+    followup: ["processing"],
+  }
+
+  const existingPhrases = parsed.phrases as Partial<AgentConfig["phrases"]> | undefined
+  const needsFill = !existingPhrases ||
+    !existingPhrases.thinking ||
+    !existingPhrases.tool ||
+    !existingPhrases.followup
+
+  if (needsFill) {
+    const filled = {
+      thinking: existingPhrases?.thinking ?? PLACEHOLDER_PHRASES.thinking,
+      tool: existingPhrases?.tool ?? PLACEHOLDER_PHRASES.tool,
+      followup: existingPhrases?.followup ?? PLACEHOLDER_PHRASES.followup,
+    }
+    parsed.phrases = filled
+    console.warn("agent.json is missing phrases, added placeholders")
+    fs.writeFileSync(configFile, JSON.stringify(parsed, null, 2) + "\n", "utf-8")
+  }
+
+  _cachedAgentConfig = parsed as unknown as AgentConfig
   return _cachedAgentConfig
 }
 

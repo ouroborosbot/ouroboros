@@ -1,6 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import type { ChannelCallbacks } from "../../engine/core"
-import { THINKING_PHRASES, FOLLOWUP_PHRASES } from "../../wardrobe/phrases"
+
+vi.mock("../../identity", () => ({
+  getAgentName: vi.fn(() => "testagent"),
+  loadAgentConfig: vi.fn(() => ({
+    name: "testagent",
+    configPath: "~/.agentconfigs/testagent/config.json",
+    phrases: {
+      thinking: ["test thinking"],
+      tool: ["test tool"],
+      followup: ["test followup"],
+    },
+  })),
+}))
+
+import { getPhrases } from "../../wardrobe/phrases"
 
 // Tests for src/teams.ts Teams channel adapter.
 
@@ -43,7 +57,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     const calledWith = mockStream.update.mock.calls[0][0] as string
     expect(calledWith).toMatch(/\.\.\.$/)
     const phrase = calledWith.replace(/\.\.\.$/, "")
-    expect(THINKING_PHRASES).toContain(phrase)
+    expect(getPhrases().thinking).toContain(phrase)
     // Clean up timer
     callbacks.onTextChunk("done")
   })
@@ -1416,7 +1430,7 @@ describe("Teams adapter - phrase rotation", () => {
     const rotatedCall = mockStream.update.mock.calls[0][0] as string
     expect(rotatedCall).toMatch(/\.\.\.$/)
     const phrase = rotatedCall.replace(/\.\.\.$/, "")
-    expect(THINKING_PHRASES).toContain(phrase)
+    expect(getPhrases().thinking).toContain(phrase)
 
     callbacks.onTextChunk("done") // cleanup
   })
@@ -1479,7 +1493,7 @@ describe("Teams adapter - phrase rotation", () => {
     callbacks.onModelStart()
     expect(mockStream.update).toHaveBeenCalled()
     const phrase = (mockStream.update.mock.calls[0][0] as string).replace(/\.\.\.$/, "")
-    expect(FOLLOWUP_PHRASES).toContain(phrase)
+    expect(getPhrases().followup).toContain(phrase)
 
     callbacks.onTextChunk("done") // cleanup
   })

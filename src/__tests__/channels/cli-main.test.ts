@@ -61,6 +61,11 @@ vi.mock("../../identity", () => ({
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
     configPath: "~/.agentconfigs/testagent/config.json",
+    phrases: {
+      thinking: ["working"],
+      tool: ["running tool"],
+      followup: ["processing"],
+    },
   })),
 }))
 
