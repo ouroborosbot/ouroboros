@@ -78,7 +78,7 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 **Output**: New/updated workflow file plus verification notes at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-2b-ci-gate.md`.
 **Acceptance**: CI definition includes an explicit coverage step using `npm run test:coverage`, valid workflow paths, and relevant triggers.
 
-### ⬜ Unit 2c: CI Coverage Gate — Verify
+### ✅ Unit 2c: CI Coverage Gate — Verify
 **What**: Validate CI workflow correctness via local checks (syntax/path review and command parity) and document expected pass/fail behavior.
 **Output**: Validation record at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-2c-verify.md`.
 **Acceptance**: CI gate behavior is documented and workflow references valid paths/scripts.
@@ -146,3 +146,4 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - [2026-03-02 14:37] Unit 2b complete: coverage workflow added and local validation passed
 - [2026-03-02 14:37] Unit 2b blocked: remote rejected push for `.github/workflows/coverage.yml` (OAuth token missing `workflow` scope)
 - [2026-03-02 14:46] Unit 2b unblocked: push succeeded after credential refresh with `workflow` scope
+- [PENDING_UNIT2C_TS] Unit 2c complete: CI workflow verification recorded
