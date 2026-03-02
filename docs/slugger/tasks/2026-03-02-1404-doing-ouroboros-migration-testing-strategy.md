@@ -48,7 +48,7 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Setup/Research
+### ✅ Unit 0: Setup/Research
 **What**: Audit current testing baseline (`vitest.config.ts`, test scripts, existing CI workflows, and current contributor docs) and record concrete gaps against planning completion criteria.
 **Output**: Gap checklist in `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/baseline-audit.md`.
 **Acceptance**: Checklist explicitly covers thresholds, CI coverage gate, shared conventions doc location, and expected legacy coverage gap handling.
@@ -138,3 +138,4 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - [2026-03-02 14:28] Validation pass: confirmed paths/scripts and aligned CI unit with current repo state (no workflows directory yet)
 - [2026-03-02 14:28] Quality pass: verified template completeness, acceptance coverage, and emoji unit headers
 - [2026-03-02 14:29] Set status to READY_FOR_EXECUTION after completing mandatory conversion passes
+- [PENDING_UNIT0_TS] Unit 0 complete: baseline gaps documented in artifacts checklist
