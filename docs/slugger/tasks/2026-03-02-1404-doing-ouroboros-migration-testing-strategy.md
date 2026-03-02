@@ -108,7 +108,7 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 **Output**: Updated `CONTRIBUTING.md`.
 **Acceptance**: `CONTRIBUTING.md` remains concise while clearly directing contributors/agents to mandatory testing conventions.
 
-### ⬜ Unit 4c: CONTRIBUTING Entry Point — Verify
+### ✅ Unit 4c: CONTRIBUTING Entry Point — Verify
 **What**: Verify path/link correctness and contributor discoverability from the repo root.
 **Output**: Validation note at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-4c-verify.md`.
 **Acceptance**: Link resolves and entry-point guidance is unambiguous.
@@ -152,3 +152,4 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - [2026-03-02 14:49] Unit 3c complete: conventions completeness checklist verified
 - [2026-03-02 14:50] Unit 4a complete: CONTRIBUTING entry-point gap recorded
 - [2026-03-02 14:50] Unit 4b complete: CONTRIBUTING linked to shared testing conventions and validated
+- [PENDING_UNIT4C_TS] Unit 4c complete: path/link discoverability verification recorded
