@@ -58,7 +58,7 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 **Output**: Failing test/coverage run log at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-1a-red.log` and uncovered file list.
 **Acceptance**: Coverage run fails before backfill work, and failure output identifies concrete uncovered areas.
 
-### ⬜ Unit 1b: Coverage Threshold Enforcement — Green
+### ✅ Unit 1b: Coverage Threshold Enforcement — Green
 **What**: Implement threshold enforcement in `vitest.config.ts` and add/update tests to close uncovered paths identified in Unit 1a.
 **Output**: Updated config/tests plus a coverage gap resolution note at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-1b-gap-resolution.md`.
 **Acceptance**: Targeted tests pass locally and uncovered legacy paths identified in Unit 1a are addressed.
@@ -140,3 +140,4 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - [2026-03-02 14:29] Set status to READY_FOR_EXECUTION after completing mandatory conversion passes
 - [2026-03-02 14:31] Unit 0 complete: baseline gaps documented in artifacts checklist
 - [2026-03-02 14:33] Unit 1a complete: thresholds enabled and baseline investigation captured (no legacy gaps exposed)
+- [PENDING_UNIT1B_TS] Unit 1b complete: gap-resolution note added and test/build checks passed
