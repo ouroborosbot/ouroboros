@@ -205,7 +205,7 @@ Update tests in `src/__tests__/wardrobe/phrases.test.ts`:
 **Output**: Updated `src/identity.ts`, `src/wardrobe/phrases.ts`, `src/channels/cli.ts`, `src/channels/teams.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 3c: Phrases required in config -- Coverage
+### ✅ Unit 3c: Phrases required in config -- Coverage
 **What**: Verify 100% coverage on the new validation logic in `loadAgentConfig()` and simplified `getPhrases()`. Check branches: phrases present, phrases missing, partial phrases.
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new code, all tests green
@@ -452,3 +452,4 @@ Wiring:
 - 2026-03-02 15:38 Unit 2 complete: phrases.ts moved to src/wardrobe/, all 6 import sites updated, 874 tests pass, build clean
 - 2026-03-02 15:40 Unit 3a complete: 3 failing tests — identity auto-fill placeholders, warn+write, phrases no hardcoded exports
 - 2026-03-02 15:45 Unit 3b complete: AgentConfig.phrases required, auto-fill in loadAgentConfig, getPhrases() simplified, consumers updated (cli.ts, teams.ts), identity mocks added to cli.test.ts/teams.test.ts, 872 tests pass
+- 2026-03-02 15:46 Unit 3c complete: identity.ts 100%, wardrobe/phrases.ts 100% (all metrics)
