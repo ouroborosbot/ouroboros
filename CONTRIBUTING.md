@@ -40,6 +40,8 @@ npm run test:coverage # with coverage report
 
 100% coverage is mandatory on all code in `src/`. Entry points (`*-entry.ts`) are excluded from coverage (not testable). If you break a test, fix it before committing.
 
+For mandatory shared testing policy details (TDD flow, CI gate contract, mocking conventions, and verification checklist), see [docs/cross-agent/testing-conventions.md](docs/cross-agent/testing-conventions.md).
+
 Test files live in `src/__tests__/`, mirroring the `src/` directory structure. Named `{module}.test.ts`.
 
 ## Task docs
