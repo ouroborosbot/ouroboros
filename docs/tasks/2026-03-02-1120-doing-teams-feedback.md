@@ -2,7 +2,7 @@
 
 **Status**: drafting
 **Execution Mode**: direct
-**Created**: [pending]
+**Created**: 2026-03-02 13:12
 **Planning**: ./2026-03-02-1120-planning-teams-feedback.md
 **Artifacts**: ./2026-03-02-1120-doing-teams-feedback/
 
@@ -95,27 +95,17 @@ Fix three Teams bot channel issues and improve the presentation architecture: (1
 
 ---
 
-### ⬜ Unit 2a: Move phrases.ts to src/wardrobe/ -- Tests
-**What**: Update all test import paths from `../../repertoire/phrases` to `../../wardrobe/phrases` in:
-- `src/__tests__/repertoire/phrases.test.ts` -- move file to `src/__tests__/wardrobe/phrases.test.ts`
-- `src/__tests__/channels/cli.test.ts` -- update import
-- `src/__tests__/channels/teams.test.ts` -- update import
-**Output**: Tests reference new path, FAIL because `src/wardrobe/phrases.ts` doesn't exist yet
-**Acceptance**: Tests exist at new paths and FAIL (red)
-
-### ⬜ Unit 2b: Move phrases.ts to src/wardrobe/ -- Implementation
-**What**:
+### ⬜ Unit 2: Move phrases.ts to src/wardrobe/ (mechanical refactor)
+**What**: Atomic file move -- no TDD needed since there's no new logic, just path changes:
 - Create `src/wardrobe/` directory
 - Move `src/repertoire/phrases.ts` to `src/wardrobe/phrases.ts` (content unchanged)
 - Update source imports in `src/channels/cli.ts` and `src/channels/teams.ts` from `../repertoire/phrases` to `../wardrobe/phrases`
+- Move `src/__tests__/repertoire/phrases.test.ts` to `src/__tests__/wardrobe/phrases.test.ts`
+- Update all test imports: `../../repertoire/phrases` to `../../wardrobe/phrases` in `phrases.test.ts`, `cli.test.ts`, `teams.test.ts`
 - Delete `src/repertoire/phrases.ts`
-**Output**: File moved, all imports updated
-**Acceptance**: All tests PASS (green), no warnings. `src/repertoire/` contains only `commands.ts` and `skills.ts`.
-
-### ⬜ Unit 2c: Move phrases.ts -- Coverage
-**What**: Verify no coverage regressions. The move is mechanical -- no new code -- but ensure all import paths resolve correctly.
-**Output**: Full test suite green, coverage unchanged
-**Acceptance**: All tests green, no warnings
+- Verify `src/repertoire/` contains only `commands.ts` and `skills.ts`
+**Output**: File moved, all imports updated, all tests pass
+**Acceptance**: `npm test` passes, no warnings, no coverage regressions
 
 ---
 
@@ -209,19 +199,10 @@ export function formatError(error: Error): string {
 
 ---
 
-### ⬜ Unit 5a: Error severity on ChannelCallbacks -- Tests
-**What**: Update `onError` mock signatures across all test files to accept severity parameter:
-- `src/__tests__/engine/core.test.ts`: update all ~128 `onError` references to accept `(error: Error, severity: string)`. For the test "fires onError on API errors and ends loop", verify the severity value is `"terminal"`.
-- Add test in core.test.ts: transient error (context overflow retry) calls `onError` with severity `"transient"`
-- Add test in core.test.ts: network retry calls `onError` with severity `"transient"`
-- Add test in core.test.ts: tool loop limit calls `onError` with severity `"terminal"`
-- `src/__tests__/channels/cli.test.ts`: update onError test to pass severity
-- `src/__tests__/channels/teams.test.ts`: update onError test to pass severity
-**Output**: Failing tests (interface mismatch)
-**Acceptance**: Tests exist and FAIL (red) because implementation not yet changed
+### ⬜ Unit 5: Error severity on ChannelCallbacks (coordinated interface change)
+**What**: Breaking interface change -- all call sites and implementations must update together:
 
-### ⬜ Unit 5b: Error severity on ChannelCallbacks -- Implementation
-**What**:
+Source changes:
 - In `src/engine/core.ts` line 82: change `onError(error: Error): void` to `onError(error: Error, severity: "transient" | "terminal"): void`
 - Update all 5 call sites in `src/engine/core.ts`:
   - Line 270: `callbacks.onError(new Error("tool loop limit..."), "terminal")`
@@ -229,15 +210,15 @@ export function formatError(error: Error): string {
   - Line 385: `callbacks.onError(new Error("context trimmed..."), "transient")`
   - Line 392: `callbacks.onError(new Error("network error..."), "transient")`
   - Line 406: `callbacks.onError(e instanceof Error ? e : new Error(String(e)), "terminal")`
-- In `src/channels/cli.ts`: update `onError` callback signature to accept severity parameter (behavior unchanged for now -- always writes to stderr)
-- In `src/channels/teams.ts`: update `onError` callback signature to accept severity parameter (behavior unchanged for now -- always calls `safeEmit`)
-**Output**: Updated `core.ts`, `cli.ts`, `teams.ts`
-**Acceptance**: All tests PASS (green), no warnings
+- In `src/channels/cli.ts`: update `onError` callback signature to `(error: Error, severity: "transient" | "terminal")`. Behavior unchanged for now -- always writes to stderr regardless of severity (severity-aware rendering comes in Unit 6).
+- In `src/channels/teams.ts`: update `onError` callback signature to `(error: Error, severity: "transient" | "terminal")`. Behavior unchanged for now -- always calls `safeEmit` (severity-aware rendering comes in Unit 7).
 
-### ⬜ Unit 5c: Error severity -- Coverage
-**What**: Verify all severity branches are covered in core.ts tests. Verify both channels accept the new parameter.
-**Output**: Coverage report
-**Acceptance**: 100% coverage on changes, all tests green
+Test changes (all in the same commit):
+- `src/__tests__/engine/core.test.ts`: update all ~128 `onError` mock signatures to accept severity parameter. Add assertions: "fires onError on API errors" verifies severity `"terminal"`. Add tests for transient (context overflow, network retry) and terminal (tool loop limit) severity values.
+- `src/__tests__/channels/cli.test.ts`: update onError test to pass severity parameter
+- `src/__tests__/channels/teams.test.ts`: update onError test to pass severity parameter
+**Output**: Updated `core.ts`, `cli.ts`, `teams.ts`, and all test files
+**Acceptance**: All tests PASS (green), no warnings, 100% coverage on changes
 
 ---
 
@@ -367,4 +348,4 @@ export function formatError(error: Error): string {
 - **Decisions made**: Update docs immediately, commit right away
 
 ## Progress Log
-- [pending] Created from planning doc
+- 2026-03-02 13:12 Created from planning doc (pass 1)
