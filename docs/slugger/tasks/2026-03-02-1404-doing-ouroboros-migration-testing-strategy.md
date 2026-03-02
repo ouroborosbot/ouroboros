@@ -103,7 +103,7 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 **Output**: Gap note at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-4a-gap.md`.
 **Acceptance**: Note lists missing anchor/link language that must be added.
 
-### ⬜ Unit 4b: CONTRIBUTING Entry Point — Green
+### ✅ Unit 4b: CONTRIBUTING Entry Point — Green
 **What**: Update `CONTRIBUTING.md` with concise testing entry-point guidance and link to `docs/cross-agent/testing-conventions.md`.
 **Output**: Updated `CONTRIBUTING.md`.
 **Acceptance**: `CONTRIBUTING.md` remains concise while clearly directing contributors/agents to mandatory testing conventions.
@@ -151,3 +151,4 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - [2026-03-02 14:49] Unit 3b complete: shared testing conventions doc authored and validated
 - [2026-03-02 14:49] Unit 3c complete: conventions completeness checklist verified
 - [2026-03-02 14:50] Unit 4a complete: CONTRIBUTING entry-point gap recorded
+- [PENDING_UNIT4B_TS] Unit 4b complete: CONTRIBUTING linked to shared testing conventions and validated
