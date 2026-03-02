@@ -160,7 +160,7 @@ Fix three Teams bot channel issues and improve the presentation architecture: (1
 
 ---
 
-### ⬜ Unit 3a: Phrases required in agent config -- Tests
+### ✅ Unit 3a: Phrases required in agent config -- Tests
 **Depends on**: Unit 2 (phrases.test.ts path changes)
 **What**: Update tests in `src/__tests__/identity.test.ts`:
 - Add test: `loadAgentConfig()` with agent.json missing `phrases` field calls `console.warn` with message containing "agent.json is missing phrases" and writes placeholders to file via `fs.writeFileSync`
@@ -450,3 +450,4 @@ Wiring:
 - 2026-03-02 15:36 Unit 1b complete: Added 3 patterns to TOOL_INTENT_PATTERNS — all 100 tests pass, build clean
 - 2026-03-02 15:37 Unit 1c complete: kicks.ts 100% coverage (Stmts/Branch/Funcs/Lines), full suite 874 tests pass
 - 2026-03-02 15:38 Unit 2 complete: phrases.ts moved to src/wardrobe/, all 6 import sites updated, 874 tests pass, build clean
+- 2026-03-02 15:40 Unit 3a complete: 3 failing tests — identity auto-fill placeholders, warn+write, phrases no hardcoded exports
