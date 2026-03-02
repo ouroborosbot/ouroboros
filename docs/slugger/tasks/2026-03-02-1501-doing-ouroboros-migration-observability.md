@@ -57,14 +57,14 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Acceptance**: Matrix covers required envelope, minimum event catalog, and target runtime files before code changes.
 
 ### ⬜ Unit 1a: Observability Core Module — Red
-**What**: Add failing tests for structured logger/trace primitives, required envelope fields, NDJSON shape, and `logging.level` behavior.
-**Output**: New failing tests and red run log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-1a-red.log`.
-**Acceptance**: Tests fail for missing observability module and/or missing required envelope and config behavior.
+**What**: Add failing tests for structured logger/trace primitives, required envelope fields, NDJSON shape, and `logging.level` behavior (new `src/__tests__/observability/*.test.ts`).
+**Output**: New failing observability tests and red run log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-1a-red.log`.
+**Acceptance**: Tests fail for missing `src/observability/` module and missing required envelope/config behavior.
 
 ### ⬜ Unit 1b: Observability Core Module — Green
-**What**: Implement `src/observability/` logger and trace helpers to satisfy Unit 1a tests.
-**Output**: New observability module code and test updates.
-**Acceptance**: Unit 1a tests pass with required envelope fields and configurable level behavior.
+**What**: Implement `src/observability/` logger and trace helpers (factory + event helpers) to satisfy Unit 1a tests.
+**Output**: New module files under `src/observability/` and updated tests.
+**Acceptance**: Unit 1a tests pass with required envelope fields and configurable `logging.level`.
 
 ### ⬜ Unit 1c: Observability Core Module — Coverage & Refactor
 **What**: Refactor if needed and verify 100% coverage for new observability module code.
@@ -72,13 +72,13 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Acceptance**: New observability module code is fully covered and tests remain green.
 
 ### ⬜ Unit 2a: Trace Propagation (Entrypoints/Core) — Red
-**What**: Add failing tests proving trace IDs are created at turn entrypoints and expected downstream calls do not yet receive them.
-**Output**: Failing trace propagation tests and red log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-2a-red.log`.
+**What**: Add failing tests proving trace IDs are created at turn entry boundaries in `src/channels/cli.ts` and `src/channels/teams.ts` and propagated into `src/engine/core.ts`.
+**Output**: Failing trace propagation tests (channel + core suites) and red log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-2a-red.log`.
 **Acceptance**: Tests fail before implementation and explicitly show missing trace propagation behavior.
 
 ### ⬜ Unit 2b: Trace Propagation (Entrypoints/Core) — Green
-**What**: Implement trace ID generation and propagation through core execution path.
-**Output**: Updated entrypoint/core code and passing tests.
+**What**: Implement trace ID generation and propagation through `src/channels/cli.ts`, `src/channels/teams.ts`, and `src/engine/core.ts`.
+**Output**: Updated runtime code and passing trace propagation tests.
 **Acceptance**: Tests confirm trace IDs are generated once per turn and propagated through execution.
 
 ### ⬜ Unit 2c: Trace Propagation (Entrypoints/Core) — Coverage & Refactor
@@ -87,13 +87,13 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Acceptance**: Trace propagation code paths are fully covered and tests remain green.
 
 ### ⬜ Unit 3a: Engine/Mind/Tools Instrumentation — Red
-**What**: Add failing tests for required event emissions (`*.start`, `*.end`, `*.error`) and envelope compliance in engine, mind, and tool execution paths.
-**Output**: Failing tests and red log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-3a-red.log`.
+**What**: Add failing tests for required event emissions (`*.start`, `*.end`, `*.error`) and envelope compliance in `src/engine/core.ts`, `src/mind/context.ts`, `src/mind/prompt.ts`, and `src/engine/tools*.ts`.
+**Output**: Failing tests (engine/mind/tool suites) and red log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-3a-red.log`.
 **Acceptance**: Tests fail and identify missing event-level instrumentation for engine/mind/tools.
 
 ### ⬜ Unit 3b: Engine/Mind/Tools Instrumentation — Green
 **What**: Implement structured event logging for engine, mind, and tools with required envelope and no sensitive payload dumps.
-**Output**: Updated runtime code and passing subsystem tests.
+**Output**: Updated `src/engine/core.ts`, `src/mind/context.ts`, `src/mind/prompt.ts`, `src/engine/tools.ts`, `src/engine/tools-base.ts`, `src/engine/tools-teams.ts` and passing tests.
 **Acceptance**: Required engine/mind/tools catalog events are emitted with required fields and tests pass.
 
 ### ⬜ Unit 3c: Engine/Mind/Tools Instrumentation — Coverage & Refactor
@@ -102,8 +102,8 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Acceptance**: New instrumentation paths are fully covered and tests remain green.
 
 ### ⬜ Unit 4a: Channel Instrumentation Contract — Red
-**What**: Add failing tests for CLI/Teams ensuring user-facing output remains channel-native while diagnostics route through structured logger.
-**Output**: Failing tests and red log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-4a-red.log`.
+**What**: Add failing tests for CLI/Teams ensuring user-facing output remains channel-native while diagnostics route through structured logger (`src/__tests__/channels/cli*.test.ts`, `src/__tests__/channels/teams.test.ts`).
+**Output**: Failing channel contract tests and red log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-4a-red.log`.
 **Acceptance**: Tests fail before implementation and demonstrate contract violations.
 
 ### ⬜ Unit 4b: Channel Instrumentation Contract — Green
@@ -117,13 +117,13 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Acceptance**: Channel instrumentation new code is fully covered and tests remain green.
 
 ### ⬜ Unit 5a: Config/Identity/Clients/Repertoire Instrumentation — Red
-**What**: Add failing tests for minimum event catalog coverage in config/identity/client/repertoire paths.
-**Output**: Failing tests and red log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-5a-red.log`.
+**What**: Add failing tests for minimum event catalog coverage in `src/config.ts`, `src/identity.ts`, `src/engine/ado-client.ts`, `src/engine/graph-client.ts`, and `src/repertoire/*`.
+**Output**: Failing tests (`src/__tests__/config.test.ts`, `src/__tests__/identity.test.ts`, `src/__tests__/engine/*client.test.ts`, `src/__tests__/repertoire/*.test.ts`) and red log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-5a-red.log`.
 **Acceptance**: Tests fail and enumerate missing component-level events before implementation.
 
 ### ⬜ Unit 5b: Config/Identity/Clients/Repertoire Instrumentation — Green
 **What**: Implement required structured event logging for config, identity, client requests, and repertoire load paths.
-**Output**: Updated runtime files and passing tests.
+**Output**: Updated `src/config.ts`, `src/identity.ts`, `src/engine/ado-client.ts`, `src/engine/graph-client.ts`, `src/repertoire/commands.ts`, `src/repertoire/phrases.ts`, `src/repertoire/skills.ts` and passing tests.
 **Acceptance**: Required component events are emitted with required envelope and tests pass.
 
 ### ⬜ Unit 5c: Config/Identity/Clients/Repertoire Instrumentation — Coverage & Refactor
@@ -152,4 +152,5 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 
 ## Progress Log
 - [2026-03-02 15:50] Created from planning doc
-- [PENDING_GRANULARITY_TS] Granularity pass: split implementation into atomic red/green/coverage units by subsystem
+- [2026-03-02 15:54] Granularity pass: split implementation into atomic red/green/coverage units by subsystem
+- [PENDING_VALIDATION_TS] Validation pass: aligned units to concrete runtime/test files and current repo structure
