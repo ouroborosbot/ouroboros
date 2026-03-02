@@ -58,7 +58,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 
 ### ⬜ Unit 1a: Observability Core Module — Red
 **What**: Add failing tests for structured logger/trace primitives, required envelope fields, NDJSON shape, and `logging.level` behavior (new `src/__tests__/observability/*.test.ts`).
-**Output**: New failing observability tests and red run log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-1a-red.log`.
+**Output**: New failing observability tests and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-1a-red-run.txt`.
 **Acceptance**: Tests fail for missing `src/observability/` module and missing required envelope/config behavior.
 
 ### ⬜ Unit 1b: Observability Core Module — Green
@@ -73,7 +73,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 
 ### ⬜ Unit 2a: Trace Propagation (Entrypoints/Core) — Red
 **What**: Add failing tests proving trace IDs are created at turn entry boundaries in `src/channels/cli.ts` and `src/channels/teams.ts` and propagated into `src/engine/core.ts`.
-**Output**: Failing trace propagation tests (channel + core suites) and red log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-2a-red.log`.
+**Output**: Failing trace propagation tests (channel + core suites) and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-2a-red-run.txt`.
 **Acceptance**: Tests fail before implementation and explicitly show missing trace propagation behavior.
 
 ### ⬜ Unit 2b: Trace Propagation (Entrypoints/Core) — Green
@@ -88,7 +88,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 
 ### ⬜ Unit 3a: Engine/Mind/Tools Instrumentation — Red
 **What**: Add failing tests for required event emissions (`*.start`, `*.end`, `*.error`) and envelope compliance in `src/engine/core.ts`, `src/mind/context.ts`, `src/mind/prompt.ts`, and `src/engine/tools*.ts`.
-**Output**: Failing tests (engine/mind/tool suites) and red log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-3a-red.log`.
+**Output**: Failing tests (engine/mind/tool suites) and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-3a-red-run.txt`.
 **Acceptance**: Tests fail and identify missing event-level instrumentation for engine/mind/tools.
 
 ### ⬜ Unit 3b: Engine/Mind/Tools Instrumentation — Green
@@ -103,7 +103,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 
 ### ⬜ Unit 4a: Channel Instrumentation Contract — Red
 **What**: Add failing tests for CLI/Teams ensuring user-facing output remains channel-native while diagnostics route through structured logger (`src/__tests__/channels/cli*.test.ts`, `src/__tests__/channels/teams.test.ts`).
-**Output**: Failing channel contract tests and red log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-4a-red.log`.
+**Output**: Failing channel contract tests and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-4a-red-run.txt`.
 **Acceptance**: Tests fail before implementation and demonstrate contract violations.
 
 ### ⬜ Unit 4b: Channel Instrumentation Contract — Green
@@ -118,7 +118,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 
 ### ⬜ Unit 5a: Config/Identity/Clients/Repertoire Instrumentation — Red
 **What**: Add failing tests for minimum event catalog coverage in `src/config.ts`, `src/identity.ts`, `src/engine/ado-client.ts`, `src/engine/graph-client.ts`, and `src/repertoire/*`.
-**Output**: Failing tests (`src/__tests__/config.test.ts`, `src/__tests__/identity.test.ts`, `src/__tests__/engine/*client.test.ts`, `src/__tests__/repertoire/*.test.ts`) and red log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-5a-red.log`.
+**Output**: Failing tests (`src/__tests__/config.test.ts`, `src/__tests__/identity.test.ts`, `src/__tests__/engine/*client.test.ts`, `src/__tests__/repertoire/*.test.ts`) and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-5a-red-run.txt`.
 **Acceptance**: Tests fail and enumerate missing component-level events before implementation.
 
 ### ⬜ Unit 5b: Config/Identity/Clients/Repertoire Instrumentation — Green
@@ -138,7 +138,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 
 ### ⬜ Unit 6b: Final Quality Gate & Completion Audit
 **What**: Run `npm run test`, `npm run test:coverage`, and `npm run build`, then audit completion criteria line-by-line.
-**Output**: Final logs (`final-test.log`, `final-coverage.log`, `final-build.log`) and audit checklist at `./2026-03-02-1501-doing-ouroboros-migration-observability/final-audit.md`.
+**Output**: Final run artifacts (`final-test-output.txt`, `final-coverage-output.txt`, `final-build-output.txt`) and audit checklist at `./2026-03-02-1501-doing-ouroboros-migration-observability/final-audit.md`.
 **Acceptance**: All completion criteria are explicitly marked met with evidence and no warnings.
 
 ## Execution
@@ -147,6 +147,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Push after each unit complete
 - Run full test suite before marking unit done
 - **All artifacts**: Save outputs, logs, data to `./[task-name]/` directory
+- Artifact files listed in this doc are execution evidence only and are not runtime log sinks.
 - **Fixes/blockers**: Spawn sub-agent immediately — don't ask, just do it
 - **Decisions made**: Update docs immediately, commit right away
 
@@ -155,3 +156,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 15:51] Granularity pass: split implementation into atomic red/green/coverage units by subsystem
 - [2026-03-02 15:52] Validation pass: aligned units to concrete runtime/test files and current repo structure
 - [2026-03-02 15:53] Quality pass: verified template completeness, acceptance coverage, and emoji headers; set status to READY_FOR_EXECUTION
+- [PENDING_FEEDBACK_TS] Clarified that artifact run files are evidence outputs only; runtime logging sink remains stderr-only in this phase
