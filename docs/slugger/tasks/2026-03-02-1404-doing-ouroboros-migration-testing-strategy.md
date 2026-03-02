@@ -53,7 +53,7 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 **Output**: Gap checklist in `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/baseline-audit.md`.
 **Acceptance**: Checklist explicitly covers thresholds, CI coverage gate, shared conventions doc location, and expected legacy coverage gap handling.
 
-### ⬜ Unit 1a: Coverage Threshold Enforcement — Red
+### ✅ Unit 1a: Coverage Threshold Enforcement — Red
 **What**: Run `npm run test:coverage` after introducing threshold assertions to confirm baseline failure and identify uncovered legacy paths that must be backfilled.
 **Output**: Failing test/coverage run log at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-1a-red.log` and uncovered file list.
 **Acceptance**: Coverage run fails before backfill work, and failure output identifies concrete uncovered areas.
@@ -139,3 +139,4 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - [2026-03-02 14:28] Quality pass: verified template completeness, acceptance coverage, and emoji unit headers
 - [2026-03-02 14:29] Set status to READY_FOR_EXECUTION after completing mandatory conversion passes
 - [2026-03-02 14:31] Unit 0 complete: baseline gaps documented in artifacts checklist
+- [PENDING_UNIT1A_TS] Unit 1a complete: thresholds enabled and baseline investigation captured (no legacy gaps exposed)
