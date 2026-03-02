@@ -41,13 +41,13 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [ ] For this phase, should we keep CLI user-facing UX prints (`session cleared`, `bye`, etc.) on stdout and scope structured logging to operational diagnostics only?
 - [ ] Should this phase include file-based logging configuration in `config.ts`, or keep sink/output configuration minimal (stderr only) until daemon work?
 - [ ] What is the minimum required instrumentation surface for approval in this phase: channels + core only, or also tools/context/session modules?
 
 ## Decisions Made
 - This planning doc targets migration sequence item #2: Observability.
 - The completed testing-strategy planning/doing task is treated as predecessor and baseline.
+- Logging/output contract for this phase is channel-agnostic: user-facing content stays in channel-native output paths (CLI stdout, Teams APIs, etc.), while structured operational diagnostics flow through the observability path (stderr sink in this phase).
 
 ## Context / References
 - `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration/implementation-order.md`
@@ -62,3 +62,4 @@ Current codebase still uses ad-hoc `console` logging in channel and entrypoint c
 
 ## Progress Log
 - [2026-03-02 15:01] Created
+- [PENDING_Q1_TS] Resolved Open Question #1 with cross-channel output vs observability contract
