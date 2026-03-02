@@ -143,4 +143,4 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - [2026-03-02 14:34] Unit 1b complete: gap-resolution note added and test/build checks passed
 - [2026-03-02 14:35] Unit 1c complete: coverage/build verification artifacts recorded
 - [2026-03-02 14:36] Unit 2a complete: CI red baseline captured (no workflows directory)
-- [PENDING_UNIT2B_TS] Unit 2b complete: coverage workflow added and local validation passed
+- [2026-03-02 14:37] Unit 2b complete: coverage workflow added and local validation passed
