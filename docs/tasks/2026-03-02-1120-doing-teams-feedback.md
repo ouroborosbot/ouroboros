@@ -277,7 +277,7 @@ Test changes (all in the same commit):
 
 ---
 
-### ⬜ Unit 6a: CLI uses shared formatter -- Tests
+### ✅ Unit 6a: CLI uses shared formatter -- Tests
 **Depends on**: Unit 4 (format.ts), Unit 5 (error severity)
 **What**: Update CLI tests to expect formatted output from shared module:
 - `onToolEnd` success test: verify stderr contains `formatToolResult(name, summary, true)` output (green colored)
@@ -456,3 +456,4 @@ Wiring:
 - 2026-03-02 15:46 Unit 4a complete: 8 failing tests for formatToolResult, formatKick, formatError (module doesn't exist yet)
 - 2026-03-02 15:47 Units 4b+4c complete: format.ts created, all 8 tests pass, 100% coverage
 - 2026-03-02 15:51 Unit 5 complete: onError(error, severity) interface change — 5 call sites, both channels, all test mocks updated atomically. 880 tests pass, build clean
+- 2026-03-02 15:53 Unit 6a complete: 3 failing tests for shared formatter (onToolEnd green/red, onError severity branching)
