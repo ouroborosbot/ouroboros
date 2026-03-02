@@ -141,4 +141,4 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - [2026-03-02 14:31] Unit 0 complete: baseline gaps documented in artifacts checklist
 - [2026-03-02 14:33] Unit 1a complete: thresholds enabled and baseline investigation captured (no legacy gaps exposed)
 - [2026-03-02 14:34] Unit 1b complete: gap-resolution note added and test/build checks passed
-- [PENDING_UNIT1C_TS] Unit 1c complete: coverage/build verification artifacts recorded
+- [2026-03-02 14:35] Unit 1c complete: coverage/build verification artifacts recorded
