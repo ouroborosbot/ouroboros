@@ -637,7 +637,7 @@ describe("CLI adapter - onError", () => {
     const agent = await import("../../channels/cli")
     const callbacks = agent.createCliCallbacks()
 
-    callbacks.onError(new Error("connection failed"))
+    callbacks.onError(new Error("connection failed"), "terminal")
     const output = stderrChunks.join("")
     expect(output).toContain("connection failed")
 
@@ -658,7 +658,7 @@ describe("CLI adapter - onError", () => {
 
     callbacks.onModelStart() // start spinner
     stderrChunks.length = 0
-    callbacks.onError(new Error("timeout"))
+    callbacks.onError(new Error("timeout"), "terminal")
     const output = stderrChunks.join("")
     // Should clear spinner and show error
     expect(output).toContain("timeout")
