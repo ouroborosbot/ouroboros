@@ -1,6 +1,6 @@
 # Planning: Teams Channel Feedback — Multi-Message, Shared Formatting, Error Severity, Phrases Config
 
-**Status**: NEEDS_REVIEW
+**Status**: APPROVED
 **Created**: 2026-03-02 11:21
 
 ## Goal
@@ -10,7 +10,7 @@ Fix three Teams bot channel issues and improve the presentation architecture: (1
 
 ### In Scope
 
-**1. New `src/wardrobe/` directory** (name pending final confirmation):
+**1. New `src/wardrobe/` directory** (confirmed):
 - New directory for presentation/display code -- how the agent presents itself to users
 - Move `src/repertoire/phrases.ts` to `src/wardrobe/phrases.ts`
 - Create `src/wardrobe/format.ts` with `formatToolResult()`, `formatKick()`, `formatError()`
@@ -109,10 +109,10 @@ Prompt for next work-planner:
 ## Open Questions
 - [x] Should `onError` also be a standalone message in Teams, or stay as `safeEmit` in the current stream? **Resolved**: Depends on severity. Transient = ephemeral via `stream.update()`. Terminal = standalone via `sendMessage`.
 - [x] Stream lifecycle -- `ctx.send()` alongside open stream? **Resolved**: Will be answered via early manual testing with user (doing doc Unit 0). Approach 3 (don't close stream, send alongside) is preferred. Approach 2 (close-and-send) is fallback.
-- [x] Where should shared display code live? **Resolved**: `src/wardrobe/` (name pending final confirmation). Not `src/channels/` (channel-specific), not `src/repertoire/` (agent capabilities), not `src/display/` (too technical).
+- [x] Where should shared display code live? **Resolved**: `src/wardrobe/` (confirmed). Not `src/channels/` (channel-specific), not `src/repertoire/` (agent capabilities), not `src/display/` (too technical).
 
 ## Decisions Made
-- **`src/wardrobe/` directory** (name pending confirmation): Presentation/display code lives here. `phrases.ts` moves from `src/repertoire/`, `format.ts` is new. The metaphor is the agent's "clothes" -- how it presents itself. `src/repertoire/` retains agent capability code (commands, skills).
+- **`src/wardrobe/` directory** (confirmed): Presentation/display code lives here. `phrases.ts` moves from `src/repertoire/`, `format.ts` is new. The metaphor is the agent's "clothes" -- how it presents itself. `src/repertoire/` retains agent capability code (commands, skills).
 - **Phrases required in config**: `AgentConfig.phrases` becomes required. No more hardcoded fallback arrays. `loadAgentConfig()` auto-writes placeholders + warning if missing. This makes agent personality explicit and configurable.
 - **Multi-message over separators**: Tool results, kicks, and terminal errors are separate Teams messages via `ctx.send()`, not `\n\n`-separated text in one message.
 - **Shared formatter**: A shared module generates display strings; each channel decides how to render them. Three functions, plain string output, no state.
@@ -168,7 +168,7 @@ Prompt for next work-planner:
 - `src/__tests__/repertoire/phrases.test.ts`: needs path update to `wardrobe/`, tests for removed fallback arrays
 
 ## Notes
-The `src/wardrobe/` directory name is pending final confirmation from the user. The metaphor is the agent's "clothes" -- how it presents itself to users. The name can be changed later without affecting the architecture. All references in this doc and the doing doc use `wardrobe/` as a placeholder.
+The `src/wardrobe/` directory name is confirmed. The metaphor is the agent's "clothes" -- how it presents itself to users.
 
 The phrases change is a config-level breaking change for agents that don't have phrases in their agent.json. The auto-placeholder + warning approach ensures existing deployments don't break -- they just get boring placeholder phrases and a console warning prompting the user to customize. `ouroboros/agent.json` already has phrases and is unaffected.
 
