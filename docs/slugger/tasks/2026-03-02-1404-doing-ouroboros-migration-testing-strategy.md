@@ -88,7 +88,7 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 **Output**: Content gap matrix at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-3a-gap-matrix.md`.
 **Acceptance**: Matrix identifies all mandatory sections needed in `docs/cross-agent/testing-conventions.md`.
 
-### ⬜ Unit 3b: Cross-Agent Testing Conventions — Green
+### ✅ Unit 3b: Cross-Agent Testing Conventions — Green
 **What**: Author `docs/cross-agent/testing-conventions.md` with mandatory, cross-agent testing conventions (coverage policy, TDD flow, mocking conventions, CI expectations, and artifact expectations).
 **Output**: New `docs/cross-agent/testing-conventions.md`.
 **Acceptance**: Document contains actionable mandatory guidance and aligns with repository structure and existing test tooling.
@@ -148,3 +148,4 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - [2026-03-02 14:46] Unit 2b unblocked: push succeeded after credential refresh with `workflow` scope
 - [2026-03-02 14:47] Unit 2c complete: CI workflow verification recorded
 - [2026-03-02 14:48] Unit 3a complete: cross-agent testing conventions gap matrix recorded
+- [PENDING_UNIT3B_TS] Unit 3b complete: shared testing conventions doc authored and validated
