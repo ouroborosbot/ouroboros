@@ -98,4 +98,4 @@ Approach 3 is preferred (simplest, least disruption). Open question is whether i
 - 2026-03-02 11:27 Resolved open questions, updated decisions
 - 2026-03-02 11:28 Approved, converting to doing doc (previous attempt)
 - 2026-03-02 11:55 Refreshed planning with updated scope and codebase verification
-- [pending] Major scope change: multi-message + shared formatting layer
+- 2026-03-02 12:02 Major scope change: multi-message + shared formatting layer
