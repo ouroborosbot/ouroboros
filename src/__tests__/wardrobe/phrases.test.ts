@@ -5,46 +5,15 @@ vi.mock("../../identity", () => ({
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
     configPath: "~/.agentconfigs/testagent/config.json",
+    phrases: {
+      thinking: ["working"],
+      tool: ["running tool"],
+      followup: ["processing"],
+    },
   })),
 }))
 
 import * as identity from "../../identity"
-
-describe("phrases - pool exports", () => {
-  beforeEach(() => {
-    vi.resetModules()
-    vi.mocked(identity.loadAgentConfig).mockReturnValue({
-      name: "testagent",
-      configPath: "~/.agentconfigs/testagent/config.json",
-    })
-  })
-
-  it("exports THINKING_PHRASES as non-empty array", async () => {
-    const { THINKING_PHRASES } = await import("../../wardrobe/phrases")
-    expect(Array.isArray(THINKING_PHRASES)).toBe(true)
-    expect(THINKING_PHRASES.length).toBeGreaterThan(0)
-  })
-
-  it("exports TOOL_PHRASES as non-empty array", async () => {
-    const { TOOL_PHRASES } = await import("../../wardrobe/phrases")
-    expect(Array.isArray(TOOL_PHRASES)).toBe(true)
-    expect(TOOL_PHRASES.length).toBeGreaterThan(0)
-  })
-
-  it("exports FOLLOWUP_PHRASES as non-empty array", async () => {
-    const { FOLLOWUP_PHRASES } = await import("../../wardrobe/phrases")
-    expect(Array.isArray(FOLLOWUP_PHRASES)).toBe(true)
-    expect(FOLLOWUP_PHRASES.length).toBeGreaterThan(0)
-  })
-
-  it("phrases have no trailing ellipsis", async () => {
-    const { THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } = await import("../../wardrobe/phrases")
-    const all = [...THINKING_PHRASES, ...TOOL_PHRASES, ...FOLLOWUP_PHRASES]
-    for (const p of all) {
-      expect(p).not.toMatch(/\.{3}$/)
-    }
-  })
-})
 
 describe("phrases - pickPhrase", () => {
   beforeEach(() => {
@@ -52,9 +21,10 @@ describe("phrases - pickPhrase", () => {
   })
 
   it("returns a phrase from the pool", async () => {
-    const { pickPhrase, THINKING_PHRASES } = await import("../../wardrobe/phrases")
-    const result = pickPhrase(THINKING_PHRASES)
-    expect(THINKING_PHRASES).toContain(result)
+    const { pickPhrase } = await import("../../wardrobe/phrases")
+    const pool = ["alpha", "bravo", "charlie"]
+    const result = pickPhrase(pool)
+    expect(pool).toContain(result)
   })
 
   it("avoids immediate repeat when lastUsed is provided", async () => {
@@ -82,9 +52,10 @@ describe("phrases - pickPhrase", () => {
   })
 
   it("works without lastUsed parameter", async () => {
-    const { pickPhrase, TOOL_PHRASES } = await import("../../wardrobe/phrases")
-    const result = pickPhrase(TOOL_PHRASES)
-    expect(TOOL_PHRASES).toContain(result)
+    const { pickPhrase } = await import("../../wardrobe/phrases")
+    const pool = ["x", "y", "z"]
+    const result = pickPhrase(pool)
+    expect(pool).toContain(result)
   })
 })
 
@@ -93,7 +64,7 @@ describe("phrases - getPhrases from agent.json", () => {
     vi.resetModules()
   })
 
-  it("returns custom phrases from agent.json when present", async () => {
+  it("returns phrases directly from loadAgentConfig().phrases", async () => {
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
       name: "testagent",
       configPath: "~/.agentconfigs/testagent/config.json",
@@ -112,35 +83,30 @@ describe("phrases - getPhrases from agent.json", () => {
     expect(phrases.followup).toEqual(["custom followup"])
   })
 
-  it("returns default phrases when agent.json has no phrases", async () => {
-    vi.mocked(identity.loadAgentConfig).mockReturnValue({
-      name: "testagent",
-      configPath: "~/.agentconfigs/testagent/config.json",
-    })
-
-    const { getPhrases } = await import("../../wardrobe/phrases")
-    const phrases = getPhrases()
-
-    expect(phrases.thinking.length).toBeGreaterThan(0)
-    expect(phrases.tool.length).toBeGreaterThan(0)
-    expect(phrases.followup.length).toBeGreaterThan(0)
-  })
-
-  it("returns defaults for individual missing phrase categories", async () => {
+  it("returns placeholders when loadAgentConfig has auto-filled phrases", async () => {
+    // loadAgentConfig now always returns phrases (auto-filled with placeholders if missing)
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
       name: "testagent",
       configPath: "~/.agentconfigs/testagent/config.json",
       phrases: {
-        thinking: ["custom thinking only"],
+        thinking: ["working"],
+        tool: ["running tool"],
+        followup: ["processing"],
       },
     })
 
     const { getPhrases } = await import("../../wardrobe/phrases")
     const phrases = getPhrases()
 
-    expect(phrases.thinking).toEqual(["custom thinking only"])
-    // tool and followup should fall back to defaults
-    expect(phrases.tool.length).toBeGreaterThan(0)
-    expect(phrases.followup.length).toBeGreaterThan(0)
+    expect(phrases.thinking).toEqual(["working"])
+    expect(phrases.tool).toEqual(["running tool"])
+    expect(phrases.followup).toEqual(["processing"])
+  })
+
+  it("does not export THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES", async () => {
+    const mod = await import("../../wardrobe/phrases")
+    expect("THINKING_PHRASES" in mod).toBe(false)
+    expect("TOOL_PHRASES" in mod).toBe(false)
+    expect("FOLLOWUP_PHRASES" in mod).toBe(false)
   })
 })
