@@ -57,7 +57,10 @@ Fix three Teams bot channel issues and improve the presentation architecture: (1
 - User participates to confirm message ordering and stream behavior
 - Must complete before implementation units that depend on the answer
 
-**10. Tests**:
+**10. Update documentation**:
+- Update `README.md` and `CONTRIBUTING.md` to reflect the new `src/wardrobe/` directory, moved files, and updated project structure
+
+**11. Tests**:
 - Update all existing tests for new import paths, new `onError` signature
 - Add new tests for all new code -- 100% coverage
 
