@@ -5,8 +5,8 @@
 - Target file status: exists
 
 ## Link Path Check
-- Source: 
-- Target: 
+- Source: `CONTRIBUTING.md`
+- Target: `docs/cross-agent/testing-conventions.md`
 - Resolution: valid relative path from repository root contributor guide.
 
 ## Outcome
