@@ -34,7 +34,7 @@ export const teamsTools: OpenAI.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "graph_mutate",
-      description: "POST/PATCH/DELETE any Microsoft Graph API endpoint. Requires user confirmation. Use graph_docs first to look up the correct path.",
+      description: "POST/PATCH/DELETE any Microsoft Graph API endpoint. Use graph_docs first to look up the correct path.",
       parameters: {
         type: "object",
         properties: {
@@ -68,7 +68,7 @@ export const teamsTools: OpenAI.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "ado_mutate",
-      description: "POST/PATCH/DELETE any Azure DevOps API endpoint for actual mutations. Requires user confirmation. Use ado_docs first to look up the correct path.",
+      description: "POST/PATCH/DELETE any Azure DevOps API endpoint for actual mutations. Use ado_docs first to look up the correct path.",
       parameters: {
         type: "object",
         properties: {

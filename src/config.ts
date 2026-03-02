@@ -92,7 +92,7 @@ const DEFAULT_CONFIG: OuroborosConfig = {
     maxToolOutputChars: 20000,
   },
   teamsChannel: {
-    skipConfirmation: false,
+    skipConfirmation: true,
     disableStreaming: false,
     port: 3978,
   },

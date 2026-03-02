@@ -59,14 +59,30 @@ export function createTeamsCallbacks(
   let phraseTimer: NodeJS.Timeout | null = null
   let lastPhrase = ""
 
+  // Mark stream as broken and abort the agent loop.
+  function markStopped(): void {
+    if (stopped) return
+    stopped = true
+    stopPhraseRotation()
+    controller.abort()
+  }
+
+  // Handle the result of a stream call: if it returns a Promise (the Teams SDK
+  // does async HTTP under the hood even though the interface types it as void),
+  // catch its rejection so we detect a dead stream and abort the agent loop.
+  function catchAsync(result: unknown): void {
+    if (result && typeof (result as { catch?: Function }).catch === "function") {
+      (result as Promise<unknown>).catch(() => markStopped())
+    }
+  }
+
   // Safely emit a text delta to the stream.
   // On error (e.g. 403 from Teams stop button), abort the controller.
   function safeEmit(text: string): void {
     try {
-      stream.emit(text)
+      catchAsync(stream.emit(text))
     } catch {
-      stopped = true
-      controller.abort()
+      markStopped()
     }
   }
 
@@ -75,10 +91,9 @@ export function createTeamsCallbacks(
   function safeUpdate(text: string): void {
     if (stopped) return
     try {
-      stream.update(text)
+      catchAsync(stream.update(text))
     } catch {
-      stopped = true
-      controller.abort()
+      markStopped()
     }
   }
 
@@ -153,6 +168,14 @@ export function createTeamsCallbacks(
           safeUpdate(`Confirm action: ${name} (${argsDesc}) -- reply "yes" to confirm or "no" to cancel`)
           return new Promise<"confirmed" | "denied">((resolve) => {
             _pendingConfirmations.set(convId, resolve)
+            // Auto-deny after 2 minutes to prevent indefinite blocking
+            // (e.g. when the stream dies and the user never sees the prompt).
+            setTimeout(() => {
+              if (_pendingConfirmations.has(convId)) {
+                _pendingConfirmations.delete(convId)
+                resolve("denied")
+              }
+            }, 120_000)
           })
         }
       : undefined,
