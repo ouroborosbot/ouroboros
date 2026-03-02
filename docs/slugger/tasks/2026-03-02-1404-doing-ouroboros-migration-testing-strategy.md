@@ -63,7 +63,7 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 **Output**: Updated config/tests plus a coverage gap resolution note at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-1b-gap-resolution.md`.
 **Acceptance**: Targeted tests pass locally and uncovered legacy paths identified in Unit 1a are addressed.
 
-### ⬜ Unit 1c: Coverage Threshold Enforcement — Verify
+### ✅ Unit 1c: Coverage Threshold Enforcement — Verify
 **What**: Re-run full coverage suite and verify enforced thresholds hold with no warnings.
 **Output**: Passing coverage run log at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-1c-green.log`.
 **Acceptance**: `npm run test:coverage` succeeds with 100% thresholds enforced.
@@ -141,3 +141,4 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - [2026-03-02 14:31] Unit 0 complete: baseline gaps documented in artifacts checklist
 - [2026-03-02 14:33] Unit 1a complete: thresholds enabled and baseline investigation captured (no legacy gaps exposed)
 - [2026-03-02 14:34] Unit 1b complete: gap-resolution note added and test/build checks passed
+- [PENDING_UNIT1C_TS] Unit 1c complete: coverage/build verification artifacts recorded
