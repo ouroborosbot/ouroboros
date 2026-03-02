@@ -226,7 +226,7 @@ Update tests in `src/__tests__/wardrobe/phrases.test.ts`:
 **Output**: Failing tests in `src/__tests__/wardrobe/format.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `src/wardrobe/format.ts` doesn't exist
 
-### ⬜ Unit 4b: Shared formatter (format.ts) -- Implementation
+### ✅ Unit 4b: Shared formatter (format.ts) -- Implementation
 **What**: Create `src/wardrobe/format.ts`:
 ```typescript
 export function formatToolResult(name: string, summary: string, success: boolean): string {
@@ -248,7 +248,7 @@ export function formatError(error: Error): string {
 **Output**: New `src/wardrobe/format.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 4c: Shared formatter -- Coverage
+### ✅ Unit 4c: Shared formatter -- Coverage
 **What**: Verify 100% coverage on `format.ts`. All branches covered (success/failure, empty summary, counter/no-counter, empty error message).
 **Output**: Coverage report
 **Acceptance**: 100% coverage, all tests green
@@ -454,3 +454,4 @@ Wiring:
 - 2026-03-02 15:45 Unit 3b complete: AgentConfig.phrases required, auto-fill in loadAgentConfig, getPhrases() simplified, consumers updated (cli.ts, teams.ts), identity mocks added to cli.test.ts/teams.test.ts, 872 tests pass
 - 2026-03-02 15:46 Unit 3c complete: identity.ts 100%, wardrobe/phrases.ts 100% (all metrics)
 - 2026-03-02 15:46 Unit 4a complete: 8 failing tests for formatToolResult, formatKick, formatError (module doesn't exist yet)
+- 2026-03-02 15:47 Units 4b+4c complete: format.ts created, all 8 tests pass, 100% coverage
