@@ -212,7 +212,7 @@ Update tests in `src/__tests__/wardrobe/phrases.test.ts`:
 
 ---
 
-### ⬜ Unit 4a: Shared formatter (format.ts) -- Tests
+### ✅ Unit 4a: Shared formatter (format.ts) -- Tests
 **Depends on**: Unit 2 (`src/wardrobe/` directory)
 **What**: Create `src/__tests__/wardrobe/format.test.ts` with tests for:
 - `formatToolResult("read_file", "package.json", true)` returns `"✓ read_file (package.json)"`
@@ -453,3 +453,4 @@ Wiring:
 - 2026-03-02 15:40 Unit 3a complete: 3 failing tests — identity auto-fill placeholders, warn+write, phrases no hardcoded exports
 - 2026-03-02 15:45 Unit 3b complete: AgentConfig.phrases required, auto-fill in loadAgentConfig, getPhrases() simplified, consumers updated (cli.ts, teams.ts), identity mocks added to cli.test.ts/teams.test.ts, 872 tests pass
 - 2026-03-02 15:46 Unit 3c complete: identity.ts 100%, wardrobe/phrases.ts 100% (all metrics)
+- 2026-03-02 15:46 Unit 4a complete: 8 failing tests for formatToolResult, formatKick, formatError (module doesn't exist yet)
