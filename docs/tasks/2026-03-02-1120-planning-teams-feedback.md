@@ -73,4 +73,4 @@ The `\n\n` separator approach: `onToolEnd` and `onKick` emit their permanent lin
 ## Progress Log
 - 2026-03-02 11:21 Created
 - 2026-03-02 11:27 Resolved open questions, updated decisions
-- PENDING Approved, converting to doing doc
+- 2026-03-02 11:28 Approved, converting to doing doc
