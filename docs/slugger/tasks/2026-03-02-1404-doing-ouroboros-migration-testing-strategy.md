@@ -69,14 +69,14 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 **Acceptance**: `npm run test:coverage` succeeds with 100% thresholds enforced.
 
 ### ⬜ Unit 2a: CI Coverage Gate — Red
-**What**: Define CI gate checks and create a failing pre-change validation that demonstrates CI currently does not enforce `npm run test:coverage` as required.
+**What**: Define CI gate checks and capture failing pre-change validation that demonstrates CI currently does not enforce `npm run test:coverage` (repo currently has no `.github/workflows` directory).
 **Output**: CI gap note and red validation evidence at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-2a-red.md`.
 **Acceptance**: Evidence clearly shows missing or insufficient CI coverage gating before implementation.
 
 ### ⬜ Unit 2b: CI Coverage Gate — Green
-**What**: Add/update CI workflow(s) to run `npm run test:coverage` for relevant changes.
-**Output**: Workflow changes plus verification notes at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-2b-ci-gate.md`.
-**Acceptance**: CI definition includes an explicit coverage step using `npm run test:coverage` and is configured for relevant triggers.
+**What**: Create `.github/workflows/coverage.yml` (or equivalent single-source CI workflow) to run `npm run test:coverage` for relevant changes.
+**Output**: New/updated workflow file plus verification notes at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-2b-ci-gate.md`.
+**Acceptance**: CI definition includes an explicit coverage step using `npm run test:coverage`, valid workflow paths, and relevant triggers.
 
 ### ⬜ Unit 2c: CI Coverage Gate — Verify
 **What**: Validate CI workflow correctness via local checks (syntax/path review and command parity) and document expected pass/fail behavior.
@@ -134,4 +134,5 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 
 ## Progress Log
 - [2026-03-02 14:27] Created from planning doc
-- [PENDING_GRANULARITY_TS] Granularity pass: split final verification into atomic units and stamped created timestamp
+- [2026-03-02 14:27] Granularity pass: split final verification into atomic units and stamped created timestamp
+- [PENDING_VALIDATION_TS] Validation pass: confirmed paths/scripts and aligned CI unit with current repo state (no workflows directory yet)
