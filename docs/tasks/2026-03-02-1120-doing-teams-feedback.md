@@ -255,7 +255,7 @@ export function formatError(error: Error): string {
 
 ---
 
-### ⬜ Unit 5: Error severity on ChannelCallbacks (coordinated interface change)
+### ✅ Unit 5: Error severity on ChannelCallbacks (coordinated interface change)
 **What**: Breaking interface change -- all call sites and implementations must update together:
 
 Source changes:
@@ -455,3 +455,4 @@ Wiring:
 - 2026-03-02 15:46 Unit 3c complete: identity.ts 100%, wardrobe/phrases.ts 100% (all metrics)
 - 2026-03-02 15:46 Unit 4a complete: 8 failing tests for formatToolResult, formatKick, formatError (module doesn't exist yet)
 - 2026-03-02 15:47 Units 4b+4c complete: format.ts created, all 8 tests pass, 100% coverage
+- 2026-03-02 15:51 Unit 5 complete: onError(error, severity) interface change — 5 call sites, both channels, all test mocks updated atomically. 880 tests pass, build clean
