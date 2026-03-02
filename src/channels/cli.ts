@@ -2,7 +2,7 @@ import OpenAI from "openai"
 import * as readline from "readline"
 import { runAgent, ChannelCallbacks } from "../engine/core"
 import { buildSystem } from "../mind/prompt"
-import { pickPhrase, THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "../wardrobe/phrases"
+import { pickPhrase, getPhrases } from "../wardrobe/phrases"
 import { sessionPath } from "../config"
 import { loadSession, deleteSession, cachedBuildSystem, postTurn } from "../mind/context"
 import type { UsageData } from "../mind/context"
@@ -247,7 +247,8 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
       hadReasoning = false
       textDirty = false
       streamer.reset()
-      const pool = hadToolRun ? FOLLOWUP_PHRASES : THINKING_PHRASES
+      const phrases = getPhrases()
+      const pool = hadToolRun ? phrases.followup : phrases.thinking
       const first = pickPhrase(pool)
       currentSpinner = new Spinner(first, pool)
       currentSpinner.start()
@@ -281,8 +282,9 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
         process.stdout.write("\n")
         textDirty = false
       }
-      const first = pickPhrase(TOOL_PHRASES)
-      currentSpinner = new Spinner(first, TOOL_PHRASES)
+      const toolPhrases = getPhrases().tool
+      const first = pickPhrase(toolPhrases)
+      currentSpinner = new Spinner(first, toolPhrases)
       currentSpinner.start()
       hadToolRun = true
     },

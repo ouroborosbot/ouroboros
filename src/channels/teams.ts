@@ -5,7 +5,7 @@ import { runAgent, ChannelCallbacks, RunAgentOptions } from "../engine/core"
 import type { ToolContext } from "../engine/tools"
 import { getOAuthConfig, getAdoConfig } from "../config"
 import { buildSystem } from "../mind/prompt"
-import { pickPhrase, THINKING_PHRASES, FOLLOWUP_PHRASES } from "../wardrobe/phrases"
+import { pickPhrase, getPhrases } from "../wardrobe/phrases"
 import { sessionPath, getTeamsConfig, getTeamsChannelConfig } from "../config"
 import { loadSession, deleteSession, cachedBuildSystem, postTurn } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "../repertoire/commands"
@@ -113,7 +113,8 @@ export function createTeamsCallbacks(
   return {
     onModelStart: () => {
       if (hadRealOutput) return // real output already shown; don't overwrite with phrases
-      const pool = hadToolRun ? FOLLOWUP_PHRASES : THINKING_PHRASES
+      const phrases = getPhrases()
+      const pool = hadToolRun ? phrases.followup : phrases.thinking
       const first = pickPhrase(pool)
       lastPhrase = first
       safeUpdate(first + "...")
@@ -234,7 +235,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
 
   // Send first thinking phrase immediately so the user sees feedback
   // before sync I/O (session load, trim) blocks the event loop.
-  stream.update(pickPhrase(THINKING_PHRASES) + "...")
+  stream.update(pickPhrase(getPhrases().thinking) + "...")
   await new Promise(r => setImmediate(r))
 
   const registry = createCommandRegistry()

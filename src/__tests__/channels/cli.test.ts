@@ -1,9 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import type { ChannelCallbacks } from "../../engine/core"
-import { THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "../../wardrobe/phrases"
 
-// These imports will fail until agent.ts is refactored to export them.
-// That's exactly the point -- tests must FAIL (red) for Unit 2a.
+vi.mock("../../identity", () => ({
+  getAgentName: vi.fn(() => "testagent"),
+  loadAgentConfig: vi.fn(() => ({
+    name: "testagent",
+    configPath: "~/.agentconfigs/testagent/config.json",
+    phrases: {
+      thinking: ["test thinking"],
+      tool: ["test tool"],
+      followup: ["test followup"],
+    },
+  })),
+}))
+
+import { getPhrases } from "../../wardrobe/phrases"
 
 describe("CLI adapter - createCliCallbacks", () => {
   let stdoutChunks: string[]
@@ -514,7 +525,7 @@ describe("CLI adapter - onToolStart", () => {
 
     callbacks.onToolStart("read_file", { path: "/tmp/test.txt" })
     const output = stderrChunks.join("")
-    expect(TOOL_PHRASES.some(p => output.includes(p))).toBe(true)
+    expect(getPhrases().tool.some(p => output.includes(p))).toBe(true)
 
     // Clean up
     callbacks.onToolEnd("read_file", "/tmp/test.txt", true)
@@ -682,7 +693,7 @@ describe("CLI adapter - phrase rotation", () => {
 
     callbacks.onModelStart()
     const output = stderrChunks.join("")
-    expect(THINKING_PHRASES.some(p => output.includes(p))).toBe(true)
+    expect(getPhrases().thinking.some(p => output.includes(p))).toBe(true)
 
     callbacks.onModelStreamStart()
   })
@@ -702,7 +713,7 @@ describe("CLI adapter - phrase rotation", () => {
     stderrChunks.length = 0
     callbacks.onModelStart()
     const output = stderrChunks.join("")
-    expect(FOLLOWUP_PHRASES.some(p => output.includes(p))).toBe(true)
+    expect(getPhrases().followup.some(p => output.includes(p))).toBe(true)
 
     callbacks.onModelStreamStart()
   })
@@ -722,7 +733,7 @@ describe("CLI adapter - phrase rotation", () => {
     const secondOutput = stderrChunks.join("")
 
     // After rotation, output should contain a phrase from the pool
-    expect(THINKING_PHRASES.some(p => secondOutput.includes(p))).toBe(true)
+    expect(getPhrases().thinking.some(p => secondOutput.includes(p))).toBe(true)
 
     callbacks.onModelStreamStart()
     vi.useRealTimers()
