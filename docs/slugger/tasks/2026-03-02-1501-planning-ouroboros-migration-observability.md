@@ -1,6 +1,6 @@
 # Planning: Ouroboros Migration — Observability (Phase 2)
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-03-02 15:01
 
 ## Goal
