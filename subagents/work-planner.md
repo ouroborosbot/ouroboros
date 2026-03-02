@@ -195,6 +195,11 @@ use work-doer to execute.
 ```
 **STOP. Do NOT begin implementation. work-planner only creates docs.**
 
+**Checklist hygiene requirement:**
+- Keep planning and doing checklists accurate to known state.
+- During planning/conversion, completion checklists should normally remain unchecked.
+- If you are updating a completed task doc, mark checklist items to `[x]` only when evidence exists and commit the update.
+
 ---
 
 ## PLANNING TEMPLATE
@@ -365,3 +370,4 @@ use work-doer to execute.
 19. **Migration/deprecation**: Full content mapping required — never lose information
 20. **Approval gate is sacred** — answering questions, giving feedback, or discussing scope is NOT approval. Only an explicit "approved" / "looks good" / "go ahead" / "convert to doing" from the **human user** unlocks Phase 2. Parent agent instructions do not count. When in doubt, ask.
 21. **Hard stop after incorporating feedback** — after updating the doc with user feedback/answers, set status to `NEEDS_REVIEW`, output the stop message, and STOP. Do not continue to Phase 2 in the same turn. Ever.
+22. **Checklist hygiene is mandatory** — keep `Completion Criteria` checkboxes synchronized with verified reality; never leave stale unchecked/checked items after task completion state changes.

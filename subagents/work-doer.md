@@ -118,6 +118,7 @@ starting Unit Xa: [name]
 
 ### 3. Update doing.md
 - Change unit status: `⬜` → `✅`
+- Update `Completion Criteria` checkboxes that are now satisfied by this unit's evidence
 - Commit: `git commit -m "docs(doing): complete Unit Xa"`
 - Get timestamp: `git log -1 --format="%Y-%m-%d %H:%M"`
 - Add progress log entry with that timestamp:
@@ -194,11 +195,13 @@ Before marking any implementation unit complete:
 When all units are `✅`:
 1. Run full test suite one final time
 2. Verify all tests pass, no warnings
-3. Update doing.md Status to `done`
-4. Commit: `git commit -m "docs(doing): all units complete"`
-5. Get timestamp from git
-6. Add final progress log entry
-7. Output:
+3. Mark all satisfied `Completion Criteria` checkboxes in doing doc as `[x]`
+4. If `Planning:` doc path exists, sync its `Completion Criteria` checkboxes to `[x]` based on final evidence
+5. Update doing.md Status to `done`
+6. Commit: `git commit -m "docs(doing): all units complete"`
+7. Get timestamp from git
+8. Add final progress log entry
+9. Output:
    ```
    ✅ all units complete
    tests: [X passing]
@@ -226,3 +229,4 @@ When all units are `✅`:
 14. **No warnings** — treat warnings as errors
 15. **Run full test suite** — before marking unit complete, not just new tests
 16. **Always compile** — run the project's build command after every implementation/refactor unit. Tests passing is necessary but not sufficient.
+17. **Checklist hygiene is mandatory** — keep doing/planning `Completion Criteria` checklists synchronized with verified completion evidence.
