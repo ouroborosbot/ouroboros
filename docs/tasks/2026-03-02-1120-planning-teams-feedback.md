@@ -1,6 +1,6 @@
 # Planning: Teams Channel Feedback Improvements
 
-**Status**: approved
+**Status**: drafting
 **Created**: 2026-03-02 11:21
 
 ## Goal
@@ -9,27 +9,28 @@ Fix three Teams bot channel issues: (1) tool/kick results are ephemeral and vani
 ## Scope
 
 ### In Scope
-- Make `onToolEnd` feedback permanent in Teams messages via `safeEmit` using emoji format: `\n\n✓ tool_name (summary)` / `\n\n✗ tool_name: error`
+- Make `onToolEnd` feedback permanent in Teams messages via `safeEmit` using emoji format: `✓ tool_name (summary)` / `✗ tool_name: error` -- prefixed with `\n\n` for separation from preceding text
 - Keep `onToolStart` ephemeral (matching CLI's ephemeral spinner pattern)
-- Implement `onKick` callback in Teams channel callbacks with visible permanent indicator
-- Add "continuing" pattern to `TOOL_INTENT_PATTERNS` in `src/engine/kicks.ts`
-- Add `\n\n` separator between agent loop iterations in Teams (emitted before tool results and kick indicators)
-- Update all existing tests and add new tests for all changes
+- Implement `onKick` callback in Teams channel callbacks with visible permanent indicator via `safeEmit` -- prefixed with `\n\n` for separation
+- Add "continuing" pattern to `TOOL_INTENT_PATTERNS` in `src/engine/kicks.ts` -- anchored `^continuing\.?$` so it doesn't match mid-sentence usage
 - Maintain CLI behavior unchanged
+- Update all existing tests and add new tests for 100% coverage on all changes
 
 ### Out of Scope
 - Changing the CLI channel callbacks
-- Changing the `ChannelCallbacks` interface (onKick is already optional)
-- Redesigning the kick system for context-awareness (that's the existing TODO)
+- Changing the `ChannelCallbacks` interface (onKick is already optional at line 83 of core.ts)
+- Redesigning the kick system for context-awareness (that's the existing TODO in kicks.ts)
 - Changing the Teams SDK streaming protocol or buffered mode architecture
 - Changing tool execution logic in `src/engine/core.ts`
 
 ## Completion Criteria
-- [ ] Teams `onToolEnd` emits permanent emoji-based text (`\n\n✓ name (summary)` / `\n\n✗ name: error`) via `safeEmit`
-- [ ] Teams `onToolStart` remains ephemeral via `safeUpdate` (matching CLI spinner pattern)
-- [ ] Teams `onKick` callback implemented, emits visible permanent kick indicator via `safeEmit`
-- [ ] `TOOL_INTENT_PATTERNS` includes pattern for bare "Continuing." / "continuing" text
-- [ ] Text from successive loop iterations separated by `\n\n` in Teams messages
+- [ ] Teams `onToolEnd` emits permanent emoji-based text via `safeEmit` -- success: `\n\n✓ name (summary)` / failure: `\n\n✗ name: error`
+- [ ] Teams `onToolEnd` also keeps the ephemeral `safeUpdate` for live status feedback while tool runs
+- [ ] Teams `onToolStart` remains ephemeral via `safeUpdate` only (unchanged)
+- [ ] Teams `onKick` callback implemented, emits `\n\n↻ kick` (or `\n\n↻ kick N/M` when maxKicks > 1) via `safeEmit`
+- [ ] `TOOL_INTENT_PATTERNS` includes anchored pattern for bare "Continuing." / "continuing" text
+- [ ] Existing false-negative texts like "the process is continuing as expected" still return false
+- [ ] The `\n\n` prefix on tool results and kick indicators provides iteration separation in Teams messages
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -44,33 +45,40 @@ Fix three Teams bot channel issues: (1) tool/kick results are ephemeral and vani
 ## Open Questions
 - [x] Tool feedback format: emoji-based like CLI -- `✓ tool_name (summary)` / `✗ tool_name: error`
 - [x] onToolStart: keep ephemeral (match CLI spinner). Don't duplicate logic -- same interface, per-channel rendering.
-- [x] Separator: `\n\n` double newline. Teams SDK is one-message-per-turn (emit accumulates, close finalizes). Multiple separate messages would require Bot Framework conversation API directly -- out of scope.
+- [x] Separator: `\n\n` double newline prefix on permanent indicators. Teams SDK is one-message-per-turn (emit accumulates, close finalizes). Multiple separate messages would require Bot Framework conversation API directly -- out of scope.
 - [x] Kick indicator: keep visible. Kicks are a core differentiator of ouroboros and should be obvious to the user.
 
 ## Decisions Made
 - Tool feedback format: emoji-based `✓ name (summary)` / `✗ name: error` -- matches CLI style
 - onToolStart stays ephemeral via `safeUpdate` -- consistent with CLI's ephemeral spinner
 - Each channel renders callbacks its own way; don't duplicate logic, just handle per-channel rendering
-- `\n\n` separator between loop iterations (Teams SDK is one-message-per-turn, multi-message requires different API)
+- `\n\n` prefix on permanent indicators (onToolEnd, onKick) handles the iteration separator issue -- the prefix ensures separation from any preceding model text without requiring the text-emitting side to know what follows
 - Kick indicator visible in Teams -- kicks are a core ouroboros differentiator
-- `onToolEnd` emits `\n\n` prefix before the tool result line to separate from preceding text
+- "Continuing." pattern must be anchored (`^continuing\.?$`) to avoid false positives on sentences like "the process is continuing as expected"
+- onToolEnd keeps both `safeUpdate` (live status) and adds `safeEmit` (permanent result) -- they serve different purposes
 
 ## Context / References
-- `src/channels/teams.ts` lines 145-157: current `onToolStart`/`onToolEnd` using `safeUpdate` (ephemeral)
-- `src/channels/cli.ts` lines 289-295: CLI `onToolEnd` shows permanent checkmark/X
-- `src/channels/cli.ts` lines 302-311: CLI `onKick` shows permanent kick indicator
-- `src/engine/core.ts` line 83: `onKick?(attempt, maxKicks)` -- already optional in interface
+- `src/channels/teams.ts` lines 145-157: current `onToolStart`/`onToolEnd` using `safeUpdate` (ephemeral only)
+- `src/channels/teams.ts` lines 81-87: `safeEmit` function (emits permanent text to stream)
+- `src/channels/teams.ts` lines 91-98: `safeUpdate` function (ephemeral status update)
+- `src/channels/cli.ts` lines 289-295: CLI `onToolEnd` -- stops spinner with checkmark/X via `spinner.stop()`/`spinner.fail()`
+- `src/channels/cli.ts` lines 302-311: CLI `onKick` -- stops spinner, writes `↻ kick` with optional counter
+- `src/engine/core.ts` line 83: `onKick?(attempt, maxKicks)` -- already optional in ChannelCallbacks interface
 - `src/engine/core.ts` line 274: where `onKick` is called in the agent loop
-- `src/engine/kicks.ts` lines 33-111: `TOOL_INTENT_PATTERNS` array
-- `src/__tests__/channels/teams.test.ts`: existing Teams test file
-- `src/__tests__/engine/kicks.test.ts`: existing kicks test file (if present)
+- `src/engine/kicks.ts` lines 33-111: `TOOL_INTENT_PATTERNS` array (no "continuing" pattern currently)
+- `src/engine/kicks.ts` line 118: `hasToolIntent()` function
+- `src/__tests__/channels/teams.test.ts`: existing Teams test file -- tests for onToolEnd (lines 287-308) will need updating
+- `src/__tests__/engine/kicks.test.ts`: existing kicks test file -- has `hasToolIntent` and `detectKick` tests
 
 ## Notes
-The Teams SDK accumulates all `stream.emit()` deltas into one final message. The separator issue happens because iteration N's text ends with a period and iteration N+1's text starts with an emoji/word -- no whitespace between them since each is a separate `emit()` call.
+The Teams SDK accumulates all `stream.emit()` deltas into one final message. The separator issue happens because iteration N's text ends with a period and iteration N+1's tool result starts with an emoji/word -- no whitespace between them since each is a separate `emit()` call. Example: "Backlog expansion underway.✓ create_work_item (Title)".
 
-The `\n\n` separator approach: `onToolEnd` and `onKick` emit their permanent lines prefixed with `\n\n`. This ensures separation from any preceding model text without requiring the text-emitting side to know about what follows.
+The `\n\n` prefix approach: `onToolEnd` and `onKick` emit their permanent lines prefixed with `\n\n`. This ensures separation from any preceding model text. No trailing `\n\n` is needed because the next iteration's model text starts on a new stream anyway.
+
+The `onToolEnd` keeps the `safeUpdate` call alongside the new `safeEmit` -- the update shows live status while the tool runs (ephemeral), the emit writes the permanent result.
 
 ## Progress Log
 - 2026-03-02 11:21 Created
 - 2026-03-02 11:27 Resolved open questions, updated decisions
-- 2026-03-02 11:28 Approved, converting to doing doc
+- 2026-03-02 11:28 Approved, converting to doing doc (previous attempt)
+- [pending] Refreshed planning with updated scope and codebase verification
