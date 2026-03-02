@@ -289,7 +289,7 @@ Note: the current CLI writes `"✗ name: error"` (literal word "error") on tool 
 **Output**: Failing tests
 **Acceptance**: Tests FAIL (red) because CLI not yet refactored
 
-### ⬜ Unit 6b: CLI uses shared formatter -- Implementation
+### ✅ Unit 6b: CLI uses shared formatter -- Implementation
 **What**: In `src/channels/cli.ts`:
 - Add import: `import { formatToolResult, formatKick, formatError } from "../wardrobe/format"`
 - `onToolEnd`: The shared formatter returns complete strings with emoji (e.g., `"✓ name (summary)"`). The CLI spinner's `stop(msg)` and `fail(msg)` add their own emoji. To avoid doubling up, call `spinner.stop()` (no arg, just clears the spinner line), then write the formatted string with ANSI colors directly to stderr:
@@ -317,7 +317,7 @@ Note: the current CLI writes `"✗ name: error"` (literal word "error") on tool 
 **Output**: Updated `src/channels/cli.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 6c: CLI shared formatter -- Coverage
+### ✅ Unit 6c: CLI shared formatter -- Coverage
 **What**: Verify all branches covered: success/failure tool results, kick with/without counter, transient/terminal errors.
 **Output**: Coverage report
 **Acceptance**: 100% coverage, all tests green
@@ -457,3 +457,4 @@ Wiring:
 - 2026-03-02 15:47 Units 4b+4c complete: format.ts created, all 8 tests pass, 100% coverage
 - 2026-03-02 15:51 Unit 5 complete: onError(error, severity) interface change — 5 call sites, both channels, all test mocks updated atomically. 880 tests pass, build clean
 - 2026-03-02 15:53 Unit 6a complete: 3 failing tests for shared formatter (onToolEnd green/red, onError severity branching)
+- 2026-03-02 15:55 Units 6b+6c complete: CLI uses shared formatters, severity branching on onError, 881 tests pass, cli.ts 100% lines/funcs
