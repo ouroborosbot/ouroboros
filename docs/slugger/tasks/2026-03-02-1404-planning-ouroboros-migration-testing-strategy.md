@@ -64,6 +64,7 @@ Current baseline already uses Vitest with V8 coverage and reporters configured; 
 - [2026-03-02 14:04] Created
 - [2026-03-02 14:05] Set status to NEEDS_REVIEW
 - [2026-03-02 14:06] Corrected Created/Progress Log timestamps
-- [2026-03-02 14:09] Incorporated user feedback: include CI gating, CONTRIBUTIONS.md-based guidance, and backfill exposed legacy coverage gaps
+- [2026-03-02 14:09] Incorporated user feedback: include CI gating, CONTRIBUTING.md-based guidance, and backfill exposed legacy coverage gaps
 - [2026-03-02 14:13] Defined upfront documentation location for mandatory test conventions (CONTRIBUTING.md entry point + docs/cross-agent/testing-conventions.md)
 - [2026-03-02 14:18] Renamed shared conventions target to docs/cross-agent/testing-conventions.md for clearer cross-agent ownership
+- [PENDING_TIMESTAMP] Corrected CONTRIBUTING.md naming in prior progress-log entry
