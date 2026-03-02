@@ -3,6 +3,7 @@ import * as readline from "readline"
 import { runAgent, ChannelCallbacks } from "../engine/core"
 import { buildSystem } from "../mind/prompt"
 import { pickPhrase, getPhrases } from "../wardrobe/phrases"
+import { formatToolResult, formatKick, formatError } from "../wardrobe/format"
 import { sessionPath } from "../config"
 import { loadSession, deleteSession, cachedBuildSystem, postTurn } from "../mind/context"
 import type { UsageData } from "../mind/context"
@@ -289,17 +290,21 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
       hadToolRun = true
     },
     onToolEnd: (name: string, argSummary: string, success: boolean) => {
-      if (success) {
-        currentSpinner?.stop(`${name}${argSummary ? ` (${argSummary})` : ""}`)
-      } else {
-        currentSpinner?.fail(`${name}: error`)
-      }
+      currentSpinner?.stop()
       currentSpinner = null
+      const msg = formatToolResult(name, argSummary, success)
+      const color = success ? "\x1b[32m" : "\x1b[31m"
+      process.stderr.write(`${color}${msg}\x1b[0m\n`)
     },
-    onError: (error: Error, _severity: "transient" | "terminal") => {
-      currentSpinner?.fail("request failed")
-      currentSpinner = null
-      process.stderr.write(`\x1b[31m${error}\x1b[0m\n`)
+    onError: (error: Error, severity: "transient" | "terminal") => {
+      if (severity === "transient") {
+        currentSpinner?.fail(error.message)
+        currentSpinner = null
+      } else {
+        currentSpinner?.stop()
+        currentSpinner = null
+        process.stderr.write(`\x1b[31m${formatError(error)}\x1b[0m\n`)
+      }
     },
     onKick: (attempt: number, maxKicks: number) => {
       currentSpinner?.stop()
@@ -308,8 +313,7 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
         process.stdout.write("\n")
         textDirty = false
       }
-      const counter = maxKicks > 1 ? ` ${attempt}/${maxKicks}` : ""
-      process.stderr.write(`\x1b[33m↻ kick${counter}\x1b[0m\n`)
+      process.stderr.write(`\x1b[33m${formatKick(attempt, maxKicks)}\x1b[0m\n`)
     },
     flushMarkdown: () => {
       currentSpinner?.stop()
