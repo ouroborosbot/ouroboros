@@ -107,7 +107,7 @@ Fix three Teams bot channel issues and improve the presentation architecture: (1
 
 ---
 
-### ⬜ Unit 1a: Kick pattern gaps -- Tests
+### ✅ Unit 1a: Kick pattern gaps -- Tests
 **What**: Add test cases to `src/__tests__/engine/kicks.test.ts`:
 
 "Continuing." / "continues." patterns:
