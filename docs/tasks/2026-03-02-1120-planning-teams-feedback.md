@@ -132,3 +132,4 @@ Approach 3 is preferred (simplest, least disruption). Approach 2 is the fallback
 - 2026-03-02 11:55 Refreshed planning with updated scope and codebase verification
 - 2026-03-02 12:02 Major scope change: multi-message + shared formatting layer
 - 2026-03-02 12:24 Added error severity on onError, formatError(), follow-up section, resolved onError open question
+- 2026-03-02 12:35 Final refinements: format.ts to src/repertoire/, resolved stream questions via manual testing, status NEEDS_REVIEW
