@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import type { ChannelCallbacks } from "../../engine/core"
-import { THINKING_PHRASES, FOLLOWUP_PHRASES } from "../../repertoire/phrases"
+import { THINKING_PHRASES, FOLLOWUP_PHRASES } from "../../wardrobe/phrases"
 
 // Tests for src/teams.ts Teams channel adapter.
 
