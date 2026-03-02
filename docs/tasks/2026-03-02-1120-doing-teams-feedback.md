@@ -146,7 +146,7 @@ Fix three Teams bot channel issues and improve the presentation architecture: (1
 
 ---
 
-### ⬜ Unit 2: Move phrases.ts to src/wardrobe/ (mechanical refactor)
+### ✅ Unit 2: Move phrases.ts to src/wardrobe/ (mechanical refactor)
 **What**: Atomic file move -- no TDD needed since there's no new logic, just path changes:
 - Create `src/wardrobe/` directory
 - Move `src/repertoire/phrases.ts` to `src/wardrobe/phrases.ts` (content unchanged)
@@ -449,3 +449,4 @@ Wiring:
 - 2026-03-02 15:36 Unit 1a complete: Added 10 failing tests for bare "Continuing.", sentence-final "continues.", and "Next up" patterns plus 4 false-negative guards
 - 2026-03-02 15:36 Unit 1b complete: Added 3 patterns to TOOL_INTENT_PATTERNS — all 100 tests pass, build clean
 - 2026-03-02 15:37 Unit 1c complete: kicks.ts 100% coverage (Stmts/Branch/Funcs/Lines), full suite 874 tests pass
+- 2026-03-02 15:38 Unit 2 complete: phrases.ts moved to src/wardrobe/, all 6 import sites updated, 874 tests pass, build clean
