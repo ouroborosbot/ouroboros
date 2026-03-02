@@ -118,7 +118,7 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 **Output**: Final run logs at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/final-test.log` and `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/final-coverage.log`.
 **Acceptance**: Full suite and coverage commands pass with no warnings.
 
-### ⬜ Unit 5b: Completion Criteria Audit
+### ✅ Unit 5b: Completion Criteria Audit
 **What**: Perform a line-by-line audit against planning completion criteria and code coverage requirements before handoff.
 **Output**: Audit checklist at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/final-verification.md`.
 **Acceptance**: Every completion criterion is explicitly marked met with linked evidence/artifact paths.
@@ -154,3 +154,4 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - [2026-03-02 14:50] Unit 4b complete: CONTRIBUTING linked to shared testing conventions and validated
 - [2026-03-02 14:51] Unit 4c complete: path/link discoverability verification recorded
 - [2026-03-02 14:52] Unit 5a complete: final test/coverage/build logs recorded
+- [PENDING_UNIT5B_TS] Unit 5b complete: final completion-criteria audit recorded
