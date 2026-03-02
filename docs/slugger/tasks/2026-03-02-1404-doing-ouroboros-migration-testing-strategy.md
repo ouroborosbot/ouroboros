@@ -93,7 +93,7 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 **Output**: New `docs/cross-agent/testing-conventions.md`.
 **Acceptance**: Document contains actionable mandatory guidance and aligns with repository structure and existing test tooling.
 
-### ⬜ Unit 3c: Cross-Agent Testing Conventions — Verify
+### ✅ Unit 3c: Cross-Agent Testing Conventions — Verify
 **What**: Validate clarity/completeness of the new conventions doc against the completion criteria checklist.
 **Output**: Verification checklist at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-3c-verify.md`.
 **Acceptance**: Checklist confirms no unresolved “what” decisions remain for testing strategy execution.
@@ -149,3 +149,4 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - [2026-03-02 14:47] Unit 2c complete: CI workflow verification recorded
 - [2026-03-02 14:48] Unit 3a complete: cross-agent testing conventions gap matrix recorded
 - [2026-03-02 14:49] Unit 3b complete: shared testing conventions doc authored and validated
+- [PENDING_UNIT3C_TS] Unit 3c complete: conventions completeness checklist verified
