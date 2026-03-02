@@ -41,13 +41,14 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [ ] What is the minimum required instrumentation surface for approval in this phase: channels + core only, or also tools/context/session modules?
+- [ ] None at this time.
 
 ## Decisions Made
 - This planning doc targets migration sequence item #2: Observability.
 - The completed testing-strategy planning/doing task is treated as predecessor and baseline.
 - Logging/output contract for this phase is channel-agnostic: user-facing content stays in channel-native output paths (CLI stdout, Teams APIs, etc.), while structured operational diagnostics flow through the observability path (stderr sink in this phase).
 - Logging configuration for this phase is machine-first: NDJSON (`json`) is the canonical output format, `logging.level` is configurable, and sink stays `stderr` only; file-based sinks/rotation are deferred.
+- Required instrumentation surface for this phase is full runtime coverage across `src/` with event-level logs (not chunk-level content), while excluding sensitive payload dumps.
 
 ## Context / References
 - `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration/implementation-order.md`
@@ -65,3 +66,4 @@ Model consumption is primary: logs should be stable, structured, and parseable f
 - [2026-03-02 15:01] Created
 - [2026-03-02 15:24] Resolved Open Question #1 with cross-channel output vs observability contract
 - [2026-03-02 15:32] Resolved Open Question #2 with machine-first json logging config (level configurable, stderr sink only)
+- [PENDING_Q3_TS] Resolved Open Question #3 with full runtime event-level instrumentation scope
