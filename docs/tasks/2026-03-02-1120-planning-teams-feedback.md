@@ -81,4 +81,4 @@ The `onToolEnd` keeps the `safeUpdate` call alongside the new `safeEmit` -- the 
 - 2026-03-02 11:21 Created
 - 2026-03-02 11:27 Resolved open questions, updated decisions
 - 2026-03-02 11:28 Approved, converting to doing doc (previous attempt)
-- [pending] Refreshed planning with updated scope and codebase verification
+- 2026-03-02 11:55 Refreshed planning with updated scope and codebase verification
