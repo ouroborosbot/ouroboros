@@ -12,22 +12,25 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 
 ### In Scope
 - Add shared observability module under `src/observability/` (logger, trace helpers, factory exports).
-- Define structured event shape and log levels for operational events.
+- Define machine-first NDJSON event schema and configurable `logging.level`.
 - Add trace ID propagation through turn entrypoints and engine execution path.
-- Replace selected ad-hoc operational `console.log/error` calls with structured logger events.
-- Add tests for logger behavior, trace helpers, and key instrumentation points.
+- Instrument runtime paths across `src/` with event-level logging (including channels, engine, mind, clients, config/identity, repertoire, and entrypoints).
+- Keep user-facing output in channel-native paths while routing operational diagnostics through logger sinks.
+- Add tests for logger behavior, trace helpers, and instrumentation points.
 - Ensure test/build/coverage remain green with 100% coverage on new code.
 
 ### Out of Scope
 - Full daemon log aggregation/retention pipeline and `ouro logs` CLI.
 - External telemetry sinks (Datadog, PostHog, etc.).
-- Broad instrumentation of modules not touched by this phase (for example, future memory-system events beyond current migration scope).
+- Chunk-level content logging and streaming-chunk spam logs.
+- Logging sensitive payloads (full user messages, raw tool args/secrets).
 
 ## Completion Criteria
 - [ ] `src/observability/` module exists with reusable logger + trace ID primitives.
-- [ ] Engine/channel flow emits structured events for turn lifecycle and error paths.
+- [ ] NDJSON (`json`) is the canonical log format with configurable `logging.level` and stderr sink for this phase.
+- [ ] Runtime paths across `src/` emit event-level structured logs with no chunk-level or sensitive-payload dumps.
 - [ ] Trace IDs are generated at turn entry and propagated through core execution.
-- [ ] Existing ad-hoc operational logging in scoped files is replaced or wrapped by structured logging.
+- [ ] Existing ad-hoc operational logging in scoped runtime files is replaced or wrapped by structured logging.
 - [ ] Tests cover new observability code and instrumentation behavior.
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
@@ -67,3 +70,4 @@ Model consumption is primary: logs should be stable, structured, and parseable f
 - [2026-03-02 15:24] Resolved Open Question #1 with cross-channel output vs observability contract
 - [2026-03-02 15:32] Resolved Open Question #2 with machine-first json logging config (level configurable, stderr sink only)
 - [2026-03-02 15:35] Resolved Open Question #3 with full runtime event-level instrumentation scope
+- [PENDING_REVIEW_TS] Consistency pass: aligned Scope/Out of Scope/Completion Criteria with finalized Q1-Q3 decisions
