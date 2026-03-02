@@ -12,9 +12,11 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 
 ### In Scope
 - Align `vitest.config.ts` coverage enforcement with the migration requirement of 100% statements, branches, functions, and lines.
-- Document mandatory test conventions for new migration modules (test file placement, mocking patterns, and isolation rules) in repository docs.
+- Add CI gating for `npm run test:coverage` so coverage regressions fail automated checks.
+- Document mandatory test conventions for migration work in an agent-oriented testing guide that builds on `CONTRIBUTIONS.md` without overloading it.
 - Validate test scripts and developer workflow commands for running full tests and coverage checks.
 - Add or update tests only when required to satisfy new baseline enforcement introduced in this phase.
+- Backfill any legacy coverage gaps that are exposed by threshold enforcement changes in this phase.
 
 ### Out of Scope
 - Implementing provider abstraction, channels, memory system, daemon, or any migration feature beyond testing baseline setup.
@@ -23,8 +25,10 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 
 ## Completion Criteria
 - [ ] Vitest configuration enforces 100% coverage thresholds (lines, branches, functions, statements) for applicable source files.
-- [ ] Testing strategy guidance for migration work is documented in-repo and reflects current project structure.
+- [ ] CI enforces `npm run test:coverage` as a required gate for relevant changes.
+- [ ] Testing strategy guidance for migration work is documented in-repo and reflects current project structure, extending `CONTRIBUTIONS.md` via focused agent-oriented guidance.
 - [ ] Test and coverage commands run successfully after updates.
+- [ ] Any pre-existing uncovered paths surfaced by threshold enforcement are backfilled to meet the baseline.
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -37,13 +41,14 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [ ] Should this first task also include introducing CI gating for `npm run test:coverage`, or remain local workflow only for now?
-- [ ] Should we codify conventions in an existing doc (if present) or create a new `docs/testing-strategy.md` style reference in this repo?
-- [ ] Should this phase include backfilling any currently uncovered legacy files if threshold enforcement exposes pre-existing gaps?
+- [ ] None at this time.
 
 ## Decisions Made
 - Scope for this planning cycle is limited to the first ordered migration task: Testing Strategy.
 - `implementation-order.md` is treated as the source of truth for task sequence.
+- Include CI gating for `npm run test:coverage` in this first task.
+- Follow existing repository documentation patterns by building on `CONTRIBUTIONS.md` with focused agent-oriented testing guidance, without overloading `CONTRIBUTIONS.md` itself.
+- Backfill and close any legacy coverage gaps exposed by threshold enforcement during this phase.
 
 ## Context / References
 - `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration/implementation-order.md`
@@ -58,3 +63,4 @@ Current baseline already uses Vitest with V8 coverage and reporters configured; 
 - [2026-03-02 14:04] Created
 - [2026-03-02 14:05] Set status to NEEDS_REVIEW
 - [2026-03-02 14:06] Corrected Created/Progress Log timestamps
+- [PENDING_TIMESTAMP] Incorporated user feedback: include CI gating, CONTRIBUTIONS.md-based guidance, and backfill exposed legacy coverage gaps
