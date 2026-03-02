@@ -224,21 +224,40 @@ Test changes (all in the same commit):
 
 ### ⬜ Unit 6a: CLI uses shared formatter -- Tests
 **What**: Update CLI tests to expect formatted output from shared module:
-- `onToolEnd` success test: verify spinner.stop called with `formatToolResult()` output
-- `onToolEnd` failure test: verify spinner.fail called with formatted output
-- `onKick` test: verify stderr output uses `formatKick()` output
-- `onError` tests: update for severity-aware rendering. Add tests for transient (spinner message) vs terminal (permanent stderr)
+- `onToolEnd` success test: verify stderr contains `formatToolResult(name, summary, true)` output (green colored)
+- `onToolEnd` failure test: verify stderr contains `formatToolResult(name, summary, false)` output (red colored)
+- `onKick` test: verify stderr output contains `formatKick()` output (yellow colored)
+- `onError` tests: update for severity-aware rendering. Add tests for transient (ephemeral stderr line) vs terminal (permanent stderr line)
+
+Note: the current CLI writes `"✗ name: error"` (literal word "error") on tool failure. The shared formatter will change this to `"✗ name: <actual summary>"` -- this is an intentional improvement, showing the actual tool arg summary on failure instead of a generic word.
 **Output**: Failing tests
 **Acceptance**: Tests FAIL (red) because CLI not yet refactored
 
 ### ⬜ Unit 6b: CLI uses shared formatter -- Implementation
 **What**: In `src/channels/cli.ts`:
 - Add import: `import { formatToolResult, formatKick, formatError } from "../wardrobe/format"`
-- `onToolEnd`: use `formatToolResult(name, argSummary, success)` for both `spinner.stop()` and `spinner.fail()`
-- `onKick`: use `formatKick(attempt, maxKicks)` for the stderr output
+- `onToolEnd`: The shared formatter returns complete strings with emoji (e.g., `"✓ name (summary)"`). The CLI spinner's `stop(msg)` and `fail(msg)` add their own emoji. To avoid doubling up, call `spinner.stop()` (no arg, just clears the spinner line), then write the formatted string with ANSI colors directly to stderr:
+  ```typescript
+  onToolEnd: (name: string, argSummary: string, success: boolean) => {
+    currentSpinner?.stop()
+    currentSpinner = null
+    const msg = formatToolResult(name, argSummary, success)
+    const color = success ? "\x1b[32m" : "\x1b[31m"
+    process.stderr.write(`${color}${msg}\x1b[0m\n`)
+  },
+  ```
+- `onKick`: use `formatKick(attempt, maxKicks)` for the stderr output, with yellow ANSI:
+  ```typescript
+  onKick: (attempt: number, maxKicks: number) => {
+    currentSpinner?.stop()
+    currentSpinner = null
+    if (textDirty) { process.stdout.write("\n"); textDirty = false }
+    process.stderr.write(`\x1b[33m${formatKick(attempt, maxKicks)}\x1b[0m\n`)
+  },
+  ```
 - `onError`: branch on severity:
-  - `"transient"`: `currentSpinner?.fail(formatError(error))` + continue (spinner handles it)
-  - `"terminal"`: `currentSpinner?.fail("request failed")` + `process.stderr.write(...)` with ANSI red
+  - `"transient"`: show ephemeral spinner message (existing behavior -- `spinner.fail()` + continue)
+  - `"terminal"`: permanent stderr line with ANSI red
 **Output**: Updated `src/channels/cli.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
