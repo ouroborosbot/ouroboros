@@ -1,6 +1,6 @@
 # Planning: Teams Channel Feedback Improvements
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-03-02 11:21
 
 ## Goal
@@ -72,4 +72,5 @@ The `\n\n` separator approach: `onToolEnd` and `onKick` emit their permanent lin
 
 ## Progress Log
 - 2026-03-02 11:21 Created
-- PENDING Resolved open questions, updated decisions
+- 2026-03-02 11:27 Resolved open questions, updated decisions
+- PENDING Approved, converting to doing doc
