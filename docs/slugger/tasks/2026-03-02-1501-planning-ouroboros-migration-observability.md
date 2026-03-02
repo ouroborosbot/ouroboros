@@ -1,7 +1,7 @@
 # Planning: Ouroboros Migration — Observability (Phase 2)
 
-**Status**: drafting
-**Created**: PENDING_CREATED_TS
+**Status**: NEEDS_REVIEW
+**Created**: 2026-03-02 15:01
 
 ## Goal
 Introduce a structured observability foundation (logger + trace IDs) so turn execution, tool behavior, and key engine/channel events are diagnosable without relying on ad-hoc `console` output.
@@ -61,4 +61,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 Current codebase still uses ad-hoc `console` logging in channel and entrypoint code; this phase should establish a consistent structured baseline without overreaching into daemon-level ops plumbing.
 
 ## Progress Log
-- [PENDING_CREATED_TS] Created
+- [2026-03-02 15:01] Created
