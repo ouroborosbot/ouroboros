@@ -68,7 +68,7 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 **Output**: Passing coverage run log at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-1c-green.log`.
 **Acceptance**: `npm run test:coverage` succeeds with 100% thresholds enforced.
 
-### ⬜ Unit 2a: CI Coverage Gate — Red
+### ✅ Unit 2a: CI Coverage Gate — Red
 **What**: Define CI gate checks and capture failing pre-change validation that demonstrates CI currently does not enforce `npm run test:coverage` (repo currently has no `.github/workflows` directory).
 **Output**: CI gap note and red validation evidence at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-2a-red.md`.
 **Acceptance**: Evidence clearly shows missing or insufficient CI coverage gating before implementation.
@@ -142,3 +142,4 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - [2026-03-02 14:33] Unit 1a complete: thresholds enabled and baseline investigation captured (no legacy gaps exposed)
 - [2026-03-02 14:34] Unit 1b complete: gap-resolution note added and test/build checks passed
 - [2026-03-02 14:35] Unit 1c complete: coverage/build verification artifacts recorded
+- [PENDING_UNIT2A_TS] Unit 2a complete: CI red baseline captured (no workflows directory)
