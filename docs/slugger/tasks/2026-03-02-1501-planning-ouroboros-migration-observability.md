@@ -66,4 +66,4 @@ Model consumption is primary: logs should be stable, structured, and parseable f
 - [2026-03-02 15:01] Created
 - [2026-03-02 15:24] Resolved Open Question #1 with cross-channel output vs observability contract
 - [2026-03-02 15:32] Resolved Open Question #2 with machine-first json logging config (level configurable, stderr sink only)
-- [PENDING_Q3_TS] Resolved Open Question #3 with full runtime event-level instrumentation scope
+- [2026-03-02 15:35] Resolved Open Question #3 with full runtime event-level instrumentation scope
