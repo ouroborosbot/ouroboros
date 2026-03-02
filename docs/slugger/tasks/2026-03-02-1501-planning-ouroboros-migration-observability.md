@@ -62,4 +62,4 @@ Current codebase still uses ad-hoc `console` logging in channel and entrypoint c
 
 ## Progress Log
 - [2026-03-02 15:01] Created
-- [PENDING_Q1_TS] Resolved Open Question #1 with cross-channel output vs observability contract
+- [2026-03-02 15:24] Resolved Open Question #1 with cross-channel output vs observability contract
