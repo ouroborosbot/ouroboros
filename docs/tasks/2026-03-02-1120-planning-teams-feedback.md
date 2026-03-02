@@ -186,4 +186,4 @@ Stream lifecycle: approach 3 (don't close, send alongside) is preferred for simp
 - 2026-03-02 12:02 Major scope change: multi-message + shared formatting layer
 - 2026-03-02 12:24 Added error severity on onError, formatError(), follow-up section, resolved onError open question
 - 2026-03-02 12:35 Final refinements: format.ts to src/repertoire/, resolved stream questions via manual testing
-- [pending] Added src/wardrobe/ directory, phrases required in config, comprehensive scope rewrite
+- 2026-03-02 12:57 Added src/wardrobe/ directory, phrases required in config, comprehensive scope rewrite
