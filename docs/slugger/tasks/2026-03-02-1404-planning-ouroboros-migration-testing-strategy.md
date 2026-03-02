@@ -13,7 +13,7 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 ### In Scope
 - Align `vitest.config.ts` coverage enforcement with the migration requirement of 100% statements, branches, functions, and lines.
 - Add CI gating for `npm run test:coverage` so coverage regressions fail automated checks.
-- Define mandatory test convention documentation locations up front: keep `CONTRIBUTING.md` as the concise entry point and add a dedicated agent-oriented testing conventions doc at `docs/testing/agent-test-conventions.md`.
+- Define mandatory test convention documentation locations up front: keep `CONTRIBUTING.md` as the concise entry point and add a dedicated cross-agent testing conventions doc at `docs/cross-agent/testing-conventions.md`.
 - Validate test scripts and developer workflow commands for running full tests and coverage checks.
 - Add or update tests only when required to satisfy new baseline enforcement introduced in this phase.
 - Backfill any legacy coverage gaps that are exposed by threshold enforcement changes in this phase.
@@ -26,7 +26,7 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 ## Completion Criteria
 - [ ] Vitest configuration enforces 100% coverage thresholds (lines, branches, functions, statements) for applicable source files.
 - [ ] CI enforces `npm run test:coverage` as a required gate for relevant changes.
-- [ ] Mandatory test convention documentation is finalized at `docs/testing/agent-test-conventions.md`, with `CONTRIBUTING.md` containing concise entry-point guidance and a link to that doc.
+- [ ] Mandatory test convention documentation is finalized at `docs/cross-agent/testing-conventions.md`, with `CONTRIBUTING.md` containing concise entry-point guidance and a link to that doc.
 - [ ] Test and coverage commands run successfully after updates.
 - [ ] Any pre-existing uncovered paths surfaced by threshold enforcement are backfilled to meet the baseline.
 - [ ] 100% test coverage on all new code
@@ -47,7 +47,7 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - Scope for this planning cycle is limited to the first ordered migration task: Testing Strategy.
 - `implementation-order.md` is treated as the source of truth for task sequence.
 - Include CI gating for `npm run test:coverage` in this first task.
-- Use `CONTRIBUTING.md` as the concise contributor entry point and place detailed mandatory testing conventions in `docs/testing/agent-test-conventions.md` to avoid overloading the top-level contributor guide.
+- Use `CONTRIBUTING.md` as the concise contributor entry point and place detailed mandatory testing conventions in `docs/cross-agent/testing-conventions.md` to avoid overloading the top-level contributor guide.
 - Backfill and close any legacy coverage gaps exposed by threshold enforcement during this phase.
 
 ## Context / References
@@ -65,4 +65,5 @@ Current baseline already uses Vitest with V8 coverage and reporters configured; 
 - [2026-03-02 14:05] Set status to NEEDS_REVIEW
 - [2026-03-02 14:06] Corrected Created/Progress Log timestamps
 - [2026-03-02 14:09] Incorporated user feedback: include CI gating, CONTRIBUTIONS.md-based guidance, and backfill exposed legacy coverage gaps
-- [2026-03-02 14:13] Defined upfront documentation location for mandatory test conventions (CONTRIBUTING.md entry point + docs/testing/agent-test-conventions.md)
+- [2026-03-02 14:13] Defined upfront documentation location for mandatory test conventions (CONTRIBUTING.md entry point + docs/cross-agent/testing-conventions.md)
+- [PENDING_TIMESTAMP] Renamed shared conventions target to docs/cross-agent/testing-conventions.md for clearer cross-agent ownership
