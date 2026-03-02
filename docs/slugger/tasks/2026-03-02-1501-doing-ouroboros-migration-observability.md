@@ -2,7 +2,7 @@
 
 **Status**: drafting
 **Execution Mode**: direct
-**Created**: 2026-03-02 15:01
+**Created**: 2026-03-02 15:50
 **Planning**: ./2026-03-02-1501-planning-ouroboros-migration-observability.md
 **Artifacts**: ./2026-03-02-1501-doing-ouroboros-migration-observability/
 
@@ -56,25 +56,90 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Output**: Baseline event/instrumentation matrix at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-0-baseline-matrix.md`.
 **Acceptance**: Matrix covers required envelope, minimum event catalog, and target runtime files before code changes.
 
-### ⬜ Unit 1: Observability Foundation
-**What**: Introduce shared observability primitives under `src/observability/` for machine-first NDJSON logging with configurable `logging.level` and trace helpers.
-**Output**: New observability module plus baseline tests.
-**Acceptance**: Logger/trace module compiles and targeted tests pass.
+### ⬜ Unit 1a: Observability Core Module — Red
+**What**: Add failing tests for structured logger/trace primitives, required envelope fields, NDJSON shape, and `logging.level` behavior.
+**Output**: New failing tests and red run log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-1a-red.log`.
+**Acceptance**: Tests fail for missing observability module and/or missing required envelope and config behavior.
 
-### ⬜ Unit 2: Trace Propagation
-**What**: Generate trace IDs at turn entrypoints and propagate through execution flow.
-**Output**: Entry and engine integration updates with tests.
-**Acceptance**: Tests prove trace IDs are generated and propagated through core turn execution.
+### ⬜ Unit 1b: Observability Core Module — Green
+**What**: Implement `src/observability/` logger and trace helpers to satisfy Unit 1a tests.
+**Output**: New observability module code and test updates.
+**Acceptance**: Unit 1a tests pass with required envelope fields and configurable level behavior.
 
-### ⬜ Unit 3: Runtime Instrumentation Coverage
-**What**: Add event-level structured instrumentation across runtime components in scope while preserving channel-native user output.
-**Output**: Instrumented runtime files and subsystem tests.
-**Acceptance**: Required components emit structured events using required envelope fields without chunk-level/sensitive payload logging.
+### ⬜ Unit 1c: Observability Core Module — Coverage & Refactor
+**What**: Refactor if needed and verify 100% coverage for new observability module code.
+**Output**: Coverage verification note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-1c-coverage.md`.
+**Acceptance**: New observability module code is fully covered and tests remain green.
 
-### ⬜ Unit 4: Verification & Completion Audit
-**What**: Run full validation (test/build/coverage), verify event-catalog coverage, and audit completion criteria.
-**Output**: Final verification artifacts and completion audit.
-**Acceptance**: Completion criteria are fully met with linked evidence artifacts.
+### ⬜ Unit 2a: Trace Propagation (Entrypoints/Core) — Red
+**What**: Add failing tests proving trace IDs are created at turn entrypoints and expected downstream calls do not yet receive them.
+**Output**: Failing trace propagation tests and red log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-2a-red.log`.
+**Acceptance**: Tests fail before implementation and explicitly show missing trace propagation behavior.
+
+### ⬜ Unit 2b: Trace Propagation (Entrypoints/Core) — Green
+**What**: Implement trace ID generation and propagation through core execution path.
+**Output**: Updated entrypoint/core code and passing tests.
+**Acceptance**: Tests confirm trace IDs are generated once per turn and propagated through execution.
+
+### ⬜ Unit 2c: Trace Propagation (Entrypoints/Core) — Coverage & Refactor
+**What**: Refactor trace plumbing as needed and verify coverage for new paths.
+**Output**: Coverage note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-2c-coverage.md`.
+**Acceptance**: Trace propagation code paths are fully covered and tests remain green.
+
+### ⬜ Unit 3a: Engine/Mind/Tools Instrumentation — Red
+**What**: Add failing tests for required event emissions (`*.start`, `*.end`, `*.error`) and envelope compliance in engine, mind, and tool execution paths.
+**Output**: Failing tests and red log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-3a-red.log`.
+**Acceptance**: Tests fail and identify missing event-level instrumentation for engine/mind/tools.
+
+### ⬜ Unit 3b: Engine/Mind/Tools Instrumentation — Green
+**What**: Implement structured event logging for engine, mind, and tools with required envelope and no sensitive payload dumps.
+**Output**: Updated runtime code and passing subsystem tests.
+**Acceptance**: Required engine/mind/tools catalog events are emitted with required fields and tests pass.
+
+### ⬜ Unit 3c: Engine/Mind/Tools Instrumentation — Coverage & Refactor
+**What**: Refactor instrumentation helpers/call sites and verify full coverage on new code.
+**Output**: Coverage note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-3c-coverage.md`.
+**Acceptance**: New instrumentation paths are fully covered and tests remain green.
+
+### ⬜ Unit 4a: Channel Instrumentation Contract — Red
+**What**: Add failing tests for CLI/Teams ensuring user-facing output remains channel-native while diagnostics route through structured logger.
+**Output**: Failing tests and red log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-4a-red.log`.
+**Acceptance**: Tests fail before implementation and demonstrate contract violations.
+
+### ⬜ Unit 4b: Channel Instrumentation Contract — Green
+**What**: Implement channel instrumentation to satisfy cross-channel contract and event catalog expectations.
+**Output**: Updated channel code and passing tests.
+**Acceptance**: Tests confirm channel UX remains native and operational diagnostics are structured logger events.
+
+### ⬜ Unit 4c: Channel Instrumentation Contract — Coverage & Refactor
+**What**: Refactor channel instrumentation and verify coverage on newly introduced branches/error paths.
+**Output**: Coverage note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-4c-coverage.md`.
+**Acceptance**: Channel instrumentation new code is fully covered and tests remain green.
+
+### ⬜ Unit 5a: Config/Identity/Clients/Repertoire Instrumentation — Red
+**What**: Add failing tests for minimum event catalog coverage in config/identity/client/repertoire paths.
+**Output**: Failing tests and red log at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-5a-red.log`.
+**Acceptance**: Tests fail and enumerate missing component-level events before implementation.
+
+### ⬜ Unit 5b: Config/Identity/Clients/Repertoire Instrumentation — Green
+**What**: Implement required structured event logging for config, identity, client requests, and repertoire load paths.
+**Output**: Updated runtime files and passing tests.
+**Acceptance**: Required component events are emitted with required envelope and tests pass.
+
+### ⬜ Unit 5c: Config/Identity/Clients/Repertoire Instrumentation — Coverage & Refactor
+**What**: Refactor for consistency and verify complete coverage on new code paths.
+**Output**: Coverage note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-5c-coverage.md`.
+**Acceptance**: New config/identity/clients/repertoire instrumentation code is fully covered and tests remain green.
+
+### ⬜ Unit 6a: End-to-End Event Catalog Verification
+**What**: Run targeted and full test suites validating minimum event catalog coverage and required envelope fields across components.
+**Output**: Verification matrix at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-6a-event-catalog-verify.md`.
+**Acceptance**: Matrix confirms each required event is covered by tests with no unresolved gaps.
+
+### ⬜ Unit 6b: Final Quality Gate & Completion Audit
+**What**: Run `npm run test`, `npm run test:coverage`, and `npm run build`, then audit completion criteria line-by-line.
+**Output**: Final logs (`final-test.log`, `final-coverage.log`, `final-build.log`) and audit checklist at `./2026-03-02-1501-doing-ouroboros-migration-observability/final-audit.md`.
+**Acceptance**: All completion criteria are explicitly marked met with evidence and no warnings.
 
 ## Execution
 - **TDD strictly enforced**: tests → red → implement → green → refactor
@@ -86,4 +151,5 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - **Decisions made**: Update docs immediately, commit right away
 
 ## Progress Log
-- [2026-03-02 15:01] Created from planning doc
+- [2026-03-02 15:50] Created from planning doc
+- [PENDING_GRANULARITY_TS] Granularity pass: split implementation into atomic red/green/coverage units by subsystem
