@@ -16,14 +16,14 @@
 Establish and enforce the testing baseline for the ouroboros migration by formalizing Vitest coverage thresholds and test conventions so all subsequent migration work ships with consistent, verifiable quality controls.
 
 ## Completion Criteria
-- [ ] Vitest configuration enforces 100% coverage thresholds (lines, branches, functions, statements) for applicable source files.
-- [ ] CI enforces `npm run test:coverage` as a required gate for relevant changes.
-- [ ] Mandatory test convention documentation is finalized at `docs/cross-agent/testing-conventions.md`, with `CONTRIBUTING.md` containing concise entry-point guidance and a link to that doc.
-- [ ] Test and coverage commands run successfully after updates.
-- [ ] Any pre-existing uncovered paths surfaced by threshold enforcement are backfilled to meet the baseline.
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] Vitest configuration enforces 100% coverage thresholds (lines, branches, functions, statements) for applicable source files.
+- [x] CI enforces `npm run test:coverage` as a required gate for relevant changes.
+- [x] Mandatory test convention documentation is finalized at `docs/cross-agent/testing-conventions.md`, with `CONTRIBUTING.md` containing concise entry-point guidance and a link to that doc.
+- [x] Test and coverage commands run successfully after updates.
+- [x] Any pre-existing uncovered paths surfaced by threshold enforcement are backfilled to meet the baseline.
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -156,3 +156,4 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - [2026-03-02 14:52] Unit 5a complete: final test/coverage/build logs recorded
 - [2026-03-02 14:53] Unit 5b complete: final completion-criteria audit recorded
 - [2026-03-02 14:53] All units complete: final verification suite passed and doing status set to done
+- [PENDING_DOING_COMPLETE_TS] Marked doing completion criteria checkboxes complete
