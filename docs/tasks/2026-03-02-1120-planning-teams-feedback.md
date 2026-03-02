@@ -1,6 +1,6 @@
 # Planning: Teams Channel Feedback — Multi-Message + Shared Formatting + Error Severity
 
-**Status**: drafting
+**Status**: NEEDS_REVIEW
 **Created**: 2026-03-02 11:21
 
 ## Goal
@@ -9,7 +9,7 @@ Fix three Teams bot channel issues and improve error handling by introducing mul
 ## Scope
 
 ### In Scope
-- **Shared formatting layer**: Extract display-string generation for tool results, kick indicators, and errors into a shared module (`src/channels/format.ts`) so both CLI and Teams use the same "what to display" logic, and each channel only handles "how to display". Functions: `formatToolResult()`, `formatKick()`, `formatError()`
+- **Shared formatting layer**: Extract display-string generation for tool results, kick indicators, and errors into a shared module (`src/repertoire/format.ts`) so both CLI and Teams use the same "what to display" logic, and each channel only handles "how to display". Functions: `formatToolResult()`, `formatKick()`, `formatError()`
 - **Multi-message Teams output**: Tool results, kick indicators, and terminal errors are sent as separate standalone messages in Teams via `ctx.send()` -- not appended to the streaming message
 - **Error severity on `onError`**: Change the `ChannelCallbacks` interface -- `onError(error: Error, severity: "transient" | "terminal"): void`. All call sites in `src/engine/core.ts` pass the correct severity. Channels render by severity: transient = ephemeral status, terminal = permanent message
 - **Teams `onToolEnd`**: Sends tool result as standalone message via `sendMessage` callback. Format: `✓ name (summary)` / `✗ name: error`
@@ -36,7 +36,8 @@ Prompt for next work-planner:
 "The onError callback now has severity (transient|terminal) and terminal errors are shown as permanent messages to users. Add agent self-explanation: when a terminal error is shown, the agent loop should do one more model call where the model acknowledges and explains the error to the user in plain language. See the error handling in src/engine/core.ts lines 270-410."
 
 ## Completion Criteria
-- [ ] Shared formatter module `src/channels/format.ts` exists with `formatToolResult()`, `formatKick()`, and `formatError()` functions
+- [ ] Early manual testing with user confirms `ctx.send()` behavior alongside open stream (approach 3 or fallback to approach 2)
+- [ ] Shared formatter module `src/repertoire/format.ts` exists with `formatToolResult()`, `formatKick()`, and `formatError()` functions
 - [ ] CLI `onToolEnd`, `onKick`, and `onError` use the shared formatter (identical visual output, verified by existing tests)
 - [ ] `ChannelCallbacks.onError` signature updated to `onError(error: Error, severity: "transient" | "terminal"): void`
 - [ ] All `callbacks.onError()` call sites in `src/engine/core.ts` pass correct severity
@@ -61,8 +62,8 @@ Prompt for next work-planner:
 
 ## Open Questions
 - [x] Should `onError` also be a standalone message in Teams, or stay as `safeEmit` in the current stream? **Resolved**: Depends on severity. Transient errors (retrying) stay ephemeral via `stream.update()`. Terminal errors (fatal, loop limit) become standalone messages via `sendMessage`.
-- [ ] When the stream has had no text emitted yet (model returned only tool calls, no content), should `stream.close()` still be called before `ctx.send()`? The SDK's `stream.close()` on an empty stream might behave unexpectedly -- needs testing
-- [ ] Does `ctx.send()` work reliably mid-handler (before the message handler returns)? The SDK auto-closes the stream after handler return -- need to verify `ctx.send()` doesn't conflict with the open stream
+- [x] When the stream has had no text emitted yet (model returned only tool calls, no content), should `stream.close()` still be called before `ctx.send()`? **Resolved**: Will be answered via early manual testing with user (doing doc Unit 0). Preferred approach is don't close -- just send alongside.
+- [x] Does `ctx.send()` work reliably mid-handler (before the message handler returns)? **Resolved**: Will be answered via early manual testing with user (doing doc Unit 0). Approach 3 (don't close stream, send alongside) is preferred. Approach 2 (close-and-send, lose streaming for 2nd+ iterations) is the fallback if live testing shows ordering or conflict issues.
 
 ## Decisions Made
 - **Multi-message over separators**: Tool results, kicks, and terminal errors are separate Teams messages via `ctx.send()`, not `\n\n`-separated text in one message. This is cleaner and matches how a human would send status updates.
@@ -75,6 +76,8 @@ Prompt for next work-planner:
 - **CLI behavior unchanged**: The CLI refactor only changes where the format strings come from (shared module), not what they look like. Existing CLI tests should pass without modification (updated to pass the new severity parameter).
 - **"Continuing." pattern anchored**: `/^continuing\.?$/i` to avoid false positives on mid-sentence "continuing"
 - **onToolStart stays ephemeral**: `stream.update()` only, matching CLI's spinner pattern
+- **Early manual testing with user**: The doing doc will front-load a Unit 0 that builds a minimal `ctx.send()` test alongside an open stream in live Teams. User participates to verify message ordering and stream behavior. This resolves the two stream lifecycle questions before building on top of assumptions. Preferred: approach 3 (don't close, send alongside). Fallback: approach 2 (close-and-send).
+- **Shared formatter lives in `src/repertoire/`**: Alongside `phrases.ts` -- it's shared display-facing code, not channel-specific
 
 ## Context / References
 - `src/channels/teams.ts` lines 48-189: `createTeamsCallbacks()` -- the main factory function that needs changes
@@ -95,6 +98,7 @@ Prompt for next work-planner:
 - `src/engine/core.ts` line 385: `callbacks.onError(new Error("context trimmed..."))` -- transient
 - `src/engine/core.ts` line 392: `callbacks.onError(new Error("network error..."))` -- transient
 - `src/engine/core.ts` line 406: `callbacks.onError(e)` -- terminal (catch-all fatal)
+- `src/repertoire/phrases.ts`: existing shared display-facing module -- `format.ts` will live alongside it
 - `src/engine/kicks.ts` lines 33-111: `TOOL_INTENT_PATTERNS` array
 - `src/__tests__/channels/teams.test.ts`: existing Teams tests (onToolEnd at lines 287-308, onError at lines 311-317 need updating)
 - `src/__tests__/channels/cli.test.ts` lines 616-634: existing CLI onError tests need severity parameter added
@@ -119,7 +123,7 @@ Possible approaches to the stream lifecycle:
 2. **Close-and-send**: Close the stream when a tool starts, send tool result as standalone, send subsequent model text as standalone too (no more streaming after first close). Downside: no streaming for second+ iterations.
 3. **Don't close, just send**: Keep the stream open for model text throughout, and use `ctx.send()` for tool results/kicks alongside the open stream. The stream auto-closes on handler return. This is simplest but needs testing to confirm `ctx.send()` works alongside an open stream.
 
-Approach 3 is preferred (simplest, least disruption). Open question is whether it works reliably.
+Approach 3 is preferred (simplest, least disruption). Approach 2 is the fallback. This will be resolved via early manual testing with the user in doing doc Unit 0, before any implementation depends on the answer.
 
 ## Progress Log
 - 2026-03-02 11:21 Created
