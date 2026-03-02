@@ -144,4 +144,4 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 - [2026-03-02 14:35] Unit 1c complete: coverage/build verification artifacts recorded
 - [2026-03-02 14:36] Unit 2a complete: CI red baseline captured (no workflows directory)
 - [2026-03-02 14:37] Unit 2b complete: coverage workflow added and local validation passed
-- [PENDING_BLOCK_TS] Unit 2b blocked: remote rejected push for `.github/workflows/coverage.yml` (OAuth token missing `workflow` scope)
+- [2026-03-02 14:37] Unit 2b blocked: remote rejected push for `.github/workflows/coverage.yml` (OAuth token missing `workflow` scope)
