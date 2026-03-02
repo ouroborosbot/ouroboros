@@ -139,7 +139,7 @@ Fix three Teams bot channel issues and improve the presentation architecture: (1
 **Output**: Updated `src/engine/kicks.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 1c: Kick pattern gaps -- Coverage
+### ✅ Unit 1c: Kick pattern gaps -- Coverage
 **What**: Verify 100% coverage on all three new patterns. Run full test suite.
 **Output**: Coverage report confirms full coverage
 **Acceptance**: 100% coverage on new code, all tests green, no warnings
@@ -448,3 +448,4 @@ Wiring:
   - Prerequisites section added (build before Unit 0, Unit 5 breaking change coordination)
 - 2026-03-02 15:36 Unit 1a complete: Added 10 failing tests for bare "Continuing.", sentence-final "continues.", and "Next up" patterns plus 4 false-negative guards
 - 2026-03-02 15:36 Unit 1b complete: Added 3 patterns to TOOL_INTENT_PATTERNS — all 100 tests pass, build clean
+- 2026-03-02 15:37 Unit 1c complete: kicks.ts 100% coverage (Stmts/Branch/Funcs/Lines), full suite 874 tests pass
