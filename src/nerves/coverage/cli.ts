@@ -31,7 +31,7 @@ export function runAuditCli(argv: string[]): number {
   const runDir = args.runDir ?? latestRun?.run_dir
 
   if (!runDir) {
-    console.error("observability audit: no run directory found; provide --run-dir")
+    console.error("nerves audit: no run directory found; provide --run-dir")
     return 2
   }
 
@@ -46,7 +46,7 @@ export function runAuditCli(argv: string[]): number {
 
   mkdirSync(dirname(outputPath), { recursive: true })
   writeFileSync(outputPath, JSON.stringify(report, null, 2), "utf8")
-  console.log(`observability audit: ${report.overall_status} (${outputPath})`)
+  console.log(`nerves audit: ${report.overall_status} (${outputPath})`)
 
   return report.overall_status === "pass" ? 0 : 1
 }
