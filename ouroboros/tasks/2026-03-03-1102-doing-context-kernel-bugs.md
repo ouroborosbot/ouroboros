@@ -1,6 +1,6 @@
 # Doing: Context Kernel Wiring Bugs + Friend Storage Redesign
 
-**Status**: drafting
+**Status**: in-progress
 **Execution Mode**: direct
 **Created**: 2026-03-03 14:34
 **Planning**: ./2026-03-03-1102-planning-context-kernel-bugs.md
