@@ -458,3 +458,4 @@ Wiring:
 - 2026-03-02 15:51 Unit 5 complete: onError(error, severity) interface change — 5 call sites, both channels, all test mocks updated atomically. 880 tests pass, build clean
 - 2026-03-02 15:53 Unit 6a complete: 3 failing tests for shared formatter (onToolEnd green/red, onError severity branching)
 - 2026-03-02 15:55 Units 6b+6c complete: CLI uses shared formatters, severity branching on onError, 881 tests pass, cli.ts 100% lines/funcs
+- 2026-03-02 16:03 Unit 7a complete: 22 failing tests for dual-mode rendering -- streaming mode (onToolEnd/onKick/onError with inline emit), buffered mode (sendMessage, flush first-to-emit/subsequent-to-sendMessage, fallback), handleTeamsMessage sendMessage param, ctx.send wiring
