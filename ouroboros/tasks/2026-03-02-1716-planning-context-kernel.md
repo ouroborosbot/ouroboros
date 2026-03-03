@@ -440,9 +440,14 @@ class FileContextStore implements ContextStore {
 
 // src/mind/context/types.ts
 
+// Closed union types -- adding a new provider or integration requires a code change
+// (which is correct: new providers need resolution logic, new integrations need API clients).
+type IdentityProvider = "aad" | "local";  // "aad" = Teams/AAD, "local" = CLI/OS username
+type Integration = "ado" | "github" | "graph";
+
 // --- Layer 1: Identity ---
 interface ExternalId {
-  provider: string;  // "aad", "local", "discord", "telegram", etc. -- extensible, not a closed union
+  provider: IdentityProvider;  // closed union -- new channels add to IdentityProvider type
   externalId: string;
   tenantId?: string;  // for AAD/Teams
   linkedAt: string;   // ISO date -- when this external ID was associated with the identity
@@ -469,7 +474,7 @@ interface AuthorityCapability {
 }
 
 interface AuthorityProfile {
-  integration: "ado" | "github" | "graph";
+  integration: Integration;
   scope: string;           // org/project
   capabilities: AuthorityCapability[];
   cachedAt: string;        // ISO date
@@ -479,13 +484,13 @@ interface AuthorityProfile {
 // Hybrid authority checker: optimistic reads, pre-validated writes
 interface AuthorityChecker {
   // Read path: optimistic, returns true unless we have cached 403 evidence
-  canRead(integration: string, scope: string): boolean;
+  canRead(integration: Integration, scope: string): boolean;
   // Write path: probes permissions endpoint before returning
-  canWrite(integration: string, scope: string, action: string): Promise<boolean>;
+  canWrite(integration: Integration, scope: string, action: string): Promise<boolean>;
   // Record a 403 failure for learning
-  record403(integration: string, scope: string, action: string): void;
+  record403(integration: Integration, scope: string, action: string): void;
   // Invalidate cache for a scope (e.g., on TTL expiry)
-  invalidate(integration: string, scope: string): void;
+  invalidate(integration: Integration, scope: string): void;
 }
 
 // --- Layer 3: Memory (Phase 3) ---
@@ -504,7 +509,7 @@ interface FriendMemory {
 // --- Layer 4: Channel ---
 interface ChannelCapabilities {
   channel: "cli" | "teams";
-  availableIntegrations: ("ado" | "github" | "graph")[];  // which integrations this channel can reach
+  availableIntegrations: Integration[];  // which integrations this channel can reach
   supportsMarkdown: boolean;
   supportsStreaming: boolean;
   supportsRichCards: boolean;
@@ -562,3 +567,4 @@ interface ResolvedContext {
 - 2026-03-02 2240 A12: No chicken-and-egg. Authority Promise is eager-start (A7), buildSystem() awaits it in Phase 2 (D15 already says it becomes async). Already resolved by D6+D15+A7.
 - 2026-03-02 2159 A14: Authority cache keying already resolved by D13 (id+integration+scope). Module-scope Map confirmed as intended home. No doc changes needed.
 - 2026-03-02 2202 A15: buildSystem() async from Phase 1. No two-step sync->async migration. All callers updated once in Phase 1; Phase 2 just adds await inside the already-async function. Updated D15, Q12, unit 1G.
+- PENDING_TIMESTAMP A16: No bare strings in type system. Added `type IdentityProvider = "aad" | "local"` and `type Integration = "ado" | "github" | "graph"`. ExternalId.provider uses IdentityProvider, AuthorityProfile.integration and AuthorityChecker methods use Integration, ChannelCapabilities.availableIntegrations uses Integration[]. Adding a new provider or integration = add to the union (and write the supporting code).
