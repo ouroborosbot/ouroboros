@@ -1016,7 +1016,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 ---
 
-### ⬜ Unit 3Bb: Friend Preferences Prompt Injection + save_friend_note Tool
+### ✅ Unit 3Bb: Friend Preferences Prompt Injection + save_friend_note Tool
 
 **What**: Extend `contextSection()` to render toolPreferences in the system prompt when FriendMemory exists. Create `save_friend_note` tool so the model can persist preferences when a friend expresses one.
 
@@ -1051,11 +1051,11 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - `save_friend_note` registered as `ToolDefinition` (no integration required)
 
 **Completion criteria:**
-- [ ] `contextSection()` renders toolPreferences in system prompt when FriendMemory exists
-- [ ] `save_friend_note` tool allows model to persist preferences
-- [ ] Error handling per D16
-- [ ] 100% test coverage
-- [ ] All tests pass
+- [x] `contextSection()` renders toolPreferences in system prompt when FriendMemory exists
+- [x] `save_friend_note` tool allows model to persist preferences
+- [x] Error handling per D16
+- [x] 100% test coverage (prompt.ts 100%, tools-base.ts new code 100%)
+- [x] All tests pass (1072)
 
 ---
 
@@ -1386,3 +1386,4 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - 2026-03-03 0021 Unit 2D complete: contextSection() renders authority constraints when checker present + integrations available. Lists integrations, notes write operations are pre-flight checked. No section for CLI (no checker) or absent context. 1036 tests total.
 - 2026-03-03 0023 Unit 3A complete: resolveAdoContext() helper extracts org/project from args or runs discovery cascade. Single org/project auto-selected, multiple returns disambiguation. CLI rejection (no ADO integration). Error handling: catch-all returns error message. 1047 tests total.
 - 2026-03-03 0030 Unit 3Ba complete: FriendMemory type (id, toolPreferences, schemaVersion), memory collection on ContextStore + FileContextStore, resolveMemory() with D16 graceful error handling, resolver loads memory alongside identity/channel/authority. 1062 tests total.
+- 2026-03-03 0034 Unit 3Bb complete: contextSection() renders "## friend preferences" from FriendMemory.toolPreferences (skipped when null/empty). save_friend_note base tool creates/updates FriendMemory via memoryStore on ToolContext. D16 error handling on write failure. 1072 tests total.
