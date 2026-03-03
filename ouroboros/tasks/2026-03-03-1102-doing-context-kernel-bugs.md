@@ -241,19 +241,19 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Output**: Coverage report showing 100% on Teams adapter changes.
 **Acceptance**: 100% coverage on new code, tests still green.
 
-### ⬜ Unit 10a: CLI adapter wiring -- Tests
+### ✅ Unit 10a: CLI adapter wiring -- Tests
 **What**: Write tests for CLI adapter changes in `cli.ts`. Test: (1) Bug 2 fix: buildSystem called with resolved context. (2) `FileFriendStore` created with two paths. (3) CLI external ID format: `username@hostname` with provider `"local"`. (4) `toolContext.friendStore` set. (5) Session path uses friend UUID from resolved context. (6) Friend record re-read from disk each turn.
 **Output**: Updated `cli.test.ts` with wiring tests.
 **Files**: `src/__tests__/senses/cli.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because cli.ts still uses old wiring.
 
-### ⬜ Unit 10b: CLI adapter wiring -- Implementation
+### ✅ Unit 10b: CLI adapter wiring -- Implementation
 **What**: Update `cli.ts`: (1) Create `FileFriendStore` with agentKnowledgePath (`getAgentRoot()/friends`) and piiBridgePath (`~/.agentconfigs/{agentName}/friends`). (2) CLI external ID: `${os.userInfo().username}@${os.hostname()}` with provider `"local"`, displayName = `os.userInfo().username`. (3) Create `FriendResolver` and resolve. (4) Pass resolved context to buildSystem. (5) Set `toolContext.friendStore`. (6) Session path: `sessionPath(friend.id, "cli", "session")`. (7) Replace old imports.
 **Output**: Updated `cli.ts` with new wiring.
 **Files**: `src/senses/cli.ts`
 **Acceptance**: All CLI tests PASS (green), no warnings.
 
-### ⬜ Unit 10c: CLI adapter -- Coverage & Refactor
+### ✅ Unit 10c: CLI adapter -- Coverage & Refactor
 **What**: Verify 100% coverage on CLI adapter changes.
 **Output**: Coverage report showing 100% on CLI adapter changes.
 **Acceptance**: 100% coverage on new code, tests still green.
@@ -309,3 +309,4 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 - 2026-03-03 15:33 Units 7a-7c complete: contextSection redesigned with behavioral instructions (ephemerality, name quality, priority, working-memory trust, stale notes, new-friend). Notes in system prompt, toolPreferences not in system prompt. 100% coverage on prompt.ts. 1189 tests pass.
 - 2026-03-03 15:36 Units 8a-8c complete: sessionPath restructured to 3-arg (friendId, channel, key). Auto-creates parent dirs. Callers updated with temporary "default" friendId until Units 9-10 wire real friend UUID. 100% coverage on config.ts. 1189 tests pass.
 - 2026-03-03 15:39 Units 9a-9c complete: Teams adapter wired -- buildSystem called with resolved context, toolContext.friendStore set, sessionPath uses friend UUID, context resolved early. 100% coverage on teams.ts. 1192 tests pass.
+- 2026-03-03 15:41 Units 10a-10c complete: CLI adapter wired -- buildSystem called with resolved context, toolContext.friendStore set, sessionPath uses friend UUID. New code fully covered. 1195 tests pass.
