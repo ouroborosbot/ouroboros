@@ -163,6 +163,14 @@ export function contextSection(context?: ResolvedContext): string {
   if (ch.maxMessageLength !== Infinity) traits.push(`max ${ch.maxMessageLength} chars`)
   lines.push(`channel: ${ch.channel}${traits.length ? ` (${traits.join(", ")})` : ""}`)
 
+  // Authority
+  if (context.checker && ch.availableIntegrations.length > 0) {
+    lines.push("")
+    lines.push("## authority")
+    lines.push(`integrations: ${ch.availableIntegrations.join(", ")}`)
+    lines.push("write operations are pre-flight checked -- mutations may be denied if insufficient permissions")
+  }
+
   return lines.join("\n")
 }
 
