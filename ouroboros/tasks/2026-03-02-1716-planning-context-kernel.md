@@ -16,7 +16,7 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 
 **Phase 1: Identity + Preferences + Storage Interface (Smallest Vertical Slice)**
 - 10. Directory restructuring (prerequisite) -- rename `src/engine/` to `src/heart/` (core loop, streaming, kicks, API error handling), rename `src/channels/` to `src/senses/` (channel adapters), move tool files (`tools.ts`, `tools-base.ts`, `tools-teams.ts`, `ado-client.ts`, `graph-client.ts`, and `data/` endpoint JSON files) from `src/engine/` to `src/repertoire/`. Update all imports across the codebase, all test file paths, and all documentation referencing old paths. This is a mechanical rename with no behavior changes -- all tests must pass identically before and after. Must be done first because all subsequent units reference the new paths.
-- 1A. `ContextStore` interface -- generic `get<T>(key)`, `put<T>(key, value)`, `delete(key)`, `list(prefix)`, `find<T>(prefix, predicate)` with typed layer keys. All context persistence goes through this interface. No module imports file paths or `fs` directly for context data. The `find` operation supports identity resolution by external ID (scan + predicate for file store; proper index for future DB store).
+- 1A. `ContextStore` interface -- generic `get<T>(key)`, `put<T>(key, value)`, `delete(key)`, `find<T>(prefix, predicate)` with typed layer keys. All context persistence goes through this interface. No module imports file paths or `fs` directly for context data. The `find` operation supports identity resolution by external ID (scan + predicate for file store; proper index for future DB store).
 - 1B. `FileContextStore` -- first adapter implementing `ContextStore`. Uses `~/.agentconfigs/<agent>/context/` layout. This is the only module that touches the filesystem for context storage.
 - 1C. `UserIdentity` type and resolution -- internal userId, external ID mappings (AAD, Teams), tenant memberships, integration memberships (ADO orgs). Persisted via `ContextStore`. Includes `knownScopes` — a living record of orgs/projects the user has worked in. Grows when the model successfully interacts with a scope (tool call succeeds → add/update with fresh `lastUsed`). Shrinks when Authority records persistent access denial (403 on a known scope → prune it so the prompt stops showing inaccessible scopes).
 - 1D. `UserPreferences` type and resolution -- global preferences (verbosity, confirmation policy, preview-before-mutation) plus integration-scoped preferences (ADO planning style, auto-assign, default org/project). Persisted via `ContextStore`. The model writes back learned context (e.g., last-used project) as preference updates.
@@ -56,7 +56,7 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 - Changes to the LLM provider layer (Azure/MiniMax config unchanged)
 
 ## Completion Criteria
-- [ ] `ContextStore` interface defined with `get`/`put`/`delete`/`list` operations; `FileContextStore` implements it
+- [ ] `ContextStore` interface defined with `get`/`put`/`delete`/`find` operations; `FileContextStore` implements it
 - [ ] No context module imports `fs` directly -- all persistence goes through `ContextStore`
 - [ ] All four context layers (Identity, Authority, Preferences, Channel) have TypeScript types and resolution functions
 - [ ] `LazyContextResolver` resolves layers on demand -- Authority and Preferences are not resolved unless a tool accesses them
@@ -137,7 +137,7 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 ## Decisions Made
 
 ### D1: Architecture -- Storage Interface, Not File-Based Commitment
-The context kernel defines a `ContextStore` interface (`get`, `put`, `delete`, `list`, `find`) that all persistence flows through. `FileContextStore` is the first (and initially only) adapter. The schema, resolution logic, and all consumer code never import `fs` or know where bytes live. This means swapping to a database, blob store, or API-backed store in the future requires implementing one interface -- not refactoring every module. The file layout under `~/.agentconfigs/<agent>/context/` is an implementation detail of `FileContextStore`, not an architectural commitment.
+The context kernel defines a `ContextStore` interface (`get`, `put`, `delete`, `find`) that all persistence flows through. `FileContextStore` is the first (and initially only) adapter. The schema, resolution logic, and all consumer code never import `fs` or know where bytes live. This means swapping to a database, blob store, or API-backed store in the future requires implementing one interface -- not refactoring every module. The file layout under `~/.agentconfigs/<agent>/context/` is an implementation detail of `FileContextStore`, not an architectural commitment.
 
 ### D2: Authority -- Hybrid Model, Not Pure 403 Learning
 Pure 403 learning means the agent proposes something, attempts it, fails, and then learns -- bad UX for destructive or visible operations (e.g., reparenting 50 work items, only to fail on item 1). The authority system uses a hybrid approach:
@@ -390,7 +390,6 @@ interface ContextStore {
   get<T>(key: string): Promise<T | null>;
   put<T>(key: string, value: T): Promise<void>;
   delete(key: string): Promise<void>;
-  list(prefix: string): Promise<string[]>;
   // Secondary index lookup: find the item under prefix whose value matches a predicate.
   // Used by identity resolution: "find the UserIdentity whose externalIds[] contains this external ID."
   // FileContextStore implements this by scanning files under prefix and deserializing each.
