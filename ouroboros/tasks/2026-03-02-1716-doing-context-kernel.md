@@ -843,7 +843,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 ---
 
-### ⬜ Unit 2C: Wire Authority into ado_mutate Tool
+### ✅ Unit 2C: Wire Authority into ado_mutate Tool
 
 **What**: Before executing a mutation via `ado_mutate`, check `canWrite()`. If denied, return a structured explanation instead of attempting and failing. Existing `ado_query` remains optimistic. Tool handlers call `record403()` when they receive a 403 response.
 
@@ -873,12 +873,12 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - 403 recording does not affect different scopes
 
 **Completion criteria:**
-- [ ] `ado_mutate` checks `canWrite()` before executing
-- [ ] Denied mutations return structured explanation
-- [ ] 403 responses trigger `record403()` learning
-- [ ] Backward-compatible when no context/checker is available
-- [ ] 100% test coverage
-- [ ] All tests pass
+- [x] `ado_mutate` checks `canWrite()` before executing
+- [x] Denied mutations return structured explanation (AUTHORITY_DENIED with method, org, suggested alternative)
+- [x] 403 responses trigger `record403()` learning (ado_query + ado_mutate)
+- [x] Backward-compatible when no context/checker is available
+- [x] 100% test coverage (tools-teams.ts 100%)
+- [x] All tests pass (1032)
 
 ---
 
