@@ -49,7 +49,7 @@ Rename the repository's observability namespace and command surface from `observ
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Setup/Research
+### ✅ Unit 0: Setup/Research
 **What**: Inventory all active `observability` namespace and command references in code, tests, scripts, and active docs; capture exact rename targets and expected untouched historical paths.
 **Output**: Reference inventory artifact in `./2026-03-03-1341-doing-nerves-rename/rename-inventory.md`.
 **Acceptance**: Inventory distinguishes active rename targets from historical records and is sufficient to drive deterministic edits.
@@ -108,3 +108,4 @@ Rename the repository's observability namespace and command surface from `observ
 - [2026-03-03 13:49] Created from planning doc.
 - [2026-03-03 13:50] Validation pass aligned units to existing repo paths and scripts (`src/observability`, `src/__tests__/observability`, `package.json`, `scripts/run-coverage-gate.cjs`).
 - [2026-03-03 13:51] Quality pass complete; acceptance criteria, coverage requirements, and unit-status formatting verified for execution handoff.
+- [2026-03-03 13:59] Unit 0 complete: captured active rename targets and historical exclusions in `rename-inventory.md`.
