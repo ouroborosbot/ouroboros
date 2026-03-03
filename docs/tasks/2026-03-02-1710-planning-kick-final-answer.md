@@ -66,4 +66,4 @@ The existing `final_answer` interception at core.ts:287-301 is fully provider-ag
 
 ## Progress Log
 - 2026-03-02 17:10 Created
-- (pending) Resolved open questions, finalized scope to narration-only injection
+- 2026-03-02 17:14 Resolved open questions, finalized scope to narration-only injection
