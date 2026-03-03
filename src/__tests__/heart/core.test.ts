@@ -166,6 +166,14 @@ describe("ChannelCallbacks interface", () => {
   })
 })
 
+describe("RunAgentOptions trace propagation contract", () => {
+  it("supports a traceId field in RunAgentOptions", async () => {
+    const core = await import("../../heart/core")
+    const options: core.RunAgentOptions = { traceId: "trace-123" }
+    expect((options as any).traceId).toBe("trace-123")
+  })
+})
+
 describe("runAgent", () => {
   let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal, options?: { toolChoiceRequired?: boolean }) => Promise<{ usage?: any }>
 
@@ -232,6 +240,67 @@ describe("runAgent", () => {
 
     expect(order[0]).toBe("onModelStart")
     expect(order[1]).toBe("api_call")
+  })
+
+  it("propagates traceId option into model request metadata", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([makeChunk("ok")])
+    )
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent(
+      [{ role: "system", content: "test" }],
+      callbacks,
+      undefined,
+      undefined,
+      { traceId: "trace-abc" } as any,
+    )
+
+    expect(mockCreate).toHaveBeenCalled()
+    const params = mockCreate.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(params).toEqual(expect.objectContaining({
+      metadata: expect.objectContaining({ trace_id: "trace-abc" }),
+    }))
+  })
+
+  it("emits engine lifecycle observability events for a successful turn", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
+
+    const emitObservabilityEvent = vi.fn()
+    vi.doMock("../../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+
+    mockCreate.mockReturnValue(
+      makeStream([makeChunk("ok")])
+    )
+
+    const core = await import("../../heart/core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await core.runAgent([{ role: "system", content: "test" }], callbacks)
+
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "engine.turn_start" }))
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "engine.turn_end" }))
   })
 
   it("fires onModelStreamStart on first content token", async () => {
@@ -1377,6 +1446,40 @@ describe("runAgent", () => {
     expect(assistantMsg.content).toBe("hello azure")
 
     // config cleanup handled by resetConfigCache in beforeEach
+  })
+
+  it("Azure: propagates traceId option into responses metadata", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
+
+    mockResponsesCreate.mockReturnValue(makeResponsesStream([
+      { type: "response.output_text.delta", delta: "hello azure trace" },
+    ]))
+
+    const core = await import("../../heart/core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await core.runAgent(
+      [{ role: "system", content: "test" }],
+      callbacks,
+      undefined,
+      undefined,
+      { traceId: "trace-azure" } as any,
+    )
+
+    const params = mockResponsesCreate.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(params).toEqual(expect.objectContaining({
+      metadata: { trace_id: "trace-azure" },
+    }))
   })
 
   it("Azure tool-use turn: tool executed, result pushed, loop continues", async () => {

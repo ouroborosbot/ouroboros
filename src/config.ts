@@ -2,6 +2,7 @@ import * as fs from "fs"
 import * as path from "path"
 import * as os from "os"
 import { loadAgentConfig, getAgentName } from "./identity"
+import { emitObservabilityEvent } from "./observability/runtime"
 
 export interface AzureProviderConfig {
   apiKey: string
@@ -122,7 +123,15 @@ function deepMerge(defaults: Record<string, unknown>, partial: Record<string, un
 }
 
 export function loadConfig(): OuroborosConfig {
-  if (_cachedConfig) return _cachedConfig
+  if (_cachedConfig) {
+    emitObservabilityEvent({
+      event: "config.load",
+      component: "config/identity",
+      message: "config loaded from cache",
+      meta: { source: "cache" },
+    })
+    return _cachedConfig
+  }
 
   const configPath = resolveConfigPath()
 
@@ -134,11 +143,30 @@ export function loadConfig(): OuroborosConfig {
   try {
     const raw = fs.readFileSync(configPath, "utf-8")
     fileData = JSON.parse(raw) as Record<string, unknown>
-  } catch {
+  } catch (error) {
+    emitObservabilityEvent({
+      level: "warn",
+      event: "config_identity.error",
+      component: "config/identity",
+      message: "config read failed; defaults applied",
+      meta: {
+        phase: "loadConfig",
+        reason: error instanceof Error ? error.message : String(error),
+      },
+    })
     // ENOENT or parse error -- use defaults
   }
 
   _cachedConfig = deepMerge(DEFAULT_CONFIG as unknown as Record<string, unknown>, fileData) as unknown as OuroborosConfig
+  emitObservabilityEvent({
+    event: "config.load",
+    component: "config/identity",
+    message: "config loaded from disk",
+    meta: {
+      source: "disk",
+      used_defaults_only: Object.keys(fileData).length === 0,
+    },
+  })
   return _cachedConfig
 }
 
@@ -197,10 +225,18 @@ export function getSessionDir(): string {
   return path.join(os.homedir(), ".agentconfigs", getAgentName(), "sessions")
 }
 
+export function getLogsDir(): string {
+  return path.join(os.homedir(), ".agentconfigs", getAgentName(), "logs")
+}
+
 function sanitizeKey(key: string): string {
   return key.replace(/[/:]/g, "_")
 }
 
 export function sessionPath(channel: string, key: string): string {
   return path.join(getSessionDir(), channel, sanitizeKey(key) + ".json")
+}
+
+export function logPath(channel: string, key: string): string {
+  return path.join(getLogsDir(), channel, sanitizeKey(key) + ".ndjson")
 }

@@ -164,6 +164,13 @@ describe("queryWorkItems", () => {
     const result = await queryWorkItems("token", "myorg", "query")
     expect(result).toContain("NETWORK_ERROR")
   })
+
+  it("returns NETWORK_ERROR on non-Error fetch failure", async () => {
+    mockFetch.mockRejectedValueOnce("network failure string")
+
+    const result = await queryWorkItems("token", "myorg", "query")
+    expect(result).toContain("NETWORK_ERROR")
+  })
 })
 
 describe("adoRequest", () => {
@@ -343,6 +350,13 @@ describe("adoRequest", () => {
 
   it("returns NETWORK_ERROR on fetch failure", async () => {
     mockFetch.mockRejectedValue(new Error("network error"))
+
+    const result = await adoRequest("token", "GET", "myorg", "/_apis/projects")
+    expect(result).toContain("NETWORK_ERROR")
+  })
+
+  it("returns NETWORK_ERROR on non-Error fetch failure", async () => {
+    mockFetch.mockRejectedValue("network failure string")
 
     const result = await adoRequest("token", "GET", "myorg", "/_apis/projects")
     expect(result).toContain("NETWORK_ERROR")

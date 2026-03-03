@@ -752,7 +752,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
 
     expect(runAgentCalls.length).toBe(1)
     // 5th argument (index 4) should be options with toolChoiceRequired: true
-    expect(runAgentCalls[0][4]).toMatchObject({ toolChoiceRequired: true })
+    expect(runAgentCalls[0][4]).toEqual(expect.objectContaining({ toolChoiceRequired: true }))
   })
 
   it("passes toolChoiceRequired: false when toggle is off (default)", async () => {
@@ -764,7 +764,18 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
 
     expect(runAgentCalls.length).toBe(1)
     // 5th argument (index 4) should have toolChoiceRequired: false
-    expect(runAgentCalls[0][4]).toMatchObject({ toolChoiceRequired: false })
+    expect(runAgentCalls[0][4]).toEqual(expect.objectContaining({ toolChoiceRequired: false }))
+  })
+
+  it("creates and passes a traceId option to runAgent at CLI turn entry", async () => {
+    const runAgentCalls: any[][] = []
+    setupBasic({ inputSequence: ["hello", "/exit"] })
+    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
+
+    await main()
+
+    expect(runAgentCalls.length).toBe(1)
+    expect(runAgentCalls[0][4]).toEqual(expect.objectContaining({ traceId: expect.any(String) }))
   })
 
   it("warns on stderr when assistant response is empty", async () => {

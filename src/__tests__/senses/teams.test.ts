@@ -335,6 +335,24 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
+  it("keeps Teams stream output channel-native and emits structured channel events", async () => {
+    vi.resetModules()
+    const emitObservabilityEvent = vi.fn()
+    vi.doMock("../../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onToolEnd("read_file", "package.json", true)
+
+    expect(mockStream.emit).toHaveBeenCalledWith("\n\n\u2713 read_file (package.json)\n\n")
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "channel.message_sent",
+      component: "channels",
+    }))
+  })
+
   // --- Streaming-mode onKick: inline via stream.emit ---
 
   it("onKick emits inline formatted kick via stream.emit", async () => {
@@ -1987,6 +2005,18 @@ describe("Teams adapter - session persistence", () => {
     // No teamsContext parameter -- should still work
     await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
     expect(runAgentFn).toHaveBeenCalled()
+  })
+
+  it("creates and passes a traceId option to runAgent at Teams turn entry", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
+    expect(runAgentFn).toHaveBeenCalled()
+    expect(runAgentFn.mock.calls[0][4]).toEqual(expect.objectContaining({ traceId: expect.any(String) }))
   })
 
   it("skipConfirmation=true in teamsChannel config sets skipConfirmation in agent options", async () => {

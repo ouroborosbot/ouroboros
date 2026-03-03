@@ -4,6 +4,7 @@ import type { ToolContext, ToolDefinition } from "./tools-base";
 import { teamsToolDefinitions, summarizeTeamsArgs } from "./tools-teams";
 import { adoSemanticToolDefinitions } from "./ado-semantic";
 import type { ChannelCapabilities } from "../mind/context/types";
+import { emitObservabilityEvent } from "../observability/runtime";
 
 // Re-export types and constants used by the rest of the codebase
 export { tools, finalAnswerTool } from "./tools-base";
@@ -35,10 +36,45 @@ export function isConfirmationRequired(toolName: string): boolean {
 }
 
 export async function execTool(name: string, args: Record<string, string>, ctx?: ToolContext): Promise<string> {
+  emitObservabilityEvent({
+    event: "tool.start",
+    component: "tools",
+    message: "tool execution started",
+    meta: { name },
+  });
+
   // Look up from combined registry
   const def = allDefinitions.find((d) => d.tool.function.name === name);
-  if (!def) return `unknown: ${name}`;
-  return await def.handler(args, ctx);
+  if (!def) {
+    emitObservabilityEvent({
+      level: "error",
+      event: "tool.error",
+      component: "tools",
+      message: "unknown tool requested",
+      meta: { name },
+    });
+    return `unknown: ${name}`;
+  }
+
+  try {
+    const result = await def.handler(args, ctx);
+    emitObservabilityEvent({
+      event: "tool.end",
+      component: "tools",
+      message: "tool execution finished",
+      meta: { name, success: true },
+    });
+    return result;
+  } catch (error) {
+    emitObservabilityEvent({
+      level: "error",
+      event: "tool.error",
+      component: "tools",
+      message: error instanceof Error ? error.message : String(error),
+      meta: { name },
+    });
+    throw error;
+  }
 }
 
 export function summarizeArgs(name: string, args: Record<string, string>): string {

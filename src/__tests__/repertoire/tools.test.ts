@@ -73,6 +73,11 @@ describe("execTool", () => {
     expect(fs.readFileSync).toHaveBeenCalledWith("/tmp/test.txt", "utf-8")
   })
 
+  it("rethrows non-Error values from handlers", async () => {
+    vi.mocked(fs.readFileSync).mockImplementation(() => { throw "boom" })
+    await expect(execTool("read_file", { path: "/tmp/test.txt" })).rejects.toBe("boom")
+  })
+
   // ── write_file ──
   it("write_file writes content and returns ok", async () => {
     vi.mocked(fs.writeFileSync).mockReturnValue(undefined)

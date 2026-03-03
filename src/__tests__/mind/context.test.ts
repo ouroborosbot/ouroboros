@@ -456,3 +456,27 @@ describe("postTurn", () => {
     expect(fs.writeFileSync).toHaveBeenCalledTimes(1)
   })
 })
+
+describe("mind observability instrumentation", () => {
+  it("trimMessages emits mind step lifecycle events", async () => {
+    vi.resetModules()
+    const emitObservabilityEvent = vi.fn()
+    vi.doMock("../../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+
+    const { trimMessages } = await import("../../mind/context")
+    trimMessages(
+      [
+        { role: "system", content: "sys" } as any,
+        { role: "user", content: "hello" } as any,
+      ],
+      100,
+      20,
+      200,
+    )
+
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "mind.step_start" }))
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "mind.step_end" }))
+  })
+})

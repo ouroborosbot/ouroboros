@@ -34,6 +34,12 @@ Task docs go in `<agent>/tasks/` with naming scheme `YYYY-MM-DD-HHMM-{planning|d
 - Do not make unilateral choices for unresolved planning decisions; present options and capture explicit user direction.
 - If a decision remains unresolved, keep it in `Open Questions`, set status to `NEEDS_REVIEW`, and stop at the gate.
 
+### Configuration Policy (Required)
+
+- Do not introduce or require environment variables for this project.
+- If configuration is needed, prefer explicit CLI arguments, committed config files, or in-repo defaults.
+- If a proposal would normally use env vars, stop and present a non-env-var alternative instead.
+
 ### Git Discipline
 
 - When a logical unit of work is complete and committable, commit immediately.
