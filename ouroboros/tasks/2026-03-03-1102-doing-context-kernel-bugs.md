@@ -140,13 +140,13 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Output**: Clean `tsc --noEmit` output (exit 0), full test suite green.
 **Acceptance**: `npx tsc --noEmit` exits 0 with no errors, `npx vitest run` passes all tests with no failures or warnings.
 
-### ⬜ Unit 4a: Directory rename context -> friends -- Execute
+### ✅ Unit 4a: Directory rename context -> friends -- Execute
 **What**: Rename `src/mind/context/` directory to `src/mind/friends/` and `src/__tests__/mind/context/` to `src/__tests__/mind/friends/`. Update ALL import paths across the entire codebase that reference `mind/context/` (with trailing slash or further path component like `mind/context/types`) to `mind/friends/`. IMPORTANT: `src/mind/context.ts` (the session management file, no trailing slash) is a separate file and must NOT be renamed or have its imports changed. Imports like `from "../mind/context"` refer to `context.ts`, not the directory. Only imports with a path component after `context/` (e.g., `mind/context/types`, `mind/context/store-file`) are renamed. This is a mechanical refactor (no new logic), so strict TDD red/green cycle does not apply. Instead: rename, update imports, verify.
 **Output**: All files in `context/` directory moved to `friends/`, all deep imports updated.
 **Files**: All files importing from `mind/context/` (with further path component)
 **Acceptance**: `tsc --noEmit` passes, all existing tests pass with new paths.
 
-### ⬜ Unit 4b: Directory rename -- Verification
+### ✅ Unit 4b: Directory rename -- Verification
 **What**: (1) Run `npx tsc --noEmit` to verify all import paths resolve after the rename. (2) Run `npx vitest run` to verify no broken imports at runtime. (3) Grep for any remaining `mind/context/` references (with trailing slash -- `mind/context.ts` is a separate file that should NOT be matched). Exclude planning/doing docs and node_modules from grep.
 **Output**: Clean tsc output, full test suite green, grep results showing zero stale references to `mind/context/`.
 **Acceptance**: `npx tsc --noEmit` exits 0, all tests pass, zero references to `mind/context/` in source code.
