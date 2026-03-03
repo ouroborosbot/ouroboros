@@ -1,6 +1,6 @@
 # Planning: Ouroboros Migration — Observability (Phase 2)
 
-**Status**: approved
+**Status**: NEEDS_REVIEW
 **Created**: 2026-03-02 15:01
 
 ## Goal
@@ -14,10 +14,12 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Add shared observability module under `src/observability/` (logger, trace helpers, factory exports).
 - Define machine-first NDJSON event schema and configurable `logging.level`.
 - Lock required log envelope fields for all structured events: `ts`, `level`, `event`, `trace_id`, `component`, `message`, `meta`.
+- Persist structured logs with session-style pathing under `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson`.
+- Keep log persistence append-only NDJSON (one event per line) so multiple agents can parse/validate behavior directly from files.
 - Add trace ID propagation through turn entrypoints and engine execution path.
 - Instrument runtime paths across `src/` with event-level logging (including channels, engine, mind, clients, config/identity, repertoire, and entrypoints).
 - Lock minimum event catalog coverage per component (entrypoints, channels, engine, mind, tools, config/identity, clients, repertoire) for this phase.
-- Keep user-facing output in channel-native paths while routing operational diagnostics through logger sinks.
+- Keep user-facing output in channel-native paths while routing operational diagnostics through logger sinks (`stderr` + file).
 - Add tests for logger behavior, trace helpers, and instrumentation points.
 - Ensure test/build/coverage remain green with 100% coverage on new code.
 
@@ -26,11 +28,13 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - External telemetry sinks (Datadog, PostHog, etc.).
 - Chunk-level content logging and streaming-chunk spam logs.
 - Logging sensitive payloads (full user messages, raw tool args/secrets).
+- Session/log key collision hardening (hash-suffixed filenames) and migration of existing session naming.
 
 ## Completion Criteria
 - [ ] `src/observability/` module exists with reusable logger + trace ID primitives.
-- [ ] NDJSON (`json`) is the canonical log format with configurable `logging.level` and stderr sink for this phase.
+- [ ] NDJSON (`json`) is the canonical log format with configurable `logging.level` and dual sinks for this phase (`stderr` + session-style file).
 - [ ] All structured events use required envelope fields: `ts`, `level`, `event`, `trace_id`, `component`, `message`, `meta`.
+- [ ] File sink persists append-only NDJSON events at `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson` without truncating per turn.
 - [ ] Runtime paths across `src/` emit event-level structured logs with no chunk-level or sensitive-payload dumps.
 - [ ] Minimum component event catalog is implemented and exercised in tests (entrypoints/channels/engine/mind/tools/config/identity/clients/repertoire).
 - [ ] Trace IDs are generated at turn entry and propagated through core execution.
@@ -54,9 +58,12 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - This planning doc targets migration sequence item #2: Observability.
 - The completed testing-strategy planning/doing task is treated as predecessor and baseline.
 - Logging/output contract for this phase is channel-agnostic: user-facing content stays in channel-native output paths (CLI stdout, Teams APIs, etc.), while structured operational diagnostics flow through the observability path (stderr sink in this phase).
-- Logging configuration for this phase is machine-first: NDJSON (`json`) is the canonical output format, `logging.level` is configurable, and sink stays `stderr` only; file-based sinks/rotation are deferred.
+- Logging configuration for this phase is machine-first: NDJSON (`json`) is canonical, `logging.level` is configurable, and sinks fan out to `stderr` plus a session-style file sink.
 - Required instrumentation surface for this phase is full runtime coverage across `src/` with event-level logs (not chunk-level content), while excluding sensitive payload dumps.
 - Required structured log envelope for this phase is locked to: `ts`, `level`, `event`, `trace_id`, `component`, `message`, `meta`.
+- Persisted logs use session-style pathing: `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson`.
+- Persisted logs are append-only NDJSON (one JSON event per line) so agents can arbitrarily read and parse run history.
+- `sanitizeKey` parity with sessions is intentional for this phase; collision hardening is explicitly deferred.
 - Minimum required event catalog for this phase is locked by component:
   - entrypoints: `turn.start`, `turn.end`, `turn.error`
   - channels: `channel.message_sent`, `channel.error`
@@ -87,3 +94,4 @@ Model consumption is primary: logs should be stable, structured, and parseable f
 - [2026-03-02 15:37] Consistency pass: aligned Scope/Out of Scope/Completion Criteria with finalized Q1-Q3 decisions
 - [2026-03-02 15:48] Locked required log envelope fields and minimum component event catalog to remove interpretation gaps
 - [2026-03-02 15:50] Planning approved for conversion to doing doc
+- [PENDING_PERSISTENCE_TS] Added session-style append-only NDJSON file persistence (`stderr` + file sinks) and deferred key-collision hardening
