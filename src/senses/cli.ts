@@ -331,7 +331,6 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
 }
 
 export async function main() {
-  const sessPath = sessionPath("default", "cli", "session")
   const registry = createCommandRegistry()
   registerDefaultCommands(registry)
 
@@ -352,13 +351,17 @@ export async function main() {
     /* v8 ignore next -- CLI has no OAuth sign-in; this no-op satisfies the interface @preserve */
     signin: async () => undefined,
     context: resolvedContext,
+    friendStore,
   }
+
+  const friendId = resolvedContext.friend.id
+  const sessPath = sessionPath(friendId, "cli", "session")
 
   // Load existing session or start fresh
   const existing = loadSession(sessPath)
   const messages: OpenAI.ChatCompletionMessageParam[] = existing?.messages && existing.messages.length > 0
     ? existing.messages
-    : [{ role: "system", content: await buildSystem("cli") }]
+    : [{ role: "system", content: await buildSystem("cli", undefined, resolvedContext) }]
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true })
   const ctrl = new InputController(rl)
