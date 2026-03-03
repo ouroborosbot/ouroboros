@@ -6,6 +6,7 @@ import { confirmationRequired } from "./tools-teams";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
 import type { AssistantMessageWithReasoning, ResponseItem } from "./streaming";
 import { detectKick } from "./kicks";
+import { emitObservabilityEvent } from "../observability/runtime";
 import type { TurnResult } from "./streaming";
 import type { UsageData } from "../mind/context";
 import { trimMessages, cachedBuildSystem } from "../mind/context";
@@ -169,6 +170,13 @@ export async function runAgent(
   const model = getModel();
   const { maxToolOutputChars } = getContextConfig();
   const traceId = options?.traceId;
+  emitObservabilityEvent({
+    event: "engine.turn_start",
+    trace_id: traceId,
+    component: "engine",
+    message: "runAgent turn started",
+    meta: { channel: channel ?? "unknown", provider },
+  });
 
   // Refresh system prompt at start of each turn when channel is provided
   if (channel) {
@@ -408,9 +416,24 @@ export async function runAgent(
         continue;
       }
       callbacks.onError(e instanceof Error ? e : new Error(String(e)), "terminal");
+      emitObservabilityEvent({
+        level: "error",
+        event: "engine.error",
+        trace_id: traceId,
+        component: "engine",
+        message: e instanceof Error ? e.message : String(e),
+        meta: {},
+      });
       stripLastToolCalls(messages);
       done = true;
     }
   }
+  emitObservabilityEvent({
+    event: "engine.turn_end",
+    trace_id: traceId,
+    component: "engine",
+    message: "runAgent turn completed",
+    meta: { done },
+  });
   return { usage: lastUsage };
 }

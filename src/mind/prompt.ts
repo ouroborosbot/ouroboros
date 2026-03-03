@@ -5,6 +5,7 @@ import { getAzureConfig } from "../config";
 import { finalAnswerTool, getToolsForChannel } from "../engine/tools";
 import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName } from "../identity";
+import { emitObservabilityEvent } from "../observability/runtime";
 
 // Lazy-loaded psyche text cache
 let _psycheCache: { soul: string; identity: string; lore: string; friends: string } | null = null;
@@ -139,7 +140,14 @@ when you have finished all work and want to give a text response, call the \`fin
 }
 
 export function buildSystem(channel: Channel = "cli", options?: BuildSystemOptions): string {
-  return [
+  emitObservabilityEvent({
+    event: "mind.step_start",
+    component: "mind",
+    message: "buildSystem started",
+    meta: { channel, options: options ?? {} },
+  });
+
+  const system = [
     soulSection(),
     identitySection(),
     loreSection(),
@@ -154,4 +162,13 @@ export function buildSystem(channel: Channel = "cli", options?: BuildSystemOptio
   ]
     .filter(Boolean)
     .join("\n\n");
+
+  emitObservabilityEvent({
+    event: "mind.step_end",
+    component: "mind",
+    message: "buildSystem completed",
+    meta: { channel },
+  });
+
+  return system;
 }
