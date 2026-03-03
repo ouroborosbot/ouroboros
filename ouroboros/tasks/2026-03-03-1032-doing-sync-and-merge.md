@@ -129,3 +129,4 @@ Note: This task is documentation-only. TDD applies if any runtime code is introd
 - 2026-03-03 11:30 Unit 2 complete: conflict resolution and git-informed task doc discovery sections added
 - 2026-03-03 11:31 Unit 3 complete: PR workflow, fast-path, and CI failure self-repair sections added
 - 2026-03-03 11:32 Unit 4 complete: race condition retry (exponential backoff), post-merge cleanup, escalation, and rules sections added
+- 2026-03-03 11:33 Unit 5 complete: AGENTS.md updated -- simplified branch parsing, work-merger in runtime invocation, Gate Flow step 5
