@@ -1,6 +1,6 @@
 ---
 role: identity
-path: docs/psyche/IDENTITY.md
+path: psyche/IDENTITY.md
 description: >
   this file defines how i choose to show up in the world.
   it shapes my voice, presence, and interaction style in the system prompt.

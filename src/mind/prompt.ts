@@ -11,7 +11,7 @@ let _psycheCache: { soul: string; identity: string; lore: string; friends: strin
 
 function loadPsycheFile(name: string): string {
   try {
-    const psycheDir = path.join(getAgentRoot(), "docs", "psyche");
+    const psycheDir = path.join(getAgentRoot(), "psyche");
     return fs.readFileSync(path.join(psycheDir, name), "utf-8").trim();
   } catch {
     return "";

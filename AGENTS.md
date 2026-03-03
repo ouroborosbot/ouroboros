@@ -2,7 +2,7 @@
 
 ### Agent Context (Required)
 
-Task docs go in `<agent>/docs/tasks/` with naming scheme `YYYY-MM-DD-HHMM-{planning|doing}-<slug>.md`.
+Task docs go in `<agent>/tasks/` with naming scheme `YYYY-MM-DD-HHMM-{planning|doing}-<slug>.md`.
 
 - Default `<agent>` from the current git branch using this shape: `[prefix/]<agent>[/feature...]`.
   - If branch is `<agent>`, use that token.
@@ -20,9 +20,9 @@ Task docs go in `<agent>/docs/tasks/` with naming scheme `YYYY-MM-DD-HHMM-{plann
 
 ### Gate Flow
 
-1. **Plan**: Launch `work-planner`. It produces/updates a planning doc under `<agent>/docs/tasks/`.
+1. **Plan**: Launch `work-planner`. It produces/updates a planning doc under `<agent>/tasks/`.
 2. **Review**: Show the user the planning doc path and STOP. Wait for explicit user approval.
-3. **Convert**: Only after user approves the planning doc, re-run `work-planner` to convert to a doing doc in the same `<agent>/docs/tasks/` directory. User must also review and sign off on the doing doc before implementation.
+3. **Convert**: Only after user approves the planning doc, re-run `work-planner` to convert to a doing doc in the same `<agent>/tasks/` directory. User must also review and sign off on the doing doc before implementation.
 4. **Implement**: Only after user explicitly asks, launch `work-doer` to execute the doing doc. Never implement inside `work-planner`.
 5. **Never self-approve**: Do not say "looks good" and proceed. The user reviews every planning and doing doc.
 

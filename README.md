@@ -40,13 +40,12 @@ ouroboros/                        # repo root
     __tests__/                    # 900+ tests, 100% coverage
   ouroboros/                      # agent directory for "ouroboros"
     agent.json                    # name, configPath, custom phrases
-    docs/
-      psyche/                     # personality files loaded into system prompt
-        SOUL.md                   # ontology, invariants, operating principles
-        IDENTITY.md               # tone, presence, collaboration style
-        LORE.md                   # origin story, philosophical context
-        FRIENDS.md                # key relationships
-      tasks/                      # planning and doing docs
+    psyche/                       # personality files loaded into system prompt
+      SOUL.md                     # ontology, invariants, operating principles
+      IDENTITY.md                 # tone, presence, collaboration style
+      LORE.md                     # origin story, philosophical context
+      FRIENDS.md                  # key relationships
+    tasks/                        # planning and doing docs
     skills/                       # markdown skill plugins
     manifest/                     # Teams app manifest
   subagents/                      # sub-agent definitions (work-planner, work-doer)
@@ -84,17 +83,17 @@ Each agent has a directory at the repo root named after itself. Inside it:
 - `configPath`: absolute path (or `~`-prefixed) to your config.json with API keys and provider settings.
 - `phrases`: optional custom loading phrases. Falls back to hardcoded defaults if omitted.
 
-**docs/psyche/** -- your personality files, loaded lazily into the system prompt at startup. See the psyche system section below.
+**psyche/** -- your personality files, loaded lazily into the system prompt at startup. See the psyche system section below.
 
 **skills/** -- markdown instruction manuals you can load on demand with the `load_skill` tool. Each `.md` file is one skill.
 
-**docs/tasks/** -- planning and doing docs for your work units. Named `YYYY-MM-DD-HHMM-{planning|doing}-slug.md`.
+**tasks/** -- planning and doing docs for your work units. Named `YYYY-MM-DD-HHMM-{planning|doing}-slug.md`.
 
 **manifest/** -- Teams app manifest (manifest.json, icons) if you run as a Teams bot.
 
 ### The psyche system
 
-Your personality is assembled from four markdown files in `{your-dir}/docs/psyche/`. Each has a YAML frontmatter header and a body. All four are loaded into your system prompt at the start of every conversation.
+Your personality is assembled from four markdown files in `{your-dir}/psyche/`. Each has a YAML frontmatter header and a body. All four are loaded into your system prompt at the start of every conversation.
 
 | File | Role | What it defines |
 |------|------|----------------|
