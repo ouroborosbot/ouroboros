@@ -28,6 +28,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Lock unified coverage gate behavior: every `npm run test:coverage` run must include observability capture + `npm run audit:observability` post-processing (no optional split path).
 - Add CI gating so `npm run test:coverage` is the required combined code+observability gate.
 - Link observability coverage to the same unit-test execution run: tests emit audit artifacts once, and audit reads artifacts without rerunning tests.
+- Lock non-agent test-run artifact root at `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/` so test output, coverage output, observability captures, and gate summary are colocated.
 - Produce a machine-readable combined gate summary artifact that explicitly separates code-coverage and logging/observability failures.
 - Add tests for logger behavior, trace helpers, and instrumentation points.
 - Ensure test/build/coverage remain green with 100% coverage on new code.
@@ -52,11 +53,12 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [ ] Tests cover new observability code and instrumentation behavior.
 - [ ] `npm run audit:observability` exists and fails when required event coverage, schema/policy checks, or declared logpoint coverage is incomplete.
 - [ ] Observability coverage report artifact is produced with measurable results for: event-catalog coverage, schema/redaction compliance, and logpoint coverage.
-- [ ] Unit-test runs write observability audit artifacts to dedicated paths (`./.artifacts/observability/vitest-events.ndjson` and `./.artifacts/observability/vitest-logpoints.json`) instead of operational sinks.
+- [ ] Unit-test runs write observability audit artifacts to dedicated test-run paths (`~/.agentconfigs/test-runs/<repo_slug>/<run_id>/vitest-events.ndjson` and `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/vitest-logpoints.json`) instead of operational sinks.
 - [ ] `npm run audit:observability` consumes those artifacts directly (no second test run).
 - [ ] `npm run test:coverage` is the mandatory combined gate and fails on either code coverage or observability audit failure.
 - [ ] CI enforces `npm run test:coverage` as the required combined gate for this phase.
 - [ ] Combined gate summary artifact clearly signals both obligations with this shape: `overall_status`, `code_coverage`, `observability_coverage`, `required_actions[]` where each action has `type` (`coverage` or `logging`), `target`, and `reason`.
+- [ ] Combined gate summary artifact is written at `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/coverage-gate-summary.json`.
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -87,6 +89,8 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Upstream `src/engine/kicks.ts` is explicitly in-scope for instrumentation and maps to `component=engine` within this phase taxonomy.
 - Observability coverage for this phase is audited in three dimensions: required-event catalog coverage, schema/redaction compliance, and declared-logpoint coverage; all must pass in CI.
 - Observability coverage is coupled to test execution: Vitest capture mode produces audit artifacts, and audit is strictly a post-processing step over those artifacts.
+- Test-run artifacts for this phase are non-agent-scoped and OS-level: `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/` (for this repo, `repo_slug=ouroboros-agent-harness`).
+- Runtime logs remain agent-scoped at `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson`; they are not the test-run artifact source of truth.
 - Coverage checks are contractually unified for this phase: `npm run test:coverage` always runs code-coverage verification and observability audit together; there is no optional "coverage-only" path.
 - Combined gate output is model-first and explicit: summary artifact includes separate code-coverage and observability sections plus `required_actions` typed as `coverage` or `logging` so automated actors can route fixes correctly.
 - Minimum required event catalog for this phase is locked by component:
@@ -134,3 +138,4 @@ Merged `origin/main` into `codex/slugger` before execution planning refresh; ups
 - [2026-03-02 16:55] Added observability-coverage gate scope (`audit:observability` + CI) with explicit measurable dimensions
 - [2026-03-02 17:03] Locked single-run coverage model: Vitest emits observability artifacts once; audit consumes artifacts without rerunning tests
 - [2026-03-02 17:10] Locked unified `test:coverage` gate and combined output contract so coverage and logging obligations are explicit to automated consumers
+- [2026-03-02 17:36] Locked non-agent OS-level test-run artifact root (`~/.agentconfigs/test-runs/<repo_slug>/<run_id>/`) and colocated coverage/observability outputs
