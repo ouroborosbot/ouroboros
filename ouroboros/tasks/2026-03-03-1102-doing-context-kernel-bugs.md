@@ -174,13 +174,13 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Files**: `src/__tests__/repertoire/tools.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because getToolsForChannel doesn't accept preferences yet.
 
-### ⬜ Unit 6b: Preference injection -- Implementation
+### ✅ Unit 6b: Preference injection -- Implementation
 **What**: Update `getToolsForChannel()` in `tools.ts` to accept optional `toolPreferences` parameter. For each preference key, find tools whose `integration` field matches, and append the preference text to `function.description`. Return new tool objects (don't mutate originals).
 **Output**: Updated `tools.ts` with preference injection logic.
 **Files**: `src/repertoire/tools.ts`
 **Acceptance**: All preference injection tests PASS (green), no warnings.
 
-### ⬜ Unit 6c: Preference injection -- Coverage & Refactor
+### ✅ Unit 6c: Preference injection -- Coverage & Refactor
 **What**: Verify 100% coverage on getToolsForChannel preference injection.
 **Output**: Coverage report showing 100% on `tools.ts` preference code.
 **Acceptance**: 100% coverage on new code, tests still green.
