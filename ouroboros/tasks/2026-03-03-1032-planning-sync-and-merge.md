@@ -109,3 +109,4 @@ The work-merger subagent is purely a documentation/workflow artifact -- it instr
 - 2026-03-03 10:39 Incorporated user decisions: merge commits, PR-based merge, fast-path, dynamic discovery with recency bias, gh CLI
 - 2026-03-03 10:57 Incorporated feedback: corrected branch naming (Codex uses codex/<agent>, not <agent>/<slug>), added explicit Codex skill dual-install requirements
 - 2026-03-03 11:04 Incorporated feedback: unified branch naming (<agent>/<slug> for both), race condition retry flow, CI failure self-repair, post-merge branch cleanup
+- 2026-03-03 11:07 Added CONTRIBUTING.md to scope, completion criteria, and context references
