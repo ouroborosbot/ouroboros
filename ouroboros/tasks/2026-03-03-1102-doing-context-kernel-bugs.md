@@ -264,7 +264,7 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Files**: `src/__tests__/heart/core.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because core.ts doesn't do per-turn refresh yet.
 
-### ⬜ Unit 11b: Agent loop per-turn refresh -- Implementation
+### ✅ Unit 11b: Agent loop per-turn refresh -- Implementation
 **What**: Update `runAgent()` in `core.ts`: (1) At start of each iteration, if `options?.toolContext?.friendStore` and `options?.toolContext?.context?.friend?.id` exist, re-read the friend record from disk via `friendStore.get(friendId)`. (2) Rebuild system prompt with `buildSystem(channel, options, updatedContext)` using the fresh friend record. (3) Pass `friend.toolPreferences` to `getToolsForChannel()` for preference injection. (4) Update the ToolContext re-export to use new type.
 **Output**: Updated `core.ts` with per-turn refresh logic.
 **Files**: `src/heart/core.ts`
