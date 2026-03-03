@@ -130,3 +130,4 @@ Note: This task is documentation-only. TDD applies if any runtime code is introd
 - 2026-03-03 11:31 Unit 3 complete: PR workflow, fast-path, and CI failure self-repair sections added
 - 2026-03-03 11:32 Unit 4 complete: race condition retry (exponential backoff), post-merge cleanup, escalation, and rules sections added
 - 2026-03-03 11:33 Unit 5 complete: AGENTS.md updated -- simplified branch parsing, work-merger in runtime invocation, Gate Flow step 5
+- 2026-03-03 11:34 Unit 6 complete: subagents/README.md updated -- work-merger in table, install commands (Claude Code + Codex), workflow step 5
