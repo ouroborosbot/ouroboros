@@ -102,7 +102,7 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Acceptance**: 100% coverage on new code, tests still green.
 
 ### ⬜ Unit 2a: FileFriendStore (two-backend split) -- Tests
-**What**: Write tests for `FileFriendStore` with two-backend split (agent knowledge path + PII bridge path). Test: constructor auto-creates directories, `get()` merges data from both backends, `put()` splits record across both (agent knowledge gets id/displayName/toolPreferences/notes/createdAt/updatedAt/schemaVersion; PII bridge gets id/externalIds/tenantMemberships/schemaVersion), `delete()` removes from both, `findByExternalId()` scans PII bridge then merges with agent knowledge. Edge cases: missing files return null, corrupted JSON returns null, empty directory returns null from findByExternalId, schema migration.
+**What**: Write tests for `FileFriendStore` with two-backend split (agent knowledge path + PII bridge path). Test: constructor auto-creates directories, `get()` merges data from both backends, `put()` splits record across both (agent knowledge gets id/displayName/toolPreferences/notes/createdAt/updatedAt/schemaVersion; PII bridge gets id/externalIds/tenantMemberships/schemaVersion), `delete()` removes from both, `findByExternalId()` scans PII bridge then merges with agent knowledge. Edge cases: missing files return null, corrupted JSON returns null, empty directory returns null from findByExternalId, schema migration. **Critical**: include tests that verify `put()` writes files to BOTH backend paths independently -- read each backend file directly (not via `get()`) to confirm the correct fields landed in the correct location. This catches silent single-backend write failures.
 **Output**: Updated `store-file.test.ts` with FileFriendStore tests.
 **Files**: `src/__tests__/mind/context/store-file.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `FileFriendStore` doesn't exist yet.
@@ -111,7 +111,7 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **What**: Implement `FileFriendStore` class in `store-file.ts`. Constructor takes two paths (agentKnowledgePath, piiBridgePath) and calls `mkdirSync(path, { recursive: true })` for both. `get(id)` reads both JSON files and merges. `put(id, record)` splits the `FriendRecord` and writes to both locations. `delete(id)` removes from both. `findByExternalId(provider, externalId, tenantId?)` scans PII bridge directory for matching external ID, then reads agent knowledge and merges. Remove old `FileContextStore` and `FileCollectionStore`.
 **Output**: Updated `store-file.ts` with FileFriendStore implementation.
 **Files**: `src/mind/context/store-file.ts`
-**Acceptance**: All store-file tests PASS (green), no warnings.
+**Acceptance**: All store-file tests PASS (green), no warnings. Tests verify that `put()` actually writes files to BOTH backend paths (agent knowledge AND PII bridge) -- not just that the merged `get()` result is correct. This catches the scenario where one backend write silently fails or is skipped.
 
 ### ⬜ Unit 2c: FileFriendStore -- Coverage & Refactor
 **What**: Verify 100% coverage on FileFriendStore. Test all error paths.
@@ -135,6 +135,11 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Output**: Coverage report showing 100% on `resolver.ts`.
 **Acceptance**: 100% coverage on new code, tests still green.
 
+### ⬜ Unit 3d: Pre-rename validation checkpoint
+**What**: Run `npx tsc --noEmit` and `npx vitest run` to verify all type/interface changes from Units 1-3 compile and pass before the directory rename in Unit 4 churns all import paths. This is the cheapest point to catch type errors -- after the rename, every failure is obscured by import path noise.
+**Output**: Clean `tsc --noEmit` output (exit 0), full test suite green.
+**Acceptance**: `npx tsc --noEmit` exits 0 with no errors, `npx vitest run` passes all tests with no failures or warnings.
+
 ### ⬜ Unit 4a: Directory rename context -> friends -- Execute
 **What**: Rename `src/mind/context/` directory to `src/mind/friends/` and `src/__tests__/mind/context/` to `src/__tests__/mind/friends/`. Update ALL import paths across the entire codebase that reference `mind/context/` (with trailing slash or further path component like `mind/context/types`) to `mind/friends/`. IMPORTANT: `src/mind/context.ts` (the session management file, no trailing slash) is a separate file and must NOT be renamed or have its imports changed. Imports like `from "../mind/context"` refer to `context.ts`, not the directory. Only imports with a path component after `context/` (e.g., `mind/context/types`, `mind/context/store-file`) are renamed. This is a mechanical refactor (no new logic), so strict TDD red/green cycle does not apply. Instead: rename, update imports, verify.
 **Output**: All files in `context/` directory moved to `friends/`, all deep imports updated.
@@ -142,9 +147,9 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Acceptance**: `tsc --noEmit` passes, all existing tests pass with new paths.
 
 ### ⬜ Unit 4b: Directory rename -- Verification
-**What**: Run full test suite to verify no broken imports. Grep for any remaining `mind/context/` references (with trailing slash -- `mind/context.ts` is a separate file that should NOT be matched). Exclude planning/doing docs and node_modules from grep.
-**Output**: Grep results showing zero stale references to `mind/context/`.
-**Acceptance**: Zero references to `mind/context/` in source code, all tests pass.
+**What**: (1) Run `npx tsc --noEmit` to verify all import paths resolve after the rename. (2) Run `npx vitest run` to verify no broken imports at runtime. (3) Grep for any remaining `mind/context/` references (with trailing slash -- `mind/context.ts` is a separate file that should NOT be matched). Exclude planning/doing docs and node_modules from grep.
+**Output**: Clean tsc output, full test suite green, grep results showing zero stale references to `mind/context/`.
+**Acceptance**: `npx tsc --noEmit` exits 0, all tests pass, zero references to `mind/context/` in source code.
 
 ### ⬜ Unit 5a: save_friend_note redesign -- Tests
 **What**: Write tests for redesigned `save_friend_note` tool in `tools-base.ts`. Test: new parameters (`type`, `key`, `content`, `override`), validation (missing content returns first-person error, missing key for tool_preference/note returns first-person error, invalid type returns first-person error), `type: "name"` updates displayName and notes["name"], `type: "tool_preference"` with conflict detection (existing value + no override = returns existing + merge instruction, with override = overwrites), `type: "note"` with same conflict behavior, writes to disk via `friendStore.put()`, no in-memory mutation, updated tool description with first-person override guidance. Test the broadened description text.
@@ -179,6 +184,11 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **What**: Verify 100% coverage on getToolsForChannel preference injection.
 **Output**: Coverage report showing 100% on `tools.ts` preference code.
 **Acceptance**: 100% coverage on new code, tests still green.
+
+### ⬜ Unit 6d: Post-tool-layer validation checkpoint
+**What**: Run `npx vitest run` to verify the entire tool layer (save_friend_note redesign in tools-base.ts, preference injection in tools.ts) is solid before moving to the prompt layer in Unit 7. Units 5-6 modified core tool infrastructure -- catch any breakage here rather than discovering it while debugging prompt tests.
+**Output**: Full test suite green.
+**Acceptance**: `npx vitest run` passes all tests with no failures or warnings.
 
 ### ⬜ Unit 7a: System prompt contextSection redesign -- Tests
 **What**: Write tests for updated `contextSection()` in `prompt.ts`. Test: no context = empty string, context with friend renders `friend: displayName`, authority section removed entirely, notes rendered in system prompt (first person), toolPreferences NOT rendered in system prompt, memory ephemerality instruction present when friend context exists, name-quality instruction present with displayName, new-friend instruction present when notes and toolPreferences both empty, new-friend instruction absent when any note or preference exists, priority guidance present, working-memory trust instruction present, stale notes awareness instruction present. Test `buildSystem()` passes context through.
@@ -264,6 +274,11 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **What**: Verify 100% coverage on core.ts changes.
 **Output**: Coverage report showing 100% on core.ts changes.
 **Acceptance**: 100% coverage on new code, tests still green.
+
+### ⬜ Unit 11d: Full integration validation checkpoint
+**What**: Run `npx tsc --noEmit` and `npx vitest run` to verify the entire dependency chain compiles and all tests pass after all implementation units (1-11) are complete. This catches cross-unit wiring issues -- type mismatches between the store layer (Units 1-2), resolver (Unit 3), tools (Units 5-6), prompt (Unit 7), session paths (Unit 8), adapters (Units 9-10), and agent loop (Unit 11) -- before the final documentation/cleanup unit.
+**Output**: Clean `tsc --noEmit` output (exit 0), full test suite green.
+**Acceptance**: `npx tsc --noEmit` exits 0 with no errors, `npx vitest run` passes all tests with no failures or warnings.
 
 ### ⬜ Unit 12: Documentation + Final Verification
 **What**: (1) Update top-level README.md to document the friend storage split (agent knowledge vs PII bridge, what lives where and why) and the session path structure. (2) Run full test suite. (3) Run coverage report and verify 100% on all new/modified code. (4) Check for any remaining references to old type names (FriendIdentity, FriendMemory, ContextStore, FileContextStore, ContextResolver, CollectionStore, AuthorityChecker) in source code. (5) Check for any stale imports from deleted files (authority.ts, memory.ts, identity.ts).
