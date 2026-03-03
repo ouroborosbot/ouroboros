@@ -658,7 +658,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 ---
 
-### ⬜ Unit 1Hb: ADO Scope Discovery + ado_work_items Optional Org
+### ✅ Unit 1Hb: ADO Scope Discovery + ado_work_items Optional Org
 
 **What**: Add scope discovery functions to the ADO client and wire them into `ado_work_items`. The `organization` parameter becomes **optional**. When omitted, the tool discovers orgs/projects via ADO APIs and disambiguates. Remove `validateAdoOrg()` and `ado.organizations` config.
 
