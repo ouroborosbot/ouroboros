@@ -196,6 +196,24 @@ describe("loadConfig", () => {
     expect(config2.context.maxTokens).toBe(60000)
     expect(fs.readFileSync).toHaveBeenCalledTimes(2)
   })
+
+  it("emits config.load observability event when loading config", async () => {
+    vi.resetModules()
+    const emitObservabilityEvent = vi.fn()
+    vi.doMock("../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { loadConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    loadConfig()
+
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "config.load",
+      component: "config/identity",
+    }))
+  })
 })
 
 describe("getAzureConfig", () => {

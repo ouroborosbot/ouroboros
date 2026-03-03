@@ -239,6 +239,35 @@ describe("loadAgentConfig", () => {
     expect(first).toBe(second) // same reference
     expect(fs.readFileSync).toHaveBeenCalledTimes(1)
   })
+
+  it("emits identity.resolve observability event when loading agent config", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    const agentJson = {
+      name: "ouroboros",
+      configPath: "~/.agentconfigs/ouroboros/config.json",
+      phrases: {
+        thinking: ["thinking"],
+        tool: ["tool"],
+        followup: ["followup"],
+      },
+    }
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(agentJson))
+
+    vi.resetModules()
+    const emitObservabilityEvent = vi.fn()
+    vi.doMock("../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    loadAgentConfig()
+
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "identity.resolve",
+      component: "config/identity",
+    }))
+  })
 })
 
 describe("resetIdentity", () => {

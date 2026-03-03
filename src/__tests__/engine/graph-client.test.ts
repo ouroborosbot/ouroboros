@@ -279,3 +279,26 @@ describe("graphRequest", () => {
     expect(result).toContain("400")
   })
 })
+
+describe("graph-client observability contract", () => {
+  it("emits client.request_start event for Graph requests", async () => {
+    vi.resetModules()
+    const emitObservabilityEvent = vi.fn()
+    vi.doMock("../../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+    mockFetch.mockReset()
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ displayName: "Jane" }),
+    })
+
+    const { getProfile } = await import("../../engine/graph-client")
+    await getProfile("test-token")
+
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "client.request_start",
+      component: "clients",
+    }))
+  })
+})

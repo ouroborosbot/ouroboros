@@ -1,0 +1,292 @@
+
+> ouroboros-agent-harness@1.0.0 test
+> vitest run src/__tests__/config.test.ts src/__tests__/identity.test.ts src/__tests__/engine/ado-client.test.ts src/__tests__/engine/graph-client.test.ts src/__tests__/repertoire/commands.test.ts src/__tests__/repertoire/skills.test.ts src/__tests__/wardrobe/phrases.test.ts
+
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+stderr | src/__tests__/identity.test.ts > loadAgentConfig > auto-fills placeholder phrases when agent.json has no phrases field
+agent.json is missing phrases, added placeholders
+
+stderr | src/__tests__/identity.test.ts > loadAgentConfig > caches the config after first load
+agent.json is missing phrases, added placeholders
+
+stderr | src/__tests__/identity.test.ts > resetIdentity > clears cached agent config so it can be re-loaded
+agent.json is missing phrases, added placeholders
+agent.json is missing phrases, added placeholders
+
+ ❯ src/__tests__/identity.test.ts (19 tests | 1 failed) 18ms
+     ✓ parses --agent <name> from process.argv 2ms
+     ✓ parses --agent <name> when other args are present 1ms
+     ✓ throws when --agent is missing from process.argv 1ms
+     ✓ throws when --agent is present but no value follows 1ms
+     ✓ caches the agent name after first parse 0ms
+     ✓ resolves repo root from src/ directory (dev via tsx) 0ms
+     ✓ returns a directory that exists 0ms
+     ✓ returns path.join(repoRoot, agentName) 0ms
+     ✓ uses a different name for a different agent 0ms
+     ✓ reads and parses agent.json from agent root 1ms
+     ✓ auto-fills placeholder phrases when agent.json has no phrases field 1ms
+     ✓ warns and writes placeholders when agent.json is missing phrases 1ms
+     ✓ does NOT warn or write when agent.json already has phrases 0ms
+     ✓ throws descriptive error when agent.json is missing 0ms
+     ✓ throws descriptive error when agent.json has invalid JSON 0ms
+     ✓ caches the config after first load 1ms
+     × emits identity.resolve observability event when loading agent config 4ms
+     ✓ clears cached agent name so it can be re-parsed 0ms
+     ✓ clears cached agent config so it can be re-loaded 0ms
+ ❯ src/__tests__/repertoire/commands.test.ts (28 tests | 1 failed) 25ms
+     ✓ register and get a command 11ms
+     ✓ get returns undefined for unknown command 0ms
+     ✓ list returns commands filtered by channel 1ms
+     ✓ dispatch calls handler and returns handled:true 1ms
+     ✓ dispatch returns handled:false for unknown command 0ms
+     ✓ registers exit, new, and commands 0ms
+     ✓ /exit handler returns action:exit 0ms
+     ✓ /new handler returns action:new 0ms
+     ✓ /commands handler returns formatted list for cli channel 0ms
+     ✓ /commands handler for teams does NOT include /exit 0ms
+     ✓ /exit description uses agent name 0ms
+     ✓ /exit is NOT available in teams channel list 0ms
+     ✓ /tool-required command toggles between ON and OFF 0ms
+     ✓ getToolChoiceRequired returns toggle state 0ms
+     ✓ resetToolChoiceRequired resets the toggle to false 0ms
+     ✓ /tool-required is CLI-only 0ms
+     ✓ /tool-required appears in /commands for cli 1ms
+     ✓ /tool-required does NOT appear in /commands for teams 0ms
+     ✓ parses /exit as command 'exit' 0ms
+     ✓ parses /new with no args 0ms
+     ✓ parses command with arguments 0ms
+     ✓ returns null for regular text 0ms
+     ✓ returns null for text with / in the middle 0ms
+     ✓ trims leading spaces before checking 0ms
+     ✓ is case insensitive 0ms
+     ✓ returns null for / alone 0ms
+     ✓ returns null for //double 0ms
+     × emits repertoire.load_start event when registering default commands 4ms
+ ❯ src/__tests__/repertoire/skills.test.ts (17 tests | 1 failed) 23ms
+     ✓ returns skills directory under agent root 11ms
+     ✓ returns empty array when skills directory does not exist 1ms
+     ✓ returns empty array when skills directory is empty 0ms
+     ✓ returns sorted skill names from .md files 1ms
+     ✓ filters out non-.md files 0ms
+     ✓ returns only basenames without .md extension 0ms
+     ✓ reads from agent root skills directory 1ms
+     ✓ returns skill content when skill file exists 0ms
+     ✓ throws when skill file does not exist 1ms
+     ✓ tracks loaded skill in loaded skills list 0ms
+     ✓ does not duplicate skill in loaded list on repeated loads 0ms
+     ✓ loads from agent root skills directory 0ms
+     ✓ returns empty array when no skills have been loaded 0ms
+     ✓ returns a copy, not the internal array 0ms
+     ✓ clears all loaded skills 0ms
+     ✓ is safe to call when no skills are loaded 1ms
+     × emits repertoire.load_start when loading a skill 4ms
+ ❯ src/__tests__/engine/ado-client.test.ts (22 tests | 1 failed) 20ms
+     ✓ returns formatted work items on success 2ms
+     ✓ returns message when no work items found 2ms
+     ✓ handles unassigned work items 0ms
+     ✓ returns AUTH_REQUIRED on 401 from WIQL query 4ms
+     ✓ returns AUTH_REQUIRED on 401 from work item details fetch 0ms
+     ✓ returns PERMISSION_DENIED on 403 1ms
+     ✓ returns THROTTLED on 429 0ms
+     ✓ returns NETWORK_ERROR on fetch failure 0ms
+     ✓ makes GET request and returns formatted JSON string 1ms
+     ✓ makes POST request with body (WIQL) 0ms
+     ✓ makes PATCH request with body 0ms
+     ✓ makes DELETE request without body 0ms
+     ✓ does not duplicate api-version if already present in path 0ms
+     ✓ appends api-version with & when path already has query params 0ms
+     ✓ returns formatted JSON (pretty printed) 0ms
+     ✓ returns AUTH_REQUIRED on 401 0ms
+     ✓ returns PERMISSION_DENIED on 403 0ms
+     ✓ returns THROTTLED on 429 0ms
+     ✓ returns SERVICE_ERROR on 500 0ms
+     ✓ returns NETWORK_ERROR on fetch failure 0ms
+     ✓ returns error string on generic 4xx 0ms
+     × emits client.request_start event for ADO requests 6ms
+ ❯ src/__tests__/engine/graph-client.test.ts (20 tests | 1 failed) 19ms
+     ✓ returns formatted profile on success 2ms
+     ✓ handles missing optional fields gracefully 0ms
+     ✓ returns AUTH_REQUIRED on 401 0ms
+     ✓ returns PERMISSION_DENIED on 403 0ms
+     ✓ returns THROTTLED on 429 0ms
+     ✓ returns SERVICE_ERROR on 500 0ms
+     ✓ returns NETWORK_ERROR on fetch failure 0ms
+     ✓ makes GET request and returns formatted JSON string 0ms
+     ✓ makes POST request with body 0ms
+     ✓ makes PATCH request with body 0ms
+     ✓ makes DELETE request without body 0ms
+     ✓ handles paths with query parameters 0ms
+     ✓ returns formatted JSON (pretty printed) 0ms
+     ✓ returns error string on 401 0ms
+     ✓ returns error string on 403 0ms
+     ✓ returns error string on 429 0ms
+     ✓ returns error string on 500 0ms
+     ✓ returns NETWORK_ERROR on fetch failure 0ms
+     ✓ returns error string on generic 4xx 0ms
+     × emits client.request_start event for Graph requests 12ms
+ ❯ src/__tests__/wardrobe/phrases.test.ts (10 tests | 1 failed) 29ms
+     ✓ returns a phrase from the pool 17ms
+     ✓ avoids immediate repeat when lastUsed is provided 2ms
+     ✓ returns the only element for single-element pool 0ms
+     ✓ returns the only element even when lastUsed matches (single-element) 1ms
+     ✓ returns empty string for empty pool 0ms
+     ✓ works without lastUsed parameter 0ms
+     ✓ returns phrases directly from loadAgentConfig().phrases 0ms
+     ✓ returns placeholders when loadAgentConfig has auto-filled phrases 0ms
+     ✓ does not export THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES 0ms
+     × emits repertoire.load_end when loading phrase pools 6ms
+ ❯ src/__tests__/config.test.ts (38 tests | 1 failed) 45ms
+     ✓ reads config from path specified in agent.json configPath 18ms
+     ✓ auto-creates config directory when loading 2ms
+     ✓ returns defaults when file is missing (ENOENT) 1ms
+     ✓ returns defaults when file contains invalid JSON 1ms
+     ✓ merges partial config with defaults 1ms
+     ✓ does not use OUROBOROS_CONFIG_PATH env var 1ms
+     ✓ resolves configPath with ~ to homedir 0ms
+     ✓ uses absolute configPath as-is 2ms
+     ✓ caches config after first load 1ms
+     ✓ re-reads from disk after resetConfigCache() 1ms
+     × emits config.load observability event when loading config 7ms
+     ✓ returns azure config from config.json 1ms
+     ✓ uses default apiVersion when not specified 0ms
+     ✓ returns minimax config from config.json 0ms
+     ✓ returns teams config from config.json 0ms
+     ✓ returns context config from config.json 0ms
+     ✓ returns defaults when not configured 1ms
+     ✓ returns sessions directory using agent name from identity module 0ms
+     ✓ returns correct path for cli channel using agent name 0ms
+     ✓ returns correct path for teams channel with conversation id 0ms
+     ✓ sanitizes key by replacing slashes and colons with underscores 0ms
+     ✓ returns default connection names 0ms
+     ✓ respects config.json values 0ms
+     ✓ returns empty organizations by default 0ms
+     ✓ respects config.json values 0ms
+     ✓ returns default teamsChannel config when not specified 0ms
+     ✓ returns teamsChannel config from config.json 0ms
+     ✓ returns a shallow copy (not the same reference) 1ms
+     ✓ merges partial teamsChannel config with defaults 1ms
+     ✓ returns default integrations config when not specified 0ms
+     ✓ returns integrations config from config.json 0ms
+     ✓ returns a shallow copy (not the same reference) 0ms
+     ✓ deep-merges partial config into cached config 0ms
+     ✓ overrides specific fields while leaving others untouched 0ms
+     ✓ works with resetConfigCache to restore defaults 0ms
+     ✓ handles empty partial (no-op) 0ms
+     ✓ can set nested config sections (teamsChannel, integrations) 0ms
+     ✓ can overwrite then reset then overwrite again 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/config.test.ts > loadConfig > emits config.load observability event when loading config
+AssertionError: expected "vi.fn()" to be called with arguments: [ ObjectContaining{…} ]
+
+Number of calls: 0
+
+ ❯ src/__tests__/config.test.ts:212:36
+    210|     loadConfig()
+    211| 
+    212|     expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectC…
+       |                                    ^
+    213|       event: "config.load",
+    214|       component: "config/identity",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  src/__tests__/identity.test.ts > loadAgentConfig > emits identity.resolve observability event when loading agent config
+AssertionError: expected "vi.fn()" to be called with arguments: [ ObjectContaining{…} ]
+
+Number of calls: 0
+
+ ❯ src/__tests__/identity.test.ts:266:36
+    264|     loadAgentConfig()
+    265| 
+    266|     expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectC…
+       |                                    ^
+    267|       event: "identity.resolve",
+    268|       component: "config/identity",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  src/__tests__/engine/ado-client.test.ts > ado-client observability contract > emits client.request_start event for ADO requests
+AssertionError: expected "vi.fn()" to be called with arguments: [ ObjectContaining{…} ]
+
+Number of calls: 0
+
+ ❯ src/__tests__/engine/ado-client.test.ts:380:36
+    378|     await adoRequest("test-token", "GET", "myorg", "/_apis/projects")
+    379| 
+    380|     expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectC…
+       |                                    ^
+    381|       event: "client.request_start",
+    382|       component: "clients",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  src/__tests__/engine/graph-client.test.ts > graph-client observability contract > emits client.request_start event for Graph requests
+AssertionError: expected "vi.fn()" to be called with arguments: [ ObjectContaining{…} ]
+
+Number of calls: 0
+
+ ❯ src/__tests__/engine/graph-client.test.ts:299:36
+    297|     await getProfile("test-token")
+    298| 
+    299|     expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectC…
+       |                                    ^
+    300|       event: "client.request_start",
+    301|       component: "clients",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  src/__tests__/repertoire/commands.test.ts > commands observability contract > emits repertoire.load_start event when registering default commands
+AssertionError: expected "vi.fn()" to be called with arguments: [ ObjectContaining{…} ]
+
+Number of calls: 0
+
+ ❯ src/__tests__/repertoire/commands.test.ts:276:36
+    274|     registerDefaultCommands(registry)
+    275| 
+    276|     expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectC…
+       |                                    ^
+    277|       event: "repertoire.load_start",
+    278|       component: "repertoire",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+ FAIL  src/__tests__/repertoire/skills.test.ts > skills observability contract > emits repertoire.load_start when loading a skill
+AssertionError: expected "vi.fn()" to be called with arguments: [ ObjectContaining{…} ]
+
+Number of calls: 0
+
+ ❯ src/__tests__/repertoire/skills.test.ts:194:36
+    192|     loadSkill("my-skill")
+    193| 
+    194|     expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectC…
+       |                                    ^
+    195|       event: "repertoire.load_start",
+    196|       component: "repertoire",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  src/__tests__/wardrobe/phrases.test.ts > phrases observability contract > emits repertoire.load_end when loading phrase pools
+AssertionError: expected "vi.fn()" to be called with arguments: [ ObjectContaining{…} ]
+
+Number of calls: 0
+
+ ❯ src/__tests__/wardrobe/phrases.test.ts:125:36
+    123|     getPhrases()
+    124| 
+    125|     expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectC…
+       |                                    ^
+    126|       event: "repertoire.load_end",
+    127|       component: "repertoire",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+
+
+ Test Files  7 failed (7)
+      Tests  7 failed | 147 passed (154)
+   Start at  18:06:24
+   Duration  320ms (transform 788ms, setup 0ms, import 853ms, tests 179ms, environment 1ms)
+
