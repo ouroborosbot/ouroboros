@@ -199,3 +199,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 17:04] Locked single-run observability coverage flow: tests emit artifacts once, audit consumes artifacts without rerunning tests
 - [2026-03-02 17:10] Locked mandatory combined `test:coverage` gate and explicit `required_actions` output typing for both coverage and logging fixes
 - [2026-03-02 17:36] Locked non-agent OS-level test-run artifact root (`~/.agentconfigs/test-runs/<repo_slug>/<run_id>/`) and colocated final/capture outputs there
+- [2026-03-02 17:38] Pass 1 (first draft refresh): re-validated doing doc against latest planning updates; no structural changes needed
