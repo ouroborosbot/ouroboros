@@ -2,7 +2,7 @@
 
 **Status**: drafting
 **Execution Mode**: direct
-**Created**: PENDING_TIMESTAMP
+**Created**: 2026-03-02 2302
 **Planning**: ./2026-03-02-1716-planning-context-kernel.md
 **Artifacts**: ./2026-03-02-1716-doing-context-kernel/
 
@@ -1268,4 +1268,4 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 ## Progress Log
 ⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
-- PENDING_TIMESTAMP Created from planning doc
+- 2026-03-02 2302 Created from planning doc
