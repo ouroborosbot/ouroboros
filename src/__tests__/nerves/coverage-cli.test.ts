@@ -50,7 +50,7 @@ describe("nerves/coverage cli", () => {
     auditSpy.mockReturnValueOnce({
       overall_status: "pass",
       required_actions: [],
-      observability_coverage: {
+      nerves_coverage: {
         event_catalog: { status: "pass", required: 1, observed: 1, missing: [] },
         schema_redaction: { status: "pass", checked_events: 1, violations: [] },
         logpoint_coverage: { status: "pass", declared: 1, observed: 1, missing: [] },
@@ -74,7 +74,7 @@ describe("nerves/coverage cli", () => {
     auditSpy.mockReturnValueOnce({
       overall_status: "pass",
       required_actions: [],
-      observability_coverage: {
+      nerves_coverage: {
         event_catalog: { status: "pass", required: 1, observed: 1, missing: [] },
         schema_redaction: { status: "pass", checked_events: 1, violations: [] },
         logpoint_coverage: { status: "pass", declared: 1, observed: 1, missing: [] },
@@ -89,7 +89,7 @@ describe("nerves/coverage cli", () => {
     auditSpy.mockReturnValueOnce({
       overall_status: "fail",
       required_actions: [{ type: "logging", target: "event-catalog", reason: "missing" }],
-      observability_coverage: {
+      nerves_coverage: {
         event_catalog: { status: "fail", required: 2, observed: 1, missing: ["engine:engine.error"] },
         schema_redaction: { status: "pass", checked_events: 1, violations: [] },
         logpoint_coverage: { status: "pass", declared: 1, observed: 1, missing: [] },

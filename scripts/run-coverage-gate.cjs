@@ -43,7 +43,7 @@ function main() {
 
   const activePath = path.join(ROOT, ".active-run.json")
   const latestPath = path.join(ROOT, "latest-run.json")
-  const observabilityCoveragePath = path.join(runDir, "nerves-coverage.json")
+  const nervesCoveragePath = path.join(runDir, "nerves-coverage.json")
   const summaryPath = path.join(runDir, "coverage-gate-summary.json")
 
   writeJson(activePath, info)
@@ -62,12 +62,12 @@ function main() {
     "--run-dir",
     runDir,
     "--output",
-    observabilityCoveragePath,
+    nervesCoveragePath,
   ]).status ?? 1
 
-  let observabilityReport = null
-  if (existsSync(observabilityCoveragePath)) {
-    observabilityReport = readJson(observabilityCoveragePath)
+  let nervesReport = null
+  if (existsSync(nervesCoveragePath)) {
+    nervesReport = readJson(nervesCoveragePath)
   }
 
   const requiredActions = []
@@ -80,13 +80,13 @@ function main() {
     })
   }
 
-  const observabilityStatus = observabilityReport?.overall_status === "pass" && auditExit === 0
+  const nervesStatus = nervesReport?.overall_status === "pass" && auditExit === 0
     ? "pass"
     : "fail"
 
-  if (Array.isArray(observabilityReport?.required_actions)) {
-    requiredActions.push(...observabilityReport.required_actions)
-  } else if (observabilityStatus === "fail") {
+  if (Array.isArray(nervesReport?.required_actions)) {
+    requiredActions.push(...nervesReport.required_actions)
+  } else if (nervesStatus === "fail") {
     requiredActions.push({
       type: "logging",
       target: "nerves-audit",
@@ -95,15 +95,15 @@ function main() {
   }
 
   const overallStatus =
-    codeCoverageStatus === "pass" && observabilityStatus === "pass" ? "pass" : "fail"
+    codeCoverageStatus === "pass" && nervesStatus === "pass" ? "pass" : "fail"
 
   const summary = {
     overall_status: overallStatus,
     code_coverage: {
       status: codeCoverageStatus,
     },
-    observability_coverage: observabilityReport?.observability_coverage ?? {
-      status: observabilityStatus,
+    nerves_coverage: nervesReport?.nerves_coverage ?? {
+      status: nervesStatus,
     },
     required_actions: requiredActions,
   }

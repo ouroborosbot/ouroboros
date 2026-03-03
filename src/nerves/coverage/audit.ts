@@ -36,7 +36,7 @@ export interface LogpointCoverage {
 export interface ObservabilityCoverageReport {
   overall_status: "pass" | "fail"
   required_actions: RequiredAction[]
-  observability_coverage: {
+  nerves_coverage: {
     event_catalog: EventCatalogCoverage
     schema_redaction: SchemaRedactionCoverage
     logpoint_coverage: LogpointCoverage
@@ -189,7 +189,7 @@ export function auditObservabilityCoverage(input: AuditInput): ObservabilityCove
   return {
     overall_status: overallStatus,
     required_actions: requiredActions,
-    observability_coverage: {
+    nerves_coverage: {
       event_catalog: {
         status: eventCatalogStatus,
         required: requiredEventKeys.length,
