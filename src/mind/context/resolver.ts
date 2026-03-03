@@ -1,16 +1,13 @@
-// ContextResolver -- resolves identity + channel into a ResolvedContext.
+// FriendResolver -- resolves external identity into a FriendRecord + channel capabilities.
 // Created per-request (per-incoming-message), per-friend.
-// Phase 1: identity + channel. Phase 2 adds authority. Phase 3 adds memory.
+// Replaces the old ContextResolver: no authority checker, no separate memory resolution.
 
-import type { ContextStore } from "./store"
-import type { IdentityProvider, ResolvedContext } from "./types"
-import { resolveIdentity } from "./identity"
+import { randomUUID } from "crypto"
+import type { FriendStore } from "./store"
+import type { IdentityProvider, FriendRecord, ResolvedContext, ExternalId } from "./types"
 import { getChannelCapabilities } from "./channel"
-import { createAuthorityChecker } from "./authority"
-import type { ProbeFunction } from "./authority"
-import { resolveMemory } from "./memory"
 
-export interface ContextResolverParams {
+export interface FriendResolverParams {
   provider: IdentityProvider
   externalId: string
   tenantId?: string
@@ -18,40 +15,69 @@ export interface ContextResolverParams {
   channel: string
 }
 
-// Default probe function: always returns true (optimistic).
-// Unit 2B will wire this to the actual Security Namespaces API.
-const defaultProbe: ProbeFunction = async () => true
+const CURRENT_SCHEMA_VERSION = 1
 
-export class ContextResolver {
-  private readonly store: ContextStore
-  private readonly params: ContextResolverParams
-  private readonly probe: ProbeFunction
+export class FriendResolver {
+  private readonly store: FriendStore
+  private readonly params: FriendResolverParams
 
-  constructor(store: ContextStore, params: ContextResolverParams, probe?: ProbeFunction) {
+  constructor(store: FriendStore, params: FriendResolverParams) {
     this.store = store
     this.params = params
-    this.probe = probe ?? defaultProbe
   }
 
   async resolve(): Promise<ResolvedContext> {
-    const identity = await resolveIdentity(this.store.identity, {
+    const friend = await this.resolveOrCreate()
+    const channel = getChannelCapabilities(this.params.channel)
+    return { friend, channel }
+  }
+
+  private async resolveOrCreate(): Promise<FriendRecord> {
+    // Try to find existing friend by external ID
+    let existing: FriendRecord | null = null
+    try {
+      existing = await this.store.findByExternalId(
+        this.params.provider,
+        this.params.externalId,
+        this.params.tenantId,
+      )
+    } catch {
+      // Store search failure -- fall through to create new (D16)
+    }
+
+    if (existing) return existing
+
+    // First encounter -- create new FriendRecord
+    const now = new Date().toISOString()
+    const externalId: ExternalId = {
       provider: this.params.provider,
       externalId: this.params.externalId,
-      tenantId: this.params.tenantId,
+      linkedAt: now,
+      ...(this.params.tenantId !== undefined ? { tenantId: this.params.tenantId } : {}),
+    }
+
+    const tenantMemberships: string[] =
+      this.params.tenantId ? [this.params.tenantId] : []
+
+    const friend: FriendRecord = {
+      id: randomUUID(),
       displayName: this.params.displayName,
-    })
+      externalIds: [externalId],
+      tenantMemberships,
+      toolPreferences: {},
+      notes: {},
+      createdAt: now,
+      updatedAt: now,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+    }
 
-    const channel = getChannelCapabilities(this.params.channel)
+    // Persist -- log and continue on failure (D16)
+    try {
+      await this.store.put(friend.id, friend)
+    } catch (err) {
+      console.error("failed to persist friend record:", err)
+    }
 
-    // Create authority checker only when integrations are available (Teams).
-    // CLI pays zero cost -- no checker created.
-    const checker = channel.availableIntegrations.length > 0
-      ? createAuthorityChecker(this.probe)
-      : undefined
-
-    // Load friend memory (null if missing or on error -- D16)
-    const memory = await resolveMemory(this.store.memory, identity)
-
-    return { identity, channel, checker, memory }
+    return friend
   }
 }
