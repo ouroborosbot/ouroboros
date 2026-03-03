@@ -399,7 +399,7 @@ Wiring:
 
 ---
 
-### ⬜ Unit 8: Full integration test run
+### ✅ Unit 8: Full integration test run
 **What**: Run the complete test suite (`npm test`). Verify:
 - All tests pass
 - No warnings
