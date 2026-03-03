@@ -86,7 +86,7 @@ Rename the repository's observability namespace and command surface from `observ
 **What**: Update active docs and materially incorrect slugger task path mentions impacted by this rename while preserving historical records.
 **Acceptance**: Active docs are updated, historical records remain intentionally untouched, and checks pass.
 
-### ⬜ Unit 3c: Documentation and Task Path Accuracy — Coverage & Refactor
+### ✅ Unit 3c: Documentation and Task Path Accuracy — Coverage & Refactor
 **What**: Run final hygiene checks for naming consistency and remove any unnecessary transitional wording.
 **Acceptance**: No active in-scope docs or commands use `observability` as subsystem name; tests and checks remain green.
 
@@ -117,3 +117,4 @@ Rename the repository's observability namespace and command surface from `observ
 - [2026-03-03 14:08] Unit 2c complete: reran combined coverage gate at 100% with `nerves` pipeline naming and verified clean build.
 - [2026-03-03 14:09] Unit 3a complete: added failing naming-consistency test for active docs/command paths still containing stale `observability` terms.
 - [2026-03-03 14:11] Unit 3b complete: renamed active runtime/coverage identifiers and symbols to `nerves`, updated imports/tests, and passed full suite + build.
+- [2026-03-03 14:13] Unit 3c complete: final active-surface naming scan is clean and combined coverage gate remains 100% with no warnings.
