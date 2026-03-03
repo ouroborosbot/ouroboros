@@ -16,7 +16,7 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 
 **Phase 1: Identity + Preferences + Storage Interface (Smallest Vertical Slice)**
 - 10. Directory restructuring (prerequisite) -- rename `src/engine/` to `src/heart/` (core loop, streaming, kicks, API error handling), rename `src/channels/` to `src/senses/` (channel adapters), move tool files (`tools.ts`, `tools-base.ts`, `tools-teams.ts`, `ado-client.ts`, `graph-client.ts`, and `data/` endpoint JSON files) from `src/engine/` to `src/repertoire/`. Update all imports across the codebase, all test file paths, and all documentation referencing old paths. This is a mechanical rename with no behavior changes -- all tests must pass identically before and after. Must be done first because all subsequent units reference the new paths.
-- 1A. `ContextStore` interface -- generic `get<T>(key)`, `put<T>(key, value)`, `delete(key)`, `find<T>(prefix, predicate)` with typed layer keys. All context persistence goes through this interface. No module imports file paths or `fs` directly for context data. The `find` operation supports identity resolution by external ID (scan + predicate for file store; proper index for future DB store).
+- 1A. `ContextStore` interface -- typed collection properties (`identity: CollectionStore<UserIdentity>`, `preferences: CollectionStore<UserPreferences>`), where `CollectionStore<T>` provides `get(id)`, `put(id, value)`, `delete(id)`, `find(predicate)`. IDs are always plain strings (UUIDs), no slashes, no compound keys. All context persistence goes through this interface. No module imports file paths or `fs` directly for context data. `find(predicate)` supports identity resolution by external ID (scan + predicate for file store; proper index for future DB store). Adding a new persisted type = add one property to `ContextStore`.
 - 1B. `FileContextStore` -- first adapter implementing `ContextStore`. Uses `~/.agentconfigs/<agent>/context/` layout. This is the only module that touches the filesystem for context storage.
 - 1C. `UserIdentity` type and resolution -- internal userId, external ID mappings (AAD, Teams), tenant memberships, integration memberships (ADO orgs). Persisted via `ContextStore`. Includes `knownScopes` — a living record of orgs/projects the user has worked in. Grows when the model successfully interacts with a scope (tool call succeeds → add/update with fresh `lastUsed`). Shrinks when Authority records persistent access denial (403 on a known scope → prune it so the prompt stops showing inaccessible scopes).
 - 1D. `UserPreferences` type and resolution -- global preferences (verbosity, confirmation policy, preview-before-mutation) plus integration-scoped preferences (ADO planning style, auto-assign, default org/project). Persisted via `ContextStore`. The model writes back learned context (e.g., last-used project) as preference updates.
@@ -56,7 +56,7 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 - Changes to the LLM provider layer (Azure/MiniMax config unchanged)
 
 ## Completion Criteria
-- [ ] `ContextStore` interface defined with `get`/`put`/`delete`/`find` operations; `FileContextStore` implements it
+- [ ] `ContextStore` interface defined with typed collection properties (`identity`, `preferences`); each `CollectionStore<T>` provides `get`/`put`/`delete`/`find`; `FileContextStore` implements it
 - [ ] No context module imports `fs` directly -- all persistence goes through `ContextStore`
 - [ ] All four context layers (Identity, Authority, Preferences, Channel) have TypeScript types and resolution functions
 - [ ] `LazyContextResolver` resolves layers on demand -- Authority and Preferences are not resolved unless a tool accesses them
@@ -136,8 +136,8 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 
 ## Decisions Made
 
-### D1: Architecture -- Storage Interface, Not File-Based Commitment
-The context kernel defines a `ContextStore` interface (`get`, `put`, `delete`, `find`) that all persistence flows through. `FileContextStore` is the first (and initially only) adapter. The schema, resolution logic, and all consumer code never import `fs` or know where bytes live. This means swapping to a database, blob store, or API-backed store in the future requires implementing one interface -- not refactoring every module. The file layout under `~/.agentconfigs/<agent>/context/` is an implementation detail of `FileContextStore`, not an architectural commitment.
+### D1: Architecture -- Typed Collection Store, Not Generic Key-Value
+The context kernel defines a `ContextStore` interface with typed collection properties (`identity: CollectionStore<UserIdentity>`, `preferences: CollectionStore<UserPreferences>`). Each `CollectionStore<T>` provides `get(id)`, `put(id, value)`, `delete(id)`, `find(predicate)`. IDs are always plain strings (UUIDs) — no slashes, no compound keys, no encoding. Consumers write `store.identity.get(userId)` and get type-safe results with zero ambiguity. `FileContextStore` is the first (and initially only) adapter. The schema, resolution logic, and all consumer code never import `fs` or know where bytes live. This means swapping to a database, blob store, or API-backed store in the future requires implementing one interface — not refactoring every module. The file layout under `~/.agentconfigs/<agent>/context/` is an implementation detail of `FileContextStore`, not an architectural commitment. Adding a new persisted type = add one `CollectionStore<T>` property to `ContextStore`.
 
 ### D2: Authority -- Hybrid Model, Not Pure 403 Learning
 Pure 403 learning means the agent proposes something, attempts it, fails, and then learns -- bad UX for destructive or visible operations (e.g., reparenting 50 work items, only to fail on item 1). The authority system uses a hybrid approach:
@@ -195,7 +195,7 @@ New code follows the agent-creature body metaphor (D19). The context kernel live
 
 **Context kernel files** (`src/mind/context/`):
 - `src/mind/context/types.ts` -- all layer type definitions (UserIdentity, AuthorityProfile, UserPreferences, ChannelCapabilities, LazyResolvedContext)
-- `src/mind/context/store.ts` -- `ContextStore` interface
+- `src/mind/context/store.ts` -- `CollectionStore<T>` and `ContextStore` interfaces
 - `src/mind/context/store-file.ts` -- `FileContextStore` adapter
 - `src/mind/context/identity.ts` -- UserIdentity resolution (get-or-create, external ID lookup)
 - `src/mind/context/authority.ts` -- Authority resolution and `AuthorityChecker`
@@ -253,8 +253,8 @@ Users will talk to the agent from many channels over time -- Teams today, Discor
 
 **Hard rules:**
 1. **Internal UUID is the only primary key.** Every channel-specific identity is just an entry in `externalIds[]`. No system -- storage keys, authority cache keys, preference lookups -- ever uses an external ID as a primary key. Everything keys off the internal UUID.
-2. **`ContextStore` keys for preferences/authority use internal UUID, never external IDs.** Pattern: `preferences/{userId}`, `authority/{userId}/{integration}/{scope}`. If we accidentally key by AAD ID, adding Discord later requires a migration. Don't.
-3. **Identity resolution is always: external ID -> lookup -> internal UUID.** The `ContextStore` interface needs a secondary index or query path for this -- "find the `UserIdentity` whose `externalIds[]` contains `{ provider: "teams", externalId: "abc-123" }`." A simple `get(key)` isn't enough. See `find()` on `ContextStore`.
+2. **`CollectionStore` IDs are always internal UUIDs, never external IDs.** `store.identity.get(userId)`, `store.preferences.get(userId)`. If we accidentally key by AAD ID, adding Discord later requires a migration. Don't.
+3. **Identity resolution is always: external ID -> lookup -> internal UUID.** `store.identity.find(u => u.externalIds.some(...))` scans identities by predicate. This is the secondary index path — `FileContextStore` scans files, a DB adapter would use a proper index.
 4. **Linking = adding an external ID to an existing `UserIdentity`.** If Jordan uses Teams (AAD) and later uses Discord, the Discord channel resolves to no existing identity, prompts the user to link, and adds the Discord external ID to Jordan's existing `UserIdentity`. One user, many external IDs, one set of preferences and knownScopes.
 5. **Unlinking = removing an external ID.** The user can detach a channel identity. If only one external ID remains, the `UserIdentity` persists (it's keyed by UUID, not by external ID).
 
@@ -384,25 +384,38 @@ Units 4A-4C. Process templates, authority-aware planning, structural safety. Dep
 ```typescript
 // src/mind/context/store.ts
 
-// Storage-agnostic interface for context persistence.
-// All context modules go through this -- none import fs directly.
-interface ContextStore {
-  get<T>(key: string): Promise<T | null>;
-  put<T>(key: string, value: T): Promise<void>;
-  delete(key: string): Promise<void>;
-  // Secondary index lookup: find the item under prefix whose value matches a predicate.
+// Generic collection store -- one type, simple CRUD + find.
+// IDs are always plain strings (UUIDs). No slashes, no compound keys.
+interface CollectionStore<T> {
+  get(id: string): Promise<T | null>;
+  put(id: string, value: T): Promise<void>;
+  delete(id: string): Promise<void>;
+  // Scan all items in the collection and return the first match.
   // Used by identity resolution: "find the UserIdentity whose externalIds[] contains this external ID."
-  // FileContextStore implements this by scanning files under prefix and deserializing each.
+  // FileContextStore scans files in the collection directory.
   // A database adapter would use a proper index/query.
-  find<T>(prefix: string, predicate: (value: T) => boolean): Promise<T | null>;
+  find(predicate: (value: T) => boolean): Promise<T | null>;
+}
+
+// Typed context store -- each persisted type gets a named collection property.
+// Adding a new persisted type = add one property here.
+// Consumers write store.identity.get(userId), store.preferences.put(userId, prefs) -- type-safe, zero ambiguity.
+interface ContextStore {
+  readonly identity: CollectionStore<UserIdentity>;
+  readonly preferences: CollectionStore<UserPreferences>;
 }
 
 // src/mind/context/store-file.ts
 
 // First adapter: file-based storage under ~/.agentconfigs/<agent>/context/
-// Key maps to file path: key "identity/user-123" -> context/identity/user-123.json
+// Each collection maps to a subdirectory: context/identity/, context/preferences/
+// Each item maps to a JSON file: context/identity/{uuid}.json
 // This is the ONLY module that touches fs for context data.
-class FileContextStore implements ContextStore { /* ... */ }
+class FileContextStore implements ContextStore {
+  readonly identity: CollectionStore<UserIdentity>;   // -> context/identity/
+  readonly preferences: CollectionStore<UserPreferences>; // -> context/preferences/
+  // Each property is a FileCollectionStore<T> pointing at its own directory.
+}
 
 // src/mind/context/types.ts
 
