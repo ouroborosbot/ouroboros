@@ -19,7 +19,7 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 - 1A. `ContextStore` interface -- typed collection properties, starting with `identity: CollectionStore<FriendIdentity>` in Phase 1. `CollectionStore<T>` provides `get(id)`, `put(id, value)`, `delete(id)`, `find(predicate)`. IDs are always plain strings (UUIDs), no slashes, no compound keys. All context persistence goes through this interface. No module imports file paths or `fs` directly for context data. `find(predicate)` supports identity resolution by external ID (scan + predicate for file store; proper index for future DB store). Adding a new persisted type = add one `CollectionStore<T>` property to `ContextStore`. Phase 3 adds `memory: CollectionStore<FriendMemory>` for model-managed per-friend notes.
 - 1B. `FileContextStore` -- first adapter implementing `ContextStore`. Constructor takes a base path (e.g., `~/.agentconfigs/ouroboros/context`); it does not resolve the path itself. Each collection maps to a subdirectory (Phase 1: `context/identity/`), each item to a JSON file (`{uuid}.json`). This is the only module that touches the filesystem for context storage. Phase 3 adds `context/memory/`.
 - 1C. `FriendIdentity` type and resolution -- internal ID (UUID), external ID mappings (AAD, Teams), tenant memberships, display name. Persisted via `ContextStore`. This is the only layer that truly needs persistence — the UUID ↔ external ID mapping can't be re-derived from an API.
-- ~~1D.~~ *(Removed — per-friend preferences deferred to Phase 3 as `FriendMemory` with freeform `toolPreferences`. See 3G. Global preferences like verbosity and confirmation policy are agent-level concerns, not per-friend.)*
+- ~~1D.~~ *(Removed -- per-friend preferences moved to Phase 3 as `FriendMemory` with freeform `toolPreferences`. See 3G. Global preferences like verbosity and confirmation policy are agent-level concerns, not per-friend.)*
 - 1E. `ChannelCapabilities` type -- channel identifier (`"cli" | "teams"`) plus capability flags (`supportsMarkdown`, `supportsStreaming`, `supportsRichCards`, `maxMessageLength`) plus `availableIntegrations` declaring which integrations the channel can reach. Defined as a hardcoded `const` map in `src/mind/context/channel.ts` keyed by channel identifier — channel adapters pass the channel string, the map returns the full capabilities object. Adding a new channel = add one entry to the map. Pure lookup, no resolution needed. Drives tool routing and prompt filtering.
 - 1F. `ContextResolver` -- resolves identity (from store) and channel (from lookup) into a `ResolvedContext` object. In Phase 1, all resolution is cheap (file read + pure lookup) so everything resolves eagerly — no lazy Promises needed yet. Laziness (explicit `Promise<T>` fields) is introduced in Phase 2 when authority resolution requires API calls. Phase 3 adds memory resolution.
 - 1G. System prompt injection -- `buildSystem()` becomes async from Phase 1 and gains a `contextSection()` that renders identity + channel into the system prompt. Async from the start to avoid a mid-stream signature change when Phase 2 adds `await context.authority` -- all callers are updated once. Rebuilt per-turn. Gracefully omitted when no context is available. Phase 2 adds authority constraints; Phase 3 adds memory (toolPreferences loaded dynamically per-tool, not in system prompt).
@@ -114,13 +114,13 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 - [x] Q14: Schema versioning for persisted types? **Resolved (D17)**: `schemaVersion` field + migration functions on read.
 - [x] Q15: Should tokens move into the context kernel? **Resolved (D18)**: no. Tokens stay in `ToolContext`, context stays in `ResolvedContext`. Different lifecycles.
 
-### Open (deferred -- not blocking Phase 1)
+### Open (to be resolved before their respective phase units)
 
 - [ ] Q4: **Process template cache scoping (Phase 4)**
   ADO allows different process templates per project within the same org. When we build process template awareness (Phase 4, unit 4A), should we cache the fetched template definition per-project or per-org?
   - **Per-project** (recommended): matches ADO's scoping. Each project can have a different process (Basic, Agile, Scrum). Caching per-org would return wrong results if projects differ.
   - **Per-org**: fewer cache entries but incorrect if projects use different templates.
-  - **Decision needed before**: Phase 4 doing doc creation.
+  - **Decision needed before**: starting Phase 4 units.
 
 - [x] Q5: **Preference editing mechanism (Phase 3+)**
   ~~Should preferences be editable via slash commands at runtime?~~ **Resolved (A5)**: preferences are now freeform model-managed `toolPreferences` on `FriendMemory`. The model writes them conversationally when a friend expresses a preference, and reads them before calling the relevant tool. No slash commands, no config file, no typed schema. The model is the editor.
@@ -129,13 +129,13 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
   Should the new semantic ADO tools (`ado_create_epic`, `ado_move_items`, etc.) replace the existing generic `ado_query`/`ado_mutate` tools, or coexist alongside them?
   - **Coexist** (recommended): semantic tools are the preferred path for common operations. Generic tools remain as an escape hatch for edge cases, advanced queries, and operations not yet covered by semantic tools. The model naturally prefers semantic tools when available.
   - **Replace**: cleaner tool list, but loses flexibility for uncommon operations.
-  - **Decision needed before**: Phase 3 doing doc creation.
+  - **Decision needed before**: starting Phase 3 units.
 
 - [ ] Q8: **Authority pre-flight endpoint selection (Phase 2)**
   For the hybrid authority model's write-path pre-flight check (D2), which ADO API endpoint should `canWrite()` probe to verify permissions without attempting the mutation?
   - **Security Namespaces API** (`/_apis/security/namespaces`) (recommended): returns granular permission bits per namespace. Well-documented. Can check specific actions (create work item, delete, etc.) without side effects.
   - **Permissions API** (`/_apis/permissions`): can check specific permission bits but less commonly used in ADO integrations.
-  - **Decision needed before**: Phase 2 doing doc creation (unit 2B: `AuthorityChecker` implementation).
+  - **Decision needed before**: starting unit 2B (`AuthorityChecker` implementation).
 
 ## Decisions Made
 
@@ -388,23 +388,16 @@ Paths reflect the directory restructuring done in unit 10. The agent-creature bo
 
 ## Notes
 
-**Standing rule: documentation travels with the code.** Every unit updates all relevant docs (CLAUDE.md, memory, cross-agent, psyche, markdown references) before it can be marked complete. This applies to every doing doc derived from this plan.
+**Standing rule: documentation travels with the code.** Every unit updates all relevant docs (CLAUDE.md, memory, cross-agent, psyche, markdown references) before it can be marked complete.
 
-This is a large initiative that should be broken into multiple doing docs. The recommended phasing for the doing doc conversion:
+**One doing doc, four phases.** All phases (1-4) go into a single doing doc and are worked through in one marathon. The phase labels (Phase 1, 2, 3, 4) are organizational sections within the doing doc, not separate timelines or separate doing docs. Units are executed in order within each phase, and phases are executed in order:
 
-**Doing Doc 1: Identity + Channel + Storage Interface (Phase 1)**
-Units 10, 1A-1C, 1E-1H (1D removed). Starts with directory restructuring (unit 10), then builds the storage interface, identity, channel capabilities, resolver, system prompt injection, and wires through one real ADO operation. Proves the kernel end-to-end.
+- **Phase 1: Identity + Channel + Storage Interface** -- Units 10, 1A-1C, 1E-1H (1D removed). Starts with directory restructuring, then builds storage, identity, channel, resolver, prompt injection, and wires through one real ADO operation.
+- **Phase 2: Authority** -- Units 2A-2D. Hybrid authority model, wired into tools and prompt.
+- **Phase 3: ADO Semantic Tools + Friend Memory** -- Units 3A-3G. Semantic ADO tools + FriendMemory with freeform toolPreferences.
+- **Phase 4: ADO Intelligence** -- Units 4A-4C. Process templates, authority-aware planning, structural safety.
 
-**Doing Doc 2: Authority (Phase 2)**
-Units 2A-2D. Builds the hybrid authority model, wires it into existing tools and prompt. Depends on Doing Doc 1.
-
-**Doing Doc 3: ADO Semantic Tools + Friend Memory (Phase 3)**
-Units 3A-3G. The new ADO tools that consume the full context kernel, plus `FriendMemory` with freeform `toolPreferences` (model-managed per-tool notes per friend). Depends on Doing Doc 2.
-
-**Doing Doc 4: ADO Intelligence (Phase 4)**
-Units 4A-4C. Process templates, authority-aware planning, structural safety. Depends on Doing Doc 3.
-
-### Proposed TypeScript Schema (for reference during doing doc conversion)
+### Proposed TypeScript Schema (reference for doing doc units)
 
 ```typescript
 // src/mind/context/store.ts
@@ -588,3 +581,4 @@ interface ToolDefinition {
 - 2026-03-02 2204 A16: No bare strings in type system. Added `type IdentityProvider = "aad" | "local"` and `type Integration = "ado" | "github" | "graph"`. ExternalId.provider uses IdentityProvider, AuthorityProfile.integration and AuthorityChecker methods use Integration, ChannelCapabilities.availableIntegrations uses Integration[]. Adding a new provider or integration = add to the union (and write the supporting code).
 - 2026-03-02 2207 A21: ToolDefinition wrapper type co-locates tool metadata. Each tool declares its OpenAI schema, handler, integration (if any), and confirmationRequired (if mutation). Replaces separate tools/teamsTools arrays + confirmationRequired Set. getToolsForChannel() filters ToolDefinition[] by matching integration against availableIntegrations. Updated D3, D5, integration points 4/5/7, added ToolDefinition to schema.
 - 2026-03-02 2212 A23-A25 + kill authority TTL cache. Removed all authority cache/TTL references (D4 rewritten, D13 updated, D16 updated, D18 updated, unit 2A updated, AuthorityProfile loses cachedAt/expiresAt, AuthorityChecker loses invalidate()). Authority learned fresh each conversation -- no cache, no TTL, no invalidation. Completion criteria tightened: cross-tenant replaced with per-friend per-conversation scoping, FriendMemory made concrete (type + CRUD + save tool + read from ResolvedContext), added criteria for async buildSystem (A15), typed unions (A16), ToolDefinition (A21), removed validateAdoOrg (D20). A14 resolution (cache keying) is now moot.
+- PENDING_TIMESTAMP One-doing-doc language pass. Rewrote Notes section: "multiple doing docs" replaced with "one doing doc, four phases." Updated Open Questions header and "Decision needed before" lines to reference phase units instead of separate doing docs. Fixed "deferred" wording on unit 1D.
