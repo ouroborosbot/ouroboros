@@ -1869,4 +1869,25 @@ describe("save_friend_note tool", () => {
     expect(result).toContain("error")
     expect(result).toContain("disk full")
   })
+
+  it("returns error when friend has no id", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const friendNoId = makeFriend({ id: "" })
+    const ctx = {
+      signin: vi.fn(),
+      context: { friend: friendNoId, channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity } },
+      friendStore: { get: vi.fn(), put: vi.fn(), delete: vi.fn(), findByExternalId: vi.fn() },
+    }
+    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "test" }, ctx)
+    expect(result).toContain("no friend identity")
+  })
+
+  it("returns error when friendStore.get returns null", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx({ friendStore: { get: vi.fn().mockResolvedValue(null), put: vi.fn(), delete: vi.fn(), findByExternalId: vi.fn() } })
+    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "test" }, ctx)
+    expect(result).toContain("can't find")
+  })
 })
