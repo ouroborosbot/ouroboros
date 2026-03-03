@@ -494,6 +494,130 @@ describe("ado_validate_structure tool", () => {
   })
 })
 
+describe("channel-aware formatting", () => {
+  beforeEach(() => { vi.resetAllMocks() })
+
+  function makeTeamsCtx() {
+    return makeCtx({
+      context: {
+        ...makeCtx().context,
+        channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 4000 },
+      },
+    })
+  }
+
+  function makeCliCtx() {
+    return makeCtx({
+      context: {
+        ...makeCtx().context,
+        channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
+      },
+    })
+  }
+
+  it("ado_backlog_list: Teams gets markdown formatted output", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ workItems: [{ id: 100 }] }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [{ id: 100, fields: { "System.Title": "Epic One", "System.WorkItemType": "Epic", "System.State": "Active", "System.AssignedTo": { displayName: "Jordan" }, "System.AreaPath": "Platform", "System.IterationPath": "Sprint 1", "System.Parent": null } }],
+    }))
+
+    const def = findTool("ado_backlog_list")!
+    const result = await def.handler({}, makeTeamsCtx())
+    // Teams should get markdown-formatted output
+    expect(result).toContain("**")
+    expect(result).toContain("Epic One")
+  })
+
+  it("ado_backlog_list: CLI gets plain text tabular output", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ workItems: [{ id: 100 }] }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [{ id: 100, fields: { "System.Title": "Epic One", "System.WorkItemType": "Epic", "System.State": "Active", "System.AssignedTo": { displayName: "Jordan" }, "System.AreaPath": "Platform", "System.IterationPath": "Sprint 1", "System.Parent": null } }],
+    }))
+
+    const def = findTool("ado_backlog_list")!
+    const result = await def.handler({}, makeCliCtx())
+    // CLI should get plain text, not markdown
+    expect(result).not.toContain("**")
+    expect(result).toContain("Epic One")
+    expect(result).toContain("#100")
+  })
+
+  it("ado_backlog_list: Teams response respects maxMessageLength", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    // Create many items to exceed 4000 char limit
+    const items = Array.from({ length: 50 }, (_, i) => ({
+      id: i + 100,
+      fields: {
+        "System.Title": `Work Item ${i} with a very long title that takes up space`,
+        "System.WorkItemType": "User Story",
+        "System.State": "Active",
+        "System.AssignedTo": { displayName: "Jordan" },
+        "System.AreaPath": "Platform\\Team A\\SubTeam B",
+        "System.IterationPath": "Sprint 1",
+        "System.Parent": 99,
+      },
+    }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ workItems: items.map(i => ({ id: i.id })) }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ value: items }))
+
+    const ctx = makeTeamsCtx()
+    const def = findTool("ado_backlog_list")!
+    const result = await def.handler({}, ctx)
+    // Should be truncated to near maxMessageLength
+    expect(result.length).toBeLessThanOrEqual(4100) // Some tolerance
+  })
+
+  it("ado_backlog_list: CLI has no truncation", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    const items = Array.from({ length: 50 }, (_, i) => ({
+      id: i + 100,
+      fields: {
+        "System.Title": `Work Item ${i} with details`,
+        "System.WorkItemType": "Task",
+        "System.State": "Active",
+        "System.AssignedTo": null,
+        "System.AreaPath": "Platform",
+        "System.IterationPath": "Sprint 1",
+        "System.Parent": null,
+      },
+    }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ workItems: items.map(i => ({ id: i.id })) }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ value: items }))
+
+    const def = findTool("ado_backlog_list")!
+    const result = await def.handler({}, makeCliCtx())
+    // All 50 items should be present
+    expect(result).toContain("Work Item 49")
+  })
+
+  it("ado_backlog_list: empty result message adapts to channel", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ workItems: [] }))
+
+    const def = findTool("ado_backlog_list")!
+    const result = await def.handler({}, makeTeamsCtx())
+    expect(result).toContain("No work items")
+  })
+
+  it("ado_backlog_list: no context (fallback) uses JSON format", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ workItems: [{ id: 100 }] }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [{ id: 100, fields: { "System.Title": "Item", "System.WorkItemType": "Task", "System.State": "New", "System.AssignedTo": null, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": null } }],
+    }))
+
+    const def = findTool("ado_backlog_list")!
+    // ctx with no context
+    const ctx = { ...makeCtx(), context: undefined }
+    const result = await def.handler({}, ctx as any)
+    // Should fall back to JSON
+    const parsed = JSON.parse(result)
+    expect(parsed.items).toBeDefined()
+  })
+})
+
 describe("ado_batch_update tool", () => {
   beforeEach(() => { vi.resetAllMocks() })
 
