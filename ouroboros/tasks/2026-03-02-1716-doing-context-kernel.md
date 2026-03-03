@@ -1237,7 +1237,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 ---
 
-### ⬜ Unit 4A: Process Template Awareness
+### ✅ Unit 4A: Process Template Awareness
 
 **What**: Fetch actual process template definitions from ADO API, derive hierarchy rules, and prevent illegal parent/child structures. Supports Basic, Agile, and Scrum process templates.
 
@@ -1269,11 +1269,11 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - Unknown process template: returns null
 
 **Completion criteria:**
-- [ ] Process template fetching works for Basic, Agile, Scrum
-- [ ] Hierarchy rules derived correctly
-- [ ] Validation function for parent/child type rules
-- [ ] 100% test coverage
-- [ ] All tests pass
+- [x] Process template fetching works for Basic, Agile, Scrum
+- [x] Hierarchy rules derived correctly
+- [x] Validation function for parent/child type rules
+- [x] 100% test coverage
+- [x] All tests pass
 
 ---
 
