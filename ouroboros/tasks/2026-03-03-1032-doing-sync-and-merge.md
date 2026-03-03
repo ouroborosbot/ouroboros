@@ -97,7 +97,7 @@ Note: This task is documentation-only. TDD applies if any runtime code is introd
 **Output**: Updated `subagents/README.md`.
 **Acceptance**: Table has work-merger row. Claude Code install section includes work-merger symlink. Codex install section includes `mkdir`, hard-link, and optional `openai.yaml` for work-merger. Workflow section has step 4 (or equivalent) for sync-and-merge.
 
-### ⬜ Unit 7: Update `CONTRIBUTING.md` -- sync-and-merge and branch convention
+### ✅ Unit 7: Update `CONTRIBUTING.md` -- sync-and-merge and branch convention
 **What**: Update `CONTRIBUTING.md` to: (1) update the Branches section to reflect the unified `<agent>/<slug>` convention for all agents (remove any `codex/` references if present), (2) add a new "Sync and merge" section documenting the PR-based merge workflow, race condition handling, and that work-merger handles this step.
 **Output**: Updated `CONTRIBUTING.md`.
 **Acceptance**: Branches section shows unified `<agent>/<slug>` for both agents (including `slugger` examples alongside `ouroboros`). Existing "do not commit directly to main" guidance strengthened to reference PR-based merge flow. New Sync and merge section explains the workflow (work-doer finishes -> work-merger runs -> PR -> CI -> merge -> cleanup). Task docs section references work-merger alongside work-planner and work-doer.
