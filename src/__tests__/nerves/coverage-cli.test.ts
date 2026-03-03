@@ -4,7 +4,7 @@ import { tmpdir } from "os"
 
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-describe("observability/coverage cli", () => {
+describe("nerves/coverage cli", () => {
   afterEach(() => {
     vi.resetModules()
     vi.restoreAllMocks()
@@ -22,9 +22,7 @@ describe("observability/coverage cli", () => {
 
     const { runAuditCli } = await import("../../nerves/coverage/cli")
     expect(runAuditCli([])).toBe(2)
-    expect(stderrSpy).toHaveBeenCalledWith(
-      "observability audit: no run directory found; provide --run-dir",
-    )
+    expect(stderrSpy).toHaveBeenCalledWith("nerves audit: no run directory found; provide --run-dir")
   })
 
   it("writes report output and returns success/failure codes from audit results", async () => {
@@ -102,6 +100,6 @@ describe("observability/coverage cli", () => {
     expect(JSON.parse(readFileSync(outputPath, "utf8"))).toEqual(
       expect.objectContaining({ overall_status: "fail" }),
     )
-    expect(stdoutSpy).toHaveBeenCalled()
+    expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining("nerves audit:"))
   })
 })
