@@ -18,7 +18,7 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 ## Completion Criteria
 - [x] Vitest configuration enforces 100% coverage thresholds (lines, branches, functions, statements) for applicable source files.
 - [x] CI enforces `npm run test:coverage` as a required gate for relevant changes.
-- [x] Mandatory test convention documentation is finalized at `docs/cross-agent/testing-conventions.md`, with `CONTRIBUTING.md` containing concise entry-point guidance and a link to that doc.
+- [x] Mandatory test convention documentation is finalized at `cross-agent-docs/testing-conventions.md`, with `CONTRIBUTING.md` containing concise entry-point guidance and a link to that doc.
 - [x] Test and coverage commands run successfully after updates.
 - [x] Any pre-existing uncovered paths surfaced by threshold enforcement are backfilled to meet the baseline.
 - [x] 100% test coverage on all new code
@@ -86,11 +86,11 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 ### ✅ Unit 3a: Cross-Agent Testing Conventions — Red
 **What**: Capture missing convention content by diffing current contributor guidance against required migration testing conventions.
 **Output**: Content gap matrix at `./2026-03-02-1404-doing-ouroboros-migration-testing-strategy/unit-3a-gap-matrix.md`.
-**Acceptance**: Matrix identifies all mandatory sections needed in `docs/cross-agent/testing-conventions.md`.
+**Acceptance**: Matrix identifies all mandatory sections needed in `cross-agent-docs/testing-conventions.md`.
 
 ### ✅ Unit 3b: Cross-Agent Testing Conventions — Green
-**What**: Author `docs/cross-agent/testing-conventions.md` with mandatory, cross-agent testing conventions (coverage policy, TDD flow, mocking conventions, CI expectations, and artifact expectations).
-**Output**: New `docs/cross-agent/testing-conventions.md`.
+**What**: Author `cross-agent-docs/testing-conventions.md` with mandatory, cross-agent testing conventions (coverage policy, TDD flow, mocking conventions, CI expectations, and artifact expectations).
+**Output**: New `cross-agent-docs/testing-conventions.md`.
 **Acceptance**: Document contains actionable mandatory guidance and aligns with repository structure and existing test tooling.
 
 ### ✅ Unit 3c: Cross-Agent Testing Conventions — Verify
@@ -104,7 +104,7 @@ Establish and enforce the testing baseline for the ouroboros migration by formal
 **Acceptance**: Note lists missing anchor/link language that must be added.
 
 ### ✅ Unit 4b: CONTRIBUTING Entry Point — Green
-**What**: Update `CONTRIBUTING.md` with concise testing entry-point guidance and link to `docs/cross-agent/testing-conventions.md`.
+**What**: Update `CONTRIBUTING.md` with concise testing entry-point guidance and link to `cross-agent-docs/testing-conventions.md`.
 **Output**: Updated `CONTRIBUTING.md`.
 **Acceptance**: `CONTRIBUTING.md` remains concise while clearly directing contributors/agents to mandatory testing conventions.
 

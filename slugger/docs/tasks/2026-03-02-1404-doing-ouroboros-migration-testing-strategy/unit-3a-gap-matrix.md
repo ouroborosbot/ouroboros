@@ -1,6 +1,6 @@
 # Unit 3a Gap Matrix
 
-## Required Section Matrix for `docs/cross-agent/testing-conventions.md`
+## Required Section Matrix for `cross-agent-docs/testing-conventions.md`
 
 | Required Section | Present in `CONTRIBUTING.md` | Gap | Needed in New Doc |
 |---|---|---|---|

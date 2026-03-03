@@ -6,7 +6,7 @@
 
 ## Link Path Check
 - Source: `CONTRIBUTING.md`
-- Target: `docs/cross-agent/testing-conventions.md`
+- Target: `cross-agent-docs/testing-conventions.md`
 - Resolution: valid relative path from repository root contributor guide.
 
 ## Outcome

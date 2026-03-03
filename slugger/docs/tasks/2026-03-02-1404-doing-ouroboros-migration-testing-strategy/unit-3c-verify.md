@@ -1,7 +1,7 @@
 # Unit 3c Verification Checklist
 
 ## Target
-- `docs/cross-agent/testing-conventions.md`
+- `cross-agent-docs/testing-conventions.md`
 
 ## Required Coverage
 
