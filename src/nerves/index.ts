@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync } from "fs"
+import { appendFile, mkdirSync } from "fs"
 import { dirname } from "path"
 import { randomUUID } from "crypto"
 
@@ -69,7 +69,11 @@ export function ensureTraceId(traceId?: string): string {
 export function createFanoutSink(sinks: LogSink[]): LogSink {
   return (entry: LogEvent): void => {
     for (const sink of sinks) {
-      sink(entry)
+      try {
+        sink(entry)
+      } catch {
+        // Fanout must stay resilient: one sink failure cannot block others.
+      }
     }
   }
 }
@@ -82,9 +86,22 @@ export function createStderrSink(write: (chunk: string) => unknown = (chunk) => 
 
 export function createNdjsonFileSink(filePath: string): LogSink {
   mkdirSync(dirname(filePath), { recursive: true })
+  const queue: string[] = []
+  let flushing = false
+
+  function flush(): void {
+    if (flushing || queue.length === 0) return
+    flushing = true
+    const line = queue.shift() as string
+    appendFile(filePath, line, "utf8", () => {
+      flushing = false
+      flush()
+    })
+  }
 
   return (entry: LogEvent): void => {
-    appendFileSync(filePath, `${JSON.stringify(entry)}\n`, "utf8")
+    queue.push(`${JSON.stringify(entry)}\n`)
+    flush()
   }
 }
 
