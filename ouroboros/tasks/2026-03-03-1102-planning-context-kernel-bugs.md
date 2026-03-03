@@ -78,7 +78,7 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 *First-encounter creation flow (explicit):*
 - When `findByExternalId()` returns `null`, the resolver creates a new `FriendRecord`:
   - `id`: fresh UUID (via `crypto.randomUUID()`)
-  - `displayName`: from the system-provided name (AAD `activity.from.name` for Teams, OS username for CLI)
+  - `displayName`: from the system-provided name (AAD `activity.from.name` for Teams, OS username for CLI — just the username part, not the full external ID)
   - `externalIds`: `[{ provider, externalId, tenantId }]` from the channel context
   - `tenantMemberships`: `[tenantId]` if present
   - `toolPreferences`: `{}`
@@ -126,9 +126,11 @@ save_friend_note({
   - Same conflict behavior as tool_preference — if exists and `!override`, returns existing and asks model to merge.
   - Saves to `record.notes[key] = content`.
 
-*Tool description:*
+*Tool description (first person — this is the agent's tool, not a leash):*
 - Broadened from "save a preference about how they like things done" to cover all friend knowledge: name, role, projects, working style, communication preferences, tool preferences, any fact worth remembering.
 - Description should explicitly mention the three types and when to use each.
+- Description must include `override` guidance in first person: "If I'm replacing or correcting something I already know, I use `override: true`. If I'm saving something new and want to check what I already have first, I omit `override` and review what comes back."
+- The tool is for the agent to manage its own knowledge about friends. The description guides, not controls.
 
 *Implementation:*
 - Reads full `FriendRecord` via `ctx.friendStore.get(ctx.context.friend.id)`
@@ -151,6 +153,15 @@ save_friend_note({
 - This instruction only appears when both `notes` and `toolPreferences` are empty. Once the agent has saved anything about the friend, the instruction goes away — replaced by the rendered notes and the general ephemerality reminder.
 - The detection is simple: `Object.keys(record.notes).length === 0 && Object.keys(record.toolPreferences).length === 0`.
 - This is key to friend retention — the first interaction sets the tone. The agent should feel like it cares about getting to know the person.
+
+*Working-memory trust instruction:*
+- The agent's context window is its working memory — the live, authoritative source of truth. Notes saved with `save_friend_note` are a journal for future me: they persist across sessions so I don't lose what I've learned. But within a session, working memory (the conversation) is what I trust.
+- First-person instruction in `contextSection()`: "My working memory (this conversation) is my source of truth. The notes in my context are a journal from past me — if something I just learned contradicts my notes, I trust what I just learned and update my notes to match. If my notes still don't match after saving, I should check that I actually saved correctly."
+- This also covers the per-turn staleness: after a `save_friend_note` call, the system prompt may be stale until next turn. The agent trusts its working memory (it just called the tool) over the stale system prompt.
+
+*Stale notes awareness instruction:*
+- When the agent learns something that might invalidate related notes, it should proactively check. First-person instruction: "When I learn something that might affect other things I know about a friend — like a team change that might mean different projects — I should ask whether my other notes are still accurate and update accordingly."
+- This is a soft instruction. The model decides when relationships between notes are strong enough to warrant checking.
 
 *Name quality instruction:*
 - Always include in `contextSection()` when friend context is present: "The name I have remembered for this friend is {displayName}. If this doesn't seem like their actual name, I should ask what they'd like to be called and save it."
@@ -186,7 +197,13 @@ Sessions currently live at `~/.agentconfigs/{agentName}/sessions/{channel}/{sess
 - `getSessionDir()` may be removed or simplified since the path now depends on friend ID.
 
 *CLI special case:*
-- CLI currently uses `sessionPath("cli", "session")` — a single hardcoded session. With the new structure, CLI needs a friend ID too. The CLI resolver already creates/finds a `FriendRecord` (from OS username as external ID). The friend UUID from resolution is used for the session path.
+- CLI currently uses `sessionPath("cli", "session")` — a single hardcoded session. With the new structure, CLI needs a friend ID too. The CLI resolver already creates/finds a `FriendRecord` (from `username@hostname` as external ID). The friend UUID from resolution is used for the session path.
+
+*CLI external ID format:*
+- Provider: `"local"`
+- External ID: `${os.userInfo().username}@${os.hostname()}` (e.g., `"alex@macbook-pro.local"`)
+- This disambiguates across machines (same person on two machines = two friend records, correct behavior — re-linking is deferred) and across accounts on the same machine.
+- `displayName` is just the username part (`os.userInfo().username`), not the full `user@host`.
 
 *Documentation:*
 - Update top-level README.md to document the friend storage split (agent knowledge vs PII bridge, what lives where and why) and the session path structure
@@ -227,6 +244,10 @@ Sessions currently live at `~/.agentconfigs/{agentName}/sessions/{channel}/{sess
 - [ ] `getToolsForChannel()` accepts `toolPreferences` and injects matching preferences into tool `function.description` (in `tools` API param, not system prompt)
 - [ ] `toolPreferences` entries appear in tool descriptions only (not system prompt)
 - [ ] `notes` entries appear in system prompt only (not tool descriptions)
+- [ ] `save_friend_note` tool description includes first-person `override` guidance (replace/correct = override, new/check = omit)
+- [ ] System prompt includes working-memory trust instruction (conversation is source of truth, notes are journal for future me)
+- [ ] System prompt includes stale notes awareness instruction (check related notes when learning something that might invalidate them)
+- [ ] CLI external ID uses `username@hostname` format with provider `"local"`
 - [ ] System prompt includes priority guidance (friend's request first, social niceties second) when friend context is present
 - [ ] Missing `aadObjectId` handled gracefully: friend record created with empty `externalIds`, no error
 - [ ] Session path restructured: `~/.agentconfigs/{agentName}/sessions/{friendUuid}/{channel}/{sessionId}.json`
@@ -346,3 +367,4 @@ When an agent is moved to a new machine/installation, the PII bridge doesn't tra
 - 2026-03-03 15:00 Sixth revision: (1) AuthorityChecker moved from out-of-scope to in-scope removal — dead weight, we're already touching every file it lives in. Remove interface, checker field, resolver logic, prompt rendering, authority.ts, and tests. (2) Tools-in-session-file noted as deferred nice-to-have for debugging/recall.
 - 2026-03-03 13:36 Seventh revision from review: (1) ContextResolver → FriendResolver rename — "context" is overloaded. (2) Explicit first-encounter creation flow — findByExternalId returns null, create new FriendRecord, return it. First-class scenario for friend retention. (3) "on file" → "remembered" — human-centric language. (4) New-friend behavior instruction in system prompt when notes and toolPreferences are both empty — guides agent to be welcoming and save what it learns during first interaction.
 - 2026-03-03 13:54 Eighth revision from unhappy-path walkthrough (new friend, ADO, Teams): (1) Priority guidance — friend's request comes first, social niceties woven in naturally. (2) Missing aadObjectId graceful degradation — create FriendRecord with empty externalIds, friend is real even without external ID. (3) Session path restructuring — sessions tied to friend internal UUID: `sessions/{friendUuid}/{channel}/{sessionId}.json`. No migration, no backwards compat.
+- 2026-03-03 14:10 Ninth revision from unhappy-path walkthrough (returning CLI friend, corrections): (1) save_friend_note tool description gets first-person override guidance — agent's tool, not a leash. (2) Working-memory trust instruction — context window is source of truth, saved notes are journal for future me. (3) Stale notes awareness — when learning something that might invalidate related notes, ask and update. (4) CLI external ID: `username@hostname` with provider `"local"` — disambiguates across machines and accounts.
