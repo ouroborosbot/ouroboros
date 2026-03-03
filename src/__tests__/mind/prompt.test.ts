@@ -581,6 +581,21 @@ describe("contextSection", () => {
     expect(contextSection(undefined)).toBe("")
   })
 
+  it("returns empty string when context has neither friend nor identity", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      channel: {
+        channel: "cli" as const,
+        availableIntegrations: [] as any[],
+        supportsMarkdown: false,
+        supportsStreaming: true,
+        supportsRichCards: false,
+        maxMessageLength: Infinity,
+      },
+    }
+    expect(contextSection(ctx as any)).toBe("")
+  })
+
   it("renders friend identity with display name", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
