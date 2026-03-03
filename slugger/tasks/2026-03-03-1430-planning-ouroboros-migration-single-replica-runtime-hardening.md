@@ -1,6 +1,6 @@
 # Planning: Ouroboros Migration — Single-Replica Runtime Hardening
 
-**Status**: approved
+**Status**: done
 **Created**: 2026-03-03 14:30
 
 ## Goal
@@ -27,17 +27,17 @@ Define and lock runtime hardening requirements for single-replica preview so req
 - Feature expansion unrelated to runtime resilience for preview.
 
 ## Completion Criteria
-- [ ] Runtime hardening contract is implemented for single-replica preview and applied to active request-path code.
-- [ ] Request-path logging and persistence sinks are non-blocking in practice for expected preview concurrency.
-- [ ] Tool-surface runtime posture is enforced according to agreed preview policy.
-- [ ] Remote channels cannot execute local CLI/file/git/gh tools, and denial UX explains multi-user safety rationale with a clear alternative path.
-- [ ] Concurrency guardrails (limits/timeouts/backpressure behavior) are implemented and covered by tests.
-- [ ] System-prompt rebuild path has explicit safety behavior (freshness + consistency) covered by tests.
-- [ ] Load-validation artifacts exist and demonstrate agreed preview thresholds: 10 concurrent remote conversations, p95 first-feedback <= 2s, p95 final <= 9s for simple no-tool turns, p95 final <= 30s for tool/external turns, and error rate < 1%.
-- [ ] CI gate fails when runtime-hardening contract checks regress.
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] Runtime hardening contract is implemented for single-replica preview and applied to active request-path code.
+- [x] Request-path logging and persistence sinks are non-blocking in practice for expected preview concurrency.
+- [x] Tool-surface runtime posture is enforced according to agreed preview policy.
+- [x] Remote channels cannot execute local CLI/file/git/gh tools, and denial UX explains multi-user safety rationale with a clear alternative path.
+- [x] Concurrency guardrails (limits/timeouts/backpressure behavior) are implemented and covered by tests.
+- [x] System-prompt rebuild path has explicit safety behavior (freshness + consistency) covered by tests.
+- [x] Load-validation artifacts exist and demonstrate agreed preview thresholds: 10 concurrent remote conversations, p95 first-feedback <= 2s, p95 final <= 9s for simple no-tool turns, p95 final <= 30s for tool/external turns, and error rate < 1%.
+- [x] CI gate fails when runtime-hardening contract checks regress.
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -83,3 +83,4 @@ Current-state baseline check (2026-03-03): base tools currently include local sh
 - [2026-03-03 14:36] Rebased planning assumptions on current repo state, locked remote tool-safety policy, and clarified unresolved SLO/capacity questions.
 - [2026-03-03 14:39] Locked concurrency and SLO contract (10 concurrent conversations with split p95 response targets and <1% error rate).
 - [2026-03-03 14:42] Planning approved for doing conversion.
+- [2026-03-03 15:18] Execution completed and criteria synced from doing/final audit evidence.
