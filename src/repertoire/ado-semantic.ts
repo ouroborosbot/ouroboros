@@ -139,7 +139,18 @@ function buildPreviewOps(operation: string, args: Record<string, string>): JsonP
   }
 }
 
-function formatWorkItems(items: EnrichedWorkItem[]): any[] {
+interface FormattedItem {
+  id: number
+  title: string
+  type: string
+  state: string
+  assignedTo: string | null
+  areaPath: string
+  iteration: string
+  parent: number | null
+}
+
+function formatWorkItems(items: EnrichedWorkItem[]): FormattedItem[] {
   return items.map(wi => ({
     id: wi.id,
     title: wi.fields["System.Title"] ?? "",
@@ -150,6 +161,44 @@ function formatWorkItems(items: EnrichedWorkItem[]): any[] {
     iteration: wi.fields["System.IterationPath"] ?? "",
     parent: wi.fields["System.Parent"] ?? null,
   }))
+}
+
+function formatMarkdown(items: FormattedItem[], maxLen: number): string {
+  const lines: string[] = []
+  for (const item of items) {
+    const assignee = item.assignedTo || "Unassigned"
+    const parent = item.parent ? ` (parent: #${item.parent})` : ""
+    const line = `- **#${item.id}** ${item.title} [${item.type}] _${item.state}_ | ${assignee}${parent}`
+    // Check if adding this line would exceed limit
+    const current = lines.join("\n")
+    if (current.length + line.length + 1 > maxLen - 50) {
+      lines.push(`_...and ${items.length - lines.length} more items_`)
+      break
+    }
+    lines.push(line)
+  }
+  return lines.join("\n")
+}
+
+function formatPlainText(items: FormattedItem[]): string {
+  return items.map(item => {
+    const assignee = item.assignedTo || "Unassigned"
+    const parent = item.parent ? ` parent:#${item.parent}` : ""
+    return `#${item.id}  ${item.type.padEnd(14)} ${item.state.padEnd(10)} ${assignee.padEnd(15)} ${item.title}${parent}`
+  }).join("\n")
+}
+
+function formatForChannel(items: FormattedItem[], ctx: ToolContext | undefined, org: string, project: string): string {
+  const channel = ctx?.context?.channel
+  if (!channel) {
+    return JSON.stringify({ items, organization: org, project })
+  }
+
+  if (channel.supportsMarkdown) {
+    return formatMarkdown(items, channel.maxMessageLength)
+  }
+
+  return formatPlainText(items)
 }
 
 export const adoSemanticToolDefinitions: ToolDefinition[] = [
@@ -210,7 +259,7 @@ export const adoSemanticToolDefinitions: ToolDefinition[] = [
       }
 
       if (!wiqlData.workItems || wiqlData.workItems.length === 0) {
-        return JSON.stringify({ items: [], message: "No work items found matching the query." })
+        return "No work items found matching the query."
       }
 
       // Step 2: Batch fetch enriched details (max 200)
@@ -230,7 +279,7 @@ export const adoSemanticToolDefinitions: ToolDefinition[] = [
       }
 
       const items = formatWorkItems(batchData.value ?? [])
-      return JSON.stringify({ items, organization, project })
+      return formatForChannel(items, ctx, organization, project)
     },
     integration: "ado",
   },
