@@ -81,7 +81,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Output**: Coverage verification note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-1c-coverage.md`.
 **Acceptance**: New observability module code is fully covered and tests remain green.
 
-### ⬜ Unit 2a: Trace Propagation (Entrypoints/Core) — Red
+### ✅ Unit 2a: Trace Propagation (Entrypoints/Core) — Red
 **What**: Add failing tests proving trace IDs are created at turn entry boundaries in `src/channels/cli.ts` and `src/channels/teams.ts` and propagated into `src/engine/core.ts`.
 **Output**: Failing trace propagation tests (channel + core suites) and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-2a-red-run.txt`.
 **Acceptance**: Tests fail before implementation and explicitly show missing trace propagation behavior.
@@ -207,3 +207,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 17:43] Unit 1a complete: added failing observability core tests and captured red run evidence (missing module/envelope/sink behavior)
 - [2026-03-02 17:44] Unit 1b complete: implemented observability core module (trace helpers, level filtering, sink fan-out, stderr + NDJSON file sinks); tests green and build clean
 - [2026-03-02 17:46] Unit 1c complete: added coverage backfill tests (observability defaults/warn + CLI spinner success branch), verified 100% coverage and clean build
+- [2026-03-02 17:48] Unit 2a complete: added failing trace propagation tests for CLI entry, Teams entry, and core model-request metadata propagation
