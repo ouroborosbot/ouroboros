@@ -6,8 +6,8 @@
   - Evidence: `vitest.config.ts` thresholds block
 - [x] CI enforces `npm run test:coverage`
   - Evidence: `.github/workflows/coverage.yml`
-- [x] Mandatory conventions documented at `docs/cross-agent/testing-conventions.md` with `CONTRIBUTING.md` entry point
-  - Evidence: `docs/cross-agent/testing-conventions.md`, `CONTRIBUTING.md`
+- [x] Mandatory conventions documented at `cross-agent-docs/testing-conventions.md` with `CONTRIBUTING.md` entry point
+  - Evidence: `cross-agent-docs/testing-conventions.md`, `CONTRIBUTING.md`
 - [x] Test and coverage commands run successfully
   - Evidence: `final-test.log`, `final-coverage.log`
 - [x] Legacy coverage gaps surfaced by thresholds are backfilled or resolved

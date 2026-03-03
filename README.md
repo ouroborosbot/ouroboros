@@ -50,6 +50,7 @@ ouroboros/                        # repo root
     skills/                       # markdown skill plugins
     manifest/                     # Teams app manifest
   subagents/                      # sub-agent definitions (work-planner, work-doer)
+  cross-agent-docs/               # shared docs (testing conventions, etc.)
   docs/
     OAUTH-SETUP.md                # shared OAuth infrastructure docs
   package.json

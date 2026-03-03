@@ -23,7 +23,7 @@
 
 ### 3. Shared Testing Conventions Location
 
-- Decided target path: `docs/cross-agent/testing-conventions.md`.
+- Decided target path: `cross-agent-docs/testing-conventions.md`.
 - File does not yet exist.
 - `CONTRIBUTING.md` does not yet link to this path.
 
@@ -37,6 +37,6 @@
 
 1. Add explicit 100% thresholds in `vitest.config.ts`.
 2. Add CI coverage workflow (`npm run test:coverage`).
-3. Create `docs/cross-agent/testing-conventions.md`.
+3. Create `cross-agent-docs/testing-conventions.md`.
 4. Add concise pointer in `CONTRIBUTING.md`.
 5. Backfill any legacy uncovered files surfaced by threshold enforcement.
