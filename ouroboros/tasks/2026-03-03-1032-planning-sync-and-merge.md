@@ -17,8 +17,11 @@ Build a new `work-merger` subagent that runs after work-doer completes, fetching
 - Update `AGENTS.md` to add sync-and-merge as a workflow step after work-doer
 - The work-merger workflow: fetch, merge, conflict resolution using task docs, test, create PR via `gh`, CI passes, merge PR to main
 - Conflict resolution strategy: read own task doc + other agent's recent task docs to understand intent
-- Escalation path: stop and ask user when truly stuck
-- Branch convention documentation: Claude Code uses `<agent>/<slug>` (e.g., `ouroboros/context-kernel`), Codex uses `codex/<agent>` (e.g., `codex/slugger`). Follows existing AGENTS.md `[prefix/]<agent>[/feature...]` parsing.
+- Race condition retry flow: if PR has conflicts (other agent merged while this agent was working), pull updated main, re-resolve conflicts using task docs, run tests, force-push branch, let CI re-run
+- CI failure self-repair: agent attempts to fix CI failures itself first (it wrote the code, has task context), only escalates to user for genuinely ambiguous issues
+- Post-merge cleanup: delete feature branch (local and remote) after PR is merged
+- Escalation path: stop and ask user only when truly stuck (not for fixable test/lint failures)
+- Branch convention unification: both agents use `<agent>/<slug>` (e.g., `ouroboros/context-kernel`, `slugger/some-feature`). The old `codex/<agent>` prefix convention is deprecated. AGENTS.md branch parsing rules updated accordingly.
 - Update `cross-agent-docs/` with sync-and-merge conventions if needed
 
 ### Out of Scope
@@ -38,8 +41,11 @@ Build a new `work-merger` subagent that runs after work-doer completes, fetching
 - [ ] The work-merger doc covers: fetch, merge, conflict resolution with task doc context, test, PR creation via `gh`, merge PR to main
 - [ ] The work-merger doc covers the fast-path: branch already up-to-date with main (still creates PR, CI must pass)
 - [ ] The work-merger doc covers dynamic task doc discovery: scan `*/tasks/` dirs with recency bias (most recent doing docs first)
-- [ ] The work-merger doc covers escalation: when to stop and ask the user
-- [ ] Branch naming convention documented: Claude Code uses `<agent>/<slug>`, Codex uses `codex/<agent>` (follows AGENTS.md `[prefix/]<agent>[/feature...]` parsing)
+- [ ] The work-merger doc covers race condition retry: re-fetch, re-merge, re-resolve conflicts, force-push, CI re-run
+- [ ] The work-merger doc covers CI failure self-repair: agent fixes failures itself first, escalates only when genuinely stuck
+- [ ] The work-merger doc covers post-merge cleanup: delete feature branch (local + remote)
+- [ ] The work-merger doc covers escalation: when to stop and ask the user (only for genuinely ambiguous issues, not fixable failures)
+- [ ] Branch naming convention unified and documented: both agents use `<agent>/<slug>`, old `codex/` prefix convention deprecated in AGENTS.md
 - [ ] `cross-agent-docs/sync-and-merge-conventions.md` created with shared conventions
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
@@ -60,11 +66,14 @@ Note: This task is primarily documentation (subagent .md files, workflow docs). 
 ## Decisions Made
 - work-merger is a new subagent, not an extension of work-doer (separation of concerns, keeps work-doer general-purpose)
 - No modifications to work-planner or work-doer
-- **Branch convention**: Claude Code uses `<agent>/<slug>` (e.g., `ouroboros/context-kernel`). Codex uses `codex/<agent>` (e.g., `codex/slugger`). Follows existing AGENTS.md `[prefix/]<agent>[/feature...]` parsing. The work-merger doc should not hardcode agent names -- it derives the current agent from the branch name using this convention.
+- **Branch convention (unified)**: both agents use `<agent>/<slug>` (e.g., `ouroboros/context-kernel`, `slugger/some-feature`). The old `codex/<agent>` prefix convention is deprecated. AGENTS.md branch parsing simplified to just `<agent>[/<slug>]`. The work-merger doc derives the current agent from the first path segment of the branch name -- no hardcoded agent names.
 - **Dual-install pattern**: work-merger.md is authored once in `subagents/` with YAML frontmatter. It works as a Claude Code sub-agent AND as a Codex skill (hard-linked as `SKILL.md`). Same pattern already used by work-planner and work-doer.
 - No task locking -- first-come-first-served to main
 - Conflict resolution uses task docs as context (own doing doc + other agent's recent doing docs on main)
-- Escalation to user only when truly stuck (tests fail after resolution, or conflict is ambiguous)
+- **Race condition retry**: if the PR has merge conflicts because the other agent merged to main in the meantime, the agent pulls updated main, re-resolves conflicts (re-reading task docs), runs tests, force-pushes the branch, and lets CI re-run. This is the most common real-world scenario.
+- **CI failure self-repair**: agent attempts to fix CI failures itself first (lint issues, test failures, etc.) since it wrote the code and has full task context. Only escalates to user when there is genuinely something that needs human input -- not just a failing test it could fix.
+- **Post-merge cleanup**: after PR is merged to main, delete the feature branch both locally (`git branch -d`) and remotely (`git push origin --delete`).
+- Escalation to user only when truly stuck (ambiguous conflict that can't be resolved from task docs, or repeated CI failures after self-repair attempts)
 - KISS throughout -- minimal moving parts
 - **Merge strategy**: merge commits (not rebase). Simpler, preserves branch history.
 - **PR-based merge to main**: agents create a PR via `gh pr create`, CI must pass, then `gh pr merge`. No direct push to main. Keeps main green.
@@ -78,8 +87,8 @@ Note: This task is primarily documentation (subagent .md files, workflow docs). 
 - Workflow definition: `AGENTS.md`
 - Cross-agent conventions: `cross-agent-docs/testing-conventions.md`
 - Agent task directories: `ouroboros/tasks/`, `slugger/tasks/`
-- Branch convention from AGENTS.md: branch encodes agent name, parsed as `[prefix/]<agent>[/feature...]`
-- Current branches: `ouroboros` (Claude Code), `codex/slugger` (Codex, remote), `main`
+- Branch convention from AGENTS.md (to be updated): currently `[prefix/]<agent>[/feature...]` with `codex/` special-casing, will simplify to `<agent>/<slug>`
+- Current branches: `ouroboros` (Claude Code), `codex/slugger` (Codex, remote -- will become `slugger/<slug>` under new convention), `main`
 - Codex skill install pattern: hard-link `.md` as `~/.codex/skills/<name>/SKILL.md` + optional `agents/openai.yaml`
 - AGENTS.md Runtime-Specific Invocation: Codex uses `$work-planner`/`$work-doer` skill syntax; will need `$work-merger`
 
@@ -89,6 +98,8 @@ The work-merger subagent is purely a documentation/workflow artifact -- it instr
 1. The conflict resolution strategy -- how to read own doing doc + discover and read other agents' recent doing docs to understand both intents, then resolve conflicts preserving both.
 2. The PR workflow -- push branch, `gh pr create`, wait for CI, `gh pr merge`, handle CI failures.
 3. Task doc discovery -- scanning `*/tasks/` dirs, sorting by YYYY-MM-DD-HHMM prefix for recency, reading the most recent doing docs first.
+4. The race condition retry loop -- the most common real-world scenario where main moves while the agent is working. Must handle re-fetch, re-merge, re-resolve, force-push cleanly.
+5. CI failure self-repair -- the agent should be instructed to treat CI failures as its own problem to fix first, not immediately escalate. Clear boundary between "fixable by agent" and "needs human."
 
 ## Progress Log
 - 2026-03-03 10:33 Created
