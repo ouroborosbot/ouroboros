@@ -275,7 +275,7 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Output**: Coverage report showing 100% on core.ts changes.
 **Acceptance**: 100% coverage on new code, tests still green.
 
-### ⬜ Unit 11d: Full integration validation checkpoint
+### ✅ Unit 11d: Full integration validation checkpoint
 **What**: Run `npx tsc --noEmit` and `npx vitest run` to verify the entire dependency chain compiles and all tests pass after all implementation units (1-11) are complete. This catches cross-unit wiring issues -- type mismatches between the store layer (Units 1-2), resolver (Unit 3), tools (Units 5-6), prompt (Unit 7), session paths (Unit 8), adapters (Units 9-10), and agent loop (Unit 11) -- before the final documentation/cleanup unit.
 **Output**: Clean `tsc --noEmit` output (exit 0), full test suite green.
 **Acceptance**: `npx tsc --noEmit` exits 0 with no errors, `npx vitest run` passes all tests with no failures or warnings.
@@ -312,3 +312,4 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 - 2026-03-03 15:41 Units 10a-10c complete: CLI adapter wired -- buildSystem called with resolved context, toolContext.friendStore set, sessionPath uses friend UUID. New code fully covered. 1195 tests pass.
 - 2026-03-03 15:46 Unit 11a complete: 3 failing tests for per-turn friend refresh (friendStore.get, toolPreferences in getToolsForChannel, buildSystem with fresh context). 1195 pass, 3 fail (red).
 - 2026-03-03 15:48 Units 11b-11c complete: Per-turn friend refresh in runAgent -- friendStore.get re-reads friend from disk, fresh context passed to buildSystem, toolPreferences passed to getToolsForChannel. Non-null assertion on unreachable branch, added null-return test for 100% coverage on core.ts. 1199 tests pass.
+- 2026-03-03 15:49 Unit 11d complete: Full integration validation checkpoint. tsc --noEmit clean, 1199 tests pass, no warnings.
