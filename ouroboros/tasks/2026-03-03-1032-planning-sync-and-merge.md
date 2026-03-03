@@ -33,8 +33,7 @@ Build a new `work-merger` subagent that runs after work-doer completes, fetching
 ## Completion Criteria
 - [ ] `subagents/work-merger.md` exists with YAML frontmatter and complete workflow instructions
 - [ ] work-merger is installable as a Claude Code sub-agent (symlink into `~/.claude/agents/`) AND as a Codex skill (hard-link as `~/.codex/skills/work-merger/SKILL.md`)
-- [ ] `subagents/README.md` install instructions updated to include work-merger commands for both Claude Code and Codex skill harnesses (including optional `openai.yaml` UI metadata)
-- [ ] `subagents/README.md` updated: work-merger in table, workflow description extended, install commands for both Claude Code and Codex
+- [ ] `subagents/README.md` updated: work-merger in table, workflow description extended, install commands for both Claude Code and Codex (including optional `openai.yaml` UI metadata)
 - [ ] `AGENTS.md` updated: extended workflow (work-planner -> work-doer -> work-merger), Runtime-Specific Invocation includes `$work-merger` for Codex and sub-agent for Claude Code
 - [ ] The work-merger doc covers: fetch, merge, conflict resolution with task doc context, test, PR creation via `gh`, merge PR to main
 - [ ] The work-merger doc covers the fast-path: branch already up-to-date with main (still creates PR, CI must pass)
