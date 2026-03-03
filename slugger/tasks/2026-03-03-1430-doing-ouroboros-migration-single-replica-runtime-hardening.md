@@ -96,7 +96,7 @@ Define and lock runtime hardening requirements for single-replica preview so req
 **Output**: Updated engine/channel/prompt runtime code and passing tests.
 **Acceptance**: Concurrency and prompt consistency behavior are enforced and observable in runtime/tests.
 
-### ⬜ Unit 3c: Concurrency Guardrails and Prompt-Rebuild Safety — Coverage & Refactor
+### ✅ Unit 3c: Concurrency Guardrails and Prompt-Rebuild Safety — Coverage & Refactor
 **What**: Cover boundary conditions (limit reached, timeout, degraded fallback) and refactor for maintainability.
 **Output**: Coverage artifact at `./2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-3c-coverage-run.txt`.
 **Acceptance**: New guardrail and prompt-safety paths are fully covered.
@@ -139,3 +139,4 @@ Define and lock runtime hardening requirements for single-replica preview so req
 - [2026-03-03 14:58] Unit 2c complete: verified 100% coverage and clean build after non-blocking sink hardening (`unit-2c-coverage-run.txt`, `unit-2c-build-run.txt`).
 - [2026-03-03 15:01] Unit 3a complete: added failing tests for global in-flight Teams guardrails and prompt-refresh safety/consistency; captured red evidence in `unit-3a-red-run.txt`.
 - [2026-03-03 15:04] Unit 3b complete: implemented global Teams in-flight concurrency cap and resilient prompt-refresh fallback/preservation behavior; verified full test + build green (`unit-3b-test-run.txt`, `unit-3b-build-run.txt`).
+- [2026-03-03 15:06] Unit 3c complete: closed guardrail/prompt fallback branch coverage gaps and re-verified 100% coverage + clean build (`unit-3c-coverage-run.txt`, `unit-3c-build-run.txt`).
