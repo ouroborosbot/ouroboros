@@ -28,9 +28,9 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 - 1A. `ContextStore` interface -- typed collection properties, starting with `identity: CollectionStore<FriendIdentity>` in Phase 1. `CollectionStore<T>` provides `get(id)`, `put(id, value)`, `delete(id)`, `find(predicate)`. IDs are always plain strings (UUIDs), no slashes, no compound keys. All context persistence goes through this interface. No module imports file paths or `fs` directly for context data. `find(predicate)` supports identity resolution by external ID (scan + predicate for file store; proper index for future DB store). Adding a new persisted type = add one `CollectionStore<T>` property to `ContextStore`. Phase 3 adds `memory: CollectionStore<FriendMemory>` for model-managed per-friend notes.
 - 1B. `FileContextStore` -- first adapter implementing `ContextStore`. Constructor takes a base path (e.g., `~/.agentconfigs/ouroboros/context`); it does not resolve the path itself. Each collection maps to a subdirectory (Phase 1: `context/identity/`), each item to a JSON file (`{uuid}.json`). This is the only module that touches the filesystem for context storage. Phase 3 adds `context/memory/`.
 - 1C. `FriendIdentity` type and resolution -- internal ID (UUID), external ID mappings (AAD, Teams), tenant memberships, display name. Persisted via `ContextStore`. This is the only layer that truly needs persistence — the UUID ↔ external ID mapping can't be re-derived from an API.
-- ~~1D.~~ *(Removed -- per-friend preferences moved to Phase 3 as `FriendMemory` with freeform `toolPreferences`. See 3G. Global preferences like verbosity and confirmation policy are agent-level concerns, not per-friend.)*
+- ~~1D.~~ *(Removed -- per-friend preferences moved to Phase 3 as `FriendMemory` with freeform `toolPreferences`. See 3B. Global preferences like verbosity and confirmation policy are agent-level concerns, not per-friend.)*
 - 1E. `ChannelCapabilities` type -- channel identifier (`"cli" | "teams"`) plus capability flags (`supportsMarkdown`, `supportsStreaming`, `supportsRichCards`, `maxMessageLength`) plus `availableIntegrations` declaring which integrations the channel can reach. Defined as a hardcoded `const` map in `src/mind/context/channel.ts` keyed by channel identifier — channel adapters pass the channel string, the map returns the full capabilities object. Adding a new channel = add one entry to the map. Pure lookup, no resolution needed. Drives tool routing and prompt filtering.
-- 1F. `ContextResolver` -- resolves identity (from store) and channel (from lookup) into a `ResolvedContext` object. In Phase 1, all resolution is cheap (file read + pure lookup) so everything resolves eagerly — no lazy Promises needed yet. Laziness (explicit `Promise<T>` fields) is introduced in Phase 2 when authority resolution requires API calls. Phase 3 adds memory resolution.
+- 1F. `ContextResolver` -- resolves identity (from store) and channel (from lookup) into a `ResolvedContext` object. In Phase 1, all resolution is cheap (file read + pure lookup) so everything resolves eagerly -- no Promises needed yet. Phase 2 adds explicit `Promise<T>` fields for authority (eager-start -- API call fires at resolver build time, consumers await when needed, see D6). Phase 3 adds memory resolution.
 - 1G. System prompt injection -- `buildSystem()` becomes async from Phase 1 and gains a `contextSection()` that renders identity + channel into the system prompt. Async from the start to avoid a mid-stream signature change when Phase 2 adds `await context.authority` -- all callers are updated once. Rebuilt per-turn. Gracefully omitted when no context is available. Phase 2 adds authority constraints; Phase 3 adds memory (toolPreferences loaded dynamically per-tool, not in system prompt).
 - 1H. Wire context through ONE real ADO operation (Teams channel only): the existing `ado_work_items` tool gains runtime scope discovery. The tool schema changes: `organization` becomes **optional** (currently required). When the model provides org/project, use them directly. When omitted, the tool handler discovers the friend's orgs/projects via ADO APIs (Accounts API → Projects API) and disambiguates: single org → auto-select; multiple orgs → return the list for the model to ask the friend which one. Same logic applies at the project level within an org. Zero orgs → return "no ADO organizations found" and the model tells the friend. The `validateAdoOrg()` call is replaced by this discovery flow. The conversation carries discovery results forward — no caching. This is the proof that the kernel works end-to-end. ADO is Teams-only (CLI has `availableIntegrations = []`, no OAuth tokens) so this wiring is tested exclusively via the Teams channel.
 
@@ -42,12 +42,11 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 
 **Phase 3: ADO Semantic Tools + Friend Memory (Full Consumer)**
 - 3A. Per-friend ADO context (runtime scope discovery, conversational org/project selection) integrated into semantic tools
-- 3G. `FriendMemory` type and resolution -- `memory: CollectionStore<FriendMemory>` added to `ContextStore`. `FriendMemory` has `toolPreferences: Record<string, string>` — freeform, model-managed per-tool notes. The model writes toolPreferences when a friend expresses a preference; the model reads them before calling the relevant tool. Stored as JSON (structured envelope, freeform content). A save tool allows the model to persist notes. No typed preference schema, no defaults, no enums — the model decides what matters.
-- 3B. Enriched backlog query tool -- single-call `ado_backlog_list` with hierarchy, types, parent info, assignee
-- 3C. Semantic ADO operations -- `ado_create_epic`, `ado_create_issue`, `ado_move_items`, `ado_restructure_backlog`, `ado_validate_structure`, `ado_preview_changes`
-- 3D. Batch operations -- `ado_batch_update` client-side batching with plan validation and per-item results
-- 3E. Channel-aware ADO behavior -- Teams gets summarized views, CLI gets structured tabular output
-- 3F. Dry-run mode -- `ado_preview_changes` returns structured diff before mutation
+- 3B. `FriendMemory` type and resolution -- `memory: CollectionStore<FriendMemory>` added to `ContextStore`. `FriendMemory` has `toolPreferences: Record<string, string>` -- freeform, model-managed per-tool notes. The model writes toolPreferences when a friend expresses a preference (via a `save_friend_note` tool). Tool handlers read `ResolvedContext.memory.toolPreferences` and incorporate relevant preferences into their behavior or response -- preferences flow through the tool handler, not the system prompt (see D10). Stored as JSON (structured envelope, freeform content). No typed preference schema, no defaults, no enums -- the model decides what matters.
+- 3C. Enriched backlog query tool -- single-call `ado_backlog_list` with hierarchy, types, parent info, assignee
+- 3D. Semantic ADO operations -- `ado_create_epic`, `ado_create_issue`, `ado_move_items`, `ado_restructure_backlog`, `ado_validate_structure`, `ado_preview_changes`. `ado_preview_changes` is the dry-run tool: returns a structured diff of what a mutation would do before executing it. All mutation tools can be called in preview mode via this tool.
+- 3E. Batch operations -- `ado_batch_update` client-side batching with plan validation and per-item results
+- 3F. Channel-aware ADO behavior -- Teams gets summarized views, CLI gets structured tabular output
 
 **Phase 4: ADO Intelligence (Advanced)**
 - 4A. Process template awareness -- fetch actual process template definition from ADO API, derive hierarchy rules, prevent illegal parent/child structures
@@ -70,7 +69,7 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 - [ ] `ContextStore` interface defined with typed collection properties; Phase 1: `identity` only; Phase 3 adds `memory`. Each `CollectionStore<T>` provides `get`/`put`/`delete`/`find`; `FileContextStore` implements it
 - [ ] No context module imports `fs` directly -- all persistence goes through `ContextStore`
 - [ ] All four context layers (Identity, Authority, Memory, Channel) have TypeScript types and resolution functions (phased: Identity + Channel in Phase 1, Authority in Phase 2, Memory in Phase 3)
-- [ ] `ContextResolver` resolves identity + channel eagerly in Phase 1; Phase 2 adds authority (lazy); Phase 3 adds memory
+- [ ] `ContextResolver` resolves identity + channel eagerly in Phase 1; Phase 2 adds authority (eager-start Promise, D6); Phase 3 adds memory
 - [ ] Authority uses hybrid model: reads are optimistic (403 learning), writes have pre-flight check via Security Namespaces API (Q8)
 - [ ] Identity persists across sessions via `ContextStore`; Authority is learned fresh per-turn (checker on resolver, memoized within turn, discarded after); FriendMemory (toolPreferences) persists via `ContextStore` (Phase 3)
 - [ ] ADO scope discovery works at runtime via Accounts API + Projects API; conversation carries results forward (no caching)
@@ -85,7 +84,7 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 - [ ] System prompt includes resolved context (identity, channel, authority constraints) via `contextSection()` in `buildSystem()`
 - [ ] Authority constraints rendered as explicit "can / CANNOT" in prompt so model plans around limitations
 - [ ] Prompt injection gracefully omitted when no context is available (CLI with no identity, first turn)
-- [ ] `FriendMemory` type exists with `toolPreferences: Record<string, string>`; `ContextStore.memory` collection supports CRUD; a save tool lets the model persist notes; tool handlers can read `toolPreferences` from `ResolvedContext.memory` (Phase 3)
+- [ ] `FriendMemory` type exists with `toolPreferences: Record<string, string>`; `ContextStore.memory` collection supports CRUD; a `save_friend_note` tool lets the model persist preferences; tool handlers read `ResolvedContext.memory.toolPreferences` and incorporate relevant preferences into behavior/response (Phase 3, unit 3B)
 - [ ] `buildSystem()` is async; all callers use `await buildSystem()` (A15)
 - [ ] `IdentityProvider` and `Integration` are typed unions -- no bare `string` in ExternalId.provider, AuthorityProfile.integration, AuthorityChecker methods, or ChannelCapabilities.availableIntegrations (A16)
 - [ ] All tools use `ToolDefinition` wrapper; `getToolsForChannel()` filters by `ToolDefinition.integration` against `availableIntegrations`; separate `confirmationRequired` Set is removed (A21)
@@ -225,7 +224,7 @@ channel: teams (markdown, no streaming, max 4000 chars)
 - scope limited to area path "Platform\Backend"
 ```
 
-Note: toolPreferences (Phase 3) are NOT injected into the system prompt — they are loaded dynamically when the model is about to call a tool that has associated preferences. ADO scopes are also not in the prompt — they're a tool-level concern (discovered inline, conversation carries them forward).
+Note: toolPreferences (Phase 3) are NOT injected into the system prompt. Instead, tool handlers read `ResolvedContext.memory.toolPreferences` and incorporate relevant preferences into their behavior or response. The preferences flow through the handler, not the prompt -- the model sees them in tool results, not upfront. ADO scopes are also not in the prompt -- they're a tool-level concern (discovered inline, conversation carries them forward).
 
 Design rules:
 - **Rebuilt per-turn**: `buildSystem()` already runs each turn. Context may change mid-conversation, so the prompt must reflect the latest state.
@@ -388,7 +387,7 @@ What replaces them:
 
 - **Phase 1: Identity + Channel + Storage Interface** -- Units 10, 1A-1C, 1E-1H (1D removed). Starts with directory restructuring, then builds storage, identity, channel, resolver, prompt injection, and wires through one real ADO operation.
 - **Phase 2: Authority** -- Units 2A-2D. Hybrid authority model, wired into tools and prompt.
-- **Phase 3: ADO Semantic Tools + Friend Memory** -- Units 3A-3G. Semantic ADO tools + FriendMemory with freeform toolPreferences.
+- **Phase 3: ADO Semantic Tools + Friend Memory** -- Units 3A-3F. Semantic ADO tools + FriendMemory with freeform toolPreferences.
 - **Phase 4: ADO Intelligence** -- Units 4A-4C. Process templates, authority-aware planning, structural safety.
 
 ### Proposed TypeScript Schema (reference for doing doc units)
@@ -414,19 +413,19 @@ interface CollectionStore<T> {
 // Consumers write store.identity.get(id), store.memory.get(id) -- type-safe, zero ambiguity.
 interface ContextStore {
   readonly identity: CollectionStore<FriendIdentity>;
-  // Added in unit 3G (Phase 3):
+  // Added in unit 3B (Phase 3):
   // readonly memory: CollectionStore<FriendMemory>;
 }
 
 // src/mind/context/store-file.ts
 
 // First adapter: file-based storage under ~/.agentconfigs/<agent>/context/
-// Each collection maps to a subdirectory: context/identity/ (unit 3G adds context/memory/)
+// Each collection maps to a subdirectory: context/identity/ (unit 3B adds context/memory/)
 // Each item maps to a JSON file: context/identity/{uuid}.json
 // This is the ONLY module that touches fs for context data.
 class FileContextStore implements ContextStore {
   readonly identity: CollectionStore<FriendIdentity>;   // -> context/identity/
-  // Added in unit 3G (Phase 3):
+  // Added in unit 3B (Phase 3):
   // readonly memory: CollectionStore<FriendMemory>;     // -> context/memory/
   // Each property is a FileCollectionStore<T> pointing at its own directory.
 }
@@ -520,15 +519,15 @@ interface ChannelCapabilities {
 // --- Resolved Context (output of resolver) ---
 // Phase 1 (units 1A-1H): identity + channel only (everything is cheap, no Promises).
 // Unit 2A adds: authority + checker (Phase 2).
-// Unit 3G adds: memory (Phase 3).
-// Principle: don't add laziness until there's something expensive to be lazy about.
+// Unit 3B adds: memory (Phase 3).
+// Principle: don't add complexity until there's something that needs it.
 interface ResolvedContext {
   readonly identity: FriendIdentity;
   readonly channel: ChannelCapabilities;
   // Added in unit 2A (Phase 2):
   // readonly authority: Promise<AuthorityProfile[]>;
   // readonly checker: AuthorityChecker;
-  // Added in unit 3G (Phase 3):
+  // Added in unit 3B (Phase 3):
   // readonly memory: FriendMemory | null;  // null if no memory exists for this friend yet
 }
 
@@ -580,3 +579,4 @@ interface ToolDefinition {
 - 2026-03-02 2224 Resolved Q4 (no process template cache -- fetch at runtime, conversation carries forward), Q5 (moved to Resolved), Q7 (coexist -- semantic preferred, generic as escape hatch). Only Q8 remains open. Fixed schema "Phase X adds" comments to reference specific units (3G, 2A). Clarified Context/References section for work-doer (paths are post-unit-10, current codebase still uses old names).
 - 2026-03-02 2228 Q8 resolved: Security Namespaces API for pre-flight writes. All open questions now resolved. Final coherence pass: rewrote Goal to reflect final design (no caching, typed unions, ToolDefinition, Security Namespaces, one marathon). Fixed 7 issues: unit 2B references Security Namespaces API (Q8), D2 references Security Namespaces API, D12 "Users" -> "Friends", D14 stale ContextStore.find("identity",...) -> store.identity.find(...), D15 removed "caching can be re-added" hedge, duplicate ResolvedContext schema comment removed, Q1 clarified eager-start Promise, D12 "now vs later" -> "in scope vs out of scope", Out of Scope "Deferred" -> "Postponed", completion criterion updated with Security Namespaces API.
 - 2026-03-02 2238 Final consistency fixes from friend review. (1) Q3 "lazy" -> "eager-start Promise" to match D6/A7. (2) AuthorityChecker lifecycle clarified: per-turn not per-conversation. Checker lives on resolver, memoizes within turn, discarded after. Cross-turn authority knowledge lives in conversation history; if trimmed, model re-probes. Updated D4, D13, D18, unit 2A, completion criteria, Goal, schema comments, Q3. (3) ChannelCapabilities: removed orphaned fields (supportsInteractiveConfirmation, defaultVerbosity, defaultConfirmationFriction) -- YAGNI, no consumer. (4) Context/References ToolContext: clarified post-unit-10 state vs later modifications by units 1H/D5/D20. (5) D11 retitled "403 Triggers Fresh Scope Discovery" -- tools re-discover, not authority layer.
+- PENDING_TIMESTAMP Five final fixes. (1) Unit 1F: "Laziness" -> "explicit Promise<T> fields (eager-start, see D6)". (2) Completion criteria: "lazy" -> "eager-start Promise, D6". (3) Phase 3 units renumbered sequentially: 3G->3B, 3B->3C, 3C->3D, 3D->3E, 3E->3F. Updated all references (1D, Notes, schema comments, completion criteria). (4) toolPreferences read mechanism made explicit: tool handlers read ResolvedContext.memory.toolPreferences and incorporate into behavior/response -- not system prompt, not a separate read tool. Updated 3B (was 3G), D10, completion criterion. save_friend_note tool for writes. (5) 3F dry-run merged into 3D (was 3C) -- ado_preview_changes is part of semantic operations, not a separate unit.
