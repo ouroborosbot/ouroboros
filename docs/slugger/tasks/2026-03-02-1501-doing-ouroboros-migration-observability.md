@@ -25,15 +25,15 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [ ] Minimum component event catalog is implemented and exercised in tests (entrypoints/channels/engine including `src/engine/kicks.ts`/mind/tools/config/identity/clients/repertoire).
 - [x] Trace IDs are generated at turn entry and propagated through core execution.
 - [ ] Existing ad-hoc operational logging in scoped runtime files is replaced or wrapped by structured logging.
-- [ ] Tests cover new observability code and instrumentation behavior.
-- [ ] `npm run audit:observability` exists and fails when required event coverage, schema/policy checks, or declared logpoint coverage is incomplete.
-- [ ] Observability coverage report artifact is produced with measurable results for: event-catalog coverage, schema/redaction compliance, and logpoint coverage.
-- [ ] Vitest runs in observability-capture mode and writes audit artifacts to `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/vitest-events.ndjson` and `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/vitest-logpoints.json` (not operational sinks).
-- [ ] `npm run audit:observability` consumes captured artifacts directly and does not rerun tests.
-- [ ] `npm run test:coverage` is the mandatory combined gate and fails on either code coverage or observability audit failure.
-- [ ] CI enforces `npm run test:coverage` as the required combined gate for this phase.
-- [ ] Combined gate summary artifact clearly signals both obligations with this shape: `overall_status`, `code_coverage`, `observability_coverage`, `required_actions[]` where each action has `type` (`coverage` or `logging`), `target`, and `reason`.
-- [ ] Combined gate summary artifact is written at `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/coverage-gate-summary.json`.
+- [x] Tests cover new observability code and instrumentation behavior.
+- [x] `npm run audit:observability` exists and fails when required event coverage, schema/policy checks, or declared logpoint coverage is incomplete.
+- [x] Observability coverage report artifact is produced with measurable results for: event-catalog coverage, schema/redaction compliance, and logpoint coverage.
+- [x] Vitest runs in observability-capture mode and writes audit artifacts to `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/vitest-events.ndjson` and `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/vitest-logpoints.json` (not operational sinks).
+- [x] `npm run audit:observability` consumes captured artifacts directly and does not rerun tests.
+- [x] `npm run test:coverage` is the mandatory combined gate and fails on either code coverage or observability audit failure.
+- [x] CI enforces `npm run test:coverage` as the required combined gate for this phase.
+- [x] Combined gate summary artifact clearly signals both obligations with this shape: `overall_status`, `code_coverage`, `observability_coverage`, `required_actions[]` where each action has `type` (`coverage` or `logging`), `target`, and `reason`.
+- [x] Combined gate summary artifact is written at `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/coverage-gate-summary.json`.
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -146,7 +146,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Output**: Failing audit evidence at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-6a-red-run.txt`.
 **Acceptance**: Audit fails before implementation and clearly reports failing dimensions (event-catalog, schema/redaction, logpoint coverage) from capture artifacts.
 
-### ⬜ Unit 6b: Observability Coverage Gate — Green
+### ✅ Unit 6b: Observability Coverage Gate — Green
 **What**: Implement machine-readable coverage contract and audit pipeline (`src/observability/coverage/*` + `npm run audit:observability`), add Vitest capture-mode artifact emission, wire `npm run test:coverage` to run the combined gate, and integrate with CI workflow.
 **Output**: Coverage contract/audit tooling plus CI workflow update and implementation notes at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-6b-audit-gate.md`.
 **Acceptance**: `npm run test:coverage` runs code coverage plus observability audit in one mandatory path, CI invokes that combined gate, and capture artifacts are produced at `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/`.
@@ -220,3 +220,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 18:09] Unit 5b complete: implemented structured events for config/identity, ADO/Graph request lifecycle, command/skill/phrase repertoire loaders, and added config log-path helpers
 - [2026-03-02 18:12] Unit 5c complete: backfilled non-Error/error-path branches and config log-path helper coverage; restored global 100% coverage and clean build
 - [2026-03-02 18:14] Unit 6a complete: added failing audit contract tests for event-catalog, schema/redaction, and logpoint coverage dimensions over capture artifacts
+- [2026-03-02 18:29] Unit 6b complete: implemented coverage contract/audit modules, worker-level vitest capture emission, combined `test:coverage` gate orchestration, CI artifact upload, and verified passing gate artifacts at `~/.agentconfigs/test-runs/ouroboros-agent-harness/2026-03-03T02-28-47-446Z/`
