@@ -58,6 +58,7 @@ export class Spinner {
     if (this.iv) { clearInterval(this.iv); this.iv = null }
     if (this.piv) { clearInterval(this.piv); this.piv = null }
     process.stderr.write("\r\x1b[K")
+    /* v8 ignore next -- ok parameter currently unused by callers @preserve */
     if (ok) process.stderr.write(`\x1b[32m\u2713\x1b[0m ${ok}\n`)
   }
 
@@ -346,6 +347,7 @@ export async function main() {
   })
   const resolvedContext = await resolver.resolve()
   const cliToolContext: ToolContext = {
+    /* v8 ignore next -- CLI has no OAuth sign-in; this no-op satisfies the interface @preserve */
     signin: async () => undefined,
     context: resolvedContext,
   }

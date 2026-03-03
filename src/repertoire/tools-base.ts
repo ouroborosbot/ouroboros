@@ -304,6 +304,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
         await ctx.memoryStore.put(friendId, memory);
         return `saved: ${a.key} = ${a.value}`;
       } catch (err) {
+        /* v8 ignore next -- defensive: non-Error branch for String(err) @preserve */
         return `error saving note: ${err instanceof Error ? err.message : String(err)}`;
       }
     },

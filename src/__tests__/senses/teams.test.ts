@@ -3539,6 +3539,33 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
     )
   })
 
+  it("uses 'Unknown' displayName when teamsContext.displayName is falsy", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDepsForContext({ runAgentFn })
+    const ContextResolver = (await import("../../mind/context/resolver")).ContextResolver
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const teamsContext = {
+      graphToken: "g-token",
+      adoToken: "a-token",
+      signin: vi.fn(),
+      aadObjectId: "aad-user-789",
+      tenantId: "tenant-xyz",
+      displayName: "",  // falsy -- should fall back to "Unknown"
+    }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-999", teamsContext)
+
+    expect(ContextResolver).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        displayName: "Unknown",
+      }),
+    )
+  })
+
   it("handles TeamsMessageContext without AAD fields (backward compat -- no context attached)", async () => {
     vi.resetModules()
     const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })

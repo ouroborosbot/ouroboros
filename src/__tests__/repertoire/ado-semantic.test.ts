@@ -218,6 +218,76 @@ describe("ado_backlog_list tool", () => {
     expect(wiqlCall[2]).toBe("explicit-org") // org parameter
     expect(wiqlCall[3]).toContain("explicit-proj") // path includes project
   })
+
+  it("handles work items with missing fields (null/undefined field values)", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      workItems: [{ id: 100 }],
+    }))
+    // Return work item with all fields missing/undefined
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [{ id: 100, fields: {} }],
+    }))
+
+    const def = findTool("ado_backlog_list")!
+    const result = await def.handler({}, makeCtx())
+    // Should render without error even though all fields are missing
+    expect(result).toContain("#100")
+  })
+
+  it("handles AssignedTo object with no displayName property", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      workItems: [{ id: 100 }],
+    }))
+    // AssignedTo exists but has no displayName -- tests ?. chain
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [{ id: 100, fields: { "System.Title": "Item", "System.WorkItemType": "Task", "System.State": "New", "System.AssignedTo": { uniqueName: "user@contoso.com" }, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": null } }],
+    }))
+
+    const def = findTool("ado_backlog_list")!
+    const result = await def.handler({}, makeCtx())
+    expect(result).toContain("Unassigned")
+  })
+
+  it("handles batch response with undefined value (batchData.value ?? [])", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      workItems: [{ id: 100 }],
+    }))
+    // Batch response has no value field
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({}))
+
+    const def = findTool("ado_backlog_list")!
+    const result = await def.handler({}, makeCtx())
+    // Should handle gracefully (empty items)
+    expect(result).toBeDefined()
+  })
+
+  it("CLI channel renders plain text with parent notation", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      workItems: [{ id: 100 }, { id: 101 }],
+    }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [
+        { id: 100, fields: { "System.Title": "Parent Epic", "System.WorkItemType": "Epic", "System.State": "Active", "System.AssignedTo": null, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": null } },
+        { id: 101, fields: { "System.Title": "Child Task", "System.WorkItemType": "Task", "System.State": "Active", "System.AssignedTo": null, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": 100 } },
+      ],
+    }))
+
+    const def = findTool("ado_backlog_list")!
+    const cliCtx = makeCtx({
+      context: {
+        ...makeCtx().context,
+        channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
+      },
+    })
+    const result = await def.handler({}, cliCtx)
+    // CLI plain text should include parent notation
+    expect(result).toContain("parent:#100")
+    expect(result).not.toContain("**")
+  })
 })
 
 describe("ado_create_epic tool", () => {
@@ -423,6 +493,20 @@ describe("ado_preview_changes tool", () => {
     const parsed = JSON.parse(result)
     expect(parsed.preview).toBe(true)
     expect(parsed.operations).toHaveLength(2)
+  })
+
+  it("preview move_items with undefined workItemIds defaults to empty string", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+
+    const def = findTool("ado_preview_changes")!
+    const result = await def.handler({
+      operation: "move_items",
+      newParentId: "200",
+      // workItemIds omitted -- should default to "" via || ""
+    }, makeCtx())
+    const parsed = JSON.parse(result)
+    expect(parsed.preview).toBe(true)
+    expect(parsed.operations).toHaveLength(0)
   })
 
   it("returns error for unknown operation", async () => {

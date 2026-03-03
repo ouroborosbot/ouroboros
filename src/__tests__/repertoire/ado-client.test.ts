@@ -468,6 +468,15 @@ describe("discoverOrganizations", () => {
 
     await expect(discoverOrganizations("test-token")).rejects.toThrow("network error")
   })
+
+  it("throws when profile response is missing publicAlias", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ displayName: "User with no alias" }),
+    })
+
+    await expect(discoverOrganizations("test-token")).rejects.toThrow("ADO profile response missing publicAlias")
+  })
 })
 
 describe("discoverProjects", () => {
