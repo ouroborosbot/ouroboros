@@ -18,14 +18,14 @@ Format: `type(scope): description` or `type(scope): feature - description`
 
 Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
 
-Scope is the area of change: `config`, `teams`, `cli`, `engine`, `readme`, `planning`, etc. When working on a specific feature or task, include its name after the colon.
+Scope is the area of change: `config`, `teams`, `cli`, `heart`, `mind`, `repertoire`, `senses`, `wardrobe`, `readme`, `planning`, etc. When working on a specific feature or task, include its name after the colon.
 
 Keep the description lowercase, imperative, concise. No "Co-Authored-By" lines.
 
 ```
 feat(config): load config path from agent.json
-fix(teams): oauth - prevent confirmation deadlock
-test: multi-agent harness - cover all branches for identity module
+fix(senses): oauth - prevent confirmation deadlock
+test(mind): context kernel - cover all branches for identity resolution
 docs(planning): approved multi-agent harness plan
 ```
 
@@ -76,7 +76,7 @@ Everything under `{agent}/` is yours to modify freely:
 
 ## Shared harness
 
-`src/` is shared infrastructure. Changes there affect all agents. Be deliberate -- test thoroughly, keep coverage at 100%, and don't introduce agent-specific logic into the harness.
+`src/` is shared infrastructure. Changes there affect all agents. The harness uses a creature-body metaphor for its modules: `heart/` (core loop, streaming, kicks), `mind/` (prompt, context kernel, session memory), `repertoire/` (tools, skills, commands, API clients), `senses/` (channel adapters: CLI, Teams), `wardrobe/` (formatting, phrases). Be deliberate -- test thoroughly, keep coverage at 100%, and don't introduce agent-specific logic into the harness.
 
 ## Psyche changes
 
