@@ -223,6 +223,30 @@ describe("loadAgentConfig", () => {
     expect(() => loadAgentConfig()).toThrow(/agent\.json/)
   })
 
+  it("handles non-Error read failures when loading agent.json", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw "read-failure"
+    })
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/agent\.json/)
+  })
+
+  it("handles non-Error parse failures when loading agent.json", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockReturnValue("{\"name\":\"ouroboros\"}")
+    const parseSpy = vi.spyOn(JSON, "parse").mockImplementation(() => {
+      throw "parse-failure"
+    })
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/agent\.json/)
+    parseSpy.mockRestore()
+  })
+
   it("caches the config after first load", async () => {
     process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
     const agentJson = {
