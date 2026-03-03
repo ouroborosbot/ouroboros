@@ -13,19 +13,28 @@ export { teamsTools } from "./tools-teams";
 
 // All tool definitions in a single registry
 const allDefinitions: ToolDefinition[] = [...baseToolDefinitions, ...teamsToolDefinitions, ...adoSemanticToolDefinitions];
+const REMOTE_BLOCKED_LOCAL_TOOLS = new Set(["shell", "read_file", "write_file", "git_commit", "gh_cli"]);
+
+function baseToolsForCapabilities(capabilities?: ChannelCapabilities): OpenAI.ChatCompletionTool[] {
+  const isRemoteChannel = capabilities?.channel === "teams";
+  if (!isRemoteChannel) return tools;
+  return tools.filter((tool) => !REMOTE_BLOCKED_LOCAL_TOOLS.has(tool.function.name));
+}
 
 // Return the appropriate tools list based on channel capabilities.
 // Base tools (no integration) are always included.
 // Teams/integration tools are included only if their integration is in availableIntegrations.
 export function getToolsForChannel(capabilities?: ChannelCapabilities): OpenAI.ChatCompletionTool[] {
+  const baseTools = baseToolsForCapabilities(capabilities);
+
   if (!capabilities || capabilities.availableIntegrations.length === 0) {
-    return tools;
+    return baseTools;
   }
   const available = new Set(capabilities.availableIntegrations);
   const integrationTools = [...teamsToolDefinitions, ...adoSemanticToolDefinitions].filter(
     (d) => d.integration && available.has(d.integration),
   );
-  return [...tools, ...integrationTools.map((d) => d.tool)];
+  return [...baseTools, ...integrationTools.map((d) => d.tool)];
 }
 
 // Check whether a tool requires user confirmation before execution.
@@ -54,6 +63,20 @@ export async function execTool(name: string, args: Record<string, string>, ctx?:
       meta: { name },
     });
     return `unknown: ${name}`;
+  }
+
+  const isRemoteChannel = ctx?.context?.channel?.channel === "teams";
+  if (isRemoteChannel && REMOTE_BLOCKED_LOCAL_TOOLS.has(name)) {
+    const message =
+      "I can't do that from here because I'm talking to multiple people in a shared remote channel, and local shell/file/git/gh operations could let conversations interfere with each other. Ask me for a remote-safe alternative (Graph/ADO/web), or run that operation from CLI.";
+    emitNervesEvent({
+      level: "warn",
+      event: "tool.error",
+      component: "tools",
+      message: "blocked local tool in remote channel",
+      meta: { name, channel: "teams" },
+    });
+    return message;
   }
 
   try {
