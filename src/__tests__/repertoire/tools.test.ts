@@ -1243,6 +1243,151 @@ describe("execTool for generic ADO tools", () => {
   })
 })
 
+describe("ado_mutate authority checks (Unit 2C)", () => {
+  it("ado_mutate proceeds when canWrite() returns true", async () => {
+    vi.resetModules()
+    const { adoRequest } = await import("../../repertoire/ado-client")
+    vi.mocked(adoRequest).mockResolvedValue('{"id": 789}')
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      adoToken: "test-token",
+      signin: vi.fn(),
+      context: {
+        identity: { id: "id", displayName: "test", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
+        checker: {
+          canRead: vi.fn().mockReturnValue(true),
+          canWrite: vi.fn().mockResolvedValue(true),
+          record403: vi.fn(),
+        },
+      },
+    }
+
+    const result = await execTool("ado_mutate", { method: "POST", organization: "myorg", path: "/_apis/wit/workitems/$Task" }, ctx)
+    expect(result).toBe('{"id": 789}')
+    expect(adoRequest).toHaveBeenCalled()
+  })
+
+  it("ado_mutate returns structured denial when canWrite() returns false", async () => {
+    vi.resetModules()
+    const { adoRequest } = await import("../../repertoire/ado-client")
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      adoToken: "test-token",
+      signin: vi.fn(),
+      context: {
+        identity: { id: "id", displayName: "test", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
+        checker: {
+          canRead: vi.fn().mockReturnValue(true),
+          canWrite: vi.fn().mockResolvedValue(false),
+          record403: vi.fn(),
+        },
+      },
+    }
+
+    const result = await execTool("ado_mutate", { method: "POST", organization: "myorg", path: "/_apis/wit/workitems/$Task" }, ctx)
+    expect(result).toContain("AUTHORITY_DENIED")
+    // Should NOT call adoRequest
+    expect(adoRequest).not.toHaveBeenCalled()
+  })
+
+  it("ado_mutate proceeds when no context/checker is available (backward-compatible)", async () => {
+    vi.resetModules()
+    const { adoRequest } = await import("../../repertoire/ado-client")
+    vi.mocked(adoRequest).mockResolvedValue('{"id": 111}')
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      adoToken: "test-token",
+      signin: vi.fn(),
+      // No context or checker
+    }
+
+    const result = await execTool("ado_mutate", { method: "PATCH", organization: "myorg", path: "/_apis/wit/workitems/1" }, ctx)
+    expect(result).toBe('{"id": 111}')
+    expect(adoRequest).toHaveBeenCalled()
+  })
+
+  it("ado_query calls record403() on PERMISSION_DENIED response", async () => {
+    vi.resetModules()
+    const { adoRequest } = await import("../../repertoire/ado-client")
+    vi.mocked(adoRequest).mockResolvedValue("PERMISSION_DENIED: You don't have access to this ADO resource.")
+
+    const { execTool } = await import("../../repertoire/tools")
+    const record403 = vi.fn()
+    const ctx = {
+      adoToken: "test-token",
+      signin: vi.fn(),
+      context: {
+        identity: { id: "id", displayName: "test", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
+        checker: {
+          canRead: vi.fn().mockReturnValue(true),
+          canWrite: vi.fn().mockResolvedValue(true),
+          record403,
+        },
+      },
+    }
+
+    const result = await execTool("ado_query", { organization: "myorg", path: "/_apis/projects" }, ctx)
+    expect(result).toContain("PERMISSION_DENIED")
+    expect(record403).toHaveBeenCalledWith("ado", "myorg", expect.any(String))
+  })
+
+  it("ado_mutate calls record403() on PERMISSION_DENIED response", async () => {
+    vi.resetModules()
+    const { adoRequest } = await import("../../repertoire/ado-client")
+    vi.mocked(adoRequest).mockResolvedValue("PERMISSION_DENIED: You don't have access to this ADO resource.")
+
+    const { execTool } = await import("../../repertoire/tools")
+    const record403 = vi.fn()
+    const ctx = {
+      adoToken: "test-token",
+      signin: vi.fn(),
+      context: {
+        identity: { id: "id", displayName: "test", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
+        checker: {
+          canRead: vi.fn().mockReturnValue(true),
+          canWrite: vi.fn().mockResolvedValue(true),
+          record403,
+        },
+      },
+    }
+
+    const result = await execTool("ado_mutate", { method: "POST", organization: "myorg", path: "/_apis/wit/workitems/$Task" }, ctx)
+    expect(result).toContain("PERMISSION_DENIED")
+    expect(record403).toHaveBeenCalledWith("ado", "myorg", expect.any(String))
+  })
+
+  it("structured denial message includes what was denied and suggested alternative", async () => {
+    vi.resetModules()
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      adoToken: "test-token",
+      signin: vi.fn(),
+      context: {
+        identity: { id: "id", displayName: "test", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
+        checker: {
+          canRead: vi.fn().mockReturnValue(true),
+          canWrite: vi.fn().mockResolvedValue(false),
+          record403: vi.fn(),
+        },
+      },
+    }
+
+    const result = await execTool("ado_mutate", { method: "DELETE", organization: "myorg", path: "/_apis/wit/workitems/99" }, ctx)
+    expect(result).toContain("AUTHORITY_DENIED")
+    expect(result).toContain("myorg")
+    expect(result).toContain("DELETE")
+  })
+})
+
 describe("execTool for docs tools", () => {
   it("graph_docs returns matching endpoints for a query", async () => {
     vi.resetModules()
