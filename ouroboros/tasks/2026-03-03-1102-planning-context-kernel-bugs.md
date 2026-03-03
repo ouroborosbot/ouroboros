@@ -399,3 +399,4 @@ A single person may have multiple external IDs (e.g., AAD identity + conversatio
 - 2026-03-03 14:29 Eleventh revision from unhappy-path walkthrough (fresh install, email-as-displayName): (1) Directory bootstrap — FileFriendStore auto-creates directories on construction, sessionPath auto-creates parent dirs. (2) save_friend_note parameter validation with first-person error messages.
 - 2026-03-03 14:33 Twelfth revision: (1) Directory rename `src/mind/context/` → `src/mind/friends/`. (2) Deferred notes for system prompt cleanup/consistency and findByExternalId performance.
 - 2026-03-03 14:34 Approved by user
+- 2026-03-03 14:42 Doing doc created (4 passes complete)
