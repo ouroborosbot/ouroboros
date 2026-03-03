@@ -750,7 +750,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 ---
 
-### ⬜ Unit 2A: Authority Types and Resolution
+### ✅ Unit 2A: Authority Types and Resolution
 
 **What**: Implement the Authority layer -- integration-scoped capability profiles using a hybrid model: optimistic on read-path (attempt and learn from 403), pre-flight check on write-path (verify before proposing destructive operations).
 
@@ -792,14 +792,14 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - API timeout: assume optimistic
 
 **Completion criteria:**
-- [ ] `AuthorityChecker` implementation with `canRead`, `canWrite`, `record403`
-- [ ] Hybrid model: optimistic reads, pre-flight writes via Security Namespaces API
-- [ ] Per-turn lifecycle: memoizes within turn, discarded after
-- [ ] Eager-start Promise on `ResolvedContext`
-- [ ] Resolver skips authority for CLI (empty `availableIntegrations`)
-- [ ] Error handling per D16
-- [ ] 100% test coverage
-- [ ] All tests pass
+- [x] `AuthorityChecker` implementation with `canRead`, `canWrite`, `record403`
+- [x] Hybrid model: optimistic reads, pre-flight writes via Security Namespaces API
+- [x] Per-turn lifecycle: memoizes within turn, discarded after
+- [x] Eager-start Promise on `ResolvedContext` (checker created at resolve time)
+- [x] Resolver skips authority for CLI (empty `availableIntegrations`)
+- [x] Error handling per D16 (probe errors return optimistic true)
+- [x] 100% test coverage (authority.ts 100%, resolver.ts 100%)
+- [x] All tests pass (1011)
 
 ---
 
