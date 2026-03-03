@@ -1,6 +1,6 @@
 # Doing: Teams Channel Feedback — Multi-Message, Shared Formatting, Error Severity, Phrases Config
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-03-02 13:12
 **Planning**: ./2026-03-02-1120-planning-teams-feedback.md
@@ -410,7 +410,7 @@ Wiring:
 
 ---
 
-### ⬜ Unit 9: Documentation updates
+### ✅ Unit 9: Documentation updates
 **What**: Update project documentation:
 - `README.md`: update project structure to show `src/wardrobe/` directory with `format.ts` and `phrases.ts`. Remove `phrases.ts` from `src/repertoire/` listing. Add brief description of `wardrobe/` purpose.
 - `CONTRIBUTING.md`: if it references `src/repertoire/phrases.ts` or the phrase system, update those references.
