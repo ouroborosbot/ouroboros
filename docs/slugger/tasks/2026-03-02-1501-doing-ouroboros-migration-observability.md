@@ -141,7 +141,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Output**: Coverage note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-5c-coverage.md`.
 **Acceptance**: New config/identity/clients/repertoire instrumentation code is fully covered and tests remain green.
 
-### ⬜ Unit 6a: Observability Coverage Gate — Red
+### ✅ Unit 6a: Observability Coverage Gate — Red
 **What**: Add failing tests/fixtures for observability coverage auditing (missing required events/logpoints, schema violations, redaction violations) and baseline `audit:observability` failure behavior, including missing/invalid capture-artifact cases.
 **Output**: Failing audit evidence at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-6a-red-run.txt`.
 **Acceptance**: Audit fails before implementation and clearly reports failing dimensions (event-catalog, schema/redaction, logpoint coverage) from capture artifacts.
@@ -219,3 +219,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 18:06] Unit 5a complete: added failing event-catalog tests for config/identity, ADO/Graph clients, command/skill loaders, and phrase loading paths
 - [2026-03-02 18:09] Unit 5b complete: implemented structured events for config/identity, ADO/Graph request lifecycle, command/skill/phrase repertoire loaders, and added config log-path helpers
 - [2026-03-02 18:12] Unit 5c complete: backfilled non-Error/error-path branches and config log-path helper coverage; restored global 100% coverage and clean build
+- [2026-03-02 18:14] Unit 6a complete: added failing audit contract tests for event-catalog, schema/redaction, and logpoint coverage dimensions over capture artifacts
