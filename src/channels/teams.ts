@@ -190,9 +190,9 @@ export function createTeamsCallbacks(
         safeEmit("\n\n" + msg + "\n\n")
       }
     },
-    onKick: (attempt: number, maxKicks: number) => {
+    onKick: () => {
       stopPhraseRotation()
-      const msg = formatKick(attempt, maxKicks)
+      const msg = formatKick()
       if (buffered) {
         safeSend(msg)
       } else {
@@ -332,7 +332,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
     signin: teamsContext.signin,
     adoOrganizations: getAdoConfig().organizations,
   } : undefined
-  const agentOptions: RunAgentOptions = { maxKicks: 3 }
+  const agentOptions: RunAgentOptions = {}
   if (toolContext) agentOptions.toolContext = toolContext
   if (disableStreaming) agentOptions.disableStreaming = true
   if (getTeamsChannelConfig().skipConfirmation) agentOptions.skipConfirmation = true

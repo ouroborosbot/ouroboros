@@ -306,14 +306,14 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
         process.stderr.write(`\x1b[31m${formatError(error)}\x1b[0m\n`)
       }
     },
-    onKick: (attempt: number, maxKicks: number) => {
+    onKick: () => {
       currentSpinner?.stop()
       currentSpinner = null
       if (textDirty) {
         process.stdout.write("\n")
         textDirty = false
       }
-      process.stderr.write(`\x1b[33m${formatKick(attempt, maxKicks)}\x1b[0m\n`)
+      process.stderr.write(`\x1b[33m${formatKick()}\x1b[0m\n`)
     },
     flushMarkdown: () => {
       currentSpinner?.stop()

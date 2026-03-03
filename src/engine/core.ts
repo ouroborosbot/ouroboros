@@ -80,14 +80,13 @@ export interface ChannelCallbacks {
   onToolStart(name: string, args: Record<string, string>): void;
   onToolEnd(name: string, summary: string, success: boolean): void;
   onError(error: Error, severity: "transient" | "terminal"): void;
-  onKick?(attempt: number, maxKicks: number): void;
+  onKick?(): void;
   onConfirmAction?(name: string, args: Record<string, string>): Promise<"confirmed" | "denied">;
 }
 
 export interface RunAgentOptions {
   toolChoiceRequired?: boolean;
   disableStreaming?: boolean;
-  maxKicks?: number;
   skipConfirmation?: boolean;
   toolContext?: ToolContext;
 }
@@ -173,7 +172,6 @@ export async function runAgent(
     messages[0] = { role: "system", content: cachedBuildSystem(channel, buildSystem, options) };
   }
 
-  const maxKicks = options?.maxKicks ?? 1;
   let kickCount = 0;
   let done = false;
   let toolRounds = 0;
@@ -260,9 +258,7 @@ export async function runAgent(
         (msg as AssistantMessageWithReasoning)._reasoning_items = reasoningItems;
       }
       if (!result.toolCalls.length) {
-        const kick = kickCount < maxKicks
-          ? detectKick(result.content, options)
-          : null;
+        const kick = detectKick(result.content, options);
         if (kick) {
           kickCount++;
           toolRounds++;
@@ -271,7 +267,7 @@ export async function runAgent(
             done = true;
             continue;
           }
-          callbacks.onKick?.(kickCount, maxKicks);
+          callbacks.onKick?.();
           // Preserve original content with self-correction appended
           const kickContent = result.content
             ? result.content + "\n\n" + kick.message
