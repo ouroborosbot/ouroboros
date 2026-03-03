@@ -105,4 +105,4 @@ Merged `origin/main` into `codex/slugger` before execution planning refresh; ups
 - [2026-03-02 15:50] Planning approved for conversion to doing doc
 - [2026-03-02 16:05] Added session-style append-only NDJSON file persistence (`stderr` + file sinks) and deferred key-collision hardening
 - [2026-03-02 16:11] Consistency cleanup: aligned sink contract to dual-sink decision, locked key mapping semantics, and required sink abstraction
-- [PENDING_MAIN_SYNC_TS] Synced planning assumptions to merged `origin/main` runtime changes and re-approved for conversion refresh
+- [2026-03-02 16:15] Synced planning assumptions to merged `origin/main` runtime changes and re-approved for conversion refresh
