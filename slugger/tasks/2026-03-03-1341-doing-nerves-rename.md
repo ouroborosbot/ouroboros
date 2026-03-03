@@ -1,6 +1,6 @@
 # Doing: Rename Observability Namespace and Commands to Nerves
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-03-03 13:49
 **Planning**: ./2026-03-03-1341-planning-nerves-rename.md
@@ -90,7 +90,7 @@ Rename the repository's observability namespace and command surface from `observ
 **What**: Run final hygiene checks for naming consistency and remove any unnecessary transitional wording.
 **Acceptance**: No active in-scope docs or commands use `observability` as subsystem name; tests and checks remain green.
 
-### ⬜ Unit 4: Final Verification and Handoff
+### ✅ Unit 4: Final Verification and Handoff
 **What**: Run full verification suite and capture artifacts for implementation handoff.
 **Output**: Saved logs/results in `./2026-03-03-1341-doing-nerves-rename/` and updated completion checklist evidence.
 **Acceptance**: Full test suite passes, coverage gate passes, `audit:nerves` gate passes, and completion criteria are demonstrably satisfiable.
@@ -118,3 +118,4 @@ Rename the repository's observability namespace and command surface from `observ
 - [2026-03-03 14:09] Unit 3a complete: added failing naming-consistency test for active docs/command paths still containing stale `observability` terms.
 - [2026-03-03 14:11] Unit 3b complete: renamed active runtime/coverage identifiers and symbols to `nerves`, updated imports/tests, and passed full suite + build.
 - [2026-03-03 14:13] Unit 3c complete: final active-surface naming scan is clean and combined coverage gate remains 100% with no warnings.
+- [2026-03-03 14:15] Unit 4 complete: full suite (`1262/1262`) passed, coverage remained 100%, `audit:nerves` gate passed, and build succeeded for handoff.
