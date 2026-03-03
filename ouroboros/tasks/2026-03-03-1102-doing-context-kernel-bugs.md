@@ -151,19 +151,19 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Output**: Clean tsc output, full test suite green, grep results showing zero stale references to `mind/context/`.
 **Acceptance**: `npx tsc --noEmit` exits 0, all tests pass, zero references to `mind/context/` in source code.
 
-### ⬜ Unit 5a: save_friend_note redesign -- Tests
+### ✅ Unit 5a: save_friend_note redesign -- Tests
 **What**: Write tests for redesigned `save_friend_note` tool in `tools-base.ts`. Test: new parameters (`type`, `key`, `content`, `override`), validation (missing content returns first-person error, missing key for tool_preference/note returns first-person error, invalid type returns first-person error), `type: "name"` updates displayName and notes["name"], `type: "tool_preference"` with conflict detection (existing value + no override = returns existing + merge instruction, with override = overwrites), `type: "note"` with same conflict behavior, writes to disk via `friendStore.put()`, no in-memory mutation, updated tool description with first-person override guidance. Test the broadened description text.
 **Output**: Updated `tools.test.ts` with save_friend_note tests.
 **Files**: `src/__tests__/repertoire/tools.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because old save_friend_note exists.
 
-### ⬜ Unit 5b: save_friend_note redesign -- Implementation
+### ✅ Unit 5b: save_friend_note redesign -- Implementation
 **What**: Rewrite `save_friend_note` tool definition in `tools-base.ts`. New parameters: `type` (name/tool_preference/note), `key` (required for tool_preference and note), `content` (always required), `override` (boolean, default false). Handler reads from `ctx.friendStore.get()`, applies type-specific logic, writes via `ctx.friendStore.put()`. Update `ToolContext` type: replace `memoryStore: CollectionStore<FriendMemory>` with `friendStore: FriendStore`. Update tool description to first-person, covering all three types and override guidance.
 **Output**: Updated `tools-base.ts` with redesigned save_friend_note.
 **Files**: `src/repertoire/tools-base.ts`
 **Acceptance**: All save_friend_note tests PASS (green), no warnings.
 
-### ⬜ Unit 5c: save_friend_note -- Coverage & Refactor
+### ✅ Unit 5c: save_friend_note -- Coverage & Refactor
 **What**: Verify 100% coverage on save_friend_note handler and validation paths.
 **Output**: Coverage report showing 100% on save_friend_note handler.
 **Acceptance**: 100% coverage on new code, tests still green.
