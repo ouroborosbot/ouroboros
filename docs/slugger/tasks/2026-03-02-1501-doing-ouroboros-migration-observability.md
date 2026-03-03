@@ -30,7 +30,9 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [ ] Observability coverage report artifact is produced with measurable results for: event-catalog coverage, schema/redaction compliance, and logpoint coverage.
 - [ ] Vitest runs in observability-capture mode and writes audit artifacts to `./.artifacts/observability/vitest-events.ndjson` and `./.artifacts/observability/vitest-logpoints.json` (not operational sinks).
 - [ ] `npm run audit:observability` consumes captured artifacts directly and does not rerun tests.
-- [ ] CI enforces `npm run audit:observability` as a required gate for this phase.
+- [ ] `npm run test:coverage` is the mandatory combined gate and fails on either code coverage or observability audit failure.
+- [ ] CI enforces `npm run test:coverage` as the required combined gate for this phase.
+- [ ] Combined gate summary artifact clearly signals both obligations with this shape: `overall_status`, `code_coverage`, `observability_coverage`, `required_actions[]` where each action has `type` (`coverage` or `logging`), `target`, and `reason`.
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -144,14 +146,14 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Acceptance**: Audit fails before implementation and clearly reports failing dimensions (event-catalog, schema/redaction, logpoint coverage) from capture artifacts.
 
 ### ⬜ Unit 6b: Observability Coverage Gate — Green
-**What**: Implement machine-readable coverage contract and audit pipeline (`src/observability/coverage/*` + `npm run audit:observability`), add Vitest capture-mode artifact emission, and integrate with CI workflow.
+**What**: Implement machine-readable coverage contract and audit pipeline (`src/observability/coverage/*` + `npm run audit:observability`), add Vitest capture-mode artifact emission, wire `npm run test:coverage` to run the combined gate, and integrate with CI workflow.
 **Output**: Coverage contract/audit tooling plus CI workflow update and implementation notes at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-6b-audit-gate.md`.
-**Acceptance**: `npm run audit:observability` passes with full required coverage dimensions, CI contains an explicit audit step, and capture artifacts are produced in the locked paths.
+**Acceptance**: `npm run test:coverage` runs code coverage plus observability audit in one mandatory path, CI invokes that combined gate, and capture artifacts are produced in the locked paths.
 
 ### ⬜ Unit 6c: Observability Coverage Gate — Verify
-**What**: Run tests once in capture mode, then run observability audit as post-processing over captured artifacts, and produce parseable metrics artifact for automated consumers.
-**Output**: Observability coverage report at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-6c-observability-coverage.json` and verification note.
-**Acceptance**: Report includes measurable values for event-catalog coverage, schema/redaction compliance, and logpoint coverage; verification confirms no second test run for audit.
+**What**: Run the combined coverage gate once, verify observability audit is post-processing over captured artifacts, and produce parseable summary/report artifacts for automated consumers.
+**Output**: Observability coverage report at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-6c-observability-coverage.json`, combined gate summary at `./.artifacts/observability/coverage-gate-summary.json`, and verification note.
+**Acceptance**: Report includes measurable values for event-catalog coverage, schema/redaction compliance, and logpoint coverage; combined summary includes `required_actions` entries typed as `coverage` or `logging`; verification confirms no second test run for audit.
 
 ### ⬜ Unit 7a: End-to-End Event Catalog Verification
 **What**: Run targeted and full test suites validating minimum event catalog coverage, required envelope fields, and persisted append-only NDJSON outputs.
@@ -159,7 +161,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Acceptance**: Matrix confirms each required event is covered by tests, persisted files are parseable NDJSON, and no unresolved gaps remain.
 
 ### ⬜ Unit 7b: Final Quality Gate & Completion Audit
-**What**: Run `npm run test`, `npm run test:coverage`, and `npm run build`, then audit completion criteria line-by-line.
+**What**: Run `npm run test`, mandatory combined `npm run test:coverage`, and `npm run build`, then audit completion criteria line-by-line.
 **Output**: Final run artifacts (`final-test-output.txt`, `final-coverage-output.txt`, `final-build-output.txt`) and audit checklist at `./2026-03-02-1501-doing-ouroboros-migration-observability/final-audit.md`.
 **Acceptance**: All completion criteria are explicitly marked met with evidence and no warnings.
 
@@ -172,7 +174,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Artifact files listed in this doc are execution evidence only and are not runtime log sinks.
 - Runtime observability sinks for this phase are `stderr` and session-style append-only NDJSON files; collision hardening remains out of scope.
 - Persisted log key mapping is locked to session parity: CLI=`session`, Teams=`conversationId`.
-- Observability coverage gating must run as `npm run audit:observability` and pass before unit/final completion.
+- Observability coverage gating is mandatory inside `npm run test:coverage`; standalone `npm run audit:observability` can exist but is not the primary gate path.
 - Test-time observability capture writes only to `./.artifacts/observability/*` artifacts; normal runtime sinks are not the audit source of truth.
 - **Fixes/blockers**: Spawn sub-agent immediately — don't ask, just do it
 - **Decisions made**: Update docs immediately, commit right away
@@ -192,3 +194,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 16:37] Explicitly added `src/engine/kicks.ts` + `src/__tests__/engine/kicks.test.ts` to Unit 3 and completion criteria
 - [2026-03-02 16:56] Added explicit observability-coverage gate units (`audit:observability`, CI enforcement, machine-readable coverage report) and reset status to drafting for re-review
 - [2026-03-02 17:04] Locked single-run observability coverage flow: tests emit artifacts once, audit consumes artifacts without rerunning tests
+- [2026-03-02 17:10] Locked mandatory combined `test:coverage` gate and explicit `required_actions` output typing for both coverage and logging fixes
