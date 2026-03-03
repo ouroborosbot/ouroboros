@@ -4,7 +4,16 @@
 **Created**: 2026-03-02 17:16
 
 ## Goal
-Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that transforms the ouroboros agent from a bot that calls REST APIs into a constraint-aware reasoning engine operating within identity, authority, and channel boundaries. The kernel uses a storage-agnostic interface (file-based first adapter), a resolver that builds context per-request, a hybrid authority model (optimistic reads, pre-flight checks on mutations), and consumer-driven phasing that wires real ADO operations through the kernel as layers are built -- not after. Memory is model-managed and freeform — the model decides what to store about each friend (per-tool preferences, eventually relationship context), not a typed schema. The conversation history IS the session — there is no separate session state layer. Tools are stateless; the model provides all required context on every call.
+Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that transforms the ouroboros agent from a bot that calls REST APIs into a constraint-aware reasoning engine operating within identity, authority, and channel boundaries.
+
+**Core design principles:**
+- **No caching anywhere.** APIs are the source of truth. Authority is learned fresh each conversation via 403 responses and Security Namespaces API pre-flight probes. ADO scopes are discovered at runtime via Accounts + Projects APIs. Process templates are fetched when needed. The conversation carries all learned state forward. Don't persist what you can re-derive.
+- **Typed, not stringly.** `IdentityProvider` and `Integration` are closed union types. `ToolDefinition` wraps each tool's OpenAI schema with co-located metadata (handler, integration, confirmationRequired). No bare strings in the type system.
+- **Model-managed memory.** `FriendMemory` with freeform `toolPreferences: Record<string, string>` -- the model decides what to store about each friend, not a typed schema.
+- **Conversation IS the session.** No separate session state layer. Tools are stateless; the model provides all required context on every call.
+- **Consumer-driven phasing.** Each phase wires real operations through the kernel as layers are built -- not after. One doing doc, four phases, one marathon.
+
+**The kernel uses:** a storage-agnostic interface (`ContextStore` with typed `CollectionStore<T>` properties, file-based first adapter), a per-request resolver that builds context from store + APIs, a hybrid authority model (optimistic reads, pre-flight writes via Security Namespaces API), and a `ToolDefinition`-based tool registry filtered by channel capabilities.
 
 **DO NOT include time estimates (hours/days) -- planning should focus on scope and criteria, not duration.**
 
@@ -27,7 +36,7 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 
 **Phase 2: Authority (Demand-Driven)**
 - 2A. `Authority` type and resolution -- integration-scoped capability profiles using a hybrid model: optimistic on read-path (attempt and learn from 403), pre-flight check on write-path (verify before proposing destructive operations). No cache -- authority is learned fresh each conversation via 403 responses and pre-flight probes; the conversation carries results forward.
-- 2B. `AuthorityChecker` -- distinguishes read operations (optimistic, learn from failure) from write operations (pre-validated). Provides `canRead(scope)` (always true until 403 disproves) and `canWrite(scope)` (probes API before returning). Pre-flight writes check a lightweight endpoint (e.g., project-level permissions descriptor) rather than attempting the actual mutation.
+- 2B. `AuthorityChecker` -- distinguishes read operations (optimistic, learn from failure) from write operations (pre-validated). Provides `canRead(scope)` (always true until 403 disproves) and `canWrite(scope)` (probes API before returning). Pre-flight writes use the Security Namespaces API (`/_apis/security/namespaces`) to check granular permission bits without side effects (Q8).
 - 2C. Wire Authority into existing `ado_mutate` tool -- before executing a mutation, check `canWrite()`. If denied, return a structured explanation instead of attempting and failing. Existing `ado_query` remains optimistic.
 - 2D. Extend system prompt injection with authority constraints -- `contextSection()` renders "can / CANNOT" authority limits into the prompt so the model plans around constraints upfront (see D10).
 
@@ -54,7 +63,7 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 - Database-backed or cloud-backed storage adapters (file adapter is the only one built; interface exists for future adapters)
 - OAuth flow changes (existing Teams SDK OAuth is kept as-is)
 - Changes to the LLM provider layer (Azure/MiniMax config unchanged)
-- **`world` / `rapport` notes on FriendMemory (future)** -- per-friend social/professional graph notes (`world`) and agent relationship notes (`rapport`), both prompt-loaded. Deferred until `toolPreferences` proves the model-managed notes pattern. When built, these replace `FRIENDS.md` (psyche/FRIENDS.md) — per-person knowledge moves from a static psyche file to dynamic model-managed memory. The channel-level social norm ("speaking to Microsoft employees") belongs in IDENTITY.md, not per-friend.
+- **`world` / `rapport` notes on FriendMemory (future)** -- per-friend social/professional graph notes (`world`) and agent relationship notes (`rapport`), both prompt-loaded. Postponed until `toolPreferences` proves the model-managed notes pattern in Phase 3. When built, these replace `FRIENDS.md` (psyche/FRIENDS.md) -- per-person knowledge moves from a static psyche file to dynamic model-managed memory. The channel-level social norm ("speaking to Microsoft employees") belongs in IDENTITY.md, not per-friend.
 - Typed per-friend preference schemas (killed — verbosity, confirmationPolicy, riskTolerance are agent-level concerns defined in psyche, not per-friend preferences)
 
 ## Completion Criteria
@@ -62,7 +71,7 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 - [ ] No context module imports `fs` directly -- all persistence goes through `ContextStore`
 - [ ] All four context layers (Identity, Authority, Memory, Channel) have TypeScript types and resolution functions (phased: Identity + Channel in Phase 1, Authority in Phase 2, Memory in Phase 3)
 - [ ] `ContextResolver` resolves identity + channel eagerly in Phase 1; Phase 2 adds authority (lazy); Phase 3 adds memory
-- [ ] Authority uses hybrid model: reads are optimistic (403 learning), writes have pre-flight check
+- [ ] Authority uses hybrid model: reads are optimistic (403 learning), writes have pre-flight check via Security Namespaces API (Q8)
 - [ ] Identity persists across sessions via `ContextStore`; Authority is learned fresh per-conversation (no cache); FriendMemory (toolPreferences) persists via `ContextStore` (Phase 3)
 - [ ] ADO scope discovery works at runtime via Accounts API + Projects API; conversation carries results forward (no caching)
 - [ ] Tools are stateless — model provides all required context (org, project, IDs) on every call; no ambient session state
@@ -102,7 +111,7 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 ## Open Questions
 
 ### Resolved
-- [x] Q1: Should the `ContextResolver` pipeline be synchronous or async? **Resolved (D6)**: async. The lazy resolver uses explicit `Promise<T>` for layers that require I/O. Only layers actually accessed pay the async cost.
+- [x] Q1: Should the `ContextResolver` pipeline be synchronous or async? **Resolved (D6)**: async. The resolver uses explicit `Promise<T>` fields for layers that require I/O (authority in Phase 2). Promises are eager-start (API call fires at resolver build time, A7); consumers await them when needed.
 - [x] Q2: How should we model the identity-to-external-ID mapping when the same person uses CLI and Teams? **Resolved (D12)**: each channel has its own resolution path. Cross-channel linking is opt-in. CLI and Teams identities are separate for now.
 - [x] Q3: Should authority profiles be eagerly fetched or lazily fetched? **Resolved (D6)**: lazy, no cache. Authority is a `Promise<AuthorityProfile[]>` on the resolved context, not fetched until awaited. Learned fresh each conversation -- no TTL cache.
 - [x] Q6: How should we handle session context when the same friend is in Teams and CLI simultaneously? **Resolved (D8, superseded)**: Session layer was eliminated. Conversation history is per-channel. Identity and Memory are per-friend, shared across channels.
@@ -116,14 +125,11 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 - [x] Q4: Process template cache scoping? **Resolved**: no cache. Process template is fetched from the ADO API at runtime when needed; the conversation carries the result forward. Same principle as authority and scope discovery -- don't cache what you can re-derive.
 - [x] Q5: Preference editing mechanism? **Resolved (A5)**: preferences are freeform model-managed `toolPreferences` on `FriendMemory`. The model writes them conversationally, reads them before calling the relevant tool. No slash commands, no config file, no typed schema.
 - [x] Q7: Semantic vs generic ADO tool coexistence? **Resolved**: coexist. Semantic tools are the preferred path for common operations. Generic tools (`ado_query`, `ado_mutate`) remain as an escape hatch for edge cases and operations not yet covered by semantic tools. The model naturally prefers semantic tools when available.
+- [x] Q8: Authority pre-flight endpoint selection? **Resolved**: Security Namespaces API (`/_apis/security/namespaces`). Standard way ADO extensions check permissions -- well-documented, granular per-action permission bits, no side effects. Used by `AuthorityChecker.canWrite()` in unit 2B.
 
-### Open (to be resolved before their respective phase units)
+### Open
 
-- [ ] Q8: **Authority pre-flight endpoint selection (Phase 2)**
-  For the hybrid authority model's write-path pre-flight check (D2), which ADO API endpoint should `canWrite()` probe to verify permissions without attempting the mutation?
-  - **Security Namespaces API** (`/_apis/security/namespaces`) (recommended): returns granular permission bits per namespace. Well-documented. Can check specific actions (create work item, delete, etc.) without side effects.
-  - **Permissions API** (`/_apis/permissions`): can check specific permission bits but less commonly used in ADO integrations.
-  - **Decision needed before**: starting unit 2B (`AuthorityChecker` implementation).
+*(All questions resolved.)*
 
 ## Decisions Made
 
@@ -133,7 +139,7 @@ The context kernel defines a `ContextStore` interface with typed collection prop
 ### D2: Authority -- Hybrid Model, Not Pure 403 Learning
 Pure 403 learning means the agent proposes something, attempts it, fails, and then learns -- bad UX for destructive or visible operations (e.g., reparenting 50 work items, only to fail on item 1). The authority system uses a hybrid approach:
 - **Read path (optimistic)**: assume allowed, attempt the call, learn from 403. Good for discovery. `canRead()` returns true until disproven.
-- **Write path (pre-validated)**: before proposing a mutation plan, check a lightweight permissions endpoint to verify write access. `canWrite(scope)` probes before returning. If denied, the agent explains the limitation to the friend rather than attempting and failing.
+- **Write path (pre-validated)**: before proposing a mutation plan, probe the Security Namespaces API (`/_apis/security/namespaces`) to verify write access (Q8). `canWrite(scope)` probes before returning. If denied, the agent explains the limitation to the friend rather than attempting and failing.
 - The authority resolver distinguishes read vs. write via an `AuthorityChecker` that tools call with the operation type.
 
 ### D3: Channel Modeling -- Capability Flags, Not Just Enum
@@ -235,7 +241,7 @@ This is wired in Phase 1 (1G) for identity + channel, and extended in Phase 2 (2
 Scopes are discovered at runtime via ADO APIs and carried forward in the conversation — there is no cache (in-memory or persisted). When Authority (Phase 2) records a 403 on a scope, the next tool call that needs scopes re-discovers them via the ADO APIs. The revoked scope naturally disappears because the API no longer returns it. No cross-layer feedback needed — the API is the source of truth.
 
 ### D12: Cross-Channel Identity -- Designed For Multi-Channel From Day One
-Users will talk to the agent from many channels over time -- Teams today, Discord/Telegram/iMessage/web tomorrow. The identity model must make cross-channel linking a natural extension, not a retrofit.
+Friends will talk to the agent from many channels over time -- Teams today, Discord/Telegram/iMessage/web tomorrow. The identity model must make cross-channel linking a natural extension, not a retrofit.
 
 **Hard rules:**
 1. **Internal UUID is the only primary key.** Every channel-specific identity is just an entry in `externalIds[]`. No system -- storage keys, preference lookups -- ever uses an external ID as a primary key. Everything keys off the internal UUID.
@@ -249,9 +255,9 @@ Users will talk to the agent from many channels over time -- Teams today, Discor
 - **CLI**: no OAuth. Keyed by OS username. Look up by `{ provider: "local", externalId: os.userInfo().username }`.
 - **Future channels** (Discord, Telegram, web): each provides its own external ID. Same pattern -- look up by external ID, get-or-create `FriendIdentity`.
 
-**What we build now vs later:**
-- **Now**: identity resolution with get-or-create, `ContextStore` with external ID lookup, `externalIds[]` as an array on `FriendIdentity`. The data model supports multiple external IDs from day one.
-- **Later**: linking UX (`/link-identity`), unlinking, conflict resolution when merging two existing identities (whose memory wins?).
+**In scope vs out of scope:**
+- **In scope (Phase 1)**: identity resolution with get-or-create, `ContextStore` with external ID lookup, `externalIds[]` as an array on `FriendIdentity`. The data model supports multiple external IDs from day one.
+- **Out of scope**: linking UX (`/link-identity`), unlinking, conflict resolution when merging two existing identities (whose memory wins?).
 
 ### D13: Resolver Lifecycle -- Store Per-Process, Resolver Per-Request
 Two distinct lifecycles:
@@ -266,14 +272,14 @@ Authority has no in-memory cache (D4). Authority state is learned fresh each con
 
 ### D14: Identity Bootstrapping -- Always Get-or-Create
 Identity resolution is always "get or create." When a friend first interacts with the agent, if no `FriendIdentity` exists for the channel's external ID, one is created automatically with sensible defaults:
-- **Teams**: the bot activity carries an AAD userId and tenantId. The resolver calls `ContextStore.find("identity", ...)` to look up by external ID. If not found, it mints a new internal UUID, creates a `FriendIdentity` with the AAD external ID, and persists it. Display name comes from the bot activity or a Graph API call.
+- **Teams**: the bot activity carries an AAD userId and tenantId. The resolver calls `store.identity.find(...)` to look up by external ID. If not found, it mints a new internal UUID, creates a `FriendIdentity` with the AAD external ID, and persists it. Display name comes from the bot activity or a Graph API call.
 - **CLI**: keyed by OS username (`os.userInfo().username`). Same get-or-create pattern. Display name defaults to the OS username.
 - No manual setup required. No onboarding flow. The friend just starts talking and identity is created transparently on first contact.
 
 ### D15: buildSystem() API Change -- Async From Phase 1, Explicit Optional Context Parameter
 `buildSystem()` currently takes `(channel, options?)`. To render the context section (identity, channel capabilities), it needs access to `ResolvedContext`. The solution is an explicit optional parameter: `buildSystem(channel, options?, context?)`. When `context` is absent, the context section is omitted entirely (graceful degradation -- the agent works exactly as it does today). `buildSystem()` becomes async in Phase 1, even though Phase 1 resolution has no Promises to await. This avoids a mid-stream signature change: all callers are updated to `await buildSystem()` once in Phase 1, and Phase 2 simply adds `await context.authority` inside the already-async function -- no caller changes needed. There is no chicken-and-egg: the resolver creates the authority Promise eagerly at build time (D6, A7), `buildSystem()` awaits the result -- by the time it runs, the API call is already in-flight or completed. Backward-compatible: callers that don't pass context get the same behavior as before.
 
-**`cachedBuildSystem()` is removed.** The existing 60s TTL cache in `src/mind/context.ts` caches by channel — with per-friend context, this would serve the wrong friend's identity. System prompt construction is string concatenation, not expensive enough to cache. Callers call `buildSystem()` directly. `resetSystemPromptCache()` is also removed. Caching can be re-added later if profiling shows a need.
+**`cachedBuildSystem()` is removed.** The existing 60s TTL cache in `src/mind/context.ts` caches by channel -- with per-friend context, this would serve the wrong friend's identity. System prompt construction is string concatenation, not expensive enough to cache. Callers call `buildSystem()` directly. `resetSystemPromptCache()` is also removed.
 
 ### D16: Resolver Error Handling -- Per-Layer Strategy
 Each context layer has its own error handling strategy. No layer failure should crash the agent.
@@ -511,8 +517,7 @@ interface ChannelCapabilities {
 }
 
 // --- Resolved Context (output of resolver) ---
-// Phase 1: identity + channel only (everything is cheap to resolve, no Promises).
-// Phase 1 (units 1A-1H): identity + channel only.
+// Phase 1 (units 1A-1H): identity + channel only (everything is cheap, no Promises).
 // Unit 2A adds: authority + checker (Phase 2).
 // Unit 3G adds: memory (Phase 3).
 // Principle: don't add laziness until there's something expensive to be lazy about.
@@ -572,3 +577,4 @@ interface ToolDefinition {
 - 2026-03-02 2212 A23-A25 + kill authority TTL cache. Removed all authority cache/TTL references (D4 rewritten, D13 updated, D16 updated, D18 updated, unit 2A updated, AuthorityProfile loses cachedAt/expiresAt, AuthorityChecker loses invalidate()). Authority learned fresh each conversation -- no cache, no TTL, no invalidation. Completion criteria tightened: cross-tenant replaced with per-friend per-conversation scoping, FriendMemory made concrete (type + CRUD + save tool + read from ResolvedContext), added criteria for async buildSystem (A15), typed unions (A16), ToolDefinition (A21), removed validateAdoOrg (D20). A14 resolution (cache keying) is now moot.
 - 2026-03-02 2214 One-doing-doc language pass. Rewrote Notes section: "multiple doing docs" replaced with "one doing doc, four phases." Updated Open Questions header and "Decision needed before" lines to reference phase units instead of separate doing docs. Fixed "deferred" wording on unit 1D.
 - 2026-03-02 2224 Resolved Q4 (no process template cache -- fetch at runtime, conversation carries forward), Q5 (moved to Resolved), Q7 (coexist -- semantic preferred, generic as escape hatch). Only Q8 remains open. Fixed schema "Phase X adds" comments to reference specific units (3G, 2A). Clarified Context/References section for work-doer (paths are post-unit-10, current codebase still uses old names).
+- PENDING_TIMESTAMP Q8 resolved: Security Namespaces API for pre-flight writes. All open questions now resolved. Final coherence pass: rewrote Goal to reflect final design (no caching, typed unions, ToolDefinition, Security Namespaces, one marathon). Fixed 7 issues: unit 2B references Security Namespaces API (Q8), D2 references Security Namespaces API, D12 "Users" -> "Friends", D14 stale ContextStore.find("identity",...) -> store.identity.find(...), D15 removed "caching can be re-added" hedge, duplicate ResolvedContext schema comment removed, Q1 clarified eager-start Promise, D12 "now vs later" -> "in scope vs out of scope", Out of Scope "Deferred" -> "Postponed", completion criterion updated with Security Namespaces API.
