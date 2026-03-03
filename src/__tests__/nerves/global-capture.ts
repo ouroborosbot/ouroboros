@@ -56,7 +56,7 @@ function mergeLogpointFile(logpointsPath: string, observed: string[]): void {
   )
 }
 
-const CAPTURE_STATE_KEY = Symbol.for("ouroboros.observability.capture-state")
+const CAPTURE_STATE_KEY = Symbol.for("ouroboros.nerves.capture-state")
 type CaptureState = {
   runDir: string
   logpointsPath: string

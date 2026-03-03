@@ -34,14 +34,14 @@ describe("formatError", () => {
 describe("format observability contract", () => {
   it("emits channels message event when formatting tool output", async () => {
     vi.resetModules()
-    const emitObservabilityEvent = vi.fn()
+    const emitNervesEvent = vi.fn()
     vi.doMock("../../nerves/runtime", () => ({
-      emitObservabilityEvent,
+      emitNervesEvent,
     }))
     const format = await import("../../wardrobe/format")
 
     expect(format.formatToolResult("read_file", "package.json", true)).toBe("✓ read_file (package.json)")
-    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
       event: "channel.message_sent",
       component: "channels",
     }))

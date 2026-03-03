@@ -38,7 +38,7 @@ const LEVEL_PRIORITY: Record<LogLevel, number> = {
   warn: 30,
   error: 40,
 }
-const GLOBAL_SINKS_KEY = Symbol.for("ouroboros.observability.global-sinks")
+const GLOBAL_SINKS_KEY = Symbol.for("ouroboros.nerves.global-sinks")
 
 function resolveGlobalSinks(): Set<LogSink> {
   const scope = globalThis as Record<PropertyKey, unknown>

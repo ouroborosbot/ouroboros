@@ -4,7 +4,7 @@ import type { ToolContext, ToolDefinition } from "./tools-base";
 import { teamsToolDefinitions, summarizeTeamsArgs } from "./tools-teams";
 import { adoSemanticToolDefinitions } from "./ado-semantic";
 import type { ChannelCapabilities } from "../mind/context/types";
-import { emitObservabilityEvent } from "../nerves/runtime";
+import { emitNervesEvent } from "../nerves/runtime";
 
 // Re-export types and constants used by the rest of the codebase
 export { tools, finalAnswerTool } from "./tools-base";
@@ -36,7 +36,7 @@ export function isConfirmationRequired(toolName: string): boolean {
 }
 
 export async function execTool(name: string, args: Record<string, string>, ctx?: ToolContext): Promise<string> {
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "tool.start",
     component: "tools",
     message: "tool execution started",
@@ -46,7 +46,7 @@ export async function execTool(name: string, args: Record<string, string>, ctx?:
   // Look up from combined registry
   const def = allDefinitions.find((d) => d.tool.function.name === name);
   if (!def) {
-    emitObservabilityEvent({
+    emitNervesEvent({
       level: "error",
       event: "tool.error",
       component: "tools",
@@ -58,7 +58,7 @@ export async function execTool(name: string, args: Record<string, string>, ctx?:
 
   try {
     const result = await def.handler(args, ctx);
-    emitObservabilityEvent({
+    emitNervesEvent({
       event: "tool.end",
       component: "tools",
       message: "tool execution finished",
@@ -66,7 +66,7 @@ export async function execTool(name: string, args: Record<string, string>, ctx?:
     });
     return result;
   } catch (error) {
-    emitObservabilityEvent({
+    emitNervesEvent({
       level: "error",
       event: "tool.error",
       component: "tools",

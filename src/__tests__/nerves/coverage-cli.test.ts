@@ -17,7 +17,7 @@ describe("nerves/coverage cli", () => {
       readLatestRun: () => null,
     }))
     vi.doMock("../../nerves/coverage/audit", () => ({
-      auditObservabilityCoverage: vi.fn(),
+      auditNervesCoverage: vi.fn(),
     }))
 
     const { runAuditCli } = await import("../../nerves/coverage/cli")
@@ -42,7 +42,7 @@ describe("nerves/coverage cli", () => {
       }),
     }))
     vi.doMock("../../nerves/coverage/audit", () => ({
-      auditObservabilityCoverage: auditSpy,
+      auditNervesCoverage: auditSpy,
     }))
 
     const { runAuditCli } = await import("../../nerves/coverage/cli")

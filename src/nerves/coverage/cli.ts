@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "fs"
 import { dirname, join } from "path"
 
-import { auditObservabilityCoverage } from "./audit"
+import { auditNervesCoverage } from "./audit"
 import { readLatestRun } from "./run-artifacts"
 
 interface CliArgs {
@@ -39,7 +39,7 @@ export function runAuditCli(argv: string[]): number {
   const logpointsPath = args.logpointsPath ?? join(runDir, "vitest-logpoints.json")
   const outputPath = args.output ?? join(runDir, "nerves-coverage.json")
 
-  const report = auditObservabilityCoverage({
+  const report = auditNervesCoverage({
     eventsPath,
     logpointsPath,
   })

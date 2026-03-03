@@ -212,9 +212,9 @@ describe("loadConfig", () => {
 
   it("emits config.load observability event when loading config", async () => {
     vi.resetModules()
-    const emitObservabilityEvent = vi.fn()
+    const emitNervesEvent = vi.fn()
     vi.doMock("../nerves/runtime", () => ({
-      emitObservabilityEvent,
+      emitNervesEvent,
     }))
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
 
@@ -222,7 +222,7 @@ describe("loadConfig", () => {
     resetConfigCache()
     loadConfig()
 
-    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
       event: "config.load",
       component: "config/identity",
     }))

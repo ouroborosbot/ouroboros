@@ -1,6 +1,6 @@
 import type OpenAI from "openai"
 import { getContextConfig } from "../config"
-import { emitObservabilityEvent } from "../nerves/runtime"
+import { emitNervesEvent } from "../nerves/runtime"
 import * as fs from "fs"
 import * as path from "path"
 
@@ -17,7 +17,7 @@ export function trimMessages(
   contextMargin: number,
   actualTokenCount?: number,
 ): OpenAI.ChatCompletionMessageParam[] {
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "mind.step_start",
     component: "mind",
     message: "trimMessages started",
@@ -26,7 +26,7 @@ export function trimMessages(
   const overTokens = actualTokenCount ? actualTokenCount > maxTokens : false
 
   if (!overTokens) {
-    emitObservabilityEvent({
+    emitNervesEvent({
       event: "mind.step_end",
       component: "mind",
       message: "trimMessages completed without trimming",
@@ -52,7 +52,7 @@ export function trimMessages(
   }
 
   const trimmed = [messages[0], ...messages.slice(cutIndex)]
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "mind.step_end",
     component: "mind",
     message: "trimMessages completed with trimming",

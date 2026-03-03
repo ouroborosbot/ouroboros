@@ -214,16 +214,16 @@ describe("detectKick", () => {
   })
 
   it("emits engine.error observability event when a kick is detected", async () => {
-    const emitObservabilityEvent = vi.fn()
+    const emitNervesEvent = vi.fn()
     vi.resetModules()
     vi.doMock("../../nerves/runtime", () => ({
-      emitObservabilityEvent,
+      emitNervesEvent,
     }))
 
     const kicks = await import("../../heart/kicks")
     kicks.detectKick("let me check that")
 
-    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
       event: "engine.error",
       component: "engine",
     }))

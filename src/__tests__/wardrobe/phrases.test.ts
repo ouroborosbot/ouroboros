@@ -114,15 +114,15 @@ describe("phrases - getPhrases from agent.json", () => {
 describe("phrases observability contract", () => {
   it("emits repertoire.load_end when loading phrase pools", async () => {
     vi.resetModules()
-    const emitObservabilityEvent = vi.fn()
+    const emitNervesEvent = vi.fn()
     vi.doMock("../../nerves/runtime", () => ({
-      emitObservabilityEvent,
+      emitNervesEvent,
     }))
 
     const { getPhrases } = await import("../../wardrobe/phrases")
     getPhrases()
 
-    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
       event: "repertoire.load_end",
       component: "repertoire",
     }))
