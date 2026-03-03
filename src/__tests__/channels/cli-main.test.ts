@@ -722,6 +722,17 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
     expect(runAgentCalls[0][4]).toEqual({ toolChoiceRequired: false })
   })
 
+  it("creates and passes a traceId option to runAgent at CLI turn entry", async () => {
+    const runAgentCalls: any[][] = []
+    setupBasic({ inputSequence: ["hello", "/exit"] })
+    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
+
+    await main()
+
+    expect(runAgentCalls.length).toBe(1)
+    expect(runAgentCalls[0][4]).toEqual(expect.objectContaining({ traceId: expect.any(String) }))
+  })
+
   it("warns on stderr when assistant response is empty", async () => {
     setupBasic({ inputSequence: ["hello", "/exit"] })
     mocks.runAgent.mockImplementation(async (msgs: any[]) => {

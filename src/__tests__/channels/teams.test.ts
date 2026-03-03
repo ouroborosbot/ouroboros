@@ -1956,6 +1956,18 @@ describe("Teams adapter - session persistence", () => {
     expect(runAgentFn).toHaveBeenCalled()
   })
 
+  it("creates and passes a traceId option to runAgent at Teams turn entry", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../channels/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
+    expect(runAgentFn).toHaveBeenCalled()
+    expect(runAgentFn.mock.calls[0][4]).toEqual(expect.objectContaining({ traceId: expect.any(String) }))
+  })
+
   it("skipConfirmation=true in teamsChannel config sets skipConfirmation in agent options", async () => {
     vi.resetModules()
     const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
