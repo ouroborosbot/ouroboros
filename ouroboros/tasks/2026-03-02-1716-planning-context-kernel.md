@@ -148,7 +148,7 @@ Pure 403 learning means the agent proposes something, attempts it, fails, and th
 Channel context uses both an identifier (`"cli" | "teams"`) AND capability flags (`supportsMarkdown`, `supportsStreaming`, `supportsRichCards`, `maxMessageLength`, `availableIntegrations`). This allows the system to adapt behavior based on what the channel can actually do, rather than hardcoding per-channel behavior. The existing `Channel` type (`"cli" | "teams"`) in `src/mind/prompt.ts` becomes a key into a `ChannelCapabilities` lookup.
 
 `availableIntegrations` is the single source of truth for what a channel can reach. ADO is Teams-only for the foreseeable future -- CLI has no OAuth tokens and therefore no integration access. This drives three consumers -- no per-channel switch statements anywhere:
-1. **Tool routing**: `getToolsForChannel()` filters the tool list to only include tools whose integration is in `availableIntegrations`. If Discord declares `["github"]`, it gets GitHub tools but not ADO tools -- without any Discord-specific code in the router.
+1. **Tool routing**: every tool is wrapped in a `ToolDefinition` that declares its `integration` (e.g., `"ado"`, `"graph"`, or `undefined` for base tools). `getToolsForChannel()` filters the `ToolDefinition[]` registry to only include tools whose `integration` is `undefined` (base tools, always included) or is in the channel's `availableIntegrations`. If Discord declares `["github"]`, it gets base tools + GitHub tools but not ADO tools -- without any Discord-specific code in the router. `ToolDefinition` also co-locates `confirmationRequired` (replaces the current separate `Set<string>` in `tools-teams.ts`) and the handler function.
 2. **Prompt injection**: `contextSection()` only renders authority constraints for integrations in the list. CLI users don't see ADO constraints because CLI has no integrations.
 3. **Resolver**: `ContextResolver` skips authority resolution (Phase 2) if `availableIntegrations` is empty. No wasted API calls for channels that can't use the results.
 
@@ -156,13 +156,15 @@ Channel integration mapping:
 - **CLI**: `availableIntegrations = []` -- no OAuth, no tokens, no integration access. Identity still works (local file-based), but no ADO/Graph/GitHub tools.
 - **Teams**: `availableIntegrations = ["ado", "graph"]` -- OAuth-backed via Azure Bot Service token store. ADO and Graph tools available.
 
-This replaces the current hardcoded pattern in `getToolsForChannel()` where `channel === "teams"` gates the Teams tool list. The channel capabilities definition becomes the single place to configure what a channel can do.
+This replaces the current hardcoded pattern in `getToolsForChannel()` where `channel === "teams"` gates the Teams tool list. The channel capabilities definition + `ToolDefinition.integration` become the single mechanism to configure what a channel can do.
 
 ### D4: Authority Cache Invalidation -- TTL + Event-Driven
 Authority profiles are cached with a configurable TTL (default: 30 minutes). Additionally, any 403 response from an ADO/Graph API call triggers immediate cache invalidation for that integration scope. This catches permission changes without waiting for TTL expiry.
 
-### D5: ToolContext Extension -- Backward Compatible
-The existing `ToolContext` interface in `src/repertoire/tools-base.ts` is extended (not replaced) with an optional `context?: ResolvedContext` field. The `adoOrganizations` field is removed — org validation moves to runtime scope discovery (see D20). This means existing tool handlers need minor updates (replace `validateAdoOrg()` with scope discovery), but the overall shape is backward-compatible. New semantic tools access context layers on demand.
+### D5: ToolContext Extension + ToolDefinition Wrapper
+The existing `ToolContext` interface in `src/repertoire/tools-base.ts` is extended (not replaced) with an optional `context?: ResolvedContext` field. The `adoOrganizations` field is removed -- org validation moves to runtime scope discovery (see D20). This means existing tool handlers need minor updates (replace `validateAdoOrg()` with scope discovery), but the overall shape is backward-compatible. New semantic tools access context layers on demand.
+
+A new `ToolDefinition` wrapper type co-locates all tool metadata: the OpenAI tool schema, the handler function, the required `integration` (if any), and whether `confirmationRequired`. This replaces the current pattern of separate arrays (`tools`, `teamsTools`) and a separate `confirmationRequired` Set. All tools are registered in a single `ToolDefinition[]` array. `getToolsForChannel()` filters this array by matching `ToolDefinition.integration` against `ChannelCapabilities.availableIntegrations` (see D3).
 
 ### D6: Resolver -- Eager in Phase 1, Lazy When Needed
 **Phase 1**: all resolution is cheap. Identity = file read, Channel = pure lookup. No expensive I/O. The resolver resolves everything eagerly into a `ResolvedContext` with direct values. Simple, no Promises.
@@ -357,10 +359,10 @@ Paths reflect the directory restructuring done in unit 10. The agent-creature bo
 1. **runAgent()** in `src/heart/core.ts` -- receives `channel` param, receives `ToolContext` via `RunAgentOptions.toolContext`. The resolver is already attached to `ToolContext.context` by the channel adapter before `runAgent()` is called. `runAgent()` does not create the resolver.
 2. **handleTeamsMessage()** in `src/senses/teams.ts` -- builds `ToolContext` from OAuth tokens and ADO config. Creates the `ContextResolver` with the AAD external ID from the bot activity, attaches it to `ToolContext.context`.
 3. **CLI adapter** in `src/senses/cli.ts` -- currently does not build a `ToolContext`. Phase 1 adds a minimal `ToolContext` with `context` field (resolver using OS username as external ID). No tokens, no integrations — identity only.
-4. **getToolsForChannel()** in `src/repertoire/tools.ts` -- currently hardcodes `channel === "teams"` to gate Teams tools. Refactored to accept `ChannelCapabilities` and filter tools by `availableIntegrations` (see D3). New channels get integration-scoped tools without code changes to the router.
-5. **execTool()** in `src/repertoire/tools.ts` -- dispatches to handler with `ToolContext`. New semantic tools need handlers registered here.
+4. **getToolsForChannel()** in `src/repertoire/tools.ts` -- currently hardcodes `channel === "teams"` to gate Teams tools. Refactored to accept `ChannelCapabilities` and filter the `ToolDefinition[]` registry: include tools where `integration` is `undefined` (base tools) or where `integration` is in `availableIntegrations` (see D3, D5). New channels get integration-scoped tools without code changes to the router.
+5. **execTool()** in `src/repertoire/tools.ts` -- dispatches to handler with `ToolContext`. With `ToolDefinition`, the handler is co-located on the definition object -- `execTool()` looks up the `ToolDefinition` by name and calls its handler.
 6. **sessionPath()** in `src/config.ts` -- `~/.agentconfigs/<agent>/sessions/<channel>/<key>.json`. Context storage follows a parallel pattern via `FileContextStore`.
-7. **confirmationRequired** set in `src/repertoire/tools-teams.ts` -- semantic ADO mutation tools need to be added here.
+7. **confirmationRequired** -- currently a separate `Set<string>` in `src/repertoire/tools-teams.ts`. Absorbed into `ToolDefinition.confirmationRequired` (boolean flag co-located on each tool definition). The separate Set is removed.
 
 ### ADO API Patterns (from ado-client.ts and ado-endpoints.json)
 - WIQL queries for work item search
@@ -538,6 +540,19 @@ interface ResolvedContext {
   // Phase 3 adds:
   // readonly memory: FriendMemory | null;  // null if no memory exists for this friend yet
 }
+
+// --- Tool Definition (src/repertoire/tools-base.ts) ---
+// Wraps the OpenAI tool schema with co-located metadata.
+// Replaces the current pattern of separate arrays (tools, teamsTools) + separate confirmationRequired Set.
+// All tools registered in a single ToolDefinition[] array.
+interface ToolDefinition {
+  tool: OpenAI.ChatCompletionTool;
+  handler: ToolHandler;
+  integration?: Integration;        // undefined = base tool (always available); "ado" | "graph" | "github" = requires this integration
+  confirmationRequired?: boolean;   // true = requires friend confirmation before execution (mutations)
+}
+// getToolsForChannel() filters ToolDefinition[] by matching integration against ChannelCapabilities.availableIntegrations.
+// Base tools (integration undefined) are always included. Integration tools are included only if the channel declares that integration.
 ```
 
 ## Progress Log
@@ -568,3 +583,4 @@ interface ResolvedContext {
 - 2026-03-02 2159 A14: Authority cache keying already resolved by D13 (id+integration+scope). Module-scope Map confirmed as intended home. No doc changes needed.
 - 2026-03-02 2202 A15: buildSystem() async from Phase 1. No two-step sync->async migration. All callers updated once in Phase 1; Phase 2 just adds await inside the already-async function. Updated D15, Q12, unit 1G.
 - 2026-03-02 2204 A16: No bare strings in type system. Added `type IdentityProvider = "aad" | "local"` and `type Integration = "ado" | "github" | "graph"`. ExternalId.provider uses IdentityProvider, AuthorityProfile.integration and AuthorityChecker methods use Integration, ChannelCapabilities.availableIntegrations uses Integration[]. Adding a new provider or integration = add to the union (and write the supporting code).
+- PENDING_TIMESTAMP A21: ToolDefinition wrapper type co-locates tool metadata. Each tool declares its OpenAI schema, handler, integration (if any), and confirmationRequired (if mutation). Replaces separate tools/teamsTools arrays + confirmationRequired Set. getToolsForChannel() filters ToolDefinition[] by matching integration against availableIntegrations. Updated D3, D5, integration points 4/5/7, added ToolDefinition to schema.
