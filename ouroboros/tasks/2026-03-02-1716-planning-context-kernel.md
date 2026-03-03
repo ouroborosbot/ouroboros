@@ -560,4 +560,4 @@ interface ResolvedContext {
 - 2026-03-02 2228 A8: Kill cachedBuildSystem(). 60s TTL cache keyed by channel is wrong with per-friend context — would serve wrong friend's identity. buildSystem() is cheap string concatenation, no cache needed. Added to D15.
 - 2026-03-02 2232 A9+A10: ado_work_items organization parameter becomes optional. Disambiguation cascade: single org → auto-select, multiple → model asks friend, zero → "no ADO organizations found." Same at project level. validateAdoOrg() replaced by discovery flow. Made explicit in unit 1H.
 - 2026-03-02 2240 A12: No chicken-and-egg. Authority Promise is eager-start (A7), buildSystem() awaits it in Phase 2 (D15 already says it becomes async). Already resolved by D6+D15+A7.
-- PENDING_TIMESTAMP A14: Authority cache keying already resolved by D13 (id+integration+scope). Module-scope Map confirmed as intended home. No doc changes needed.
+- 2026-03-02 2159 A14: Authority cache keying already resolved by D13 (id+integration+scope). Module-scope Map confirmed as intended home. No doc changes needed.
