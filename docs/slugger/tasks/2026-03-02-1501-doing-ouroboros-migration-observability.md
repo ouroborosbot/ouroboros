@@ -22,7 +22,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [ ] Sink abstraction exists and routes each event to configured sinks without instrumentation-site changes.
 - [ ] File sink persists append-only NDJSON events at `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson` without truncating per turn, using session-key parity (CLI=`session`, Teams=`conversationId`).
 - [ ] Runtime paths across `src/` emit event-level structured logs with no chunk-level or sensitive-payload dumps.
-- [ ] Minimum component event catalog is implemented and exercised in tests (entrypoints/channels/engine/mind/tools/config/identity/clients/repertoire).
+- [ ] Minimum component event catalog is implemented and exercised in tests (entrypoints/channels/engine including `src/engine/kicks.ts`/mind/tools/config/identity/clients/repertoire).
 - [ ] Trace IDs are generated at turn entry and propagated through core execution.
 - [ ] Existing ad-hoc operational logging in scoped runtime files is replaced or wrapped by structured logging.
 - [ ] Tests cover new observability code and instrumentation behavior.
@@ -89,14 +89,14 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Acceptance**: Trace propagation code paths are fully covered and tests remain green.
 
 ### ⬜ Unit 3a: Engine/Mind/Tools Instrumentation — Red
-**What**: Add failing tests for required event emissions (`*.start`, `*.end`, `*.error`) and envelope compliance in `src/engine/core.ts`, `src/mind/context.ts`, `src/mind/prompt.ts`, and `src/engine/tools*.ts`.
-**Output**: Failing tests (engine/mind/tool suites) and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-3a-red-run.txt`.
-**Acceptance**: Tests fail and identify missing event-level instrumentation for engine/mind/tools.
+**What**: Add failing tests for required event emissions (`*.start`, `*.end`, `*.error`) and envelope compliance in `src/engine/core.ts`, `src/engine/kicks.ts`, `src/mind/context.ts`, `src/mind/prompt.ts`, and `src/engine/tools*.ts`.
+**Output**: Failing tests (engine/mind/tool suites, including `src/__tests__/engine/kicks.test.ts`) and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-3a-red-run.txt`.
+**Acceptance**: Tests fail and identify missing event-level instrumentation for engine (core + kicks), mind, and tools.
 
 ### ⬜ Unit 3b: Engine/Mind/Tools Instrumentation — Green
 **What**: Implement structured event logging for engine, mind, and tools with required envelope and no sensitive payload dumps.
-**Output**: Updated `src/engine/core.ts`, `src/mind/context.ts`, `src/mind/prompt.ts`, `src/engine/tools.ts`, `src/engine/tools-base.ts`, `src/engine/tools-teams.ts` and passing tests.
-**Acceptance**: Required engine/mind/tools catalog events are emitted with required fields and tests pass.
+**Output**: Updated `src/engine/core.ts`, `src/engine/kicks.ts`, `src/mind/context.ts`, `src/mind/prompt.ts`, `src/engine/tools.ts`, `src/engine/tools-base.ts`, `src/engine/tools-teams.ts` and passing tests.
+**Acceptance**: Required engine/mind/tools catalog events are emitted with required fields (including `src/engine/kicks.ts`) and tests pass.
 
 ### ⬜ Unit 3c: Engine/Mind/Tools Instrumentation — Coverage & Refactor
 **What**: Refactor instrumentation helpers/call sites and verify full coverage on new code.
@@ -167,3 +167,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 16:17] Pass 2 (granularity): clarified Unit 5 ownership to include wardrobe scope without additional unit splits
 - [2026-03-02 16:18] Pass 3 (validation): aligned wardrobe component mapping in acceptance criteria with planning decisions and merged codebase
 - [2026-03-02 16:18] Pass 4 (quality): verified template completeness, acceptance coverage, and emoji headers; set status to READY_FOR_EXECUTION
+- [PENDING_KICKS_SCOPE_TS] Explicitly added `src/engine/kicks.ts` + `src/__tests__/engine/kicks.test.ts` to Unit 3 and completion criteria
