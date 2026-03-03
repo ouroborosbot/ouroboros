@@ -2,6 +2,7 @@ import type OpenAI from "openai";
 import { tools, baseToolDefinitions } from "./tools-base";
 import type { ToolContext, ToolDefinition } from "./tools-base";
 import { teamsToolDefinitions, summarizeTeamsArgs } from "./tools-teams";
+import { adoSemanticToolDefinitions } from "./ado-semantic";
 import type { ChannelCapabilities } from "../mind/context/types";
 
 // Re-export types and constants used by the rest of the codebase
@@ -10,7 +11,7 @@ export type { ToolContext, ToolHandler, ToolDefinition } from "./tools-base";
 export { teamsTools } from "./tools-teams";
 
 // All tool definitions in a single registry
-const allDefinitions: ToolDefinition[] = [...baseToolDefinitions, ...teamsToolDefinitions];
+const allDefinitions: ToolDefinition[] = [...baseToolDefinitions, ...teamsToolDefinitions, ...adoSemanticToolDefinitions];
 
 // Return the appropriate tools list based on channel capabilities.
 // Base tools (no integration) are always included.
@@ -20,10 +21,10 @@ export function getToolsForChannel(capabilities?: ChannelCapabilities): OpenAI.C
     return tools;
   }
   const available = new Set(capabilities.availableIntegrations);
-  const filtered = teamsToolDefinitions.filter(
+  const integrationTools = [...teamsToolDefinitions, ...adoSemanticToolDefinitions].filter(
     (d) => d.integration && available.has(d.integration),
   );
-  return [...tools, ...filtered.map((d) => d.tool)];
+  return [...tools, ...integrationTools.map((d) => d.tool)];
 }
 
 // Check whether a tool requires user confirmation before execution.
@@ -58,5 +59,6 @@ export function summarizeArgs(name: string, args: Record<string, string>): strin
   if (name === "claude") return args.prompt?.slice(0, 40) || "";
   if (name === "web_search") return args.query?.slice(0, 40) || "";
   if (name === "save_friend_note") return args.key || "";
+  if (name === "ado_backlog_list") return `${args.organization || ""} ${args.project || ""}`.trim();
   return JSON.stringify(args).slice(0, 30);
 }
