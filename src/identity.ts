@@ -1,6 +1,6 @@
 import * as fs from "fs"
 import * as path from "path"
-import { emitObservabilityEvent } from "./observability/runtime"
+import { emitNervesEvent } from "./nerves/runtime"
 
 export interface AgentConfig {
   name: string
@@ -22,7 +22,7 @@ let _cachedAgentConfig: AgentConfig | null = null
  */
 export function getAgentName(): string {
   if (_cachedAgentName) {
-    emitObservabilityEvent({
+    emitNervesEvent({
       event: "identity.resolve",
       component: "config/identity",
       message: "resolved agent name from cache",
@@ -39,7 +39,7 @@ export function getAgentName(): string {
   }
 
   _cachedAgentName = process.argv[idx + 1]
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "identity.resolve",
     component: "config/identity",
     message: "resolved agent name from argv",
@@ -71,7 +71,7 @@ export function getAgentRoot(): string {
  */
 export function loadAgentConfig(): AgentConfig {
   if (_cachedAgentConfig) {
-    emitObservabilityEvent({
+    emitNervesEvent({
       event: "identity.resolve",
       component: "config/identity",
       message: "loaded agent config from cache",
@@ -87,7 +87,7 @@ export function loadAgentConfig(): AgentConfig {
   try {
     raw = fs.readFileSync(configFile, "utf-8")
   } catch (error) {
-    emitObservabilityEvent({
+    emitNervesEvent({
       level: "error",
       event: "config_identity.error",
       component: "config/identity",
@@ -106,7 +106,7 @@ export function loadAgentConfig(): AgentConfig {
   try {
     parsed = JSON.parse(raw) as Record<string, unknown>
   } catch (error) {
-    emitObservabilityEvent({
+    emitNervesEvent({
       level: "error",
       event: "config_identity.error",
       component: "config/identity",
@@ -141,7 +141,7 @@ export function loadAgentConfig(): AgentConfig {
     }
     parsed.phrases = filled
     console.warn("agent.json is missing phrases, added placeholders")
-    emitObservabilityEvent({
+    emitNervesEvent({
       level: "warn",
       event: "config_identity.error",
       component: "config/identity",
@@ -152,7 +152,7 @@ export function loadAgentConfig(): AgentConfig {
   }
 
   _cachedAgentConfig = parsed as unknown as AgentConfig
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "identity.resolve",
     component: "config/identity",
     message: "loaded agent config from disk",

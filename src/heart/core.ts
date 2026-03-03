@@ -6,7 +6,7 @@ import { getChannelCapabilities } from "../mind/context/channel";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
 import type { AssistantMessageWithReasoning, ResponseItem } from "./streaming";
 import { detectKick } from "./kicks";
-import { emitObservabilityEvent } from "../observability/runtime";
+import { emitNervesEvent } from "../nerves/runtime";
 import type { KickReason } from "./kicks";
 import type { TurnResult } from "./streaming";
 import type { UsageData } from "../mind/context";
@@ -170,7 +170,7 @@ export async function runAgent(
   const model = getModel();
   const { maxToolOutputChars } = getContextConfig();
   const traceId = options?.traceId;
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "engine.turn_start",
     trace_id: traceId,
     component: "engine",
@@ -419,7 +419,7 @@ export async function runAgent(
         continue;
       }
       callbacks.onError(e instanceof Error ? e : new Error(String(e)), "terminal");
-      emitObservabilityEvent({
+      emitNervesEvent({
         level: "error",
         event: "engine.error",
         trace_id: traceId,
@@ -431,7 +431,7 @@ export async function runAgent(
       done = true;
     }
   }
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "engine.turn_end",
     trace_id: traceId,
     component: "engine",

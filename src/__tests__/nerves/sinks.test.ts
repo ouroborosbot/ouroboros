@@ -4,7 +4,7 @@ import { tmpdir } from "os"
 
 import { describe, expect, it } from "vitest"
 
-import { createNdjsonFileSink } from "../../observability"
+import { createNdjsonFileSink } from "../../nerves"
 
 describe("observability/sinks", () => {
   it("appends ndjson events without truncating", () => {

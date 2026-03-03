@@ -5,7 +5,7 @@ import {
   eventKey,
   getDeclaredLogpoints,
   getRequiredEventKeys,
-} from "../../observability/coverage/contract"
+} from "../../nerves/coverage/contract"
 
 describe("observability/coverage contract", () => {
   it("builds deterministic event keys", () => {

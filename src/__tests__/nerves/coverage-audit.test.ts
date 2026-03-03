@@ -3,7 +3,7 @@ import { join } from "path"
 import { tmpdir } from "os"
 
 import { describe, expect, it } from "vitest"
-import { REQUIRED_EVENTS, getRequiredEventKeys } from "../../observability/coverage/contract"
+import { REQUIRED_EVENTS, getRequiredEventKeys } from "../../nerves/coverage/contract"
 
 type AuditResult = {
   overall_status: "pass" | "fail"
@@ -12,7 +12,7 @@ type AuditResult = {
     target: string
     reason: string
   }>
-  observability_coverage: {
+  nerves_coverage: {
     event_catalog: { status: "pass" | "fail" }
     schema_redaction: { status: "pass" | "fail" }
     logpoint_coverage: { status: "pass" | "fail" }
@@ -20,57 +20,57 @@ type AuditResult = {
 }
 
 async function runAudit(events: Array<Record<string, unknown>>, logpoints: Record<string, unknown>): Promise<AuditResult> {
-  const runDir = mkdtempSync(join(tmpdir(), "ouro-observability-audit-"))
+  const runDir = mkdtempSync(join(tmpdir(), "ouro-nerves-audit-"))
   const eventsPath = join(runDir, "vitest-events.ndjson")
   const logpointsPath = join(runDir, "vitest-logpoints.json")
 
   writeFileSync(eventsPath, events.map((e) => JSON.stringify(e)).join("\n") + "\n", "utf8")
   writeFileSync(logpointsPath, JSON.stringify(logpoints, null, 2), "utf8")
 
-  const audit = await import("../../observability/coverage/audit")
-  return audit.auditObservabilityCoverage({
+  const audit = await import("../../nerves/coverage/audit")
+  return audit.auditNervesCoverage({
     eventsPath,
     logpointsPath,
   })
 }
 
 async function runAuditWithFiles(eventsContent: string, logpointsContent: string): Promise<AuditResult> {
-  const runDir = mkdtempSync(join(tmpdir(), "ouro-observability-audit-"))
+  const runDir = mkdtempSync(join(tmpdir(), "ouro-nerves-audit-"))
   const eventsPath = join(runDir, "vitest-events.ndjson")
   const logpointsPath = join(runDir, "vitest-logpoints.json")
 
   writeFileSync(eventsPath, eventsContent, "utf8")
   writeFileSync(logpointsPath, logpointsContent, "utf8")
 
-  const audit = await import("../../observability/coverage/audit")
-  return audit.auditObservabilityCoverage({
+  const audit = await import("../../nerves/coverage/audit")
+  return audit.auditNervesCoverage({
     eventsPath,
     logpointsPath,
   })
 }
 
 async function runAuditWithoutLogpoints(events: Array<Record<string, unknown>>): Promise<AuditResult> {
-  const runDir = mkdtempSync(join(tmpdir(), "ouro-observability-audit-"))
+  const runDir = mkdtempSync(join(tmpdir(), "ouro-nerves-audit-"))
   const eventsPath = join(runDir, "vitest-events.ndjson")
 
   writeFileSync(eventsPath, events.map((e) => JSON.stringify(e)).join("\n") + "\n", "utf8")
 
-  const audit = await import("../../observability/coverage/audit")
-  return audit.auditObservabilityCoverage({
+  const audit = await import("../../nerves/coverage/audit")
+  return audit.auditNervesCoverage({
     eventsPath,
     logpointsPath: join(runDir, "missing-logpoints.json"),
   })
 }
 
 async function runAuditMissingEventsFile(logpoints: Record<string, unknown>): Promise<AuditResult> {
-  const runDir = mkdtempSync(join(tmpdir(), "ouro-observability-audit-"))
+  const runDir = mkdtempSync(join(tmpdir(), "ouro-nerves-audit-"))
   const eventsPath = join(runDir, "missing-events.ndjson")
   const logpointsPath = join(runDir, "vitest-logpoints.json")
 
   writeFileSync(logpointsPath, JSON.stringify(logpoints, null, 2), "utf8")
 
-  const audit = await import("../../observability/coverage/audit")
-  return audit.auditObservabilityCoverage({
+  const audit = await import("../../nerves/coverage/audit")
+  return audit.auditNervesCoverage({
     eventsPath,
     logpointsPath,
   })
@@ -94,7 +94,7 @@ describe("observability/coverage audit contract", () => {
     )
 
     expect(report.overall_status).toBe("fail")
-    expect(report.observability_coverage.event_catalog.status).toBe("fail")
+    expect(report.nerves_coverage.event_catalog.status).toBe("fail")
     expect(report.required_actions).toContainEqual(expect.objectContaining({
       type: "logging",
       target: "event-catalog",
@@ -118,7 +118,7 @@ describe("observability/coverage audit contract", () => {
     )
 
     expect(report.overall_status).toBe("fail")
-    expect(report.observability_coverage.schema_redaction.status).toBe("fail")
+    expect(report.nerves_coverage.schema_redaction.status).toBe("fail")
     expect(report.required_actions).toContainEqual(expect.objectContaining({
       type: "logging",
       target: "schema-redaction",
@@ -145,7 +145,7 @@ describe("observability/coverage audit contract", () => {
     )
 
     expect(report.overall_status).toBe("fail")
-    expect(report.observability_coverage.logpoint_coverage.status).toBe("fail")
+    expect(report.nerves_coverage.logpoint_coverage.status).toBe("fail")
     expect(report.required_actions).toContainEqual(expect.objectContaining({
       type: "logging",
       target: "logpoint-coverage",
@@ -169,7 +169,7 @@ describe("observability/coverage audit contract", () => {
     )
 
     expect(report.overall_status).toBe("fail")
-    expect(report.observability_coverage.schema_redaction.status).toBe("fail")
+    expect(report.nerves_coverage.schema_redaction.status).toBe("fail")
     expect(report.required_actions).toContainEqual(expect.objectContaining({
       type: "logging",
       target: "schema-redaction",
@@ -193,7 +193,7 @@ describe("observability/coverage audit contract", () => {
     )
 
     expect(report.overall_status).toBe("fail")
-    expect(report.observability_coverage.logpoint_coverage.declared).toBeGreaterThan(1)
+    expect(report.nerves_coverage.logpoint_coverage.declared).toBeGreaterThan(1)
     expect(report.required_actions).toContainEqual(expect.objectContaining({
       type: "logging",
       target: "logpoint-coverage",
@@ -207,7 +207,7 @@ describe("observability/coverage audit contract", () => {
     )
 
     expect(report.overall_status).toBe("fail")
-    expect(report.observability_coverage.schema_redaction.status).toBe("fail")
+    expect(report.nerves_coverage.schema_redaction.status).toBe("fail")
     expect(report.required_actions).toContainEqual(expect.objectContaining({
       type: "logging",
       target: "schema-redaction",
@@ -232,9 +232,9 @@ describe("observability/coverage audit contract", () => {
 
     expect(report.overall_status).toBe("pass")
     expect(report.required_actions).toEqual([])
-    expect(report.observability_coverage.event_catalog.status).toBe("pass")
-    expect(report.observability_coverage.schema_redaction.status).toBe("pass")
-    expect(report.observability_coverage.logpoint_coverage.status).toBe("pass")
+    expect(report.nerves_coverage.event_catalog.status).toBe("pass")
+    expect(report.nerves_coverage.schema_redaction.status).toBe("pass")
+    expect(report.nerves_coverage.logpoint_coverage.status).toBe("pass")
   })
 
   it("uses observed events when logpoints file is absent", async () => {
@@ -251,7 +251,7 @@ describe("observability/coverage audit contract", () => {
     )
 
     expect(report.overall_status).toBe("pass")
-    expect(report.observability_coverage.logpoint_coverage.status).toBe("pass")
+    expect(report.nerves_coverage.logpoint_coverage.status).toBe("pass")
   })
 
   it("fails cleanly when events capture file is missing", async () => {
@@ -261,8 +261,8 @@ describe("observability/coverage audit contract", () => {
     })
 
     expect(report.overall_status).toBe("fail")
-    expect(report.observability_coverage.event_catalog.status).toBe("fail")
-    expect(report.observability_coverage.schema_redaction.status).toBe("pass")
+    expect(report.nerves_coverage.event_catalog.status).toBe("fail")
+    expect(report.nerves_coverage.schema_redaction.status).toBe("pass")
     expect(report.required_actions).toContainEqual(expect.objectContaining({
       type: "logging",
       target: "event-catalog",
@@ -276,8 +276,8 @@ describe("observability/coverage audit contract", () => {
     )
 
     expect(report.overall_status).toBe("fail")
-    expect(report.observability_coverage.schema_redaction.status).toBe("pass")
-    expect(report.observability_coverage.event_catalog.status).toBe("fail")
+    expect(report.nerves_coverage.schema_redaction.status).toBe("pass")
+    expect(report.nerves_coverage.event_catalog.status).toBe("fail")
   })
 
   it("ignores non-array logpoint payload fields", async () => {
@@ -295,7 +295,7 @@ describe("observability/coverage audit contract", () => {
     )
 
     expect(report.overall_status).toBe("fail")
-    expect(report.observability_coverage.logpoint_coverage.declared).toBeGreaterThan(1)
+    expect(report.nerves_coverage.logpoint_coverage.declared).toBeGreaterThan(1)
     expect(report.required_actions).toContainEqual(expect.objectContaining({
       type: "logging",
       target: "logpoint-coverage",

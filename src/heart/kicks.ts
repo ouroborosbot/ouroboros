@@ -137,7 +137,7 @@ export function detectKick(
   const isEmpty = !content?.trim();
 
   if (isEmpty) {
-    emitObservabilityEvent({
+    emitNervesEvent({
       level: "error",
       event: "engine.error",
       component: "engine",
@@ -148,7 +148,7 @@ export function detectKick(
   }
 
   if (hasToolIntent(content)) {
-    emitObservabilityEvent({
+    emitNervesEvent({
       level: "error",
       event: "engine.error",
       component: "engine",
@@ -159,7 +159,7 @@ export function detectKick(
   }
 
   if (options?.toolChoiceRequired) {
-    emitObservabilityEvent({
+    emitNervesEvent({
       level: "error",
       event: "engine.error",
       component: "engine",
@@ -171,4 +171,4 @@ export function detectKick(
 
   return null;
 }
-import { emitObservabilityEvent } from "../observability/runtime";
+import { emitNervesEvent } from "../nerves/runtime";

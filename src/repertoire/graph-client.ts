@@ -3,7 +3,7 @@
 // and a thin getProfile() wrapper for backward compatibility.
 
 import { handleApiError } from "../heart/api-error"
-import { emitObservabilityEvent } from "../observability/runtime"
+import { emitNervesEvent } from "../nerves/runtime"
 
 const GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 
@@ -23,7 +23,7 @@ export async function graphRequest(
   body?: string,
 ): Promise<string> {
   try {
-    emitObservabilityEvent({
+    emitNervesEvent({
       event: "client.request_start",
       component: "clients",
       message: "starting Graph request",
@@ -43,7 +43,7 @@ export async function graphRequest(
     const res = await fetch(url, opts)
 
     if (!res.ok) {
-      emitObservabilityEvent({
+      emitNervesEvent({
         level: "error",
         event: "client.error",
         component: "clients",
@@ -54,7 +54,7 @@ export async function graphRequest(
     }
 
     const data = await res.json()
-    emitObservabilityEvent({
+    emitNervesEvent({
       event: "client.request_end",
       component: "clients",
       message: "Graph request completed",
@@ -62,7 +62,7 @@ export async function graphRequest(
     })
     return JSON.stringify(data, null, 2)
   } catch (err) {
-    emitObservabilityEvent({
+    emitNervesEvent({
       level: "error",
       event: "client.error",
       component: "clients",
@@ -81,7 +81,7 @@ export async function graphRequest(
 // Backward-compatible thin wrapper: fetches /me and formats as human-readable text.
 export async function getProfile(token: string): Promise<string> {
   try {
-    emitObservabilityEvent({
+    emitNervesEvent({
       event: "client.request_start",
       component: "clients",
       message: "starting Graph profile request",
@@ -93,7 +93,7 @@ export async function getProfile(token: string): Promise<string> {
     })
 
     if (!res.ok) {
-      emitObservabilityEvent({
+      emitNervesEvent({
         level: "error",
         event: "client.error",
         component: "clients",
@@ -111,7 +111,7 @@ export async function getProfile(token: string): Promise<string> {
       `Department: ${profile.department || "N/A"}`,
       `Office: ${profile.officeLocation || "N/A"}`,
     ]
-    emitObservabilityEvent({
+    emitNervesEvent({
       event: "client.request_end",
       component: "clients",
       message: "Graph profile request completed",
@@ -119,7 +119,7 @@ export async function getProfile(token: string): Promise<string> {
     })
     return lines.join("\n")
   } catch (err) {
-    emitObservabilityEvent({
+    emitNervesEvent({
       level: "error",
       event: "client.error",
       component: "clients",

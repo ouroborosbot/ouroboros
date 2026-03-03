@@ -278,16 +278,16 @@ describe("loadAgentConfig", () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(agentJson))
 
     vi.resetModules()
-    const emitObservabilityEvent = vi.fn()
-    vi.doMock("../observability/runtime", () => ({
-      emitObservabilityEvent,
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../nerves/runtime", () => ({
+      emitNervesEvent,
     }))
 
     const { loadAgentConfig, resetIdentity } = await import("../identity")
     resetIdentity()
     loadAgentConfig()
 
-    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
       event: "identity.resolve",
       component: "config/identity",
     }))

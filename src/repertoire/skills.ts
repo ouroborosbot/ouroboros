@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { getAgentRoot } from "../identity";
-import { emitObservabilityEvent } from "../observability/runtime";
+import { emitNervesEvent } from "../nerves/runtime";
 
 // Skills live in {agentRoot}/skills/ directory
 export function getSkillsDir(): string {
@@ -12,7 +12,7 @@ export function getSkillsDir(): string {
 const loadedSkills: string[] = [];
 
 export function listSkills(): string[] {
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "repertoire.load_start",
     component: "repertoire",
     message: "listing skills",
@@ -20,7 +20,7 @@ export function listSkills(): string[] {
   });
   const skillsDir = getSkillsDir();
   if (!fs.existsSync(skillsDir)) {
-    emitObservabilityEvent({
+    emitNervesEvent({
       event: "repertoire.load_end",
       component: "repertoire",
       message: "skills directory missing",
@@ -33,7 +33,7 @@ export function listSkills(): string[] {
     .filter((f) => f.endsWith(".md"))
     .map((f) => path.basename(f, ".md"))
     .sort();
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "repertoire.load_end",
     component: "repertoire",
     message: "listed skills",
@@ -43,7 +43,7 @@ export function listSkills(): string[] {
 }
 
 export function loadSkill(skillName: string): string {
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "repertoire.load_start",
     component: "repertoire",
     message: "loading skill",
@@ -52,7 +52,7 @@ export function loadSkill(skillName: string): string {
   const skillPath = path.join(getSkillsDir(), `${skillName}.md`);
 
   if (!fs.existsSync(skillPath)) {
-    emitObservabilityEvent({
+    emitNervesEvent({
       level: "error",
       event: "repertoire.error",
       component: "repertoire",
@@ -68,7 +68,7 @@ export function loadSkill(skillName: string): string {
     loadedSkills.push(skillName);
   }
 
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "repertoire.load_end",
     component: "repertoire",
     message: "loaded skill",

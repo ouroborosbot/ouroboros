@@ -2,8 +2,8 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { homedir } from "os"
 import { dirname, join } from "path"
 
-import { registerGlobalLogSink, type LogEvent } from "../../observability"
-import { getDeclaredLogpoints } from "../../observability/coverage/contract"
+import { registerGlobalLogSink, type LogEvent } from "../../nerves"
+import { getDeclaredLogpoints } from "../../nerves/coverage/contract"
 
 const REPO_SLUG = "ouroboros-agent-harness"
 
@@ -56,7 +56,7 @@ function mergeLogpointFile(logpointsPath: string, observed: string[]): void {
   )
 }
 
-const CAPTURE_STATE_KEY = Symbol.for("ouroboros.observability.capture-state")
+const CAPTURE_STATE_KEY = Symbol.for("ouroboros.nerves.capture-state")
 type CaptureState = {
   runDir: string
   logpointsPath: string

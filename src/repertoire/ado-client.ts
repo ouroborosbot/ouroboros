@@ -3,7 +3,7 @@
 // and a thin queryWorkItems() wrapper for backward compatibility.
 
 import { handleApiError } from "../heart/api-error"
-import { emitObservabilityEvent } from "../observability/runtime"
+import { emitNervesEvent } from "../nerves/runtime"
 
 const ADO_BASE = "https://dev.azure.com"
 const VSSPS_BASE = "https://app.vssps.visualstudio.com"
@@ -55,7 +55,7 @@ export async function adoRequest(
   body?: string,
 ): Promise<string> {
   try {
-    emitObservabilityEvent({
+    emitNervesEvent({
       event: "client.request_start",
       component: "clients",
       message: "starting ADO request",
@@ -80,7 +80,7 @@ export async function adoRequest(
     const res = await fetch(url, opts)
 
     if (!res.ok) {
-      emitObservabilityEvent({
+      emitNervesEvent({
         level: "error",
         event: "client.error",
         component: "clients",
@@ -91,7 +91,7 @@ export async function adoRequest(
     }
 
     const data = await res.json()
-    emitObservabilityEvent({
+    emitNervesEvent({
       event: "client.request_end",
       component: "clients",
       message: "ADO request completed",
@@ -99,7 +99,7 @@ export async function adoRequest(
     })
     return JSON.stringify(data, null, 2)
   } catch (err) {
-    emitObservabilityEvent({
+    emitNervesEvent({
       level: "error",
       event: "client.error",
       component: "clients",
@@ -123,7 +123,7 @@ export async function queryWorkItems(
   query: string,
 ): Promise<string> {
   try {
-    emitObservabilityEvent({
+    emitNervesEvent({
       event: "client.request_start",
       component: "clients",
       message: "starting ADO work item query",
@@ -144,7 +144,7 @@ export async function queryWorkItems(
     )
 
     if (!wiqlRes.ok) {
-      emitObservabilityEvent({
+      emitNervesEvent({
         level: "error",
         event: "client.error",
         component: "clients",
@@ -157,7 +157,7 @@ export async function queryWorkItems(
     const wiqlData = (await wiqlRes.json()) as WiqlResult
 
     if (!wiqlData.workItems || wiqlData.workItems.length === 0) {
-      emitObservabilityEvent({
+      emitNervesEvent({
         event: "client.request_end",
         component: "clients",
         message: "ADO work item query returned no results",
@@ -178,7 +178,7 @@ export async function queryWorkItems(
     )
 
     if (!detailRes.ok) {
-      emitObservabilityEvent({
+      emitNervesEvent({
         level: "error",
         event: "client.error",
         component: "clients",
@@ -196,7 +196,7 @@ export async function queryWorkItems(
       return `#${wi.id}: ${wi.fields["System.Title"]} [${wi.fields["System.State"]}] (${assignedTo})`
     })
 
-    emitObservabilityEvent({
+    emitNervesEvent({
       event: "client.request_end",
       component: "clients",
       message: "ADO work item query completed",
@@ -204,7 +204,7 @@ export async function queryWorkItems(
     })
     return lines.join("\n")
   } catch (err) {
-    emitObservabilityEvent({
+    emitNervesEvent({
       level: "error",
       event: "client.error",
       component: "clients",
