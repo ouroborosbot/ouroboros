@@ -6,6 +6,7 @@ import { finalAnswerTool, getToolsForChannel } from "../repertoire/tools";
 import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName } from "../identity";
 import type { ResolvedContext } from "./context/types";
+import { getChannelCapabilities } from "./context/channel";
 
 // Lazy-loaded psyche text cache
 let _psycheCache: { soul: string; identity: string; lore: string; friends: string } | null = null;
@@ -91,7 +92,7 @@ function dateSection(): string {
 }
 
 function toolsSection(channel: Channel, options?: BuildSystemOptions): string {
-  const channelTools = getToolsForChannel(channel);
+  const channelTools = getToolsForChannel(getChannelCapabilities(channel));
   const activeTools = options?.toolChoiceRequired ? [...channelTools, finalAnswerTool] : channelTools;
   const list = activeTools
     .map((t) => `- ${t.function.name}: ${t.function.description}`)

@@ -1,26 +1,43 @@
 import type OpenAI from "openai";
-import { tools, baseToolHandlers } from "./tools-base";
-import type { ToolContext } from "./tools-base";
-import { teamsTools, teamsToolHandlers, summarizeTeamsArgs } from "./tools-teams";
+import { tools, baseToolDefinitions } from "./tools-base";
+import type { ToolContext, ToolDefinition } from "./tools-base";
+import { teamsToolDefinitions, summarizeTeamsArgs } from "./tools-teams";
+import type { ChannelCapabilities } from "../mind/context/types";
 
 // Re-export types and constants used by the rest of the codebase
 export { tools, finalAnswerTool } from "./tools-base";
-export type { ToolContext, ToolHandler } from "./tools-base";
+export type { ToolContext, ToolHandler, ToolDefinition } from "./tools-base";
 export { teamsTools } from "./tools-teams";
 
-// Return the appropriate tools list based on channel.
-// Teams gets base tools + teams tools; CLI (and any other channel) gets base tools only.
-export function getToolsForChannel(channel?: string): OpenAI.ChatCompletionTool[] {
-  if (channel === "teams") {
-    return [...tools, ...teamsTools];
+// All tool definitions in a single registry
+const allDefinitions: ToolDefinition[] = [...baseToolDefinitions, ...teamsToolDefinitions];
+
+// Return the appropriate tools list based on channel capabilities.
+// Base tools (no integration) are always included.
+// Teams/integration tools are included only if their integration is in availableIntegrations.
+export function getToolsForChannel(capabilities?: ChannelCapabilities): OpenAI.ChatCompletionTool[] {
+  if (!capabilities || capabilities.availableIntegrations.length === 0) {
+    return tools;
   }
-  return tools;
+  const available = new Set(capabilities.availableIntegrations);
+  const filtered = teamsToolDefinitions.filter(
+    (d) => d.integration && available.has(d.integration),
+  );
+  return [...tools, ...filtered.map((d) => d.tool)];
+}
+
+// Check whether a tool requires user confirmation before execution.
+// Reads from ToolDefinition.confirmationRequired instead of a separate Set.
+export function isConfirmationRequired(toolName: string): boolean {
+  const def = allDefinitions.find((d) => d.tool.function.name === toolName);
+  return def?.confirmationRequired === true;
 }
 
 export async function execTool(name: string, args: Record<string, string>, ctx?: ToolContext): Promise<string> {
-  const h = baseToolHandlers[name] || teamsToolHandlers[name];
-  if (!h) return `unknown: ${name}`;
-  return await h(args, ctx);
+  // Look up from combined registry
+  const def = allDefinitions.find((d) => d.tool.function.name === name);
+  if (!def) return `unknown: ${name}`;
+  return await def.handler(args, ctx);
 }
 
 export function summarizeArgs(name: string, args: Record<string, string>): string {

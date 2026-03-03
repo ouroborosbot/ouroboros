@@ -1973,7 +1973,8 @@ describe("Teams adapter - session persistence", () => {
     expect(options.toolContext.graphToken).toBe("g-token")
     expect(options.toolContext.adoToken).toBe("a-token")
     expect(typeof options.toolContext.signin).toBe("function")
-    expect(Array.isArray(options.toolContext.adoOrganizations)).toBe(true)
+    // adoOrganizations removed from ToolContext in Unit 1Ha
+    expect(options.toolContext.adoOrganizations).toBeUndefined()
   })
 
   it("handleTeamsMessage works without TeamsMessageContext (backward compat)", async () => {
