@@ -11,6 +11,7 @@ import { sessionPath, getTeamsConfig, getTeamsChannelConfig } from "../config"
 import { loadSession, deleteSession, postTurn } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "../repertoire/commands"
 import { createTraceId } from "../nerves"
+import { emitNervesEvent } from "../nerves/runtime"
 import { FileContextStore } from "../mind/context/store-file"
 import { ContextResolver } from "../mind/context/resolver"
 import * as os from "os"
@@ -272,6 +273,7 @@ export function resolvePendingConfirmation(convId: string, text: string): boolea
 
 // Per-conversation lock to serialize messages for the same conversation
 const _convLocks = new Map<string, Promise<void>>()
+let _inFlightTeamsTurns = 0
 
 export async function withConversationLock(convId: string, fn: () => Promise<void>): Promise<void> {
   const prev = _convLocks.get(convId) || Promise.resolve()
@@ -303,6 +305,21 @@ export interface TeamsMessageContext {
 
 // Handle an incoming Teams message
 export async function handleTeamsMessage(text: string, stream: TeamsStream, conversationId: string, teamsContext?: TeamsMessageContext, disableStreaming?: boolean, sendMessage?: (text: string) => Promise<void>): Promise<void> {
+  const maxConcurrent = Math.max(1, getTeamsChannelConfig().maxConcurrentConversations || 10)
+  if (_inFlightTeamsTurns >= maxConcurrent) {
+    const message = "I can't do that from here right now because this single-replica preview is already handling its maximum concurrent conversations. Please retry in a moment."
+    emitNervesEvent({
+      level: "warn",
+      event: "channel.error",
+      component: "channels",
+      message: "teams concurrency cap reached",
+      meta: { channel: "teams", conversation_id: conversationId, max_concurrent: maxConcurrent },
+    })
+    stream.emit(message)
+    return
+  }
+  _inFlightTeamsTurns++
+  try {
   // NOTE: Confirmation resolution is handled in the app.on("message") handler
   // BEFORE the conversation lock.  By the time we get here, any pending
   // confirmation has already been resolved and the reply consumed.
@@ -386,6 +403,9 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   // Trim context and save session
   postTurn(messages, sessPath, result.usage)
   // SDK auto-closes the stream after our handler returns (app.process.js)
+  } finally {
+    _inFlightTeamsTurns = Math.max(0, _inFlightTeamsTurns - 1)
+  }
 }
 
 // Start the Teams app in DevtoolsPlugin mode (local dev) or Bot Service mode (real Teams).

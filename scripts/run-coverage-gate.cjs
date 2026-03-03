@@ -15,6 +15,10 @@ function runNpm(args) {
   return spawnSync(npmCmd(), args, { stdio: "inherit" })
 }
 
+function runNode(args) {
+  return spawnSync(process.execPath, args, { stdio: "inherit" })
+}
+
 function createRunId() {
   return new Date().toISOString().replace(/[:.]/g, "-")
 }
@@ -44,6 +48,8 @@ function main() {
   const activePath = path.join(ROOT, ".active-run.json")
   const latestPath = path.join(ROOT, "latest-run.json")
   const nervesCoveragePath = path.join(runDir, "nerves-coverage.json")
+  const runtimeLoadValidationPath = path.join(runDir, "runtime-hardening-load-validation.json")
+  const runtimeSummaryPath = path.join(runDir, "runtime-hardening-summary.json")
   const summaryPath = path.join(runDir, "coverage-gate-summary.json")
 
   writeJson(activePath, info)
@@ -55,6 +61,14 @@ function main() {
     unlinkSync(activePath)
   }
 
+  const loadValidationExit = runNode([
+    path.join("scripts", "run-runtime-hardening-load-validation.cjs"),
+    "--run-dir",
+    runDir,
+    "--output",
+    runtimeLoadValidationPath,
+  ]).status ?? 1
+
   const auditExit = runNpm([
     "run",
     "audit:nerves",
@@ -65,9 +79,25 @@ function main() {
     nervesCoveragePath,
   ]).status ?? 1
 
+  const runtimeAuditExit = runNpm([
+    "run",
+    "audit:runtime-hardening",
+    "--",
+    "--run-dir",
+    runDir,
+    "--input",
+    runtimeLoadValidationPath,
+    "--output",
+    runtimeSummaryPath,
+  ]).status ?? 1
+
   let nervesReport = null
   if (existsSync(nervesCoveragePath)) {
     nervesReport = readJson(nervesCoveragePath)
+  }
+  let runtimeReport = null
+  if (existsSync(runtimeSummaryPath)) {
+    runtimeReport = readJson(runtimeSummaryPath)
   }
 
   const requiredActions = []
@@ -94,8 +124,24 @@ function main() {
     })
   }
 
+  const runtimeStatus = runtimeReport?.overall_status === "pass"
+    && runtimeAuditExit === 0
+    && loadValidationExit === 0
+    ? "pass"
+    : "fail"
+
+  if (Array.isArray(runtimeReport?.required_actions)) {
+    requiredActions.push(...runtimeReport.required_actions)
+  } else if (runtimeStatus === "fail") {
+    requiredActions.push({
+      type: "artifact",
+      target: "runtime-hardening-audit",
+      reason: "runtime hardening audit did not produce a valid report",
+    })
+  }
+
   const overallStatus =
-    codeCoverageStatus === "pass" && nervesStatus === "pass" ? "pass" : "fail"
+    codeCoverageStatus === "pass" && nervesStatus === "pass" && runtimeStatus === "pass" ? "pass" : "fail"
 
   const summary = {
     overall_status: overallStatus,
@@ -104,6 +150,9 @@ function main() {
     },
     nerves_coverage: nervesReport?.nerves_coverage ?? {
       status: nervesStatus,
+    },
+    runtime_hardening: runtimeReport?.runtime_hardening ?? {
+      status: runtimeStatus,
     },
     required_actions: requiredActions,
   }
