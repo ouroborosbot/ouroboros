@@ -227,17 +227,32 @@ git push --force-with-lease origin ${BRANCH}
 
 ### Step 2: Create the pull request
 
+Before creating the PR, build a comprehensive description of **all** changes on this branch relative to main — not just the most recent task. Use git to understand the full scope:
+
+```bash
+# All commits on this branch not on main
+git log origin/main..HEAD --oneline
+
+# All doing docs on this branch (completed tasks)
+git log origin/main..HEAD --name-only --diff-filter=A -- '*/tasks/*-doing-*.md'
+
+# Summary of all files changed
+git diff origin/main --stat
+```
+
+Read each doing doc found above. The PR body should summarize every completed task on the branch, grouped logically. Include:
+- A section per task (or group of related tasks) with a brief summary of what was implemented
+- A final "Files changed" summary (e.g., "164 files changed — new context kernel, codebase restructure, sync-and-merge system")
+
 ```bash
 gh pr create \
   --base main \
   --head "${BRANCH}" \
   --title "${AGENT}: merge $(echo ${BRANCH} | cut -d'/' -f2-)" \
-  --body "Automated merge of ${BRANCH} into main.
-
-Task: $(basename ${DOING_DOC})
-
-Merge performed by work-merger."
+  --body "<comprehensive description built from all doing docs and git diff>"
 ```
+
+The PR description is the permanent record of what this branch contributed. Make it complete.
 
 If a PR already exists for this branch (e.g., from a retry), skip creation:
 ```bash
