@@ -113,23 +113,11 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 - [x] Q13: Resolver error handling -- what happens when layers fail? **Resolved (D16)**: per-layer error strategy. No layer failure crashes the agent.
 - [x] Q14: Schema versioning for persisted types? **Resolved (D17)**: `schemaVersion` field + migration functions on read.
 - [x] Q15: Should tokens move into the context kernel? **Resolved (D18)**: no. Tokens stay in `ToolContext`, context stays in `ResolvedContext`. Different lifecycles.
+- [x] Q4: Process template cache scoping? **Resolved**: no cache. Process template is fetched from the ADO API at runtime when needed; the conversation carries the result forward. Same principle as authority and scope discovery -- don't cache what you can re-derive.
+- [x] Q5: Preference editing mechanism? **Resolved (A5)**: preferences are freeform model-managed `toolPreferences` on `FriendMemory`. The model writes them conversationally, reads them before calling the relevant tool. No slash commands, no config file, no typed schema.
+- [x] Q7: Semantic vs generic ADO tool coexistence? **Resolved**: coexist. Semantic tools are the preferred path for common operations. Generic tools (`ado_query`, `ado_mutate`) remain as an escape hatch for edge cases and operations not yet covered by semantic tools. The model naturally prefers semantic tools when available.
 
 ### Open (to be resolved before their respective phase units)
-
-- [ ] Q4: **Process template cache scoping (Phase 4)**
-  ADO allows different process templates per project within the same org. When we build process template awareness (Phase 4, unit 4A), should we cache the fetched template definition per-project or per-org?
-  - **Per-project** (recommended): matches ADO's scoping. Each project can have a different process (Basic, Agile, Scrum). Caching per-org would return wrong results if projects differ.
-  - **Per-org**: fewer cache entries but incorrect if projects use different templates.
-  - **Decision needed before**: starting Phase 4 units.
-
-- [x] Q5: **Preference editing mechanism (Phase 3+)**
-  ~~Should preferences be editable via slash commands at runtime?~~ **Resolved (A5)**: preferences are now freeform model-managed `toolPreferences` on `FriendMemory`. The model writes them conversationally when a friend expresses a preference, and reads them before calling the relevant tool. No slash commands, no config file, no typed schema. The model is the editor.
-
-- [ ] Q7: **Semantic vs generic ADO tool coexistence (Phase 3)**
-  Should the new semantic ADO tools (`ado_create_epic`, `ado_move_items`, etc.) replace the existing generic `ado_query`/`ado_mutate` tools, or coexist alongside them?
-  - **Coexist** (recommended): semantic tools are the preferred path for common operations. Generic tools remain as an escape hatch for edge cases, advanced queries, and operations not yet covered by semantic tools. The model naturally prefers semantic tools when available.
-  - **Replace**: cleaner tool list, but loses flexibility for uncommon operations.
-  - **Decision needed before**: starting Phase 3 units.
 
 - [ ] Q8: **Authority pre-flight endpoint selection (Phase 2)**
   For the hybrid authority model's write-path pre-flight check (D2), which ADO API endpoint should `canWrite()` probe to verify permissions without attempting the mutation?
@@ -344,8 +332,8 @@ What replaces them:
 
 ## Context / References
 
-### Existing Codebase Architecture (Post-Restructuring)
-Paths reflect the directory restructuring done in unit 10. The agent-creature body metaphor (D19) governs all top-level directories.
+### Codebase Architecture (as of unit 10 completion)
+**NOTE for work-doer:** These paths reflect the codebase AFTER unit 10 (directory restructuring) completes. Before unit 10, the current paths are `src/engine/` (not `src/heart/`), `src/channels/` (not `src/senses/`), and tool files live in `src/engine/` (not `src/repertoire/`). All units after unit 10 reference the new paths below. The agent-creature body metaphor (D19) governs all top-level directories.
 
 - **Entry points**: `src/cli-entry.ts` (CLI), `src/teams-entry.ts` (Teams with dotenv)
 - **Heart** (core loop): `src/heart/core.ts` -- `runAgent()` loop, provider selection, streaming, tool execution
@@ -420,19 +408,19 @@ interface CollectionStore<T> {
 // Consumers write store.identity.get(id), store.memory.get(id) -- type-safe, zero ambiguity.
 interface ContextStore {
   readonly identity: CollectionStore<FriendIdentity>;
-  // Phase 3 adds:
+  // Added in unit 3G (Phase 3):
   // readonly memory: CollectionStore<FriendMemory>;
 }
 
 // src/mind/context/store-file.ts
 
 // First adapter: file-based storage under ~/.agentconfigs/<agent>/context/
-// Each collection maps to a subdirectory: context/identity/ (Phase 3 adds context/memory/)
+// Each collection maps to a subdirectory: context/identity/ (unit 3G adds context/memory/)
 // Each item maps to a JSON file: context/identity/{uuid}.json
 // This is the ONLY module that touches fs for context data.
 class FileContextStore implements ContextStore {
   readonly identity: CollectionStore<FriendIdentity>;   // -> context/identity/
-  // Phase 3 adds:
+  // Added in unit 3G (Phase 3):
   // readonly memory: CollectionStore<FriendMemory>;     // -> context/memory/
   // Each property is a FileCollectionStore<T> pointing at its own directory.
 }
@@ -524,16 +512,17 @@ interface ChannelCapabilities {
 
 // --- Resolved Context (output of resolver) ---
 // Phase 1: identity + channel only (everything is cheap to resolve, no Promises).
-// Phase 2: adds authority (Promise<AuthorityProfile[]>) when API calls are needed.
-// Phase 3: adds memory (FriendMemory) for model-managed toolPreferences.
+// Phase 1 (units 1A-1H): identity + channel only.
+// Unit 2A adds: authority + checker (Phase 2).
+// Unit 3G adds: memory (Phase 3).
 // Principle: don't add laziness until there's something expensive to be lazy about.
 interface ResolvedContext {
   readonly identity: FriendIdentity;
   readonly channel: ChannelCapabilities;
-  // Phase 2 adds:
+  // Added in unit 2A (Phase 2):
   // readonly authority: Promise<AuthorityProfile[]>;
   // readonly checker: AuthorityChecker;
-  // Phase 3 adds:
+  // Added in unit 3G (Phase 3):
   // readonly memory: FriendMemory | null;  // null if no memory exists for this friend yet
 }
 
@@ -582,3 +571,4 @@ interface ToolDefinition {
 - 2026-03-02 2207 A21: ToolDefinition wrapper type co-locates tool metadata. Each tool declares its OpenAI schema, handler, integration (if any), and confirmationRequired (if mutation). Replaces separate tools/teamsTools arrays + confirmationRequired Set. getToolsForChannel() filters ToolDefinition[] by matching integration against availableIntegrations. Updated D3, D5, integration points 4/5/7, added ToolDefinition to schema.
 - 2026-03-02 2212 A23-A25 + kill authority TTL cache. Removed all authority cache/TTL references (D4 rewritten, D13 updated, D16 updated, D18 updated, unit 2A updated, AuthorityProfile loses cachedAt/expiresAt, AuthorityChecker loses invalidate()). Authority learned fresh each conversation -- no cache, no TTL, no invalidation. Completion criteria tightened: cross-tenant replaced with per-friend per-conversation scoping, FriendMemory made concrete (type + CRUD + save tool + read from ResolvedContext), added criteria for async buildSystem (A15), typed unions (A16), ToolDefinition (A21), removed validateAdoOrg (D20). A14 resolution (cache keying) is now moot.
 - 2026-03-02 2214 One-doing-doc language pass. Rewrote Notes section: "multiple doing docs" replaced with "one doing doc, four phases." Updated Open Questions header and "Decision needed before" lines to reference phase units instead of separate doing docs. Fixed "deferred" wording on unit 1D.
+- PENDING_TIMESTAMP Resolved Q4 (no process template cache -- fetch at runtime, conversation carries forward), Q5 (moved to Resolved), Q7 (coexist -- semantic preferred, generic as escape hatch). Only Q8 remains open. Fixed schema "Phase X adds" comments to reference specific units (3G, 2A). Clarified Context/References section for work-doer (paths are post-unit-10, current codebase still uses old names).
