@@ -207,7 +207,7 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Output**: Coverage report showing 100% on `prompt.ts` contextSection.
 **Acceptance**: 100% coverage on new code, tests still green.
 
-### ⬜ Unit 8a: Session path restructuring -- Tests
+### ✅ Unit 8a: Session path restructuring -- Tests
 **What**: Write tests for updated `sessionPath()` in `config.ts`. Test: new signature `sessionPath(friendId, channel, key)`, returns path `~/.agentconfigs/{agentName}/sessions/{friendId}/{channel}/{key}.json`, auto-creates parent directories, `getSessionDir()` removed or simplified.
 **Output**: Updated `config.test.ts` with session path tests.
 **Files**: `src/__tests__/config.test.ts`
