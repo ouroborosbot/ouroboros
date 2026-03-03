@@ -1,6 +1,6 @@
 # Doing: Context Kernel -- Structured Friend Context System
 
-**Status**: drafting
+**Status**: READY_FOR_EXECUTION
 **Execution Mode**: direct
 **Created**: 2026-03-02 2302
 **Planning**: ./2026-03-02-1716-planning-context-kernel.md
@@ -1354,4 +1354,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 ## Progress Log
 ⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
-- 2026-03-02 2302 Created from planning doc
+- 2026-03-02 2302 Created from planning doc (Pass 1: first draft)
+- 2026-03-02 2309 Pass 2: granularity -- split Unit 1H into 1Ha/1Hb/1Hc, split Unit 3B into 3Ba/3Bb. Updated all cross-references.
+- 2026-03-02 2309 Pass 3: validation -- found 4 issues: (1) api-error.ts missing from unit 10 renames, (2) cachedBuildSystem lives in context.ts not prompt.ts, (3) test files are combined tools.test.ts not separate tools-base/tools-teams, (4) src/repertoire/ already exists. All fixed.
+- 2026-03-02 2309 Pass 4: quality -- all 21 units have emoji headers, completion criteria, test requirements, 100% coverage. No TBD items. No changes needed.
