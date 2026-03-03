@@ -1,6 +1,6 @@
 # Planning: Ouroboros Migration — Observability (Phase 2)
 
-**Status**: NEEDS_REVIEW
+**Status**: done
 **Created**: 2026-03-02 15:01
 
 ## Goal
@@ -41,27 +41,27 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Session/log key collision hardening (hash-suffixed filenames) and migration of existing session naming.
 
 ## Completion Criteria
-- [ ] `src/observability/` module exists with reusable logger + trace ID primitives.
-- [ ] NDJSON (`json`) is the canonical log format with configurable `logging.level` and dual sinks for this phase (`stderr` + session-style file).
-- [ ] All structured events use required envelope fields: `ts`, `level`, `event`, `trace_id`, `component`, `message`, `meta`.
-- [ ] Sink abstraction exists and routes each event to configured sinks without instrumentation-site changes.
-- [ ] File sink persists append-only NDJSON events at `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson` without truncating per turn, using session-key parity (CLI=`session`, Teams=`conversationId`).
-- [ ] Runtime paths across `src/` emit event-level structured logs with no chunk-level or sensitive-payload dumps.
-- [ ] Minimum component event catalog is implemented and exercised in tests (entrypoints/channels/engine including `src/engine/kicks.ts`/mind/tools/config/identity/clients/repertoire).
-- [ ] Trace IDs are generated at turn entry and propagated through core execution.
-- [ ] Existing ad-hoc operational logging in scoped runtime files is replaced or wrapped by structured logging.
-- [ ] Tests cover new observability code and instrumentation behavior.
-- [ ] `npm run audit:observability` exists and fails when required event coverage, schema/policy checks, or declared logpoint coverage is incomplete.
-- [ ] Observability coverage report artifact is produced with measurable results for: event-catalog coverage, schema/redaction compliance, and logpoint coverage.
-- [ ] Unit-test runs write observability audit artifacts to dedicated test-run paths (`~/.agentconfigs/test-runs/<repo_slug>/<run_id>/vitest-events.ndjson` and `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/vitest-logpoints.json`) instead of operational sinks.
-- [ ] `npm run audit:observability` consumes those artifacts directly (no second test run).
-- [ ] `npm run test:coverage` is the mandatory combined gate and fails on either code coverage or observability audit failure.
-- [ ] CI enforces `npm run test:coverage` as the required combined gate for this phase.
-- [ ] Combined gate summary artifact clearly signals both obligations with this shape: `overall_status`, `code_coverage`, `observability_coverage`, `required_actions[]` where each action has `type` (`coverage` or `logging`), `target`, and `reason`.
-- [ ] Combined gate summary artifact is written at `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/coverage-gate-summary.json`.
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] `src/observability/` module exists with reusable logger + trace ID primitives.
+- [x] NDJSON (`json`) is the canonical log format with configurable `logging.level` and dual sinks for this phase (`stderr` + session-style file).
+- [x] All structured events use required envelope fields: `ts`, `level`, `event`, `trace_id`, `component`, `message`, `meta`.
+- [x] Sink abstraction exists and routes each event to configured sinks without instrumentation-site changes.
+- [x] File sink persists append-only NDJSON events at `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson` without truncating per turn, using session-key parity (CLI=`session`, Teams=`conversationId`).
+- [x] Runtime paths across `src/` emit event-level structured logs with no chunk-level or sensitive-payload dumps.
+- [x] Minimum component event catalog is implemented and exercised in tests (entrypoints/channels/engine including `src/engine/kicks.ts`/mind/tools/config/identity/clients/repertoire).
+- [x] Trace IDs are generated at turn entry and propagated through core execution.
+- [x] Existing ad-hoc operational logging in scoped runtime files is replaced or wrapped by structured logging.
+- [x] Tests cover new observability code and instrumentation behavior.
+- [x] `npm run audit:observability` exists and fails when required event coverage, schema/policy checks, or declared logpoint coverage is incomplete.
+- [x] Observability coverage report artifact is produced with measurable results for: event-catalog coverage, schema/redaction compliance, and logpoint coverage.
+- [x] Unit-test runs write observability audit artifacts to dedicated test-run paths (`~/.agentconfigs/test-runs/<repo_slug>/<run_id>/vitest-events.ndjson` and `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/vitest-logpoints.json`) instead of operational sinks.
+- [x] `npm run audit:observability` consumes those artifacts directly (no second test run).
+- [x] `npm run test:coverage` is the mandatory combined gate and fails on either code coverage or observability audit failure.
+- [x] CI enforces `npm run test:coverage` as the required combined gate for this phase.
+- [x] Combined gate summary artifact clearly signals both obligations with this shape: `overall_status`, `code_coverage`, `observability_coverage`, `required_actions[]` where each action has `type` (`coverage` or `logging`), `target`, and `reason`.
+- [x] Combined gate summary artifact is written at `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/coverage-gate-summary.json`.
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -71,7 +71,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [ ] None at this time.
+- [x] None at this time.
 
 ## Decisions Made
 - This planning doc targets migration sequence item #2: Observability.
@@ -139,3 +139,4 @@ Merged `origin/main` into `codex/slugger` before execution planning refresh; ups
 - [2026-03-02 17:03] Locked single-run coverage model: Vitest emits observability artifacts once; audit consumes artifacts without rerunning tests
 - [2026-03-02 17:10] Locked unified `test:coverage` gate and combined output contract so coverage and logging obligations are explicit to automated consumers
 - [2026-03-02 17:36] Locked non-agent OS-level test-run artifact root (`~/.agentconfigs/test-runs/<repo_slug>/<run_id>/`) and colocated coverage/observability outputs
+- [2026-03-02 18:43] Execution complete: synced planning completion criteria to final evidence from run `~/.agentconfigs/test-runs/ouroboros-agent-harness/2026-03-03T02-42-35-165Z/`.
