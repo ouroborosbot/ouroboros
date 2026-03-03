@@ -3,6 +3,7 @@
 // and a thin queryWorkItems() wrapper for backward compatibility.
 
 import { handleApiError } from "../heart/api-error"
+import { emitObservabilityEvent } from "../observability/runtime"
 
 const ADO_BASE = "https://dev.azure.com"
 const VSSPS_BASE = "https://app.vssps.visualstudio.com"
@@ -54,6 +55,13 @@ export async function adoRequest(
   body?: string,
 ): Promise<string> {
   try {
+    emitObservabilityEvent({
+      event: "client.request_start",
+      component: "clients",
+      message: "starting ADO request",
+      meta: { client: "ado", method, org, path },
+    })
+
     const fullPath = ensureApiVersion(path)
     const url = `${ADO_BASE}/${org}${fullPath}`
 
@@ -72,12 +80,38 @@ export async function adoRequest(
     const res = await fetch(url, opts)
 
     if (!res.ok) {
+      emitObservabilityEvent({
+        level: "error",
+        event: "client.error",
+        component: "clients",
+        message: "ADO request failed",
+        meta: { client: "ado", method, org, path, status: res.status },
+      })
       return handleApiError(res, "ADO", "ado")
     }
 
     const data = await res.json()
+    emitObservabilityEvent({
+      event: "client.request_end",
+      component: "clients",
+      message: "ADO request completed",
+      meta: { client: "ado", method, org, path, success: true },
+    })
     return JSON.stringify(data, null, 2)
   } catch (err) {
+    emitObservabilityEvent({
+      level: "error",
+      event: "client.error",
+      component: "clients",
+      message: "ADO request threw exception",
+      meta: {
+        client: "ado",
+        method,
+        org,
+        path,
+        reason: err instanceof Error ? err.message : String(err),
+      },
+    })
     return handleApiError(err, "ADO", "ado")
   }
 }
@@ -89,6 +123,13 @@ export async function queryWorkItems(
   query: string,
 ): Promise<string> {
   try {
+    emitObservabilityEvent({
+      event: "client.request_start",
+      component: "clients",
+      message: "starting ADO work item query",
+      meta: { client: "ado", org, operation: "queryWorkItems" },
+    })
+
     // Step 1: Run WIQL query to get work item IDs
     const wiqlRes = await fetch(
       `${ADO_BASE}/${org}/_apis/wit/wiql?${DEFAULT_API_VERSION}`,
@@ -103,12 +144,25 @@ export async function queryWorkItems(
     )
 
     if (!wiqlRes.ok) {
+      emitObservabilityEvent({
+        level: "error",
+        event: "client.error",
+        component: "clients",
+        message: "ADO WIQL query failed",
+        meta: { client: "ado", org, operation: "queryWorkItems", stage: "wiql", status: wiqlRes.status },
+      })
       return handleApiError(wiqlRes, "ADO", "ado")
     }
 
     const wiqlData = (await wiqlRes.json()) as WiqlResult
 
     if (!wiqlData.workItems || wiqlData.workItems.length === 0) {
+      emitObservabilityEvent({
+        event: "client.request_end",
+        component: "clients",
+        message: "ADO work item query returned no results",
+        meta: { client: "ado", org, operation: "queryWorkItems", count: 0 },
+      })
       return "No work items found matching the query."
     }
 
@@ -124,6 +178,13 @@ export async function queryWorkItems(
     )
 
     if (!detailRes.ok) {
+      emitObservabilityEvent({
+        level: "error",
+        event: "client.error",
+        component: "clients",
+        message: "ADO work item details fetch failed",
+        meta: { client: "ado", org, operation: "queryWorkItems", stage: "details", status: detailRes.status },
+      })
       return handleApiError(detailRes, "ADO", "ado")
     }
 
@@ -135,8 +196,26 @@ export async function queryWorkItems(
       return `#${wi.id}: ${wi.fields["System.Title"]} [${wi.fields["System.State"]}] (${assignedTo})`
     })
 
+    emitObservabilityEvent({
+      event: "client.request_end",
+      component: "clients",
+      message: "ADO work item query completed",
+      meta: { client: "ado", org, operation: "queryWorkItems", count: lines.length },
+    })
     return lines.join("\n")
   } catch (err) {
+    emitObservabilityEvent({
+      level: "error",
+      event: "client.error",
+      component: "clients",
+      message: "ADO work item query threw exception",
+      meta: {
+        client: "ado",
+        org,
+        operation: "queryWorkItems",
+        reason: err instanceof Error ? err.message : String(err),
+      },
+    })
     return handleApiError(err, "ADO", "ado")
   }
 }

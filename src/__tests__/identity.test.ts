@@ -223,6 +223,30 @@ describe("loadAgentConfig", () => {
     expect(() => loadAgentConfig()).toThrow(/agent\.json/)
   })
 
+  it("handles non-Error read failures when loading agent.json", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw "read-failure"
+    })
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/agent\.json/)
+  })
+
+  it("handles non-Error parse failures when loading agent.json", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockReturnValue("{\"name\":\"ouroboros\"}")
+    const parseSpy = vi.spyOn(JSON, "parse").mockImplementation(() => {
+      throw "parse-failure"
+    })
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/agent\.json/)
+    parseSpy.mockRestore()
+  })
+
   it("caches the config after first load", async () => {
     process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
     const agentJson = {
@@ -238,6 +262,35 @@ describe("loadAgentConfig", () => {
 
     expect(first).toBe(second) // same reference
     expect(fs.readFileSync).toHaveBeenCalledTimes(1)
+  })
+
+  it("emits identity.resolve observability event when loading agent config", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    const agentJson = {
+      name: "ouroboros",
+      configPath: "~/.agentconfigs/ouroboros/config.json",
+      phrases: {
+        thinking: ["thinking"],
+        tool: ["tool"],
+        followup: ["followup"],
+      },
+    }
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(agentJson))
+
+    vi.resetModules()
+    const emitObservabilityEvent = vi.fn()
+    vi.doMock("../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    loadAgentConfig()
+
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "identity.resolve",
+      component: "config/identity",
+    }))
   })
 })
 

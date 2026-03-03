@@ -508,6 +508,27 @@ describe("CLI adapter - onModelStreamStart", () => {
 
     vi.restoreAllMocks()
   })
+
+  it("stop with success message writes green check output", async () => {
+    const stderrChunks: string[] = []
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
+      stderrChunks.push(chunk.toString())
+      return true
+    })
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true)
+
+    vi.resetModules()
+    const agent = await import("../../senses/cli")
+
+    const s = new agent.Spinner("test")
+    s.stop("done")
+
+    const output = stderrChunks.join("")
+    expect(output).toContain("\u2713")
+    expect(output).toContain("done")
+
+    vi.restoreAllMocks()
+  })
 })
 
 describe("CLI adapter - onToolStart", () => {
@@ -623,6 +644,33 @@ describe("CLI adapter - onToolEnd", () => {
     // Uses shared formatter: "checkmark get_current_time" (no parens for empty summary)
     expect(output).toContain("\u2713 get_current_time")
     expect(output).not.toContain("()")
+
+    vi.restoreAllMocks()
+  })
+
+  it("keeps stderr output channel-native and emits structured channel events", async () => {
+    const stderrChunks: string[] = []
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
+      stderrChunks.push(chunk.toString())
+      return true
+    })
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true)
+
+    vi.resetModules()
+    const emitObservabilityEvent = vi.fn()
+    vi.doMock("../../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+    const agent = await import("../../senses/cli")
+    const callbacks = agent.createCliCallbacks()
+
+    callbacks.onToolEnd("read_file", "/tmp/test.txt", true)
+
+    expect(stderrChunks.join("")).toContain("\u2713 read_file (/tmp/test.txt)")
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "channel.message_sent",
+      component: "channels",
+    }))
 
     vi.restoreAllMocks()
   })

@@ -7,7 +7,9 @@
     "dev": "tsc && node dist/cli-entry.js --agent ouroboros",
     "dev:slugger": "tsc && node dist/cli-entry.js --agent slugger",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage:vitest": "vitest run --coverage",
+    "audit:observability": "npm run build && node dist/observability/coverage/cli-main.js",
+    "test:coverage": "node scripts/run-coverage-gate.cjs",
     "teams": "tsc && node dist/teams-entry.js --agent ouroboros",
     "teams:no-stream": "tsc && node dist/teams-entry.js --agent ouroboros --disable-streaming",
     "manifest:package": "cd ouroboros/manifest && zip -r ../../manifest.zip manifest.json color.png outline.png"

@@ -1,5 +1,6 @@
 import type { Channel } from "../mind/prompt"
 import { getAgentName } from "../identity"
+import { emitObservabilityEvent } from "../observability/runtime"
 
 export interface CommandContext {
   channel: Channel
@@ -62,6 +63,13 @@ export function resetToolChoiceRequired(): void {
 }
 
 export function registerDefaultCommands(registry: CommandRegistry): void {
+  emitObservabilityEvent({
+    event: "repertoire.load_start",
+    component: "repertoire",
+    message: "registering default commands",
+    meta: {},
+  })
+
   registry.register({
     name: "exit",
     description: `quit ${getAgentName()}`,
@@ -95,6 +103,13 @@ export function registerDefaultCommands(registry: CommandRegistry): void {
       _toolChoiceRequired = !_toolChoiceRequired
       return { action: "response", message: `tool-required mode: ${_toolChoiceRequired ? "ON" : "OFF"}` }
     },
+  })
+
+  emitObservabilityEvent({
+    event: "repertoire.load_end",
+    component: "repertoire",
+    message: "registered default commands",
+    meta: {},
   })
 }
 

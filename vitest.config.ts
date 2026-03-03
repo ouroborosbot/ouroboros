@@ -4,11 +4,18 @@ export default defineConfig({
   test: {
     globals: true,
     exclude: ["dist/**", "node_modules/**"],
+    maxWorkers: 1,
+    setupFiles: ["src/__tests__/observability/global-capture.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov", "json-summary"],
       include: ["src/**/*.ts"],
-      exclude: ["src/__tests__/**", "src/*-entry.ts", "src/mind/context/store.ts"],
+      exclude: [
+        "src/__tests__/**",
+        "src/*-entry.ts",
+        "src/mind/context/store.ts",
+        "src/observability/coverage/cli-main.ts",
+      ],
       thresholds: {
         lines: 100,
         branches: 100,

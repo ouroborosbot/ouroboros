@@ -1,6 +1,6 @@
 # Doing: Ouroboros Migration — Observability (Phase 2)
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-03-02 15:50
 **Planning**: ./2026-03-02-1501-planning-ouroboros-migration-observability.md
@@ -16,19 +16,27 @@
 Introduce a structured observability foundation (logger + trace IDs) so turn execution, tool behavior, and key engine/channel events are diagnosable without relying on ad-hoc `console` output.
 
 ## Completion Criteria
-- [ ] `src/observability/` module exists with reusable logger + trace ID primitives.
-- [ ] NDJSON (`json`) is the canonical log format with configurable `logging.level` and dual sinks for this phase (`stderr` + session-style file).
-- [ ] All structured events use required envelope fields: `ts`, `level`, `event`, `trace_id`, `component`, `message`, `meta`.
-- [ ] Sink abstraction exists and routes each event to configured sinks without instrumentation-site changes.
-- [ ] File sink persists append-only NDJSON events at `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson` without truncating per turn, using session-key parity (CLI=`session`, Teams=`conversationId`).
-- [ ] Runtime paths across `src/` emit event-level structured logs with no chunk-level or sensitive-payload dumps.
-- [ ] Minimum component event catalog is implemented and exercised in tests (entrypoints/channels/engine/mind/tools/config/identity/clients/repertoire).
-- [ ] Trace IDs are generated at turn entry and propagated through core execution.
-- [ ] Existing ad-hoc operational logging in scoped runtime files is replaced or wrapped by structured logging.
-- [ ] Tests cover new observability code and instrumentation behavior.
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] `src/observability/` module exists with reusable logger + trace ID primitives.
+- [x] NDJSON (`json`) is the canonical log format with configurable `logging.level` and dual sinks for this phase (`stderr` + session-style file).
+- [x] All structured events use required envelope fields: `ts`, `level`, `event`, `trace_id`, `component`, `message`, `meta`.
+- [x] Sink abstraction exists and routes each event to configured sinks without instrumentation-site changes.
+- [x] File sink persists append-only NDJSON events at `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson` without truncating per turn, using session-key parity (CLI=`session`, Teams=`conversationId`).
+- [x] Runtime paths across `src/` emit event-level structured logs with no chunk-level or sensitive-payload dumps.
+- [x] Minimum component event catalog is implemented and exercised in tests (entrypoints/channels/engine including `src/engine/kicks.ts`/mind/tools/config/identity/clients/repertoire).
+- [x] Trace IDs are generated at turn entry and propagated through core execution.
+- [x] Existing ad-hoc operational logging in scoped runtime files is replaced or wrapped by structured logging.
+- [x] Tests cover new observability code and instrumentation behavior.
+- [x] `npm run audit:observability` exists and fails when required event coverage, schema/policy checks, or declared logpoint coverage is incomplete.
+- [x] Observability coverage report artifact is produced with measurable results for: event-catalog coverage, schema/redaction compliance, and logpoint coverage.
+- [x] Vitest runs in observability-capture mode and writes audit artifacts to `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/vitest-events.ndjson` and `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/vitest-logpoints.json` (not operational sinks).
+- [x] `npm run audit:observability` consumes captured artifacts directly and does not rerun tests.
+- [x] `npm run test:coverage` is the mandatory combined gate and fails on either code coverage or observability audit failure.
+- [x] CI enforces `npm run test:coverage` as the required combined gate for this phase.
+- [x] Combined gate summary artifact clearly signals both obligations with this shape: `overall_status`, `code_coverage`, `observability_coverage`, `required_actions[]` where each action has `type` (`coverage` or `logging`), `target`, and `reason`.
+- [x] Combined gate summary artifact is written at `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/coverage-gate-summary.json`.
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -53,94 +61,109 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Setup/Research
+### ✅ Unit 0: Setup/Research
 **What**: Audit current runtime logging behavior and map required structured events, envelope fields, sink abstraction/fan-out design, and target files under `src/` (`stderr` + session-style file pathing).
 **Output**: Baseline event/instrumentation matrix at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-0-baseline-matrix.md`.
 **Acceptance**: Matrix covers required envelope, minimum event catalog, target runtime files (including merged `src/wardrobe/phrases.ts` and `src/wardrobe/format.ts`), and file sink path/key contract `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson` (CLI=`session`, Teams=`conversationId`).
 
-### ⬜ Unit 1a: Observability Core Module — Red
+### ✅ Unit 1a: Observability Core Module — Red
 **What**: Add failing tests for structured logger/trace primitives, required envelope fields, NDJSON shape, `logging.level`, sink abstraction behavior, and sink fan-out (`stderr` + append-only file sink) in `src/__tests__/observability/*.test.ts`.
 **Output**: New failing observability tests and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-1a-red-run.txt`.
 **Acceptance**: Tests fail for missing `src/observability/` module and missing envelope/config/sink persistence behavior.
 
-### ⬜ Unit 1b: Observability Core Module — Green
+### ✅ Unit 1b: Observability Core Module — Green
 **What**: Implement `src/observability/` logger and trace helpers (factory + event helpers) with sink abstraction and fan-out to `stderr` and append-only file persistence.
 **Output**: New module files under `src/observability/` and updated tests.
 **Acceptance**: Unit 1a tests pass with required envelope fields, configurable `logging.level`, sink abstraction, and append-only file writes to the session-style path.
 
-### ⬜ Unit 1c: Observability Core Module — Coverage & Refactor
+### ✅ Unit 1c: Observability Core Module — Coverage & Refactor
 **What**: Refactor if needed and verify 100% coverage for new observability module code.
 **Output**: Coverage verification note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-1c-coverage.md`.
 **Acceptance**: New observability module code is fully covered and tests remain green.
 
-### ⬜ Unit 2a: Trace Propagation (Entrypoints/Core) — Red
+### ✅ Unit 2a: Trace Propagation (Entrypoints/Core) — Red
 **What**: Add failing tests proving trace IDs are created at turn entry boundaries in `src/channels/cli.ts` and `src/channels/teams.ts` and propagated into `src/engine/core.ts`.
 **Output**: Failing trace propagation tests (channel + core suites) and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-2a-red-run.txt`.
 **Acceptance**: Tests fail before implementation and explicitly show missing trace propagation behavior.
 
-### ⬜ Unit 2b: Trace Propagation (Entrypoints/Core) — Green
+### ✅ Unit 2b: Trace Propagation (Entrypoints/Core) — Green
 **What**: Implement trace ID generation and propagation through `src/channels/cli.ts`, `src/channels/teams.ts`, and `src/engine/core.ts`.
 **Output**: Updated runtime code and passing trace propagation tests.
 **Acceptance**: Tests confirm trace IDs are generated once per turn and propagated through execution.
 
-### ⬜ Unit 2c: Trace Propagation (Entrypoints/Core) — Coverage & Refactor
+### ✅ Unit 2c: Trace Propagation (Entrypoints/Core) — Coverage & Refactor
 **What**: Refactor trace plumbing as needed and verify coverage for new paths.
 **Output**: Coverage note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-2c-coverage.md`.
 **Acceptance**: Trace propagation code paths are fully covered and tests remain green.
 
-### ⬜ Unit 3a: Engine/Mind/Tools Instrumentation — Red
-**What**: Add failing tests for required event emissions (`*.start`, `*.end`, `*.error`) and envelope compliance in `src/engine/core.ts`, `src/mind/context.ts`, `src/mind/prompt.ts`, and `src/engine/tools*.ts`.
-**Output**: Failing tests (engine/mind/tool suites) and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-3a-red-run.txt`.
-**Acceptance**: Tests fail and identify missing event-level instrumentation for engine/mind/tools.
+### ✅ Unit 3a: Engine/Mind/Tools Instrumentation — Red
+**What**: Add failing tests for required event emissions (`*.start`, `*.end`, `*.error`) and envelope compliance in `src/engine/core.ts`, `src/engine/kicks.ts`, `src/mind/context.ts`, `src/mind/prompt.ts`, and `src/engine/tools*.ts`.
+**Output**: Failing tests (engine/mind/tool suites, including `src/__tests__/engine/kicks.test.ts`) and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-3a-red-run.txt`.
+**Acceptance**: Tests fail and identify missing event-level instrumentation for engine (core + kicks), mind, and tools.
 
-### ⬜ Unit 3b: Engine/Mind/Tools Instrumentation — Green
+### ✅ Unit 3b: Engine/Mind/Tools Instrumentation — Green
 **What**: Implement structured event logging for engine, mind, and tools with required envelope and no sensitive payload dumps.
-**Output**: Updated `src/engine/core.ts`, `src/mind/context.ts`, `src/mind/prompt.ts`, `src/engine/tools.ts`, `src/engine/tools-base.ts`, `src/engine/tools-teams.ts` and passing tests.
-**Acceptance**: Required engine/mind/tools catalog events are emitted with required fields and tests pass.
+**Output**: Updated `src/engine/core.ts`, `src/engine/kicks.ts`, `src/mind/context.ts`, `src/mind/prompt.ts`, `src/engine/tools.ts`, `src/engine/tools-base.ts`, `src/engine/tools-teams.ts` and passing tests.
+**Acceptance**: Required engine/mind/tools catalog events are emitted with required fields (including `src/engine/kicks.ts`) and tests pass.
 
-### ⬜ Unit 3c: Engine/Mind/Tools Instrumentation — Coverage & Refactor
+### ✅ Unit 3c: Engine/Mind/Tools Instrumentation — Coverage & Refactor
 **What**: Refactor instrumentation helpers/call sites and verify full coverage on new code.
 **Output**: Coverage note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-3c-coverage.md`.
 **Acceptance**: New instrumentation paths are fully covered and tests remain green.
 
-### ⬜ Unit 4a: Channel Instrumentation Contract — Red
+### ✅ Unit 4a: Channel Instrumentation Contract — Red
 **What**: Add failing tests for CLI/Teams ensuring user-facing output remains channel-native while diagnostics route through structured logger (`src/__tests__/channels/cli*.test.ts`, `src/__tests__/channels/teams.test.ts`, `src/__tests__/wardrobe/format.test.ts`).
 **Output**: Failing channel contract tests and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-4a-red-run.txt`.
 **Acceptance**: Tests fail before implementation and demonstrate contract violations.
 
-### ⬜ Unit 4b: Channel Instrumentation Contract — Green
+### ✅ Unit 4b: Channel Instrumentation Contract — Green
 **What**: Implement channel instrumentation to satisfy cross-channel contract and event catalog expectations.
 **Output**: Updated `src/channels/cli.ts`, `src/channels/teams.ts`, `src/wardrobe/format.ts` and passing tests.
 **Acceptance**: Tests confirm channel UX remains native, operational diagnostics are structured logger events, and `src/wardrobe/format.ts` emits `component=channels` events.
 
-### ⬜ Unit 4c: Channel Instrumentation Contract — Coverage & Refactor
+### ✅ Unit 4c: Channel Instrumentation Contract — Coverage & Refactor
 **What**: Refactor channel instrumentation and verify coverage on newly introduced branches/error paths.
 **Output**: Coverage note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-4c-coverage.md`.
 **Acceptance**: Channel instrumentation new code is fully covered and tests remain green.
 
-### ⬜ Unit 5a: Config/Identity/Clients/Repertoire/Wardrobe Instrumentation — Red
+### ✅ Unit 5a: Config/Identity/Clients/Repertoire/Wardrobe Instrumentation — Red
 **What**: Add failing tests for minimum event catalog coverage in `src/config.ts`, `src/identity.ts`, `src/engine/ado-client.ts`, `src/engine/graph-client.ts`, `src/repertoire/*`, and `src/wardrobe/phrases.ts`.
 **Output**: Failing tests (`src/__tests__/config.test.ts`, `src/__tests__/identity.test.ts`, `src/__tests__/engine/*client.test.ts`, `src/__tests__/repertoire/*.test.ts`, `src/__tests__/wardrobe/phrases.test.ts`) and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-5a-red-run.txt`.
 **Acceptance**: Tests fail and enumerate missing component-level events before implementation.
 
-### ⬜ Unit 5b: Config/Identity/Clients/Repertoire/Wardrobe Instrumentation — Green
+### ✅ Unit 5b: Config/Identity/Clients/Repertoire/Wardrobe Instrumentation — Green
 **What**: Implement required structured event logging for config, identity, client requests, and repertoire load paths, including config helpers needed for session-style logs directory/path resolution.
 **Output**: Updated `src/config.ts`, `src/identity.ts`, `src/engine/ado-client.ts`, `src/engine/graph-client.ts`, `src/repertoire/commands.ts`, `src/repertoire/skills.ts`, `src/wardrobe/phrases.ts` and passing tests.
 **Acceptance**: Required component events are emitted with required envelope, session-style log path resolution works, `src/wardrobe/phrases.ts` emits `component=repertoire` events, and tests pass.
 
-### ⬜ Unit 5c: Config/Identity/Clients/Repertoire/Wardrobe Instrumentation — Coverage & Refactor
+### ✅ Unit 5c: Config/Identity/Clients/Repertoire/Wardrobe Instrumentation — Coverage & Refactor
 **What**: Refactor for consistency and verify complete coverage on new code paths.
 **Output**: Coverage note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-5c-coverage.md`.
 **Acceptance**: New config/identity/clients/repertoire instrumentation code is fully covered and tests remain green.
 
-### ⬜ Unit 6a: End-to-End Event Catalog Verification
+### ✅ Unit 6a: Observability Coverage Gate — Red
+**What**: Add failing tests/fixtures for observability coverage auditing (missing required events/logpoints, schema violations, redaction violations) and baseline `audit:observability` failure behavior, including missing/invalid capture-artifact cases.
+**Output**: Failing audit evidence at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-6a-red-run.txt`.
+**Acceptance**: Audit fails before implementation and clearly reports failing dimensions (event-catalog, schema/redaction, logpoint coverage) from capture artifacts.
+
+### ✅ Unit 6b: Observability Coverage Gate — Green
+**What**: Implement machine-readable coverage contract and audit pipeline (`src/observability/coverage/*` + `npm run audit:observability`), add Vitest capture-mode artifact emission, wire `npm run test:coverage` to run the combined gate, and integrate with CI workflow.
+**Output**: Coverage contract/audit tooling plus CI workflow update and implementation notes at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-6b-audit-gate.md`.
+**Acceptance**: `npm run test:coverage` runs code coverage plus observability audit in one mandatory path, CI invokes that combined gate, and capture artifacts are produced at `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/`.
+
+### ✅ Unit 6c: Observability Coverage Gate — Verify
+**What**: Run the combined coverage gate once, verify observability audit is post-processing over captured artifacts, and produce parseable summary/report artifacts for automated consumers.
+**Output**: Observability coverage report at `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/unit-6c-observability-coverage.json`, combined gate summary at `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/coverage-gate-summary.json`, and verification note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-6c-verify.md`.
+**Acceptance**: Report includes measurable values for event-catalog coverage, schema/redaction compliance, and logpoint coverage; combined summary includes `required_actions` entries typed as `coverage` or `logging`; verification confirms no second test run for audit.
+
+### ✅ Unit 7a: End-to-End Event Catalog Verification
 **What**: Run targeted and full test suites validating minimum event catalog coverage, required envelope fields, and persisted append-only NDJSON outputs.
-**Output**: Verification matrix at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-6a-event-catalog-verify.md`.
+**Output**: Verification matrix at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-7a-event-catalog-verify.md`.
 **Acceptance**: Matrix confirms each required event is covered by tests, persisted files are parseable NDJSON, and no unresolved gaps remain.
 
-### ⬜ Unit 6b: Final Quality Gate & Completion Audit
-**What**: Run `npm run test`, `npm run test:coverage`, and `npm run build`, then audit completion criteria line-by-line.
-**Output**: Final run artifacts (`final-test-output.txt`, `final-coverage-output.txt`, `final-build-output.txt`) and audit checklist at `./2026-03-02-1501-doing-ouroboros-migration-observability/final-audit.md`.
+### ✅ Unit 7b: Final Quality Gate & Completion Audit
+**What**: Run `npm run test`, mandatory combined `npm run test:coverage`, and `npm run build`, then audit completion criteria line-by-line.
+**Output**: Final run artifacts at `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/` (`final-test-output.txt`, `final-coverage-output.txt`, `final-build-output.txt`) and audit checklist at `./2026-03-02-1501-doing-ouroboros-migration-observability/final-audit.md`.
 **Acceptance**: All completion criteria are explicitly marked met with evidence and no warnings.
 
 ## Execution
@@ -148,10 +171,14 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Commit after each phase (1a, 1b, 1c)
 - Push after each unit complete
 - Run full test suite before marking unit done
-- **All artifacts**: Save outputs, logs, data to `./[task-name]/` directory
+- **Execution evidence artifacts**: Save notes/checklists under `./[task-name]/` directory.
 - Artifact files listed in this doc are execution evidence only and are not runtime log sinks.
 - Runtime observability sinks for this phase are `stderr` and session-style append-only NDJSON files; collision hardening remains out of scope.
 - Persisted log key mapping is locked to session parity: CLI=`session`, Teams=`conversationId`.
+- Observability coverage gating is mandatory inside `npm run test:coverage`; standalone `npm run audit:observability` can exist but is not the primary gate path.
+- Test-run outputs (tests, coverage, observability captures, combined summary) must be colocated at `~/.agentconfigs/test-runs/<repo_slug>/<run_id>/` (for this repo, `repo_slug=ouroboros-agent-harness`).
+- Test-run artifact directories are ephemeral and should be easy to clean up between runs.
+- Normal runtime sinks (`stderr` + session-style logs) are not the audit source of truth.
 - **Fixes/blockers**: Spawn sub-agent immediately — don't ask, just do it
 - **Decisions made**: Update docs immediately, commit right away
 
@@ -167,3 +194,33 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 16:17] Pass 2 (granularity): clarified Unit 5 ownership to include wardrobe scope without additional unit splits
 - [2026-03-02 16:18] Pass 3 (validation): aligned wardrobe component mapping in acceptance criteria with planning decisions and merged codebase
 - [2026-03-02 16:18] Pass 4 (quality): verified template completeness, acceptance coverage, and emoji headers; set status to READY_FOR_EXECUTION
+- [2026-03-02 16:37] Explicitly added `src/engine/kicks.ts` + `src/__tests__/engine/kicks.test.ts` to Unit 3 and completion criteria
+- [2026-03-02 16:56] Added explicit observability-coverage gate units (`audit:observability`, CI enforcement, machine-readable coverage report) and reset status to drafting for re-review
+- [2026-03-02 17:04] Locked single-run observability coverage flow: tests emit artifacts once, audit consumes artifacts without rerunning tests
+- [2026-03-02 17:10] Locked mandatory combined `test:coverage` gate and explicit `required_actions` output typing for both coverage and logging fixes
+- [2026-03-02 17:36] Locked non-agent OS-level test-run artifact root (`~/.agentconfigs/test-runs/<repo_slug>/<run_id>/`) and colocated final/capture outputs there
+- [2026-03-02 17:38] Pass 1 (first draft refresh): re-validated doing doc against latest planning updates; no structural changes needed
+- [2026-03-02 17:38] Pass 2 (granularity): confirmed units are atomic/testable and require no additional splits
+- [2026-03-02 17:39] Pass 3 (validation): verified referenced runtime/test/config/workflow file paths exist and match current repo
+- [2026-03-02 17:39] Pass 4 (quality): verified completeness (no placeholders, coverage/TDD requirements present, emoji unit headers intact); set status to READY_FOR_EXECUTION
+- [2026-03-02 17:42] Unit 0 complete: baseline matrix captured current runtime logging, locked envelope/event/sink contracts, and mapped all in-scope files
+- [2026-03-02 17:43] Unit 1a complete: added failing observability core tests and captured red run evidence (missing module/envelope/sink behavior)
+- [2026-03-02 17:44] Unit 1b complete: implemented observability core module (trace helpers, level filtering, sink fan-out, stderr + NDJSON file sinks); tests green and build clean
+- [2026-03-02 17:46] Unit 1c complete: added coverage backfill tests (observability defaults/warn + CLI spinner success branch), verified 100% coverage and clean build
+- [2026-03-02 17:48] Unit 2a complete: added failing trace propagation tests for CLI entry, Teams entry, and core model-request metadata propagation
+- [2026-03-02 17:49] Unit 2b complete: added traceId to RunAgentOptions, generated trace IDs at CLI/Teams turn entry, and propagated into core model request metadata
+- [2026-03-02 17:51] Unit 2c complete: verified trace propagation coverage + build; backfilled Azure metadata branch and restored global 100% coverage
+- [2026-03-02 17:53] Unit 3a complete: added failing instrumentation tests for engine core/kicks, mind context/prompt, and tools lifecycle events
+- [2026-03-02 17:56] Unit 3b complete: implemented observability runtime emitter and instrumented engine core/kicks, mind context/prompt, and tools lifecycle events
+- [2026-03-02 17:59] Unit 3c complete: backfilled instrumentation coverage for tools non-Error catch path and runtime logger routing/default initialization; restored global 100% coverage and clean build
+- [2026-03-02 18:02] Unit 4a complete: added failing CLI/Teams/format channel contract tests proving channel-native UX remains while required `channels` structured events are missing
+- [2026-03-02 18:03] Unit 4b complete: instrumented shared channel formatter to emit structured `channel.message_sent` and `channel.error` events while preserving channel-native CLI/Teams output contracts
+- [2026-03-02 18:04] Unit 4c complete: verified full coverage/build after channel contract instrumentation and recorded evidence artifacts
+- [2026-03-02 18:06] Unit 5a complete: added failing event-catalog tests for config/identity, ADO/Graph clients, command/skill loaders, and phrase loading paths
+- [2026-03-02 18:09] Unit 5b complete: implemented structured events for config/identity, ADO/Graph request lifecycle, command/skill/phrase repertoire loaders, and added config log-path helpers
+- [2026-03-02 18:12] Unit 5c complete: backfilled non-Error/error-path branches and config log-path helper coverage; restored global 100% coverage and clean build
+- [2026-03-02 18:14] Unit 6a complete: added failing audit contract tests for event-catalog, schema/redaction, and logpoint coverage dimensions over capture artifacts
+- [2026-03-02 18:29] Unit 6b complete: implemented coverage contract/audit modules, worker-level vitest capture emission, combined `test:coverage` gate orchestration, CI artifact upload, and verified passing gate artifacts at `~/.agentconfigs/test-runs/ouroboros-agent-harness/2026-03-03T02-28-47-446Z/`
+- [2026-03-02 18:32] Unit 6c complete: executed mandatory combined gate once, wrote `unit-6c-observability-coverage.json` + `coverage-gate-summary.json` under run artifacts, and verified audit is post-processing without a second test run
+- [2026-03-02 18:42] Unit 7a complete: validated targeted event-catalog suites plus combined gate artifacts; verified required envelope coverage and 19/19 required event keys in captured NDJSON.
+- [2026-03-02 18:43] Unit 7b complete: backfilled remaining observability coverage gaps, reran final `test` + mandatory combined `test:coverage` + `build`, produced final run artifacts, and completed line-by-line completion audit.

@@ -103,6 +103,19 @@ describe("loadConfig", () => {
     expect(config.context.maxTokens).toBe(80000)
   })
 
+  it("returns defaults when config read throws a non-Error value", async () => {
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw "read-failure"
+    })
+
+    const { loadConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const config = loadConfig()
+
+    expect(config.providers.azure.apiKey).toBe("")
+    expect(config.context.maxTokens).toBe(80000)
+  })
+
   it("merges partial config with defaults", async () => {
     const partial = {
       providers: {
@@ -195,6 +208,24 @@ describe("loadConfig", () => {
     expect(config1).not.toBe(config2)
     expect(config2.context.maxTokens).toBe(60000)
     expect(fs.readFileSync).toHaveBeenCalledTimes(2)
+  })
+
+  it("emits config.load observability event when loading config", async () => {
+    vi.resetModules()
+    const emitObservabilityEvent = vi.fn()
+    vi.doMock("../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { loadConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    loadConfig()
+
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "config.load",
+      component: "config/identity",
+    }))
   })
 })
 
@@ -373,6 +404,30 @@ describe("sessionPath", () => {
     const p = sessionPath("teams", "a]conv/id:123")
 
     expect(p).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "sessions", "teams", "a]conv_id_123.json"))
+  })
+})
+
+describe("logPath", () => {
+  beforeEach(async () => {
+    vi.resetModules()
+  })
+
+  it("returns logs directory using agent name from identity module", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { getLogsDir } = await import("../config")
+    const dir = getLogsDir()
+
+    expect(dir).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "logs"))
+  })
+
+  it("returns NDJSON log path and sanitizes key", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { logPath } = await import("../config")
+    const p = logPath("teams", "a]conv/id:123")
+
+    expect(p).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "logs", "teams", "a]conv_id_123.ndjson"))
   })
 })
 

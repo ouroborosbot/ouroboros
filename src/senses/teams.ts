@@ -10,6 +10,7 @@ import { formatToolResult, formatKick, formatError } from "../wardrobe/format"
 import { sessionPath, getTeamsConfig, getTeamsChannelConfig } from "../config"
 import { loadSession, deleteSession, postTurn } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "../repertoire/commands"
+import { createTraceId } from "../observability"
 import { FileContextStore } from "../mind/context/store-file"
 import { ContextResolver } from "../mind/context/resolver"
 import * as os from "os"
@@ -344,6 +345,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   // Run agent
   const controller = new AbortController()
   const callbacks = createTeamsCallbacks(stream, controller, sendMessage, { disableStreaming, conversationId })
+  const traceId = createTraceId()
   const toolContext: ToolContext | undefined = teamsContext ? {
     graphToken: teamsContext.graphToken,
     adoToken: teamsContext.adoToken,
@@ -363,6 +365,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   }
 
   const agentOptions: RunAgentOptions = {}
+  agentOptions.traceId = traceId
   if (toolContext) agentOptions.toolContext = toolContext
   if (disableStreaming) agentOptions.disableStreaming = true
   if (getTeamsChannelConfig().skipConfirmation) agentOptions.skipConfirmation = true

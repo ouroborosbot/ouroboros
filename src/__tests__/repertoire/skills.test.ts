@@ -177,3 +177,23 @@ describe("skills - clearLoadedSkills", () => {
     expect(getLoadedSkills()).toEqual([])
   })
 })
+
+describe("skills observability contract", () => {
+  it("emits repertoire.load_start when loading a skill", async () => {
+    vi.resetModules()
+    const emitObservabilityEvent = vi.fn()
+    vi.doMock("../../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readFileSync).mockReturnValue("content")
+    const { loadSkill } = await import("../../repertoire/skills")
+    loadSkill("my-skill")
+
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "repertoire.load_start",
+      component: "repertoire",
+    }))
+  })
+})
