@@ -3,15 +3,15 @@ import * as fs from "fs";
 import { execSync, spawnSync } from "child_process";
 import { listSkills, loadSkill } from "./skills";
 import { getIntegrationsConfig } from "../config";
-import type { Integration, ResolvedContext, FriendMemory } from "../mind/friends/types";
-import type { CollectionStore } from "../mind/friends/store";
+import type { Integration, ResolvedContext, FriendRecord } from "../mind/friends/types";
+import type { FriendStore } from "../mind/friends/store";
 
 export interface ToolContext {
   graphToken?: string;
   adoToken?: string;
   signin: (connectionName: string) => Promise<string | undefined>;
   context?: ResolvedContext;
-  memoryStore?: CollectionStore<FriendMemory>;
+  friendStore?: FriendStore;
 }
 
 export type ToolHandler = (args: Record<string, string>, ctx?: ToolContext) => string | Promise<string>;
@@ -277,33 +277,65 @@ export const baseToolDefinitions: ToolDefinition[] = [
       function: {
         name: "save_friend_note",
         description:
-          "save a preference or note about the current friend. call this when the friend expresses a preference about how they like things done.",
+          "save something i learned about my friend. use type 'name' to update their display name, 'tool_preference' for how they like a specific tool to behave (key = tool category like 'ado', 'graph'), or 'note' for general knowledge (key = topic). when updating an existing value, set override to true if i'm replacing/correcting it. omit override (or set false) if i'm unsure and want to check what's already saved.",
         parameters: {
           type: "object",
           properties: {
-            key: { type: "string", description: "category for the preference (e.g. 'ado', 'general', 'formatting')" },
-            value: { type: "string", description: "the preference to save" },
+            type: { type: "string", enum: ["name", "tool_preference", "note"], description: "what kind of information to save" },
+            key: { type: "string", description: "category key (required for tool_preference and note, e.g. 'ado', 'role')" },
+            content: { type: "string", description: "the value to save" },
+            override: { type: "string", enum: ["true", "false"], description: "set to 'true' to overwrite an existing value" },
           },
-          required: ["key", "value"],
+          required: ["type", "content"],
         },
       },
     },
     handler: async (a, ctx) => {
       if (!ctx?.context) {
-        return "error: no friend context available -- cannot save note";
+        return "i can't save notes -- no friend context available";
       }
-      if (!ctx.memoryStore) {
-        return "error: memory store not available -- cannot save note";
+      if (!ctx.friendStore) {
+        return "i can't save notes -- friend store not available";
       }
-      const friendId = ctx.context.friend?.id ?? ctx.context.identity?.id;
-      if (!friendId) return "error: no friend identity available -- cannot save note";
+      const friendId = ctx.context.friend?.id;
+      if (!friendId) return "i can't save notes -- no friend identity available";
+
+      // Validate parameters
+      if (!a.content) return "i need a content value to save";
+      const validTypes = ["name", "tool_preference", "note"];
+      if (!validTypes.includes(a.type)) return `i don't recognize type '${a.type}' -- use name, tool_preference, or note`;
+      if ((a.type === "tool_preference" || a.type === "note") && !a.key) return "i need a key for tool_preference or note type";
+
       try {
-        const existing = await ctx.memoryStore.get(friendId);
-        const memory: FriendMemory = existing
-          ? { ...existing, toolPreferences: { ...existing.toolPreferences, [a.key]: a.value } }
-          : { id: friendId, toolPreferences: { [a.key]: a.value }, schemaVersion: 1 };
-        await ctx.memoryStore.put(friendId, memory);
-        return `saved: ${a.key} = ${a.value}`;
+        // Read fresh record from disk
+        const record = await ctx.friendStore.get(friendId);
+        if (!record) return "i can't find the friend record on disk";
+        const isOverride = a.override === "true";
+
+        if (a.type === "name") {
+          const updated: FriendRecord = { ...record, displayName: a.content, notes: { ...record.notes, name: a.content }, updatedAt: new Date().toISOString() };
+          await ctx.friendStore.put(friendId, updated);
+          return `saved: displayName = ${a.content}`;
+        }
+
+        if (a.type === "tool_preference") {
+          const existing = record.toolPreferences[a.key];
+          if (existing && !isOverride) {
+            return `i already have a preference for '${a.key}': "${existing}". if you want to replace it, call again with override: true. or merge both values into content and override.`;
+          }
+          const updated: FriendRecord = { ...record, toolPreferences: { ...record.toolPreferences, [a.key]: a.content }, updatedAt: new Date().toISOString() };
+          await ctx.friendStore.put(friendId, updated);
+          return `saved: toolPreference ${a.key} = ${a.content}`;
+        }
+
+        // type === "note"
+        const existing = record.notes[a.key];
+        if (existing && !isOverride) {
+          return `i already have a note for '${a.key}': "${existing}". if you want to replace it, call again with override: true. or merge both values into content and override.`;
+        }
+        const updated: FriendRecord = { ...record, notes: { ...record.notes, [a.key]: a.content }, updatedAt: new Date().toISOString() };
+        await ctx.friendStore.put(friendId, updated);
+        return `saved: note ${a.key} = ${a.content}`;
       } catch (err) {
         /* v8 ignore next -- defensive: non-Error branch for String(err) @preserve */
         return `error saving note: ${err instanceof Error ? err.message : String(err)}`;
