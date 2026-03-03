@@ -108,6 +108,15 @@ const TOOL_INTENT_PATTERNS = [
   /\bmy plan\b/i,
   /\bthe plan is\b/i,
   /\btool calls only\b/i,
+
+  // Bare "Continuing." / "continuing" — standalone continuation signal
+  /^continuing\.?$/i,
+
+  // Sentence-final "continues." — e.g. "Backlog theatre continues."
+  /\bcontinues\.\s*$/i,
+
+  // "Next up" at start of text — e.g. "Next up:", "Next up, I'll..."
+  /^next up\b/i,
 ];
 
 // Normalize curly quotes/apostrophes to straight so patterns match consistently

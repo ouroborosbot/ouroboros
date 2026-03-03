@@ -1,9 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import type { ChannelCallbacks } from "../../engine/core"
-import { THINKING_PHRASES, TOOL_PHRASES, FOLLOWUP_PHRASES } from "../../repertoire/phrases"
 
-// These imports will fail until agent.ts is refactored to export them.
-// That's exactly the point -- tests must FAIL (red) for Unit 2a.
+vi.mock("../../identity", () => ({
+  getAgentName: vi.fn(() => "testagent"),
+  loadAgentConfig: vi.fn(() => ({
+    name: "testagent",
+    configPath: "~/.agentconfigs/testagent/config.json",
+    phrases: {
+      thinking: ["test thinking"],
+      tool: ["test tool"],
+      followup: ["test followup"],
+    },
+  })),
+}))
+
+import { getPhrases } from "../../wardrobe/phrases"
 
 describe("CLI adapter - createCliCallbacks", () => {
   let stdoutChunks: string[]
@@ -514,7 +525,7 @@ describe("CLI adapter - onToolStart", () => {
 
     callbacks.onToolStart("read_file", { path: "/tmp/test.txt" })
     const output = stderrChunks.join("")
-    expect(TOOL_PHRASES.some(p => output.includes(p))).toBe(true)
+    expect(getPhrases().tool.some(p => output.includes(p))).toBe(true)
 
     // Clean up
     callbacks.onToolEnd("read_file", "/tmp/test.txt", true)
@@ -548,7 +559,7 @@ describe("CLI adapter - onToolStart", () => {
 })
 
 describe("CLI adapter - onToolEnd", () => {
-  it("stops tool spinner with checkmark on stderr on success", async () => {
+  it("writes green formatted tool result on success", async () => {
     const stderrChunks: string[] = []
     vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
       stderrChunks.push(chunk.toString())
@@ -563,13 +574,15 @@ describe("CLI adapter - onToolEnd", () => {
     callbacks.onToolStart("read_file", { path: "/tmp/test.txt" })
     callbacks.onToolEnd("read_file", "/tmp/test.txt", true)
     const output = stderrChunks.join("")
-    expect(output).toContain("read_file")
-    expect(output).toContain("\u2713") // checkmark
+    // Uses shared formatter: "checkmark read_file (/tmp/test.txt)"
+    expect(output).toContain("\u2713 read_file (/tmp/test.txt)")
+    // Green ANSI
+    expect(output).toContain("\x1b[32m")
 
     vi.restoreAllMocks()
   })
 
-  it("shows failure on stderr when success is false", async () => {
+  it("writes red formatted tool result on failure", async () => {
     const stderrChunks: string[] = []
     vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
       stderrChunks.push(chunk.toString())
@@ -584,8 +597,10 @@ describe("CLI adapter - onToolEnd", () => {
     callbacks.onToolStart("read_file", { path: "/tmp/test.txt" })
     callbacks.onToolEnd("read_file", "/tmp/test.txt", false)
     const output = stderrChunks.join("")
-    expect(output).toContain("read_file")
-    expect(output).toContain("error")
+    // Uses shared formatter: "cross read_file: /tmp/test.txt"
+    expect(output).toContain("\u2717 read_file: /tmp/test.txt")
+    // Red ANSI
+    expect(output).toContain("\x1b[31m")
 
     vi.restoreAllMocks()
   })
@@ -605,8 +620,8 @@ describe("CLI adapter - onToolEnd", () => {
     callbacks.onToolStart("get_current_time", {})
     callbacks.onToolEnd("get_current_time", "", true)
     const output = stderrChunks.join("")
-    expect(output).toContain("get_current_time")
-    // Should not have extra parentheses for empty summary
+    // Uses shared formatter: "checkmark get_current_time" (no parens for empty summary)
+    expect(output).toContain("\u2713 get_current_time")
     expect(output).not.toContain("()")
 
     vi.restoreAllMocks()
@@ -614,7 +629,7 @@ describe("CLI adapter - onToolEnd", () => {
 })
 
 describe("CLI adapter - onError", () => {
-  it("writes error to stderr", async () => {
+  it("writes terminal error to stderr with red ANSI", async () => {
     const stderrChunks: string[] = []
     vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
       stderrChunks.push(chunk.toString())
@@ -626,14 +641,15 @@ describe("CLI adapter - onError", () => {
     const agent = await import("../../channels/cli")
     const callbacks = agent.createCliCallbacks()
 
-    callbacks.onError(new Error("connection failed"))
+    callbacks.onError(new Error("connection failed"), "terminal")
     const output = stderrChunks.join("")
-    expect(output).toContain("connection failed")
+    expect(output).toContain("Error: connection failed")
+    expect(output).toContain("\x1b[31m")
 
     vi.restoreAllMocks()
   })
 
-  it("clears active spinner before showing error", async () => {
+  it("shows transient error as ephemeral spinner message", async () => {
     const stderrChunks: string[] = []
     vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
       stderrChunks.push(chunk.toString())
@@ -647,11 +663,31 @@ describe("CLI adapter - onError", () => {
 
     callbacks.onModelStart() // start spinner
     stderrChunks.length = 0
-    callbacks.onError(new Error("timeout"))
+    callbacks.onError(new Error("retrying..."), "transient")
     const output = stderrChunks.join("")
-    // Should clear spinner and show error
-    expect(output).toContain("timeout")
-    expect(output).toContain("request failed")
+    // Transient errors use spinner.fail() which shows the message ephemerally
+    expect(output).toContain("retrying...")
+
+    vi.restoreAllMocks()
+  })
+
+  it("clears active spinner before showing terminal error", async () => {
+    const stderrChunks: string[] = []
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
+      stderrChunks.push(chunk.toString())
+      return true
+    })
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true)
+
+    vi.resetModules()
+    const agent = await import("../../channels/cli")
+    const callbacks = agent.createCliCallbacks()
+
+    callbacks.onModelStart() // start spinner
+    stderrChunks.length = 0
+    callbacks.onError(new Error("timeout"), "terminal")
+    const output = stderrChunks.join("")
+    expect(output).toContain("Error: timeout")
 
     vi.restoreAllMocks()
   })
@@ -682,7 +718,7 @@ describe("CLI adapter - phrase rotation", () => {
 
     callbacks.onModelStart()
     const output = stderrChunks.join("")
-    expect(THINKING_PHRASES.some(p => output.includes(p))).toBe(true)
+    expect(getPhrases().thinking.some(p => output.includes(p))).toBe(true)
 
     callbacks.onModelStreamStart()
   })
@@ -702,7 +738,7 @@ describe("CLI adapter - phrase rotation", () => {
     stderrChunks.length = 0
     callbacks.onModelStart()
     const output = stderrChunks.join("")
-    expect(FOLLOWUP_PHRASES.some(p => output.includes(p))).toBe(true)
+    expect(getPhrases().followup.some(p => output.includes(p))).toBe(true)
 
     callbacks.onModelStreamStart()
   })
@@ -722,7 +758,7 @@ describe("CLI adapter - phrase rotation", () => {
     const secondOutput = stderrChunks.join("")
 
     // After rotation, output should contain a phrase from the pool
-    expect(THINKING_PHRASES.some(p => secondOutput.includes(p))).toBe(true)
+    expect(getPhrases().thinking.some(p => secondOutput.includes(p))).toBe(true)
 
     callbacks.onModelStreamStart()
     vi.useRealTimers()
