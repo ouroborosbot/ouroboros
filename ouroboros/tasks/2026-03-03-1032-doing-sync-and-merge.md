@@ -125,3 +125,4 @@ Note: This task is documentation-only. TDD applies if any runtime code is introd
 - 2026-03-03 11:15 Added gh CLI preflight checks to Unit 1 and completion criteria (user feedback)
 - 2026-03-03 11:25 Updated Unit 2: git-informed task doc discovery replaces timestamp heuristic. Updated Unit 4: exponential backoff (no retry limit) with mandatory user communication on each retry. (user feedback)
 - 2026-03-03 11:28 Unit 0 complete: outline.md created mapping all completion criteria to work-merger sections
+- 2026-03-03 11:29 Unit 1 complete: work-merger.md created with frontmatter, On Startup (agent detection, gh preflight), Timestamp pattern, Merge Loop
