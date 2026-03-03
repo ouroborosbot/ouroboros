@@ -1,6 +1,6 @@
 # Doing: Ouroboros Migration — Single-Replica Runtime Hardening
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-03-03 14:43
 **Planning**: ./2026-03-03-1430-planning-ouroboros-migration-single-replica-runtime-hardening.md
@@ -16,7 +16,7 @@
 Define and lock runtime hardening requirements for single-replica preview so request-path behavior remains non-blocking and resilient under concurrent real-world usage.
 
 ## Completion Criteria
-- [ ] Runtime hardening contract is implemented for single-replica preview and applied to active request-path code.
+- [x] Runtime hardening contract is implemented for single-replica preview and applied to active request-path code.
 - [x] Request-path logging and persistence sinks are non-blocking in practice for expected preview concurrency.
 - [x] Tool-surface runtime posture is enforced according to agreed preview policy.
 - [x] Remote channels cannot execute local CLI/file/git/gh tools, and denial UX explains multi-user safety rationale with a clear alternative path.
@@ -24,9 +24,9 @@ Define and lock runtime hardening requirements for single-replica preview so req
 - [x] System-prompt rebuild path has explicit safety behavior (freshness + consistency) covered by tests.
 - [x] Load-validation artifacts exist and demonstrate agreed preview thresholds: 10 concurrent remote conversations, p95 first-feedback <= 2s, p95 final <= 9s for simple no-tool turns, p95 final <= 30s for tool/external turns, and error rate < 1%.
 - [x] CI gate fails when runtime-hardening contract checks regress.
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -111,7 +111,7 @@ Define and lock runtime hardening requirements for single-replica preview so req
 **Output**: Validation outputs and CI wiring notes at `./2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-4b-load-validation.md`.
 **Acceptance**: Artifacts report 10-conversation target and SLO metrics; CI gate is enforced.
 
-### ⬜ Unit 4c: Final Verification and Completion Audit
+### ✅ Unit 4c: Final Verification and Completion Audit
 **What**: Run final verification (`npm run test`, `npm run test:coverage`, `npm run build`, hardening validation checks), then audit completion criteria line-by-line.
 **Output**: Final audit at `./2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/final-audit.md` plus run artifacts in the task artifacts directory.
 **Acceptance**: All completion criteria are satisfied with explicit evidence and no warnings.
@@ -142,3 +142,5 @@ Define and lock runtime hardening requirements for single-replica preview so req
 - [2026-03-03 15:06] Unit 3c complete: closed guardrail/prompt fallback branch coverage gaps and re-verified 100% coverage + clean build (`unit-3c-coverage-run.txt`, `unit-3c-build-run.txt`).
 - [2026-03-03 15:09] Unit 4a complete: added failing load-validation schema and CI gate contract tests (split SLO + typed required-actions) and captured red evidence in `unit-4a-red-run.txt`.
 - [2026-03-03 15:13] Unit 4b complete: implemented runtime-hardening load-validation schema/audit, wired coverage gate + package scripts for CI enforcement, and captured implementation notes in `unit-4b-load-validation.md`.
+- [2026-03-03 15:18] Unit 4c complete: backfilled remaining runtime-hardening CLI/gate branches, re-ran full verification (`test`, `test:coverage`, `build`, runtime-hardening validation/audit), and captured final evidence in `final-audit.md`.
+- [2026-03-03 15:18] All units complete: status set to `done` and completion criteria verified with artifact-backed audit evidence.
