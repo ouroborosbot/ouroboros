@@ -295,7 +295,8 @@ export const baseToolDefinitions: ToolDefinition[] = [
       if (!ctx.memoryStore) {
         return "error: memory store not available -- cannot save note";
       }
-      const friendId = ctx.context.identity.id;
+      const friendId = ctx.context.friend?.id ?? ctx.context.identity?.id;
+      if (!friendId) return "error: no friend identity available -- cannot save note";
       try {
         const existing = await ctx.memoryStore.get(friendId);
         const memory: FriendMemory = existing

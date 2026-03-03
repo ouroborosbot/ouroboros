@@ -10,8 +10,9 @@ import { formatToolResult, formatKick, formatError } from "../wardrobe/format"
 import { sessionPath, getTeamsConfig, getTeamsChannelConfig } from "../config"
 import { loadSession, deleteSession, postTurn } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "../repertoire/commands"
-import { FileContextStore } from "../mind/context/store-file"
-import { ContextResolver } from "../mind/context/resolver"
+import { FileFriendStore } from "../mind/context/store-file"
+import { FriendResolver } from "../mind/context/resolver"
+import { getAgentRoot, getAgentName } from "../identity"
 import * as os from "os"
 import * as path from "path"
 
@@ -279,14 +280,15 @@ export async function withConversationLock(convId: string, fn: () => Promise<voi
   await current
 }
 
-// Shared context store singleton -- created once, reused across all requests.
-let _contextStore: InstanceType<typeof FileContextStore> | null = null
-function getContextStore(): InstanceType<typeof FileContextStore> {
-  if (!_contextStore) {
-    const basePath = path.join(os.homedir(), ".agentconfigs", "context")
-    _contextStore = new FileContextStore(basePath)
+// Shared friend store singleton -- created once, reused across all requests.
+let _friendStore: InstanceType<typeof FileFriendStore> | null = null
+function getFriendStore(): InstanceType<typeof FileFriendStore> {
+  if (!_friendStore) {
+    const agentKnowledgePath = path.join(getAgentRoot(), "friends")
+    const piiBridgePath = path.join(os.homedir(), ".agentconfigs", getAgentName(), "friends")
+    _friendStore = new FileFriendStore(agentKnowledgePath, piiBridgePath)
   }
-  return _contextStore
+  return _friendStore
 }
 
 // Context from the Teams activity that carries OAuth tokens and signin ability
@@ -350,13 +352,15 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
     signin: teamsContext.signin,
   } : undefined
 
-  // Resolve context kernel (identity + channel) when AAD identity is available
-  if (toolContext && teamsContext?.aadObjectId) {
-    const resolver = new ContextResolver(getContextStore(), {
-      provider: "aad" as const,
-      externalId: teamsContext.aadObjectId,
-      tenantId: teamsContext.tenantId,
-      displayName: teamsContext.displayName || "Unknown",
+  // Resolve context kernel (identity + channel)
+  if (toolContext) {
+    const provider = teamsContext?.aadObjectId ? "aad" as const : "teams-conversation" as const
+    const externalId = teamsContext?.aadObjectId || conversationId
+    const resolver = new FriendResolver(getFriendStore(), {
+      provider,
+      externalId,
+      tenantId: teamsContext?.tenantId,
+      displayName: teamsContext?.displayName || "Unknown",
       channel: "teams",
     })
     toolContext.context = await resolver.resolve()

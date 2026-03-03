@@ -3,6 +3,7 @@ import type { ChannelCallbacks } from "../../heart/core"
 
 vi.mock("../../identity", () => ({
   getAgentName: vi.fn(() => "testagent"),
+  getAgentRoot: vi.fn(() => "/mock/agent/root"),
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
     configPath: "~/.agentconfigs/testagent/config.json",
@@ -12,6 +13,22 @@ vi.mock("../../identity", () => ({
       followup: ["test followup"],
     },
   })),
+}))
+vi.mock("../../mind/context/store-file", () => ({
+  FileFriendStore: vi.fn(function (this: any) {
+    this.get = vi.fn()
+    this.put = vi.fn()
+    this.delete = vi.fn()
+    this.findByExternalId = vi.fn()
+  }),
+}))
+vi.mock("../../mind/context/resolver", () => ({
+  FriendResolver: vi.fn(function (this: any) {
+    this.resolve = vi.fn().mockResolvedValue({
+      friend: { id: "mock-uuid", displayName: "Test User", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
+      channel: { channel: "teams", availableIntegrations: ["graph", "ado"], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
+    })
+  }),
 }))
 
 import { getPhrases } from "../../wardrobe/phrases"
@@ -1702,6 +1719,42 @@ describe("Teams adapter - session persistence", () => {
       registerDefaultCommands: vi.fn(),
       parseSlashCommand: vi.fn().mockImplementation(parseSlashCommandFn),
     }))
+    const MockFileFriendStore = vi.fn(function (this: any) {
+      this.get = vi.fn()
+      this.put = vi.fn()
+      this.delete = vi.fn()
+      this.findByExternalId = vi.fn()
+    })
+    vi.doMock("../../mind/context/store-file", () => ({
+      FileFriendStore: MockFileFriendStore,
+    }))
+    const mockResolve = vi.fn().mockResolvedValue({
+      friend: {
+        id: "mock-uuid",
+        displayName: "Test User",
+        externalIds: [{ provider: "aad", externalId: "aad-user-123", tenantId: "tenant-abc", linkedAt: "2026-01-01" }],
+        tenantMemberships: ["tenant-abc"],
+        toolPreferences: {},
+        notes: {},
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams",
+        availableIntegrations: ["graph", "ado"],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    })
+    const MockFriendResolver = vi.fn(function (this: any) {
+      this.resolve = mockResolve
+    })
+    vi.doMock("../../mind/context/resolver", () => ({
+      FriendResolver: MockFriendResolver,
+    }))
   }
 
   it("handleTeamsMessage accepts conversationId parameter", async () => {
@@ -2026,6 +2079,19 @@ describe("Teams adapter - session persistence", () => {
       }),
       registerDefaultCommands: vi.fn(),
       parseSlashCommand: vi.fn().mockReturnValue(null),
+    }))
+    vi.doMock("../../mind/context/store-file", () => ({
+      FileFriendStore: vi.fn(function (this: any) {
+        this.get = vi.fn(); this.put = vi.fn(); this.delete = vi.fn(); this.findByExternalId = vi.fn()
+      }),
+    }))
+    vi.doMock("../../mind/context/resolver", () => ({
+      FriendResolver: vi.fn(function (this: any) {
+        this.resolve = vi.fn().mockResolvedValue({
+          friend: { id: "m", displayName: "U", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
+          channel: { channel: "teams", availableIntegrations: ["graph", "ado"], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
+        })
+      }),
     }))
     const teams = await import("../../senses/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
@@ -2508,6 +2574,42 @@ describe("Teams adapter - handleTeamsMessage with disableStreaming", () => {
       registerDefaultCommands: vi.fn(),
       parseSlashCommand: vi.fn().mockImplementation(parseSlashCommandFn),
     }))
+    const MockFileFriendStore = vi.fn(function (this: any) {
+      this.get = vi.fn()
+      this.put = vi.fn()
+      this.delete = vi.fn()
+      this.findByExternalId = vi.fn()
+    })
+    vi.doMock("../../mind/context/store-file", () => ({
+      FileFriendStore: MockFileFriendStore,
+    }))
+    const mockResolve = vi.fn().mockResolvedValue({
+      friend: {
+        id: "mock-uuid",
+        displayName: "Test User",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams",
+        availableIntegrations: ["graph", "ado"],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    })
+    const MockFriendResolver = vi.fn(function (this: any) {
+      this.resolve = mockResolve
+    })
+    vi.doMock("../../mind/context/resolver", () => ({
+      FriendResolver: MockFriendResolver,
+    }))
   }
 
   it("disableStreaming flag is forwarded to createTeamsCallbacks - text is buffered", async () => {
@@ -2908,6 +3010,42 @@ describe("Teams adapter - confirmation callback", () => {
       registerDefaultCommands: vi.fn(),
       parseSlashCommand: vi.fn().mockReturnValue(null),
     }))
+    const MockFileFriendStore = vi.fn(function (this: any) {
+      this.get = vi.fn()
+      this.put = vi.fn()
+      this.delete = vi.fn()
+      this.findByExternalId = vi.fn()
+    })
+    vi.doMock("../../mind/context/store-file", () => ({
+      FileFriendStore: MockFileFriendStore,
+    }))
+    const mockResolve = vi.fn().mockResolvedValue({
+      friend: {
+        id: "mock-uuid",
+        displayName: "Test User",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams",
+        availableIntegrations: ["graph", "ado"],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    })
+    const MockFriendResolver = vi.fn(function (this: any) {
+      this.resolve = mockResolve
+    })
+    vi.doMock("../../mind/context/resolver", () => ({
+      FriendResolver: MockFriendResolver,
+    }))
   }
 
   it("onConfirmAction sends descriptive message via stream.update", async () => {
@@ -3282,6 +3420,42 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
       registerDefaultCommands: vi.fn(),
       parseSlashCommand: vi.fn().mockReturnValue(null),
     }))
+    const MockFileFriendStore = vi.fn(function (this: any) {
+      this.get = vi.fn()
+      this.put = vi.fn()
+      this.delete = vi.fn()
+      this.findByExternalId = vi.fn()
+    })
+    vi.doMock("../../mind/context/store-file", () => ({
+      FileFriendStore: MockFileFriendStore,
+    }))
+    const mockResolve = vi.fn().mockResolvedValue({
+      friend: {
+        id: "mock-uuid",
+        displayName: "Test User",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams",
+        availableIntegrations: ["graph", "ado"],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    })
+    const MockFriendResolver = vi.fn(function (this: any) {
+      this.resolve = mockResolve
+    })
+    vi.doMock("../../mind/context/resolver", () => ({
+      FriendResolver: MockFriendResolver,
+    }))
   }
 
   it("handleTeamsMessage accepts sendMessage parameter and passes it to createTeamsCallbacks", async () => {
@@ -3437,11 +3611,13 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
     }))
 
     const mockResolve = vi.fn().mockResolvedValue({
-      identity: {
+      friend: {
         id: "mock-uuid",
         displayName: "Test User",
         externalIds: [{ provider: "aad", externalId: "aad-user-123", tenantId: "tenant-abc", linkedAt: "2026-01-01" }],
         tenantMemberships: ["tenant-abc"],
+        toolPreferences: {},
+        notes: {},
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -3456,28 +3632,26 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
       },
     })
 
-    const MockFileContextStore = vi.fn(function (this: any) {
-      this.identity = {
-        get: vi.fn(),
-        put: vi.fn(),
-        delete: vi.fn(),
-        find: vi.fn(),
-      }
+    const MockFileFriendStore = vi.fn(function (this: any) {
+      this.get = vi.fn()
+      this.put = vi.fn()
+      this.delete = vi.fn()
+      this.findByExternalId = vi.fn()
     })
     vi.doMock("../../mind/context/store-file", () => ({
-      FileContextStore: MockFileContextStore,
+      FileFriendStore: MockFileFriendStore,
     }))
-    const MockContextResolver = vi.fn(function (this: any) {
+    const MockFriendResolver = vi.fn(function (this: any) {
       this.resolve = mockResolve
     })
     vi.doMock("../../mind/context/resolver", () => ({
-      ContextResolver: MockContextResolver,
+      FriendResolver: MockFriendResolver,
     }))
 
     return { runAgentFn, mockResolve }
   }
 
-  it("creates ContextResolver with AAD external ID from TeamsMessageContext and attaches to ToolContext", async () => {
+  it("creates FriendResolver with AAD external ID from TeamsMessageContext and attaches to ToolContext", async () => {
     vi.resetModules()
     const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     const { mockResolve } = mockTeamsDepsForContext({ runAgentFn })
@@ -3502,16 +3676,16 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
     expect(options).toBeDefined()
     expect(options.toolContext).toBeDefined()
     expect(options.toolContext.context).toBeDefined()
-    expect(options.toolContext.context.identity.displayName).toBe("Test User")
+    expect(options.toolContext.context.friend.displayName).toBe("Test User")
     expect(options.toolContext.context.channel.channel).toBe("teams")
     expect(options.toolContext.context.channel.availableIntegrations).toContain("graph")
   })
 
-  it("ContextResolver is created with aad provider, externalId, tenantId, and displayName", async () => {
+  it("FriendResolver is created with aad provider, externalId, tenantId, and displayName", async () => {
     vi.resetModules()
     const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDepsForContext({ runAgentFn })
-    const ContextResolver = (await import("../../mind/context/resolver")).ContextResolver
+    const FriendResolver = (await import("../../mind/context/resolver")).FriendResolver
     const teams = await import("../../senses/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
 
@@ -3526,8 +3700,8 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
 
     await teams.handleTeamsMessage("hello", mockStream as any, "conv-456", teamsContext)
 
-    // ContextResolver constructor should have been called with params including aad provider
-    expect(ContextResolver).toHaveBeenCalledWith(
+    // FriendResolver constructor should have been called with params including aad provider
+    expect(FriendResolver).toHaveBeenCalledWith(
       expect.anything(), // store
       expect.objectContaining({
         provider: "aad",
@@ -3543,7 +3717,7 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
     vi.resetModules()
     const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDepsForContext({ runAgentFn })
-    const ContextResolver = (await import("../../mind/context/resolver")).ContextResolver
+    const FriendResolver = (await import("../../mind/context/resolver")).FriendResolver
     const teams = await import("../../senses/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
 
@@ -3558,7 +3732,7 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
 
     await teams.handleTeamsMessage("hello", mockStream as any, "conv-999", teamsContext)
 
-    expect(ContextResolver).toHaveBeenCalledWith(
+    expect(FriendResolver).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
         displayName: "Unknown",
@@ -3566,14 +3740,15 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
     )
   })
 
-  it("handles TeamsMessageContext without AAD fields (backward compat -- no context attached)", async () => {
+  it("handles TeamsMessageContext without AAD fields (uses teams-conversation fallback)", async () => {
     vi.resetModules()
     const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDepsForContext({ runAgentFn })
+    const FriendResolver = (await import("../../mind/context/resolver")).FriendResolver
     const teams = await import("../../senses/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
 
-    // No aadObjectId -- backward compat
+    // No aadObjectId -- uses teams-conversation fallback with conversationId
     const teamsContext = {
       graphToken: "g-token",
       adoToken: "a-token",
@@ -3583,18 +3758,29 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
     await teams.handleTeamsMessage("hello", mockStream as any, "conv-789", teamsContext)
     expect(runAgentFn).toHaveBeenCalled()
 
-    // toolContext should exist but context should not be set (no AAD identity info)
+    // FriendResolver should be created with teams-conversation provider and conversationId as externalId
+    expect(FriendResolver).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        provider: "teams-conversation",
+        externalId: "conv-789",
+        displayName: "Unknown",
+        channel: "teams",
+      }),
+    )
+
+    // toolContext should exist with resolved context
     const callArgs = runAgentFn.mock.calls[0]
     const options = callArgs[4]
     expect(options.toolContext).toBeDefined()
-    expect(options.toolContext.context).toBeUndefined()
+    expect(options.toolContext.context).toBeDefined()
   })
 
-  it("FileContextStore is created once and shared across multiple handleTeamsMessage calls", async () => {
+  it("FileFriendStore is created once and shared across multiple handleTeamsMessage calls", async () => {
     vi.resetModules()
     const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDepsForContext({ runAgentFn })
-    const FileContextStore = (await import("../../mind/context/store-file")).FileContextStore
+    const FileFriendStore = (await import("../../mind/context/store-file")).FileFriendStore
     const teams = await import("../../senses/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
 
@@ -3610,8 +3796,8 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
     await teams.handleTeamsMessage("msg1", mockStream as any, "conv-1", teamsContext)
     await teams.handleTeamsMessage("msg2", mockStream as any, "conv-2", teamsContext)
 
-    // FileContextStore should be created only once (singleton), not per-request
-    expect(FileContextStore).toHaveBeenCalledTimes(1)
+    // FileFriendStore should be created only once (singleton), not per-request
+    expect(FileFriendStore).toHaveBeenCalledTimes(1)
   })
 })
 
