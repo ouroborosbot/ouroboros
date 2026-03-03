@@ -95,21 +95,28 @@ describe("hasToolIntent", () => {
     expect(hasToolIntent(text)).toBe(true)
   })
 
-  // Bare "Continuing." / "continuing" patterns
+  // "Continuing" at start of any line
   it.each([
     "Continuing.",
     "continuing",
     "Continuing",
     "continuing.",
-  ])("returns true for bare continuing: %s", (text) => {
+    "Continuing the march to 40+.",
+    "Continuing the work on the project",
+    "Continuing with the next batch.",
+    "Continuing to create tasks.",
+    "We're at 32 items.\nContinuing the march to 40+.",
+  ])("returns true for continuing at line start: %s", (text) => {
     expect(hasToolIntent(text)).toBe(true)
   })
 
-  // Sentence-final "continues." pattern
+  // "continues" anywhere in text
   it.each([
     "Backlog theatre continues.",
     "The work continues.",
-  ])("returns true for sentence-final continues: %s", (text) => {
+    "The task continues to be complex",
+    "The migration continues smoothly",
+  ])("returns true for continues: %s", (text) => {
     expect(hasToolIntent(text)).toBe(true)
   })
 
@@ -122,11 +129,9 @@ describe("hasToolIntent", () => {
     expect(hasToolIntent(text)).toBe(true)
   })
 
-  // False negatives — these should NOT match the new patterns
+  // False negatives — these should NOT match
   it.each([
     "the process is continuing as expected",
-    "Continuing the work on the project",
-    "The task continues to be complex",
     "What's next up on the agenda?",
   ])("returns false for non-intent similar text: %s", (text) => {
     expect(hasToolIntent(text)).toBe(false)
