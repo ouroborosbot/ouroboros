@@ -817,4 +817,43 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
     expect(options.toolContext.context.channel.channel).toBe("cli")
     expect(options.toolContext.context.channel.availableIntegrations).toEqual([])
   })
+
+  it("buildSystem is called with resolved context as third argument", async () => {
+    setupBasic({ inputSequence: ["hello", "/exit"] })
+    mocks.loadSession.mockReturnValue(null) // force new session -> calls buildSystem
+
+    await main()
+
+    expect(mocks.buildSystem).toHaveBeenCalledWith(
+      "cli",
+      undefined,
+      expect.objectContaining({
+        friend: expect.objectContaining({ displayName: "testuser" }),
+        channel: expect.objectContaining({ channel: "cli" }),
+      }),
+    )
+  })
+
+  it("toolContext.friendStore is set from the FileFriendStore", async () => {
+    setupBasic({ inputSequence: ["hello", "/exit"] })
+    const runAgentCalls: any[][] = []
+    mocks.runAgent.mockImplementation(async (...args: any[]) => {
+      runAgentCalls.push(args)
+      return { usage: undefined }
+    })
+
+    await main()
+
+    const options = runAgentCalls[0][4]
+    expect(options.toolContext.friendStore).toBeDefined()
+  })
+
+  it("session path uses friend UUID from resolved context", async () => {
+    setupBasic({ inputSequence: ["hello", "/exit"] })
+
+    await main()
+
+    // sessionPath should be called with the friend UUID ("mock-uuid"), not "default"
+    expect(mocks.sessionPath).toHaveBeenCalledWith("mock-uuid", "cli", "session")
+  })
 })
