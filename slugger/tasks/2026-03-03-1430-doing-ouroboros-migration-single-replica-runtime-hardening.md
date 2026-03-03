@@ -22,8 +22,8 @@ Define and lock runtime hardening requirements for single-replica preview so req
 - [x] Remote channels cannot execute local CLI/file/git/gh tools, and denial UX explains multi-user safety rationale with a clear alternative path.
 - [x] Concurrency guardrails (limits/timeouts/backpressure behavior) are implemented and covered by tests.
 - [x] System-prompt rebuild path has explicit safety behavior (freshness + consistency) covered by tests.
-- [ ] Load-validation artifacts exist and demonstrate agreed preview thresholds: 10 concurrent remote conversations, p95 first-feedback <= 2s, p95 final <= 9s for simple no-tool turns, p95 final <= 30s for tool/external turns, and error rate < 1%.
-- [ ] CI gate fails when runtime-hardening contract checks regress.
+- [x] Load-validation artifacts exist and demonstrate agreed preview thresholds: 10 concurrent remote conversations, p95 first-feedback <= 2s, p95 final <= 9s for simple no-tool turns, p95 final <= 30s for tool/external turns, and error rate < 1%.
+- [x] CI gate fails when runtime-hardening contract checks regress.
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -106,7 +106,7 @@ Define and lock runtime hardening requirements for single-replica preview so req
 **Output**: Red artifact at `./2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-4a-red-run.txt`.
 **Acceptance**: Tests fail for missing/incorrect load-validation contract behavior.
 
-### ⬜ Unit 4b: Load-Validation and CI Gate Contract — Implementation
+### ✅ Unit 4b: Load-Validation and CI Gate Contract — Implementation
 **What**: Implement load-validation harness/artifacts and wire CI to fail on runtime hardening contract regressions.
 **Output**: Validation outputs and CI wiring notes at `./2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-4b-load-validation.md`.
 **Acceptance**: Artifacts report 10-conversation target and SLO metrics; CI gate is enforced.
@@ -141,3 +141,4 @@ Define and lock runtime hardening requirements for single-replica preview so req
 - [2026-03-03 15:04] Unit 3b complete: implemented global Teams in-flight concurrency cap and resilient prompt-refresh fallback/preservation behavior; verified full test + build green (`unit-3b-test-run.txt`, `unit-3b-build-run.txt`).
 - [2026-03-03 15:06] Unit 3c complete: closed guardrail/prompt fallback branch coverage gaps and re-verified 100% coverage + clean build (`unit-3c-coverage-run.txt`, `unit-3c-build-run.txt`).
 - [2026-03-03 15:09] Unit 4a complete: added failing load-validation schema and CI gate contract tests (split SLO + typed required-actions) and captured red evidence in `unit-4a-red-run.txt`.
+- [2026-03-03 15:13] Unit 4b complete: implemented runtime-hardening load-validation schema/audit, wired coverage gate + package scripts for CI enforcement, and captured implementation notes in `unit-4b-load-validation.md`.
