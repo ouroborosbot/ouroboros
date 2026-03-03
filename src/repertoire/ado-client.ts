@@ -5,6 +5,7 @@
 import { handleApiError } from "../heart/api-error"
 
 const ADO_BASE = "https://dev.azure.com"
+const VSSPS_BASE = "https://app.vssps.visualstudio.com"
 const DEFAULT_API_VERSION = "api-version=7.1"
 
 interface WiqlResult {
@@ -138,4 +139,61 @@ export async function queryWorkItems(
   } catch (err) {
     return handleApiError(err, "ADO", "ado")
   }
+}
+
+// Discover ADO organizations accessible by the authenticated user.
+// 1. Fetches user profile to get publicAlias (member ID)
+// 2. Uses Accounts API to list organizations for that member
+// Throws on API errors (callers handle error presentation).
+export async function discoverOrganizations(token: string): Promise<string[]> {
+  // Step 1: Get the user's publicAlias from their profile
+  const profileRes = await fetch(
+    `${VSSPS_BASE}/_apis/profile/profiles/me?${DEFAULT_API_VERSION}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  )
+
+  if (!profileRes.ok) {
+    throw new Error(`ADO profile request failed: ${profileRes.status} ${profileRes.statusText}`)
+  }
+
+  const profile = (await profileRes.json()) as { publicAlias?: string }
+  const memberId = profile.publicAlias
+  if (!memberId) {
+    throw new Error("ADO profile response missing publicAlias")
+  }
+
+  // Step 2: List organizations for this member
+  const accountsRes = await fetch(
+    `${VSSPS_BASE}/_apis/accounts?memberId=${memberId}&${DEFAULT_API_VERSION}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  )
+
+  if (!accountsRes.ok) {
+    throw new Error(`ADO accounts request failed: ${accountsRes.status} ${accountsRes.statusText}`)
+  }
+
+  const data = (await accountsRes.json()) as { value?: { accountName: string }[] }
+  return (data.value ?? []).map((a) => a.accountName)
+}
+
+// Discover projects within an ADO organization.
+// Throws on API errors (callers handle error presentation).
+export async function discoverProjects(token: string, org: string): Promise<string[]> {
+  const res = await fetch(
+    `${ADO_BASE}/${org}/_apis/projects?${DEFAULT_API_VERSION}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  )
+
+  if (!res.ok) {
+    throw new Error(`ADO projects request failed: ${res.status} ${res.statusText}`)
+  }
+
+  const data = (await res.json()) as { value?: { name: string }[] }
+  return (data.value ?? []).map((p) => p.name)
 }
