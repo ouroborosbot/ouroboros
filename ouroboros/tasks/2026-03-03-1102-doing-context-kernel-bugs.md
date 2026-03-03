@@ -185,7 +185,7 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Output**: Coverage report showing 100% on `tools.ts` preference code.
 **Acceptance**: 100% coverage on new code, tests still green.
 
-### ⬜ Unit 6d: Post-tool-layer validation checkpoint
+### ✅ Unit 6d: Post-tool-layer validation checkpoint
 **What**: Run `npx vitest run` to verify the entire tool layer (save_friend_note redesign in tools-base.ts, preference injection in tools.ts) is solid before moving to the prompt layer in Unit 7. Units 5-6 modified core tool infrastructure -- catch any breakage here rather than discovering it while debugging prompt tests.
 **Output**: Full test suite green.
 **Acceptance**: `npx vitest run` passes all tests with no failures or warnings.
@@ -305,3 +305,4 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 - 2026-03-03 15:16 Unit 3d complete: Pre-rename validation checkpoint. Updated all consumer imports (cli.ts, teams.ts, prompt.ts, tools-base.ts) and test mocks (cli-main.test.ts, teams.test.ts) for FileFriendStore/FriendResolver. tsc --noEmit passes, 1158 tests pass, build clean.
 - 2026-03-03 15:20 Units 4a-4b complete: Directory rename context/ -> friends/. All import paths updated, tsc passes, 1158 tests pass, zero stale mind/context/ references in source.
 - 2026-03-03 15:24 Units 5a-5c complete: save_friend_note redesigned with type/key/content/override params. ToolContext uses friendStore instead of memoryStore. Conflict detection, first-person errors, 100% coverage on tools-base.ts. 1172 tests pass.
+- 2026-03-03 15:30 Units 6a-6d complete: getToolsForChannel accepts toolPreferences param, injects matching preferences into integration tool descriptions. No mutation of originals, unknown keys ignored. 100% coverage on tools.ts. Post-tool-layer checkpoint: 1179 tests pass.
