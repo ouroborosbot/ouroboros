@@ -1,5 +1,7 @@
 import OpenAI from "openai"
 import * as readline from "readline"
+import * as os from "os"
+import * as path from "path"
 import { runAgent, ChannelCallbacks } from "../heart/core"
 import { buildSystem } from "../mind/prompt"
 import { pickPhrase, getPhrases } from "../wardrobe/phrases"
@@ -9,6 +11,9 @@ import { loadSession, deleteSession, postTurn } from "../mind/context"
 import type { UsageData } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand, getToolChoiceRequired } from "../repertoire/commands"
 import { getAgentName } from "../identity"
+import { FileContextStore } from "../mind/context/store-file"
+import { ContextResolver } from "../mind/context/resolver"
+import type { ToolContext } from "../repertoire/tools"
 
 // readline.Interface exposes undocumented mutable line/cursor for in-progress input
 type ReadlineInternals = readline.Interface & { line: string; cursor: number }
@@ -329,6 +334,22 @@ export async function main() {
   const registry = createCommandRegistry()
   registerDefaultCommands(registry)
 
+  // Resolve context kernel (identity + channel) for CLI
+  const storePath = path.join(os.homedir(), ".agentconfigs", "context")
+  const contextStore = new FileContextStore(storePath)
+  const username = os.userInfo().username
+  const resolver = new ContextResolver(contextStore, {
+    provider: "local" as const,
+    externalId: username,
+    displayName: username,
+    channel: "cli",
+  })
+  const resolvedContext = await resolver.resolve()
+  const cliToolContext: ToolContext = {
+    signin: async () => undefined,
+    context: resolvedContext,
+  }
+
   // Load existing session or start fresh
   const existing = loadSession(sessPath)
   const messages: OpenAI.ChatCompletionMessageParam[] = existing?.messages && existing.messages.length > 0
@@ -410,7 +431,7 @@ export async function main() {
       ctrl.suppress(() => currentAbort!.abort())
       let result: { usage?: UsageData } | undefined
       try {
-        result = await runAgent(messages, cliCallbacks, "cli", currentAbort.signal, { toolChoiceRequired: getToolChoiceRequired() })
+        result = await runAgent(messages, cliCallbacks, "cli", currentAbort.signal, { toolChoiceRequired: getToolChoiceRequired(), toolContext: cliToolContext })
       } catch {
         // AbortError — silently return to prompt
       }
