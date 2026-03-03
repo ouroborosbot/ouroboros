@@ -1,22 +1,36 @@
 import { describe, it, expect, vi } from "vitest"
 import { ContextResolver } from "../../../mind/context/resolver"
 import type { CollectionStore, ContextStore } from "../../../mind/context/store"
-import type { FriendIdentity } from "../../../mind/context/types"
+import type { FriendIdentity, FriendMemory } from "../../../mind/context/types"
 
 function createMockStore(): ContextStore {
-  const items = new Map<string, FriendIdentity>()
+  const identityItems = new Map<string, FriendIdentity>()
   const identity: CollectionStore<FriendIdentity> = {
-    get: vi.fn(async (id: string) => items.get(id) ?? null),
-    put: vi.fn(async (id: string, value: FriendIdentity) => { items.set(id, value) }),
-    delete: vi.fn(async (id: string) => { items.delete(id) }),
+    get: vi.fn(async (id: string) => identityItems.get(id) ?? null),
+    put: vi.fn(async (id: string, value: FriendIdentity) => { identityItems.set(id, value) }),
+    delete: vi.fn(async (id: string) => { identityItems.delete(id) }),
     find: vi.fn(async (predicate: (value: FriendIdentity) => boolean) => {
-      for (const value of items.values()) {
+      for (const value of identityItems.values()) {
         if (predicate(value)) return value
       }
       return null
     }),
   }
-  return { identity }
+
+  const memoryItems = new Map<string, FriendMemory>()
+  const memory: CollectionStore<FriendMemory> = {
+    get: vi.fn(async (id: string) => memoryItems.get(id) ?? null),
+    put: vi.fn(async (id: string, value: FriendMemory) => { memoryItems.set(id, value) }),
+    delete: vi.fn(async (id: string) => { memoryItems.delete(id) }),
+    find: vi.fn(async (predicate: (value: FriendMemory) => boolean) => {
+      for (const value of memoryItems.values()) {
+        if (predicate(value)) return value
+      }
+      return null
+    }),
+  }
+
+  return { identity, memory }
 }
 
 describe("ContextResolver", () => {
@@ -165,5 +179,64 @@ describe("ContextResolver", () => {
     const ctx = await resolver.resolve()
     // CLI has no integrations, so authority checker should be undefined
     expect(ctx.checker).toBeUndefined()
+  })
+
+  it("loads existing FriendMemory into ResolvedContext", async () => {
+    const store = createMockStore()
+    const memory: FriendMemory = {
+      id: "placeholder", // will be replaced by actual resolved identity id
+      toolPreferences: { ado: "flat backlog view" },
+      schemaVersion: 1,
+    }
+
+    const resolver = new ContextResolver(store, {
+      provider: "aad",
+      externalId: "aad-user-1",
+      tenantId: "tenant-1",
+      displayName: "Jordan",
+      channel: "teams",
+    })
+
+    // Resolve once to create the identity, then seed memory with correct id
+    const firstCtx = await resolver.resolve()
+    const friendId = firstCtx.identity.id
+    memory.id = friendId
+    await store.memory.put(friendId, memory)
+
+    // Resolve again -- memory should be loaded
+    const ctx = await resolver.resolve()
+    expect(ctx.memory).not.toBeNull()
+    expect(ctx.memory!.toolPreferences.ado).toBe("flat backlog view")
+  })
+
+  it("returns null memory for new friend with no stored memory", async () => {
+    const store = createMockStore()
+    const resolver = new ContextResolver(store, {
+      provider: "aad",
+      externalId: "aad-new-user",
+      tenantId: "tenant-1",
+      displayName: "New Person",
+      channel: "teams",
+    })
+
+    const ctx = await resolver.resolve()
+    expect(ctx.memory).toBeNull()
+  })
+
+  it("returns null memory on store read error (D16)", async () => {
+    const store = createMockStore()
+    // Seed an identity so we get a stable id
+    const resolver = new ContextResolver(store, {
+      provider: "local",
+      externalId: "user",
+      displayName: "User",
+      channel: "cli",
+    })
+
+    // Make memory.get throw
+    vi.mocked(store.memory.get).mockRejectedValue(new Error("disk error"))
+
+    const ctx = await resolver.resolve()
+    expect(ctx.memory).toBeNull()
   })
 })
