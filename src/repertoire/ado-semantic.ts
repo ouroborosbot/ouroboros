@@ -1,7 +1,7 @@
 // Semantic ADO tools -- enriched, single-call operations over the ADO API.
-// Phase 3: ado_backlog_list (query), more mutation tools in 3D.
+// Phase 3: ado_backlog_list (query), mutation tools (3D).
 
-import type { ToolDefinition } from "./tools-base"
+import type { ToolDefinition, ToolContext } from "./tools-base"
 import { adoRequest } from "./ado-client"
 import { resolveAdoContext } from "./ado-context"
 
@@ -50,6 +50,93 @@ function buildWiqlQuery(project: string, filters: Record<string, string>): strin
   }
 
   return `SELECT [System.Id] FROM WorkItems WHERE ${conditions.join(" AND ")} ORDER BY [System.ChangedDate] DESC`
+}
+
+// Valid parent-child relationships for common process templates
+const VALID_PARENT_CHILD: Record<string, string[]> = {
+  "Epic": ["Feature", "User Story", "Issue", "Product Backlog Item"],
+  "Feature": ["User Story", "Product Backlog Item", "Bug", "Task"],
+  "User Story": ["Task", "Bug"],
+  "Product Backlog Item": ["Task", "Bug"],
+  "Issue": ["Task"],
+  "Bug": ["Task"],
+}
+
+interface JsonPatchOp {
+  op: "add" | "replace" | "remove"
+  path: string
+  value?: any
+}
+
+function buildCreatePatch(args: Record<string, string>): JsonPatchOp[] {
+  const ops: JsonPatchOp[] = [
+    { op: "add", path: "/fields/System.Title", value: args.title },
+  ]
+  if (args.description) {
+    ops.push({ op: "add", path: "/fields/System.Description", value: args.description })
+  }
+  if (args.areaPath) {
+    ops.push({ op: "add", path: "/fields/System.AreaPath", value: args.areaPath })
+  }
+  if (args.iterationPath) {
+    ops.push({ op: "add", path: "/fields/System.IterationPath", value: args.iterationPath })
+  }
+  if (args.parentId) {
+    ops.push({
+      op: "add",
+      path: "/relations/-",
+      value: {
+        rel: "System.LinkTypes.Hierarchy-Reverse",
+        url: args.parentId, // Will be resolved to full URL by ADO
+      },
+    })
+  }
+  return ops
+}
+
+function buildReparentPatch(newParentId: string): JsonPatchOp[] {
+  return [
+    {
+      op: "add",
+      path: "/relations/-",
+      value: {
+        rel: "System.LinkTypes.Hierarchy-Reverse",
+        url: newParentId,
+      },
+    },
+  ]
+}
+
+async function checkAuth(ctx: ToolContext | undefined): Promise<string | null> {
+  if (!ctx?.adoToken) {
+    return "AUTH_REQUIRED:ado -- I need access to Azure DevOps. Please sign in when prompted."
+  }
+  return null
+}
+
+async function checkWriteAuthority(ctx: ToolContext, org: string): Promise<string | null> {
+  if (ctx.context?.checker) {
+    const allowed = await ctx.context.checker.canWrite("ado", org, "createWorkItem")
+    if (!allowed) {
+      return `AUTHORITY_DENIED: Write operation to ${org} was denied by pre-flight authority check.`
+    }
+  }
+  return null
+}
+
+function buildPreviewOps(operation: string, args: Record<string, string>): JsonPatchOp[] | null {
+  switch (operation) {
+    case "create_epic":
+      return buildCreatePatch({ ...args, workItemType: "Epic" })
+    case "create_issue":
+      return buildCreatePatch({ ...args, workItemType: "Issue" })
+    case "move_items": {
+      const ids = (args.workItemIds || "").split(",").map(s => s.trim()).filter(Boolean)
+      return ids.map(() => buildReparentPatch(args.newParentId || "")).flat()
+    }
+    default:
+      return null
+  }
 }
 
 function formatWorkItems(items: EnrichedWorkItem[]): any[] {
@@ -144,6 +231,302 @@ export const adoSemanticToolDefinitions: ToolDefinition[] = [
 
       const items = formatWorkItems(batchData.value ?? [])
       return JSON.stringify({ items, organization, project })
+    },
+    integration: "ado",
+  },
+
+  // -- ado_create_epic --
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "ado_create_epic",
+        description: "Create an epic in Azure DevOps with title, description, area path, and optional parent.",
+        parameters: {
+          type: "object",
+          properties: {
+            organization: { type: "string", description: "ADO organization (optional)" },
+            project: { type: "string", description: "ADO project (optional)" },
+            title: { type: "string", description: "Epic title" },
+            description: { type: "string", description: "Epic description" },
+            areaPath: { type: "string", description: "Area path" },
+            parentId: { type: "string", description: "Parent work item ID (optional)" },
+          },
+          required: ["title"],
+        },
+      },
+    },
+    handler: async (args, ctx) => {
+      const authErr = await checkAuth(ctx)
+      if (authErr) return authErr
+
+      const adoCtx = await resolveAdoContext(ctx!.adoToken!, ctx!.context!, { organization: args.organization, project: args.project })
+      if (!adoCtx.ok) return adoCtx.error
+
+      const writeErr = await checkWriteAuthority(ctx!, adoCtx.organization)
+      if (writeErr) return writeErr
+
+      const ops = buildCreatePatch(args)
+      const result = await adoRequest(ctx!.adoToken!, "POST", adoCtx.organization, `/${adoCtx.project}/_apis/wit/workitems/$Epic`, JSON.stringify(ops))
+      return result
+    },
+    integration: "ado",
+    confirmationRequired: true,
+  },
+
+  // -- ado_create_issue --
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "ado_create_issue",
+        description: "Create an issue or user story in Azure DevOps with title, description, area path, and parent epic.",
+        parameters: {
+          type: "object",
+          properties: {
+            organization: { type: "string", description: "ADO organization (optional)" },
+            project: { type: "string", description: "ADO project (optional)" },
+            title: { type: "string", description: "Issue/story title" },
+            description: { type: "string", description: "Description" },
+            areaPath: { type: "string", description: "Area path" },
+            parentId: { type: "string", description: "Parent work item ID" },
+            workItemType: { type: "string", description: "Work item type (default: Issue)" },
+          },
+          required: ["title"],
+        },
+      },
+    },
+    handler: async (args, ctx) => {
+      const authErr = await checkAuth(ctx)
+      if (authErr) return authErr
+
+      const adoCtx = await resolveAdoContext(ctx!.adoToken!, ctx!.context!, { organization: args.organization, project: args.project })
+      if (!adoCtx.ok) return adoCtx.error
+
+      const writeErr = await checkWriteAuthority(ctx!, adoCtx.organization)
+      if (writeErr) return writeErr
+
+      const wiType = args.workItemType || "Issue"
+      const ops = buildCreatePatch(args)
+      const result = await adoRequest(ctx!.adoToken!, "POST", adoCtx.organization, `/${adoCtx.project}/_apis/wit/workitems/$${wiType}`, JSON.stringify(ops))
+      return result
+    },
+    integration: "ado",
+    confirmationRequired: true,
+  },
+
+  // -- ado_move_items --
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "ado_move_items",
+        description: "Reparent work items -- move them to a new parent epic or feature.",
+        parameters: {
+          type: "object",
+          properties: {
+            organization: { type: "string", description: "ADO organization (optional)" },
+            project: { type: "string", description: "ADO project (optional)" },
+            workItemIds: { type: "string", description: "Comma-separated work item IDs to move" },
+            newParentId: { type: "string", description: "New parent work item ID" },
+          },
+          required: ["workItemIds", "newParentId"],
+        },
+      },
+    },
+    handler: async (args, ctx) => {
+      const authErr = await checkAuth(ctx)
+      if (authErr) return authErr
+
+      const adoCtx = await resolveAdoContext(ctx!.adoToken!, ctx!.context!, { organization: args.organization, project: args.project })
+      if (!adoCtx.ok) return adoCtx.error
+
+      const writeErr = await checkWriteAuthority(ctx!, adoCtx.organization)
+      if (writeErr) return writeErr
+
+      const ids = args.workItemIds.split(",").map(s => s.trim()).filter(Boolean)
+      const ops = buildReparentPatch(args.newParentId)
+      const moved: number[] = []
+      const errors: { id: string, error: string }[] = []
+
+      for (const id of ids) {
+        const result = await adoRequest(ctx!.adoToken!, "PATCH", adoCtx.organization, `/${adoCtx.project}/_apis/wit/workitems/${id}`, JSON.stringify(ops))
+        try {
+          const parsed = JSON.parse(result)
+          if (parsed.id) {
+            moved.push(parsed.id)
+          } else {
+            errors.push({ id, error: result })
+          }
+        } catch {
+          errors.push({ id, error: result })
+        }
+      }
+
+      return JSON.stringify({ moved, errors, organization: adoCtx.organization, project: adoCtx.project })
+    },
+    integration: "ado",
+    confirmationRequired: true,
+  },
+
+  // -- ado_restructure_backlog --
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "ado_restructure_backlog",
+        description: "Bulk restructure: reparent multiple work items in a single logical operation.",
+        parameters: {
+          type: "object",
+          properties: {
+            organization: { type: "string", description: "ADO organization (optional)" },
+            project: { type: "string", description: "ADO project (optional)" },
+            operations: { type: "string", description: "JSON array of { workItemId, newParentId } objects" },
+          },
+          required: ["operations"],
+        },
+      },
+    },
+    handler: async (args, ctx) => {
+      const authErr = await checkAuth(ctx)
+      if (authErr) return authErr
+
+      const adoCtx = await resolveAdoContext(ctx!.adoToken!, ctx!.context!, { organization: args.organization, project: args.project })
+      if (!adoCtx.ok) return adoCtx.error
+
+      const writeErr = await checkWriteAuthority(ctx!, adoCtx.organization)
+      if (writeErr) return writeErr
+
+      let operations: { workItemId: number, newParentId: number }[]
+      try {
+        operations = JSON.parse(args.operations)
+      } catch {
+        return "error: operations must be a valid JSON array"
+      }
+
+      const results: { workItemId: number, success: boolean, error?: string }[] = []
+
+      for (const op of operations) {
+        const ops = buildReparentPatch(String(op.newParentId))
+        const result = await adoRequest(ctx!.adoToken!, "PATCH", adoCtx.organization, `/${adoCtx.project}/_apis/wit/workitems/${op.workItemId}`, JSON.stringify(ops))
+        try {
+          const parsed = JSON.parse(result)
+          if (parsed.id) {
+            results.push({ workItemId: op.workItemId, success: true })
+          } else {
+            results.push({ workItemId: op.workItemId, success: false, error: result })
+          }
+        } catch {
+          results.push({ workItemId: op.workItemId, success: false, error: result })
+        }
+      }
+
+      return JSON.stringify({ results, organization: adoCtx.organization, project: adoCtx.project })
+    },
+    integration: "ado",
+    confirmationRequired: true,
+  },
+
+  // -- ado_validate_structure --
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "ado_validate_structure",
+        description: "Validate parent/child type rules without making changes. Checks if a work item type can be a child of a given parent.",
+        parameters: {
+          type: "object",
+          properties: {
+            organization: { type: "string", description: "ADO organization (optional)" },
+            project: { type: "string", description: "ADO project (optional)" },
+            parentId: { type: "string", description: "Parent work item ID" },
+            childType: { type: "string", description: "Proposed child work item type" },
+          },
+          required: ["parentId", "childType"],
+        },
+      },
+    },
+    handler: async (args, ctx) => {
+      const authErr = await checkAuth(ctx)
+      if (authErr) return authErr
+
+      const adoCtx = await resolveAdoContext(ctx!.adoToken!, ctx!.context!, { organization: args.organization, project: args.project })
+      if (!adoCtx.ok) return adoCtx.error
+
+      // Fetch parent work item to get its type
+      const parentResult = await adoRequest(ctx!.adoToken!, "GET", adoCtx.organization, `/${adoCtx.project}/_apis/wit/workitems?ids=${args.parentId}&fields=System.WorkItemType`)
+      let parentData: BatchResponse
+      try {
+        parentData = JSON.parse(parentResult)
+      } catch {
+        return parentResult
+      }
+
+      if (!parentData.value || parentData.value.length === 0) {
+        return `error: parent work item ${args.parentId} not found`
+      }
+
+      const parentType = parentData.value[0].fields["System.WorkItemType"]
+      const allowedChildren = VALID_PARENT_CHILD[parentType] || []
+      const violations: string[] = []
+
+      if (!allowedChildren.includes(args.childType)) {
+        violations.push(`${args.childType} cannot be a child of ${parentType}. Allowed children: ${allowedChildren.join(", ") || "none"}`)
+      }
+
+      return JSON.stringify({
+        valid: violations.length === 0,
+        parentType,
+        childType: args.childType,
+        violations,
+      })
+    },
+    integration: "ado",
+  },
+
+  // -- ado_preview_changes --
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "ado_preview_changes",
+        description: "Dry-run: preview what a mutation would do without executing it. Returns structured diff of operations.",
+        parameters: {
+          type: "object",
+          properties: {
+            organization: { type: "string", description: "ADO organization (optional)" },
+            project: { type: "string", description: "ADO project (optional)" },
+            operation: { type: "string", description: "Operation to preview: create_epic, create_issue, move_items" },
+            title: { type: "string", description: "Title (for create operations)" },
+            description: { type: "string", description: "Description (for create operations)" },
+            areaPath: { type: "string", description: "Area path" },
+            parentId: { type: "string", description: "Parent ID" },
+            workItemIds: { type: "string", description: "Comma-separated IDs (for move operations)" },
+            newParentId: { type: "string", description: "New parent ID (for move operations)" },
+          },
+          required: ["operation"],
+        },
+      },
+    },
+    handler: async (args, ctx) => {
+      const authErr = await checkAuth(ctx)
+      if (authErr) return authErr
+
+      const adoCtx = await resolveAdoContext(ctx!.adoToken!, ctx!.context!, { organization: args.organization, project: args.project })
+      if (!adoCtx.ok) return adoCtx.error
+
+      const operations = buildPreviewOps(args.operation, args)
+      if (operations === null) {
+        return `Unknown operation: ${args.operation}. Supported: create_epic, create_issue, move_items`
+      }
+
+      return JSON.stringify({
+        preview: true,
+        operation: args.operation,
+        organization: adoCtx.organization,
+        project: adoCtx.project,
+        operations,
+      })
     },
     integration: "ado",
   },

@@ -246,6 +246,19 @@ describe("ado_create_epic tool", () => {
     ]))
   })
 
+  it("includes iterationPath in JSON Patch when provided", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 201 }))
+
+    const def = findTool("ado_create_epic")!
+    await def.handler({ title: "Epic", iterationPath: "Sprint 3" }, makeCtxWithChecker())
+    const call = vi.mocked(adoRequest).mock.calls[0]
+    const body = JSON.parse(call[4]!)
+    expect(body).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: "/fields/System.IterationPath", value: "Sprint 3" }),
+    ]))
+  })
+
   it("checks canWrite before executing", async () => {
     vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
     const ctx = makeCtxWithChecker(false)
@@ -344,6 +357,16 @@ describe("ado_move_items tool", () => {
     const result = await def.handler({ workItemIds: "101,102", newParentId: "200" }, makeCtxWithChecker())
     const parsed = JSON.parse(result)
     expect(parsed.moved.length + parsed.errors.length).toBe(2)
+  })
+
+  it("handles response with no id field in JSON", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ error: "unexpected" }))
+
+    const def = findTool("ado_move_items")!
+    const result = await def.handler({ workItemIds: "101", newParentId: "200" }, makeCtxWithChecker())
+    const parsed = JSON.parse(result)
+    expect(parsed.errors).toHaveLength(1)
   })
 })
 
@@ -460,6 +483,15 @@ describe("ado_validate_structure tool", () => {
     const result = await def.handler({ parentId: "999", childType: "User Story" }, makeCtx())
     expect(result).toContain("not found")
   })
+
+  it("handles API error when fetching parent", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce("ERROR: 500 Server Error")
+
+    const def = findTool("ado_validate_structure")!
+    const result = await def.handler({ parentId: "100", childType: "Task" }, makeCtx())
+    expect(result).toContain("ERROR")
+  })
 })
 
 describe("ado_restructure_backlog tool", () => {
@@ -514,5 +546,25 @@ describe("ado_restructure_backlog tool", () => {
     // At least one success and one failure
     expect(parsed.results.some((r: any) => r.success)).toBe(true)
     expect(parsed.results.some((r: any) => !r.success)).toBe(true)
+  })
+
+  it("returns error for invalid JSON operations", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    const def = findTool("ado_restructure_backlog")!
+    const result = await def.handler({ operations: "not valid json" }, makeCtxWithChecker())
+    expect(result).toContain("error")
+    expect(result).toContain("valid JSON")
+  })
+
+  it("handles response with no id field (API error in JSON)", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ error: "something went wrong" }))
+
+    const def = findTool("ado_restructure_backlog")!
+    const result = await def.handler({
+      operations: JSON.stringify([{ workItemId: 101, newParentId: 200 }]),
+    }, makeCtxWithChecker())
+    const parsed = JSON.parse(result)
+    expect(parsed.results[0].success).toBe(false)
   })
 })
