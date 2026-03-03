@@ -132,6 +132,50 @@ describe("fetchProcessTemplate", () => {
     const result = await fetchProcessTemplate("test-token", "contoso", "MyProject")
     expect(result).toBeNull()
   })
+
+  it("returns null when template response has no name field", async () => {
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [{ name: "System.ProcessTemplateType", value: "some-guid" }],
+    }))
+    // Template response with no name field
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      typeId: "some-guid",
+      // name is missing
+    }))
+
+    const result = await fetchProcessTemplate("test-token", "contoso", "MyProject")
+    expect(result).toBeNull()
+  })
+
+  it("returns null when step 3 work item types response is non-JSON", async () => {
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [{ name: "System.ProcessTemplateType", value: "some-guid" }],
+    }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      name: "Basic",
+      typeId: "some-guid",
+    }))
+    // Step 3 returns non-JSON
+    vi.mocked(adoRequest).mockResolvedValueOnce("ERROR: 403 Forbidden")
+
+    const result = await fetchProcessTemplate("test-token", "contoso", "MyProject")
+    expect(result).toBeNull()
+  })
+
+  it("returns null when step 3 work item types response is missing value", async () => {
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [{ name: "System.ProcessTemplateType", value: "some-guid" }],
+    }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      name: "Basic",
+      typeId: "some-guid",
+    }))
+    // Step 3 returns valid JSON but no value field
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ count: 0 }))
+
+    const result = await fetchProcessTemplate("test-token", "contoso", "MyProject")
+    expect(result).toBeNull()
+  })
 })
 
 describe("deriveHierarchyRules", () => {
@@ -165,6 +209,17 @@ describe("deriveHierarchyRules", () => {
     // Should return an object with types as keys, each with empty children array
     expect(rules["Ticket"]).toEqual([])
     expect(rules["SubTicket"]).toEqual([])
+  })
+
+  it("skips parent types from known hierarchy that are not in project types (typeSet.has false branch)", () => {
+    // Basic hierarchy defines Epic > Issue > Task, but project only has Epic and Task (no Issue)
+    const rules = deriveHierarchyRules("Basic", ["Epic", "Task"])
+    // Epic should have empty children since "Issue" is not in project types
+    expect(rules["Epic"]).toEqual([])
+    // Task is initialized with empty children
+    expect(rules["Task"]).toEqual([])
+    // "Issue" key should not exist since it's not in workItemTypes
+    expect(rules["Issue"]).toBeUndefined()
   })
 })
 

@@ -132,6 +132,7 @@ export const teamsToolDefinitions: ToolDefinition[] = [
         return `Invalid method "${args.method}". Must be one of: ${MUTATE_METHODS.join(", ")}`;
       }
       // Authority pre-flight check
+      /* v8 ignore next -- fallback unreachable: method is validated against MUTATE_METHODS above @preserve */
       const action = METHOD_TO_ACTION[args.method] || args.method;
       if (ctx.context?.checker) {
         const allowed = await ctx.context.checker.canWrite("ado", args.organization, action);

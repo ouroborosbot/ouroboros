@@ -219,6 +219,13 @@ describe("execTool", () => {
     expect(result).toBe("(no output)")
   })
 
+  it("claude catches thrown exception from spawnSync", async () => {
+    vi.mocked(spawnSync).mockImplementation(() => { throw new Error("ENOENT: claude not found") })
+    const result = await execTool("claude", { prompt: "test" })
+    expect(result).toContain("error:")
+    expect(result).toContain("ENOENT")
+  })
+
   // ── web_search ──
   it("web_search calls perplexity API and returns results", async () => {
     setTestConfig({ integrations: { perplexityApiKey: "test-key" } })
@@ -953,6 +960,22 @@ describe("execTool with ToolContext (graph/ado handlers)", () => {
     expect(result).toContain("error")
   })
 
+  it("ado_work_items without org: non-Error discovery rejection uses String(e)", async () => {
+    vi.resetModules()
+    const { discoverOrganizations } = await import("../../repertoire/ado-client")
+    vi.mocked(discoverOrganizations).mockRejectedValue("string rejection")
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("ado_work_items", {}, ctx)
+    expect(result).toContain("string rejection")
+  })
+
   it("base tools work without ToolContext", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockReturnValue("file content")
@@ -1572,6 +1595,18 @@ describe("summarizeArgs for docs tools", () => {
 
   it("returns key=value summary for save_friend_note", () => {
     expect(summarizeArgs("save_friend_note", { key: "ado", value: "flat backlog" })).toBe("ado")
+  })
+
+  it("returns empty string for save_friend_note with no key", () => {
+    expect(summarizeArgs("save_friend_note", { value: "flat backlog" })).toBe("")
+  })
+
+  it("returns org + project for ado_backlog_list", () => {
+    expect(summarizeArgs("ado_backlog_list", { organization: "myorg", project: "myproj" })).toBe("myorg myproj")
+  })
+
+  it("returns empty string for ado_backlog_list with no org/project", () => {
+    expect(summarizeArgs("ado_backlog_list", {})).toBe("")
   })
 })
 

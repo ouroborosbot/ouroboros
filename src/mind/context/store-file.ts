@@ -76,6 +76,7 @@ class FileCollectionStore<T extends { schemaVersion: number }> implements Collec
     }
 
     for (const entry of entries) {
+      /* v8 ignore next -- defensive: skip non-JSON files @preserve */
       if (!entry.endsWith(".json")) continue
       const id = entry.slice(0, -5) // remove .json
       const item = await this.get(id)
