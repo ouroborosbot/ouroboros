@@ -102,7 +102,7 @@ Note: This task is documentation-only. TDD applies if any runtime code is introd
 **Output**: Updated `CONTRIBUTING.md`.
 **Acceptance**: Branches section shows unified `<agent>/<slug>` for both agents (including `slugger` examples alongside `ouroboros`). Existing "do not commit directly to main" guidance strengthened to reference PR-based merge flow. New Sync and merge section explains the workflow (work-doer finishes -> work-merger runs -> PR -> CI -> merge -> cleanup). Task docs section references work-merger alongside work-planner and work-doer.
 
-### ⬜ Unit 8: Create `cross-agent-docs/sync-and-merge-conventions.md`
+### ✅ Unit 8: Create `cross-agent-docs/sync-and-merge-conventions.md`
 **What**: Create the shared conventions doc covering: branch naming, merge strategy (merge commits), PR-based merge flow, conflict resolution using task docs, race condition retry, CI self-repair policy, post-merge cleanup, and escalation rules. Similar in structure to `cross-agent-docs/testing-conventions.md`.
 **Output**: New file `cross-agent-docs/sync-and-merge-conventions.md`.
 **Acceptance**: File exists, covers all shared conventions from planning decisions. Structured with numbered sections similar to testing-conventions.md. Both agents can reference this as the authoritative sync-and-merge policy.
