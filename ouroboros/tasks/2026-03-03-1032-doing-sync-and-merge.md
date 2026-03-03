@@ -1,6 +1,6 @@
 # Doing: Sync-and-Merge System for Multi-Agent Collaboration
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-03-03 11:09
 **Planning**: ./2026-03-03-1032-planning-sync-and-merge.md
@@ -16,24 +16,24 @@
 Build a new `work-merger` subagent that runs after work-doer completes, fetching origin/main, merging, resolving conflicts using task docs for context, running tests, and pushing to main -- enabling two agents (ouroboros on Claude Code, slugger on Codex) to work simultaneously on the same repo without manual merge coordination.
 
 ## Completion Criteria
-- [ ] `subagents/work-merger.md` exists with YAML frontmatter and complete workflow instructions
-- [ ] work-merger is installable as a Claude Code sub-agent (symlink into `~/.claude/agents/`) AND as a Codex skill (hard-link as `~/.codex/skills/work-merger/SKILL.md`)
-- [ ] `subagents/README.md` updated: work-merger in table, workflow description extended, install commands for both Claude Code and Codex (including optional `openai.yaml` UI metadata)
-- [ ] `AGENTS.md` updated: extended workflow (work-planner -> work-doer -> work-merger), Runtime-Specific Invocation includes `$work-merger` for Codex and sub-agent for Claude Code
-- [ ] The work-merger doc covers: fetch, merge, conflict resolution with task doc context, test, PR creation via `gh`, merge PR to main
-- [ ] The work-merger doc covers the fast-path: branch already up-to-date with main (still creates PR, CI must pass)
-- [ ] The work-merger doc covers git-informed task doc discovery: use `git log origin/main --not HEAD` to find doing docs that landed on main since the branch point (not just timestamp-sorted scanning)
-- [ ] The work-merger doc covers race condition retry: exponential backoff (30s, 1m, 2m, 4m...), no retry limit, clear user-facing communication on each retry (retry number, wait duration, reason)
-- [ ] The work-merger doc covers CI failure self-repair: agent fixes failures itself first, escalates only when genuinely stuck
-- [ ] The work-merger doc covers post-merge cleanup: delete feature branch (local + remote)
-- [ ] The work-merger doc covers escalation: when to stop and ask the user (only for genuinely ambiguous issues, not fixable failures)
-- [ ] The work-merger doc covers `gh` CLI preflight checks: installed, authenticated, GitHub remote exists, repo default set. Agent self-repairs what it can, escalates only when human input needed (credentials, OAuth)
-- [ ] Branch naming convention unified and documented: both agents use `<agent>/<slug>`, old `codex/` prefix convention deprecated in AGENTS.md
-- [ ] `CONTRIBUTING.md` updated: sync-and-merge workflow section, unified branch convention (`<agent>/<slug>`), PR-based merge flow
-- [ ] `cross-agent-docs/sync-and-merge-conventions.md` created with shared conventions
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] `subagents/work-merger.md` exists with YAML frontmatter and complete workflow instructions
+- [x] work-merger is installable as a Claude Code sub-agent (symlink into `~/.claude/agents/`) AND as a Codex skill (hard-link as `~/.codex/skills/work-merger/SKILL.md`)
+- [x] `subagents/README.md` updated: work-merger in table, workflow description extended, install commands for both Claude Code and Codex (including optional `openai.yaml` UI metadata)
+- [x] `AGENTS.md` updated: extended workflow (work-planner -> work-doer -> work-merger), Runtime-Specific Invocation includes `$work-merger` for Codex and sub-agent for Claude Code
+- [x] The work-merger doc covers: fetch, merge, conflict resolution with task doc context, test, PR creation via `gh`, merge PR to main
+- [x] The work-merger doc covers the fast-path: branch already up-to-date with main (still creates PR, CI must pass)
+- [x] The work-merger doc covers git-informed task doc discovery: use `git log origin/main --not HEAD` to find doing docs that landed on main since the branch point (not just timestamp-sorted scanning)
+- [x] The work-merger doc covers race condition retry: exponential backoff (30s, 1m, 2m, 4m...), no retry limit, clear user-facing communication on each retry (retry number, wait duration, reason)
+- [x] The work-merger doc covers CI failure self-repair: agent fixes failures itself first, escalates only when genuinely stuck
+- [x] The work-merger doc covers post-merge cleanup: delete feature branch (local + remote)
+- [x] The work-merger doc covers escalation: when to stop and ask the user (only for genuinely ambiguous issues, not fixable failures)
+- [x] The work-merger doc covers `gh` CLI preflight checks: installed, authenticated, GitHub remote exists, repo default set. Agent self-repairs what it can, escalates only when human input needed (credentials, OAuth)
+- [x] Branch naming convention unified and documented: both agents use `<agent>/<slug>`, old `codex/` prefix convention deprecated in AGENTS.md
+- [x] `CONTRIBUTING.md` updated: sync-and-merge workflow section, unified branch convention (`<agent>/<slug>`), PR-based merge flow
+- [x] `cross-agent-docs/sync-and-merge-conventions.md` created with shared conventions
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -107,7 +107,7 @@ Note: This task is documentation-only. TDD applies if any runtime code is introd
 **Output**: New file `cross-agent-docs/sync-and-merge-conventions.md`.
 **Acceptance**: File exists, covers all shared conventions from planning decisions. Structured with numbered sections similar to testing-conventions.md. Both agents can reference this as the authoritative sync-and-merge policy.
 
-### ⬜ Unit 9: Final review and verification
+### ✅ Unit 9: Final review and verification
 **What**: Re-read all modified/created files end-to-end. Verify every completion criterion is satisfied. Run `npm test` and `npm run build` to confirm no regressions. Check cross-references between docs are consistent (e.g., CONTRIBUTING.md links to cross-agent-docs, AGENTS.md references work-merger correctly, README install commands are accurate).
 **Output**: All completion criteria checked off. Build and tests pass.
 **Acceptance**: Every completion criterion checkbox can be marked `[x]`. `npm test` passes. `npm run build` passes. No warnings. All cross-references between docs are accurate.
