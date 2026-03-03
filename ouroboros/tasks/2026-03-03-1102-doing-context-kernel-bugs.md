@@ -118,19 +118,19 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Output**: Coverage report showing 100% on `store-file.ts`.
 **Acceptance**: 100% coverage on new code, tests still green.
 
-### ⬜ Unit 3a: FriendResolver (replaces ContextResolver) -- Tests
+### ✅ Unit 3a: FriendResolver (replaces ContextResolver) -- Tests
 **What**: Write tests for `FriendResolver` (renamed from `ContextResolver`). Test: constructor takes `FriendStore` + params, `resolve()` calls `store.findByExternalId()`, first-encounter flow (findByExternalId returns null -> creates new FriendRecord with UUID, system displayName, empty notes/toolPreferences, saves via store.put, returns record), returning friend flow (findByExternalId returns existing -> does NOT overwrite displayName), channel capabilities lookup, no authority checker creation, result shape is `{ friend: FriendRecord, channel: ChannelCapabilities }`. Test Teams-conversation fallback provider.
 **Output**: Updated `resolver.test.ts` with FriendResolver tests.
 **Files**: `src/__tests__/mind/context/resolver.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `FriendResolver` doesn't exist yet.
 
-### ⬜ Unit 3b: FriendResolver -- Implementation
+### ✅ Unit 3b: FriendResolver -- Implementation
 **What**: Implement `FriendResolver` class in `resolver.ts`. Constructor takes `FriendStore` + `FriendResolverParams`. `resolve()` uses `store.findByExternalId()`, creates new `FriendRecord` on first encounter, returns `{ friend, channel }`. Remove `resolveIdentity()` import and `resolveMemory()` import. Delete `memory.ts` and `identity.ts` (logic moves into resolver). Update `FriendResolverParams` to accept provider (including `"teams-conversation"`), externalId, tenantId, displayName, channel.
 **Output**: Updated `resolver.ts`, deleted `memory.ts`, `identity.ts`, `identity.test.ts`, `memory.test.ts`.
 **Files**: `src/mind/context/resolver.ts`, `src/mind/context/identity.ts` (delete), `src/mind/context/memory.ts` (delete), `src/__tests__/mind/context/identity.test.ts` (delete), `src/__tests__/mind/context/memory.test.ts` (delete)
 **Acceptance**: All resolver tests PASS (green), no warnings.
 
-### ⬜ Unit 3c: FriendResolver -- Coverage & Refactor
+### ✅ Unit 3c: FriendResolver -- Coverage & Refactor
 **What**: Verify 100% coverage on FriendResolver. Test all branches.
 **Output**: Coverage report showing 100% on `resolver.ts`.
 **Acceptance**: 100% coverage on new code, tests still green.
