@@ -2882,7 +2882,7 @@ describe("kick mechanism", () => {
     const assistantMessages = messages.filter((m: any) => m.role === "assistant")
     expect(assistantMessages).toHaveLength(2)
     expect(assistantMessages[0].content).toContain("let me read that file for you")
-    expect(assistantMessages[0].content).toContain("I narrated instead of acting. Calling the tool now.")
+    expect(assistantMessages[0].content).toContain("I narrated instead of acting. Calling the tool now -- if I've already finished, I can use final_answer.")
     expect(assistantMessages[1].content).toBe("here is the result")
   })
 
@@ -2971,7 +2971,7 @@ describe("kick mechanism", () => {
 
     // The self-correction assistant message should contain original narration + kick message
     const assistantMessages = messages.filter((m: any) => m.role === "assistant")
-    expect(assistantMessages.some((m: any) => m.content?.includes("let me check that") && m.content?.includes("I narrated instead of acting."))).toBe(true)
+    expect(assistantMessages.some((m: any) => m.content?.includes("let me check that") && m.content?.includes("I narrated instead of acting. Calling the tool now -- if I've already finished, I can use final_answer."))).toBe(true)
   })
 
   it("onKick callback receives no arguments", async () => {
@@ -3059,7 +3059,7 @@ describe("kick mechanism", () => {
     const assistantMessages = messages.filter((m: any) => m.role === "assistant")
     expect(assistantMessages).toHaveLength(2)
     expect(assistantMessages[0].content).toContain("I'm going to")
-    expect(assistantMessages[0].content).toContain("I narrated instead of acting. Calling the tool now.")
+    expect(assistantMessages[0].content).toContain("I narrated instead of acting. Calling the tool now -- if I've already finished, I can use final_answer.")
     expect(assistantMessages[1].content).toBe("the file says hello")
   })
 
@@ -3118,7 +3118,7 @@ describe("kick mechanism", () => {
     const assistantMessages = messages.filter((m: any) => m.role === "assistant")
     expect(assistantMessages).toHaveLength(2)
     expect(assistantMessages[0].content).toContain("let me read that file")
-    expect(assistantMessages[0].content).toContain("I narrated instead of acting. Calling the tool now.")
+    expect(assistantMessages[0].content).toContain("I narrated instead of acting. Calling the tool now -- if I've already finished, I can use final_answer.")
     expect(assistantMessages[1].content).toBe("here is the answer")
 
     // config cleanup handled by resetConfigCache in beforeEach
@@ -3994,6 +3994,210 @@ describe("integration: kick + tool_choice required combined", () => {
     expect(toolMessage).toBeDefined()
     // The result should come from the graph_profile handler (not "unknown")
     expect(toolMessage.content).not.toContain("unknown")
+  })
+})
+
+describe("final_answer injection after narration kick", () => {
+  let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal, options?: { toolChoiceRequired?: boolean }) => Promise<{ usage?: any }>
+
+  function makeStream(chunks: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const chunk of chunks) {
+          yield chunk
+        }
+      },
+    }
+  }
+
+  function makeChunk(content?: string, toolCalls?: any[]) {
+    const delta: any = {}
+    if (content !== undefined) delta.content = content
+    if (toolCalls !== undefined) delta.tool_calls = toolCalls
+    return { choices: [{ delta }] }
+  }
+
+  beforeEach(async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
+    mockCreate.mockReset()
+    mockResponsesCreate.mockReset()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+
+    const core = await import("../../engine/core")
+    runAgent = core.runAgent
+  })
+
+  it("after narration kick, final_answer is present in tools sent to API", async () => {
+    const toolsPerCall: any[][] = []
+    let callCount = 0
+    mockCreate.mockImplementation((params: any) => {
+      callCount++
+      toolsPerCall.push(params.tools)
+      if (callCount === 1) {
+        // Narration: triggers kick
+        return makeStream([makeChunk("let me read that file")])
+      }
+      // After kick: respond normally
+      return makeStream([makeChunk("here is the result")])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks)
+
+    expect(callCount).toBe(2)
+    // First call: no final_answer (no prior kick)
+    const firstToolNames = toolsPerCall[0].map((t: any) => t.function.name)
+    expect(firstToolNames).not.toContain("final_answer")
+    // Second call (after narration kick): final_answer IS present
+    const secondToolNames = toolsPerCall[1].map((t: any) => t.function.name)
+    expect(secondToolNames).toContain("final_answer")
+  })
+
+  it("after empty kick, final_answer is NOT in tools (narration-only injection)", async () => {
+    const toolsPerCall: any[][] = []
+    let callCount = 0
+    mockCreate.mockImplementation((params: any) => {
+      callCount++
+      toolsPerCall.push(params.tools)
+      if (callCount === 1) {
+        // Empty response: triggers empty kick
+        return makeStream([{ choices: [{ delta: {} }] }])
+      }
+      // After kick: respond normally
+      return makeStream([makeChunk("here is the result")])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks)
+
+    expect(callCount).toBe(2)
+    // After empty kick: final_answer should NOT be injected
+    const secondToolNames = toolsPerCall[1].map((t: any) => t.function.name)
+    expect(secondToolNames).not.toContain("final_answer")
+  })
+
+  it("model calls final_answer after narration kick -- terminates cleanly", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([makeChunk("I'll check that for you")])
+      }
+      // After narration kick, model uses final_answer
+      return makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"answer":"the answer is 42"}' } },
+        ]),
+      ])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks)
+
+    expect(callCount).toBe(2)
+    const lastAssistant = [...messages].reverse().find((m: any) => m.role === "assistant")
+    expect(lastAssistant.content).toBe("the answer is 42")
+    expect(lastAssistant.tool_calls).toBeUndefined()
+  })
+
+  it("activeTools computed per-iteration -- first call has no final_answer, after kick it does", async () => {
+    const toolsPerCall: any[][] = []
+    let callCount = 0
+    mockCreate.mockImplementation((params: any) => {
+      callCount++
+      toolsPerCall.push([...params.tools])
+      if (callCount === 1) {
+        return makeStream([makeChunk("let me do that")])
+      }
+      return makeStream([makeChunk("done")])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks)
+
+    // Verify tools are computed per-iteration (not static)
+    expect(toolsPerCall.length).toBe(2)
+    const firstNames = toolsPerCall[0].map((t: any) => t.function.name)
+    const secondNames = toolsPerCall[1].map((t: any) => t.function.name)
+    // First iteration: no final_answer
+    expect(firstNames).not.toContain("final_answer")
+    // Second iteration (after narration kick): final_answer present
+    expect(secondNames).toContain("final_answer")
+  })
+
+  it("toolChoiceRequired still includes final_answer even without prior kick", async () => {
+    const toolsPerCall: any[][] = []
+    mockCreate.mockImplementation((params: any) => {
+      toolsPerCall.push(params.tools)
+      return makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"answer":"done"}' } },
+        ]),
+      ])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    // With toolChoiceRequired, final_answer should be in tools from the first call
+    const toolNames = toolsPerCall[0].map((t: any) => t.function.name)
+    expect(toolNames).toContain("final_answer")
   })
 })
 
