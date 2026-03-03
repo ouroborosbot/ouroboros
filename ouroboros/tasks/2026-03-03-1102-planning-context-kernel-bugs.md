@@ -89,11 +89,12 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 - Returns the newly created `FriendRecord` as part of `ResolvedContext`
 - This is the critical first-run path — the friend's first impression of the agent. The doing doc must treat this as a first-class scenario with dedicated tests.
 
-*Missing external ID (graceful degradation):*
-- If `aadObjectId` is genuinely absent from the Teams activity (guest users, some Bot Framework configs), we still create a `FriendRecord` with an internal UUID — but with an empty `externalIds` array.
-- The friend is real even if the external system didn't identify them. The agent can still learn their name, preferences, and notes via conversation.
-- Without an external ID, the friend can't be recognized across sessions by `findByExternalId()`. But their sessions are still tied to their internal UUID (see Session Path Restructuring below).
-- If they later gain an AAD identity (e.g., guest becomes a member), a future `findByExternalId()` won't match their existing record — this is acceptable. Re-linking is a deferred problem (see Notes).
+*Missing AAD identity (conversation ID fallback):*
+- If `aadObjectId` is absent from the Teams activity (guest users, some Bot Framework configs), use the Teams conversation ID as the external ID instead: `findByExternalId("teams-conversation", conversationId)`.
+- This creates a `FriendRecord` with `externalIds: [{ provider: "teams-conversation", externalId: conversationId }]`. The conversation IS the identity for guests — stable within the conversation, so sessions and notes persist across turns.
+- If a guest starts a new conversation, they appear as a new friend. Acceptable for unidentified guests — the agent can still learn about them within each conversation.
+- The resolver always has something to search for. No special "anonymous" path, no empty `externalIds` arrays, no circular dependency between session path and friend UUID.
+- If they later gain an AAD identity (e.g., guest becomes a member), they'd have a separate friend record from their conversation-based one. Linking multiple external IDs to the same friend is a deferred problem (see Notes).
 
 *Per-turn refresh (no in-memory mutation):*
 - Each turn, re-read the friend record from disk via `store.get(friendId)` before building the system prompt and tools. The friend ID is known from initial identity resolution.
@@ -249,7 +250,8 @@ Sessions currently live at `~/.agentconfigs/{agentName}/sessions/{channel}/{sess
 - [ ] System prompt includes stale notes awareness instruction (check related notes when learning something that might invalidate them)
 - [ ] CLI external ID uses `username@hostname` format with provider `"local"`
 - [ ] System prompt includes priority guidance (friend's request first, social niceties second) when friend context is present
-- [ ] Missing `aadObjectId` handled gracefully: friend record created with empty `externalIds`, no error
+- [ ] Missing `aadObjectId` handled gracefully: falls back to `teams-conversation` provider with conversation ID as external ID
+- [ ] No empty `externalIds` arrays — resolver always has an external ID to search for
 - [ ] Session path restructured: `~/.agentconfigs/{agentName}/sessions/{friendUuid}/{channel}/{sessionId}.json`
 - [ ] `sessionPath()` accepts friend ID, callers pass it from resolved context
 - [ ] CLI session path uses friend UUID from CLI identity resolution
@@ -354,6 +356,9 @@ The `tools` API parameter is not persisted in session files today. For debugging
 **Deferred: Friend re-linking after agent migration (carry forward, do not implement)**
 When an agent is moved to a new machine/installation, the PII bridge doesn't travel with it. The agent retains friend knowledge (by UUID and display name) but can't recognize returning friends from their external IDs. Re-linking strategy TBD — possible approaches include confirmation from a known channel, manual claim, display-name fuzzy match + confirmation, or encrypted export/import. Depends on how agents actually get moved around, which we don't know yet.
 
+**Deferred: External ID linking (carry forward, do not implement)**
+A single person may have multiple external IDs (e.g., AAD identity + conversation-based identity for when they were a guest, or identities across CLI and Teams). Currently each external ID creates a separate `FriendRecord`. Linking multiple external IDs to the same friend requires a merge strategy — combining notes, preferences, and session histories. TBD after the core friend system proves out.
+
 ## Progress Log
 - 2026-03-03 11:03 Created
 - 2026-03-03 11:04 Resolved all open questions from SDK type inspection; added decisions
@@ -368,3 +373,4 @@ When an agent is moved to a new machine/installation, the PII bridge doesn't tra
 - 2026-03-03 13:36 Seventh revision from review: (1) ContextResolver → FriendResolver rename — "context" is overloaded. (2) Explicit first-encounter creation flow — findByExternalId returns null, create new FriendRecord, return it. First-class scenario for friend retention. (3) "on file" → "remembered" — human-centric language. (4) New-friend behavior instruction in system prompt when notes and toolPreferences are both empty — guides agent to be welcoming and save what it learns during first interaction.
 - 2026-03-03 13:54 Eighth revision from unhappy-path walkthrough (new friend, ADO, Teams): (1) Priority guidance — friend's request comes first, social niceties woven in naturally. (2) Missing aadObjectId graceful degradation — create FriendRecord with empty externalIds, friend is real even without external ID. (3) Session path restructuring — sessions tied to friend internal UUID: `sessions/{friendUuid}/{channel}/{sessionId}.json`. No migration, no backwards compat.
 - 2026-03-03 14:10 Ninth revision from unhappy-path walkthrough (returning CLI friend, corrections): (1) save_friend_note tool description gets first-person override guidance — agent's tool, not a leash. (2) Working-memory trust instruction — context window is source of truth, saved notes are journal for future me. (3) Stale notes awareness — when learning something that might invalidate related notes, ask and update. (4) CLI external ID: `username@hostname` with provider `"local"` — disambiguates across machines and accounts.
+- 2026-03-03 14:23 Tenth revision from unhappy-path walkthrough (Teams guest, no aadObjectId): Discovered circular dependency — session path requires friend UUID but without external ID, no stable UUID exists. Fix: use conversation ID as fallback external ID (`provider: "teams-conversation"`). Resolver always has something to search for. Added deferred note for external ID linking (merging multiple external IDs to same friend).
