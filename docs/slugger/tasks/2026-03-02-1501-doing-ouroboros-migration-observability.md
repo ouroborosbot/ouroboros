@@ -111,7 +111,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Output**: Coverage note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-3c-coverage.md`.
 **Acceptance**: New instrumentation paths are fully covered and tests remain green.
 
-### ⬜ Unit 4a: Channel Instrumentation Contract — Red
+### ✅ Unit 4a: Channel Instrumentation Contract — Red
 **What**: Add failing tests for CLI/Teams ensuring user-facing output remains channel-native while diagnostics route through structured logger (`src/__tests__/channels/cli*.test.ts`, `src/__tests__/channels/teams.test.ts`, `src/__tests__/wardrobe/format.test.ts`).
 **Output**: Failing channel contract tests and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-4a-red-run.txt`.
 **Acceptance**: Tests fail before implementation and demonstrate contract violations.
@@ -213,3 +213,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 17:53] Unit 3a complete: added failing instrumentation tests for engine core/kicks, mind context/prompt, and tools lifecycle events
 - [2026-03-02 17:56] Unit 3b complete: implemented observability runtime emitter and instrumented engine core/kicks, mind context/prompt, and tools lifecycle events
 - [2026-03-02 17:59] Unit 3c complete: backfilled instrumentation coverage for tools non-Error catch path and runtime logger routing/default initialization; restored global 100% coverage and clean build
+- [2026-03-02 18:02] Unit 4a complete: added failing CLI/Teams/format channel contract tests proving channel-native UX remains while required `channels` structured events are missing
