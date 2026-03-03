@@ -491,3 +491,4 @@ interface LazyResolvedContext {
 - 2026-03-02 19:18 Added D12 (multi-channel identity, internal UUID as only primary key, ContextStore.find()), D13 (resolver per-request lifecycle), availableIntegrations on ChannelCapabilities.
 - 2026-03-02 19:20 D3 expanded: availableIntegrations drives tool routing, prompt injection, and resolver. No per-channel switch statements.
 - 2026-03-02 19:20 Cleaned up: fixed stale "session" refs, moved Preferences fully to Phase 1 (removed Phase 2 duplication), renumbered Phase 2 units.
+- 2026-03-02 19:34 Batch update from review feedback: absorbed Q9/Q12/Q13/Q14/Q15 as D14-D18, restructured remaining open Qs (Q4/Q5/Q7/Q8) as self-contained deferred items, reordered all decisions D1-D18 sequentially, updated D6 + 1F to explicit Promise pattern (no proxy), clarified CLI has no ADO (Teams-only), updated 1H as Teams-channel-only wiring, updated ChannelCapabilities schema comments.
