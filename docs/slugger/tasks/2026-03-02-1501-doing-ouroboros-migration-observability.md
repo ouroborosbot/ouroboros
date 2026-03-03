@@ -106,7 +106,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Output**: Updated `src/engine/core.ts`, `src/engine/kicks.ts`, `src/mind/context.ts`, `src/mind/prompt.ts`, `src/engine/tools.ts`, `src/engine/tools-base.ts`, `src/engine/tools-teams.ts` and passing tests.
 **Acceptance**: Required engine/mind/tools catalog events are emitted with required fields (including `src/engine/kicks.ts`) and tests pass.
 
-### ⬜ Unit 3c: Engine/Mind/Tools Instrumentation — Coverage & Refactor
+### ✅ Unit 3c: Engine/Mind/Tools Instrumentation — Coverage & Refactor
 **What**: Refactor instrumentation helpers/call sites and verify full coverage on new code.
 **Output**: Coverage note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-3c-coverage.md`.
 **Acceptance**: New instrumentation paths are fully covered and tests remain green.
@@ -212,3 +212,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 17:51] Unit 2c complete: verified trace propagation coverage + build; backfilled Azure metadata branch and restored global 100% coverage
 - [2026-03-02 17:53] Unit 3a complete: added failing instrumentation tests for engine core/kicks, mind context/prompt, and tools lifecycle events
 - [2026-03-02 17:56] Unit 3b complete: implemented observability runtime emitter and instrumented engine core/kicks, mind context/prompt, and tools lifecycle events
+- [2026-03-02 17:59] Unit 3c complete: backfilled instrumentation coverage for tools non-Error catch path and runtime logger routing/default initialization; restored global 100% coverage and clean build
