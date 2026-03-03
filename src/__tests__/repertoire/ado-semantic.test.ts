@@ -1008,7 +1008,27 @@ describe("ado_detect_orphans tool", () => {
     expect(parsed.orphans).toHaveLength(0)
   })
 
-  it("handles API error gracefully", async () => {
+  it("returns empty orphans when no work items found", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ workItems: [] }))
+
+    const def = findTool("ado_detect_orphans")!
+    const result = await def.handler({}, makeCtx())
+    const parsed = JSON.parse(result)
+    expect(parsed.orphans).toHaveLength(0)
+  })
+
+  it("handles batch fetch error", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ workItems: [{ id: 100 }] }))
+    vi.mocked(adoRequest).mockResolvedValueOnce("ERROR: 500 Batch Failed")
+
+    const def = findTool("ado_detect_orphans")!
+    const result = await def.handler({}, makeCtx())
+    expect(result).toContain("ERROR")
+  })
+
+  it("handles WIQL API error gracefully", async () => {
     vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
     vi.mocked(adoRequest).mockResolvedValueOnce("ERROR: 500 Server Error")
 
