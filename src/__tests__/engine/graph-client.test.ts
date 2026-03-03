@@ -104,6 +104,13 @@ describe("getProfile", () => {
     const result = await getProfile("token")
     expect(result).toContain("NETWORK_ERROR")
   })
+
+  it("returns NETWORK_ERROR on non-Error fetch failure", async () => {
+    mockFetch.mockRejectedValue("fetch failed as string")
+
+    const result = await getProfile("token")
+    expect(result).toContain("NETWORK_ERROR")
+  })
 })
 
 describe("graphRequest", () => {
@@ -262,6 +269,13 @@ describe("graphRequest", () => {
 
   it("returns NETWORK_ERROR on fetch failure", async () => {
     mockFetch.mockRejectedValue(new Error("network error"))
+
+    const result = await graphRequest("token", "GET", "/me")
+    expect(result).toContain("NETWORK_ERROR")
+  })
+
+  it("returns NETWORK_ERROR on non-Error fetch failure", async () => {
+    mockFetch.mockRejectedValue("network failure string")
 
     const result = await graphRequest("token", "GET", "/me")
     expect(result).toContain("NETWORK_ERROR")
