@@ -4614,6 +4614,63 @@ describe("confirmation system", () => {
     expect(mockStore.get).toHaveBeenCalledWith("uuid-1")
   })
 
+  it("handles friendStore.get returning null gracefully", async () => {
+    mockCreate.mockReturnValue(makeStream([makeChunk("hi")]))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const mockStore = {
+      get: vi.fn().mockResolvedValue(null),
+      put: vi.fn(),
+      delete: vi.fn(),
+      findByExternalId: vi.fn(),
+    }
+
+    const messages: any[] = [
+      { role: "system", content: "old prompt" },
+      { role: "user", content: "hello" },
+    ]
+
+    await runAgent(messages, callbacks, "cli", undefined, {
+      toolContext: {
+        signin: async () => undefined,
+        friendStore: mockStore,
+        context: {
+          friend: {
+            id: "uuid-1",
+            displayName: "Old Name",
+            externalIds: [],
+            tenantMemberships: [],
+            toolPreferences: {},
+            notes: {},
+            createdAt: "2026-01-01",
+            updatedAt: "2026-01-01",
+            schemaVersion: 1,
+          },
+          channel: {
+            channel: "cli" as const,
+            availableIntegrations: [],
+            supportsMarkdown: false,
+            supportsStreaming: true,
+            supportsRichCards: false,
+            maxMessageLength: Infinity,
+          },
+        },
+      },
+    } as any)
+
+    // friendStore.get was called but returned null -- no crash
+    expect(mockStore.get).toHaveBeenCalledWith("uuid-1")
+  })
+
   it("passes toolPreferences to getToolsForChannel when friend has preferences", async () => {
     // This test verifies that after re-reading the friend record,
     // the agent loop uses the fresh toolPreferences for tool description injection.
