@@ -1277,7 +1277,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 ---
 
-### ⬜ Unit 4B: Authority-Aware Planning
+### ✅ Unit 4B: Authority-Aware Planning
 
 **What**: Validate ADO permissions before proposing operations. When the friend lacks permission for a planned action, adapt the plan rather than proposing impossible operations.
 
@@ -1304,10 +1304,10 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - Authority check failure: proceed optimistically (consistent with D16)
 
 **Completion criteria:**
-- [ ] Multi-step operations validate authority before proposing
-- [ ] Plans adapted when friend lacks permissions
-- [ ] 100% test coverage
-- [ ] All tests pass
+- [x] Multi-step operations validate authority before proposing
+- [x] Plans adapted when friend lacks permissions
+- [x] 100% test coverage
+- [x] All tests pass
 
 ---
 
