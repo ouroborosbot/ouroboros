@@ -1,6 +1,6 @@
 # Doing: Ouroboros Migration — Observability (Phase 2)
 
-**Status**: READY_FOR_EXECUTION
+**Status**: drafting
 **Execution Mode**: direct
 **Created**: 2026-03-02 15:50
 **Planning**: ./2026-03-02-1501-planning-ouroboros-migration-observability.md
@@ -26,6 +26,9 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [ ] Trace IDs are generated at turn entry and propagated through core execution.
 - [ ] Existing ad-hoc operational logging in scoped runtime files is replaced or wrapped by structured logging.
 - [ ] Tests cover new observability code and instrumentation behavior.
+- [ ] `npm run audit:observability` exists and fails when required event coverage, schema/policy checks, or declared logpoint coverage is incomplete.
+- [ ] Observability coverage report artifact is produced with measurable results for: event-catalog coverage, schema/redaction compliance, and logpoint coverage.
+- [ ] CI enforces `npm run audit:observability` as a required gate for this phase.
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -133,12 +136,27 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Output**: Coverage note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-5c-coverage.md`.
 **Acceptance**: New config/identity/clients/repertoire instrumentation code is fully covered and tests remain green.
 
-### ⬜ Unit 6a: End-to-End Event Catalog Verification
+### ⬜ Unit 6a: Observability Coverage Gate — Red
+**What**: Add failing tests/fixtures for observability coverage auditing (missing required events/logpoints, schema violations, redaction violations) and baseline `audit:observability` failure behavior.
+**Output**: Failing audit evidence at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-6a-red-run.txt`.
+**Acceptance**: Audit fails before implementation and clearly reports failing dimensions (event-catalog, schema/redaction, logpoint coverage).
+
+### ⬜ Unit 6b: Observability Coverage Gate — Green
+**What**: Implement machine-readable coverage contract and audit pipeline (`src/observability/coverage/*` + `npm run audit:observability`) and integrate with CI workflow.
+**Output**: Coverage contract/audit tooling plus CI workflow update and implementation notes at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-6b-audit-gate.md`.
+**Acceptance**: `npm run audit:observability` passes with full required coverage dimensions and CI contains an explicit audit step.
+
+### ⬜ Unit 6c: Observability Coverage Gate — Verify
+**What**: Run the observability audit and produce parseable metrics artifact for automated consumers.
+**Output**: Observability coverage report at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-6c-observability-coverage.json` and verification note.
+**Acceptance**: Report includes measurable values for event-catalog coverage, schema/redaction compliance, and logpoint coverage; no unresolved gaps.
+
+### ⬜ Unit 7a: End-to-End Event Catalog Verification
 **What**: Run targeted and full test suites validating minimum event catalog coverage, required envelope fields, and persisted append-only NDJSON outputs.
-**Output**: Verification matrix at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-6a-event-catalog-verify.md`.
+**Output**: Verification matrix at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-7a-event-catalog-verify.md`.
 **Acceptance**: Matrix confirms each required event is covered by tests, persisted files are parseable NDJSON, and no unresolved gaps remain.
 
-### ⬜ Unit 6b: Final Quality Gate & Completion Audit
+### ⬜ Unit 7b: Final Quality Gate & Completion Audit
 **What**: Run `npm run test`, `npm run test:coverage`, and `npm run build`, then audit completion criteria line-by-line.
 **Output**: Final run artifacts (`final-test-output.txt`, `final-coverage-output.txt`, `final-build-output.txt`) and audit checklist at `./2026-03-02-1501-doing-ouroboros-migration-observability/final-audit.md`.
 **Acceptance**: All completion criteria are explicitly marked met with evidence and no warnings.
@@ -152,6 +170,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Artifact files listed in this doc are execution evidence only and are not runtime log sinks.
 - Runtime observability sinks for this phase are `stderr` and session-style append-only NDJSON files; collision hardening remains out of scope.
 - Persisted log key mapping is locked to session parity: CLI=`session`, Teams=`conversationId`.
+- Observability coverage gating must run as `npm run audit:observability` and pass before unit/final completion.
 - **Fixes/blockers**: Spawn sub-agent immediately — don't ask, just do it
 - **Decisions made**: Update docs immediately, commit right away
 
@@ -168,3 +187,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 16:18] Pass 3 (validation): aligned wardrobe component mapping in acceptance criteria with planning decisions and merged codebase
 - [2026-03-02 16:18] Pass 4 (quality): verified template completeness, acceptance coverage, and emoji headers; set status to READY_FOR_EXECUTION
 - [2026-03-02 16:37] Explicitly added `src/engine/kicks.ts` + `src/__tests__/engine/kicks.test.ts` to Unit 3 and completion criteria
+- [PENDING_OBS_AUDIT_TS] Added explicit observability-coverage gate units (`audit:observability`, CI enforcement, machine-readable coverage report) and reset status to drafting for re-review
