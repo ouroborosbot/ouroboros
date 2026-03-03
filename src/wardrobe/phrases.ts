@@ -4,7 +4,7 @@
 // If agent.json has no phrases, loadAgentConfig() auto-fills placeholders.
 
 import { loadAgentConfig } from "../identity"
-import { emitObservabilityEvent } from "../observability/runtime"
+import { emitObservabilityEvent } from "../nerves/runtime"
 
 export interface PhrasePools {
   thinking: string[]

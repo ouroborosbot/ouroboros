@@ -7,7 +7,7 @@ import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName } from "../identity";
 import type { ResolvedContext } from "./context/types";
 import { getChannelCapabilities } from "./context/channel";
-import { emitObservabilityEvent } from "../observability/runtime";
+import { emitObservabilityEvent } from "../nerves/runtime";
 
 // Lazy-loaded psyche text cache
 let _psycheCache: { soul: string; identity: string; lore: string; friends: string } | null = null;

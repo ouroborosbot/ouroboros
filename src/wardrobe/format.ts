@@ -1,7 +1,7 @@
 // Shared formatting functions for tool results, kicks, and errors.
 // Used by both CLI and Teams adapters for consistent output.
 
-import { emitObservabilityEvent } from "../observability/runtime"
+import { emitObservabilityEvent } from "../nerves/runtime"
 
 export function formatToolResult(name: string, summary: string, success: boolean): string {
   emitObservabilityEvent({

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { emitObservabilityEvent, setRuntimeLogger } from "../../observability/runtime"
+import { emitObservabilityEvent, setRuntimeLogger } from "../../nerves/runtime"
 
 describe("observability/runtime", () => {
   afterEach(() => {

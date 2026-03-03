@@ -3,7 +3,7 @@ import { join } from "path"
 import { tmpdir } from "os"
 
 import { describe, expect, it } from "vitest"
-import { REQUIRED_EVENTS, getRequiredEventKeys } from "../../observability/coverage/contract"
+import { REQUIRED_EVENTS, getRequiredEventKeys } from "../../nerves/coverage/contract"
 
 type AuditResult = {
   overall_status: "pass" | "fail"
@@ -20,14 +20,14 @@ type AuditResult = {
 }
 
 async function runAudit(events: Array<Record<string, unknown>>, logpoints: Record<string, unknown>): Promise<AuditResult> {
-  const runDir = mkdtempSync(join(tmpdir(), "ouro-observability-audit-"))
+  const runDir = mkdtempSync(join(tmpdir(), "ouro-nerves-audit-"))
   const eventsPath = join(runDir, "vitest-events.ndjson")
   const logpointsPath = join(runDir, "vitest-logpoints.json")
 
   writeFileSync(eventsPath, events.map((e) => JSON.stringify(e)).join("\n") + "\n", "utf8")
   writeFileSync(logpointsPath, JSON.stringify(logpoints, null, 2), "utf8")
 
-  const audit = await import("../../observability/coverage/audit")
+  const audit = await import("../../nerves/coverage/audit")
   return audit.auditObservabilityCoverage({
     eventsPath,
     logpointsPath,
@@ -35,14 +35,14 @@ async function runAudit(events: Array<Record<string, unknown>>, logpoints: Recor
 }
 
 async function runAuditWithFiles(eventsContent: string, logpointsContent: string): Promise<AuditResult> {
-  const runDir = mkdtempSync(join(tmpdir(), "ouro-observability-audit-"))
+  const runDir = mkdtempSync(join(tmpdir(), "ouro-nerves-audit-"))
   const eventsPath = join(runDir, "vitest-events.ndjson")
   const logpointsPath = join(runDir, "vitest-logpoints.json")
 
   writeFileSync(eventsPath, eventsContent, "utf8")
   writeFileSync(logpointsPath, logpointsContent, "utf8")
 
-  const audit = await import("../../observability/coverage/audit")
+  const audit = await import("../../nerves/coverage/audit")
   return audit.auditObservabilityCoverage({
     eventsPath,
     logpointsPath,
@@ -50,12 +50,12 @@ async function runAuditWithFiles(eventsContent: string, logpointsContent: string
 }
 
 async function runAuditWithoutLogpoints(events: Array<Record<string, unknown>>): Promise<AuditResult> {
-  const runDir = mkdtempSync(join(tmpdir(), "ouro-observability-audit-"))
+  const runDir = mkdtempSync(join(tmpdir(), "ouro-nerves-audit-"))
   const eventsPath = join(runDir, "vitest-events.ndjson")
 
   writeFileSync(eventsPath, events.map((e) => JSON.stringify(e)).join("\n") + "\n", "utf8")
 
-  const audit = await import("../../observability/coverage/audit")
+  const audit = await import("../../nerves/coverage/audit")
   return audit.auditObservabilityCoverage({
     eventsPath,
     logpointsPath: join(runDir, "missing-logpoints.json"),
@@ -63,13 +63,13 @@ async function runAuditWithoutLogpoints(events: Array<Record<string, unknown>>):
 }
 
 async function runAuditMissingEventsFile(logpoints: Record<string, unknown>): Promise<AuditResult> {
-  const runDir = mkdtempSync(join(tmpdir(), "ouro-observability-audit-"))
+  const runDir = mkdtempSync(join(tmpdir(), "ouro-nerves-audit-"))
   const eventsPath = join(runDir, "missing-events.ndjson")
   const logpointsPath = join(runDir, "vitest-logpoints.json")
 
   writeFileSync(logpointsPath, JSON.stringify(logpoints, null, 2), "utf8")
 
-  const audit = await import("../../observability/coverage/audit")
+  const audit = await import("../../nerves/coverage/audit")
   return audit.auditObservabilityCoverage({
     eventsPath,
     logpointsPath,

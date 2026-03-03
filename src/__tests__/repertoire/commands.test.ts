@@ -265,7 +265,7 @@ describe("commands observability contract", () => {
   it("emits repertoire.load_start event when registering default commands", async () => {
     vi.resetModules()
     const emitObservabilityEvent = vi.fn()
-    vi.doMock("../../observability/runtime", () => ({
+    vi.doMock("../../nerves/runtime", () => ({
       emitObservabilityEvent,
     }))
     const { createCommandRegistry, registerDefaultCommands } = await import("../../repertoire/commands")

@@ -1,6 +1,6 @@
 import type { Channel } from "../mind/prompt"
 import { getAgentName } from "../identity"
-import { emitObservabilityEvent } from "../observability/runtime"
+import { emitObservabilityEvent } from "../nerves/runtime"
 
 export interface CommandContext {
   channel: Channel

@@ -4,7 +4,7 @@ import type { ToolContext, ToolDefinition } from "./tools-base";
 import { teamsToolDefinitions, summarizeTeamsArgs } from "./tools-teams";
 import { adoSemanticToolDefinitions } from "./ado-semantic";
 import type { ChannelCapabilities } from "../mind/context/types";
-import { emitObservabilityEvent } from "../observability/runtime";
+import { emitObservabilityEvent } from "../nerves/runtime";
 
 // Re-export types and constants used by the rest of the codebase
 export { tools, finalAnswerTool } from "./tools-base";

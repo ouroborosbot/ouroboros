@@ -11,7 +11,7 @@ import {
   readLatestRun,
   writeActiveRun,
   writeLatestRun,
-} from "../../observability/coverage/run-artifacts"
+} from "../../nerves/coverage/run-artifacts"
 
 function createInfo(repoSlug: string) {
   const runId = "2026-03-02T18-00-00-000Z"

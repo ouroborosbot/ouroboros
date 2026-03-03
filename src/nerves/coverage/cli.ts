@@ -37,7 +37,7 @@ export function runAuditCli(argv: string[]): number {
 
   const eventsPath = args.eventsPath ?? join(runDir, "vitest-events.ndjson")
   const logpointsPath = args.logpointsPath ?? join(runDir, "vitest-logpoints.json")
-  const outputPath = args.output ?? join(runDir, "observability-coverage.json")
+  const outputPath = args.output ?? join(runDir, "nerves-coverage.json")
 
   const report = auditObservabilityCoverage({
     eventsPath,

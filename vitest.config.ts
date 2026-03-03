@@ -5,7 +5,7 @@ export default defineConfig({
     globals: true,
     exclude: ["dist/**", "node_modules/**"],
     maxWorkers: 1,
-    setupFiles: ["src/__tests__/observability/global-capture.ts"],
+    setupFiles: ["src/__tests__/nerves/global-capture.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov", "json-summary"],

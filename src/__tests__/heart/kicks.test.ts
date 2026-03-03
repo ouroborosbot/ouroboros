@@ -216,7 +216,7 @@ describe("detectKick", () => {
   it("emits engine.error observability event when a kick is detected", async () => {
     const emitObservabilityEvent = vi.fn()
     vi.resetModules()
-    vi.doMock("../../observability/runtime", () => ({
+    vi.doMock("../../nerves/runtime", () => ({
       emitObservabilityEvent,
     }))
 

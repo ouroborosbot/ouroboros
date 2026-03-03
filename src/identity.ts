@@ -1,6 +1,6 @@
 import * as fs from "fs"
 import * as path from "path"
-import { emitObservabilityEvent } from "./observability/runtime"
+import { emitObservabilityEvent } from "./nerves/runtime"
 
 export interface AgentConfig {
   name: string

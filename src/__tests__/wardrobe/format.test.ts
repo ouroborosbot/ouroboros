@@ -35,7 +35,7 @@ describe("format observability contract", () => {
   it("emits channels message event when formatting tool output", async () => {
     vi.resetModules()
     const emitObservabilityEvent = vi.fn()
-    vi.doMock("../../observability/runtime", () => ({
+    vi.doMock("../../nerves/runtime", () => ({
       emitObservabilityEvent,
     }))
     const format = await import("../../wardrobe/format")
