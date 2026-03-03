@@ -7,7 +7,7 @@
 Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that transforms the ouroboros agent from a bot that calls REST APIs into a constraint-aware reasoning engine operating within identity, authority, and channel boundaries.
 
 **Core design principles:**
-- **No caching anywhere.** APIs are the source of truth. Authority is learned fresh each conversation via 403 responses and Security Namespaces API pre-flight probes. ADO scopes are discovered at runtime via Accounts + Projects APIs. Process templates are fetched when needed. The conversation carries all learned state forward. Don't persist what you can re-derive.
+- **No caching anywhere.** APIs are the source of truth. Authority is learned fresh each turn via 403 responses and Security Namespaces API pre-flight probes (checker memoizes within the turn, discarded after). ADO scopes are discovered at runtime via Accounts + Projects APIs. Process templates are fetched when needed. The conversation carries all learned state forward across turns. Don't persist what you can re-derive.
 - **Typed, not stringly.** `IdentityProvider` and `Integration` are closed union types. `ToolDefinition` wraps each tool's OpenAI schema with co-located metadata (handler, integration, confirmationRequired). No bare strings in the type system.
 - **Model-managed memory.** `FriendMemory` with freeform `toolPreferences: Record<string, string>` -- the model decides what to store about each friend, not a typed schema.
 - **Conversation IS the session.** No separate session state layer. Tools are stateless; the model provides all required context on every call.
@@ -35,7 +35,7 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 - 1H. Wire context through ONE real ADO operation (Teams channel only): the existing `ado_work_items` tool gains runtime scope discovery. The tool schema changes: `organization` becomes **optional** (currently required). When the model provides org/project, use them directly. When omitted, the tool handler discovers the friend's orgs/projects via ADO APIs (Accounts API → Projects API) and disambiguates: single org → auto-select; multiple orgs → return the list for the model to ask the friend which one. Same logic applies at the project level within an org. Zero orgs → return "no ADO organizations found" and the model tells the friend. The `validateAdoOrg()` call is replaced by this discovery flow. The conversation carries discovery results forward — no caching. This is the proof that the kernel works end-to-end. ADO is Teams-only (CLI has `availableIntegrations = []`, no OAuth tokens) so this wiring is tested exclusively via the Teams channel.
 
 **Phase 2: Authority (Demand-Driven)**
-- 2A. `Authority` type and resolution -- integration-scoped capability profiles using a hybrid model: optimistic on read-path (attempt and learn from 403), pre-flight check on write-path (verify before proposing destructive operations). No cache -- authority is learned fresh each conversation via 403 responses and pre-flight probes; the conversation carries results forward.
+- 2A. `Authority` type and resolution -- integration-scoped capability profiles using a hybrid model: optimistic on read-path (attempt and learn from 403), pre-flight check on write-path (verify before proposing destructive operations). No cache -- `AuthorityChecker` lives on the resolver (per-turn), memoizes within the turn, discarded after. Conversation carries authority knowledge across turns.
 - 2B. `AuthorityChecker` -- distinguishes read operations (optimistic, learn from failure) from write operations (pre-validated). Provides `canRead(scope)` (always true until 403 disproves) and `canWrite(scope)` (probes API before returning). Pre-flight writes use the Security Namespaces API (`/_apis/security/namespaces`) to check granular permission bits without side effects (Q8).
 - 2C. Wire Authority into existing `ado_mutate` tool -- before executing a mutation, check `canWrite()`. If denied, return a structured explanation instead of attempting and failing. Existing `ado_query` remains optimistic.
 - 2D. Extend system prompt injection with authority constraints -- `contextSection()` renders "can / CANNOT" authority limits into the prompt so the model plans around constraints upfront (see D10).
@@ -72,7 +72,7 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 - [ ] All four context layers (Identity, Authority, Memory, Channel) have TypeScript types and resolution functions (phased: Identity + Channel in Phase 1, Authority in Phase 2, Memory in Phase 3)
 - [ ] `ContextResolver` resolves identity + channel eagerly in Phase 1; Phase 2 adds authority (lazy); Phase 3 adds memory
 - [ ] Authority uses hybrid model: reads are optimistic (403 learning), writes have pre-flight check via Security Namespaces API (Q8)
-- [ ] Identity persists across sessions via `ContextStore`; Authority is learned fresh per-conversation (no cache); FriendMemory (toolPreferences) persists via `ContextStore` (Phase 3)
+- [ ] Identity persists across sessions via `ContextStore`; Authority is learned fresh per-turn (checker on resolver, memoized within turn, discarded after); FriendMemory (toolPreferences) persists via `ContextStore` (Phase 3)
 - [ ] ADO scope discovery works at runtime via Accounts API + Projects API; conversation carries results forward (no caching)
 - [ ] Tools are stateless — model provides all required context (org, project, IDs) on every call; no ambient session state
 - [ ] ToolContext extension is backward-compatible -- existing tools work unchanged
@@ -81,7 +81,7 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 - [ ] Process template detection works for Basic, Agile, and Scrum
 - [ ] Channel-aware formatting works for Teams and CLI
 - [ ] Dry-run mode returns structured preview for ADO mutations
-- [ ] Authority is scoped per-friend per-conversation -- resolver creates authority state per-request (D13), no shared cache across friends or conversations
+- [ ] Authority is scoped per-friend per-turn -- `AuthorityChecker` lives on the resolver (per-request), memoizes within the turn, discarded after (D13). Conversation history carries authority knowledge across turns.
 - [ ] System prompt includes resolved context (identity, channel, authority constraints) via `contextSection()` in `buildSystem()`
 - [ ] Authority constraints rendered as explicit "can / CANNOT" in prompt so model plans around limitations
 - [ ] Prompt injection gracefully omitted when no context is available (CLI with no identity, first turn)
@@ -113,7 +113,7 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 ### Resolved
 - [x] Q1: Should the `ContextResolver` pipeline be synchronous or async? **Resolved (D6)**: async. The resolver uses explicit `Promise<T>` fields for layers that require I/O (authority in Phase 2). Promises are eager-start (API call fires at resolver build time, A7); consumers await them when needed.
 - [x] Q2: How should we model the identity-to-external-ID mapping when the same person uses CLI and Teams? **Resolved (D12)**: each channel has its own resolution path. Cross-channel linking is opt-in. CLI and Teams identities are separate for now.
-- [x] Q3: Should authority profiles be eagerly fetched or lazily fetched? **Resolved (D6)**: lazy, no cache. Authority is a `Promise<AuthorityProfile[]>` on the resolved context, not fetched until awaited. Learned fresh each conversation -- no TTL cache.
+- [x] Q3: Should authority profiles be eagerly fetched or lazily fetched? **Resolved (D6, A7)**: eager-start Promise, no cache. Authority is a `Promise<AuthorityProfile[]>` on the resolved context -- the API call fires immediately at resolver build time, consumers `await` when needed. Learned fresh each turn, conversation carries results forward.
 - [x] Q6: How should we handle session context when the same friend is in Teams and CLI simultaneously? **Resolved (D8, superseded)**: Session layer was eliminated. Conversation history is per-channel. Identity and Memory are per-friend, shared across channels.
 - [x] Q9: Identity bootstrapping -- who creates the `FriendIdentity` on first interaction? **Resolved (D14)**: always "get or create." Auto-create with sensible defaults, no manual setup.
 - [x] Q10: Session persistence between turns? **Resolved (D8, eliminated)**: no structured session state. Conversation history saved via existing `saveSession()`. Persistent knowledge lives in Identity (and Memory, Phase 3) via `ContextStore`.
@@ -157,7 +157,7 @@ Channel integration mapping:
 This replaces the current hardcoded pattern in `getToolsForChannel()` where `channel === "teams"` gates the Teams tool list. The channel capabilities definition + `ToolDefinition.integration` become the single mechanism to configure what a channel can do.
 
 ### D4: Authority -- No Cache, Conversation Carries State
-Authority has no TTL cache. The hybrid model (optimistic reads, pre-flight writes) works without one: the model learns permissions fresh each conversation via 403 responses on reads and pre-flight probes on writes. The conversation carries learned authority forward within the session. Next conversation starts fresh -- permissions may have changed, and re-learning is cheap (one 403 or one probe). This follows the "don't persist what you can re-derive" principle and eliminates all cache-related complexity (TTL, invalidation, cross-friend keying, stale entries).
+Authority has no TTL cache. The `AuthorityChecker` lives on the resolver (per-turn) and memoizes probe results within that turn. Across turns, the conversation carries authority knowledge forward -- the model sees previous 403s and probe results in the message history and acts accordingly. If messages get trimmed (ouroboros), the model loses that knowledge and re-probes on the next write attempt -- permissions might have changed anyway, and one lightweight probe per turn is cheap insurance before destructive mutations. This follows the "don't persist what you can re-derive" principle and eliminates all cache-related complexity (TTL, invalidation, cross-friend keying, stale entries).
 
 ### D5: ToolContext Extension + ToolDefinition Wrapper
 The existing `ToolContext` interface in `src/repertoire/tools-base.ts` is extended (not replaced) with an optional `context?: ResolvedContext` field. The `adoOrganizations` field is removed -- org validation moves to runtime scope discovery (see D20). This means existing tool handlers need minor updates (replace `validateAdoOrg()` with scope discovery), but the overall shape is backward-compatible. New semantic tools access context layers on demand.
@@ -237,8 +237,8 @@ Design rules:
 
 This is wired in Phase 1 (1G) for identity + channel, and extended in Phase 2 (2D) for authority.
 
-### D11: Authority → Scope Re-Discovery on 403
-Scopes are discovered at runtime via ADO APIs and carried forward in the conversation — there is no cache (in-memory or persisted). When Authority (Phase 2) records a 403 on a scope, the next tool call that needs scopes re-discovers them via the ADO APIs. The revoked scope naturally disappears because the API no longer returns it. No cross-layer feedback needed — the API is the source of truth.
+### D11: 403 Triggers Fresh Scope Discovery
+Scopes are discovered at runtime via ADO APIs and carried forward in the conversation -- there is no cache (in-memory or persisted). When a tool call receives a 403 on a scope, the next tool call that needs scopes re-discovers them via the ADO APIs. The revoked scope naturally disappears because the API no longer returns it. No cross-layer feedback needed -- the API is the source of truth.
 
 ### D12: Cross-Channel Identity -- Designed For Multi-Channel From Day One
 Friends will talk to the agent from many channels over time -- Teams today, Discord/Telegram/iMessage/web tomorrow. The identity model must make cross-channel linking a natural extension, not a retrofit.
@@ -268,7 +268,7 @@ Channel adapter responsibilities:
 - **Teams** (`handleTeamsMessage()`): extracts AAD userId + tenantId from the bot activity. Creates a resolver with `{ provider: "aad", externalId: activity.from.aadObjectId, tenantId }`. Attaches to `ToolContext` alongside OAuth tokens.
 - **CLI**: extracts OS username. Creates a resolver with `{ provider: "local", externalId: os.userInfo().username }`. CLI currently doesn't build a `ToolContext` (no tokens needed) — Phase 1 adds a minimal `ToolContext` with just the `context` field so CLI gets identity without integration access.
 
-Authority has no in-memory cache (D4). Authority state is learned fresh each conversation and carried forward in the conversation context. The resolver creates authority state per-request, scoped to the friend -- no shared state across friends or conversations.
+Authority has no in-memory cache (D4). The `AuthorityChecker` lives on the resolver -- created per-turn, discarded after the turn completes. Within a turn, it memoizes probe results (no redundant API calls to the same scope). Across turns, the conversation history carries authority knowledge forward. If messages get trimmed and the model forgets, it re-probes -- permissions might have changed anyway.
 
 ### D14: Identity Bootstrapping -- Always Get-or-Create
 Identity resolution is always "get or create." When a friend first interacts with the agent, if no `FriendIdentity` exists for the channel's external ID, one is created automatically with sensible defaults:
@@ -297,7 +297,7 @@ Every persisted type (`FriendIdentity`, `FriendMemory`) carries a `schemaVersion
 Migrations are simple pure functions (old data in, new data out), not a framework. Version 1 is the initial schema. Each version bump has one migration function. They compose: v1 -> v2 -> v3 if needed.
 
 ### D18: Token Separation -- Tokens Stay in ToolContext, Context Stays in ResolvedContext
-Tokens (`graphToken`, `adoToken`) remain in `ToolContext`. They are ephemeral per-turn credentials fetched fresh from Azure Bot Service's token store on each incoming message. The context kernel (`ResolvedContext`) manages friend knowledge: who you are (Identity), what the channel supports (Channel), and what the agent remembers about you (Memory, Phase 3). Identity and Memory are persisted (via `ContextStore`); everything else is runtime (scope discovery, authority learned per-conversation). Tokens and context coexist on the same `ToolContext` object (D5: `context?: ResolvedContext`) but serve different purposes.
+Tokens (`graphToken`, `adoToken`) remain in `ToolContext`. They are ephemeral per-turn credentials fetched fresh from Azure Bot Service's token store on each incoming message. The context kernel (`ResolvedContext`) manages friend knowledge: who you are (Identity), what the channel supports (Channel), and what the agent remembers about you (Memory, Phase 3). Identity and Memory are persisted (via `ContextStore`); everything else is runtime (scope discovery, authority learned per-turn). Tokens and context coexist on the same `ToolContext` object (D5: `context?: ResolvedContext`) but serve different purposes.
 
 ### D19: Source Directory Structure -- Agent-Creature Body Metaphor
 All top-level source directories MUST map to a part of the agent-creature's body. This is not a suggestion -- it is a naming convention enforced across the codebase. No new top-level `src/` directory may be created unless it fits the metaphor.
@@ -345,7 +345,7 @@ What replaces them:
 - **Heart** (core loop): `src/heart/core.ts` -- `runAgent()` loop, provider selection, streaming, tool execution
 - **Mind** (reasoning): `src/mind/prompt.ts` -- `buildSystem()` assembles system prompt with channel-aware sections; `src/mind/context.ts` -- `saveSession()`, `loadSession()`, `postTurn()`, `trimMessages()`
 - **Repertoire** (capabilities): `src/repertoire/tools-base.ts` (base tools), `src/repertoire/tools-teams.ts` (Teams-only tools including ADO/Graph), `src/repertoire/tools.ts` (channel-aware tool list)
-- **ToolContext interface** (`src/repertoire/tools-base.ts`): `{ graphToken?, adoToken?, signin, adoOrganizations }` — `adoOrganizations` removed by context kernel (D20); org validation moves to runtime API discovery
+- **ToolContext interface** (`src/repertoire/tools-base.ts`): `{ graphToken?, adoToken?, signin, adoOrganizations }` as of unit 10. Later units modify: unit 1H adds `context?: ResolvedContext` (D5); unit 1H removes `adoOrganizations` (D20, replaced by runtime API discovery)
 - **ADO client**: `src/repertoire/ado-client.ts` -- generic `adoRequest()` and `queryWorkItems()` wrapper
 - **Graph client**: `src/repertoire/graph-client.ts` -- generic `graphRequest()` and `getProfile()` wrapper
 - **Senses** (channels): `src/senses/cli.ts` (readline REPL), `src/senses/teams.ts` (Teams SDK bot)
@@ -470,18 +470,21 @@ interface AuthorityProfile {
   integration: Integration;
   scope: string;           // org/project
   capabilities: AuthorityCapability[];
-  // No cachedAt/expiresAt -- no TTL cache. Authority is learned fresh each conversation (D4).
+  // No cachedAt/expiresAt -- no TTL cache. Authority is learned fresh each turn (D4).
 }
 
 // Hybrid authority checker: optimistic reads, pre-validated writes.
-// No cache -- authority is learned fresh each conversation. The checker holds
-// per-conversation state (403 evidence) that is discarded when the conversation ends.
+// Lives on the resolver (per-turn, per-request). Within a single turn, memoizes
+// probe results so multiple API calls to the same scope don't re-probe. Across turns,
+// discarded -- cross-turn authority knowledge lives in conversation history.
+// If the model remembers from history, it acts accordingly. If messages get trimmed
+// and the model forgets, it re-probes -- permissions might have changed anyway.
 interface AuthorityChecker {
-  // Read path: optimistic, returns true unless a 403 was recorded this conversation
+  // Read path: optimistic, returns true unless a 403 was recorded this turn
   canRead(integration: Integration, scope: string): boolean;
   // Write path: probes permissions endpoint before returning
   canWrite(integration: Integration, scope: string, action: string): Promise<boolean>;
-  // Record a 403 failure for learning (within this conversation)
+  // Record a 403 failure for learning (within this turn, memoized on the checker)
   record403(integration: Integration, scope: string, action: string): void;
 }
 
@@ -505,10 +508,8 @@ interface ChannelCapabilities {
   supportsMarkdown: boolean;
   supportsStreaming: boolean;
   supportsRichCards: boolean;
-  supportsInteractiveConfirmation: boolean;
   maxMessageLength: number;
-  defaultVerbosity: "concise" | "normal" | "detailed";
-  defaultConfirmationFriction: "low" | "medium" | "high";
+  // Only fields with actual consumers. Add more when there's a unit that needs them (YAGNI).
   // CLI: availableIntegrations = [] -- no OAuth, no tokens, no integration access.
   //   Identity works (local file-based) but no ADO/Graph/GitHub tools.
   // Teams: availableIntegrations = ["ado", "graph"] -- OAuth-backed via Bot Service token store.
@@ -578,3 +579,4 @@ interface ToolDefinition {
 - 2026-03-02 2214 One-doing-doc language pass. Rewrote Notes section: "multiple doing docs" replaced with "one doing doc, four phases." Updated Open Questions header and "Decision needed before" lines to reference phase units instead of separate doing docs. Fixed "deferred" wording on unit 1D.
 - 2026-03-02 2224 Resolved Q4 (no process template cache -- fetch at runtime, conversation carries forward), Q5 (moved to Resolved), Q7 (coexist -- semantic preferred, generic as escape hatch). Only Q8 remains open. Fixed schema "Phase X adds" comments to reference specific units (3G, 2A). Clarified Context/References section for work-doer (paths are post-unit-10, current codebase still uses old names).
 - 2026-03-02 2228 Q8 resolved: Security Namespaces API for pre-flight writes. All open questions now resolved. Final coherence pass: rewrote Goal to reflect final design (no caching, typed unions, ToolDefinition, Security Namespaces, one marathon). Fixed 7 issues: unit 2B references Security Namespaces API (Q8), D2 references Security Namespaces API, D12 "Users" -> "Friends", D14 stale ContextStore.find("identity",...) -> store.identity.find(...), D15 removed "caching can be re-added" hedge, duplicate ResolvedContext schema comment removed, Q1 clarified eager-start Promise, D12 "now vs later" -> "in scope vs out of scope", Out of Scope "Deferred" -> "Postponed", completion criterion updated with Security Namespaces API.
+- PENDING_TIMESTAMP Final consistency fixes from friend review. (1) Q3 "lazy" -> "eager-start Promise" to match D6/A7. (2) AuthorityChecker lifecycle clarified: per-turn not per-conversation. Checker lives on resolver, memoizes within turn, discarded after. Cross-turn authority knowledge lives in conversation history; if trimmed, model re-probes. Updated D4, D13, D18, unit 2A, completion criteria, Goal, schema comments, Q3. (3) ChannelCapabilities: removed orphaned fields (supportsInteractiveConfirmation, defaultVerbosity, defaultConfirmationFriction) -- YAGNI, no consumer. (4) Context/References ToolContext: clarified post-unit-10 state vs later modifications by units 1H/D5/D20. (5) D11 retitled "403 Triggers Fresh Scope Discovery" -- tools re-discover, not authority layer.
