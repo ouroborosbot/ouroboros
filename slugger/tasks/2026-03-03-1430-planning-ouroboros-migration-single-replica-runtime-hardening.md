@@ -1,6 +1,6 @@
 # Planning: Ouroboros Migration — Single-Replica Runtime Hardening
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-03-03 14:30
 
 ## Goal
@@ -82,3 +82,4 @@ Current-state baseline check (2026-03-03): base tools currently include local sh
 - [2026-03-03 14:30] Created
 - [2026-03-03 14:36] Rebased planning assumptions on current repo state, locked remote tool-safety policy, and clarified unresolved SLO/capacity questions.
 - [2026-03-03 14:39] Locked concurrency and SLO contract (10 concurrent conversations with split p95 response targets and <1% error rate).
+- [2026-03-03 14:42] Planning approved for doing conversion.
