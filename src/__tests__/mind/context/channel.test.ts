@@ -1,0 +1,54 @@
+import { describe, it, expect } from "vitest"
+import { getChannelCapabilities } from "../../../mind/context/channel"
+import { isIntegration } from "../../../mind/context/types"
+
+describe("getChannelCapabilities", () => {
+  it("returns CLI capabilities with empty integrations", () => {
+    const caps = getChannelCapabilities("cli")
+    expect(caps.channel).toBe("cli")
+    expect(caps.availableIntegrations).toEqual([])
+    expect(caps.supportsMarkdown).toBe(false)
+    expect(caps.supportsStreaming).toBe(true)
+    expect(caps.supportsRichCards).toBe(false)
+    expect(caps.maxMessageLength).toBe(Infinity)
+  })
+
+  it("returns Teams capabilities with ado and graph integrations", () => {
+    const caps = getChannelCapabilities("teams")
+    expect(caps.channel).toBe("teams")
+    expect(caps.availableIntegrations).toEqual(["ado", "graph"])
+    expect(caps.supportsMarkdown).toBe(true)
+    expect(caps.supportsStreaming).toBe(false)
+    expect(caps.supportsRichCards).toBe(true)
+    expect(caps.maxMessageLength).toBe(4000)
+  })
+
+  it("returns minimal default capabilities for unknown channel", () => {
+    const caps = getChannelCapabilities("slack" as any)
+    expect(caps.channel).toBe("cli") // falls back to CLI-like defaults
+    expect(caps.availableIntegrations).toEqual([])
+    expect(caps.supportsMarkdown).toBe(false)
+    expect(caps.supportsStreaming).toBe(false)
+    expect(caps.supportsRichCards).toBe(false)
+    expect(caps.maxMessageLength).toBe(Infinity)
+  })
+
+  it("all integration values are valid Integration types", () => {
+    const teamsCaps = getChannelCapabilities("teams")
+    for (const integration of teamsCaps.availableIntegrations) {
+      expect(isIntegration(integration)).toBe(true)
+    }
+  })
+
+  it("all capability fields are present and correctly typed", () => {
+    for (const channel of ["cli", "teams"] as const) {
+      const caps = getChannelCapabilities(channel)
+      expect(typeof caps.channel).toBe("string")
+      expect(Array.isArray(caps.availableIntegrations)).toBe(true)
+      expect(typeof caps.supportsMarkdown).toBe("boolean")
+      expect(typeof caps.supportsStreaming).toBe("boolean")
+      expect(typeof caps.supportsRichCards).toBe("boolean")
+      expect(typeof caps.maxMessageLength).toBe("number")
+    }
+  })
+})
