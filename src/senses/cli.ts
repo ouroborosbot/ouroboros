@@ -331,7 +331,7 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
 }
 
 export async function main() {
-  const sessPath = sessionPath("cli", "session")
+  const sessPath = sessionPath("default", "cli", "session")
   const registry = createCommandRegistry()
   registerDefaultCommands(registry)
 
