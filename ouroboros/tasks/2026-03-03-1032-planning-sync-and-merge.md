@@ -16,8 +16,8 @@ Build a new `work-merger` subagent that runs after work-doer completes, fetching
 - Update `subagents/README.md`: add work-merger to the table, update workflow description, add install commands for both Claude Code and Codex skill harnesses
 - Update `AGENTS.md` to add sync-and-merge as a workflow step after work-doer
 - The work-merger workflow: fetch, merge, conflict resolution using task docs, test, create PR via `gh`, CI passes, merge PR to main
-- Conflict resolution strategy: read own task doc + other agent's recent task docs to understand intent
-- Race condition retry flow: if PR has conflicts (other agent merged while this agent was working), pull updated main, re-resolve conflicts using task docs, run tests, force-push branch, let CI re-run
+- Conflict resolution strategy: read own task doc + use git history to find doing docs that landed on main since branch point, understand both intents
+- Race condition retry flow: exponential backoff (30s, 1m, 2m, 4m...), no retry limit, clear user-facing communication on each retry. Re-fetch, re-merge, re-resolve, force-push, CI re-run.
 - CI failure self-repair: agent attempts to fix CI failures itself first (it wrote the code, has task context), only escalates to user for genuinely ambiguous issues
 - Post-merge cleanup: delete feature branch (local and remote) after PR is merged
 - `gh` CLI preflight checks in On Startup: verify installed, authenticated, GitHub remote configured, repo default set. Agent self-repairs what it can, escalates only for human-required input (credentials, OAuth)
@@ -42,8 +42,8 @@ Build a new `work-merger` subagent that runs after work-doer completes, fetching
 - [ ] `AGENTS.md` updated: extended workflow (work-planner -> work-doer -> work-merger), Runtime-Specific Invocation includes `$work-merger` for Codex and sub-agent for Claude Code
 - [ ] The work-merger doc covers: fetch, merge, conflict resolution with task doc context, test, PR creation via `gh`, merge PR to main
 - [ ] The work-merger doc covers the fast-path: branch already up-to-date with main (still creates PR, CI must pass)
-- [ ] The work-merger doc covers dynamic task doc discovery: scan `*/tasks/` dirs with recency bias (most recent doing docs first)
-- [ ] The work-merger doc covers race condition retry: re-fetch, re-merge, re-resolve conflicts, force-push, CI re-run
+- [ ] The work-merger doc covers git-informed task doc discovery: use `git log origin/main --not HEAD` to find doing docs that landed on main since the branch point (not just timestamp-sorted scanning)
+- [ ] The work-merger doc covers race condition retry: exponential backoff (30s, 1m, 2m, 4m...), no retry limit, clear user-facing communication on each retry (retry number, wait duration, reason)
 - [ ] The work-merger doc covers CI failure self-repair: agent fixes failures itself first, escalates only when genuinely stuck
 - [ ] The work-merger doc covers post-merge cleanup: delete feature branch (local + remote)
 - [ ] The work-merger doc covers escalation: when to stop and ask the user (only for genuinely ambiguous issues, not fixable failures)
@@ -73,8 +73,8 @@ Note: This task is primarily documentation (subagent .md files, workflow docs). 
 - **Branch convention (unified)**: both agents use `<agent>/<slug>` (e.g., `ouroboros/context-kernel`, `slugger/some-feature`). The old `codex/<agent>` prefix convention is deprecated. AGENTS.md branch parsing simplified to just `<agent>[/<slug>]`. The work-merger doc derives the current agent from the first path segment of the branch name -- no hardcoded agent names.
 - **Dual-install pattern**: work-merger.md is authored once in `subagents/` with YAML frontmatter. It works as a Claude Code sub-agent AND as a Codex skill (hard-linked as `SKILL.md`). Same pattern already used by work-planner and work-doer.
 - No task locking -- first-come-first-served to main
-- Conflict resolution uses task docs as context (own doing doc + other agent's recent doing docs on main)
-- **Race condition retry**: if the PR has merge conflicts because the other agent merged to main in the meantime, the agent pulls updated main, re-resolves conflicts (re-reading task docs), runs tests, force-pushes the branch, and lets CI re-run. This is the most common real-world scenario.
+- **Git-informed task doc discovery**: use `git log origin/main --not HEAD -- '*/tasks/*-doing-*.md'` (or equivalent) to find exactly which doing docs landed on main since the branch point. This replaces the pure timestamp heuristic -- no irrelevant old docs, no missed relevant ones. Conflict resolution reads own doing doc + these git-identified doing docs to understand both intents.
+- **Race condition retry with exponential backoff**: if the PR has merge conflicts because the other agent merged to main in the meantime, the agent uses exponential backoff (30s, 1m, 2m, 4m...) with no retry limit. On each retry, MUST communicate clearly to the user: retry number, wait duration, reason (e.g., "Main moved again. Retry #3, waiting 2 minutes before re-fetching. Other agent is active."). Then re-fetch, re-merge, re-resolve using task docs, run tests, force-push. This is the most common real-world scenario.
 - **CI failure self-repair**: agent attempts to fix CI failures itself first (lint issues, test failures, etc.) since it wrote the code and has full task context. Only escalates to user when there is genuinely something that needs human input -- not just a failing test it could fix.
 - **Post-merge cleanup**: after PR is merged to main, delete the feature branch both locally (`git branch -d`) and remotely (`git push origin --delete`).
 - Escalation to user only when truly stuck (ambiguous conflict that can't be resolved from task docs, or repeated CI failures after self-repair attempts)
@@ -82,7 +82,7 @@ Note: This task is primarily documentation (subagent .md files, workflow docs). 
 - **Merge strategy**: merge commits (not rebase). Simpler, preserves branch history.
 - **PR-based merge to main**: agents create a PR via `gh pr create`, CI must pass, then `gh pr merge`. No direct push to main. Keeps main green.
 - **Fast-path when up-to-date**: if `git merge origin/main` is a no-op, skip conflict resolution but still create PR and wait for CI to pass before merging.
-- **Dynamic task doc discovery**: scan `*/tasks/` directories to find all agents' task docs. Use recency bias -- sort by filename timestamp (YYYY-MM-DD-HHMM prefix), prioritize reading the most recent doing docs to understand what just changed on main.
+- **(Superseded)** ~~Dynamic task doc discovery via timestamp scan~~ -- replaced by git-informed discovery (see above).
 - **`gh` CLI available on both machines**: use `gh` for PR creation and merging on both ouroboros (Claude Code) and slugger (Codex).
 
 ## Context / References
