@@ -1195,7 +1195,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 ---
 
-### ⬜ Unit 3F: Channel-Aware ADO Behavior
+### ✅ Unit 3F: Channel-Aware ADO Behavior
 
 **What**: Make semantic ADO tools format their output based on channel capabilities. Teams gets summarized views with rich cards. CLI gets structured tabular output.
 
@@ -1225,11 +1225,11 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - Unknown channel: gets plain text fallback
 
 **Completion criteria:**
-- [ ] All semantic tools format output based on channel capabilities
-- [ ] Teams: markdown summaries, respects maxMessageLength
-- [ ] CLI: structured tabular output
-- [ ] 100% test coverage
-- [ ] All tests pass
+- [x] All semantic tools format output based on channel capabilities
+- [x] Teams: markdown summaries, respects maxMessageLength
+- [x] CLI: structured tabular output
+- [x] 100% test coverage
+- [x] All tests pass
 
 ---
 
