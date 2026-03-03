@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 
-import { createLogger } from "../../observability"
+import { createLogger, registerGlobalLogSink } from "../../observability"
 
 describe("observability/logger", () => {
   it("emits required envelope fields", () => {
@@ -156,5 +156,56 @@ describe("observability/logger", () => {
     expect(payload.event).toBe("turn.info")
 
     stderrSpy.mockRestore()
+  })
+
+  it("fans out emitted events to registered global sinks", () => {
+    const local: Array<Record<string, unknown>> = []
+    const global: Array<Record<string, unknown>> = []
+    const unregister = registerGlobalLogSink((entry) => global.push(entry as Record<string, unknown>))
+
+    const logger = createLogger({
+      level: "debug",
+      sinks: [(entry) => local.push(entry as Record<string, unknown>)],
+      now: () => new Date("2026-03-02T17:00:00.000Z"),
+    })
+
+    logger.info({
+      event: "engine.turn_end",
+      trace_id: "trace-global",
+      component: "engine",
+      message: "turn completed",
+      meta: { done: true },
+    })
+    unregister()
+
+    expect(local).toHaveLength(1)
+    expect(global).toHaveLength(1)
+    expect(global[0]).toEqual(local[0])
+  })
+
+  it("isolates logger execution from global sink failures", () => {
+    const local: Array<Record<string, unknown>> = []
+    const unregister = registerGlobalLogSink(() => {
+      throw new Error("global sink exploded")
+    })
+
+    const logger = createLogger({
+      level: "info",
+      sinks: [(entry) => local.push(entry as Record<string, unknown>)],
+    })
+
+    expect(() => {
+      logger.info({
+        event: "engine.turn_start",
+        trace_id: "trace-safe",
+        component: "engine",
+        message: "still emits",
+        meta: {},
+      })
+    }).not.toThrow()
+    unregister()
+
+    expect(local).toHaveLength(1)
+    expect(local[0]?.event).toBe("engine.turn_start")
   })
 })
