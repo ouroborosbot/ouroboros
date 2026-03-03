@@ -20,8 +20,8 @@ Define and lock runtime hardening requirements for single-replica preview so req
 - [x] Request-path logging and persistence sinks are non-blocking in practice for expected preview concurrency.
 - [x] Tool-surface runtime posture is enforced according to agreed preview policy.
 - [x] Remote channels cannot execute local CLI/file/git/gh tools, and denial UX explains multi-user safety rationale with a clear alternative path.
-- [ ] Concurrency guardrails (limits/timeouts/backpressure behavior) are implemented and covered by tests.
-- [ ] System-prompt rebuild path has explicit safety behavior (freshness + consistency) covered by tests.
+- [x] Concurrency guardrails (limits/timeouts/backpressure behavior) are implemented and covered by tests.
+- [x] System-prompt rebuild path has explicit safety behavior (freshness + consistency) covered by tests.
 - [ ] Load-validation artifacts exist and demonstrate agreed preview thresholds: 10 concurrent remote conversations, p95 first-feedback <= 2s, p95 final <= 9s for simple no-tool turns, p95 final <= 30s for tool/external turns, and error rate < 1%.
 - [ ] CI gate fails when runtime-hardening contract checks regress.
 - [ ] 100% test coverage on all new code
@@ -91,7 +91,7 @@ Define and lock runtime hardening requirements for single-replica preview so req
 **Output**: Red test artifact at `./2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-3a-red-run.txt`.
 **Acceptance**: Tests fail before implementation and capture missing guardrail/freshness behavior.
 
-### ⬜ Unit 3b: Concurrency Guardrails and Prompt-Rebuild Safety — Implementation
+### ✅ Unit 3b: Concurrency Guardrails and Prompt-Rebuild Safety — Implementation
 **What**: Implement guardrails and prompt-path safety behavior aligned to single-replica preview requirements.
 **Output**: Updated engine/channel/prompt runtime code and passing tests.
 **Acceptance**: Concurrency and prompt consistency behavior are enforced and observable in runtime/tests.
@@ -138,3 +138,4 @@ Define and lock runtime hardening requirements for single-replica preview so req
 - [2026-03-03 14:57] Unit 2b complete: implemented non-blocking sink fanout/file behavior with resilient error handling and verified full test + build green (`unit-2b-test-run.txt`, `unit-2b-build-run.txt`).
 - [2026-03-03 14:58] Unit 2c complete: verified 100% coverage and clean build after non-blocking sink hardening (`unit-2c-coverage-run.txt`, `unit-2c-build-run.txt`).
 - [2026-03-03 15:01] Unit 3a complete: added failing tests for global in-flight Teams guardrails and prompt-refresh safety/consistency; captured red evidence in `unit-3a-red-run.txt`.
+- [2026-03-03 15:04] Unit 3b complete: implemented global Teams in-flight concurrency cap and resilient prompt-refresh fallback/preservation behavior; verified full test + build green (`unit-3b-test-run.txt`, `unit-3b-build-run.txt`).
