@@ -77,7 +77,7 @@ Note: This task is documentation-only. TDD applies if any runtime code is introd
 **Output**: Conflict Resolution and Task Doc Discovery sections added to `subagents/work-merger.md`.
 **Acceptance**: Section instructs agent to: (1) read own doing doc path from the task that just completed, (2) use git log to find doing docs that landed on main since the branch point (e.g., `git log origin/main --not HEAD -- '*/tasks/*-doing-*.md'`), (3) read those doing docs to understand what the other agent changed and why, (4) resolve conflicts preserving both intents. Discovery is git-informed (based on actual commits to main), not a pure filename timestamp scan.
 
-### ⬜ Unit 3: `work-merger.md` -- PR workflow, CI, and fast-path
+### ✅ Unit 3: `work-merger.md` -- PR workflow, CI, and fast-path
 **What**: Add sections for: PR creation via `gh pr create`, waiting for CI, merging via `gh pr merge`, the fast-path (branch already up-to-date with main -- skip conflict resolution, still create PR for CI gate), and CI failure self-repair (agent fixes failures itself, only escalates when genuinely stuck).
 **Output**: PR Workflow, Fast Path, and CI Failure Handling sections added to `subagents/work-merger.md`.
 **Acceptance**: PR workflow uses `gh pr create` and `gh pr merge`. Fast-path explicitly handles the no-conflict case but still requires PR + CI. CI failure section instructs agent to attempt self-repair first (it wrote the code), with clear boundary for when to escalate.
