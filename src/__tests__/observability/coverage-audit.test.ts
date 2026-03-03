@@ -33,6 +33,21 @@ async function runAudit(events: Array<Record<string, unknown>>, logpoints: Recor
   })
 }
 
+async function runAuditWithFiles(eventsContent: string, logpointsContent: string): Promise<AuditResult> {
+  const runDir = mkdtempSync(join(tmpdir(), "ouro-observability-audit-"))
+  const eventsPath = join(runDir, "vitest-events.ndjson")
+  const logpointsPath = join(runDir, "vitest-logpoints.json")
+
+  writeFileSync(eventsPath, eventsContent, "utf8")
+  writeFileSync(logpointsPath, logpointsContent, "utf8")
+
+  const audit = await import("../../observability/coverage/audit")
+  return audit.auditObservabilityCoverage({
+    eventsPath,
+    logpointsPath,
+  })
+}
+
 describe("observability/coverage audit contract", () => {
   it("fails event-catalog coverage when required events are missing", async () => {
     const report = await runAudit(
@@ -103,6 +118,54 @@ describe("observability/coverage audit contract", () => {
 
     expect(report.overall_status).toBe("fail")
     expect(report.observability_coverage.logpoint_coverage.status).toBe("fail")
+    expect(report.required_actions).toContainEqual(expect.objectContaining({
+      type: "logging",
+      target: "logpoint-coverage",
+    }))
+  })
+
+  it("flags invalid meta fields during schema checks", async () => {
+    const report = await runAudit(
+      [
+        {
+          ts: "2026-03-02T18:00:00.000Z",
+          level: "info",
+          event: "engine.turn_start",
+          trace_id: "trace-1",
+          component: "engine",
+          message: "turn start",
+          meta: [],
+        },
+      ],
+      { declared: ["engine:engine.turn_start"], observed: ["engine:engine.turn_start"] },
+    )
+
+    expect(report.overall_status).toBe("fail")
+    expect(report.observability_coverage.schema_redaction.status).toBe("fail")
+    expect(report.required_actions).toContainEqual(expect.objectContaining({
+      type: "logging",
+      target: "schema-redaction",
+    }))
+  })
+
+  it("falls back to declared required logpoints when logpoint capture file is malformed", async () => {
+    const report = await runAuditWithFiles(
+      [
+        JSON.stringify({
+          ts: "2026-03-02T18:00:00.000Z",
+          level: "info",
+          event: "engine.turn_start",
+          trace_id: "trace-1",
+          component: "engine",
+          message: "turn start",
+          meta: {},
+        }),
+      ].join("\n"),
+      "{not-json",
+    )
+
+    expect(report.overall_status).toBe("fail")
+    expect(report.observability_coverage.logpoint_coverage.declared).toBeGreaterThan(1)
     expect(report.required_actions).toContainEqual(expect.objectContaining({
       type: "logging",
       target: "logpoint-coverage",

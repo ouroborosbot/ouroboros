@@ -38,6 +38,21 @@ const LEVEL_PRIORITY: Record<LogLevel, number> = {
   warn: 30,
   error: 40,
 }
+const GLOBAL_SINKS_KEY = Symbol.for("ouroboros.observability.global-sinks")
+
+function resolveGlobalSinks(): Set<LogSink> {
+  const scope = globalThis as Record<PropertyKey, unknown>
+  const existing = scope[GLOBAL_SINKS_KEY]
+  if (existing instanceof Set) {
+    return existing as Set<LogSink>
+  }
+
+  const created = new Set<LogSink>()
+  scope[GLOBAL_SINKS_KEY] = created
+  return created
+}
+
+const globalSinks = resolveGlobalSinks()
 
 function shouldEmit(configuredLevel: LogLevel, eventLevel: LogLevel): boolean {
   return LEVEL_PRIORITY[eventLevel] >= LEVEL_PRIORITY[configuredLevel]
@@ -73,6 +88,23 @@ export function createNdjsonFileSink(filePath: string): LogSink {
   }
 }
 
+export function registerGlobalLogSink(sink: LogSink): () => void {
+  globalSinks.add(sink)
+  return () => {
+    globalSinks.delete(sink)
+  }
+}
+
+function emitToGlobalSinks(entry: LogEvent): void {
+  for (const sink of globalSinks) {
+    try {
+      sink(entry)
+    } catch {
+      // Never fail runtime logging if an auxiliary sink errors.
+    }
+  }
+}
+
 export function createLogger(options: LoggerOptions = {}): Logger {
   const configuredLevel = options.level ?? "info"
   const sinks = options.sinks ?? [createStderrSink()]
@@ -84,7 +116,7 @@ export function createLogger(options: LoggerOptions = {}): Logger {
       return
     }
 
-    sink({
+    const payload: LogEvent = {
       ts: now().toISOString(),
       level,
       event: entry.event,
@@ -92,7 +124,10 @@ export function createLogger(options: LoggerOptions = {}): Logger {
       component: entry.component,
       message: entry.message,
       meta: entry.meta,
-    })
+    }
+
+    sink(payload)
+    emitToGlobalSinks(payload)
   }
 
   return {

@@ -1,5 +1,5 @@
 node_modules
 dist
-coverage
+/coverage
 .DS_Store
 manifest.zip
