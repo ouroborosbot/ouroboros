@@ -1,242 +1,297 @@
 import { describe, it, expect, vi } from "vitest"
-import { ContextResolver } from "../../../mind/context/resolver"
-import type { CollectionStore, ContextStore } from "../../../mind/context/store"
-import type { FriendIdentity, FriendMemory } from "../../../mind/context/types"
+import { FriendResolver } from "../../../mind/context/resolver"
+import type { FriendStore } from "../../../mind/context/store"
+import type { FriendRecord } from "../../../mind/context/types"
 
-function createMockStore(): ContextStore {
-  const identityItems = new Map<string, FriendIdentity>()
-  const identity: CollectionStore<FriendIdentity> = {
-    get: vi.fn(async (id: string) => identityItems.get(id) ?? null),
-    put: vi.fn(async (id: string, value: FriendIdentity) => { identityItems.set(id, value) }),
-    delete: vi.fn(async (id: string) => { identityItems.delete(id) }),
-    find: vi.fn(async (predicate: (value: FriendIdentity) => boolean) => {
-      for (const value of identityItems.values()) {
-        if (predicate(value)) return value
-      }
-      return null
-    }),
+function makeFriend(overrides: Partial<FriendRecord> = {}): FriendRecord {
+  return {
+    id: "uuid-1",
+    displayName: "Jordan",
+    externalIds: [
+      { provider: "aad", externalId: "aad-id-1", tenantId: "t1", linkedAt: "2026-03-02T00:00:00.000Z" },
+    ],
+    tenantMemberships: ["t1"],
+    toolPreferences: { ado: "flat backlog view" },
+    notes: { role: "engineering manager" },
+    createdAt: "2026-03-02T00:00:00.000Z",
+    updatedAt: "2026-03-02T00:00:00.000Z",
+    schemaVersion: 1,
+    ...overrides,
   }
-
-  const memoryItems = new Map<string, FriendMemory>()
-  const memory: CollectionStore<FriendMemory> = {
-    get: vi.fn(async (id: string) => memoryItems.get(id) ?? null),
-    put: vi.fn(async (id: string, value: FriendMemory) => { memoryItems.set(id, value) }),
-    delete: vi.fn(async (id: string) => { memoryItems.delete(id) }),
-    find: vi.fn(async (predicate: (value: FriendMemory) => boolean) => {
-      for (const value of memoryItems.values()) {
-        if (predicate(value)) return value
-      }
-      return null
-    }),
-  }
-
-  return { identity, memory }
 }
 
-describe("ContextResolver", () => {
-  it("creates ResolvedContext with identity and channel", async () => {
-    const store = createMockStore()
-    const resolver = new ContextResolver(store, {
+function createMockStore(existing?: FriendRecord): FriendStore {
+  return {
+    get: vi.fn(async () => existing ?? null),
+    put: vi.fn(async () => {}),
+    delete: vi.fn(async () => {}),
+    findByExternalId: vi.fn(async () => existing ?? null),
+  }
+}
+
+describe("FriendResolver", () => {
+  it("returns ResolvedContext with friend and channel", async () => {
+    const friend = makeFriend()
+    const store = createMockStore(friend)
+    const resolver = new FriendResolver(store, {
       provider: "aad",
-      externalId: "aad-user-1",
-      tenantId: "tenant-1",
+      externalId: "aad-id-1",
+      tenantId: "t1",
       displayName: "Jordan",
       channel: "teams",
     })
 
     const ctx = await resolver.resolve()
-    expect(ctx.identity.displayName).toBe("Jordan")
-    expect(ctx.identity.externalIds[0].provider).toBe("aad")
+    expect(ctx.friend.displayName).toBe("Jordan")
+    expect(ctx.friend.id).toBe("uuid-1")
     expect(ctx.channel.channel).toBe("teams")
     expect(ctx.channel.availableIntegrations).toEqual(["ado", "graph"])
   })
 
-  it("resolves CLI identity with local provider and CLI capabilities", async () => {
-    const store = createMockStore()
-    const resolver = new ContextResolver(store, {
+  it("resolves CLI identity with local provider", async () => {
+    const friend = makeFriend({
+      externalIds: [
+        { provider: "local", externalId: "alex@macbook", linkedAt: "2026-03-02T00:00:00.000Z" },
+      ],
+      tenantMemberships: [],
+    })
+    const store = createMockStore(friend)
+    const resolver = new FriendResolver(store, {
       provider: "local",
-      externalId: "jsmith",
-      displayName: "jsmith",
+      externalId: "alex@macbook",
+      displayName: "alex",
       channel: "cli",
     })
 
     const ctx = await resolver.resolve()
-    expect(ctx.identity.externalIds[0].provider).toBe("local")
-    expect(ctx.identity.externalIds[0].externalId).toBe("jsmith")
+    expect(ctx.friend.externalIds[0].provider).toBe("local")
     expect(ctx.channel.channel).toBe("cli")
-    expect(ctx.channel.availableIntegrations).toEqual([])
     expect(ctx.channel.supportsStreaming).toBe(true)
   })
 
-  it("resolves Teams identity with AAD provider and Teams capabilities", async () => {
-    const store = createMockStore()
-    const resolver = new ContextResolver(store, {
-      provider: "aad",
-      externalId: "aad-obj-id",
-      tenantId: "t1",
-      displayName: "Teams User",
-      channel: "teams",
+  describe("first-encounter flow", () => {
+    it("creates new FriendRecord when findByExternalId returns null", async () => {
+      const store = createMockStore() // no existing
+      ;(store.findByExternalId as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+
+      const resolver = new FriendResolver(store, {
+        provider: "aad",
+        externalId: "new-aad-id",
+        tenantId: "t1",
+        displayName: "New Person",
+        channel: "teams",
+      })
+
+      const ctx = await resolver.resolve()
+      // Should have created a new friend
+      expect(ctx.friend.displayName).toBe("New Person")
+      expect(ctx.friend.externalIds[0].provider).toBe("aad")
+      expect(ctx.friend.externalIds[0].externalId).toBe("new-aad-id")
+      expect(ctx.friend.externalIds[0].tenantId).toBe("t1")
+      expect(ctx.friend.tenantMemberships).toEqual(["t1"])
+      expect(ctx.friend.toolPreferences).toEqual({})
+      expect(ctx.friend.notes).toEqual({})
+      expect(ctx.friend.id).toBeTruthy()
+      // Should have saved via store.put
+      expect(store.put).toHaveBeenCalledTimes(1)
     })
 
-    const ctx = await resolver.resolve()
-    expect(ctx.identity.externalIds[0].provider).toBe("aad")
-    expect(ctx.identity.tenantMemberships).toContain("t1")
-    expect(ctx.channel.channel).toBe("teams")
-    expect(ctx.channel.supportsMarkdown).toBe(true)
+    it("generates a UUID for new friends", async () => {
+      const store = createMockStore()
+      ;(store.findByExternalId as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+
+      const resolver = new FriendResolver(store, {
+        provider: "local",
+        externalId: "alex@macbook",
+        displayName: "alex",
+        channel: "cli",
+      })
+
+      const ctx = await resolver.resolve()
+      // UUID format: 8-4-4-4-12 hex chars
+      expect(ctx.friend.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+    })
+
+    it("sets createdAt and updatedAt to current time for new friends", async () => {
+      const store = createMockStore()
+      ;(store.findByExternalId as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+
+      const before = new Date().toISOString()
+      const resolver = new FriendResolver(store, {
+        provider: "local",
+        externalId: "alex@macbook",
+        displayName: "alex",
+        channel: "cli",
+      })
+      const ctx = await resolver.resolve()
+      const after = new Date().toISOString()
+
+      expect(ctx.friend.createdAt >= before).toBe(true)
+      expect(ctx.friend.createdAt <= after).toBe(true)
+      expect(ctx.friend.updatedAt).toBe(ctx.friend.createdAt)
+    })
+
+    it("creates new friend without tenantId for local provider", async () => {
+      const store = createMockStore()
+      ;(store.findByExternalId as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+
+      const resolver = new FriendResolver(store, {
+        provider: "local",
+        externalId: "alex@macbook",
+        displayName: "alex",
+        channel: "cli",
+      })
+
+      const ctx = await resolver.resolve()
+      expect(ctx.friend.externalIds[0].tenantId).toBeUndefined()
+      expect(ctx.friend.tenantMemberships).toEqual([])
+    })
   })
 
-  it("handles unknown channel with default capabilities", async () => {
-    const store = createMockStore()
-    const resolver = new ContextResolver(store, {
-      provider: "local",
-      externalId: "user",
-      displayName: "user",
-      channel: "unknown" as any,
+  describe("returning friend flow", () => {
+    it("does NOT overwrite displayName on existing records", async () => {
+      const existing = makeFriend({ displayName: "My Preferred Name" })
+      const store = createMockStore(existing)
+
+      const resolver = new FriendResolver(store, {
+        provider: "aad",
+        externalId: "aad-id-1",
+        tenantId: "t1",
+        displayName: "SYSTEM.NAME.FROM.AAD",
+        channel: "teams",
+      })
+
+      const ctx = await resolver.resolve()
+      // Should keep the existing displayName, not overwrite with system-provided
+      expect(ctx.friend.displayName).toBe("My Preferred Name")
     })
 
-    const ctx = await resolver.resolve()
-    expect(ctx.channel.availableIntegrations).toEqual([])
-    expect(ctx.channel.supportsStreaming).toBe(false)
+    it("does not call store.put for existing friends", async () => {
+      const existing = makeFriend()
+      const store = createMockStore(existing)
+
+      const resolver = new FriendResolver(store, {
+        provider: "aad",
+        externalId: "aad-id-1",
+        tenantId: "t1",
+        displayName: "Jordan",
+        channel: "teams",
+      })
+
+      await resolver.resolve()
+      expect(store.put).not.toHaveBeenCalled()
+    })
   })
 
-  it("handles identity resolution error gracefully (auto-create)", async () => {
-    const store = createMockStore()
-    // Make store.identity.find throw
-    ;(store.identity.find as any).mockRejectedValue(new Error("disk error"))
+  describe("teams-conversation fallback", () => {
+    it("works with teams-conversation provider", async () => {
+      const store = createMockStore()
+      ;(store.findByExternalId as ReturnType<typeof vi.fn>).mockResolvedValue(null)
 
-    const resolver = new ContextResolver(store, {
-      provider: "local",
-      externalId: "user",
-      displayName: "User",
-      channel: "cli",
+      const resolver = new FriendResolver(store, {
+        provider: "teams-conversation",
+        externalId: "conv-id-123",
+        displayName: "Guest User",
+        channel: "teams",
+      })
+
+      const ctx = await resolver.resolve()
+      expect(ctx.friend.externalIds[0].provider).toBe("teams-conversation")
+      expect(ctx.friend.externalIds[0].externalId).toBe("conv-id-123")
     })
-
-    const ctx = await resolver.resolve()
-    // Should still resolve (identity auto-created on failure)
-    expect(ctx.identity.displayName).toBe("User")
-    expect(ctx.channel.channel).toBe("cli")
   })
 
-  it("returns readonly fields that reflect resolved data", async () => {
-    const store = createMockStore()
-    const resolver = new ContextResolver(store, {
-      provider: "local",
-      externalId: "user",
-      displayName: "User",
-      channel: "cli",
+  describe("channel capabilities", () => {
+    it("returns Teams capabilities for teams channel", async () => {
+      const store = createMockStore(makeFriend())
+      const resolver = new FriendResolver(store, {
+        provider: "aad",
+        externalId: "aad-id-1",
+        displayName: "Jordan",
+        channel: "teams",
+      })
+
+      const ctx = await resolver.resolve()
+      expect(ctx.channel.supportsMarkdown).toBe(true)
+      expect(ctx.channel.supportsRichCards).toBe(true)
     })
 
-    const ctx = await resolver.resolve()
-    // The identity and channel fields exist and are populated
-    expect(ctx.identity).toBeDefined()
-    expect(ctx.channel).toBeDefined()
-    expect(ctx.identity.id).toBeTruthy()
+    it("returns CLI capabilities for cli channel", async () => {
+      const store = createMockStore(makeFriend())
+      const resolver = new FriendResolver(store, {
+        provider: "local",
+        externalId: "alex@macbook",
+        displayName: "alex",
+        channel: "cli",
+      })
+
+      const ctx = await resolver.resolve()
+      expect(ctx.channel.supportsStreaming).toBe(true)
+      expect(ctx.channel.supportsMarkdown).toBe(false)
+    })
+
+    it("returns default capabilities for unknown channel", async () => {
+      const store = createMockStore(makeFriend())
+      const resolver = new FriendResolver(store, {
+        provider: "local",
+        externalId: "user",
+        displayName: "user",
+        channel: "unknown",
+      })
+
+      const ctx = await resolver.resolve()
+      expect(ctx.channel.availableIntegrations).toEqual([])
+      expect(ctx.channel.supportsStreaming).toBe(false)
+    })
   })
 
-  it("includes authority checker on ResolvedContext when availableIntegrations is non-empty (Teams)", async () => {
-    const store = createMockStore()
-    const resolver = new ContextResolver(store, {
-      provider: "aad",
-      externalId: "aad-user-1",
-      tenantId: "tenant-1",
-      displayName: "Jordan",
-      channel: "teams",
-    })
+  describe("no authority checker", () => {
+    it("result has no checker field", async () => {
+      const store = createMockStore(makeFriend())
+      const resolver = new FriendResolver(store, {
+        provider: "aad",
+        externalId: "aad-id-1",
+        displayName: "Jordan",
+        channel: "teams",
+      })
 
-    const ctx = await resolver.resolve()
-    // Teams has integrations, so authority checker should be present
-    expect(ctx.checker).toBeDefined()
-    expect(typeof ctx.checker!.canRead).toBe("function")
-    expect(typeof ctx.checker!.canWrite).toBe("function")
-    expect(typeof ctx.checker!.record403).toBe("function")
+      const ctx = await resolver.resolve()
+      expect("checker" in ctx).toBe(false)
+    })
   })
 
-  it("authority checker canWrite uses default probe (optimistic true)", async () => {
-    const store = createMockStore()
-    const resolver = new ContextResolver(store, {
-      provider: "aad",
-      externalId: "aad-user-1",
-      tenantId: "tenant-1",
-      displayName: "Jordan",
-      channel: "teams",
+  describe("error handling", () => {
+    it("handles findByExternalId failure gracefully (creates new)", async () => {
+      const store = createMockStore()
+      ;(store.findByExternalId as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("disk error"))
+
+      const resolver = new FriendResolver(store, {
+        provider: "local",
+        externalId: "user",
+        displayName: "User",
+        channel: "cli",
+      })
+
+      const ctx = await resolver.resolve()
+      // Should still resolve (creates new friend on search failure)
+      expect(ctx.friend.displayName).toBe("User")
     })
 
-    const ctx = await resolver.resolve()
-    // Default probe always returns true (optimistic)
-    const result = await ctx.checker!.canWrite("ado", "myorg", "createWorkItem")
-    expect(result).toBe(true)
-  })
+    it("handles store.put failure gracefully on new friend creation", async () => {
+      const store = createMockStore()
+      ;(store.findByExternalId as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+      ;(store.put as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("write error"))
 
-  it("skips authority when availableIntegrations is empty (CLI)", async () => {
-    const store = createMockStore()
-    const resolver = new ContextResolver(store, {
-      provider: "local",
-      externalId: "jsmith",
-      displayName: "jsmith",
-      channel: "cli",
+      const resolver = new FriendResolver(store, {
+        provider: "local",
+        externalId: "user",
+        displayName: "User",
+        channel: "cli",
+      })
+
+      // Should still resolve even if put fails
+      const ctx = await resolver.resolve()
+      expect(ctx.friend.displayName).toBe("User")
     })
-
-    const ctx = await resolver.resolve()
-    // CLI has no integrations, so authority checker should be undefined
-    expect(ctx.checker).toBeUndefined()
-  })
-
-  it("loads existing FriendMemory into ResolvedContext", async () => {
-    const store = createMockStore()
-    const memory: FriendMemory = {
-      id: "placeholder", // will be replaced by actual resolved identity id
-      toolPreferences: { ado: "flat backlog view" },
-      schemaVersion: 1,
-    }
-
-    const resolver = new ContextResolver(store, {
-      provider: "aad",
-      externalId: "aad-user-1",
-      tenantId: "tenant-1",
-      displayName: "Jordan",
-      channel: "teams",
-    })
-
-    // Resolve once to create the identity, then seed memory with correct id
-    const firstCtx = await resolver.resolve()
-    const friendId = firstCtx.identity.id
-    memory.id = friendId
-    await store.memory.put(friendId, memory)
-
-    // Resolve again -- memory should be loaded
-    const ctx = await resolver.resolve()
-    expect(ctx.memory).not.toBeNull()
-    expect(ctx.memory!.toolPreferences.ado).toBe("flat backlog view")
-  })
-
-  it("returns null memory for new friend with no stored memory", async () => {
-    const store = createMockStore()
-    const resolver = new ContextResolver(store, {
-      provider: "aad",
-      externalId: "aad-new-user",
-      tenantId: "tenant-1",
-      displayName: "New Person",
-      channel: "teams",
-    })
-
-    const ctx = await resolver.resolve()
-    expect(ctx.memory).toBeNull()
-  })
-
-  it("returns null memory on store read error (D16)", async () => {
-    const store = createMockStore()
-    // Seed an identity so we get a stable id
-    const resolver = new ContextResolver(store, {
-      provider: "local",
-      externalId: "user",
-      displayName: "User",
-      channel: "cli",
-    })
-
-    // Make memory.get throw
-    vi.mocked(store.memory.get).mockRejectedValue(new Error("disk error"))
-
-    const ctx = await resolver.resolve()
-    expect(ctx.memory).toBeNull()
   })
 })
