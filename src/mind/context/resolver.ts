@@ -8,6 +8,7 @@ import { resolveIdentity } from "./identity"
 import { getChannelCapabilities } from "./channel"
 import { createAuthorityChecker } from "./authority"
 import type { ProbeFunction } from "./authority"
+import { resolveMemory } from "./memory"
 
 export interface ContextResolverParams {
   provider: IdentityProvider
@@ -48,6 +49,9 @@ export class ContextResolver {
       ? createAuthorityChecker(this.probe)
       : undefined
 
-    return { identity, channel, checker }
+    // Load friend memory (null if missing or on error -- D16)
+    const memory = await resolveMemory(this.store.memory, identity)
+
+    return { identity, channel, checker, memory }
   }
 }

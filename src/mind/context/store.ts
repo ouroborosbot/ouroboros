@@ -2,7 +2,7 @@
 // All context persistence goes through ContextStore -- no context module imports `fs` directly.
 // Phase 1: identity collection only. Phase 3 adds memory.
 
-import type { FriendIdentity } from "./types"
+import type { FriendIdentity, FriendMemory } from "./types"
 
 // Generic CRUD + find for a collection of items keyed by string ID.
 export interface CollectionStore<T> {
@@ -16,4 +16,5 @@ export interface CollectionStore<T> {
 // Adding a new persisted type = add one readonly property.
 export interface ContextStore {
   readonly identity: CollectionStore<FriendIdentity>
+  readonly memory: CollectionStore<FriendMemory>
 }

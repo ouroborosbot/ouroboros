@@ -65,6 +65,15 @@ export interface AuthorityChecker {
   record403(integration: string, scope: string, action: string): void
 }
 
+// -- Friend Memory --
+// Model-managed memory about a friend. The model decides what to store.
+// toolPreferences is freeform Record<string, string> -- no typed schema.
+export interface FriendMemory {
+  id: string          // matches FriendIdentity.id
+  toolPreferences: Record<string, string>
+  schemaVersion: number
+}
+
 // -- Resolved Context --
 // The per-request bundle resolved by the ContextResolver.
 // Phase 1: identity + channel only.
@@ -73,4 +82,5 @@ export interface ResolvedContext {
   readonly identity: FriendIdentity
   readonly channel: ChannelCapabilities
   readonly checker?: AuthorityChecker
+  readonly memory: FriendMemory | null
 }

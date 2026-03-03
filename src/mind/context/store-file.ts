@@ -5,7 +5,7 @@
 import * as fs from "fs/promises"
 import * as path from "path"
 import type { CollectionStore, ContextStore } from "./store"
-import type { FriendIdentity } from "./types"
+import type { FriendIdentity, FriendMemory } from "./types"
 
 export interface MigrationConfig {
   currentVersion: number
@@ -14,6 +14,7 @@ export interface MigrationConfig {
 
 export interface FileContextStoreOptions {
   identity?: MigrationConfig
+  memory?: MigrationConfig
 }
 
 class FileCollectionStore<T extends { schemaVersion: number }> implements CollectionStore<T> {
@@ -91,12 +92,18 @@ class FileCollectionStore<T extends { schemaVersion: number }> implements Collec
 
 export class FileContextStore implements ContextStore {
   readonly identity: CollectionStore<FriendIdentity>
+  readonly memory: CollectionStore<FriendMemory>
 
   constructor(basePath: string, options?: FileContextStoreOptions) {
     this.identity = new FileCollectionStore<FriendIdentity>(
       basePath,
       "identity",
       options?.identity
+    )
+    this.memory = new FileCollectionStore<FriendMemory>(
+      basePath,
+      "memory",
+      options?.memory
     )
   }
 }
