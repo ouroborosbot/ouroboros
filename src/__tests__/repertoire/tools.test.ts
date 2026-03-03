@@ -705,6 +705,154 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
   })
 })
 
+describe("getToolsForChannel with toolPreferences", () => {
+  const teamsCaps = {
+    channel: "teams" as const,
+    availableIntegrations: ["ado" as const, "graph" as const],
+    supportsMarkdown: true,
+    supportsStreaming: false,
+    supportsRichCards: true,
+    maxMessageLength: 4000,
+  }
+  const cliCaps = {
+    channel: "cli" as const,
+    availableIntegrations: [] as const,
+    supportsMarkdown: false,
+    supportsStreaming: true,
+    supportsRichCards: false,
+    maxMessageLength: Infinity,
+  }
+
+  it("returns descriptions unchanged when no preferences provided", async () => {
+    vi.resetModules()
+    const { getToolsForChannel } = await import("../../repertoire/tools")
+    const withoutPrefs = getToolsForChannel(teamsCaps)
+    const withEmptyPrefs = getToolsForChannel(teamsCaps, {})
+    const withUndefined = getToolsForChannel(teamsCaps, undefined)
+
+    // All three should return identical descriptions
+    const descsWithout = withoutPrefs.map((t: any) => t.function.description)
+    const descsEmpty = withEmptyPrefs.map((t: any) => t.function.description)
+    const descsUndefined = withUndefined.map((t: any) => t.function.description)
+    expect(descsEmpty).toEqual(descsWithout)
+    expect(descsUndefined).toEqual(descsWithout)
+  })
+
+  it("appends ado preference to all tools with integration: 'ado'", async () => {
+    vi.resetModules()
+    const { getToolsForChannel } = await import("../../repertoire/tools")
+    const prefs = { ado: "my friend prefers iteration paths like Team\\Sprint1" }
+    const result = getToolsForChannel(teamsCaps, prefs)
+
+    // Find ado tools -- they should all have the preference appended
+    const adoTools = result.filter((t: any) =>
+      ["ado_query", "ado_mutate", "ado_work_items", "ado_docs",
+       "ado_backlog_list", "ado_create_epic", "ado_create_issue",
+       "ado_move_items", "ado_restructure_backlog", "ado_validate_structure",
+       "ado_preview_changes"].includes(t.function.name),
+    )
+    expect(adoTools.length).toBeGreaterThan(0)
+    for (const tool of adoTools) {
+      expect(tool.function.description).toContain("my friend prefers iteration paths like Team\\Sprint1")
+    }
+
+    // Base tools should NOT have the preference
+    const readFile = result.find((t: any) => t.function.name === "read_file")
+    expect(readFile!.function.description).not.toContain("my friend prefers")
+
+    // Graph tools should NOT have the preference
+    const graphQuery = result.find((t: any) => t.function.name === "graph_query")
+    expect(graphQuery!.function.description).not.toContain("my friend prefers")
+  })
+
+  it("appends graph preference to all tools with integration: 'graph'", async () => {
+    vi.resetModules()
+    const { getToolsForChannel } = await import("../../repertoire/tools")
+    const prefs = { graph: "always include manager field in profile queries" }
+    const result = getToolsForChannel(teamsCaps, prefs)
+
+    // Graph tools should have the preference appended
+    const graphTools = result.filter((t: any) =>
+      ["graph_query", "graph_mutate", "graph_profile", "graph_docs"].includes(t.function.name),
+    )
+    expect(graphTools.length).toBeGreaterThan(0)
+    for (const tool of graphTools) {
+      expect(tool.function.description).toContain("always include manager field in profile queries")
+    }
+
+    // ADO tools should NOT have the preference
+    const adoQuery = result.find((t: any) => t.function.name === "ado_query")
+    expect(adoQuery!.function.description).not.toContain("always include manager")
+  })
+
+  it("ignores unknown preference keys that don't match any integration", async () => {
+    vi.resetModules()
+    const { getToolsForChannel } = await import("../../repertoire/tools")
+    const withoutPrefs = getToolsForChannel(teamsCaps)
+    const withUnknownPrefs = getToolsForChannel(teamsCaps, { nonexistent: "some pref" })
+
+    // Descriptions should be identical -- unknown key has no effect
+    const descsWithout = withoutPrefs.map((t: any) => t.function.description)
+    const descsWith = withUnknownPrefs.map((t: any) => t.function.description)
+    expect(descsWith).toEqual(descsWithout)
+  })
+
+  it("applies multiple preferences independently", async () => {
+    vi.resetModules()
+    const { getToolsForChannel } = await import("../../repertoire/tools")
+    const prefs = {
+      ado: "use area path Team\\Backend",
+      graph: "prefer displayName over mail",
+    }
+    const result = getToolsForChannel(teamsCaps, prefs)
+
+    // ADO tools get ado pref but not graph pref
+    const adoQuery = result.find((t: any) => t.function.name === "ado_query")
+    expect(adoQuery!.function.description).toContain("use area path Team\\Backend")
+    expect(adoQuery!.function.description).not.toContain("prefer displayName over mail")
+
+    // Graph tools get graph pref but not ado pref
+    const graphQuery = result.find((t: any) => t.function.name === "graph_query")
+    expect(graphQuery!.function.description).toContain("prefer displayName over mail")
+    expect(graphQuery!.function.description).not.toContain("use area path Team\\Backend")
+  })
+
+  it("does not mutate original tool descriptions (rebuilt each call)", async () => {
+    vi.resetModules()
+    const { getToolsForChannel } = await import("../../repertoire/tools")
+
+    // First call with preferences
+    const prefs = { ado: "my special preference" }
+    const firstCall = getToolsForChannel(teamsCaps, prefs)
+    const adoToolFirst = firstCall.find((t: any) => t.function.name === "ado_query")
+    expect(adoToolFirst!.function.description).toContain("my special preference")
+
+    // Second call WITHOUT preferences
+    const secondCall = getToolsForChannel(teamsCaps)
+    const adoToolSecond = secondCall.find((t: any) => t.function.name === "ado_query")
+    expect(adoToolSecond!.function.description).not.toContain("my special preference")
+
+    // Third call with DIFFERENT preferences
+    const thirdCall = getToolsForChannel(teamsCaps, { ado: "different pref" })
+    const adoToolThird = thirdCall.find((t: any) => t.function.name === "ado_query")
+    expect(adoToolThird!.function.description).toContain("different pref")
+    expect(adoToolThird!.function.description).not.toContain("my special preference")
+  })
+
+  it("does not inject preferences for CLI channel (no integration tools)", async () => {
+    vi.resetModules()
+    const { getToolsForChannel } = await import("../../repertoire/tools")
+    const prefs = { ado: "some ado preference", graph: "some graph preference" }
+    const result = getToolsForChannel(cliCaps, prefs)
+
+    // CLI has no integration tools, so no descriptions should be modified
+    for (const tool of result) {
+      expect(tool.function.description).not.toContain("some ado preference")
+      expect(tool.function.description).not.toContain("some graph preference")
+    }
+  })
+})
+
 describe("isConfirmationRequired", () => {
   it("returns true for graph_mutate", async () => {
     vi.resetModules()
