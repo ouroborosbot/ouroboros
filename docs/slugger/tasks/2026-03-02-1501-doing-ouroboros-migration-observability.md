@@ -136,7 +136,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Output**: Updated `src/config.ts`, `src/identity.ts`, `src/engine/ado-client.ts`, `src/engine/graph-client.ts`, `src/repertoire/commands.ts`, `src/repertoire/skills.ts`, `src/wardrobe/phrases.ts` and passing tests.
 **Acceptance**: Required component events are emitted with required envelope, session-style log path resolution works, `src/wardrobe/phrases.ts` emits `component=repertoire` events, and tests pass.
 
-### ⬜ Unit 5c: Config/Identity/Clients/Repertoire/Wardrobe Instrumentation — Coverage & Refactor
+### ✅ Unit 5c: Config/Identity/Clients/Repertoire/Wardrobe Instrumentation — Coverage & Refactor
 **What**: Refactor for consistency and verify complete coverage on new code paths.
 **Output**: Coverage note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-5c-coverage.md`.
 **Acceptance**: New config/identity/clients/repertoire instrumentation code is fully covered and tests remain green.
@@ -218,3 +218,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 18:04] Unit 4c complete: verified full coverage/build after channel contract instrumentation and recorded evidence artifacts
 - [2026-03-02 18:06] Unit 5a complete: added failing event-catalog tests for config/identity, ADO/Graph clients, command/skill loaders, and phrase loading paths
 - [2026-03-02 18:09] Unit 5b complete: implemented structured events for config/identity, ADO/Graph request lifecycle, command/skill/phrase repertoire loaders, and added config log-path helpers
+- [2026-03-02 18:12] Unit 5c complete: backfilled non-Error/error-path branches and config log-path helper coverage; restored global 100% coverage and clean build
