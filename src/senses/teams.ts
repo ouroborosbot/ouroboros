@@ -3,7 +3,7 @@ import { App } from "@microsoft/teams.apps"
 import { DevtoolsPlugin } from "@microsoft/teams.dev"
 import { runAgent, ChannelCallbacks, RunAgentOptions } from "../heart/core"
 import type { ToolContext } from "../repertoire/tools"
-import { getOAuthConfig, getAdoConfig } from "../config"
+import { getOAuthConfig } from "../config"
 import { buildSystem } from "../mind/prompt"
 import { pickPhrase, getPhrases } from "../wardrobe/phrases"
 import { formatToolResult, formatKick, formatError } from "../wardrobe/format"
@@ -330,7 +330,6 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
     graphToken: teamsContext.graphToken,
     adoToken: teamsContext.adoToken,
     signin: teamsContext.signin,
-    adoOrganizations: getAdoConfig().organizations,
   } : undefined
   const agentOptions: RunAgentOptions = {}
   if (toolContext) agentOptions.toolContext = toolContext

@@ -1,8 +1,8 @@
 import OpenAI, { AzureOpenAI } from "openai";
 import { getAzureConfig, getMinimaxConfig, getContextConfig } from "../config";
-import { execTool, summarizeArgs, finalAnswerTool, getToolsForChannel } from "../repertoire/tools";
+import { execTool, summarizeArgs, finalAnswerTool, getToolsForChannel, isConfirmationRequired } from "../repertoire/tools";
 import type { ToolContext } from "../repertoire/tools";
-import { confirmationRequired } from "../repertoire/tools-teams";
+import { getChannelCapabilities } from "../mind/context/channel";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
 import type { AssistantMessageWithReasoning, ResponseItem } from "./streaming";
 import { detectKick } from "./kicks";
@@ -191,7 +191,7 @@ export async function runAgent(
   // Prevent MaxListenersExceeded warning — each iteration adds a listener
   try { require("events").setMaxListeners(MAX_TOOL_ROUNDS + 5, signal); } catch { /* unsupported */ }
 
-  const baseTools = getToolsForChannel(channel);
+  const baseTools = getToolsForChannel(channel ? getChannelCapabilities(channel) : undefined);
 
   while (!done) {
     // Compute activeTools per-iteration: include final_answer when
@@ -333,7 +333,7 @@ export async function runAgent(
           }
           const argSummary = summarizeArgs(tc.name, args);
           // Confirmation check for mutate tools
-          if (confirmationRequired.has(tc.name) && !options?.skipConfirmation) {
+          if (isConfirmationRequired(tc.name) && !options?.skipConfirmation) {
             let decision: "confirmed" | "denied" = "denied";
             if (callbacks.onConfirmAction) {
               decision = await callbacks.onConfirmAction(tc.name, args);
