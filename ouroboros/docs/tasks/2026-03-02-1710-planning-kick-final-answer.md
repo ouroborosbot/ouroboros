@@ -1,6 +1,6 @@
 # Planning: Inject final_answer Tool After Narration Kick
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-03-02 17:10
 
 ## Goal
