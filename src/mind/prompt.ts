@@ -165,12 +165,39 @@ export function contextSection(context?: ResolvedContext): string {
   /* v8 ignore next -- empty-traits branch unreachable: streaming/no-streaming always adds a trait @preserve */
   lines.push(`channel: ${ch.channel}${traits.length ? ` (${traits.join(", ")})` : ""}`)
 
-  // Friend notes (from FriendRecord -- rendered in system prompt)
+  // Friend record and state detection
   const friend = context.friend
-  const notes = friend?.notes
-  if (notes && Object.keys(notes).length > 0) {
+  const notes = friend?.notes ?? {}
+  const prefs = friend?.toolPreferences ?? {}
+  const hasNotes = Object.keys(notes).length > 0
+  const hasPrefs = Object.keys(prefs).length > 0
+  const isNewFriend = !hasNotes && !hasPrefs
+
+  // Priority guidance
+  lines.push("")
+  lines.push("my friend's request comes first. i help with what they need before social niceties.")
+
+  // Name quality instruction
+  lines.push("i prefer to use whatever name my friend prefers. if i learn a preferred name, i save it with save_friend_note.")
+
+  // Memory ephemerality instruction
+  lines.push("my conversation memory is ephemeral -- it resets between sessions. to remember something important about my friend, i use save_friend_note to write it to disk for future me.")
+
+  // Working-memory trust instruction
+  lines.push("the conversation is my source of truth. my notes are a journal for future me -- they may be stale or incomplete.")
+
+  // Stale notes awareness instruction
+  lines.push("when i learn something that might invalidate an existing note, i check related notes and update or override any that are stale.")
+
+  // New-friend behavior
+  if (isNewFriend) {
+    lines.push("this is a new friend -- i have no notes or preferences saved yet. i should learn their name and how they like to work, and save what i learn.")
+  }
+
+  // Friend notes (from FriendRecord -- rendered in system prompt, NOT toolPreferences)
+  if (hasNotes) {
     lines.push("")
-    lines.push("## what I know about this friend")
+    lines.push("## what i know about this friend")
     for (const [key, value] of Object.entries(notes)) {
       lines.push(`- ${key}: ${value}`)
     }
