@@ -61,7 +61,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Setup/Research
+### ✅ Unit 0: Setup/Research
 **What**: Audit current runtime logging behavior and map required structured events, envelope fields, sink abstraction/fan-out design, and target files under `src/` (`stderr` + session-style file pathing).
 **Output**: Baseline event/instrumentation matrix at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-0-baseline-matrix.md`.
 **Acceptance**: Matrix covers required envelope, minimum event catalog, target runtime files (including merged `src/wardrobe/phrases.ts` and `src/wardrobe/format.ts`), and file sink path/key contract `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson` (CLI=`session`, Teams=`conversationId`).
@@ -203,3 +203,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 17:38] Pass 2 (granularity): confirmed units are atomic/testable and require no additional splits
 - [2026-03-02 17:39] Pass 3 (validation): verified referenced runtime/test/config/workflow file paths exist and match current repo
 - [2026-03-02 17:39] Pass 4 (quality): verified completeness (no placeholders, coverage/TDD requirements present, emoji unit headers intact); set status to READY_FOR_EXECUTION
+- [2026-03-02 17:42] Unit 0 complete: baseline matrix captured current runtime logging, locked envelope/event/sink contracts, and mapped all in-scope files
