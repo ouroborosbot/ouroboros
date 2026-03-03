@@ -1417,6 +1417,40 @@ describe("runAgent", () => {
     // config cleanup handled by resetConfigCache in beforeEach
   })
 
+  it("Azure: propagates traceId option into responses metadata", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
+
+    mockResponsesCreate.mockReturnValue(makeResponsesStream([
+      { type: "response.output_text.delta", delta: "hello azure trace" },
+    ]))
+
+    const core = await import("../../engine/core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await core.runAgent(
+      [{ role: "system", content: "test" }],
+      callbacks,
+      undefined,
+      undefined,
+      { traceId: "trace-azure" } as any,
+    )
+
+    const params = mockResponsesCreate.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(params).toEqual(expect.objectContaining({
+      metadata: { trace_id: "trace-azure" },
+    }))
+  })
+
   it("Azure tool-use turn: tool executed, result pushed, loop continues", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
