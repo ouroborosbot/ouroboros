@@ -1,0 +1,122 @@
+# Doing: Sync-and-Merge System for Multi-Agent Collaboration
+
+**Status**: drafting
+**Execution Mode**: direct
+**Created**: (pending first commit)
+**Planning**: ./2026-03-03-1032-planning-sync-and-merge.md
+**Artifacts**: ./2026-03-03-1032-doing-sync-and-merge/
+
+## Execution Mode
+
+- **pending**: Awaiting user approval before each unit starts (interactive)
+- **spawn**: Spawn sub-agent for each unit (parallel/autonomous)
+- **direct**: Execute units sequentially in current session (default)
+
+## Objective
+Build a new `work-merger` subagent that runs after work-doer completes, fetching origin/main, merging, resolving conflicts using task docs for context, running tests, and pushing to main -- enabling two agents (ouroboros on Claude Code, slugger on Codex) to work simultaneously on the same repo without manual merge coordination.
+
+## Completion Criteria
+- [ ] `subagents/work-merger.md` exists with YAML frontmatter and complete workflow instructions
+- [ ] work-merger is installable as a Claude Code sub-agent (symlink into `~/.claude/agents/`) AND as a Codex skill (hard-link as `~/.codex/skills/work-merger/SKILL.md`)
+- [ ] `subagents/README.md` updated: work-merger in table, workflow description extended, install commands for both Claude Code and Codex (including optional `openai.yaml` UI metadata)
+- [ ] `AGENTS.md` updated: extended workflow (work-planner -> work-doer -> work-merger), Runtime-Specific Invocation includes `$work-merger` for Codex and sub-agent for Claude Code
+- [ ] The work-merger doc covers: fetch, merge, conflict resolution with task doc context, test, PR creation via `gh`, merge PR to main
+- [ ] The work-merger doc covers the fast-path: branch already up-to-date with main (still creates PR, CI must pass)
+- [ ] The work-merger doc covers dynamic task doc discovery: scan `*/tasks/` dirs with recency bias (most recent doing docs first)
+- [ ] The work-merger doc covers race condition retry: re-fetch, re-merge, re-resolve conflicts, force-push, CI re-run
+- [ ] The work-merger doc covers CI failure self-repair: agent fixes failures itself first, escalates only when genuinely stuck
+- [ ] The work-merger doc covers post-merge cleanup: delete feature branch (local + remote)
+- [ ] The work-merger doc covers escalation: when to stop and ask the user (only for genuinely ambiguous issues, not fixable failures)
+- [ ] Branch naming convention unified and documented: both agents use `<agent>/<slug>`, old `codex/` prefix convention deprecated in AGENTS.md
+- [ ] `CONTRIBUTING.md` updated: sync-and-merge workflow section, unified branch convention (`<agent>/<slug>`), PR-based merge flow
+- [ ] `cross-agent-docs/sync-and-merge-conventions.md` created with shared conventions
+- [ ] 100% test coverage on all new code
+- [ ] All tests pass
+- [ ] No warnings
+
+## Code Coverage Requirements
+**MANDATORY: 100% coverage on all new code.**
+- No `[ExcludeFromCodeCoverage]` or equivalent on new code
+- All branches covered (if/else, switch, try/catch)
+- All error paths tested
+- Edge cases: null, empty, boundary values
+
+Note: This task is primarily documentation (subagent .md files, workflow docs). The coverage criteria apply if any runtime code is added, but the main deliverables are markdown files. If no runtime code is written, the coverage criteria are satisfied trivially (no new code = nothing to cover).
+
+## TDD Requirements
+**Strict TDD -- no exceptions:**
+1. **Tests first**: Write failing tests BEFORE any implementation
+2. **Verify failure**: Run tests, confirm they FAIL (red)
+3. **Minimal implementation**: Write just enough code to pass
+4. **Verify pass**: Run tests, confirm they PASS (green)
+5. **Refactor**: Clean up, keep tests green
+6. **No skipping**: Never write implementation without failing test first
+
+Note: This task is documentation-only. TDD applies if any runtime code is introduced, but the expected deliverables are all markdown files. TDD is not applicable to documentation units.
+
+## Work Units
+
+### Legend
+⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
+
+**CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
+
+### ⬜ Unit 0: Research and outline
+**What**: Read existing subagent definitions (`subagents/work-planner.md`, `subagents/work-doer.md`), `AGENTS.md`, `CONTRIBUTING.md`, `subagents/README.md`, and `cross-agent-docs/testing-conventions.md`. Produce an outline of all sections needed in `work-merger.md`, mapping each planning decision to a specific section.
+**Output**: `./2026-03-03-1032-doing-sync-and-merge/outline.md` with section-by-section outline.
+**Acceptance**: Outline exists, covers every completion criterion, and maps each planning decision to a concrete section in the work-merger doc.
+
+### ⬜ Unit 1: Create `subagents/work-merger.md` -- core workflow
+**What**: Author the work-merger subagent definition with YAML frontmatter and the core merge workflow: On Startup (detect agent from branch, find own doing doc), Timestamp & Commit Pattern, and the main Merge Loop (fetch origin/main, merge, handle clean merge vs conflicts).
+**Output**: `subagents/work-merger.md` with frontmatter + On Startup + core merge workflow sections.
+**Acceptance**: File exists with valid YAML frontmatter (`name`, `description`, `model`). On Startup section derives agent name from branch using `<agent>/<slug>` convention. Merge Loop section covers `git fetch origin main`, `git merge origin/main`, and branches for clean merge vs conflict.
+
+### ⬜ Unit 2: `work-merger.md` -- conflict resolution with task doc discovery
+**What**: Add the conflict resolution section: how to read own doing doc, scan `*/tasks/` directories for other agents' recent doing docs (sorted by YYYY-MM-DD-HHMM filename prefix, most recent first), understand both intents, and resolve conflicts preserving both.
+**Output**: Conflict Resolution and Task Doc Discovery sections added to `subagents/work-merger.md`.
+**Acceptance**: Section instructs agent to: (1) read own doing doc path from the task that just completed, (2) scan `*/tasks/` dirs excluding own agent, (3) sort by filename timestamp descending, (4) read the most recent doing docs to understand what changed on main, (5) resolve conflicts preserving both intents. Recency bias is explicit.
+
+### ⬜ Unit 3: `work-merger.md` -- PR workflow, CI, and fast-path
+**What**: Add sections for: PR creation via `gh pr create`, waiting for CI, merging via `gh pr merge`, the fast-path (branch already up-to-date with main -- skip conflict resolution, still create PR for CI gate), and CI failure self-repair (agent fixes failures itself, only escalates when genuinely stuck).
+**Output**: PR Workflow, Fast Path, and CI Failure Handling sections added to `subagents/work-merger.md`.
+**Acceptance**: PR workflow uses `gh pr create` and `gh pr merge`. Fast-path explicitly handles the no-conflict case but still requires PR + CI. CI failure section instructs agent to attempt self-repair first (it wrote the code), with clear boundary for when to escalate.
+
+### ⬜ Unit 4: `work-merger.md` -- race condition retry, cleanup, escalation, and rules
+**What**: Add sections for: race condition retry flow (main moved during merge -- re-fetch, re-merge, re-resolve, force-push, CI re-run), post-merge cleanup (delete local + remote branch), escalation policy (when to stop and ask user), and a Rules section summarizing all invariants.
+**Output**: Race Condition Retry, Post-Merge Cleanup, Escalation, and Rules sections added to `subagents/work-merger.md`.
+**Acceptance**: Retry flow handles `git fetch origin main && git merge origin/main` failing due to new commits, with re-resolution using task docs and `git push --force-with-lease`. Cleanup deletes branch locally and remotely. Escalation section draws clear line between "fixable by agent" and "needs human." Rules section is a numbered list of all invariants (similar to work-planner/work-doer Rules sections).
+
+### ⬜ Unit 5: Update `AGENTS.md` -- extended workflow and branch convention
+**What**: Update `AGENTS.md` to: (1) simplify branch parsing from `[prefix/]<agent>[/feature...]` with `codex/` special-casing to just `<agent>[/<slug>]`, deprecating the old `codex/` prefix, (2) add work-merger to Runtime-Specific Invocation (`$work-merger` for Codex, sub-agent for Claude Code), (3) extend Gate Flow to include sync-and-merge step after work-doer.
+**Output**: Updated `AGENTS.md`.
+**Acceptance**: Branch parsing rule simplified (no `codex/` special-case). Runtime-Specific Invocation lists work-merger for both Codex and Claude Code. Gate Flow includes step 5 (or equivalent) for work-merger after implementation.
+
+### ⬜ Unit 6: Update `subagents/README.md` -- work-merger install and docs
+**What**: Update `subagents/README.md` to: (1) add work-merger to the Available sub-agents table, (2) add install commands for both Claude Code (symlink) and Codex skill (hard-link + optional `openai.yaml`), (3) extend the Workflow section to include the sync-and-merge step.
+**Output**: Updated `subagents/README.md`.
+**Acceptance**: Table has work-merger row. Claude Code install section includes work-merger symlink. Codex install section includes `mkdir`, hard-link, and optional `openai.yaml` for work-merger. Workflow section has step 4 (or equivalent) for sync-and-merge.
+
+### ⬜ Unit 7: Update `CONTRIBUTING.md` -- sync-and-merge and branch convention
+**What**: Update `CONTRIBUTING.md` to: (1) update the Branches section to reflect the unified `<agent>/<slug>` convention for all agents (remove any `codex/` references if present), (2) add a new "Sync and merge" section documenting the PR-based merge workflow, race condition handling, and that work-merger handles this step.
+**Output**: Updated `CONTRIBUTING.md`.
+**Acceptance**: Branches section shows unified `<agent>/<slug>` for both agents. New Sync and merge section explains the workflow (work-doer finishes -> work-merger runs -> PR -> CI -> merge -> cleanup). Task docs section references work-merger alongside work-planner and work-doer.
+
+### ⬜ Unit 8: Create `cross-agent-docs/sync-and-merge-conventions.md`
+**What**: Create the shared conventions doc covering: branch naming, merge strategy (merge commits), PR-based merge flow, conflict resolution using task docs, race condition retry, CI self-repair policy, post-merge cleanup, and escalation rules. Similar in structure to `cross-agent-docs/testing-conventions.md`.
+**Output**: New file `cross-agent-docs/sync-and-merge-conventions.md`.
+**Acceptance**: File exists, covers all shared conventions from planning decisions. Structured with numbered sections similar to testing-conventions.md. Both agents can reference this as the authoritative sync-and-merge policy.
+
+### ⬜ Unit 9: Final review and verification
+**What**: Re-read all modified/created files end-to-end. Verify every completion criterion is satisfied. Run `npm test` and `npm run build` to confirm no regressions. Check cross-references between docs are consistent (e.g., CONTRIBUTING.md links to cross-agent-docs, AGENTS.md references work-merger correctly, README install commands are accurate).
+**Output**: All completion criteria checked off. Build and tests pass.
+**Acceptance**: Every completion criterion checkbox can be marked `[x]`. `npm test` passes. `npm run build` passes. No warnings. All cross-references between docs are accurate.
+
+## Execution
+- Commit after each unit completes
+- Push after each unit complete
+- Run full test suite before marking final unit done
+- **All artifacts**: Save outputs, logs, data to `./2026-03-03-1032-doing-sync-and-merge/` directory
+- **Fixes/blockers**: Spawn sub-agent immediately -- don't ask, just do it
+- **Decisions made**: Update docs immediately, commit right away
+
+## Progress Log
