@@ -876,6 +876,265 @@ describe("contextSection", () => {
     const result = contextSection(ctx)
     expect(result).not.toContain("## authority")
   })
+
+  // --- New Unit 7a tests: contextSection redesign ---
+
+  it("includes memory ephemerality instruction when friend context exists", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01" }],
+        tenantMemberships: ["t1"],
+        toolPreferences: { ado: "use iteration paths" },
+        notes: { role: "engineer" },
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // Should include instruction about ephemeral conversation memory
+    expect(result).toContain("ephemeral")
+    expect(result).toContain("save_friend_note")
+  })
+
+  it("includes name-quality instruction with displayName", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: { name: "Jordan" },
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "cli" as const,
+        availableIntegrations: [] as any[],
+        supportsMarkdown: false,
+        supportsStreaming: true,
+        supportsRichCards: false,
+        maxMessageLength: Infinity,
+      },
+    }
+    const result = contextSection(ctx)
+    // Should include instruction about name quality
+    expect(result).toContain("name")
+    expect(result.toLowerCase()).toContain("prefer")
+  })
+
+  it("includes new-friend instruction when notes and toolPreferences both empty", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // Should include instruction about new friend
+    expect(result.toLowerCase()).toContain("new friend")
+  })
+
+  it("does NOT include new-friend instruction when notes has entries", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: { role: "engineer" },
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    expect(result.toLowerCase()).not.toContain("new friend")
+  })
+
+  it("does NOT include new-friend instruction when toolPreferences has entries", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: { ado: "use area paths" },
+        notes: {},
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    expect(result.toLowerCase()).not.toContain("new friend")
+  })
+
+  it("does NOT render toolPreferences in system prompt", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: { ado: "use iteration paths like Team\\Sprint1", graph: "include manager" },
+        notes: { role: "engineer" },
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // Tool preferences go to tool descriptions only, NOT system prompt
+    expect(result).not.toContain("use iteration paths")
+    expect(result).not.toContain("include manager")
+    // But notes SHOULD be in system prompt
+    expect(result).toContain("role: engineer")
+  })
+
+  it("includes priority guidance when friend context is present", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: { role: "engineer" },
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // Should include priority guidance -- friend's request first
+    expect(result.toLowerCase()).toContain("request")
+    expect(result.toLowerCase()).toContain("first")
+  })
+
+  it("includes working-memory trust instruction", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: { role: "engineer" },
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // Should include instruction about conversation being source of truth
+    expect(result.toLowerCase()).toContain("conversation")
+    expect(result.toLowerCase()).toContain("source of truth")
+  })
+
+  it("includes stale notes awareness instruction", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: { role: "engineer" },
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // Should include instruction about checking for stale notes
+    expect(result.toLowerCase()).toContain("stale")
+  })
 })
 
 describe("buildSystem with context", () => {
