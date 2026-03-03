@@ -101,7 +101,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Output**: Failing tests (engine/mind/tool suites, including `src/__tests__/engine/kicks.test.ts`) and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-3a-red-run.txt`.
 **Acceptance**: Tests fail and identify missing event-level instrumentation for engine (core + kicks), mind, and tools.
 
-### ⬜ Unit 3b: Engine/Mind/Tools Instrumentation — Green
+### ✅ Unit 3b: Engine/Mind/Tools Instrumentation — Green
 **What**: Implement structured event logging for engine, mind, and tools with required envelope and no sensitive payload dumps.
 **Output**: Updated `src/engine/core.ts`, `src/engine/kicks.ts`, `src/mind/context.ts`, `src/mind/prompt.ts`, `src/engine/tools.ts`, `src/engine/tools-base.ts`, `src/engine/tools-teams.ts` and passing tests.
 **Acceptance**: Required engine/mind/tools catalog events are emitted with required fields (including `src/engine/kicks.ts`) and tests pass.
@@ -211,3 +211,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 17:49] Unit 2b complete: added traceId to RunAgentOptions, generated trace IDs at CLI/Teams turn entry, and propagated into core model request metadata
 - [2026-03-02 17:51] Unit 2c complete: verified trace propagation coverage + build; backfilled Azure metadata branch and restored global 100% coverage
 - [2026-03-02 17:53] Unit 3a complete: added failing instrumentation tests for engine core/kicks, mind context/prompt, and tools lifecycle events
+- [2026-03-02 17:56] Unit 3b complete: implemented observability runtime emitter and instrumented engine core/kicks, mind context/prompt, and tools lifecycle events
