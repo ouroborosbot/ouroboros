@@ -73,16 +73,19 @@ describe("ado_backlog_list tool", () => {
 
     const def = findTool("ado_backlog_list")!
     const result = await def.handler({}, makeCtx())
-    const parsed = JSON.parse(result)
-
-    expect(parsed.items).toHaveLength(3)
-    expect(parsed.items[0].id).toBe(100)
-    expect(parsed.items[0].type).toBe("Epic")
-    expect(parsed.items[0].title).toBe("Epic One")
-    expect(parsed.items[0].assignedTo).toBe("Jordan")
-    expect(parsed.items[0].parent).toBeNull()
-    expect(parsed.items[1].parent).toBe(100)
-    expect(parsed.items[2].parent).toBe(101)
+    // makeCtx() provides a Teams channel (supportsMarkdown: true), so output is markdown
+    expect(result).toContain("**#100**")
+    expect(result).toContain("Epic One")
+    expect(result).toContain("[Epic]")
+    expect(result).toContain("Jordan")
+    expect(result).toContain("**#101**")
+    expect(result).toContain("Story One")
+    expect(result).toContain("Unassigned")
+    expect(result).toContain("(parent: #100)")
+    expect(result).toContain("**#102**")
+    expect(result).toContain("Task One")
+    expect(result).toContain("Sam")
+    expect(result).toContain("(parent: #101)")
   })
 
   it("filters by area path", async () => {
@@ -157,10 +160,7 @@ describe("ado_backlog_list tool", () => {
 
     const def = findTool("ado_backlog_list")!
     const result = await def.handler({}, makeCtx())
-    const parsed = JSON.parse(result)
-
-    expect(parsed.items).toHaveLength(0)
-    expect(parsed.message).toContain("No work items")
+    expect(result).toContain("No work items")
   })
 
   it("returns error when ADO context resolution fails", async () => {
@@ -724,6 +724,64 @@ describe("ado_batch_update tool", () => {
     }, makeCtxWithChecker())
     const parsed = JSON.parse(result)
     expect(parsed.results[0].success).toBe(true)
+  })
+
+  it("handles unknown operation type", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+
+    const def = findTool("ado_batch_update")!
+    const result = await def.handler({
+      operations: JSON.stringify([
+        { type: "delete", workItemId: 101 },
+      ]),
+    }, makeCtxWithChecker())
+    const parsed = JSON.parse(result)
+    expect(parsed.results[0].success).toBe(false)
+    expect(parsed.results[0].error).toContain("Unknown operation type")
+  })
+
+  it("handles API response with no id field", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ error: "something went wrong" }))
+
+    const def = findTool("ado_batch_update")!
+    const result = await def.handler({
+      operations: JSON.stringify([
+        { type: "update", workItemId: 101, fields: { "System.State": "Active" } },
+      ]),
+    }, makeCtxWithChecker())
+    const parsed = JSON.parse(result)
+    expect(parsed.results[0].success).toBe(false)
+  })
+
+  it("handles Error exception thrown during operation", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockRejectedValueOnce(new Error("network failure"))
+
+    const def = findTool("ado_batch_update")!
+    const result = await def.handler({
+      operations: JSON.stringify([
+        { type: "create", workItemType: "Task", fields: { "System.Title": "Test" } },
+      ]),
+    }, makeCtxWithChecker())
+    const parsed = JSON.parse(result)
+    expect(parsed.results[0].success).toBe(false)
+    expect(parsed.results[0].error).toContain("network failure")
+  })
+
+  it("handles non-Error exception thrown during operation", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockRejectedValueOnce("string error")
+
+    const def = findTool("ado_batch_update")!
+    const result = await def.handler({
+      operations: JSON.stringify([
+        { type: "update", workItemId: 101, fields: { "System.State": "Active" } },
+      ]),
+    }, makeCtxWithChecker())
+    const parsed = JSON.parse(result)
+    expect(parsed.results[0].success).toBe(false)
+    expect(parsed.results[0].error).toContain("string error")
   })
 })
 
