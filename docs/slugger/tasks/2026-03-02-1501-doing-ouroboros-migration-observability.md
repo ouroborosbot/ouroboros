@@ -159,4 +159,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 15:52] Validation pass: aligned units to concrete runtime/test files and current repo structure
 - [2026-03-02 15:53] Quality pass: verified template completeness, acceptance coverage, and emoji headers; set status to READY_FOR_EXECUTION
 - [2026-03-02 15:58] Clarified that artifact run files are evidence outputs only; runtime logging sink remains stderr-only in this phase
-- [PENDING_PERSISTENCE_TS] Updated units/criteria for session-style append-only NDJSON persistence with dual sinks (`stderr` + file)
+- [2026-03-02 16:05] Updated units/criteria for session-style append-only NDJSON persistence with dual sinks (`stderr` + file)
