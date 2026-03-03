@@ -73,7 +73,7 @@ Tests to update:
 - `src/__tests__/channels/teams.test.ts`: onKick tests (~lines 338-356, 2165-2182, 3282-3326) -- update `callbacks.onKick!(2, 3)` to `callbacks.onKick!()`
 - `src/__tests__/wardrobe/format.test.ts`: formatKick tests -- rewrite for new no-args signature
 
-**Acceptance**: Tests exist, compile, and FAIL (red) because implementation still has old signatures.
+**Acceptance**: Tests updated for new signatures. Will not compile until Unit 1b production code changes are applied (type mismatch on `onKick` and `formatKick`).
 
 ### ⬜ Unit 1b: Remove maxKicks and simplify onKick -- Implementation
 
@@ -92,14 +92,21 @@ Tests to update:
 
 ### ⬜ Unit 2a: Inject final_answer after narration kick -- Tests
 
-**What**: Write new tests for the core behavior change:
+**What**: Write new tests for the core behavior change AND update existing tests that assert on kick message text or `finalAnswerTool.description`:
 - After a narration kick fires, `final_answer` should be in the tools sent to the API on the retry iteration
 - After an empty kick fires, `final_answer` should NOT be in the tools (narration-only injection)
 - Model calls `final_answer` after narration kick -- terminates cleanly with extracted answer
 - `activeTools` is computed per-iteration (moves inside while loop or becomes reactive)
 - When `toolChoiceRequired` is true, `final_answer` is still included (existing behavior preserved)
+- Update existing assertions on narration kick message text (old: "I narrated instead of acting. Calling the tool now." -> new message mentioning `final_answer`)
+- Update any assertions on `finalAnswerTool.description` text (old: tool_choice-specific -> new: general-purpose)
 
-**Acceptance**: New tests exist, compile, and FAIL (red) because `activeTools` is still computed once before the loop.
+Tests to update for message text:
+- `src/__tests__/engine/kicks.test.ts`: kick message assertions
+- `src/__tests__/engine/core.test.ts`: any assertions on kick message content
+- `src/__tests__/engine/tools-base.test.ts` (if exists): finalAnswerTool description assertions
+
+**Acceptance**: New tests exist, compile, and FAIL (red) because `activeTools` is still computed once before the loop. Message text assertions updated to match planned new text.
 
 ### ⬜ Unit 2b: Inject final_answer after narration kick -- Implementation
 
@@ -115,18 +122,7 @@ Tests to update:
 **What**: Verify 100% coverage on all new/changed code. Run full test suite. Check for any remaining test assertions that reference old kick message text.
 **Acceptance**: 100% coverage. All tests green. No warnings.
 
-### ⬜ Unit 3: Update kick message text in tests
-
-**What**: Update any remaining test assertions that check for the old narration kick message ("I narrated instead of acting. Calling the tool now.") to use the new message ("I narrated instead of acting. Calling the tool now -- if I've already finished, I can use final_answer."). Update any tests checking `finalAnswerTool.description` text.
-
-Tests to update:
-- `src/__tests__/engine/kicks.test.ts`: kick message assertions
-- `src/__tests__/engine/core.test.ts`: any assertions on kick message content
-- `src/__tests__/engine/tools-base.test.ts` (if exists): finalAnswerTool description assertions
-
-**Acceptance**: All tests pass. No stale message text in assertions.
-
-### ⬜ Unit 4: Final validation
+### ⬜ Unit 3: Final validation
 
 **What**: Run full test suite. Verify no warnings. Verify 100% coverage on all new and changed code. Verify no leftover `maxKicks` references in production code (test code may reference it in "removed" context).
 **Acceptance**: All tests pass. No warnings. No dead maxKicks code. 100% coverage.
