@@ -1,6 +1,6 @@
 # Planning: Sync-and-Merge System for Multi-Agent Collaboration
 
-**Status**: drafting
+**Status**: NEEDS_REVIEW
 **Created**: 2026-03-03 10:33
 
 ## Goal
@@ -15,7 +15,7 @@ Build a new `work-merger` subagent that runs after work-doer completes, fetching
 - Symlink/install instructions for both Claude Code and Codex skill harnesses
 - Update `subagents/README.md` to document work-merger
 - Update `AGENTS.md` to add sync-and-merge as a workflow step after work-doer
-- The work-merger workflow: fetch, merge, conflict resolution using task docs, test, push, merge to main
+- The work-merger workflow: fetch, merge, conflict resolution using task docs, test, create PR via `gh`, CI passes, merge PR to main
 - Conflict resolution strategy: read own task doc + other agent's recent task docs to understand intent
 - Escalation path: stop and ask user when truly stuck
 - Branch convention enforcement: `<agent>/<slug>` branches, short-lived
@@ -35,7 +35,9 @@ Build a new `work-merger` subagent that runs after work-doer completes, fetching
 - [ ] work-merger is installable as both a Claude Code sub-agent and a Codex skill (same dual-install pattern as work-planner/work-doer)
 - [ ] `subagents/README.md` updated with work-merger row in the table and updated workflow description
 - [ ] `AGENTS.md` updated to reflect the extended workflow: work-planner -> work-doer -> work-merger
-- [ ] The work-merger doc covers: fetch, merge, conflict resolution with task doc context, test, push, merge to main
+- [ ] The work-merger doc covers: fetch, merge, conflict resolution with task doc context, test, PR creation via `gh`, merge PR to main
+- [ ] The work-merger doc covers the fast-path: branch already up-to-date with main (still creates PR, CI must pass)
+- [ ] The work-merger doc covers dynamic task doc discovery: scan `*/tasks/` dirs with recency bias (most recent doing docs first)
 - [ ] The work-merger doc covers escalation: when to stop and ask the user
 - [ ] Branch naming convention (`<agent>/<slug>`) is documented
 - [ ] `cross-agent-docs/sync-and-merge-conventions.md` created with shared conventions
@@ -53,11 +55,7 @@ Build a new `work-merger` subagent that runs after work-doer completes, fetching
 Note: This task is primarily documentation (subagent .md files, workflow docs). The coverage criteria apply if any runtime code is added, but the main deliverables are markdown files. If no runtime code is written, the coverage criteria are satisfied trivially (no new code = nothing to cover).
 
 ## Open Questions
-- [ ] Should work-merger handle the case where the agent's branch is already up-to-date with main (no-op fast path)?
-- [ ] Should the merge strategy be merge commit or rebase? (Merge commit is simpler and preserves branch history; rebase is cleaner but riskier with conflicts.)
-- [ ] Should work-merger create a PR or directly push to main? (Current workflow seems to be direct push to main from agent branches.)
-- [ ] Should the work-merger doc include instructions for reading task docs from BOTH `ouroboros/tasks/` and `slugger/tasks/`, or should it be generic (`<agent>/tasks/`) and discover agent directories dynamically?
-- [ ] Does the Codex/slugger environment have access to `gh` CLI, or should merge-to-main be done purely with git?
+(All resolved -- see Decisions Made.)
 
 ## Decisions Made
 - work-merger is a new subagent, not an extension of work-doer (separation of concerns, keeps work-doer general-purpose)
@@ -67,6 +65,11 @@ Note: This task is primarily documentation (subagent .md files, workflow docs). 
 - Conflict resolution uses task docs as context (own doing doc + other agent's recent doing docs on main)
 - Escalation to user only when truly stuck (tests fail after resolution, or conflict is ambiguous)
 - KISS throughout -- minimal moving parts
+- **Merge strategy**: merge commits (not rebase). Simpler, preserves branch history.
+- **PR-based merge to main**: agents create a PR via `gh pr create`, CI must pass, then `gh pr merge`. No direct push to main. Keeps main green.
+- **Fast-path when up-to-date**: if `git merge origin/main` is a no-op, skip conflict resolution but still create PR and wait for CI to pass before merging.
+- **Dynamic task doc discovery**: scan `*/tasks/` directories to find all agents' task docs. Use recency bias -- sort by filename timestamp (YYYY-MM-DD-HHMM prefix), prioritize reading the most recent doing docs to understand what just changed on main.
+- **`gh` CLI available on both machines**: use `gh` for PR creation and merging on both ouroboros (Claude Code) and slugger (Codex).
 
 ## Context / References
 - Existing subagent definitions: `subagents/work-planner.md`, `subagents/work-doer.md`
@@ -78,7 +81,11 @@ Note: This task is primarily documentation (subagent .md files, workflow docs). 
 - Current branches: `ouroboros`, `codex/slugger` (remote), `main`
 
 ## Notes
-The work-merger subagent is purely a documentation/workflow artifact -- it instructs the LLM agent on what git operations to perform and how to resolve conflicts. No runtime TypeScript code is expected. The main complexity is writing clear, unambiguous instructions for the conflict resolution strategy, particularly how to read and interpret task docs from the other agent.
+The work-merger subagent is purely a documentation/workflow artifact -- it instructs the LLM agent on what git operations to perform and how to resolve conflicts. No runtime TypeScript code is expected. The main complexity is writing clear, unambiguous instructions for:
+
+1. The conflict resolution strategy -- how to read own doing doc + discover and read other agents' recent doing docs to understand both intents, then resolve conflicts preserving both.
+2. The PR workflow -- push branch, `gh pr create`, wait for CI, `gh pr merge`, handle CI failures.
+3. Task doc discovery -- scanning `*/tasks/` dirs, sorting by YYYY-MM-DD-HHMM prefix for recency, reading the most recent doing docs first.
 
 ## Progress Log
 - 2026-03-03 10:33 Created
