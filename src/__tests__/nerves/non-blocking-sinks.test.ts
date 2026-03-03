@@ -27,8 +27,8 @@ describe("nerves non-blocking sink behavior", () => {
   it("does not throw when ndjson file append fails", async () => {
     vi.resetModules()
     vi.doMock("fs", () => ({
-      appendFileSync: vi.fn(() => {
-        throw new Error("disk full")
+      appendFile: vi.fn((_path: string, _data: string, _encoding: string, callback: (err: Error) => void) => {
+        callback(new Error("disk full"))
       }),
       mkdirSync: vi.fn(),
     }))
