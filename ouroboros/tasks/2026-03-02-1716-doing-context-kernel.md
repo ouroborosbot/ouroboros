@@ -1377,3 +1377,4 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - 2026-03-02 2334 Unit 1E complete: ChannelCapabilities lookup, CLI + Teams + unknown defaults. 5 new tests, 960 total.
 - 2026-03-02 2335 Unit 1F complete: ContextResolver resolves identity + channel into ResolvedContext. 6 new tests, 966 total.
 - 2026-03-02 2342 Unit 1G complete: async buildSystem(), contextSection(), removed cachedBuildSystem/resetSystemPromptCache. 969 tests total.
+- 2026-03-02 2353 Unit 1Ha complete: ToolDefinition wrapper type, baseToolDefinitions/teamsToolDefinitions arrays, getToolsForChannel(ChannelCapabilities), isConfirmationRequired(), removed confirmationRequired Set, removed adoOrganizations from ToolContext, added context?: ResolvedContext. 977 tests total.
