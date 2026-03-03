@@ -3,7 +3,7 @@ import * as fs from "fs/promises"
 import * as path from "path"
 import * as os from "os"
 import { FileContextStore } from "../../../mind/context/store-file"
-import type { FriendIdentity } from "../../../mind/context/types"
+import type { FriendIdentity, FriendMemory } from "../../../mind/context/types"
 
 let tmpDir: string
 
@@ -128,6 +128,91 @@ describe("FileContextStore identity collection", () => {
     ])
     expect(await store.identity.get("uuid-1")).toEqual(f1)
     expect(await store.identity.get("uuid-2")).toEqual(f2)
+  })
+})
+
+function makeMemory(overrides: Partial<FriendMemory> = {}): FriendMemory {
+  return {
+    id: "uuid-1",
+    toolPreferences: {},
+    schemaVersion: 1,
+    ...overrides,
+  }
+}
+
+describe("FileContextStore memory collection", () => {
+  it("creates context/memory/ subdirectory on first write", async () => {
+    const store = new FileContextStore(tmpDir)
+    await store.memory.put("uuid-1", makeMemory())
+    const memoryDir = path.join(tmpDir, "memory")
+    const stat = await fs.stat(memoryDir)
+    expect(stat.isDirectory()).toBe(true)
+  })
+
+  it("put writes and get reads back FriendMemory correctly", async () => {
+    const store = new FileContextStore(tmpDir)
+    const memory = makeMemory({ toolPreferences: { ado: "flat backlog" } })
+    await store.memory.put("uuid-1", memory)
+    const result = await store.memory.get("uuid-1")
+    expect(result).toEqual(memory)
+  })
+
+  it("get returns null for non-existent memory ID", async () => {
+    const store = new FileContextStore(tmpDir)
+    expect(await store.memory.get("nonexistent")).toBeNull()
+  })
+
+  it("delete removes memory file", async () => {
+    const store = new FileContextStore(tmpDir)
+    await store.memory.put("uuid-1", makeMemory())
+    await store.memory.delete("uuid-1")
+    expect(await store.memory.get("uuid-1")).toBeNull()
+  })
+
+  it("find locates memory by predicate", async () => {
+    const store = new FileContextStore(tmpDir)
+    const m1 = makeMemory({ id: "uuid-1", toolPreferences: { ado: "flat" } })
+    const m2 = makeMemory({ id: "uuid-2", toolPreferences: { ado: "tree" } })
+    await store.memory.put("uuid-1", m1)
+    await store.memory.put("uuid-2", m2)
+    const found = await store.memory.find(v => v.toolPreferences.ado === "tree")
+    expect(found).toEqual(m2)
+  })
+
+  it("handles corrupted memory JSON gracefully", async () => {
+    const store = new FileContextStore(tmpDir)
+    await store.memory.put("uuid-1", makeMemory())
+    const filePath = path.join(tmpDir, "memory", "uuid-1.json")
+    await fs.writeFile(filePath, "not valid json{{{", "utf-8")
+    expect(await store.memory.get("uuid-1")).toBeNull()
+  })
+
+  it("runs migration on memory collection when version is older", async () => {
+    const store = new FileContextStore(tmpDir, {
+      memory: {
+        currentVersion: 2,
+        migrate: (data: any, fromVersion: number) => {
+          if (fromVersion === 1) {
+            return { ...data, newField: "migrated", schemaVersion: 2 }
+          }
+          return data
+        },
+      },
+    })
+
+    const memoryDir = path.join(tmpDir, "memory")
+    await fs.mkdir(memoryDir, { recursive: true })
+    const v1Data = makeMemory()
+    await fs.writeFile(
+      path.join(memoryDir, "uuid-1.json"),
+      JSON.stringify(v1Data),
+      "utf-8"
+    )
+
+    const result = await store.memory.get("uuid-1")
+    expect(result).not.toBeNull()
+    expect((result as any).schemaVersion).toBe(2)
+    expect((result as any).newField).toBe("migrated")
   })
 })
 
