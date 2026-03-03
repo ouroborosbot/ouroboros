@@ -36,24 +36,24 @@ Build a new `work-merger` subagent that runs after work-doer completes, fetching
 - Any runtime code changes in `src/` (this is a subagent doc + workflow docs task)
 
 ## Completion Criteria
-- [ ] `subagents/work-merger.md` exists with YAML frontmatter and complete workflow instructions
-- [ ] work-merger is installable as a Claude Code sub-agent (symlink into `~/.claude/agents/`) AND as a Codex skill (hard-link as `~/.codex/skills/work-merger/SKILL.md`)
-- [ ] `subagents/README.md` updated: work-merger in table, workflow description extended, install commands for both Claude Code and Codex (including optional `openai.yaml` UI metadata)
-- [ ] `AGENTS.md` updated: extended workflow (work-planner -> work-doer -> work-merger), Runtime-Specific Invocation includes `$work-merger` for Codex and sub-agent for Claude Code
-- [ ] The work-merger doc covers: fetch, merge, conflict resolution with task doc context, test, PR creation via `gh`, merge PR to main
-- [ ] The work-merger doc covers the fast-path: branch already up-to-date with main (still creates PR, CI must pass)
-- [ ] The work-merger doc covers git-informed task doc discovery: use `git log origin/main --not HEAD` to find doing docs that landed on main since the branch point (not just timestamp-sorted scanning)
-- [ ] The work-merger doc covers race condition retry: exponential backoff (30s, 1m, 2m, 4m...), no retry limit, clear user-facing communication on each retry (retry number, wait duration, reason)
-- [ ] The work-merger doc covers CI failure self-repair: agent fixes failures itself first, escalates only when genuinely stuck
-- [ ] The work-merger doc covers post-merge cleanup: delete feature branch (local + remote)
-- [ ] The work-merger doc covers escalation: when to stop and ask the user (only for genuinely ambiguous issues, not fixable failures)
-- [ ] The work-merger doc covers `gh` CLI preflight checks: installed, authenticated, GitHub remote exists, repo default set. Agent self-repairs what it can, escalates only when human input needed (credentials, OAuth)
-- [ ] Branch naming convention unified and documented: both agents use `<agent>/<slug>`, old `codex/` prefix convention deprecated in AGENTS.md
-- [ ] `CONTRIBUTING.md` updated: sync-and-merge workflow section, unified branch convention (`<agent>/<slug>`), PR-based merge flow
-- [ ] `cross-agent-docs/sync-and-merge-conventions.md` created with shared conventions
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] `subagents/work-merger.md` exists with YAML frontmatter and complete workflow instructions
+- [x] work-merger is installable as a Claude Code sub-agent (symlink into `~/.claude/agents/`) AND as a Codex skill (hard-link as `~/.codex/skills/work-merger/SKILL.md`)
+- [x] `subagents/README.md` updated: work-merger in table, workflow description extended, install commands for both Claude Code and Codex (including optional `openai.yaml` UI metadata)
+- [x] `AGENTS.md` updated: extended workflow (work-planner -> work-doer -> work-merger), Runtime-Specific Invocation includes `$work-merger` for Codex and sub-agent for Claude Code
+- [x] The work-merger doc covers: fetch, merge, conflict resolution with task doc context, test, PR creation via `gh`, merge PR to main
+- [x] The work-merger doc covers the fast-path: branch already up-to-date with main (still creates PR, CI must pass)
+- [x] The work-merger doc covers git-informed task doc discovery: use `git log origin/main --not HEAD` to find doing docs that landed on main since the branch point (not just timestamp-sorted scanning)
+- [x] The work-merger doc covers race condition retry: exponential backoff (30s, 1m, 2m, 4m...), no retry limit, clear user-facing communication on each retry (retry number, wait duration, reason)
+- [x] The work-merger doc covers CI failure self-repair: agent fixes failures itself first, escalates only when genuinely stuck
+- [x] The work-merger doc covers post-merge cleanup: delete feature branch (local + remote)
+- [x] The work-merger doc covers escalation: when to stop and ask the user (only for genuinely ambiguous issues, not fixable failures)
+- [x] The work-merger doc covers `gh` CLI preflight checks: installed, authenticated, GitHub remote exists, repo default set. Agent self-repairs what it can, escalates only when human input needed (credentials, OAuth)
+- [x] Branch naming convention unified and documented: both agents use `<agent>/<slug>`, old `codex/` prefix convention deprecated in AGENTS.md
+- [x] `CONTRIBUTING.md` updated: sync-and-merge workflow section, unified branch convention (`<agent>/<slug>`), PR-based merge flow
+- [x] `cross-agent-docs/sync-and-merge-conventions.md` created with shared conventions
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
