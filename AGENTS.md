@@ -2,29 +2,31 @@
 
 ### Agent Context (Required)
 
-Task docs go in `docs/<agent>/tasks/` with naming scheme `YYYY-MM-DD-HHMM-{planning|doing}-<slug>.md`.
+Task docs go in `<agent>/tasks/` with naming scheme `YYYY-MM-DD-HHMM-{planning|doing}-<slug>.md`.
 
-- Default `<agent>` from the current git branch using this shape: `[prefix/]<agent>[/feature...]`.
-  - If branch is `<agent>`, use that token.
-  - If branch starts with `codex/`, treat `codex` as prefix and use the next token as `<agent>`.
-  - Any remaining path segments are feature/detail and are not part of `<agent>`.
+- Default `<agent>` from the current git branch using this shape: `<agent>[/<slug>]`.
+  - The first path segment is always the agent name (e.g., `ouroboros`, `slugger`).
+  - If the branch has no `/`, the entire branch name is the agent.
+  - Any segments after the first `/` are the feature slug and are not part of `<agent>`.
+  - The old `codex/<agent>` prefix convention is deprecated. All agents use `<agent>/<slug>` directly.
 - Branches must be agent-specific. If the branch does not clearly encode a single agent, STOP and remind the user to switch to an agent-specific branch before continuing.
 - Do not hardcode agent names in instructions. This workflow must support arbitrary agents.
 
 ### Runtime-Specific Invocation
 
-- **Codex app**: Use skills by name: `$work-planner` and `$work-doer`.
+- **Codex app**: Use skills by name: `$work-planner`, `$work-doer`, and `$work-merger`.
   - Skills are turn-scoped in practice, so re-invoke `$work-planner` on each planning/conversion turn.
   - `work-planner` already enforces `NEEDS_REVIEW` and hard-stop behavior; do not bypass it.
-- **Claude Code**: Use sub-agents from `~/.claude/agents/` (`work-planner`, `work-doer`).
+- **Claude Code**: Use sub-agents from `~/.claude/agents/` (`work-planner`, `work-doer`, `work-merger`).
 
 ### Gate Flow
 
-1. **Plan**: Launch `work-planner`. It produces/updates a planning doc under `docs/<agent>/tasks/`.
+1. **Plan**: Launch `work-planner`. It produces/updates a planning doc under `<agent>/tasks/`.
 2. **Review**: Show the user the planning doc path and STOP. Wait for explicit user approval.
-3. **Convert**: Only after user approves the planning doc, re-run `work-planner` to convert to a doing doc in the same `docs/<agent>/tasks/` directory. User must also review and sign off on the doing doc before implementation.
+3. **Convert**: Only after user approves the planning doc, re-run `work-planner` to convert to a doing doc in the same `<agent>/tasks/` directory. User must also review and sign off on the doing doc before implementation.
 4. **Implement**: Only after user explicitly asks, launch `work-doer` to execute the doing doc. Never implement inside `work-planner`.
-5. **Never self-approve**: Do not say "looks good" and proceed. The user reviews every planning and doing doc.
+5. **Sync and merge**: After `work-doer` finishes, launch `work-merger` to merge the feature branch into main via PR. It handles conflicts, CI, and race conditions autonomously.
+6. **Never self-approve**: Do not say "looks good" and proceed. The user reviews every planning and doing doc.
 
 ### Decision Collaboration (Required)
 

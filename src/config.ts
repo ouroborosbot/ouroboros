@@ -28,10 +28,6 @@ export interface OAuthConfig {
   adoConnectionName: string
 }
 
-export interface AdoConfig {
-  organizations: string[]
-}
-
 export interface ContextConfig {
   maxTokens: number
   contextMargin: number
@@ -55,7 +51,6 @@ export interface OuroborosConfig {
   }
   teams: TeamsConfig
   oauth: OAuthConfig
-  ado: AdoConfig
   context: ContextConfig
   teamsChannel: TeamsChannelConfig
   integrations: IntegrationsConfig
@@ -83,9 +78,6 @@ const DEFAULT_CONFIG: OuroborosConfig = {
   oauth: {
     graphConnectionName: "graph",
     adoConnectionName: "ado",
-  },
-  ado: {
-    organizations: [],
   },
   context: {
     maxTokens: 80000,
@@ -217,11 +209,6 @@ export function getContextConfig(): ContextConfig {
 export function getOAuthConfig(): OAuthConfig {
   const config = loadConfig()
   return { ...config.oauth }
-}
-
-export function getAdoConfig(): AdoConfig {
-  const config = loadConfig()
-  return { organizations: [...config.ado.organizations] }
 }
 
 export function getTeamsChannelConfig(): TeamsChannelConfig {

@@ -466,36 +466,12 @@ describe("getOAuthConfig", () => {
 
 })
 
-describe("getAdoConfig", () => {
-  beforeEach(async () => {
+describe("getAdoConfig removed", () => {
+  it("getAdoConfig no longer exists (removed in Unit 1Hb)", async () => {
     vi.resetModules()
+    const config = await import("../config")
+    expect((config as any).getAdoConfig).toBeUndefined()
   })
-
-  it("returns empty organizations by default", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
-
-    const { getAdoConfig, resetConfigCache } = await import("../config")
-    resetConfigCache()
-    const ado = getAdoConfig()
-
-    expect(ado.organizations).toEqual([])
-  })
-
-  it("respects config.json values", async () => {
-    const configData = {
-      ado: {
-        organizations: ["org1", "org2"],
-      },
-    }
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(configData))
-
-    const { getAdoConfig, resetConfigCache } = await import("../config")
-    resetConfigCache()
-    const ado = getAdoConfig()
-
-    expect(ado.organizations).toEqual(["org1", "org2"])
-  })
-
 })
 
 describe("getTeamsChannelConfig", () => {
