@@ -76,7 +76,7 @@ Define and lock runtime hardening requirements for single-replica preview so req
 **Output**: Red test artifact at `./2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-2a-red-run.txt`.
 **Acceptance**: Tests fail and identify current blocking/hot-path assumptions.
 
-### ⬜ Unit 2b: Request-Path Non-Blocking Contract — Implementation
+### ✅ Unit 2b: Request-Path Non-Blocking Contract — Implementation
 **What**: Implement request-path hardening changes so runtime remains responsive under sink/file pressure and prompt-path activity.
 **Output**: Updated nerves/prompt/runtime code and passing tests.
 **Acceptance**: Request-path logging/prompt behavior follows non-blocking contract with safe fallback behavior under I/O issues.
@@ -135,3 +135,4 @@ Define and lock runtime hardening requirements for single-replica preview so req
 - [2026-03-03 14:51] Unit 1b complete: implemented remote-channel local-tool filtering/denial messaging, updated contract tests, and verified full test + build green.
 - [2026-03-03 14:53] Unit 1c complete: verified 100% coverage and clean build after remote tool-safety changes (`unit-1c-coverage-run.txt`, `unit-1c-build-run.txt`).
 - [2026-03-03 14:54] Unit 2a complete: added failing non-blocking sink contract tests and captured red evidence for sink-failure throw behavior.
+- [2026-03-03 14:57] Unit 2b complete: implemented non-blocking sink fanout/file behavior with resilient error handling and verified full test + build green (`unit-2b-test-run.txt`, `unit-2b-build-run.txt`).
