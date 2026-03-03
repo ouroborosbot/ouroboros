@@ -16,10 +16,10 @@
 Introduce a structured observability foundation (logger + trace IDs) so turn execution, tool behavior, and key engine/channel events are diagnosable without relying on ad-hoc `console` output.
 
 ## Completion Criteria
-- [ ] `src/observability/` module exists with reusable logger + trace ID primitives.
-- [ ] NDJSON (`json`) is the canonical log format with configurable `logging.level` and dual sinks for this phase (`stderr` + session-style file).
-- [ ] All structured events use required envelope fields: `ts`, `level`, `event`, `trace_id`, `component`, `message`, `meta`.
-- [ ] Sink abstraction exists and routes each event to configured sinks without instrumentation-site changes.
+- [x] `src/observability/` module exists with reusable logger + trace ID primitives.
+- [x] NDJSON (`json`) is the canonical log format with configurable `logging.level` and dual sinks for this phase (`stderr` + session-style file).
+- [x] All structured events use required envelope fields: `ts`, `level`, `event`, `trace_id`, `component`, `message`, `meta`.
+- [x] Sink abstraction exists and routes each event to configured sinks without instrumentation-site changes.
 - [ ] File sink persists append-only NDJSON events at `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson` without truncating per turn, using session-key parity (CLI=`session`, Teams=`conversationId`).
 - [ ] Runtime paths across `src/` emit event-level structured logs with no chunk-level or sensitive-payload dumps.
 - [ ] Minimum component event catalog is implemented and exercised in tests (entrypoints/channels/engine including `src/engine/kicks.ts`/mind/tools/config/identity/clients/repertoire).
@@ -71,7 +71,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Output**: New failing observability tests and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-1a-red-run.txt`.
 **Acceptance**: Tests fail for missing `src/observability/` module and missing envelope/config/sink persistence behavior.
 
-### ⬜ Unit 1b: Observability Core Module — Green
+### ✅ Unit 1b: Observability Core Module — Green
 **What**: Implement `src/observability/` logger and trace helpers (factory + event helpers) with sink abstraction and fan-out to `stderr` and append-only file persistence.
 **Output**: New module files under `src/observability/` and updated tests.
 **Acceptance**: Unit 1a tests pass with required envelope fields, configurable `logging.level`, sink abstraction, and append-only file writes to the session-style path.
@@ -205,3 +205,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 17:39] Pass 4 (quality): verified completeness (no placeholders, coverage/TDD requirements present, emoji unit headers intact); set status to READY_FOR_EXECUTION
 - [2026-03-02 17:42] Unit 0 complete: baseline matrix captured current runtime logging, locked envelope/event/sink contracts, and mapped all in-scope files
 - [2026-03-02 17:43] Unit 1a complete: added failing observability core tests and captured red run evidence (missing module/envelope/sink behavior)
+- [2026-03-02 17:44] Unit 1b complete: implemented observability core module (trace helpers, level filtering, sink fan-out, stderr + NDJSON file sinks); tests green and build clean
