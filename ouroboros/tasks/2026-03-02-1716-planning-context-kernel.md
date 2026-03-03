@@ -245,8 +245,8 @@ Design rules:
 
 This is wired in Phase 1 (1G) for identity + preferences, and extended in Phase 2 (2D) for authority.
 
-### D11: Authority → Scope Cache Invalidation
-Scopes are discovered at runtime and cached in memory (not persisted). When Authority records a 403 on a scope, it invalidates the in-memory scope cache. The next tool call that needs scopes re-discovers them via the ADO APIs, and the revoked scope naturally disappears from the results. No cross-layer feedback between persisted types — just in-memory cache invalidation.
+### D11: Authority → Scope Re-Discovery on 403
+Scopes are discovered at runtime via ADO APIs and carried forward in the conversation — there is no cache (in-memory or persisted). When Authority (Phase 2) records a 403 on a scope, the next tool call that needs scopes re-discovers them via the ADO APIs. The revoked scope naturally disappears because the API no longer returns it. No cross-layer feedback needed — the API is the source of truth.
 
 ### D12: Cross-Channel Identity -- Designed For Multi-Channel From Day One
 Users will talk to the agent from many channels over time -- Teams today, Discord/Telegram/iMessage/web tomorrow. The identity model must make cross-channel linking a natural extension, not a retrofit.
@@ -329,8 +329,8 @@ All top-level source directories MUST map to a part of the agent-creature's body
 The existing `ado.organizations` config and `validateAdoOrg()` function were a pre-context-kernel workaround: manually list allowed orgs, reject anything else. This is replaced by API discovery:
 1. **Org discovery**: `GET https://app.vssps.visualstudio.com/_apis/accounts?memberId={id}` returns all ADO orgs the user belongs to. The user's OAuth token is the source of truth — no manual config needed.
 2. **Project discovery**: `GET https://dev.azure.com/{org}/_apis/projects` returns only projects the user can see within each org.
-3. **knownScopes** on `UserIdentity` caches the discovered orgs + projects with TTL. Refreshed on cache expiry or when the user mentions an unknown scope.
-4. **ADO tools validate org against knownScopes** instead of against a config list. Same safety rail, zero config.
+3. **No caching** — discovered scopes are not persisted or cached in memory. The conversation carries discovery results forward. Don't persist what you can re-derive.
+4. **ADO tools discover scopes inline** when the model doesn't specify org/project. The API itself is the validation — if the user can't see it, the API won't return it. Same safety, zero config.
 
 What gets removed:
 - `ado.organizations` from `OuroborosConfig` and `AdoConfig`
@@ -339,8 +339,8 @@ What gets removed:
 - `getAdoConfig()` from `config.ts` (unless other ADO config fields are added later)
 
 What replaces them:
-- `context.identity.knownScopes` — API-discovered, per-user, cached
-- Org/project validation in tool handlers checks knownScopes instead of a config allowlist
+- Runtime API discovery in tool handlers (Accounts API → Projects API) using the user's OAuth token
+- Conversation carries discovered scopes forward — no cache, no config allowlist
 
 ## Context / References
 
@@ -351,7 +351,7 @@ Paths reflect the directory restructuring done in unit 10. The agent-creature bo
 - **Heart** (core loop): `src/heart/core.ts` -- `runAgent()` loop, provider selection, streaming, tool execution
 - **Mind** (reasoning): `src/mind/prompt.ts` -- `buildSystem()` assembles system prompt with channel-aware sections; `src/mind/context.ts` -- `saveSession()`, `loadSession()`, `postTurn()`, `trimMessages()`
 - **Repertoire** (capabilities): `src/repertoire/tools-base.ts` (base tools), `src/repertoire/tools-teams.ts` (Teams-only tools including ADO/Graph), `src/repertoire/tools.ts` (channel-aware tool list)
-- **ToolContext interface** (`src/repertoire/tools-base.ts`): `{ graphToken?, adoToken?, signin, adoOrganizations }` — `adoOrganizations` removed by context kernel (D20); org validation moves to knownScopes
+- **ToolContext interface** (`src/repertoire/tools-base.ts`): `{ graphToken?, adoToken?, signin, adoOrganizations }` — `adoOrganizations` removed by context kernel (D20); org validation moves to runtime API discovery
 - **ADO client**: `src/repertoire/ado-client.ts` -- generic `adoRequest()` and `queryWorkItems()` wrapper
 - **Graph client**: `src/repertoire/graph-client.ts` -- generic `graphRequest()` and `getProfile()` wrapper
 - **Senses** (channels): `src/senses/cli.ts` (readline REPL), `src/senses/teams.ts` (Teams SDK bot)
@@ -461,7 +461,7 @@ interface UserIdentity {
   updatedAt: string;
   schemaVersion: number;
   // No knownScopes here — scopes are discovered at runtime via ADO APIs
-  // and cached in memory. Don't persist what you can re-derive.
+  // and carried forward in conversation. Don't persist what you can re-derive.
 }
 
 // --- Layer 2: Authority ---
@@ -505,7 +505,7 @@ interface AdoPreferences {
   autoAssignToSelf: boolean;
   backlogViewStyle: "flat" | "tree";
   // No defaultOrg/defaultProject — org/project selection is conversational.
-  // Model disambiguates using knownScopes, context window tracks current project.
+  // Model disambiguates using API-discovered scopes; conversation tracks current project.
 }
 
 interface UserPreferences {
@@ -530,7 +530,7 @@ interface ChannelCapabilities {
   //   Identity and preferences work (local file-based) but no ADO/Graph/GitHub tools.
   // Teams: availableIntegrations = ["ado", "graph"] -- OAuth-backed via Bot Service token store.
   //   ADO is Teams-only for the foreseeable future.
-  // Prompt injection only renders knownScopes/authority for integrations in this list.
+  // Prompt injection only renders authority constraints for integrations in this list.
 }
 
 // --- Resolved Context (output of resolver) ---
@@ -564,3 +564,4 @@ interface ResolvedContext {
 - 2026-03-03 20:33 D20: API-discovered scopes replace config-based org allowlist. ADO Accounts API discovers orgs, Projects API discovers projects per org. Kills ado.organizations config, adoOrganizations on ToolContext, validateAdoOrg(). User's OAuth token is source of truth.
 - 2026-03-03 20:46 Applied "don't persist what you can re-derive" across the board. Removed knownScopes and KnownScope type from UserIdentity — scopes are runtime, not persisted. Simplified resolver: eager in Phase 1, lazy in Phase 2. Renamed LazyResolvedContext → ResolvedContext, LazyContextResolver → ContextResolver. buildSystem() stays sync in Phase 1.
 - 2026-03-03 20:53 Further simplified: no in-memory scope cache either. Conversation IS the cache. Tool handler discovers scopes via API when needed, model learns from result, conversation carries knowledge forward. Zero memory footprint, zero stale data. Scopes are a tool-level concern, not a context-kernel concern. Preferences only persisted when user makes a non-default choice.
+- 2026-03-02 2108 Fixed 7 stale refs: D11 title+body (in-memory scope cache → conversation-as-cache), D20 points 3-4 and "what replaces them" (knownScopes → runtime API discovery), ToolContext reference (knownScopes → runtime API discovery), AdoPreferences comment, ChannelCapabilities comment, UserIdentity schema comment.
