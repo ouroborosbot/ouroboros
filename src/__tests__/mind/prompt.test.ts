@@ -599,11 +599,13 @@ describe("contextSection", () => {
   it("renders friend identity with display name", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
-      identity: {
+      friend: {
         id: "uuid-1",
         displayName: "Jordan",
         externalIds: [{ provider: "local" as const, externalId: "jordan", linkedAt: "2026-01-01T00:00:00.000Z" }],
         tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
         createdAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-01T00:00:00.000Z",
         schemaVersion: 1,
@@ -626,11 +628,13 @@ describe("contextSection", () => {
   it("renders AAD identity with external ID in parentheses", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
-      identity: {
+      friend: {
         id: "uuid-1",
         displayName: "Jordan Smith",
         externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01T00:00:00.000Z" }],
         tenantMemberships: ["t1"],
+        toolPreferences: {},
+        notes: {},
         createdAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-01T00:00:00.000Z",
         schemaVersion: 1,
@@ -651,11 +655,13 @@ describe("contextSection", () => {
   it("renders Teams channel capabilities correctly", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
-      identity: {
+      friend: {
         id: "uuid-1",
         displayName: "Jordan",
         externalIds: [],
         tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
         createdAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-01T00:00:00.000Z",
         schemaVersion: 1,
@@ -679,11 +685,13 @@ describe("contextSection", () => {
   it("renders CLI channel with streaming", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
-      identity: {
+      friend: {
         id: "uuid-1",
         displayName: "Jordan",
         externalIds: [],
         tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
         createdAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-01T00:00:00.000Z",
         schemaVersion: 1,
@@ -731,57 +739,6 @@ describe("contextSection", () => {
     expect(result).toContain("project: ouroboros")
   })
 
-  it("does not render authority section when checker is absent (CLI)", async () => {
-    const { contextSection } = await import("../../mind/prompt")
-    const ctx = {
-      identity: {
-        id: "uuid-1",
-        displayName: "Jordan",
-        externalIds: [],
-        tenantMemberships: [],
-        createdAt: "2026-01-01",
-        updatedAt: "2026-01-01",
-        schemaVersion: 1,
-      },
-      channel: {
-        channel: "cli" as const,
-        availableIntegrations: [] as any[],
-        supportsMarkdown: false,
-        supportsStreaming: true,
-        supportsRichCards: false,
-        maxMessageLength: Infinity,
-      },
-    }
-    const result = contextSection(ctx)
-    expect(result).not.toContain("## authority")
-  })
-
-  it("does not render authority section when context has no checker", async () => {
-    const { contextSection } = await import("../../mind/prompt")
-    const ctx = {
-      identity: {
-        id: "uuid-1",
-        displayName: "Jordan",
-        externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01" }],
-        tenantMemberships: ["t1"],
-        createdAt: "2026-01-01",
-        updatedAt: "2026-01-01",
-        schemaVersion: 1,
-      },
-      channel: {
-        channel: "teams" as const,
-        availableIntegrations: ["ado" as const, "graph" as const],
-        supportsMarkdown: true,
-        supportsStreaming: true,
-        supportsRichCards: true,
-        maxMessageLength: 28000,
-      },
-      // No checker
-    }
-    const result = contextSection(ctx)
-    expect(result).not.toContain("## authority")
-  })
-
   it("does not render notes section when notes is empty", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
@@ -809,40 +766,16 @@ describe("contextSection", () => {
     expect(result).not.toContain("what I know")
   })
 
-  it("does not render preferences section when memory is null", async () => {
+  it("does not render preferences in system prompt (toolPreferences go to tool descriptions only)", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
-      identity: {
+      friend: {
         id: "uuid-1",
         displayName: "Jordan",
         externalIds: [],
         tenantMemberships: [],
-        createdAt: "2026-01-01",
-        updatedAt: "2026-01-01",
-        schemaVersion: 1,
-      },
-      channel: {
-        channel: "cli" as const,
-        availableIntegrations: [] as any[],
-        supportsMarkdown: false,
-        supportsStreaming: true,
-        supportsRichCards: false,
-        maxMessageLength: Infinity,
-      },
-      memory: null,
-    }
-    const result = contextSection(ctx)
-    expect(result).not.toContain("## friend preferences")
-  })
-
-  it("does not render preferences section when toolPreferences is empty", async () => {
-    const { contextSection } = await import("../../mind/prompt")
-    const ctx = {
-      identity: {
-        id: "uuid-1",
-        displayName: "Jordan",
-        externalIds: [],
-        tenantMemberships: [],
+        toolPreferences: { ado: "use iteration paths" },
+        notes: {},
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -855,14 +788,10 @@ describe("contextSection", () => {
         supportsRichCards: true,
         maxMessageLength: 28000,
       },
-      memory: {
-        id: "uuid-1",
-        toolPreferences: {},
-        schemaVersion: 1,
-      },
     }
     const result = contextSection(ctx)
     expect(result).not.toContain("## friend preferences")
+    expect(result).not.toContain("use iteration paths")
   })
 
   it("does not render authority section (removed)", async () => {
@@ -1165,11 +1094,13 @@ describe("buildSystem with context", () => {
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const ctx = {
-      identity: {
+      friend: {
         id: "uuid-1",
         displayName: "Jordan",
         externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01T00:00:00.000Z" }],
         tenantMemberships: ["t1"],
+        toolPreferences: {},
+        notes: {},
         createdAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-01T00:00:00.000Z",
         schemaVersion: 1,

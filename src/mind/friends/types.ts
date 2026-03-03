@@ -59,43 +59,7 @@ export interface ChannelCapabilities {
 
 // -- Resolved Context --
 // The per-request bundle resolved by the FriendResolver.
-// During migration: includes both new (friend) and legacy (identity, memory, checker) fields.
-// Legacy fields will be removed as consumers are updated (Units 5-11).
 export interface ResolvedContext {
   readonly friend: FriendRecord
   readonly channel: ChannelCapabilities
-  // Legacy fields -- deprecated, removed after all consumers migrate
-  readonly identity?: FriendIdentity
-  readonly memory?: FriendMemory | null
-  readonly checker?: AuthorityChecker
-}
-
-// ============================================================
-// DEPRECATED: Legacy types kept for backward compat during migration.
-// These will be removed as consumers are updated (Units 2-11).
-// ============================================================
-
-/** @deprecated Use FriendRecord instead */
-export interface FriendIdentity {
-  id: string
-  displayName: string
-  externalIds: ExternalId[]
-  tenantMemberships: string[]
-  createdAt: string
-  updatedAt: string
-  schemaVersion: number
-}
-
-/** @deprecated Merged into FriendRecord */
-export interface FriendMemory {
-  id: string
-  toolPreferences: Record<string, string>
-  schemaVersion: number
-}
-
-/** @deprecated Use ResolvedContext (friend-based) instead */
-export interface AuthorityChecker {
-  canRead(integration: string, scope: string): boolean
-  canWrite(integration: string, scope: string, action: string): Promise<boolean>
-  record403(integration: string, scope: string, action: string): void
 }

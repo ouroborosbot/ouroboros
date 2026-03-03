@@ -193,9 +193,7 @@ describe("ResolvedContext type", () => {
     const ctx: ResolvedContext = { friend, channel }
     expect(ctx.friend).toBe(friend)
     expect(ctx.channel).toBe(channel)
-    // When constructed with only friend + channel, legacy fields are absent
-    expect(ctx.identity).toBeUndefined()
-    expect(ctx.memory).toBeUndefined()
-    expect(ctx.checker).toBeUndefined()
+    // ResolvedContext has only friend + channel, no legacy fields
+    expect(Object.keys(ctx)).toEqual(["friend", "channel"])
   })
 })

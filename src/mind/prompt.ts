@@ -145,8 +145,7 @@ export function contextSection(context?: ResolvedContext): string {
 
   const lines: string[] = ["## friend context"]
 
-  // Identity -- use friend field if available, fall back to legacy identity
-  const friendOrIdentity = context.friend ?? context.identity
+  const friendOrIdentity = context.friend
   if (!friendOrIdentity) return ""
   const emailId = friendOrIdentity.externalIds.find(e => e.provider === "aad")
   const idDisplay = emailId
@@ -165,10 +164,10 @@ export function contextSection(context?: ResolvedContext): string {
   /* v8 ignore next -- empty-traits branch unreachable: streaming/no-streaming always adds a trait @preserve */
   lines.push(`channel: ${ch.channel}${traits.length ? ` (${traits.join(", ")})` : ""}`)
 
-  // Friend record and state detection
-  const friend = context.friend
-  const notes = friend?.notes ?? {}
-  const prefs = friend?.toolPreferences ?? {}
+  // Friend record and state detection (friend is guaranteed non-null here -- checked above)
+  const friend = context.friend!
+  const notes = friend.notes
+  const prefs = friend.toolPreferences
   const hasNotes = Object.keys(notes).length > 0
   const hasPrefs = Object.keys(prefs).length > 0
   const isNewFriend = !hasNotes && !hasPrefs
