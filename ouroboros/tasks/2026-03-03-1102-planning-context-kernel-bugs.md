@@ -72,7 +72,7 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 - `resolveIdentity()` uses `store.findByExternalId()` instead of `store.identity.find()`
 - `resolveIdentity()` never overwrites `displayName` on an existing record. The initial value comes from the system (AAD name, OS username) on first encounter. After that, only `save_friend_note` can change it. This prevents the system from stomping on a name the friend explicitly provided.
 - `resolveMemory()` as a separate step is eliminated — the merged `FriendRecord` returned by `get()`/`findByExternalId()` already contains `toolPreferences` and `notes`. `memory.ts` may be deleted or reduced to a helper.
-- `ResolvedContext` changes from `{ identity: FriendIdentity, channel, checker?, memory: FriendMemory | null }` to `{ friend: FriendRecord, channel, checker? }`
+- `ResolvedContext` changes from `{ identity: FriendIdentity, channel, checker?, memory: FriendMemory | null }` to `{ friend: FriendRecord, channel }`. The `checker?` field is removed (AuthorityChecker eliminated).
 
 *Per-turn refresh (no in-memory mutation):*
 - Each turn, re-read the friend record from disk via `store.get(friendId)` before building the system prompt and tools. The friend ID is known from initial identity resolution.
@@ -136,14 +136,19 @@ save_friend_note({
 - `contextSection()` renders `record.notes` entries in the system prompt (first person). E.g., if `notes["role"] = "engineering manager"`, system prompt includes "I know [friend] is an engineering manager."
 - `toolPreferences` entries are NOT rendered in the system prompt — they only appear on tool descriptions. Clean separation, no dedup logic needed.
 
+*Cleanup: Remove AuthorityChecker*
+- `AuthorityChecker` (interface in `types.ts`, created in `resolver.ts`, rendered in `contextSection()`) is dead weight. Tool availability is determined by `getToolsForChannel()` via the `tools` API parameter. OAuth tokens are resolved on-demand via sign-in flow. 403s surface naturally through tool error returns. AuthorityChecker adds complexity without behavioral value.
+- Remove: `AuthorityChecker` interface from `types.ts`, `checker?` field from `ResolvedContext`, authority checking logic from `ContextResolver.resolve()`, authority section rendering from `contextSection()` in `prompt.ts`, and all associated tests.
+- We're already touching every file it lives in for the type merge — removing it now makes the merge cleaner.
+
 *Documentation:*
 - Update top-level README.md to document the friend storage split (agent knowledge vs PII bridge, what lives where and why)
 
 ### Out of Scope
 - FRIENDS.md migration (deferred — see Notes)
 - Friend re-linking after agent migration (deferred — see Notes)
-- New context kernel features (authority probing, new identity providers)
-- Changes to `AuthorityChecker` or its rendering in the system prompt — existing behavior, not part of this task
+- New context kernel features (new identity providers)
+- Persisting the `tools` array in session files for debugging/recall (deferred — see Notes)
 - Migration of existing data in `~/.agentconfigs/context/` — only one dev machine, no production users. Delete old directory manually.
 
 ## Completion Criteria
@@ -167,6 +172,7 @@ save_friend_note({
 - [ ] `save_friend_note` writes to disk only — no in-memory mutation
 - [ ] `ToolContext` type updated (`memoryStore` → `friendStore`)
 - [ ] `ContextResolver` works with `FriendStore` and merged `FriendRecord`
+- [ ] `AuthorityChecker` removed: interface, `checker?` field on `ResolvedContext`, resolver logic, prompt rendering, and tests
 - [ ] `getToolsForChannel()` accepts `toolPreferences` and injects matching preferences into tool `function.description` (in `tools` API param, not system prompt)
 - [ ] `toolPreferences` entries appear in tool descriptions only (not system prompt)
 - [ ] `notes` entries appear in system prompt only (not tool descriptions)
@@ -189,7 +195,7 @@ save_friend_note({
 - [x] Bug 1 (name quality): Should code detect garbage names? **Resolved: no. Model-judged.** Always include displayName in system prompt with a soft first-person instruction. The model is better at judging name quality than any code heuristic. No regex, no OS username comparison.
 - [x] Storage: How does the store expose two backends? **Resolved: `FriendStore` interface with domain-specific methods.** Constructor takes two paths. `get()`/`put()` read/write both backends. `findByExternalId()` searches PII bridge then merges. Generic `find(predicate)` eliminated — can't scan across two backends generically.
 - [x] Storage: What happens to `resolveMemory()`? **Resolved: eliminated.** The merged `FriendRecord` includes `toolPreferences` and `notes`. Identity resolution returns the full record — no separate memory resolution step needed. `memory.ts` may be deleted or reduced.
-- [x] Storage: What about `ResolvedContext` shape? **Resolved: `{ friend: FriendRecord, channel, checker? }`.** Replaces separate `identity` + `memory` fields. All consumers update to use `.friend.*`.
+- [x] Storage: What about `ResolvedContext` shape? **Resolved: `{ friend: FriendRecord, channel }`.** Replaces separate `identity` + `memory` fields. All consumers update to use `.friend.*`.
 - [x] Storage: Where does `agentName` come from for the PII bridge path? **Resolved: `getAgentName()`** already exists in `src/identity.ts` (parses `--agent <name>` from argv). PII bridge path: `path.join(os.homedir(), ".agentconfigs", getAgentName(), "friends")`.
 - [x] Storage: What about existing data in `~/.agentconfigs/context/`? **Resolved: no migration.** One dev machine, no production users. Delete manually.
 - [x] Storage: Should `resolveIdentity()` update displayName on returning friends? **Resolved: never.** displayName is set on first encounter from the system-provided name (AAD, OS username). After that, only `save_friend_note` with `type: "name"` can change it. Prevents the system from overwriting a friend-provided name.
@@ -198,7 +204,8 @@ save_friend_note({
 - [x] Preferences: How to handle mid-conversation preference changes? **Resolved: per-turn disk refresh.** Friend record is re-read from disk each turn. `save_friend_note` writes to disk. Next turn picks up changes automatically. No in-memory mutation needed.
 - [x] Tool: Should `save_friend_note` silently overwrite existing values? **Resolved: conflict-aware.** For `tool_preference` and `note` types, if a value already exists and `override` is not true, the tool returns the existing value and instructs the model to merge and re-call with `override: true`. For `name` type, no conflict check (friend explicitly told us).
 - [x] Prompt voice: What voice should system prompt instructions use? **Resolved: first person.** The system prompt IS the agent's inner voice. All instructions use "I" statements.
-- [x] Authority: Should authority/integrations be rendered in the system prompt? **Resolved: out of scope.** Authority is an existing concern handled by `AuthorityChecker`. Tool availability is determined by the `tools` API parameter (via `getToolsForChannel()`), not the system prompt. OAuth consent happens on-demand via sign-in flow when a tool needs a token. We don't add to or change authority rendering in this task.
+- [x] Authority: Should we keep `AuthorityChecker`? **Resolved: remove it.** It adds complexity without behavioral value. Tool availability is determined by `getToolsForChannel()` via the `tools` API parameter. OAuth consent happens on-demand via sign-in flow. 403s surface through tool error returns. We're already touching every file authority lives in — removing it makes the merge cleaner.
+- [x] Session debugging: Should the `tools` array be persisted in session files? **Resolved: deferred.** Would be useful for debugging/recall, but tools change per turn (rebuilt with preferences), and the tool list is deterministic from channel + preferences. Nice-to-have for later, not this task.
 
 ## Decisions Made
 - Bug 2 fix: Rebuild the system message on each turn by calling `buildSystem(channel, options, resolvedContext)` and replacing `messages[0].content`. Cheap because psyche files are cached. Friend record re-read from disk each turn — store is the single source of truth.
@@ -213,7 +220,7 @@ save_friend_note({
   - `FileContextStore` → `FileFriendStore`. Constructor takes two paths (agentKnowledgePath, piiBridgePath). Handles split internally.
   - `resolveIdentity()` never overwrites `displayName` on existing records. Set on first encounter, only changed by `save_friend_note`.
   - `resolveMemory()` eliminated. Memory resolution collapses into identity resolution — `FriendRecord` already has `toolPreferences` and `notes`.
-  - `ResolvedContext` changes to `{ friend: FriendRecord, channel, checker? }`. All consumers update.
+  - `ResolvedContext` changes to `{ friend: FriendRecord, channel }`. All consumers update.
   - Per-turn disk refresh: friend record re-read from disk each turn. No in-memory mutation. Store is single source of truth.
   - No migration of old data. Delete `~/.agentconfigs/context/` manually.
 - `save_friend_note` redesign:
@@ -230,15 +237,17 @@ save_friend_note({
   - `notes` entries rendered in system prompt context section (first person). Never in tool descriptions.
   - Structural separation at the data level — no dedup filtering needed.
   - `core.ts` re-reads friend record from disk each turn, passes `friend.toolPreferences` to `getToolsForChannel()` and `friend` to `buildSystem()`.
+- AuthorityChecker removal: dead weight — tool availability via `tools` API param, OAuth on-demand, 403s via tool errors. Remove interface, `checker?` field, resolver logic, prompt rendering, and tests. Simplifies the type merge.
 
 ## Context / References
 - `src/senses/teams.ts` — Teams channel adapter (bug 1, bug 2-Teams, storage redesign). `TeamsMessageContext` already has AAD fields defined at lines 298–300.
 - `src/senses/cli.ts` — CLI channel adapter (bug 2-CLI, storage redesign)
-- `src/mind/prompt.ts` — `buildSystem()` accepts optional `context` parameter. `contextSection()` renders friend info + channel traits + notes. Name-quality and ephemerality instructions add new code here.
+- `src/mind/prompt.ts` — `buildSystem()` accepts optional `context` parameter. `contextSection()` renders friend info + channel traits + notes. Name-quality and ephemerality instructions add new code here. Authority rendering removed.
 - `src/mind/context/types.ts` — `FriendIdentity`, `FriendMemory`, `ResolvedContext` types → becomes `FriendRecord` + updated `ResolvedContext`
 - `src/mind/context/store.ts` — `ContextStore`, `CollectionStore<T>` interfaces → becomes `FriendStore`
 - `src/mind/context/store-file.ts` — `FileContextStore` → `FileFriendStore` with two-backend implementation
-- `src/mind/context/resolver.ts` — `ContextResolver` → update for `FriendStore` + merged type. `resolveIdentity()` must not overwrite `displayName`.
+- `src/mind/context/authority.ts` — `AuthorityChecker` implementation → deleted (dead weight, see cleanup scope)
+- `src/mind/context/resolver.ts` — `ContextResolver` → update for `FriendStore` + merged type. `resolveIdentity()` must not overwrite `displayName`. Authority checking removed.
 - `src/mind/context/memory.ts` — `resolveMemory()` → likely deleted (collapses into identity resolution)
 - `src/mind/context/identity.ts` — `resolveIdentity()` → update for `FriendStore.findByExternalId()`
 - `src/identity.ts` — `getAgentRoot()` and `getAgentName()` for per-agent paths
@@ -260,6 +269,9 @@ The context kernel planning doc explicitly deferred removing FRIENDS.md. The pla
 - This happens AFTER `toolPreferences` proves the model-managed notes pattern
 - For now, FRIENDS.md stays as-is
 
+**Deferred: Persist tools array in session files (carry forward, do not implement)**
+The `tools` API parameter is not persisted in session files today. For debugging and recall, it would be useful to see which tools (and which preference-injected descriptions) were available on each turn. Deferred because tools change per turn and the list is deterministic from channel + preferences — can be reconstructed. Nice-to-have for later.
+
 **Deferred: Friend re-linking after agent migration (carry forward, do not implement)**
 When an agent is moved to a new machine/installation, the PII bridge doesn't travel with it. The agent retains friend knowledge (by UUID and display name) but can't recognize returning friends from their external IDs. Re-linking strategy TBD — possible approaches include confirmation from a known channel, manual claim, display-name fuzzy match + confirmation, or encrypted export/import. Depends on how agents actually get moved around, which we don't know yet.
 
@@ -273,3 +285,4 @@ When an agent is moved to a new machine/installation, the PII bridge doesn't tra
 - 2026-03-03 14:00 Fixed after happy-path walkthrough: system prompt instructions must be first person (agent's inner voice).
 - 2026-03-03 14:20 Fourth revision after unhappy-path walkthrough (CLI garbage name): (1) resolveIdentity() must never overwrite displayName on existing records — only save_friend_note can change it. (2) save_friend_note redesigned as universal friend-knowledge tool with type parameter (name, tool_preference, note), conflict-aware updates (return existing + ask to merge), and override flag. (3) FriendRecord gains notes field — structural separation of toolPreferences (→ tool descriptions) vs notes (→ system prompt) eliminates dedup filtering entirely.
 - 2026-03-03 14:45 Fifth revision addressing review feedback: (1) Name quality: eliminated code heuristics entirely — model-judged via soft first-person instruction, always present. (2) Authority: explicitly out of scope — tool availability is via `tools` API param, OAuth is on-demand. (3) Clarified getToolsForChannel injects into `tools` API param, not system prompt. (4) Eliminated all in-memory mutation — per-turn disk refresh instead. save_friend_note writes to disk, next turn re-reads. Store is single source of truth. Simpler, no staleness concerns.
+- 2026-03-03 15:00 Sixth revision: (1) AuthorityChecker moved from out-of-scope to in-scope removal — dead weight, we're already touching every file it lives in. Remove interface, checker field, resolver logic, prompt rendering, authority.ts, and tests. (2) Tools-in-session-file noted as deferred nice-to-have for debugging/recall.
