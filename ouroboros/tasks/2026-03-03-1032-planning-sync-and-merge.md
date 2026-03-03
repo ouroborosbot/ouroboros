@@ -22,6 +22,7 @@ Build a new `work-merger` subagent that runs after work-doer completes, fetching
 - Post-merge cleanup: delete feature branch (local and remote) after PR is merged
 - Escalation path: stop and ask user only when truly stuck (not for fixable test/lint failures)
 - Branch convention unification: both agents use `<agent>/<slug>` (e.g., `ouroboros/context-kernel`, `slugger/some-feature`). The old `codex/<agent>` prefix convention is deprecated. AGENTS.md branch parsing rules updated accordingly.
+- Update `CONTRIBUTING.md`: document sync-and-merge workflow, unified branch convention (`<agent>/<slug>`), and PR-based merge flow
 - Update `cross-agent-docs/` with sync-and-merge conventions if needed
 
 ### Out of Scope
@@ -46,6 +47,7 @@ Build a new `work-merger` subagent that runs after work-doer completes, fetching
 - [ ] The work-merger doc covers post-merge cleanup: delete feature branch (local + remote)
 - [ ] The work-merger doc covers escalation: when to stop and ask the user (only for genuinely ambiguous issues, not fixable failures)
 - [ ] Branch naming convention unified and documented: both agents use `<agent>/<slug>`, old `codex/` prefix convention deprecated in AGENTS.md
+- [ ] `CONTRIBUTING.md` updated: sync-and-merge workflow section, unified branch convention (`<agent>/<slug>`), PR-based merge flow
 - [ ] `cross-agent-docs/sync-and-merge-conventions.md` created with shared conventions
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
@@ -91,6 +93,7 @@ Note: This task is primarily documentation (subagent .md files, workflow docs). 
 - Current branches: `ouroboros` (Claude Code), `codex/slugger` (Codex, remote -- will become `slugger/<slug>` under new convention), `main`
 - Codex skill install pattern: hard-link `.md` as `~/.codex/skills/<name>/SKILL.md` + optional `agents/openai.yaml`
 - AGENTS.md Runtime-Specific Invocation: Codex uses `$work-planner`/`$work-doer` skill syntax; will need `$work-merger`
+- `CONTRIBUTING.md`: existing Branches section (line 5) and Task docs section (line 47) will need updating for unified branch convention and sync-and-merge workflow
 
 ## Notes
 The work-merger subagent is purely a documentation/workflow artifact -- it instructs the LLM agent on what git operations to perform and how to resolve conflicts. No runtime TypeScript code is expected. The main complexity is writing clear, unambiguous instructions for:
