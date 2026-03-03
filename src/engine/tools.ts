@@ -2,6 +2,7 @@ import type OpenAI from "openai";
 import { tools, baseToolHandlers } from "./tools-base";
 import type { ToolContext } from "./tools-base";
 import { teamsTools, teamsToolHandlers, summarizeTeamsArgs } from "./tools-teams";
+import { emitObservabilityEvent } from "../observability/runtime";
 
 // Re-export types and constants used by the rest of the codebase
 export { tools, finalAnswerTool } from "./tools-base";
@@ -18,9 +19,44 @@ export function getToolsForChannel(channel?: string): OpenAI.ChatCompletionTool[
 }
 
 export async function execTool(name: string, args: Record<string, string>, ctx?: ToolContext): Promise<string> {
+  emitObservabilityEvent({
+    event: "tool.start",
+    component: "tools",
+    message: "tool execution started",
+    meta: { name },
+  });
+
   const h = baseToolHandlers[name] || teamsToolHandlers[name];
-  if (!h) return `unknown: ${name}`;
-  return await h(args, ctx);
+  if (!h) {
+    emitObservabilityEvent({
+      level: "error",
+      event: "tool.error",
+      component: "tools",
+      message: "unknown tool requested",
+      meta: { name },
+    });
+    return `unknown: ${name}`;
+  }
+
+  try {
+    const result = await h(args, ctx);
+    emitObservabilityEvent({
+      event: "tool.end",
+      component: "tools",
+      message: "tool execution finished",
+      meta: { name, success: true },
+    });
+    return result;
+  } catch (error) {
+    emitObservabilityEvent({
+      level: "error",
+      event: "tool.error",
+      component: "tools",
+      message: error instanceof Error ? error.message : String(error),
+      meta: { name },
+    });
+    throw error;
+  }
 }
 
 export function summarizeArgs(name: string, args: Record<string, string>): string {
