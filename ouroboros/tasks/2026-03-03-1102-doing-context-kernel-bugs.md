@@ -213,13 +213,13 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Files**: `src/__tests__/config.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because sessionPath has old 2-arg signature.
 
-### ⬜ Unit 8b: Session path restructuring -- Implementation
+### ✅ Unit 8b: Session path restructuring -- Implementation
 **What**: Update `sessionPath()` in `config.ts` to accept `(friendId: string, channel: string, key: string)`. Path becomes `~/.agentconfigs/{agentName}/sessions/{friendId}/{channel}/{sanitizeKey(key)}.json`. Add `mkdirSync(dirname, { recursive: true })` to ensure parent directories exist. Update or remove `getSessionDir()`.
 **Output**: Updated `config.ts` with new sessionPath signature.
 **Files**: `src/config.ts`
 **Acceptance**: All session path tests PASS (green), no warnings.
 
-### ⬜ Unit 8c: Session path -- Coverage & Refactor
+### ✅ Unit 8c: Session path -- Coverage & Refactor
 **What**: Verify 100% coverage on sessionPath.
 **Output**: Coverage report showing 100% on sessionPath.
 **Acceptance**: 100% coverage on new code, tests still green.
@@ -307,3 +307,4 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 - 2026-03-03 15:24 Units 5a-5c complete: save_friend_note redesigned with type/key/content/override params. ToolContext uses friendStore instead of memoryStore. Conflict detection, first-person errors, 100% coverage on tools-base.ts. 1172 tests pass.
 - 2026-03-03 15:30 Units 6a-6d complete: getToolsForChannel accepts toolPreferences param, injects matching preferences into integration tool descriptions. No mutation of originals, unknown keys ignored. 100% coverage on tools.ts. Post-tool-layer checkpoint: 1179 tests pass.
 - 2026-03-03 15:33 Units 7a-7c complete: contextSection redesigned with behavioral instructions (ephemerality, name quality, priority, working-memory trust, stale notes, new-friend). Notes in system prompt, toolPreferences not in system prompt. 100% coverage on prompt.ts. 1189 tests pass.
+- 2026-03-03 15:36 Units 8a-8c complete: sessionPath restructured to 3-arg (friendId, channel, key). Auto-creates parent dirs. Callers updated with temporary "default" friendId until Units 9-10 wire real friend UUID. 100% coverage on config.ts. 1189 tests pass.
