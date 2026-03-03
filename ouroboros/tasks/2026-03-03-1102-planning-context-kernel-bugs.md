@@ -19,8 +19,8 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 - `TeamsMessageContext` already has the right fields defined (lines 298–300) — they're just never populated
 
 **Bug 1 addendum: Name quality**
-- The agent should evaluate whether the displayName on file looks like a real name and ask the friend if unsure
-- Implementation: include the displayName in the system prompt context section and add a soft first-person instruction: "The name I have on file for this friend is {displayName}. If this doesn't seem like their actual name, I should ask what they'd like to be called and save it with `save_friend_note`."
+- The agent should evaluate whether the displayName it remembers looks like a real name and ask the friend if unsure
+- Implementation: include the displayName in the system prompt context section and add a soft first-person instruction: "The name I have remembered for this friend is {displayName}. If this doesn't seem like their actual name, I should ask what they'd like to be called and save it with `save_friend_note`."
 - No code-level heuristics (regex, OS username comparison, etc.) — the model is far better at judging whether "jsmith" or "JORDAN.SMITH (CONTOSO)" is a real name than any code check
 - The model decides, asks naturally via conversation, and saves with `save_friend_note({ type: "name" })`
 
@@ -68,11 +68,26 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 - `FileContextStore` → `FileFriendStore`: constructor takes two paths (agentKnowledgePath, piiBridgePath). `get()` reads both backends and merges. `put()` splits and writes to both. `findByExternalId()` scans PII bridge, then merges.
 
 *Resolver changes:*
-- `ContextResolver` constructor takes `FriendStore` instead of `ContextStore`
+- `ContextResolver` → `FriendResolver`. "Context" is overloaded — the resolver's job is to resolve a friend, so name it that.
+- `FriendResolver` constructor takes `FriendStore` instead of `ContextStore`
 - `resolveIdentity()` uses `store.findByExternalId()` instead of `store.identity.find()`
 - `resolveIdentity()` never overwrites `displayName` on an existing record. The initial value comes from the system (AAD name, OS username) on first encounter. After that, only `save_friend_note` can change it. This prevents the system from stomping on a name the friend explicitly provided.
 - `resolveMemory()` as a separate step is eliminated — the merged `FriendRecord` returned by `get()`/`findByExternalId()` already contains `toolPreferences` and `notes`. `memory.ts` may be deleted or reduced to a helper.
 - `ResolvedContext` changes from `{ identity: FriendIdentity, channel, checker?, memory: FriendMemory | null }` to `{ friend: FriendRecord, channel }`. The `checker?` field is removed (AuthorityChecker eliminated).
+
+*First-encounter creation flow (explicit):*
+- When `findByExternalId()` returns `null`, the resolver creates a new `FriendRecord`:
+  - `id`: fresh UUID (via `crypto.randomUUID()`)
+  - `displayName`: from the system-provided name (AAD `activity.from.name` for Teams, OS username for CLI)
+  - `externalIds`: `[{ provider, externalId, tenantId }]` from the channel context
+  - `tenantMemberships`: `[tenantId]` if present
+  - `toolPreferences`: `{}`
+  - `notes`: `{}`
+  - `createdAt` / `updatedAt`: current ISO timestamp
+  - `schemaVersion`: current version
+- Saves via `store.put()` (which splits across agent knowledge and PII bridge)
+- Returns the newly created `FriendRecord` as part of `ResolvedContext`
+- This is the critical first-run path — the friend's first impression of the agent. The doing doc must treat this as a first-class scenario with dedicated tests.
 
 *Per-turn refresh (no in-memory mutation):*
 - Each turn, re-read the friend record from disk via `store.get(friendId)` before building the system prompt and tools. The friend ID is known from initial identity resolution.
@@ -121,8 +136,14 @@ save_friend_note({
 - The system prompt must tell the agent — in first person, since the system prompt IS the agent's inner voice — that its memory is ephemeral. Something like: "I have ephemeral short-term memory. Anything I don't immediately write down with `save_friend_note` will be lost forever when this conversation ends. When I learn something about a friend — their name, role, preferences, projects, working style — I save it right away."
 - Add this instruction in `contextSection()` within `prompt.ts`, when a friend context is present.
 
+*New-friend behavior instruction:*
+- When a friend has no notes and no tool preferences (i.e. a brand-new `FriendRecord` with empty `notes` and `toolPreferences`), include a first-person instruction in `contextSection()` that guides the agent on how to behave during a first encounter. Something like: "This is a new friend I haven't met before. I should be warm and welcoming, introduce myself briefly, and pay attention to anything I learn about them — their name, role, projects, how they like to work. Anything worth remembering, I save immediately with `save_friend_note`."
+- This instruction only appears when both `notes` and `toolPreferences` are empty. Once the agent has saved anything about the friend, the instruction goes away — replaced by the rendered notes and the general ephemerality reminder.
+- The detection is simple: `Object.keys(record.notes).length === 0 && Object.keys(record.toolPreferences).length === 0`.
+- This is key to friend retention — the first interaction sets the tone. The agent should feel like it cares about getting to know the person.
+
 *Name quality instruction:*
-- Always include in `contextSection()` when friend context is present: "The name I have on file for this friend is {displayName}. If this doesn't seem like their actual name, I should ask what they'd like to be called and save it."
+- Always include in `contextSection()` when friend context is present: "The name I have remembered for this friend is {displayName}. If this doesn't seem like their actual name, I should ask what they'd like to be called and save it."
 - No code heuristics. The model decides whether the name looks real.
 
 *Tool-specific preference injection:*
@@ -138,7 +159,7 @@ save_friend_note({
 
 *Cleanup: Remove AuthorityChecker*
 - `AuthorityChecker` (interface in `types.ts`, created in `resolver.ts`, rendered in `contextSection()`) is dead weight. Tool availability is determined by `getToolsForChannel()` via the `tools` API parameter. OAuth tokens are resolved on-demand via sign-in flow. 403s surface naturally through tool error returns. AuthorityChecker adds complexity without behavioral value.
-- Remove: `AuthorityChecker` interface from `types.ts`, `checker?` field from `ResolvedContext`, authority checking logic from `ContextResolver.resolve()`, authority section rendering from `contextSection()` in `prompt.ts`, and all associated tests.
+- Remove: `AuthorityChecker` interface from `types.ts`, `checker?` field from `ResolvedContext`, authority checking logic from `FriendResolver.resolve()`, authority section rendering from `contextSection()` in `prompt.ts`, and all associated tests.
 - We're already touching every file it lives in for the type merge — removing it now makes the merge cleaner.
 
 *Documentation:*
@@ -171,7 +192,10 @@ save_friend_note({
 - [ ] `save_friend_note` `name` type updates `record.displayName`
 - [ ] `save_friend_note` writes to disk only — no in-memory mutation
 - [ ] `ToolContext` type updated (`memoryStore` → `friendStore`)
-- [ ] `ContextResolver` works with `FriendStore` and merged `FriendRecord`
+- [ ] `ContextResolver` renamed to `FriendResolver` (file: `resolver.ts` → `resolver.ts`, class rename)
+- [ ] `FriendResolver` works with `FriendStore` and merged `FriendRecord`
+- [ ] First-encounter creation flow: `findByExternalId()` returns null → creates new `FriendRecord` with system-provided name, empty notes/preferences → returns newly created record
+- [ ] System prompt includes new-friend behavior instruction (first person) when `notes` and `toolPreferences` are both empty
 - [ ] `AuthorityChecker` removed: interface, `checker?` field on `ResolvedContext`, resolver logic, prompt rendering, and tests
 - [ ] `getToolsForChannel()` accepts `toolPreferences` and injects matching preferences into tool `function.description` (in `tools` API param, not system prompt)
 - [ ] `toolPreferences` entries appear in tool descriptions only (not system prompt)
@@ -210,7 +234,7 @@ save_friend_note({
 ## Decisions Made
 - Bug 2 fix: Rebuild the system message on each turn by calling `buildSystem(channel, options, resolvedContext)` and replacing `messages[0].content`. Cheap because psyche files are cached. Friend record re-read from disk each turn — store is the single source of truth.
 - Bug 1 field mapping: `activity.from.aadObjectId` → `teamsContext.aadObjectId`, `activity.conversation.tenantId` → `teamsContext.tenantId`, `activity.from.name` → `teamsContext.displayName`. Standard Bot Framework SDK fields.
-- Bug 1 name quality: No code heuristics. Always include displayName in system prompt with first-person instruction: "The name I have on file for this friend is {displayName}. If this doesn't seem like their actual name, I should ask what they'd like to be called and save it." Model decides.
+- Bug 1 name quality: No code heuristics. Always include displayName in system prompt with first-person instruction: "The name I have remembered for this friend is {displayName}. If this doesn't seem like their actual name, I should ask what they'd like to be called and save it." Model decides.
 - Storage redesign:
   - Merge `FriendIdentity` + `FriendMemory` → `FriendRecord`. One logical type, split across two files by PII boundary. New `notes: Record<string, string>` field for general friend knowledge.
   - **Agent knowledge** (`{agentRoot}/friends/{uuid}.json`): `{ id, displayName, toolPreferences, notes, createdAt, updatedAt, schemaVersion }` — portable, committed to repo. Part of what makes the agent *your* agent.
@@ -247,7 +271,7 @@ save_friend_note({
 - `src/mind/context/store.ts` — `ContextStore`, `CollectionStore<T>` interfaces → becomes `FriendStore`
 - `src/mind/context/store-file.ts` — `FileContextStore` → `FileFriendStore` with two-backend implementation
 - `src/mind/context/authority.ts` — `AuthorityChecker` implementation → deleted (dead weight, see cleanup scope)
-- `src/mind/context/resolver.ts` — `ContextResolver` → update for `FriendStore` + merged type. `resolveIdentity()` must not overwrite `displayName`. Authority checking removed.
+- `src/mind/context/resolver.ts` — `ContextResolver` → renamed to `FriendResolver`. Update for `FriendStore` + merged type. `resolveIdentity()` must not overwrite `displayName`. Explicit first-encounter creation flow. Authority checking removed.
 - `src/mind/context/memory.ts` — `resolveMemory()` → likely deleted (collapses into identity resolution)
 - `src/mind/context/identity.ts` — `resolveIdentity()` → update for `FriendStore.findByExternalId()`
 - `src/identity.ts` — `getAgentRoot()` and `getAgentName()` for per-agent paths
@@ -286,3 +310,4 @@ When an agent is moved to a new machine/installation, the PII bridge doesn't tra
 - 2026-03-03 14:20 Fourth revision after unhappy-path walkthrough (CLI garbage name): (1) resolveIdentity() must never overwrite displayName on existing records — only save_friend_note can change it. (2) save_friend_note redesigned as universal friend-knowledge tool with type parameter (name, tool_preference, note), conflict-aware updates (return existing + ask to merge), and override flag. (3) FriendRecord gains notes field — structural separation of toolPreferences (→ tool descriptions) vs notes (→ system prompt) eliminates dedup filtering entirely.
 - 2026-03-03 14:45 Fifth revision addressing review feedback: (1) Name quality: eliminated code heuristics entirely — model-judged via soft first-person instruction, always present. (2) Authority: explicitly out of scope — tool availability is via `tools` API param, OAuth is on-demand. (3) Clarified getToolsForChannel injects into `tools` API param, not system prompt. (4) Eliminated all in-memory mutation — per-turn disk refresh instead. save_friend_note writes to disk, next turn re-reads. Store is single source of truth. Simpler, no staleness concerns.
 - 2026-03-03 15:00 Sixth revision: (1) AuthorityChecker moved from out-of-scope to in-scope removal — dead weight, we're already touching every file it lives in. Remove interface, checker field, resolver logic, prompt rendering, authority.ts, and tests. (2) Tools-in-session-file noted as deferred nice-to-have for debugging/recall.
+- 2026-03-03 13:36 Seventh revision from review: (1) ContextResolver → FriendResolver rename — "context" is overloaded. (2) Explicit first-encounter creation flow — findByExternalId returns null, create new FriendRecord, return it. First-class scenario for friend retention. (3) "on file" → "remembered" — human-centric language. (4) New-friend behavior instruction in system prompt when notes and toolPreferences are both empty — guides agent to be welcoming and save what it learns during first interaction.
