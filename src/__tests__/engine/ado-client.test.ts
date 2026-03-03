@@ -360,3 +360,26 @@ describe("adoRequest", () => {
     expect(result).toContain("400")
   })
 })
+
+describe("ado-client observability contract", () => {
+  it("emits client.request_start event for ADO requests", async () => {
+    vi.resetModules()
+    const emitObservabilityEvent = vi.fn()
+    vi.doMock("../../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+    mockFetch.mockReset()
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ value: [] }),
+    })
+
+    const { adoRequest } = await import("../../engine/ado-client")
+    await adoRequest("test-token", "GET", "myorg", "/_apis/projects")
+
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "client.request_start",
+      component: "clients",
+    }))
+  })
+})
