@@ -341,8 +341,8 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     vi.resetModules()
     const teams = await import("../../channels/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
-    callbacks.onKick!(2, 3)
-    expect(mockStream.emit).toHaveBeenCalledWith("\n\n\u21BB kick 2/3\n\n")
+    callbacks.onKick!()
+    expect(mockStream.emit).toHaveBeenCalledWith("\n\n\u21BB kick\n\n")
   })
 
   it("onKick after abort does NOT call stream.emit", async () => {
@@ -352,7 +352,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     callbacks.onTextChunk("data") // triggers abort
     mockStream.emit.mockClear()
-    callbacks.onKick!(1, 3)
+    callbacks.onKick!()
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
@@ -2167,8 +2167,8 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     const teams = await import("../../channels/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
-    callbacks.onKick!(2, 3)
-    expect(sendMessage).toHaveBeenCalledWith("\u21BB kick 2/3")
+    callbacks.onKick!()
+    expect(sendMessage).toHaveBeenCalledWith("\u21BB kick")
   })
 
   it("onKick after abort does NOT call sendMessage when disableStreaming is true", async () => {
@@ -2179,7 +2179,7 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
     callbacks.flush() // trigger abort
     sendMessage.mockClear()
-    callbacks.onKick!(1, 3)
+    callbacks.onKick!()
     expect(sendMessage).not.toHaveBeenCalled()
   })
 
@@ -3280,7 +3280,7 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
 
     const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
       // Simulate onKick -- in buffered mode this should call sendMessage
-      if (callbacks.onKick) callbacks.onKick(1, 3)
+      if (callbacks.onKick) callbacks.onKick()
       callbacks.onTextChunk("answer")
       return { usage: undefined }
     })

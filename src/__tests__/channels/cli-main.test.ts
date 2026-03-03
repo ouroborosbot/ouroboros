@@ -642,8 +642,8 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
   it("onKick callback writes kick status to stderr", async () => {
     setupBasic({ inputSequence: ["hello", "/exit"] })
     mocks.runAgent.mockImplementation(async (_msgs: any, cb: any) => {
-      // Simulate kick callback
-      if (cb.onKick) cb.onKick(1, 1)
+      // Simulate kick callback -- no arguments
+      if (cb.onKick) cb.onKick()
       return { usage: undefined }
     })
 
@@ -651,16 +651,16 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
 
     const stderrOutput = stderrChunks.join("")
     expect(stderrOutput).toContain("kick")
-    // When attempt === maxKicks (1/1), counter is hidden
-    expect(stderrOutput).not.toContain("1/1")
   })
 
-  it("onKick callback handles various attempt/maxKicks values", async () => {
+  it("onKick callback receives no arguments", async () => {
     setupBasic({ inputSequence: ["hello", "/exit"] })
+    const kickArgs: number[] = []
     mocks.runAgent.mockImplementation(async (_msgs: any, cb: any) => {
       if (cb.onKick) {
-        cb.onKick(1, 2)
-        cb.onKick(2, 2)
+        // Call twice -- verify no-arg signature works
+        cb.onKick()
+        cb.onKick()
       }
       return { usage: undefined }
     })
@@ -668,8 +668,9 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
     await main()
 
     const stderrOutput = stderrChunks.join("")
-    expect(stderrOutput).toContain("1/2")
-    expect(stderrOutput).toContain("2/2")
+    // Each kick should produce "kick" text
+    const kickMatches = stderrOutput.match(/kick/g)
+    expect(kickMatches!.length).toBeGreaterThanOrEqual(2)
   })
 
   it("onKick emits newline before kick when textDirty", async () => {
@@ -677,7 +678,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
     mocks.runAgent.mockImplementation(async (_msgs: any, cb: any) => {
       // Write text without trailing newline to set textDirty
       if (cb.onTextChunk) cb.onTextChunk("partial output")
-      if (cb.onKick) cb.onKick(1, 1)
+      if (cb.onKick) cb.onKick()
       return { usage: undefined }
     })
 
