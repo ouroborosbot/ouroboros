@@ -116,9 +116,14 @@ async function checkAuth(ctx: ToolContext | undefined): Promise<string | null> {
 
 async function checkWriteAuthority(ctx: ToolContext, org: string): Promise<string | null> {
   if (ctx.context?.checker) {
-    const allowed = await ctx.context.checker.canWrite("ado", org, "createWorkItem")
-    if (!allowed) {
-      return `AUTHORITY_DENIED: Write operation to ${org} was denied by pre-flight authority check.`
+    try {
+      const allowed = await ctx.context.checker.canWrite("ado", org, "createWorkItem")
+      if (!allowed) {
+        return `AUTHORITY_DENIED: Write operation to ${org} was denied by pre-flight authority check.`
+      }
+    } catch {
+      // D16 error handling: probe failure -> proceed optimistically
+      return null
     }
   }
   return null
