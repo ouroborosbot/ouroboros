@@ -169,13 +169,23 @@ describe("resolveAdoContext", () => {
     }
   })
 
-  it("handles discovery error gracefully", async () => {
+  it("handles discovery error gracefully (Error object)", async () => {
     vi.mocked(discoverOrganizations).mockRejectedValue(new Error("network error"))
 
     const result = await resolveAdoContext("test-token", makeTeamsContext())
     expect(result.ok).toBe(false)
     if (!result.ok) {
-      expect(result.error).toContain("error")
+      expect(result.error).toContain("network error")
+    }
+  })
+
+  it("handles discovery error gracefully (non-Error thrown)", async () => {
+    vi.mocked(discoverOrganizations).mockRejectedValue("string error")
+
+    const result = await resolveAdoContext("test-token", makeTeamsContext())
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error).toContain("string error")
     }
   })
 })
