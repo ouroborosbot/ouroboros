@@ -118,4 +118,36 @@ describe("ContextResolver", () => {
     expect(ctx.channel).toBeDefined()
     expect(ctx.identity.id).toBeTruthy()
   })
+
+  it("includes authority checker on ResolvedContext when availableIntegrations is non-empty (Teams)", async () => {
+    const store = createMockStore()
+    const resolver = new ContextResolver(store, {
+      provider: "aad",
+      externalId: "aad-user-1",
+      tenantId: "tenant-1",
+      displayName: "Jordan",
+      channel: "teams",
+    })
+
+    const ctx = await resolver.resolve()
+    // Teams has integrations, so authority checker should be present
+    expect(ctx.checker).toBeDefined()
+    expect(typeof ctx.checker!.canRead).toBe("function")
+    expect(typeof ctx.checker!.canWrite).toBe("function")
+    expect(typeof ctx.checker!.record403).toBe("function")
+  })
+
+  it("skips authority when availableIntegrations is empty (CLI)", async () => {
+    const store = createMockStore()
+    const resolver = new ContextResolver(store, {
+      provider: "local",
+      externalId: "jsmith",
+      displayName: "jsmith",
+      channel: "cli",
+    })
+
+    const ctx = await resolver.resolve()
+    // CLI has no integrations, so authority checker should be undefined
+    expect(ctx.checker).toBeUndefined()
+  })
 })
