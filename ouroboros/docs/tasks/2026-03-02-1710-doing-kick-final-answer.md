@@ -59,7 +59,7 @@ Handle false-positive narration kicks gracefully by injecting `final_answer` int
 **Output**: Confirmed list of files and line ranges to modify.
 **Acceptance**: All references verified against current codebase. No surprises during implementation.
 
-### ⬜ Unit 1a: Remove maxKicks and simplify onKick -- Tests
+### ✅ Unit 1a: Remove maxKicks and simplify onKick -- Tests
 
 **What**: Update all existing test assertions that reference `maxKicks` or the `onKick(attempt, maxKicks)` signature. Write new tests that verify:
 - `onKick` callback receives no arguments
@@ -75,7 +75,7 @@ Tests to update:
 
 **Acceptance**: Tests updated for new signatures. Will not compile until Unit 1b production code changes are applied (type mismatch on `onKick` and `formatKick`).
 
-### ⬜ Unit 1b: Remove maxKicks and simplify onKick -- Implementation
+### ✅ Unit 1b: Remove maxKicks and simplify onKick -- Implementation
 
 **What**: Make the tests from 1a pass by modifying production code:
 - `src/engine/core.ts`: Remove `maxKicks` from `RunAgentOptions` interface (line 90), remove `const maxKicks = options?.maxKicks ?? 1` (line 176), change `kickCount < maxKicks` guard to unconditional kick (line 263), change `callbacks.onKick?.(kickCount, maxKicks)` to `callbacks.onKick?.()` (line 274), simplify `onKick` in `ChannelCallbacks` to `onKick?(): void` (line 83)
@@ -85,7 +85,7 @@ Tests to update:
 
 **Acceptance**: All tests from 1a PASS (green). No warnings.
 
-### ⬜ Unit 1c: Remove maxKicks -- Coverage and Refactor
+### ✅ Unit 1c: Remove maxKicks -- Coverage and Refactor
 
 **What**: Verify 100% coverage on changed code. Ensure no dead code remains from maxKicks removal. Run full test suite.
 **Acceptance**: 100% coverage on all changed lines. All tests green. No warnings.
@@ -142,3 +142,6 @@ Tests to update for message text:
 - 2026-03-02 17:44 Pass 3 - Validation: fixed tools-base.test.ts reference to tools.test.ts, added KickReason import detail to Unit 2b
 - 2026-03-02 17:44 Pass 4 - Quality: all checks pass, status set to READY_FOR_EXECUTION
 - 2026-03-02 17:47 Unit 0 complete: all references verified against current codebase. 908 tests passing. Inventory confirmed: core.ts:83/90/176/263/274/195, format.ts:11, cli.ts:309-316, teams.ts:193-200/335, plus 5 test files.
+- 2026-03-02 17:52 Unit 1a complete: test changes for no-arg onKick and removed maxKicks. 4 tests RED.
+- 2026-03-02 17:52 Unit 1b complete: production code changes. 905 tests GREEN. Build clean.
+- 2026-03-02 17:53 Unit 1c complete: 100% coverage on all changed files. No dead maxKicks code. No refactoring needed.
