@@ -425,7 +425,7 @@ Every persisted type (`FriendIdentity`, `FriendMemory`) carries a `schemaVersion
 
 ---
 
-### ⬜ Unit 1C: FriendIdentity Resolution
+### ✅ Unit 1C: FriendIdentity Resolution
 
 **What**: Implement identity resolution -- the "get-or-create" logic that maps a channel's external ID to an internal `FriendIdentity`. This is the only layer that truly needs persistence (UUID <-> external ID mapping can't be re-derived from an API).
 
@@ -1373,3 +1373,4 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - 2026-03-02 2328 Unit 10 complete: Directory restructuring -- engine/ -> heart/, channels/ -> senses/, tool files -> repertoire/. All 910 tests pass, clean build.
 - 2026-03-02 2330 Unit 1A complete: ContextStore interface, CollectionStore<T>, all context types with type guards. 21 new tests, 931 total.
 - 2026-03-02 2332 Unit 1B complete: FileContextStore with JSON persistence, schema versioning, error handling. 14 new tests, 945 total.
+- 2026-03-02 2333 Unit 1C complete: FriendIdentity resolution with get-or-create, AAD + local providers. 10 new tests, 955 total.
