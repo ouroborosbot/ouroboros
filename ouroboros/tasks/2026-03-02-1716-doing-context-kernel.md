@@ -803,7 +803,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 ---
 
-### ⬜ Unit 2B: Wire AuthorityChecker into Security Namespaces API
+### ✅ Unit 2B: Wire AuthorityChecker into Security Namespaces API
 
 **What**: Implement the actual API call to Security Namespaces for `canWrite()` pre-flight checks. This is the concrete implementation that the `AuthorityChecker` uses to probe permissions.
 
@@ -834,12 +834,12 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - Multiple permission checks in same turn: memoized (no duplicate API calls)
 
 **Completion criteria:**
-- [ ] Security Namespaces API integration works
-- [ ] Permission bit mapping for common ADO actions
-- [ ] Error handling: always falls back to optimistic on API failure
-- [ ] Memoization within turn
-- [ ] 100% test coverage
-- [ ] All tests pass
+- [x] Security Namespaces API integration works (createAdoProbe)
+- [x] Permission bit mapping for common ADO actions (ADO_ACTION_MAP: create/update/delete/reparent)
+- [x] Error handling: always falls back to optimistic on API failure (403/401/404/network)
+- [x] Memoization within turn (via AuthorityChecker from Unit 2A)
+- [x] 100% test coverage (authority.ts 100%)
+- [x] All tests pass (1026)
 
 ---
 
