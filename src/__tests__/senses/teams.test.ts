@@ -1,0 +1,3633 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import type { ChannelCallbacks } from "../../heart/core"
+
+vi.mock("../../identity", () => ({
+  getAgentName: vi.fn(() => "testagent"),
+  loadAgentConfig: vi.fn(() => ({
+    name: "testagent",
+    configPath: "~/.agentconfigs/testagent/config.json",
+    phrases: {
+      thinking: ["test thinking"],
+      tool: ["test tool"],
+      followup: ["test followup"],
+    },
+  })),
+}))
+
+import { getPhrases } from "../../wardrobe/phrases"
+
+// Tests for src/teams.ts Teams channel adapter.
+
+// Config is now loaded from config.json only (no env var fallbacks).
+// No env var save/restore needed.
+
+describe("Teams adapter - exports", () => {
+  it("exports createTeamsCallbacks", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    expect(typeof teams.createTeamsCallbacks).toBe("function")
+  })
+
+  it("exports startTeamsApp", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    expect(typeof teams.startTeamsApp).toBe("function")
+  })
+
+})
+
+describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () => {
+  let mockStream: { emit: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> }
+  let controller: AbortController
+
+  beforeEach(() => {
+    mockStream = {
+      emit: vi.fn(),
+      update: vi.fn(),
+      close: vi.fn(),
+    }
+    controller = new AbortController()
+  })
+
+  it("onModelStart sends a phrase from THINKING_PHRASES with trailing ...", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onModelStart()
+    const calledWith = mockStream.update.mock.calls[0][0] as string
+    expect(calledWith).toMatch(/\.\.\.$/)
+    const phrase = calledWith.replace(/\.\.\.$/, "")
+    expect(getPhrases().thinking).toContain(phrase)
+    // Clean up timer
+    callbacks.onTextChunk("done")
+  })
+
+  it("onModelStreamStart stops phrase rotation (does not throw)", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    expect(() => callbacks.onModelStreamStart()).not.toThrow()
+  })
+
+  // --- Delta emit tests (SDK handles accumulation) ---
+
+  it("emits text delta directly to stream", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onTextChunk("Hello")
+    expect(mockStream.emit).toHaveBeenCalledWith("Hello")
+  })
+
+  it("emits each chunk as a delta (not cumulative)", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onTextChunk("Hello")
+    callbacks.onTextChunk(" world")
+
+    expect(mockStream.emit).toHaveBeenCalledTimes(2)
+    expect(mockStream.emit).toHaveBeenNthCalledWith(1, "Hello")
+    expect(mockStream.emit).toHaveBeenNthCalledWith(2, " world")
+  })
+
+  // --- Stop-streaming tests ---
+
+  it("when emit throws (403), controller is aborted", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    mockStream.emit.mockImplementation(() => { throw new Error("403 Forbidden") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onTextChunk("data")
+    expect(controller.signal.aborted).toBe(true)
+  })
+
+  it("after abort, subsequent onTextChunk calls do not emit", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    mockStream.emit.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onTextChunk("first") // this throws and aborts
+    mockStream.emit.mockClear()
+    callbacks.onTextChunk("second")
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  it("onError after abort does not emit (graceful stop)", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    mockStream.emit.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onTextChunk("data") // triggers abort
+    mockStream.emit.mockClear()
+    callbacks.onError(new Error("connection lost"), "terminal")
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  // --- update() error handling ---
+
+  it("when update throws (403), controller is aborted", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    mockStream.update.mockImplementation(() => { throw new Error("403 Forbidden") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onToolStart("read_file", { path: "test.txt" })
+    expect(controller.signal.aborted).toBe(true)
+  })
+
+  it("after abort via update, subsequent updates are skipped", async () => {
+    vi.useFakeTimers()
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    mockStream.update.mockImplementationOnce(() => { throw new Error("403") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onModelStart() // this throws and aborts
+    mockStream.update.mockClear()
+    callbacks.onToolStart("shell", { command: "ls" }) // should be skipped
+    expect(mockStream.update).not.toHaveBeenCalled()
+    vi.useRealTimers()
+  })
+
+  // --- onReasoningChunk tests ---
+
+  it("onReasoningChunk sends reasoning text via update()", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onReasoningChunk("analyzing code")
+    expect(mockStream.update).toHaveBeenCalledWith("analyzing code")
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  it("onReasoningChunk after stop (403) is still a no-op", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    mockStream.emit.mockImplementation(() => { throw new Error("403 Forbidden") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onTextChunk("data") // triggers 403, sets stopped
+    mockStream.update.mockClear()
+    callbacks.onReasoningChunk("should not appear")
+    expect(mockStream.update).not.toHaveBeenCalled()
+  })
+
+  // --- async (Promise-based) error handling ---
+
+  it("when emit returns a rejected Promise, controller is aborted", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    mockStream.emit.mockReturnValue(Promise.reject(new Error("403 Forbidden")))
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onTextChunk("data")
+    // Let the microtask (Promise rejection handler) run
+    await new Promise(r => setTimeout(r, 0))
+    expect(controller.signal.aborted).toBe(true)
+  })
+
+  it("when update returns a rejected Promise, controller is aborted", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    mockStream.update.mockReturnValue(Promise.reject(new Error("403 Forbidden")))
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onToolStart("read_file", { path: "test.txt" })
+    await new Promise(r => setTimeout(r, 0))
+    expect(controller.signal.aborted).toBe(true)
+  })
+
+  it("after async abort via emit, phrase rotation stops", async () => {
+    vi.useFakeTimers()
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    mockStream.emit.mockReturnValue(Promise.reject(new Error("403")))
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    // Start phrase rotation
+    callbacks.onModelStart()
+    mockStream.update.mockClear()
+
+    // Emit triggers async abort
+    callbacks.onTextChunk("data")
+    await vi.advanceTimersByTimeAsync(0) // flush microtasks
+
+    // Phrase timer should have been cleared — advancing time should not produce updates
+    mockStream.update.mockClear()
+    vi.advanceTimersByTime(3000)
+    expect(mockStream.update).not.toHaveBeenCalled()
+
+    vi.useRealTimers()
+  })
+
+  it("markStopped is idempotent — second async rejection does not abort twice", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    // Both emit and update return rejected Promises
+    mockStream.emit.mockReturnValue(Promise.reject(new Error("403")))
+    mockStream.update.mockReturnValue(Promise.reject(new Error("403")))
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onTextChunk("data")       // first async rejection
+    callbacks.onToolStart("x", {})      // second async rejection (markStopped early-returns)
+    await new Promise(r => setTimeout(r, 0))
+    expect(controller.signal.aborted).toBe(true)
+  })
+
+  it("onTextChunk calls stream.emit() directly (no think-tag processing)", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onTextChunk("hello")
+    expect(mockStream.emit).toHaveBeenCalledWith("hello")
+  })
+
+  it("onReasoningChunk accumulates chunks into a single update()", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onReasoningChunk("step 1")
+    callbacks.onReasoningChunk(" step 2")
+    // Each chunk updates with the accumulated buffer
+    expect(mockStream.update).toHaveBeenCalledWith("step 1")
+    expect(mockStream.update).toHaveBeenCalledWith("step 1 step 2")
+    // Text emits only final answer, not reasoning
+    callbacks.onTextChunk("answer")
+    expect(mockStream.emit).toHaveBeenCalledTimes(1)
+    expect(mockStream.emit).toHaveBeenCalledWith("answer")
+  })
+
+  it("text without prior reasoning emits directly", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onTextChunk("just text")
+    expect(mockStream.emit).toHaveBeenCalledTimes(1)
+    expect(mockStream.emit).toHaveBeenCalledWith("just text")
+  })
+
+  it("reasoning never leaks into emitted text across turns", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onReasoningChunk("old reasoning")
+    callbacks.onModelStart()
+    callbacks.onTextChunk("answer")
+    // Reasoning was shown via update(), never emitted
+    expect(mockStream.emit).toHaveBeenCalledTimes(1)
+    expect(mockStream.emit).toHaveBeenCalledWith("answer")
+  })
+
+  // --- Tool/status callbacks ---
+
+  it("onToolStart sends informative status", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onToolStart("read_file", { path: "package.json" })
+    expect(mockStream.update).toHaveBeenCalledWith("running read_file (package.json)...")
+  })
+
+  // --- Streaming-mode onToolEnd: inline via stream.emit (not update) ---
+
+  it("onToolEnd success emits inline formatted result via stream.emit", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onToolEnd("read_file", "package.json", true)
+    expect(mockStream.emit).toHaveBeenCalledWith("\n\n\u2713 read_file (package.json)\n\n")
+  })
+
+  it("onToolEnd with empty summary emits inline formatted result", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onToolEnd("get_current_time", "", true)
+    expect(mockStream.emit).toHaveBeenCalledWith("\n\n\u2713 get_current_time\n\n")
+  })
+
+  it("onToolEnd failure emits inline formatted error via stream.emit", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onToolEnd("read_file", "missing.txt", false)
+    expect(mockStream.emit).toHaveBeenCalledWith("\n\n\u2717 read_file: missing.txt\n\n")
+  })
+
+  it("onToolEnd after abort does NOT call stream.emit", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    mockStream.emit.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onTextChunk("data") // triggers abort
+    mockStream.emit.mockClear()
+    callbacks.onToolEnd("read_file", "test.txt", true)
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  // --- Streaming-mode onKick: inline via stream.emit ---
+
+  it("onKick emits inline formatted kick via stream.emit", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onKick!()
+    expect(mockStream.emit).toHaveBeenCalledWith("\n\n\u21BB kick\n\n")
+  })
+
+  it("onKick after abort does NOT call stream.emit", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    mockStream.emit.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onTextChunk("data") // triggers abort
+    mockStream.emit.mockClear()
+    callbacks.onKick!()
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  // --- Streaming-mode onError: severity branching ---
+
+  it("onError transient calls stream.update (ephemeral)", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onError(new Error("context overflow"), "transient")
+    expect(mockStream.update).toHaveBeenCalledWith("Error: context overflow")
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  it("onError terminal emits inline formatted error via stream.emit", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onError(new Error("something broke"), "terminal")
+    expect(mockStream.emit).toHaveBeenCalledWith("\n\nError: something broke\n\n")
+  })
+
+  it("onError terminal after abort does NOT emit", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    mockStream.emit.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onTextChunk("data") // triggers abort
+    mockStream.emit.mockClear()
+    callbacks.onError(new Error("connection lost"), "terminal")
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+})
+
+describe("Teams adapter - message handling", () => {
+  function mockHandlingDeps(mockRunAgent: any) {
+    vi.doMock("../../heart/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-test-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+
+      postTurn: vi.fn(),
+    }))
+    vi.doMock("../../repertoire/commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockReturnValue({ handled: false }),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockReturnValue(null),
+    }))
+  }
+
+  it("on incoming message, pushes system and user message and calls runAgent", async () => {
+    vi.resetModules()
+
+    const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
+    mockHandlingDeps(mockRunAgent)
+
+    const teams = await import("../../senses/teams")
+
+    const mockStream = {
+      emit: vi.fn(),
+      update: vi.fn(),
+      close: vi.fn(),
+    }
+
+    await teams.handleTeamsMessage("hello from Teams", mockStream as any, "conv-test")
+
+    expect(mockRunAgent).toHaveBeenCalled()
+    const messages = mockRunAgent.mock.calls[0][0]
+    expect(messages.some((m: any) => m.role === "system")).toBe(true)
+    expect(messages.some((m: any) => m.role === "user" && m.content === "hello from Teams")).toBe(true)
+  })
+
+  it("passes AbortSignal to runAgent", async () => {
+    vi.resetModules()
+
+    const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
+    mockHandlingDeps(mockRunAgent)
+
+    const teams = await import("../../senses/teams")
+
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("test", mockStream as any, "conv-test")
+
+    // Fourth argument to runAgent should be an AbortSignal (channel is third)
+    expect(mockRunAgent).toHaveBeenCalled()
+    expect(mockRunAgent.mock.calls[0][2]).toBe("teams")
+    const signal = mockRunAgent.mock.calls[0][3]
+    expect(signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it("does not explicitly close stream (framework auto-closes)", async () => {
+    vi.resetModules()
+
+    mockHandlingDeps(vi.fn().mockResolvedValue({ usage: undefined }))
+
+    const teams = await import("../../senses/teams")
+
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("hi", mockStream as any, "conv-test")
+
+    expect(mockStream.close).not.toHaveBeenCalled()
+  })
+
+  it("per-conversation sessions: each call loads/saves independently", async () => {
+    vi.resetModules()
+
+    const capturedMessages: any[][] = []
+    const mockRunAgent = vi.fn().mockImplementation((msgs: any[]) => {
+      capturedMessages.push([...msgs])
+      return { usage: undefined }
+    })
+    mockHandlingDeps(mockRunAgent)
+
+    const teams = await import("../../senses/teams")
+
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    await teams.handleTeamsMessage("first", mockStream as any, "conv-1")
+    await teams.handleTeamsMessage("second", mockStream as any, "conv-2")
+
+    // Both calls get fresh sessions (loadSession returns null), so each has system + user = 2 msgs
+    expect(capturedMessages[0].length).toBe(2)
+    expect(capturedMessages[1].length).toBe(2)
+  })
+})
+
+describe("Teams adapter - stripMentions", () => {
+  let stripMentions: (text: string) => string
+
+  beforeEach(async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    stripMentions = teams.stripMentions
+  })
+
+  it("is exported from teams.ts", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    expect(typeof teams.stripMentions).toBe("function")
+  })
+
+  it("returns text unchanged when no mentions", () => {
+    expect(stripMentions("hello world")).toBe("hello world")
+  })
+
+  it("strips mention at start of text", () => {
+    expect(stripMentions("<at>Ouroboros</at> hello")).toBe("hello")
+  })
+
+  it("strips mention in middle of text", () => {
+    expect(stripMentions("hey <at>Ouroboros</at> do something")).toBe("hey  do something")
+  })
+
+  it("strips multiple mentions", () => {
+    expect(stripMentions("<at>Bot</at> and <at>User</at> chat")).toBe("and  chat")
+  })
+
+  it("handles extra whitespace after mention removal", () => {
+    expect(stripMentions("  <at>Bot</at>  hello  ")).toBe("hello")
+  })
+
+  it("returns empty string for empty input", () => {
+    expect(stripMentions("")).toBe("")
+  })
+
+  it("returns empty string for undefined/null input", () => {
+    expect(stripMentions(undefined as any)).toBe("")
+    expect(stripMentions(null as any)).toBe("")
+  })
+})
+
+describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
+  afterEach(() => {
+    // Config is loaded from config.json only, no env vars to clear
+  })
+
+  it("creates App with DevtoolsPlugin when CLIENT_ID is not set", async () => {
+    vi.resetModules()
+    // no env vars to clear
+
+    let capturedOpts: any = null
+    const mockOn = vi.fn()
+    const mockStart = vi.fn()
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(opts: any) { capturedOpts = opts }
+        on = mockOn
+        event = vi.fn()
+        start = mockStart
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    expect(capturedOpts.plugins).toHaveLength(1)
+    expect(mockOn).toHaveBeenCalledWith("message", expect.any(Function))
+    expect(mockStart).toHaveBeenCalledWith(3978)
+
+    consoleSpy.mockRestore()
+    vi.restoreAllMocks()
+  })
+
+  it("logs 'with DevtoolsPlugin' in DevtoolsPlugin mode", async () => {
+    vi.resetModules()
+    // no env vars to clear
+
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("DevtoolsPlugin"))
+
+    consoleSpy.mockRestore()
+    vi.restoreAllMocks()
+  })
+
+  it("passes activity.mentions.stripText in DevtoolsPlugin mode", async () => {
+    vi.resetModules()
+    // no env vars to clear
+
+    let capturedOpts: any = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(opts: any) { capturedOpts = opts }
+        on = vi.fn()
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    expect(capturedOpts.activity).toEqual({ mentions: { stripText: true } })
+
+    vi.restoreAllMocks()
+  })
+
+  it("uses teamsChannel.port config when set", async () => {
+    vi.resetModules()
+
+    const mockStart = vi.fn()
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        event = vi.fn()
+        start = mockStart
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 4000 }),
+    }))
+
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    expect(mockStart).toHaveBeenCalledWith(4000)
+
+    consoleSpy.mockRestore()
+    vi.restoreAllMocks()
+  })
+
+  it("message handler calls handleTeamsMessage with text and stream", async () => {
+    vi.resetModules()
+    // no env vars to clear
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
+    vi.doMock("../../heart/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+
+      postTurn: vi.fn(),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    expect(capturedHandler).not.toBeNull()
+
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: { text: "hello from devtools" },
+    })
+
+    expect(mockRunAgent).toHaveBeenCalled()
+
+    vi.restoreAllMocks()
+  })
+
+  it("message handler fetches tokens and passes teamsContext to handleTeamsMessage", async () => {
+    vi.resetModules()
+    // no env vars to clear
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
+    vi.doMock("../../heart/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+
+      postTurn: vi.fn(),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    // Simulate a full activity context with api.users.token.get and signin
+    const mockSignin = vi.fn().mockResolvedValue("token-from-signin")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: {
+        text: "test",
+        conversation: { id: "conv-test" },
+        from: { id: "user-123" },
+        channelId: "msteams",
+      },
+      api: {
+        users: {
+          token: {
+            get: vi.fn()
+              .mockResolvedValueOnce({ token: "graph-token-123" })
+              .mockResolvedValueOnce({ token: "ado-token-456" }),
+          },
+        },
+      },
+      signin: mockSignin,
+    })
+
+    // runAgent should have been called with toolContext containing both tokens
+    expect(mockRunAgent).toHaveBeenCalled()
+    const callArgs = mockRunAgent.mock.calls[0]
+    const options = callArgs[4]
+    expect(options).toBeDefined()
+    expect(options.toolContext).toBeDefined()
+    expect(options.toolContext.graphToken).toBe("graph-token-123")
+    expect(options.toolContext.adoToken).toBe("ado-token-456")
+    expect(typeof options.toolContext.signin).toBe("function")
+
+    // Test that the signin function proxies to ctx.signin with connectionName
+    await options.toolContext.signin("ado")
+    expect(mockSignin).toHaveBeenCalledWith({ connectionName: "ado" })
+
+    vi.restoreAllMocks()
+  })
+
+  it("message handler handles missing activity.text", async () => {
+    vi.resetModules()
+    // no env vars to clear
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
+    vi.doMock("../../heart/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+
+      postTurn: vi.fn(),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: {}, // no text property
+    })
+
+    expect(mockRunAgent).toHaveBeenCalled()
+    const messages = mockRunAgent.mock.calls[0][0]
+    const userMsg = messages.filter((m: any) => m.role === "user").pop()
+    expect(userMsg.content).toBe("")
+
+    vi.restoreAllMocks()
+  })
+
+  it("message handler catches errors without crashing", async () => {
+    vi.resetModules()
+    // no env vars to clear
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn().mockRejectedValue(new Error("agent crashed")),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await expect(capturedHandler!({
+      stream: mockStream,
+      activity: { text: "test" },
+    })).resolves.not.toThrow()
+
+    expect(errorSpy).toHaveBeenCalled()
+
+    vi.restoreAllMocks()
+  })
+
+  it("message handler catches non-Error thrown values", async () => {
+    vi.resetModules()
+    // no env vars to clear
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn().mockRejectedValue("string-crash"),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await expect(capturedHandler!({
+      stream: mockStream,
+      activity: { text: "test" },
+    })).resolves.not.toThrow()
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("string-crash"))
+
+    vi.restoreAllMocks()
+  })
+
+  it("signin wrapper catches errors and returns undefined", async () => {
+    vi.resetModules()
+    // no env vars to clear
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    // runAgent calls graph_profile which returns AUTH_REQUIRED, triggering signin
+    const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
+    vi.doMock("../../heart/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+
+      postTurn: vi.fn(),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const failingSignin = vi.fn().mockRejectedValue(new Error("signin failed"))
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: {
+        text: "test",
+        conversation: { id: "conv-test" },
+        from: { id: "user-123" },
+        channelId: "msteams",
+      },
+      api: {
+        users: { token: { get: vi.fn().mockRejectedValue(new Error("no token")) } },
+      },
+      signin: failingSignin,
+    })
+
+    // Grab the teamsContext.signin that was constructed and call it
+    const handleCall = mockRunAgent.mock.calls[0]
+    const opts = handleCall[4]
+    const result = await opts.toolContext.signin("graph")
+    expect(result).toBeUndefined()
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("signin(graph) failed"))
+
+    vi.restoreAllMocks()
+  })
+
+  it("signin wrapper logs 'no token' when signin returns falsy", async () => {
+    vi.resetModules()
+    // no env vars to clear
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
+    vi.doMock("../../heart/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+
+      postTurn: vi.fn(),
+    }))
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const mockSignin = vi.fn().mockResolvedValue(undefined)
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: {
+        text: "test",
+        conversation: { id: "conv-no-token" },
+        from: { id: "user-123" },
+        channelId: "msteams",
+      },
+      api: {
+        users: { token: { get: vi.fn().mockRejectedValue(new Error("no token")) } },
+      },
+      signin: mockSignin,
+    })
+
+    const opts = mockRunAgent.mock.calls[0][4]
+    const result = await opts.toolContext.signin("graph")
+    expect(result).toBeUndefined()
+    expect(logSpy).toHaveBeenCalledWith("[teams] signin(graph): no token")
+
+    vi.restoreAllMocks()
+  })
+
+  it("signin wrapper handles non-Error thrown values", async () => {
+    vi.resetModules()
+    // no env vars to clear
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
+    vi.doMock("../../heart/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+
+      postTurn: vi.fn(),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const mockSignin = vi.fn().mockRejectedValue("string-error")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: {
+        text: "test",
+        conversation: { id: "conv-str-err" },
+        from: { id: "user-123" },
+        channelId: "msteams",
+      },
+      api: {
+        users: { token: { get: vi.fn().mockRejectedValue(new Error("no token")) } },
+      },
+      signin: mockSignin,
+    })
+
+    const opts = mockRunAgent.mock.calls[0][4]
+    const result = await opts.toolContext.signin("graph")
+    expect(result).toBeUndefined()
+    expect(errorSpy).toHaveBeenCalledWith("[teams] signin(graph) failed: string-error")
+
+    vi.restoreAllMocks()
+  })
+
+  it("app.event error handler logs error message", async () => {
+    vi.resetModules()
+    // no env vars to clear
+
+    let capturedEventHandler: ((args: any) => void) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        event = vi.fn().mockImplementation((_name: string, handler: any) => {
+          capturedEventHandler = handler
+        })
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    expect(capturedEventHandler).toBeDefined()
+    capturedEventHandler!({ error: new Error("SDK blew up") })
+    expect(errorSpy).toHaveBeenCalledWith("[teams] app error: SDK blew up")
+
+    // Cover non-Error branch
+    capturedEventHandler!({ error: "string error" })
+    expect(errorSpy).toHaveBeenCalledWith("[teams] app error: string error")
+
+    vi.restoreAllMocks()
+  })
+})
+
+describe("Teams adapter - unhandledRejection guard", () => {
+  afterEach(() => {
+    // Clean up any __agentHandler listeners we registered
+    const listeners = process.listeners("unhandledRejection")
+    for (const l of listeners) {
+      if ((l as any).__agentHandler) process.removeListener("unhandledRejection", l)
+    }
+  })
+
+  it("registers unhandledRejection handler with __agentHandler marker (renamed from __ouroboros)", async () => {
+    vi.resetModules()
+    // no env vars to clear
+
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const listeners = process.listeners("unhandledRejection")
+    const ouroboros = listeners.find((l) => (l as any).__agentHandler)
+    expect(ouroboros).toBeDefined()
+
+    // Invoke the handler to cover the console.error line
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    ;(ouroboros as Function)(new Error("test rejection"))
+    expect(errorSpy).toHaveBeenCalledWith("[teams] unhandled rejection: test rejection")
+
+    // Cover non-Error branch
+    ;(ouroboros as Function)("string rejection")
+    expect(errorSpy).toHaveBeenCalledWith("[teams] unhandled rejection: string rejection")
+
+    vi.restoreAllMocks()
+  })
+
+  it("does not register duplicate handler on second call", async () => {
+    vi.resetModules()
+    // no env vars to clear
+
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+    teams.startTeamsApp()
+
+    const listeners = process.listeners("unhandledRejection")
+    const ouroborosCount = listeners.filter((l) => (l as any).__agentHandler).length
+    expect(ouroborosCount).toBe(1)
+
+    vi.restoreAllMocks()
+  })
+})
+
+describe("Teams adapter - startTeamsApp (Bot mode)", () => {
+  afterEach(() => {
+    // Config is loaded from config.json only, no env vars to clear
+  })
+
+  function mockBotConfig(clientId: string, clientSecret: string, tenantId: string) {
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/bot-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId, clientSecret, tenantId }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+    }))
+  }
+
+  it("creates App WITHOUT DevtoolsPlugin when CLIENT_ID is set", async () => {
+    vi.resetModules()
+
+    let capturedOpts: any = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(opts: any) { capturedOpts = opts }
+        on = vi.fn()
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    mockBotConfig("test-client-id", "test-secret", "test-tenant-id")
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    // Bot mode should NOT have plugins (no DevtoolsPlugin)
+    expect(capturedOpts.plugins).toBeUndefined()
+
+    vi.restoreAllMocks()
+  })
+
+  it("passes clientId, clientSecret, tenantId to App constructor", async () => {
+    vi.resetModules()
+
+    let capturedOpts: any = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(opts: any) { capturedOpts = opts }
+        on = vi.fn()
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    mockBotConfig("my-app-id", "my-secret", "my-tenant")
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    expect(capturedOpts.clientId).toBe("my-app-id")
+    expect(capturedOpts.clientSecret).toBe("my-secret")
+    expect(capturedOpts.tenantId).toBe("my-tenant")
+
+    vi.restoreAllMocks()
+  })
+
+  it("passes activity.mentions.stripText in bot mode", async () => {
+    vi.resetModules()
+
+    let capturedOpts: any = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(opts: any) { capturedOpts = opts }
+        on = vi.fn()
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    mockBotConfig("test-id", "test-secret", "test-tenant")
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    expect(capturedOpts.activity).toEqual({ mentions: { stripText: true } })
+
+    vi.restoreAllMocks()
+  })
+
+  it("logs 'with Bot Service' in bot mode", async () => {
+    vi.resetModules()
+
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    mockBotConfig("test-id", "test-secret", "test-tenant")
+
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Bot Service"))
+
+    consoleSpy.mockRestore()
+    vi.restoreAllMocks()
+  })
+
+  it("registers message handler in bot mode", async () => {
+    vi.resetModules()
+
+    const mockOn = vi.fn()
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = mockOn
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    mockBotConfig("test-id", "test-secret", "test-tenant")
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    expect(mockOn).toHaveBeenCalledWith("message", expect.any(Function))
+
+    vi.restoreAllMocks()
+  })
+})
+
+describe("Teams adapter - phrase rotation", () => {
+  let mockStream: { emit: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> }
+  let controller: AbortController
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    mockStream = {
+      emit: vi.fn(),
+      update: vi.fn(),
+      close: vi.fn(),
+    }
+    controller = new AbortController()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("rotates phrases every 1.5s during onModelStart", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onModelStart()
+    const firstCall = mockStream.update.mock.calls[0][0] as string
+    expect(firstCall).toMatch(/\.\.\.$/)
+
+    mockStream.update.mockClear()
+    vi.advanceTimersByTime(1500)
+    expect(mockStream.update).toHaveBeenCalledTimes(1)
+    const rotatedCall = mockStream.update.mock.calls[0][0] as string
+    expect(rotatedCall).toMatch(/\.\.\.$/)
+    const phrase = rotatedCall.replace(/\.\.\.$/, "")
+    expect(getPhrases().thinking).toContain(phrase)
+
+    callbacks.onTextChunk("done") // cleanup
+  })
+
+  it("onModelStreamStart is a no-op (phrases keep cycling through reasoning)", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onModelStart()
+    callbacks.onModelStreamStart() // no-op — does NOT stop rotation
+    mockStream.update.mockClear()
+    vi.advanceTimersByTime(1500)
+    // Phrases still cycling
+    expect(mockStream.update).toHaveBeenCalled()
+    // cleanup
+    callbacks.onTextChunk("done")
+  })
+
+  it("onReasoningChunk stops phrase rotation and shows reasoning", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onModelStart()
+    callbacks.onReasoningChunk("thinking hard")
+    mockStream.update.mockClear()
+    vi.advanceTimersByTime(3000)
+    // No more phrase rotation after reasoning arrives
+    expect(mockStream.update).not.toHaveBeenCalled()
+    // cleanup
+    callbacks.onTextChunk("done")
+  })
+
+  it("onTextChunk stops phrase rotation", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onModelStart()
+    vi.advanceTimersByTime(1500) // rotation fires
+    mockStream.update.mockClear()
+    callbacks.onTextChunk("hello") // stops rotation
+    vi.advanceTimersByTime(3000)
+    // No more rotation after text arrives
+    expect(mockStream.update).not.toHaveBeenCalled()
+  })
+
+  it("onModelStart uses FOLLOWUP_PHRASES after a tool run (no prior text)", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    // First model call — goes straight to tool without text/reasoning
+    callbacks.onModelStart()
+    callbacks.onToolStart("read_file", { path: "x" })
+    callbacks.onToolEnd("read_file", "x", true)
+    // Second model call — hadToolRun is true, hadRealOutput is false
+    mockStream.update.mockClear()
+    callbacks.onModelStart()
+    expect(mockStream.update).toHaveBeenCalled()
+    const phrase = (mockStream.update.mock.calls[0][0] as string).replace(/\.\.\.$/, "")
+    expect(getPhrases().followup).toContain(phrase)
+
+    callbacks.onTextChunk("done") // cleanup
+  })
+
+  it("onModelStart is suppressed after reasoning output even with tool run", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onModelStart()
+    callbacks.onReasoningChunk("thinking") // sets hadRealOutput
+    callbacks.onTextChunk("response")
+    callbacks.onToolStart("read_file", { path: "x" })
+    callbacks.onToolEnd("read_file", "x", true)
+    // hadRealOutput is true (from reasoning), so onModelStart is suppressed
+    mockStream.update.mockClear()
+    callbacks.onModelStart()
+    expect(mockStream.update).not.toHaveBeenCalled()
+
+    callbacks.onTextChunk("done") // cleanup
+  })
+
+  it("onModelStart is suppressed after reasoning output", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onModelStart()
+    callbacks.onReasoningChunk("deep thought") // sets hadRealOutput
+    callbacks.onTextChunk("answer")
+    // Second model call — no phrases
+    mockStream.update.mockClear()
+    callbacks.onModelStart()
+    expect(mockStream.update).not.toHaveBeenCalled()
+
+    callbacks.onTextChunk("done") // cleanup
+  })
+
+  it("onError stops phrase rotation", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onModelStart()
+    callbacks.onError(new Error("boom"), "terminal")
+    mockStream.update.mockClear()
+    vi.advanceTimersByTime(3000)
+    expect(mockStream.update).not.toHaveBeenCalled()
+  })
+
+  it("onToolStart stops phrase rotation from onModelStart", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onModelStart()
+    callbacks.onToolStart("shell", { command: "ls" })
+    mockStream.update.mockClear()
+    vi.advanceTimersByTime(3000)
+    // No rotation after tool start (it uses static tool name display)
+    expect(mockStream.update).not.toHaveBeenCalled()
+  })
+})
+
+describe("Teams adapter - session persistence", () => {
+  beforeEach(() => {
+    // no env vars to clear
+  })
+
+  function mockTeamsDeps(overrides: {
+    runAgentFn?: any
+    loadSessionReturn?: any
+    saveSessionCalls?: any[][]
+    postTurnCalls?: any[][]
+    deleteSessionCalls?: string[]
+    trimMessagesFn?: any
+    parseSlashCommandFn?: any
+    dispatchFn?: any
+  } = {}) {
+    const {
+      runAgentFn = vi.fn().mockResolvedValue({ usage: undefined }),
+      loadSessionReturn = null,
+      saveSessionCalls = [],
+      postTurnCalls = [],
+      deleteSessionCalls = [],
+      trimMessagesFn = ((msgs: any) => [...msgs]),
+      parseSlashCommandFn = (() => null),
+      dispatchFn = (() => ({ handled: false })),
+    } = overrides
+
+    vi.doMock("../../heart/core", () => ({
+      runAgent: runAgentFn,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(loadSessionReturn),
+      saveSession: vi.fn().mockImplementation((...args: any[]) => { saveSessionCalls.push(args) }),
+      deleteSession: vi.fn().mockImplementation((...args: any[]) => { deleteSessionCalls.push(args[0]) }),
+      trimMessages: vi.fn().mockImplementation(trimMessagesFn),
+
+      postTurn: vi.fn().mockImplementation((...args: any[]) => { postTurnCalls.push(args) }),
+    }))
+    vi.doMock("../../repertoire/commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockImplementation(dispatchFn),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockImplementation(parseSlashCommandFn),
+    }))
+  }
+
+  it("handleTeamsMessage accepts conversationId parameter", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
+    expect(runAgentFn).toHaveBeenCalled()
+  })
+
+  it("loads session for conversation on each message", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    const savedSession = [
+      { role: "system", content: "old prompt" },
+      { role: "user", content: "previous msg" },
+    ]
+    mockTeamsDeps({ runAgentFn, loadSessionReturn: { messages: savedSession, lastUsage: undefined } })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("new msg", mockStream as any, "conv-123")
+
+    const msgs = runAgentFn.mock.calls[0][0]
+    // System prompt comes from loaded session (refresh now happens inside runAgent)
+    expect(msgs[0].role).toBe("system")
+    expect(msgs.some((m: any) => m.content === "new msg")).toBe(true)
+  })
+
+  it("calls postTurn after runAgent with usage", async () => {
+    vi.resetModules()
+    const usageData = { input_tokens: 200, output_tokens: 100, reasoning_tokens: 20, total_tokens: 320 }
+    const postTurnCalls: any[][] = []
+    mockTeamsDeps({
+      runAgentFn: vi.fn().mockResolvedValue({ usage: usageData }),
+      postTurnCalls,
+    })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
+
+    expect(postTurnCalls.length).toBe(1)
+    expect(postTurnCalls[0][1]).toBe("/tmp/teams-session.json")
+    expect(postTurnCalls[0][2]).toEqual(usageData)
+  })
+
+  it("does not call trimMessages directly (postTurn handles it)", async () => {
+    vi.resetModules()
+    const trimCalls: any[][] = []
+    mockTeamsDeps({
+      trimMessagesFn: (...args: any[]) => { trimCalls.push(args); return [...args[0]] },
+    })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
+
+    expect(trimCalls.length).toBe(0) // trimming moved to postTurn
+  })
+
+  it("creates fresh session when no session exists", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps({ runAgentFn, loadSessionReturn: null })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
+
+    const msgs = runAgentFn.mock.calls[0][0]
+    expect(msgs[0].role).toBe("system")
+    expect(msgs[0].content).toBe("system prompt")
+    expect(msgs.length).toBe(2) // system + user
+  })
+
+  it("/new clears session and sends confirmation via stream", async () => {
+    vi.resetModules()
+    const deleteSessionCalls: string[] = []
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps({
+      runAgentFn,
+      deleteSessionCalls,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => {
+        if (name === "new") return { handled: true, result: { action: "new" } }
+        return { handled: false }
+      },
+    })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("/new", mockStream as any, "conv-123")
+
+    expect(deleteSessionCalls.length).toBe(1)
+    expect(mockStream.emit).toHaveBeenCalledWith(expect.stringContaining("session cleared"))
+    expect(runAgentFn).not.toHaveBeenCalled()
+  })
+
+  it("/commands sends command list via stream without calling runAgent", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps({
+      runAgentFn,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => {
+        if (name === "commands") return { handled: true, result: { action: "response", message: "/new - start new" } }
+        return { handled: false }
+      },
+    })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("/commands", mockStream as any, "conv-123")
+
+    expect(mockStream.emit).toHaveBeenCalledWith(expect.stringContaining("/new"))
+    expect(runAgentFn).not.toHaveBeenCalled()
+  })
+
+  it("multiple conversations maintain separate sessions", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../senses/teams")
+    const mockStream1 = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const mockStream2 = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    await teams.handleTeamsMessage("msg for conv1", mockStream1 as any, "conv-1")
+    await teams.handleTeamsMessage("msg for conv2", mockStream2 as any, "conv-2")
+
+    // Each call gets its own session (both load null, get fresh messages)
+    expect(runAgentFn).toHaveBeenCalledTimes(2)
+    const msgs1 = runAgentFn.mock.calls[0][0]
+    const msgs2 = runAgentFn.mock.calls[1][0]
+    expect(msgs1.find((m: any) => m.content === "msg for conv1")).toBeDefined()
+    expect(msgs2.find((m: any) => m.content === "msg for conv2")).toBeDefined()
+  })
+
+  it("graceful fallback on corrupt session file", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps({ runAgentFn, loadSessionReturn: null }) // null = corrupt
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
+
+    expect(runAgentFn).toHaveBeenCalled()
+    const msgs = runAgentFn.mock.calls[0][0]
+    expect(msgs[0].role).toBe("system")
+  })
+
+  it("slash command handled but no result falls through to normal message handling", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps({
+      runAgentFn,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: () => ({ handled: true, result: undefined }),
+    })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("/unknown", mockStream as any, "conv-123")
+
+    // Should fall through to runAgent since dispatch had no result
+    expect(runAgentFn).toHaveBeenCalled()
+  })
+
+  it("/commands with no message field emits empty string", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps({
+      runAgentFn,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => {
+        if (name === "commands") return { handled: true, result: { action: "response", message: undefined } }
+        return { handled: false }
+      },
+    })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("/commands", mockStream as any, "conv-123")
+
+    expect(mockStream.emit).toHaveBeenCalledWith("")
+    expect(runAgentFn).not.toHaveBeenCalled()
+  })
+
+  it("slash command with unrecognized action falls through to normal handling", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps({
+      runAgentFn,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: () => ({ handled: true, result: { action: "exit" } }),
+    })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("/exit", mockStream as any, "conv-123")
+
+    // "exit" action is not handled in Teams, so falls through to runAgent
+    expect(runAgentFn).toHaveBeenCalled()
+  })
+
+  it("withConversationLock serializes messages for same conversation", async () => {
+    vi.resetModules()
+    const order: string[] = []
+    mockTeamsDeps({})
+    const teams = await import("../../senses/teams")
+
+    const { withConversationLock } = teams
+    let callCount = 0
+    await Promise.all([
+      withConversationLock("conv-1", async () => {
+        const id = callCount++
+        order.push(`start-${id}`)
+        await new Promise((r) => setTimeout(r, 10))
+        order.push(`end-${id}`)
+      }),
+      withConversationLock("conv-1", async () => {
+        const id = callCount++
+        order.push(`start-${id}`)
+        await new Promise((r) => setTimeout(r, 10))
+        order.push(`end-${id}`)
+      }),
+    ])
+
+    // Should be sequential: start-0, end-0, start-1, end-1
+    expect(order).toEqual(["start-0", "end-0", "start-1", "end-1"])
+  })
+
+  it("withConversationLock allows parallel for different conversations", async () => {
+    vi.resetModules()
+    const order: string[] = []
+    const runAgentFn = vi.fn().mockImplementation(async (id: string) => {
+      order.push(`start-${id}`)
+      await new Promise((r) => setTimeout(r, 10))
+      order.push(`end-${id}`)
+    })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../senses/teams")
+
+    const { withConversationLock } = teams
+    await Promise.all([
+      withConversationLock("conv-1", async () => { await runAgentFn("1") }),
+      withConversationLock("conv-2", async () => { await runAgentFn("2") }),
+    ])
+
+    // Both start before either ends (parallel)
+    expect(order[0]).toBe("start-1")
+    expect(order[1]).toBe("start-2")
+  })
+
+  it("handleTeamsMessage passes toolContext to runAgent when provided via TeamsMessageContext", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const teamsContext = {
+      graphToken: "g-token",
+      adoToken: "a-token",
+      signin: vi.fn(),
+    }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123", teamsContext)
+    expect(runAgentFn).toHaveBeenCalled()
+
+    // Check that runAgent was called with options containing toolContext
+    const callArgs = runAgentFn.mock.calls[0]
+    const options = callArgs[4] // 5th arg is options
+    expect(options).toBeDefined()
+    expect(options.toolContext).toBeDefined()
+    expect(options.toolContext.graphToken).toBe("g-token")
+    expect(options.toolContext.adoToken).toBe("a-token")
+    expect(typeof options.toolContext.signin).toBe("function")
+    // adoOrganizations removed from ToolContext in Unit 1Ha
+    expect(options.toolContext.adoOrganizations).toBeUndefined()
+  })
+
+  it("handleTeamsMessage works without TeamsMessageContext (backward compat)", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    // No teamsContext parameter -- should still work
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
+    expect(runAgentFn).toHaveBeenCalled()
+  })
+
+  it("skipConfirmation=true in teamsChannel config sets skipConfirmation in agent options", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    // Use mockTeamsDeps first (sets base config mock), then override getTeamsChannelConfig
+    vi.doMock("../../heart/core", () => ({
+      runAgent: runAgentFn,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: true, disableStreaming: false, port: 3978 }),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+
+      postTurn: vi.fn(),
+    }))
+    vi.doMock("../../repertoire/commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockReturnValue({ handled: false }),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockReturnValue(null),
+    }))
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123", { graphToken: "t", adoToken: "t", signin: vi.fn() })
+    expect(runAgentFn).toHaveBeenCalled()
+    const options = runAgentFn.mock.calls[0][4]
+    expect(options.skipConfirmation).toBe(true)
+  })
+
+  it("skipConfirmation not set when teamsChannel.skipConfirmation is false (default)", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123", { graphToken: "t", adoToken: "t", signin: vi.fn() })
+    expect(runAgentFn).toHaveBeenCalled()
+    const options = runAgentFn.mock.calls[0][4]
+    expect(options.skipConfirmation).toBeUndefined()
+  })
+
+  it("triggers signin for AUTH_REQUIRED:graph after agent loop", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockImplementation(async (msgs: any[]) => {
+      msgs.push({ role: "assistant", content: "AUTH_REQUIRED:graph" })
+      return { usage: undefined }
+    })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const signinFn = vi.fn()
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-auth", {
+      graphToken: undefined,
+      adoToken: undefined,
+      signin: signinFn,
+    })
+
+    expect(signinFn).toHaveBeenCalledWith("graph")
+  })
+
+  it("triggers signin for AUTH_REQUIRED:ado after agent loop", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockImplementation(async (msgs: any[]) => {
+      msgs.push({ role: "assistant", content: "AUTH_REQUIRED:ado" })
+      return { usage: undefined }
+    })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const signinFn = vi.fn()
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-auth-ado", {
+      graphToken: undefined,
+      adoToken: undefined,
+      signin: signinFn,
+    })
+
+    expect(signinFn).toHaveBeenCalledWith("ado")
+  })
+
+  it("does not trigger signin when no AUTH_REQUIRED in messages", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockImplementation(async (msgs: any[]) => {
+      msgs.push({ role: "assistant", content: "all good" })
+      return { usage: undefined }
+    })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const signinFn = vi.fn()
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-no-auth", {
+      graphToken: "token",
+      adoToken: "token",
+      signin: signinFn,
+    })
+
+    expect(signinFn).not.toHaveBeenCalled()
+  })
+
+  it("handles non-string message content in AUTH_REQUIRED check", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockImplementation(async (msgs: any[]) => {
+      msgs.push({ role: "assistant", content: [{ type: "text", text: "complex" }] })
+      return { usage: undefined }
+    })
+    mockTeamsDeps({ runAgentFn })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const signinFn = vi.fn()
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-complex", {
+      graphToken: undefined,
+      adoToken: undefined,
+      signin: signinFn,
+    })
+
+    // Non-string content should be treated as empty, not crash
+    expect(signinFn).not.toHaveBeenCalled()
+  })
+})
+
+describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
+  let mockStream: { emit: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> }
+  let controller: AbortController
+
+  beforeEach(() => {
+    mockStream = {
+      emit: vi.fn(),
+      update: vi.fn(),
+      close: vi.fn(),
+    }
+    controller = new AbortController()
+  })
+
+  it("onTextChunk buffers text instead of calling stream.emit() when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onTextChunk("Hello")
+    callbacks.onTextChunk(" world")
+    // Text should NOT be emitted yet (buffered internally)
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  it("onReasoningChunk skips stream.update() when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onReasoningChunk("analyzing")
+    callbacks.onReasoningChunk(" more")
+    // Reasoning updates are suppressed when streaming is disabled (too many HTTP round-trips)
+    expect(mockStream.update).not.toHaveBeenCalled()
+  })
+
+  it("onModelStart still calls stream.update() with thinking phrases when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onModelStart()
+    expect(mockStream.update).toHaveBeenCalled()
+    const calledWith = mockStream.update.mock.calls[0][0] as string
+    expect(calledWith).toMatch(/\.\.\.$/)
+    // Clean up timer
+    callbacks.onTextChunk("done")
+  })
+
+  it("onToolStart still calls stream.update() when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onToolStart("read_file", { path: "test.txt" })
+    expect(mockStream.update).toHaveBeenCalledWith("running read_file (test.txt)...")
+  })
+
+  it("onToolStart flushes accumulated text buffer before showing tool status", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onTextChunk("accumulated text")
+    callbacks.onToolStart("read_file", { path: "test.txt" })
+    // First flush goes to stream.emit (primary output)
+    expect(mockStream.emit).toHaveBeenCalledWith("accumulated text")
+  })
+
+  it("onKick calls sendMessage when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onKick!()
+    expect(sendMessage).toHaveBeenCalledWith("\u21BB kick")
+  })
+
+  it("onKick after abort does NOT call sendMessage when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    mockStream.emit.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.flush() // trigger abort
+    sendMessage.mockClear()
+    callbacks.onKick!()
+    expect(sendMessage).not.toHaveBeenCalled()
+  })
+
+  it("safeSend catch: when sendMessage throws synchronously, controller is aborted", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockImplementation(() => { throw new Error("sync failure") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onToolEnd("read_file", "test.txt", true)
+    expect(controller.signal.aborted).toBe(true)
+  })
+
+  it("onToolStart flushes text to sendMessage when stream already has content", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    // First: emit text to stream (sets streamHasContent)
+    callbacks.onTextChunk("first response")
+    await callbacks.flush()
+    expect(mockStream.emit).toHaveBeenCalledWith("first response")
+    mockStream.emit.mockClear()
+    // Second: accumulate more text, then onToolStart flushes via sendMessage (streamHasContent=true)
+    callbacks.onTextChunk("second text")
+    callbacks.onToolStart("read_file", { path: "test.txt" })
+    expect(sendMessage).toHaveBeenCalledWith("second text")
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  it("onToolEnd success calls sendMessage with formatted result when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onToolEnd("read_file", "test.txt", true)
+    expect(sendMessage).toHaveBeenCalledWith("\u2713 read_file (test.txt)")
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  it("onToolEnd failure calls sendMessage with formatted error when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onToolEnd("read_file", "missing.txt", false)
+    expect(sendMessage).toHaveBeenCalledWith("\u2717 read_file: missing.txt")
+  })
+
+  it("onToolEnd after abort does NOT call sendMessage when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    mockStream.emit.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onTextChunk("data") // triggers abort (buffered, so no emit, but marking stopped)
+    // Force abort by triggering safeEmit
+    callbacks.flush()
+    sendMessage.mockClear()
+    callbacks.onToolEnd("read_file", "test.txt", true)
+    expect(sendMessage).not.toHaveBeenCalled()
+  })
+
+  it("onError terminal calls sendMessage when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onError(new Error("something broke"), "terminal")
+    expect(sendMessage).toHaveBeenCalledWith("Error: something broke")
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  it("onError transient calls stream.update when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onError(new Error("context overflow"), "transient")
+    expect(mockStream.update).toHaveBeenCalledWith("Error: context overflow")
+    expect(sendMessage).not.toHaveBeenCalled()
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  it("onError terminal after abort does NOT call sendMessage when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    mockStream.emit.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.flush() // trigger abort via emit
+    sendMessage.mockClear()
+    callbacks.onError(new Error("broken"), "terminal")
+    expect(sendMessage).not.toHaveBeenCalled()
+  })
+
+  it("flush() with no prior stream content: first text goes to stream.emit", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onTextChunk("Hello")
+    callbacks.onTextChunk(" world")
+    callbacks.onTextChunk("!")
+    expect(mockStream.emit).not.toHaveBeenCalled()
+    await callbacks.flush()
+    expect(mockStream.emit).toHaveBeenCalledTimes(1)
+    expect(mockStream.emit).toHaveBeenCalledWith("Hello world!")
+    expect(sendMessage).not.toHaveBeenCalled()
+  })
+
+  it("flush() with prior stream content but no sendMessage: text is silently dropped", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    // No sendMessage provided -- buffered mode without sendMessage
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, undefined, { disableStreaming: true })
+    // First iteration: text goes to emit
+    callbacks.onTextChunk("first response")
+    await callbacks.flush()
+    mockStream.emit.mockClear()
+    // Second iteration: no sendMessage, so text should be silently cleared (not emitted again)
+    callbacks.onTextChunk("second response")
+    await callbacks.flush()
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  it("flush() with prior stream content: text goes via sendMessage", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    // First iteration: text goes to emit
+    callbacks.onTextChunk("first response")
+    await callbacks.flush()
+    mockStream.emit.mockClear()
+    // Second iteration: text goes to sendMessage
+    callbacks.onTextChunk("second response")
+    await callbacks.flush()
+    expect(mockStream.emit).not.toHaveBeenCalled()
+    expect(sendMessage).toHaveBeenCalledWith("second response")
+  })
+
+  it("flush() with no text and no prior stream content: emits fallback message", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    // No text chunks at all
+    await callbacks.flush()
+    expect(mockStream.emit).toHaveBeenCalledWith("(completed with tool calls only \u2014 no text response)")
+  })
+
+  it("flush() is async and awaits sendMessage", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    let resolveMsg: (() => void) | null = null
+    const sendMessage = vi.fn().mockImplementation(() => new Promise<void>(r => { resolveMsg = r }))
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    // First flush to get stream content
+    callbacks.onTextChunk("first")
+    await callbacks.flush()
+    // Second flush goes to sendMessage
+    callbacks.onTextChunk("second")
+    const flushPromise = callbacks.flush()
+    // sendMessage was called but not resolved yet
+    expect(sendMessage).toHaveBeenCalledWith("second")
+    // Resolve it
+    resolveMsg!()
+    await flushPromise
+  })
+
+  it("flush() with empty buffer after prior content is a no-op (does not send empty)", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onTextChunk("text")
+    await callbacks.flush()
+    mockStream.emit.mockClear()
+    sendMessage.mockClear()
+    // Second flush with no new text
+    await callbacks.flush()
+    expect(mockStream.emit).not.toHaveBeenCalled()
+    expect(sendMessage).not.toHaveBeenCalled()
+  })
+
+  it("when disableStreaming is false, onTextChunk emits directly (no buffering)", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, undefined, { disableStreaming: false })
+    callbacks.onTextChunk("Hello")
+    expect(mockStream.emit).toHaveBeenCalledWith("Hello")
+  })
+
+  it("when disableStreaming is undefined, behavior is identical to current (no buffering)", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onTextChunk("Hello")
+    expect(mockStream.emit).toHaveBeenCalledWith("Hello")
+  })
+
+  it("flush() exists and is a no-op when disableStreaming is false", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, undefined, { disableStreaming: false })
+    callbacks.onTextChunk("Hello")
+    mockStream.emit.mockClear()
+    await callbacks.flush()
+    // flush() should not emit anything extra when not buffering
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
+  it("stop-streaming (403) still works when disableStreaming is true: emit error aborts controller", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    // flush() will trigger the emit which throws 403
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onTextChunk("data")
+    mockStream.emit.mockImplementation(() => { throw new Error("403 Forbidden") })
+    await callbacks.flush()
+    expect(controller.signal.aborted).toBe(true)
+  })
+
+  it("stop-streaming (403) via update still aborts when disableStreaming is true", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    mockStream.update.mockImplementation(() => { throw new Error("403 Forbidden") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onToolStart("read_file", { path: "test.txt" })
+    expect(controller.signal.aborted).toBe(true)
+  })
+})
+
+describe("Teams adapter - handleTeamsMessage with disableStreaming", () => {
+  beforeEach(() => {
+    // no env vars to clear
+  })
+
+  function mockTeamsDeps2(overrides: {
+    runAgentFn?: any
+    loadSessionReturn?: any
+    postTurnCalls?: any[][]
+    deleteSessionCalls?: string[]
+    parseSlashCommandFn?: any
+    dispatchFn?: any
+  } = {}) {
+    const {
+      runAgentFn = vi.fn().mockResolvedValue({ usage: undefined }),
+      loadSessionReturn = null,
+      postTurnCalls = [],
+      deleteSessionCalls = [],
+      parseSlashCommandFn = (() => null),
+      dispatchFn = (() => ({ handled: false })),
+    } = overrides
+
+    vi.doMock("../../heart/core", () => ({
+      runAgent: runAgentFn,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(loadSessionReturn),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn().mockImplementation((...args: any[]) => { deleteSessionCalls.push(args[0]) }),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+
+      postTurn: vi.fn().mockImplementation((...args: any[]) => { postTurnCalls.push(args) }),
+    }))
+    vi.doMock("../../repertoire/commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockImplementation(dispatchFn),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockImplementation(parseSlashCommandFn),
+    }))
+  }
+
+  it("disableStreaming flag is forwarded to createTeamsCallbacks - text is buffered", async () => {
+    vi.resetModules()
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      // Simulate agent producing text chunks
+      callbacks.onTextChunk("Hello")
+      callbacks.onTextChunk(" world")
+      return { usage: undefined }
+    })
+    mockTeamsDeps2({ runAgentFn: mockRunAgent })
+
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("test", mockStream as any, "conv-123", undefined, true)
+
+    // Text should have been emitted once via flush() after runAgent completes (not twice via streaming)
+    const emitCalls = mockStream.emit.mock.calls.filter((c: any) => !c[0].startsWith("Error"))
+    expect(emitCalls).toHaveLength(1)
+    expect(emitCalls[0][0]).toBe("Hello world")
+  })
+
+  it("flush() is called after runAgent completes", async () => {
+    vi.resetModules()
+    let emitCalledDuringAgent = false
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      callbacks.onTextChunk("buffered text")
+      return { usage: undefined }
+    })
+    mockTeamsDeps2({ runAgentFn: mockRunAgent })
+
+    const teams = await import("../../senses/teams")
+    const mockStream = {
+      emit: vi.fn(),
+      update: vi.fn(),
+      close: vi.fn(),
+    }
+    await teams.handleTeamsMessage("test", mockStream as any, "conv-123", undefined, true)
+
+    // The emit should have been called (by flush after runAgent)
+    expect(mockStream.emit).toHaveBeenCalledWith("buffered text")
+  })
+
+  it("when disableStreaming is false/undefined, behavior is unchanged (no buffering)", async () => {
+    vi.resetModules()
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      callbacks.onTextChunk("Hello")
+      callbacks.onTextChunk(" world")
+      return { usage: undefined }
+    })
+    mockTeamsDeps2({ runAgentFn: mockRunAgent })
+
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("test", mockStream as any, "conv-123")
+
+    // Text emitted directly (not buffered), so two emit calls
+    const textEmits = mockStream.emit.mock.calls.filter((c: any) => !c[0].startsWith("Error"))
+    expect(textEmits).toHaveLength(2)
+    expect(textEmits[0][0]).toBe("Hello")
+    expect(textEmits[1][0]).toBe(" world")
+  })
+
+  it("slash command /new does NOT call flush (emits directly)", async () => {
+    vi.resetModules()
+    const deleteSessionCalls: string[] = []
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDeps2({
+      runAgentFn,
+      deleteSessionCalls,
+      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
+      dispatchFn: (name: string) => {
+        if (name === "new") return { handled: true, result: { action: "new" } }
+        return { handled: false }
+      },
+    })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await teams.handleTeamsMessage("/new", mockStream as any, "conv-123", undefined, true)
+
+    // Slash command emits directly, runAgent not called
+    expect(deleteSessionCalls.length).toBe(1)
+    expect(mockStream.emit).toHaveBeenCalledWith("session cleared")
+    expect(runAgentFn).not.toHaveBeenCalled()
+  })
+})
+
+describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
+  let savedArgv: string[]
+
+  beforeEach(() => {
+    savedArgv = [...process.argv]
+  })
+
+  afterEach(() => {
+    process.argv = savedArgv
+    // Config is loaded from config.json only, no env vars to clear
+    // no env vars to clear
+  })
+
+  it("when --disable-streaming is in argv, threads disableStreaming to handleTeamsMessage", async () => {
+    vi.resetModules()
+    // no env vars to clear
+    process.argv = ["node", "teams-entry.ts", "--disable-streaming"]
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      callbacks.onTextChunk("Hello")
+      callbacks.onTextChunk(" world")
+      return { usage: undefined }
+    })
+    vi.doMock("../../heart/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+
+      postTurn: vi.fn(),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    expect(capturedHandler).not.toBeNull()
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: { text: "hello" },
+    })
+
+    // With --disable-streaming, two text chunks should be buffered and emitted as ONE call via flush()
+    const textEmits = mockStream.emit.mock.calls.filter((c: any) => !c[0].startsWith("Error"))
+    expect(textEmits).toHaveLength(1)
+    expect(textEmits[0][0]).toBe("Hello world")
+
+    vi.restoreAllMocks()
+  })
+
+  it("logs 'streaming: disabled' at startup when --disable-streaming is present", async () => {
+    vi.resetModules()
+    // no env vars to clear
+    process.argv = ["node", "teams-entry.ts", "--disable-streaming"]
+
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const logCalls = consoleSpy.mock.calls.map((c: any) => c[0])
+    expect(logCalls.some((msg: string) => msg.includes("streaming: disabled"))).toBe(true)
+
+    consoleSpy.mockRestore()
+    vi.restoreAllMocks()
+  })
+
+  it("detects disableStreaming via teamsChannel config", async () => {
+    vi.resetModules()
+    process.argv = ["node", "teams-entry.ts"]
+
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: true, port: 3978 }),
+    }))
+
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const logCalls = consoleSpy.mock.calls.map((c: any) => c[0])
+    expect(logCalls.some((msg: string) => msg.includes("streaming: disabled"))).toBe(true)
+
+    consoleSpy.mockRestore()
+    vi.restoreAllMocks()
+  })
+
+  it("when --disable-streaming is NOT in argv, handleTeamsMessage is called without disableStreaming", async () => {
+    vi.resetModules()
+    process.argv = ["node", "teams-entry.ts"]
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      callbacks.onTextChunk("Hello")
+      callbacks.onTextChunk(" world")
+      return { usage: undefined }
+    })
+    vi.doMock("../../heart/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+
+      postTurn: vi.fn(),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: { text: "hello" },
+    })
+
+    // Without --disable-streaming, text should be streamed directly (two emits)
+    const textEmits = mockStream.emit.mock.calls.filter((c: any) => !c[0].startsWith("Error"))
+    expect(textEmits).toHaveLength(2)
+    expect(textEmits[0][0]).toBe("Hello")
+    expect(textEmits[1][0]).toBe(" world")
+
+    vi.restoreAllMocks()
+  })
+
+  it("logs 'streaming: enabled' when flag is absent", async () => {
+    vi.resetModules()
+    // no env vars to clear
+    process.argv = ["node", "teams-entry.ts"]
+
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+    }))
+
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const logCalls = consoleSpy.mock.calls.map((c: any) => c[0])
+    expect(logCalls.some((msg: string) => msg.includes("streaming: enabled"))).toBe(true)
+    expect(logCalls.some((msg: string) => msg.includes("streaming: disabled"))).toBe(false)
+
+    consoleSpy.mockRestore()
+    vi.restoreAllMocks()
+  })
+})
+
+describe("Teams adapter - confirmation callback", () => {
+  beforeEach(() => {
+    // no env vars to clear
+  })
+
+  function mockTeamsDepsForConfirmation(overrides: {
+    runAgentFn?: any
+    loadSessionReturn?: any
+  } = {}) {
+    const {
+      runAgentFn = vi.fn().mockResolvedValue({ usage: undefined }),
+      loadSessionReturn = null,
+    } = overrides
+
+    vi.doMock("../../heart/core", () => ({
+      runAgent: runAgentFn,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(loadSessionReturn),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+
+      postTurn: vi.fn(),
+    }))
+    vi.doMock("../../repertoire/commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockReturnValue({ handled: false }),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockReturnValue(null),
+    }))
+  }
+
+  it("onConfirmAction sends descriptive message via stream.update", async () => {
+    vi.resetModules()
+
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      if (callbacks.onConfirmAction) {
+        // Start confirmation but don't await -- we'll resolve it after checking the update
+        const confirmPromise = callbacks.onConfirmAction("graph_mutate", { method: "POST", path: "/me/sendMail" })
+        // Resolve it immediately so the test can finish
+        // Use resolvePendingConfirmation to resolve it
+        const teams = await import("../../senses/teams")
+        teams.resolvePendingConfirmation("conv-desc-1", "no")
+        await confirmPromise
+      }
+      return { usage: undefined }
+    })
+
+    mockTeamsDepsForConfirmation({ runAgentFn: mockRunAgent })
+
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    await teams.handleTeamsMessage("do something", mockStream as any, "conv-desc-1", {
+      graphToken: "token",
+      adoToken: undefined,
+      signin: vi.fn(),
+    })
+
+    // The confirmation prompt should have been sent via stream.update
+    const updateCalls = mockStream.update.mock.calls.map((c: any) => c[0] as string)
+    const confirmMsg = updateCalls.find((msg: string) => msg.includes("graph_mutate") || msg.includes("Confirm"))
+    expect(confirmMsg).toBeDefined()
+  })
+
+  it("'yes' response resolves confirmed", async () => {
+    vi.resetModules()
+
+    let confirmPromise: Promise<"confirmed" | "denied"> | null = null
+
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      if (callbacks.onConfirmAction) {
+        confirmPromise = callbacks.onConfirmAction("graph_mutate", { method: "POST", path: "/me/sendMail" })
+      }
+      return { usage: undefined }
+    })
+
+    mockTeamsDepsForConfirmation({ runAgentFn: mockRunAgent })
+
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    // Start the first message (which triggers the confirmation)
+    const firstMsg = teams.handleTeamsMessage("do something", mockStream as any, "conv-confirm-yes", {
+      graphToken: "token",
+      adoToken: undefined,
+      signin: vi.fn(),
+    })
+
+    // Wait a tick for the first message to start running
+    await new Promise(r => setTimeout(r, 50))
+
+    // Resolve confirmation directly (as the app.on handler would)
+    teams.resolvePendingConfirmation("conv-confirm-yes", "yes")
+
+    await firstMsg
+
+    expect(confirmPromise).not.toBeNull()
+    const result = await confirmPromise!
+    expect(result).toBe("confirmed")
+  })
+
+  it("'no' response resolves denied", async () => {
+    vi.resetModules()
+
+    let confirmPromise: Promise<"confirmed" | "denied"> | null = null
+
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      if (callbacks.onConfirmAction) {
+        confirmPromise = callbacks.onConfirmAction("graph_mutate", { method: "DELETE", path: "/me/messages/1" })
+      }
+      return { usage: undefined }
+    })
+
+    mockTeamsDepsForConfirmation({ runAgentFn: mockRunAgent })
+
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const firstMsg = teams.handleTeamsMessage("delete my email", mockStream as any, "conv-confirm-no", {
+      graphToken: "token",
+      adoToken: undefined,
+      signin: vi.fn(),
+    })
+
+    await new Promise(r => setTimeout(r, 50))
+
+    // Resolve confirmation directly (as the app.on handler would)
+    teams.resolvePendingConfirmation("conv-confirm-no", "no")
+
+    await firstMsg
+
+    expect(confirmPromise).not.toBeNull()
+    const result = await confirmPromise!
+    expect(result).toBe("denied")
+  })
+
+  it("unrelated message resolves denied", async () => {
+    vi.resetModules()
+
+    let confirmPromise: Promise<"confirmed" | "denied"> | null = null
+
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      if (callbacks.onConfirmAction) {
+        confirmPromise = callbacks.onConfirmAction("ado_mutate", { method: "PATCH", organization: "myorg", path: "/_apis/wit/workitems/1" })
+      }
+      return { usage: undefined }
+    })
+
+    mockTeamsDepsForConfirmation({ runAgentFn: mockRunAgent })
+
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const firstMsg = teams.handleTeamsMessage("update work item", mockStream as any, "conv-confirm-other", {
+      graphToken: undefined,
+      adoToken: "token",
+      signin: vi.fn(),
+    })
+
+    await new Promise(r => setTimeout(r, 50))
+
+    // Resolve confirmation directly (as the app.on handler would)
+    teams.resolvePendingConfirmation("conv-confirm-other", "something else entirely")
+
+    await firstMsg
+
+    expect(confirmPromise).not.toBeNull()
+    const result = await confirmPromise!
+    expect(result).toBe("denied")
+  })
+
+  it("confirmation auto-denies after timeout (120s)", async () => {
+    vi.useFakeTimers()
+    vi.resetModules()
+
+    let confirmPromise: Promise<"confirmed" | "denied"> | null = null
+
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      if (callbacks.onConfirmAction) {
+        confirmPromise = callbacks.onConfirmAction("ado_mutate", { method: "POST", organization: "myorg", path: "/_apis/wit/workitems" })
+      }
+      return { usage: undefined }
+    })
+
+    mockTeamsDepsForConfirmation({ runAgentFn: mockRunAgent })
+
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const msgPromise = teams.handleTeamsMessage("create work item", mockStream as any, "conv-timeout", {
+      graphToken: undefined,
+      adoToken: "token",
+      signin: vi.fn(),
+    })
+
+    // Let the handler start and set up the confirmation
+    await vi.advanceTimersByTimeAsync(50)
+
+    expect(confirmPromise).not.toBeNull()
+
+    // Advance past the 120s timeout
+    await vi.advanceTimersByTimeAsync(120_000)
+
+    await msgPromise
+
+    const result = await confirmPromise!
+    expect(result).toBe("denied")
+
+    vi.useRealTimers()
+  })
+
+  it("confirmation timeout is a no-op when already resolved", async () => {
+    vi.useFakeTimers()
+    vi.resetModules()
+
+    let confirmPromise: Promise<"confirmed" | "denied"> | null = null
+
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      if (callbacks.onConfirmAction) {
+        confirmPromise = callbacks.onConfirmAction("ado_mutate", { method: "POST", organization: "myorg", path: "/_apis/wit/workitems" })
+      }
+      return { usage: undefined }
+    })
+
+    mockTeamsDepsForConfirmation({ runAgentFn: mockRunAgent })
+
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const msgPromise = teams.handleTeamsMessage("create item", mockStream as any, "conv-timeout-noop", {
+      graphToken: undefined,
+      adoToken: "token",
+      signin: vi.fn(),
+    })
+
+    await vi.advanceTimersByTimeAsync(50)
+
+    // Resolve BEFORE the timeout fires
+    teams.resolvePendingConfirmation("conv-timeout-noop", "yes")
+
+    await vi.advanceTimersByTimeAsync(0)
+    await msgPromise
+
+    const result = await confirmPromise!
+    expect(result).toBe("confirmed")
+
+    // Advance past the 120s timeout — should be a no-op (no double-resolve)
+    await vi.advanceTimersByTimeAsync(120_000)
+    // Still confirmed — not overwritten to denied
+    expect(await confirmPromise!).toBe("confirmed")
+
+    vi.useRealTimers()
+  })
+
+  it("pre-lock confirmation resolves before conversation lock (no deadlock)", async () => {
+    vi.resetModules()
+    // no env vars to clear
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    let confirmPromise: Promise<"confirmed" | "denied"> | null = null
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      if (callbacks.onConfirmAction) {
+        confirmPromise = callbacks.onConfirmAction("graph_mutate", { method: "POST", path: "/me/sendMail" })
+        // The agent loop would await this promise, so we do too
+        await confirmPromise
+      }
+      return { usage: undefined }
+    })
+
+    vi.doMock("../../heart/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+
+      postTurn: vi.fn(),
+    }))
+    vi.doMock("../../repertoire/commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockReturnValue({ handled: false }),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockReturnValue(null),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+    vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+    expect(capturedHandler).not.toBeNull()
+
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const convId = "conv-prelock-confirm"
+
+    // First message triggers the agent which triggers confirmation
+    const firstMsg = capturedHandler!({
+      stream: mockStream,
+      activity: { text: "send email", conversation: { id: convId }, from: { id: "user1" }, channelId: "msteams" },
+      api: { users: { token: { get: vi.fn().mockResolvedValue({ token: "graph-tok" }) } } },
+      signin: vi.fn(),
+    })
+
+    // Wait for the confirmation to be set
+    await new Promise(r => setTimeout(r, 50))
+
+    // Second message "yes" resolves the confirmation via pre-lock path
+    const secondMsg = capturedHandler!({
+      stream: mockStream,
+      activity: { text: "yes", conversation: { id: convId }, from: { id: "user1" }, channelId: "msteams" },
+      api: { users: { token: { get: vi.fn().mockResolvedValue(null) } } },
+      signin: vi.fn(),
+    })
+
+    await Promise.all([firstMsg, secondMsg])
+
+    // The confirmation should have resolved as "confirmed"
+    expect(confirmPromise).not.toBeNull()
+    const result = await confirmPromise!
+    expect(result).toBe("confirmed")
+
+    vi.restoreAllMocks()
+  })
+})
+
+describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
+  function mockTeamsDepsForSendMessage(overrides: {
+    runAgentFn?: any
+    loadSessionReturn?: any
+  } = {}) {
+    const {
+      runAgentFn = vi.fn().mockResolvedValue({ usage: undefined }),
+      loadSessionReturn = null,
+    } = overrides
+
+    vi.doMock("../../heart/core", () => ({
+      runAgent: runAgentFn,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(loadSessionReturn),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+
+      postTurn: vi.fn(),
+    }))
+    vi.doMock("../../repertoire/commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockReturnValue({ handled: false }),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockReturnValue(null),
+    }))
+  }
+
+  it("handleTeamsMessage accepts sendMessage parameter and passes it to createTeamsCallbacks", async () => {
+    vi.resetModules()
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      // Simulate buffered mode: tool run then text
+      callbacks.onToolEnd("read_file", "package.json", true)
+      callbacks.onTextChunk("Here is the file content.")
+      return { usage: undefined }
+    })
+    mockTeamsDepsForSendMessage({ runAgentFn: mockRunAgent })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+
+    await teams.handleTeamsMessage("show file", mockStream as any, "conv-send-1", undefined, true, sendMessage)
+
+    // onToolEnd should have used sendMessage (buffered mode)
+    expect(sendMessage).toHaveBeenCalledWith("\u2713 read_file (package.json)")
+  })
+
+  it("handleTeamsMessage awaits flush() (which is now async)", async () => {
+    vi.resetModules()
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      callbacks.onTextChunk("response text")
+      return { usage: undefined }
+    })
+    mockTeamsDepsForSendMessage({ runAgentFn: mockRunAgent })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+
+    // Should not throw even though flush() is now async
+    await teams.handleTeamsMessage("test", mockStream as any, "conv-send-2", undefined, true, sendMessage)
+
+    // Text should have been flushed to emit (first content)
+    expect(mockStream.emit).toHaveBeenCalledWith("response text")
+  })
+
+  it("startTeamsApp passes sendMessage wrapping ctx.send to handleTeamsMessage", async () => {
+    vi.resetModules()
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
+      // Simulate onKick -- in buffered mode this should call sendMessage
+      if (callbacks.onKick) callbacks.onKick()
+      callbacks.onTextChunk("answer")
+      return { usage: undefined }
+    })
+    vi.doMock("../../heart/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: true, port: 3978 }),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+
+      postTurn: vi.fn(),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    expect(capturedHandler).not.toBeNull()
+    const mockSend = vi.fn().mockResolvedValue(undefined)
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: { text: "hello", conversation: { id: "conv-ctx-send" }, from: { id: "user1" }, channelId: "msteams" },
+      api: { users: { token: { get: vi.fn().mockResolvedValue(null) } } },
+      signin: vi.fn(),
+      send: mockSend,
+    })
+
+    // The message handler should have passed a sendMessage function that wraps ctx.send
+    // In buffered mode, onKick should have called sendMessage which wraps ctx.send
+    expect(mockSend).toHaveBeenCalled()
+
+    vi.restoreAllMocks()
+  })
+})
+
+describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
+  function mockTeamsDepsForContext(overrides: {
+    runAgentFn?: any
+  } = {}) {
+    const {
+      runAgentFn = vi.fn().mockResolvedValue({ usage: undefined }),
+    } = overrides
+
+    vi.doMock("../../heart/core", () => ({
+      runAgent: runAgentFn,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      postTurn: vi.fn(),
+    }))
+    vi.doMock("../../repertoire/commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockReturnValue({ handled: false }),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockReturnValue(null),
+    }))
+
+    const mockResolve = vi.fn().mockResolvedValue({
+      identity: {
+        id: "mock-uuid",
+        displayName: "Test User",
+        externalIds: [{ provider: "aad", externalId: "aad-user-123", tenantId: "tenant-abc", linkedAt: "2026-01-01" }],
+        tenantMemberships: ["tenant-abc"],
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams",
+        availableIntegrations: ["graph", "ado"],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    })
+
+    const MockFileContextStore = vi.fn(function (this: any) {
+      this.identity = {
+        get: vi.fn(),
+        put: vi.fn(),
+        delete: vi.fn(),
+        find: vi.fn(),
+      }
+    })
+    vi.doMock("../../mind/context/store-file", () => ({
+      FileContextStore: MockFileContextStore,
+    }))
+    const MockContextResolver = vi.fn(function (this: any) {
+      this.resolve = mockResolve
+    })
+    vi.doMock("../../mind/context/resolver", () => ({
+      ContextResolver: MockContextResolver,
+    }))
+
+    return { runAgentFn, mockResolve }
+  }
+
+  it("creates ContextResolver with AAD external ID from TeamsMessageContext and attaches to ToolContext", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    const { mockResolve } = mockTeamsDepsForContext({ runAgentFn })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const teamsContext = {
+      graphToken: "g-token",
+      adoToken: "a-token",
+      signin: vi.fn(),
+      aadObjectId: "aad-user-123",
+      tenantId: "tenant-abc",
+      displayName: "Test User",
+    }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123", teamsContext)
+    expect(runAgentFn).toHaveBeenCalled()
+
+    // Check that runAgent was called with toolContext.context (resolved context)
+    const callArgs = runAgentFn.mock.calls[0]
+    const options = callArgs[4]
+    expect(options).toBeDefined()
+    expect(options.toolContext).toBeDefined()
+    expect(options.toolContext.context).toBeDefined()
+    expect(options.toolContext.context.identity.displayName).toBe("Test User")
+    expect(options.toolContext.context.channel.channel).toBe("teams")
+    expect(options.toolContext.context.channel.availableIntegrations).toContain("graph")
+  })
+
+  it("ContextResolver is created with aad provider, externalId, tenantId, and displayName", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDepsForContext({ runAgentFn })
+    const ContextResolver = (await import("../../mind/context/resolver")).ContextResolver
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const teamsContext = {
+      graphToken: "g-token",
+      adoToken: "a-token",
+      signin: vi.fn(),
+      aadObjectId: "aad-user-456",
+      tenantId: "tenant-xyz",
+      displayName: "Jane Doe",
+    }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-456", teamsContext)
+
+    // ContextResolver constructor should have been called with params including aad provider
+    expect(ContextResolver).toHaveBeenCalledWith(
+      expect.anything(), // store
+      expect.objectContaining({
+        provider: "aad",
+        externalId: "aad-user-456",
+        tenantId: "tenant-xyz",
+        displayName: "Jane Doe",
+        channel: "teams",
+      }),
+    )
+  })
+
+  it("uses 'Unknown' displayName when teamsContext.displayName is falsy", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDepsForContext({ runAgentFn })
+    const ContextResolver = (await import("../../mind/context/resolver")).ContextResolver
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const teamsContext = {
+      graphToken: "g-token",
+      adoToken: "a-token",
+      signin: vi.fn(),
+      aadObjectId: "aad-user-789",
+      tenantId: "tenant-xyz",
+      displayName: "",  // falsy -- should fall back to "Unknown"
+    }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-999", teamsContext)
+
+    expect(ContextResolver).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        displayName: "Unknown",
+      }),
+    )
+  })
+
+  it("handles TeamsMessageContext without AAD fields (backward compat -- no context attached)", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDepsForContext({ runAgentFn })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    // No aadObjectId -- backward compat
+    const teamsContext = {
+      graphToken: "g-token",
+      adoToken: "a-token",
+      signin: vi.fn(),
+    }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-789", teamsContext)
+    expect(runAgentFn).toHaveBeenCalled()
+
+    // toolContext should exist but context should not be set (no AAD identity info)
+    const callArgs = runAgentFn.mock.calls[0]
+    const options = callArgs[4]
+    expect(options.toolContext).toBeDefined()
+    expect(options.toolContext.context).toBeUndefined()
+  })
+
+  it("FileContextStore is created once and shared across multiple handleTeamsMessage calls", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDepsForContext({ runAgentFn })
+    const FileContextStore = (await import("../../mind/context/store-file")).FileContextStore
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const teamsContext = {
+      graphToken: "g-token",
+      adoToken: "a-token",
+      signin: vi.fn(),
+      aadObjectId: "aad-user-123",
+      tenantId: "tenant-abc",
+      displayName: "Test User",
+    }
+
+    await teams.handleTeamsMessage("msg1", mockStream as any, "conv-1", teamsContext)
+    await teams.handleTeamsMessage("msg2", mockStream as any, "conv-2", teamsContext)
+
+    // FileContextStore should be created only once (singleton), not per-request
+    expect(FileContextStore).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("Teams adapter - TeamsCallbacksWithFlush type", () => {
+  it("flush() returns a promise (async) in buffered mode", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const controller = new AbortController()
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onTextChunk("text")
+    // First flush goes to emit, second would go to sendMessage
+    const result = callbacks.flush()
+    // flush() should return a promise (or void-compatible)
+    expect(result === undefined || result instanceof Promise).toBe(true)
+    if (result instanceof Promise) await result
+  })
+})

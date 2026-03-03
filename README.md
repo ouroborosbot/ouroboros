@@ -8,6 +8,8 @@ The origin story lives at [aka.ms/GrowAnAgent](https://aka.ms/GrowAnAgent).
 
 ## Project structure
 
+The harness uses an agent-as-creature-body metaphor for its module naming:
+
 ```
 ouroboros/                        # repo root
   src/                            # shared harness (all agents share this code)
@@ -15,43 +17,53 @@ ouroboros/                        # repo root
     config.ts                     # config loading from agent.json configPath
     cli-entry.ts                  # CLI entrypoint
     teams-entry.ts                # Teams entrypoint
-    engine/
+    heart/                        # core agent loop and streaming
       core.ts                     # agent loop, client init, ChannelCallbacks
       streaming.ts                # Azure Responses API + MiniMax Chat Completions
       kicks.ts                    # self-correction: empty, narration, tool_required
-      tools-base.ts               # 11 base tools (read_file, shell, claude, etc.)
-      tools-teams.ts              # 8 Teams-specific tools (graph, ado)
-      tools.ts                    # channel-aware tool routing
       api-error.ts                # error classification
+    mind/                         # prompt, context, memory
+      prompt.ts                   # system prompt assembly from psyche + context kernel
+      context.ts                  # sliding context window, session I/O
+      context/                    # context kernel (identity, channel, authority, memory)
+        types.ts                  # FriendIdentity, FriendMemory, ChannelCapabilities, etc.
+        store.ts                  # ContextStore interface (generic CRUD)
+        store-file.ts             # FileContextStore -- filesystem adapter with migration
+        identity.ts               # identity resolution (find-or-create by external ID)
+        channel.ts                # channel capabilities (CLI vs Teams)
+        authority.ts              # AuthorityChecker, Security Namespaces pre-flight checks
+        memory.ts                 # FriendMemory with model-managed toolPreferences
+        resolver.ts               # ContextResolver -- wires identity + channel + authority
+    repertoire/                   # tools, skills, commands, API clients
+      tools-base.ts               # 12 base tools (read_file, shell, claude, save_friend_note, etc.)
+      tools-teams.ts              # 8 Teams integration tools (graph, ado)
+      tools.ts                    # channel-aware tool routing + registry
+      ado-semantic.ts             # 11 semantic ADO tools (backlog, create, move, validate, etc.)
+      ado-templates.ts            # ADO process template awareness + hierarchy rules
+      ado-context.ts              # ADO org/project discovery helper
       ado-client.ts               # Azure DevOps REST client
       graph-client.ts             # Microsoft Graph REST client
-    mind/
-      prompt.ts                   # system prompt assembly from psyche files
-      context.ts                  # sliding context window, session I/O
-    channels/
-      cli.ts                      # terminal REPL, spinner, markdown streaming
-      teams.ts                    # Teams bot, streaming cards, conversation locks
-    repertoire/
       commands.ts                 # slash commands (/exit, /new, /commands)
       skills.ts                   # skill loader (markdown files on demand)
-    wardrobe/
+    senses/                       # channel adapters
+      cli.ts                      # terminal REPL, spinner, markdown streaming
+      teams.ts                    # Teams bot, streaming cards, conversation locks
+    wardrobe/                     # formatting and presentation
       format.ts                   # shared formatters (tool results, kicks, errors)
       phrases.ts                  # loading phrases (thinking, tool, followup)
-    __tests__/                    # 900+ tests, 100% coverage
+    __tests__/                    # 1198 tests, 100% coverage
   ouroboros/                      # agent directory for "ouroboros"
     agent.json                    # name, configPath, custom phrases
-    docs/
-      psyche/                     # personality files loaded into system prompt
-        SOUL.md                   # ontology, invariants, operating principles
-        IDENTITY.md               # tone, presence, collaboration style
-        LORE.md                   # origin story, philosophical context
-        FRIENDS.md                # key relationships
-      tasks/                      # planning and doing docs
+    psyche/                       # personality files loaded into system prompt
+      SOUL.md                     # ontology, invariants, operating principles
+      IDENTITY.md                 # tone, presence, collaboration style
+      LORE.md                     # origin story, philosophical context
+      FRIENDS.md                  # key relationships
+    tasks/                        # planning and doing docs
     skills/                       # markdown skill plugins
     manifest/                     # Teams app manifest
   subagents/                      # sub-agent definitions (work-planner, work-doer)
-  docs/
-    OAUTH-SETUP.md                # shared OAuth infrastructure docs
+  cross-agent-docs/               # shared docs (testing conventions, etc.)
   package.json
   tsconfig.json
   vitest.config.ts
@@ -83,17 +95,17 @@ Each agent has a directory at the repo root named after itself. Inside it:
 - `configPath`: absolute path (or `~`-prefixed) to your config.json with API keys and provider settings.
 - `phrases`: optional custom loading phrases. Falls back to hardcoded defaults if omitted.
 
-**docs/psyche/** -- your personality files, loaded lazily into the system prompt at startup. See the psyche system section below.
+**psyche/** -- your personality files, loaded lazily into the system prompt at startup. See the psyche system section below.
 
 **skills/** -- markdown instruction manuals you can load on demand with the `load_skill` tool. Each `.md` file is one skill.
 
-**docs/tasks/** -- planning and doing docs for your work units. Named `YYYY-MM-DD-HHMM-{planning|doing}-slug.md`.
+**tasks/** -- planning and doing docs for your work units. Named `YYYY-MM-DD-HHMM-{planning|doing}-slug.md`.
 
 **manifest/** -- Teams app manifest (manifest.json, icons) if you run as a Teams bot.
 
 ### The psyche system
 
-Your personality is assembled from four markdown files in `{your-dir}/docs/psyche/`. Each has a YAML frontmatter header and a body. All four are loaded into your system prompt at the start of every conversation.
+Your personality is assembled from four markdown files in `{your-dir}/psyche/`. Each has a YAML frontmatter header and a body. All four are loaded into your system prompt at the start of every conversation.
 
 | File | Role | What it defines |
 |------|------|----------------|
@@ -115,16 +127,17 @@ The system prompt is built by `mind/prompt.ts` via `buildSystem()`. It concatena
 9. Tools list: all tools available in your channel
 10. Skills list: names of loadable skills
 11. Tool behavior section (if tool_choice is required)
+12. Friend context (if context kernel resolved): identity, channel traits, authority status, friend preferences
 
 Missing psyche files produce empty strings, not crashes. You can write your own psyche from scratch -- just create the four `.md` files in your directory.
 
 ### Your runtime
 
-**The engine loop** (`engine/core.ts`): `runAgent()` is a while loop. Each iteration: send conversation to the model, stream the response, if the model made tool calls execute them and loop, if it gave a text answer exit. Maximum 10 tool rounds per turn.
+**The heart** (`heart/core.ts`): `runAgent()` is a while loop. Each iteration: send conversation to the model, stream the response, if the model made tool calls execute them and loop, if it gave a text answer exit. Maximum 10 tool rounds per turn.
 
-**Streaming** (`engine/streaming.ts`): two provider paths. Azure OpenAI uses the Responses API with structured events (reasoning, text, tool calls). MiniMax uses Chat Completions with `<think>` tags parsed by a state machine. Both normalize into the same 7+2 callbacks.
+**Streaming** (`heart/streaming.ts`): two provider paths. Azure OpenAI uses the Responses API with structured events (reasoning, text, tool calls). MiniMax uses Chat Completions with `<think>` tags parsed by a state machine. Both normalize into the same 7+2 callbacks.
 
-**ChannelCallbacks** (`engine/core.ts`): the contract between engine and display. 7 core events:
+**ChannelCallbacks** (`heart/core.ts`): the contract between heart and display. 7 core events:
 - `onModelStart` -- model request sent
 - `onModelStreamStart` -- first token received
 - `onReasoningChunk` -- inner reasoning text
@@ -137,13 +150,23 @@ Plus 2 optional:
 - `onKick` -- self-correction triggered
 - `onConfirmAction` -- confirmation prompt for destructive tools
 
-**Kicks** (`engine/kicks.ts`): self-corrections injected as assistant-role messages when the harness detects a malformed response. Three types: `empty` (blank response), `narration` (described action instead of taking it), `tool_required` (tool_choice was required but no tool called). Kicks use first-person, forward-looking language.
+**Kicks** (`heart/kicks.ts`): self-corrections injected as assistant-role messages when the harness detects a malformed response. Three types: `empty` (blank response), `narration` (described action instead of taking it), `tool_required` (tool_choice was required but no tool called). Kicks use first-person, forward-looking language.
 
-**Channels**: CLI (`channels/cli.ts`) is a terminal REPL with readline, spinners, ANSI colors, and Ctrl-C handling. Teams (`channels/teams.ts`) is a Microsoft Teams bot with streaming cards, conversation locks, OAuth token management, and confirmation prompts for destructive tools.
+**Senses**: CLI (`senses/cli.ts`) is a terminal REPL with readline, spinners, ANSI colors, and Ctrl-C handling. Teams (`senses/teams.ts`) is a Microsoft Teams bot with streaming cards, conversation locks, OAuth token management, and confirmation prompts for destructive tools.
 
 **Context management** (`mind/context.ts`): this is the tail-eating at the heart of the ouroboros metaphor. Conversations are persisted to JSON files on disk. After each turn, the sliding window checks token count against budget (configurable, default 80,000 tokens). When over budget, oldest messages are trimmed -- never the system prompt -- until back under with a 20% margin. The agent consumes its own history to keep moving forward. Identity survives through psyche files and session persistence, not through unbounded context.
 
-**Tools**: 11 base tools available in all channels (read_file, write_file, shell, list_directory, git_commit, gh_cli, list_skills, load_skill, get_current_time, claude, web_search). Teams gets 8 additional tools (graph_query, graph_mutate, ado_query, ado_mutate, graph_profile, ado_work_items, graph_docs, ado_docs).
+**Context kernel** (`mind/context/`): the agent's awareness of who it's talking to and what it can do. Resolved once per conversation turn, the context kernel provides:
+
+- **Identity** (`context/identity.ts`): `FriendIdentity` -- find-or-create by external ID (AAD, local). People who talk to the agent are "friends", not "users". Identities are cross-referenced across providers via `externalIds[]` and persist to disk via `FileContextStore`.
+- **Channel** (`context/channel.ts`): `ChannelCapabilities` -- what the current channel supports (markdown, streaming, rich cards, max message length, available integrations). CLI and Teams have different capability profiles.
+- **Authority** (`context/authority.ts`): `AuthorityChecker` -- pre-flight permission checks for write operations. Uses ADO Security Namespaces API. Optimistic reads, pre-flight writes. Probe failures proceed optimistically (D16 error handling).
+- **Memory** (`context/memory.ts`): `FriendMemory` with model-managed `toolPreferences` (`Record<string, string>`). The model decides what to store -- no typed schemas. Saved via `save_friend_note` tool.
+- **Resolver** (`context/resolver.ts`): `ContextResolver` wires identity + channel + authority + memory into a `ResolvedContext` injected into the system prompt and tool context.
+
+Design principles: don't persist what you can re-derive; conversation IS the cache; the model manages memory freeform.
+
+**Tools**: 12 base tools available in all channels (read_file, write_file, shell, list_directory, git_commit, gh_cli, list_skills, load_skill, get_current_time, claude, web_search, save_friend_note). Teams gets 8 integration tools (graph_query, graph_mutate, ado_query, ado_mutate, graph_profile, ado_work_items, graph_docs, ado_docs) plus 11 semantic ADO tools (ado_backlog_list, ado_create_epic, ado_create_issue, ado_move_items, ado_restructure_backlog, ado_validate_structure, ado_preview_changes, ado_batch_update, ado_detect_orphans, ado_detect_cycles, ado_validate_parent_type_rules). Tools are registered in a unified `ToolDefinition[]` registry with per-tool `integration` and `confirmationRequired` flags. Channel-aware routing (`getToolsForChannel()`) filters tools by the channel's `availableIntegrations`.
 
 **Phrases** (`wardrobe/phrases.ts`): three pools of loading messages rotated during processing. Phrases are required in `agent.json`; if missing, `loadAgentConfig()` writes placeholder phrases and warns. `pickPhrase()` selects randomly but never repeats consecutively.
 

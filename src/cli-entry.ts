@@ -10,5 +10,5 @@ if (!process.argv.includes("--agent")) {
   process.exit(1)
 }
 
-import { main } from "./channels/cli"
+import { main } from "./senses/cli"
 main()

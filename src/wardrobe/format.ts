@@ -8,9 +8,8 @@ export function formatToolResult(name: string, summary: string, success: boolean
   return "\u2717 " + name + ": " + summary
 }
 
-export function formatKick(attempt: number, maxKicks: number): string {
-  const counter = maxKicks > 1 ? " " + attempt + "/" + maxKicks : ""
-  return "\u21BB kick" + counter
+export function formatKick(): string {
+  return "\u21BB kick"
 }
 
 export function formatError(error: Error): string {

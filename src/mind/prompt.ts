@@ -1,17 +1,19 @@
 import * as fs from "fs";
 import * as path from "path";
-import { getModel, getProvider } from "../engine/core";
+import { getModel, getProvider } from "../heart/core";
 import { getAzureConfig } from "../config";
-import { finalAnswerTool, getToolsForChannel } from "../engine/tools";
+import { finalAnswerTool, getToolsForChannel } from "../repertoire/tools";
 import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName } from "../identity";
+import type { ResolvedContext } from "./context/types";
+import { getChannelCapabilities } from "./context/channel";
 
 // Lazy-loaded psyche text cache
 let _psycheCache: { soul: string; identity: string; lore: string; friends: string } | null = null;
 
 function loadPsycheFile(name: string): string {
   try {
-    const psycheDir = path.join(getAgentRoot(), "docs", "psyche");
+    const psycheDir = path.join(getAgentRoot(), "psyche");
     return fs.readFileSync(path.join(psycheDir, name), "utf-8").trim();
   } catch {
     return "";
@@ -90,7 +92,7 @@ function dateSection(): string {
 }
 
 function toolsSection(channel: Channel, options?: BuildSystemOptions): string {
-  const channelTools = getToolsForChannel(channel);
+  const channelTools = getToolsForChannel(getChannelCapabilities(channel));
   const activeTools = options?.toolChoiceRequired ? [...channelTools, finalAnswerTool] : channelTools;
   const list = activeTools
     .map((t) => `- ${t.function.name}: ${t.function.description}`)
@@ -138,7 +140,52 @@ when you have finished all work and want to give a text response, call the \`fin
 \`final_answer\` must be the ONLY tool call in that turn. do not combine it with other tool calls.`;
 }
 
-export function buildSystem(channel: Channel = "cli", options?: BuildSystemOptions): string {
+export function contextSection(context?: ResolvedContext): string {
+  if (!context) return ""
+
+  const lines: string[] = ["## friend context"]
+
+  // Identity
+  const identity = context.identity
+  const emailId = identity.externalIds.find(e => e.provider === "aad")
+  const idDisplay = emailId
+    ? `${identity.displayName} (${emailId.externalId})`
+    : identity.displayName
+  lines.push(`friend: ${idDisplay}`)
+
+  // Channel
+  const ch = context.channel
+  const traits: string[] = []
+  if (ch.supportsMarkdown) traits.push("markdown")
+  if (!ch.supportsStreaming) traits.push("no streaming")
+  if (ch.supportsStreaming) traits.push("streaming")
+  if (ch.supportsRichCards) traits.push("rich cards")
+  if (ch.maxMessageLength !== Infinity) traits.push(`max ${ch.maxMessageLength} chars`)
+  /* v8 ignore next -- empty-traits branch unreachable: streaming/no-streaming always adds a trait @preserve */
+  lines.push(`channel: ${ch.channel}${traits.length ? ` (${traits.join(", ")})` : ""}`)
+
+  // Authority
+  if (context.checker && ch.availableIntegrations.length > 0) {
+    lines.push("")
+    lines.push("## authority")
+    lines.push(`integrations: ${ch.availableIntegrations.join(", ")}`)
+    lines.push("write operations are pre-flight checked -- mutations may be denied if insufficient permissions")
+  }
+
+  // Friend preferences (from FriendMemory)
+  const prefs = context.memory?.toolPreferences
+  if (prefs && Object.keys(prefs).length > 0) {
+    lines.push("")
+    lines.push("## friend preferences")
+    for (const [key, value] of Object.entries(prefs)) {
+      lines.push(`- ${key}: ${value}`)
+    }
+  }
+
+  return lines.join("\n")
+}
+
+export async function buildSystem(channel: Channel = "cli", options?: BuildSystemOptions, context?: ResolvedContext): Promise<string> {
   return [
     soulSection(),
     identitySection(),
@@ -151,6 +198,7 @@ export function buildSystem(channel: Channel = "cli", options?: BuildSystemOptio
     toolsSection(channel, options),
     skillsSection(),
     toolBehaviorSection(options),
+    contextSection(context),
   ]
     .filter(Boolean)
     .join("\n\n");

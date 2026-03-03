@@ -77,7 +77,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem()
+    const result = await buildSystem()
     expect(result).toContain("chaos monkey coding assistant")
     expect(result).toContain("crack jokes")
   })
@@ -89,7 +89,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem()
+    const result = await buildSystem()
     expect(result).toContain("i am Ouroboros")
     expect(result).toContain("i use lowercase")
   })
@@ -101,7 +101,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem()
+    const result = await buildSystem()
     expect(result).toContain("## my lore")
     expect(result).toContain("ouroboros")
   })
@@ -113,7 +113,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem()
+    const result = await buildSystem()
     expect(result).toContain("## my friends")
     expect(result).toContain("microsoft")
   })
@@ -125,7 +125,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem("cli")
+    const result = await buildSystem("cli")
     expect(result).toContain("i introduce myself on boot")
     expect(result).toContain("testagent") // agent name from identity mock
     expect(result).toContain("i can read and modify my own source code")
@@ -138,7 +138,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem("teams")
+    const result = await buildSystem("teams")
     expect(result).toContain("Microsoft Teams")
     expect(result).toContain("i keep responses concise")
     expect(result).not.toContain("i introduce myself on boot")
@@ -151,7 +151,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem()
+    const result = await buildSystem()
     expect(result).toContain("i introduce myself on boot")
   })
 
@@ -162,7 +162,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem()
+    const result = await buildSystem()
     const today = new Date().toISOString().slice(0, 10)
     expect(result).toContain(`current date: ${today}`)
   })
@@ -174,7 +174,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem()
+    const result = await buildSystem()
     expect(result).toContain("## my tools")
     expect(result).toContain("- read_file:")
     expect(result).toContain("- shell:")
@@ -189,7 +189,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem()
+    const result = await buildSystem()
     expect(result).toContain("## my skills (use load_skill to activate)")
     expect(result).toContain("code-review, self-edit, self-query")
   })
@@ -202,7 +202,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem()
+    const result = await buildSystem()
     expect(result).not.toContain("## my skills")
   })
 
@@ -231,7 +231,7 @@ describe("buildSystem", () => {
     })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem()
+    const result = await buildSystem()
     expect(result).toContain("azure openai (gpt-4o-deploy, model: test-model)")
   })
 
@@ -251,7 +251,7 @@ describe("buildSystem", () => {
     })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const { getModel } = await import("../../engine/core")
+    const { getModel } = await import("../../heart/core")
     getModel()
     setTestConfig({
       providers: {
@@ -260,7 +260,7 @@ describe("buildSystem", () => {
         },
       },
     })
-    const result = buildSystem()
+    const result = await buildSystem()
     expect(result).toContain("azure openai (default, model: test-model)")
   })
 
@@ -279,7 +279,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem()
+    const result = await buildSystem()
     expect(result).toContain("custom soul content")
   })
 
@@ -298,7 +298,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem()
+    const result = await buildSystem()
     expect(result).toContain("custom identity content")
   })
 
@@ -309,7 +309,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem("cli", { toolChoiceRequired: true })
+    const result = await buildSystem("cli", { toolChoiceRequired: true })
     expect(result).toContain("## tool behavior")
     expect(result).toContain("tool_choice is set to \"required\"")
     expect(result).toContain("final_answer")
@@ -323,7 +323,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem("cli", { toolChoiceRequired: false })
+    const result = await buildSystem("cli", { toolChoiceRequired: false })
     expect(result).not.toContain("## tool behavior")
     expect(result).not.toContain("final_answer")
   })
@@ -335,7 +335,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem("cli")
+    const result = await buildSystem("cli")
     expect(result).not.toContain("## tool behavior")
   })
 
@@ -346,7 +346,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem("teams", { disableStreaming: true })
+    const result = await buildSystem("teams", { disableStreaming: true })
     expect(result).toContain("## my flags")
     expect(result).toContain("streaming")
     expect(result).toContain("disabled")
@@ -359,7 +359,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem("cli", { disableStreaming: true })
+    const result = await buildSystem("cli", { disableStreaming: true })
     expect(result).not.toContain("## my flags")
   })
 
@@ -370,7 +370,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem("teams", { disableStreaming: false })
+    const result = await buildSystem("teams", { disableStreaming: false })
     expect(result).not.toContain("## my flags")
   })
 
@@ -381,7 +381,7 @@ describe("buildSystem", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = buildSystem("teams")
+    const result = await buildSystem("teams")
     expect(result).not.toContain("## my flags")
   })
 })
@@ -443,20 +443,20 @@ describe("psyche loading", () => {
     vi.resetModules()
   })
 
-  it("loads psyche files from agentRoot/docs/psyche/", async () => {
+  it("loads psyche files from agentRoot/psyche/", async () => {
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    buildSystem()
+    await buildSystem()
     // Check that readFileSync was called with paths under the mock agent root
     const calls = vi.mocked(fs.readFileSync).mock.calls.map(c => String(c[0]))
     const psycheCalls = calls.filter(p => p.includes("psyche"))
     expect(psycheCalls.length).toBeGreaterThan(0)
     for (const p of psycheCalls) {
-      expect(p).toContain(path.join("/mock/repo/testagent", "docs", "psyche"))
+      expect(p).toContain(path.join("/mock/repo/testagent", "psyche"))
     }
   })
 
@@ -472,7 +472,7 @@ describe("psyche loading", () => {
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     // Should not throw
-    const result = buildSystem()
+    const result = await buildSystem()
     expect(typeof result).toBe("string")
   })
 
@@ -483,9 +483,9 @@ describe("psyche loading", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    buildSystem()
+    await buildSystem()
     const callCount1 = vi.mocked(fs.readFileSync).mock.calls.length
-    buildSystem()
+    await buildSystem()
     const callCount2 = vi.mocked(fs.readFileSync).mock.calls.length
     // Second call should not trigger more readFileSync calls for psyche files
     expect(callCount2).toBe(callCount1)
@@ -498,10 +498,10 @@ describe("psyche loading", () => {
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    buildSystem()
+    await buildSystem()
     const callCount1 = vi.mocked(fs.readFileSync).mock.calls.length
     resetPsycheCache()
-    buildSystem()
+    await buildSystem()
     const callCount2 = vi.mocked(fs.readFileSync).mock.calls.length
     // After reset, psyche files should be re-read
     expect(callCount2).toBeGreaterThan(callCount1)
@@ -568,5 +568,387 @@ describe("flagsSection rationale", () => {
     resetPsycheCache()
     const result = flagsSection("teams", { disableStreaming: true })
     expect(result.toLowerCase()).toContain("latency")
+  })
+})
+
+describe("contextSection", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it("returns empty string when context is undefined", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    expect(contextSection(undefined)).toBe("")
+  })
+
+  it("renders friend identity with display name", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [{ provider: "local" as const, externalId: "jordan", linkedAt: "2026-01-01T00:00:00.000Z" }],
+        tenantMemberships: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "cli" as const,
+        availableIntegrations: [] as any[],
+        supportsMarkdown: false,
+        supportsStreaming: true,
+        supportsRichCards: false,
+        maxMessageLength: Infinity,
+      },
+    }
+    const result = contextSection(ctx)
+    expect(result).toContain("## friend context")
+    expect(result).toContain("friend: Jordan")
+    expect(result).toContain("channel: cli")
+  })
+
+  it("renders AAD identity with external ID in parentheses", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan Smith",
+        externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01T00:00:00.000Z" }],
+        tenantMemberships: ["t1"],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: false,
+        supportsRichCards: true,
+        maxMessageLength: 4000,
+      },
+    }
+    const result = contextSection(ctx)
+    expect(result).toContain("friend: Jordan Smith (jordan@contoso.com)")
+  })
+
+  it("renders Teams channel capabilities correctly", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: false,
+        supportsRichCards: true,
+        maxMessageLength: 4000,
+      },
+    }
+    const result = contextSection(ctx)
+    expect(result).toContain("channel: teams")
+    expect(result).toContain("markdown")
+    expect(result).toContain("no streaming")
+    expect(result).toContain("max 4000 chars")
+  })
+
+  it("renders CLI channel with streaming", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "cli" as const,
+        availableIntegrations: [] as any[],
+        supportsMarkdown: false,
+        supportsStreaming: true,
+        supportsRichCards: false,
+        maxMessageLength: Infinity,
+      },
+    }
+    const result = contextSection(ctx)
+    expect(result).toContain("channel: cli")
+    expect(result).toContain("streaming")
+    expect(result).not.toContain("no streaming")
+  })
+
+  it("renders authority section when checker is present (Teams)", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01" }],
+        tenantMemberships: ["t1"],
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+      checker: {
+        canRead: vi.fn().mockReturnValue(true),
+        canWrite: vi.fn().mockResolvedValue(true),
+        record403: vi.fn(),
+      },
+    }
+    const result = contextSection(ctx)
+    expect(result).toContain("## authority")
+    expect(result).toContain("ado")
+    expect(result).toContain("graph")
+  })
+
+  it("does not render authority section when checker is absent (CLI)", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "cli" as const,
+        availableIntegrations: [] as any[],
+        supportsMarkdown: false,
+        supportsStreaming: true,
+        supportsRichCards: false,
+        maxMessageLength: Infinity,
+      },
+    }
+    const result = contextSection(ctx)
+    expect(result).not.toContain("## authority")
+  })
+
+  it("does not render authority section when context has no checker", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01" }],
+        tenantMemberships: ["t1"],
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+      // No checker
+    }
+    const result = contextSection(ctx)
+    expect(result).not.toContain("## authority")
+  })
+
+  it("renders friend preferences when memory has toolPreferences", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+      memory: {
+        id: "uuid-1",
+        toolPreferences: {
+          ado: "Prefers issue-first planning. Auto-assign to self.",
+          general: "Likes concise responses.",
+        },
+        schemaVersion: 1,
+      },
+    }
+    const result = contextSection(ctx)
+    expect(result).toContain("## friend preferences")
+    expect(result).toContain("ado: Prefers issue-first planning. Auto-assign to self.")
+    expect(result).toContain("general: Likes concise responses.")
+  })
+
+  it("does not render preferences section when memory is null", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "cli" as const,
+        availableIntegrations: [] as any[],
+        supportsMarkdown: false,
+        supportsStreaming: true,
+        supportsRichCards: false,
+        maxMessageLength: Infinity,
+      },
+      memory: null,
+    }
+    const result = contextSection(ctx)
+    expect(result).not.toContain("## friend preferences")
+  })
+
+  it("does not render preferences section when toolPreferences is empty", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+      memory: {
+        id: "uuid-1",
+        toolPreferences: {},
+        schemaVersion: 1,
+      },
+    }
+    const result = contextSection(ctx)
+    expect(result).not.toContain("## friend preferences")
+  })
+
+  it("authority section mentions write operations are checked", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+      checker: {
+        canRead: vi.fn().mockReturnValue(true),
+        canWrite: vi.fn().mockResolvedValue(true),
+        record403: vi.fn(),
+      },
+    }
+    const result = contextSection(ctx)
+    expect(result).toContain("write")
+    expect(result).toContain("check")
+  })
+})
+
+describe("buildSystem with context", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it("includes context section when context is provided", async () => {
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01T00:00:00.000Z" }],
+        tenantMemberships: ["t1"],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: false,
+        supportsRichCards: true,
+        maxMessageLength: 4000,
+      },
+    }
+    const result = await buildSystem("teams", undefined, ctx)
+    expect(result).toContain("## friend context")
+    expect(result).toContain("Jordan")
+  })
+
+  it("omits context section when context is undefined", async () => {
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = await buildSystem("cli")
+    expect(result).not.toContain("## friend context")
+  })
+
+  it("returns a Promise (async function)", async () => {
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = buildSystem("cli")
+    expect(result).toBeInstanceOf(Promise)
   })
 })

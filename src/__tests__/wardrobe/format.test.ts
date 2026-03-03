@@ -16,16 +16,8 @@ describe("formatToolResult", () => {
 })
 
 describe("formatKick", () => {
-  it("formats kick without counter when maxKicks is 1", () => {
-    expect(formatKick(1, 1)).toBe("↻ kick")
-  })
-
-  it("formats kick with counter when maxKicks > 1", () => {
-    expect(formatKick(1, 3)).toBe("↻ kick 1/3")
-  })
-
-  it("formats kick with counter for second attempt", () => {
-    expect(formatKick(2, 3)).toBe("↻ kick 2/3")
+  it("always returns kick with no counter", () => {
+    expect(formatKick()).toBe("↻ kick")
   })
 })
 
