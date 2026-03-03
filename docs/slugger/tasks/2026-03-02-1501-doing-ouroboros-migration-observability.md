@@ -167,4 +167,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 16:17] Pass 2 (granularity): clarified Unit 5 ownership to include wardrobe scope without additional unit splits
 - [2026-03-02 16:18] Pass 3 (validation): aligned wardrobe component mapping in acceptance criteria with planning decisions and merged codebase
 - [2026-03-02 16:18] Pass 4 (quality): verified template completeness, acceptance coverage, and emoji headers; set status to READY_FOR_EXECUTION
-- [PENDING_KICKS_SCOPE_TS] Explicitly added `src/engine/kicks.ts` + `src/__tests__/engine/kicks.test.ts` to Unit 3 and completion criteria
+- [2026-03-02 16:37] Explicitly added `src/engine/kicks.ts` + `src/__tests__/engine/kicks.test.ts` to Unit 3 and completion criteria
