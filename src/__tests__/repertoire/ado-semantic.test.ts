@@ -164,6 +164,16 @@ describe("ado_backlog_list tool", () => {
     expect(result).toContain("AUTH_REQUIRED")
   })
 
+  it("handles API error from batch fetch", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ workItems: [{ id: 1 }] }))
+    vi.mocked(adoRequest).mockResolvedValueOnce("ERROR: 500 Batch fetch failed")
+
+    const def = findTool("ado_backlog_list")!
+    const result = await def.handler({}, makeCtx())
+    expect(result).toContain("ERROR")
+  })
+
   it("handles API error from WIQL query", async () => {
     vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
     vi.mocked(adoRequest).mockResolvedValueOnce("ERROR: 500 Internal Server Error")
