@@ -859,3 +859,101 @@ describe("ado_restructure_backlog tool", () => {
     expect(parsed.results[0].success).toBe(false)
   })
 })
+
+describe("authority-aware planning", () => {
+  beforeEach(() => { vi.resetAllMocks() })
+
+  it("ado_batch_update: full authority -- plan proceeds, all operations execute", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 101 }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 102 }))
+
+    const ctx = makeCtxWithChecker(true)
+    const def = findTool("ado_batch_update")!
+    const result = await def.handler({
+      operations: JSON.stringify([
+        { type: "create", workItemType: "Task", fields: { "System.Title": "Task A" } },
+        { type: "update", workItemId: 101, fields: { "System.State": "Active" } },
+      ]),
+    }, ctx)
+    const parsed = JSON.parse(result)
+    expect(parsed.results).toHaveLength(2)
+    expect(parsed.results.every((r: any) => r.success)).toBe(true)
+    expect(parsed.deniedOperations).toBeUndefined()
+  })
+
+  it("ado_batch_update: no authority -- returns denial with all operations listed", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+
+    const ctx = makeCtxWithChecker(false)
+    const def = findTool("ado_batch_update")!
+    const result = await def.handler({
+      operations: JSON.stringify([
+        { type: "create", workItemType: "Task", fields: { "System.Title": "Task A" } },
+      ]),
+    }, ctx)
+    expect(result).toContain("AUTHORITY_DENIED")
+  })
+
+  it("ado_restructure_backlog: partial authority -- denied operations skipped with explanation", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    // First reparent succeeds
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 101 }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 102 }))
+
+    const ctx = makeCtxWithChecker(true)
+    const def = findTool("ado_restructure_backlog")!
+    const result = await def.handler({
+      operations: JSON.stringify([
+        { workItemId: 101, newParentId: 200 },
+        { workItemId: 102, newParentId: 200 },
+      ]),
+    }, ctx)
+    const parsed = JSON.parse(result)
+    expect(parsed.results).toHaveLength(2)
+  })
+
+  it("ado_batch_update: authority check failure proceeds optimistically (D16)", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 101 }))
+
+    // Authority checker that throws on canWrite
+    const ctx = makeCtx({
+      context: {
+        ...makeCtx().context,
+        checker: {
+          canRead: vi.fn().mockReturnValue(true),
+          canWrite: vi.fn().mockRejectedValue(new Error("probe failed")),
+          record403: vi.fn(),
+        },
+      },
+    })
+    const def = findTool("ado_batch_update")!
+    const result = await def.handler({
+      operations: JSON.stringify([
+        { type: "create", workItemType: "Task", fields: { "System.Title": "Test" } },
+      ]),
+    }, ctx)
+    // Should proceed optimistically despite probe failure
+    const parsed = JSON.parse(result)
+    expect(parsed.results).toHaveLength(1)
+    expect(parsed.results[0].success).toBe(true)
+  })
+
+  it("ado_batch_update: without checker (CLI) -- proceeds without authority check", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 101 }))
+
+    // makeCtx() has no checker by default
+    const ctx = makeCtx()
+    const def = findTool("ado_batch_update")!
+    const result = await def.handler({
+      operations: JSON.stringify([
+        { type: "create", workItemType: "Task", fields: { "System.Title": "Test" } },
+      ]),
+    }, ctx)
+    const parsed = JSON.parse(result)
+    expect(parsed.results).toHaveLength(1)
+    expect(parsed.results[0].success).toBe(true)
+  })
+})
