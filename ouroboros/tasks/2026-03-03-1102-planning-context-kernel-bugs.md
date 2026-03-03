@@ -68,6 +68,9 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 - `FileContextStore` → `FileFriendStore`: constructor takes two paths (agentKnowledgePath, piiBridgePath). `get()` reads both backends and merges. `put()` splits and writes to both. `findByExternalId()` scans PII bridge, then merges.
 - **Directory bootstrap**: Constructor calls `mkdirSync(path, { recursive: true })` for both agent knowledge and PII bridge directories. Directories are guaranteed to exist before any read/write. `findByExternalId()` on an empty directory returns `null` (no files to scan = no match). No caller needs to worry about directory existence.
 
+*Directory rename:*
+- `src/mind/friends/` → `src/mind/friends/`. Consistent with the type renames (`FriendStore`, `FriendResolver`, `FriendRecord`). Import path churn is unavoidable but one-time — better to do it now while we're rewriting everything in this directory.
+
 *Resolver changes:*
 - `ContextResolver` → `FriendResolver`. "Context" is overloaded — the resolver's job is to resolve a friend, so name it that.
 - `FriendResolver` constructor takes `FriendStore` instead of `ContextStore`
@@ -264,6 +267,7 @@ Sessions currently live at `~/.agentconfigs/{agentName}/sessions/{channel}/{sess
 - [ ] `FileFriendStore` auto-creates directories on construction (`mkdirSync recursive`)
 - [ ] `sessionPath()` auto-creates parent directories before returning path
 - [ ] `save_friend_note` validates required parameters and returns first-person error messages on failure
+- [ ] `src/mind/context/` renamed to `src/mind/friends/`, all import paths updated
 - [ ] Session path restructured: `~/.agentconfigs/{agentName}/sessions/{friendUuid}/{channel}/{sessionId}.json`
 - [ ] `sessionPath()` accepts friend ID, callers pass it from resolved context
 - [ ] CLI session path uses friend UUID from CLI identity resolution
@@ -335,13 +339,13 @@ Sessions currently live at `~/.agentconfigs/{agentName}/sessions/{channel}/{sess
 - `src/senses/teams.ts` — Teams channel adapter (bug 1, bug 2-Teams, storage redesign). `TeamsMessageContext` already has AAD fields defined at lines 298–300.
 - `src/senses/cli.ts` — CLI channel adapter (bug 2-CLI, storage redesign)
 - `src/mind/prompt.ts` — `buildSystem()` accepts optional `context` parameter. `contextSection()` renders friend info + channel traits + notes. Name-quality and ephemerality instructions add new code here. Authority rendering removed.
-- `src/mind/context/types.ts` — `FriendIdentity`, `FriendMemory`, `ResolvedContext` types → becomes `FriendRecord` + updated `ResolvedContext`
-- `src/mind/context/store.ts` — `ContextStore`, `CollectionStore<T>` interfaces → becomes `FriendStore`
-- `src/mind/context/store-file.ts` — `FileContextStore` → `FileFriendStore` with two-backend implementation
-- `src/mind/context/authority.ts` — `AuthorityChecker` implementation → deleted (dead weight, see cleanup scope)
-- `src/mind/context/resolver.ts` — `ContextResolver` → renamed to `FriendResolver`. Update for `FriendStore` + merged type. `resolveIdentity()` must not overwrite `displayName`. Explicit first-encounter creation flow. Authority checking removed.
-- `src/mind/context/memory.ts` — `resolveMemory()` → likely deleted (collapses into identity resolution)
-- `src/mind/context/identity.ts` — `resolveIdentity()` → update for `FriendStore.findByExternalId()`
+- `src/mind/friends/types.ts` — `FriendIdentity`, `FriendMemory`, `ResolvedContext` types → becomes `FriendRecord` + updated `ResolvedContext`
+- `src/mind/friends/store.ts` — `ContextStore`, `CollectionStore<T>` interfaces → becomes `FriendStore`
+- `src/mind/friends/store-file.ts` — `FileContextStore` → `FileFriendStore` with two-backend implementation
+- `src/mind/friends/authority.ts` — `AuthorityChecker` implementation → deleted (dead weight, see cleanup scope)
+- `src/mind/friends/resolver.ts` — `ContextResolver` → renamed to `FriendResolver`. Update for `FriendStore` + merged type. `resolveIdentity()` must not overwrite `displayName`. Explicit first-encounter creation flow. Authority checking removed.
+- `src/mind/friends/memory.ts` — `resolveMemory()` → likely deleted (collapses into identity resolution)
+- `src/mind/friends/identity.ts` — `resolveIdentity()` → update for `FriendStore.findByExternalId()`
 - `src/identity.ts` — `getAgentRoot()` and `getAgentName()` for per-agent paths
 - `src/config.ts` — `getSessionDir()` and `sessionPath(channel, key)` → restructured to include friend UUID. `sessionPath(friendId, channel, key)` new signature.
 - `src/repertoire/tools-base.ts` — `save_friend_note` tool (lines 274–311). Complete redesign: new parameters, conflict-aware behavior, three note types.
@@ -368,6 +372,12 @@ The `tools` API parameter is not persisted in session files today. For debugging
 **Deferred: Friend re-linking after agent migration (carry forward, do not implement)**
 When an agent is moved to a new machine/installation, the PII bridge doesn't travel with it. The agent retains friend knowledge (by UUID and display name) but can't recognize returning friends from their external IDs. Re-linking strategy TBD — possible approaches include confirmation from a known channel, manual claim, display-name fuzzy match + confirmation, or encrypted export/import. Depends on how agents actually get moved around, which we don't know yet.
 
+**Deferred: System prompt cleanup and consistency (carry forward, do not implement)**
+The system prompt now has multiple behavioral instructions (ephemerality, priority, new-friend, working-memory trust, stale notes, name quality) alongside psyche content. A follow-up pass should review the full system prompt for consistency of voice, redundancy, ordering, and overall coherence. Not blocking — the instructions work — but the prompt is accreting and would benefit from a holistic edit.
+
+**Deferred: `findByExternalId` performance (carry forward, do not implement)**
+`findByExternalId()` scans all PII bridge files linearly. Fine for now (few friends), but becomes slow with hundreds of friends. Future optimization: index file mapping external IDs to UUIDs, rebuilt on startup or maintained on write.
+
 **Deferred: External ID linking (carry forward, do not implement)**
 A single person may have multiple external IDs (e.g., AAD identity + conversation-based identity for when they were a guest, or identities across CLI and Teams). Currently each external ID creates a separate `FriendRecord`. Linking multiple external IDs to the same friend requires a merge strategy — combining notes, preferences, and session histories. TBD after the core friend system proves out.
 
@@ -387,3 +397,4 @@ A single person may have multiple external IDs (e.g., AAD identity + conversatio
 - 2026-03-03 14:10 Ninth revision from unhappy-path walkthrough (returning CLI friend, corrections): (1) save_friend_note tool description gets first-person override guidance — agent's tool, not a leash. (2) Working-memory trust instruction — context window is source of truth, saved notes are journal for future me. (3) Stale notes awareness — when learning something that might invalidate related notes, ask and update. (4) CLI external ID: `username@hostname` with provider `"local"` — disambiguates across machines and accounts.
 - 2026-03-03 14:23 Tenth revision from unhappy-path walkthrough (Teams guest, no aadObjectId): Discovered circular dependency — session path requires friend UUID but without external ID, no stable UUID exists. Fix: use conversation ID as fallback external ID (`provider: "teams-conversation"`). Resolver always has something to search for. Added deferred note for external ID linking (merging multiple external IDs to same friend).
 - 2026-03-03 14:29 Eleventh revision from unhappy-path walkthrough (fresh install, email-as-displayName): (1) Directory bootstrap — FileFriendStore auto-creates directories on construction, sessionPath auto-creates parent dirs. (2) save_friend_note parameter validation with first-person error messages.
+- 2026-03-03 14:33 Twelfth revision: (1) Directory rename `src/mind/context/` → `src/mind/friends/`. (2) Deferred notes for system prompt cleanup/consistency and findByExternalId performance.
