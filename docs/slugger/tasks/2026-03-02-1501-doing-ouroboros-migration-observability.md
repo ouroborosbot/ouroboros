@@ -191,4 +191,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 16:18] Pass 4 (quality): verified template completeness, acceptance coverage, and emoji headers; set status to READY_FOR_EXECUTION
 - [2026-03-02 16:37] Explicitly added `src/engine/kicks.ts` + `src/__tests__/engine/kicks.test.ts` to Unit 3 and completion criteria
 - [2026-03-02 16:56] Added explicit observability-coverage gate units (`audit:observability`, CI enforcement, machine-readable coverage report) and reset status to drafting for re-review
-- [PENDING_CAPTURE_LINK_TS] Locked single-run observability coverage flow: tests emit artifacts once, audit consumes artifacts without rerunning tests
+- [2026-03-02 17:04] Locked single-run observability coverage flow: tests emit artifacts once, audit consumes artifacts without rerunning tests
