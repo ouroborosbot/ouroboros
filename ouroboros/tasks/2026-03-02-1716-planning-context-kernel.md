@@ -17,7 +17,7 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 **Phase 1: Identity + Preferences + Storage Interface (Smallest Vertical Slice)**
 - 10. Directory restructuring (prerequisite) -- rename `src/engine/` to `src/heart/` (core loop, streaming, kicks, API error handling), rename `src/channels/` to `src/senses/` (channel adapters), move tool files (`tools.ts`, `tools-base.ts`, `tools-teams.ts`, `ado-client.ts`, `graph-client.ts`, and `data/` endpoint JSON files) from `src/engine/` to `src/repertoire/`. Update all imports across the codebase, all test file paths, and all documentation referencing old paths. This is a mechanical rename with no behavior changes -- all tests must pass identically before and after. Must be done first because all subsequent units reference the new paths.
 - 1A. `ContextStore` interface -- typed collection properties (`identity: CollectionStore<UserIdentity>`, `preferences: CollectionStore<UserPreferences>`), where `CollectionStore<T>` provides `get(id)`, `put(id, value)`, `delete(id)`, `find(predicate)`. IDs are always plain strings (UUIDs), no slashes, no compound keys. All context persistence goes through this interface. No module imports file paths or `fs` directly for context data. `find(predicate)` supports identity resolution by external ID (scan + predicate for file store; proper index for future DB store). Adding a new persisted type = add one property to `ContextStore`.
-- 1B. `FileContextStore` -- first adapter implementing `ContextStore`. Uses `~/.agentconfigs/<agent>/context/` layout. This is the only module that touches the filesystem for context storage.
+- 1B. `FileContextStore` -- first adapter implementing `ContextStore`. Constructor takes a base path (e.g., `~/.agentconfigs/ouroboros/context`); it does not resolve the path itself. Each collection maps to a subdirectory (`context/identity/`, `context/preferences/`), each item to a JSON file (`{uuid}.json`). This is the only module that touches the filesystem for context storage.
 - 1C. `UserIdentity` type and resolution -- internal userId, external ID mappings (AAD, Teams), tenant memberships, integration memberships (ADO orgs). Persisted via `ContextStore`. Includes `knownScopes` — a living record of orgs/projects the user has worked in. Grows when the model successfully interacts with a scope (tool call succeeds → add/update with fresh `lastUsed`). Shrinks when Authority records persistent access denial (403 on a known scope → prune it so the prompt stops showing inaccessible scopes).
 - 1D. `UserPreferences` type and resolution -- global preferences (verbosity, confirmation policy, preview-before-mutation) plus integration-scoped preferences (ADO planning style, auto-assign, default org/project). Persisted via `ContextStore`. The model writes back learned context (e.g., last-used project) as preference updates.
 - 1E. `ChannelCapabilities` type -- channel identifier (`"cli" | "teams"`) plus capability flags (`supportsMarkdown`, `supportsStreaming`, `supportsRichCards`, `maxMessageLength`) plus `availableIntegrations` declaring which integrations the channel can reach. Pure lookup, no resolution needed. Drives prompt filtering — only render knownScopes/authority for integrations available in the current channel.
@@ -267,8 +267,16 @@ Users will talk to the agent from many channels over time -- Teams today, Discor
 - **Now**: identity resolution with get-or-create, `ContextStore` with external ID lookup, `externalIds[]` as an array on `UserIdentity`. The data model supports multiple external IDs from day one.
 - **Later**: linking UX (`/link-identity`), unlinking, conflict resolution when merging two existing identities (whose preferences win?).
 
-### D13: Resolver Lifecycle -- Per-Request, Not Per-Process
-The Teams bot is a single long-lived process serving multiple users. The `LazyContextResolver` MUST be instantiated per-request (per-incoming-message), not per-process. Each message from a different Teams user needs its own resolver with its own identity. This matches the existing pattern where `ToolContext` is built fresh in `handleTeamsMessage()` per-message. The resolver is created there, attached to `ToolContext`, and discarded after the turn completes. In-memory caches (Authority TTL) live at module scope and are keyed by userId+integration+scope, so they survive across requests for the same user without leaking across users.
+### D13: Resolver Lifecycle -- Store Per-Process, Resolver Per-Request
+Two distinct lifecycles:
+- **`FileContextStore`**: created once at app startup, shared across all requests. It's a stateless I/O layer — just reads/writes JSON files. No per-user state. The startup code resolves the base path from existing config (`getConfigDir() + "/context"`) and passes it to the constructor.
+- **`LazyContextResolver`**: created per-request (per-incoming-message), per-user. Each message from a different user needs its own resolver with its own identity. Created by the channel adapter, attached to `ToolContext.context`, discarded after the turn completes.
+
+Channel adapter responsibilities:
+- **Teams** (`handleTeamsMessage()`): extracts AAD userId + tenantId from the bot activity. Creates a resolver with `{ provider: "aad", externalId: activity.from.aadObjectId, tenantId }`. Attaches to `ToolContext` alongside OAuth tokens.
+- **CLI**: extracts OS username. Creates a resolver with `{ provider: "local", externalId: os.userInfo().username }`. CLI currently doesn't build a `ToolContext` (no tokens needed) — Phase 1 adds a minimal `ToolContext` with just the `context` field so CLI gets identity + preferences without integration access.
+
+In-memory caches (Authority TTL, Phase 2) live at module scope and are keyed by userId+integration+scope, so they survive across requests for the same user without leaking across users.
 
 ### D14: Identity Bootstrapping -- Always Get-or-Create
 Identity resolution is always "get or create." When a user first interacts with the agent, if no `UserIdentity` exists for the channel's external ID, one is created automatically with sensible defaults:
@@ -338,12 +346,13 @@ Paths reflect the directory restructuring done in unit 10. The agent-creature bo
 - **Channel type**: `"cli" | "teams"` defined in `src/mind/prompt.ts`
 
 ### Key Integration Points for Context Kernel
-1. **runAgent()** in `src/heart/core.ts` -- receives `channel` param, receives `ToolContext` via `RunAgentOptions.toolContext`. This is where the `LazyContextResolver` (attached to `ToolContext`) is available during tool execution.
-2. **handleTeamsMessage()** in `src/senses/teams.ts` -- builds `ToolContext` from OAuth tokens and ADO config. This is where Teams-specific identity resolution happens and the `LazyContextResolver` should be created and attached to `ToolContext`.
-3. **getToolsForChannel()** in `src/repertoire/tools.ts` -- currently hardcodes `channel === "teams"` to gate Teams tools. Refactored to accept `ChannelCapabilities` and filter tools by `availableIntegrations` (see D3). New channels get integration-scoped tools without code changes to the router.
-4. **execTool()** in `src/repertoire/tools.ts` -- dispatches to handler with `ToolContext`. New semantic tools need handlers registered here.
-5. **sessionPath()** in `src/config.ts` -- `~/.agentconfigs/<agent>/sessions/<channel>/<key>.json`. Context storage follows a parallel pattern via `FileContextStore`.
-6. **confirmationRequired** set in `src/repertoire/tools-teams.ts` -- semantic ADO mutation tools need to be added here.
+1. **runAgent()** in `src/heart/core.ts` -- receives `channel` param, receives `ToolContext` via `RunAgentOptions.toolContext`. The resolver is already attached to `ToolContext.context` by the channel adapter before `runAgent()` is called. `runAgent()` does not create the resolver.
+2. **handleTeamsMessage()** in `src/senses/teams.ts` -- builds `ToolContext` from OAuth tokens and ADO config. Creates the `LazyContextResolver` with the AAD external ID from the bot activity, attaches it to `ToolContext.context`.
+3. **CLI adapter** in `src/senses/cli.ts` -- currently does not build a `ToolContext`. Phase 1 adds a minimal `ToolContext` with `context` field (resolver using OS username as external ID). No tokens, no integrations — identity and preferences only.
+4. **getToolsForChannel()** in `src/repertoire/tools.ts` -- currently hardcodes `channel === "teams"` to gate Teams tools. Refactored to accept `ChannelCapabilities` and filter tools by `availableIntegrations` (see D3). New channels get integration-scoped tools without code changes to the router.
+5. **execTool()** in `src/repertoire/tools.ts` -- dispatches to handler with `ToolContext`. New semantic tools need handlers registered here.
+6. **sessionPath()** in `src/config.ts` -- `~/.agentconfigs/<agent>/sessions/<channel>/<key>.json`. Context storage follows a parallel pattern via `FileContextStore`.
+7. **confirmationRequired** set in `src/repertoire/tools-teams.ts` -- semantic ADO mutation tools need to be added here.
 
 ### ADO API Patterns (from ado-client.ts and ado-endpoints.json)
 - WIQL queries for work item search
@@ -546,3 +555,6 @@ interface LazyResolvedContext {
 - 2026-03-02 19:20 Cleaned up: fixed stale "session" refs, moved Preferences fully to Phase 1 (removed Phase 2 duplication), renumbered Phase 2 units.
 - 2026-03-02 19:34 Batch update from review feedback: absorbed Q9/Q12/Q13/Q14/Q15 as D14-D18, restructured remaining open Qs (Q4/Q5/Q7/Q8) as self-contained deferred items, reordered all decisions D1-D18 sequentially, updated D6 + 1F to explicit Promise pattern (no proxy), clarified CLI has no ADO (Teams-only), updated 1H as Teams-channel-only wiring, updated ChannelCapabilities schema comments.
 - 2026-03-02 19:46 Structural update: added D19 (agent-creature body metaphor -- heart/mind/repertoire/wardrobe/senses), added unit 10 (directory restructuring prerequisite -- engine/ -> heart/, channels/ -> senses/, tools -> repertoire/), rewrote D9 (file layout now under src/mind/context/ and src/repertoire/), updated all path references in Context/References, integration points, D5, and TypeScript schema comments. No stale engine/channels/context paths remain.
+- 2026-03-03 Ambiguity audit (A1-A27 identified). Beginning item-by-item resolution.
+- 2026-03-03 A1: removed list() from ContextStore (YAGNI -- no consumer needs it, find() covers identity resolution).
+- 2026-03-03 A2+A3: replaced generic key-value ContextStore with typed CollectionStore<T> properties. store.identity.get(userId) instead of get("identity/abc-123"). No slashes, no compound keys, IDs are plain UUIDs. FileContextStore constructor takes basePath (no internal path resolution). Updated D1, D12, D13 (store per-process, resolver per-request), 1A, 1B, completion criteria, schema. Added CLI adapter as integration point 3 (Phase 1 adds minimal ToolContext with context field).
