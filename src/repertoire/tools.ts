@@ -51,8 +51,9 @@ export function getToolsForChannel(
   }
 
   // Apply preferences to matching integration tools (new objects, no mutation)
+  // d.integration is guaranteed truthy -- integrationDefs are pre-filtered above
   const enrichedIntegrationTools = integrationDefs.map((d) => {
-    const pref = d.integration ? prefMap.get(d.integration) : undefined;
+    const pref = prefMap.get(d.integration!);
     return pref ? applyPreference(d.tool, pref) : d.tool;
   });
 
