@@ -459,3 +459,4 @@ Wiring:
 - 2026-03-02 15:53 Unit 6a complete: 3 failing tests for shared formatter (onToolEnd green/red, onError severity branching)
 - 2026-03-02 15:55 Units 6b+6c complete: CLI uses shared formatters, severity branching on onError, 881 tests pass, cli.ts 100% lines/funcs
 - 2026-03-02 16:03 Unit 7a complete: 22 failing tests for dual-mode rendering -- streaming mode (onToolEnd/onKick/onError with inline emit), buffered mode (sendMessage, flush first-to-emit/subsequent-to-sendMessage, fallback), handleTeamsMessage sendMessage param, ctx.send wiring
+- 2026-03-02 16:06 Unit 7b complete: dual-mode rendering implemented -- streaming mode uses safeEmit with formatToolResult/formatKick/formatError, buffered mode uses safeSend, async flush with first-to-emit/subsequent-to-sendMessage, onKick added, handleTeamsMessage passes sendMessage, 900 tests pass, build clean
