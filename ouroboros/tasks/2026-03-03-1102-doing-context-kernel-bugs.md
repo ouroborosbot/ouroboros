@@ -224,7 +224,7 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Output**: Coverage report showing 100% on sessionPath.
 **Acceptance**: 100% coverage on new code, tests still green.
 
-### ⬜ Unit 9a: Teams adapter wiring -- Tests
+### ✅ Unit 9a: Teams adapter wiring -- Tests
 **What**: Write tests for Teams adapter changes in `teams.ts`. Test: (1) Bug 1 fix: `app.on("message")` handler populates `teamsContext.aadObjectId`, `teamsContext.tenantId`, `teamsContext.displayName` from activity. (2) Bug 2 fix: `handleTeamsMessage()` passes resolved context to `buildSystem()` (system prompt rebuilt each turn with context). (3) `handleTeamsMessage()` creates `FileFriendStore` with two paths. (4) Resolver called with aadObjectId or falls back to `teams-conversation` provider with conversationId. (5) `toolContext.friendStore` set instead of `toolContext.memoryStore`. (6) Session path uses friend UUID. (7) Friend record re-read from disk each turn (toolContext updated before runAgent).
 **Output**: Updated `teams.test.ts` with wiring tests.
 **Files**: `src/__tests__/senses/teams.test.ts`
