@@ -33,7 +33,7 @@ Define and lock runtime hardening requirements for single-replica preview so req
 - [ ] Remote channels cannot execute local CLI/file/git/gh tools, and denial UX explains multi-user safety rationale with a clear alternative path.
 - [ ] Concurrency guardrails (limits/timeouts/backpressure behavior) are implemented and covered by tests.
 - [ ] System-prompt rebuild path has explicit safety behavior (freshness + consistency) covered by tests.
-- [ ] Load-validation artifacts exist and demonstrate agreed preview-readiness thresholds are met.
+- [ ] Load-validation artifacts exist and demonstrate agreed preview thresholds: 10 concurrent remote conversations, p95 first-feedback <= 2s, p95 final <= 9s for simple no-tool turns, p95 final <= 30s for tool/external turns, and error rate < 1%.
 - [ ] CI gate fails when runtime-hardening contract checks regress.
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
@@ -47,9 +47,9 @@ Define and lock runtime hardening requirements for single-replica preview so req
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [ ] What exact peak concurrent remote conversations must one replica sustain while staying within preview SLOs?
+- [x] Peak preview concurrency target is locked to 10 simultaneous remote conversations per replica.
 - [x] Preview tool policy is locked: remote channels run remote-safe tools only; local CLI/file/git/gh tools are blocked remotely and require explanatory denial messaging.
-- [ ] What user-visible SLO contract should preview enforce (latency + availability/error budget), and at what percentile windows?
+- [x] Preview SLO contract is locked: p95 first-feedback <= 2s for all turns; p95 final <= 9s for simple no-tool turns; p95 final <= 30s for tool/external turns; error rate < 1%.
 
 ## Decisions Made
 - This planning doc targets the current top backlog priority from the migration dashboard: #18 Single-Replica Runtime Hardening.
@@ -57,6 +57,8 @@ Define and lock runtime hardening requirements for single-replica preview so req
 - Configuration changes for this task must follow repo policy: no environment variables; use explicit in-repo defaults/CLI args/contracts.
 - Topic assumptions must be validated against the current codebase before implementation details are finalized.
 - Remote-channel safety policy is explicit for this phase: no local shell/file/git/gh tool execution from multi-user channels; denial responses must explain why and guide users toward safe alternatives.
+- Peak preview concurrency target for hardening validation is 10 simultaneous remote conversations per replica.
+- Preview SLO targets are split by turn type to stay strict on UX while remaining realistic for tool/network turns: first-feedback p95 <= 2s (all turns), final p95 <= 9s (simple no-tool), final p95 <= 30s (tool/external), error rate < 1%.
 
 ## Context / References
 - `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration.md`
@@ -79,3 +81,4 @@ Current-state baseline check (2026-03-03): base tools currently include local sh
 ## Progress Log
 - [2026-03-03 14:30] Created
 - [2026-03-03 14:36] Rebased planning assumptions on current repo state, locked remote tool-safety policy, and clarified unresolved SLO/capacity questions.
+- [2026-03-03 14:39] Locked concurrency and SLO contract (10 concurrent conversations with split p95 response targets and <1% error rate).
