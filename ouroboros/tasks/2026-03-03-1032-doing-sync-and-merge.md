@@ -127,3 +127,4 @@ Note: This task is documentation-only. TDD applies if any runtime code is introd
 - 2026-03-03 11:28 Unit 0 complete: outline.md created mapping all completion criteria to work-merger sections
 - 2026-03-03 11:29 Unit 1 complete: work-merger.md created with frontmatter, On Startup (agent detection, gh preflight), Timestamp pattern, Merge Loop
 - 2026-03-03 11:30 Unit 2 complete: conflict resolution and git-informed task doc discovery sections added
+- 2026-03-03 11:31 Unit 3 complete: PR workflow, fast-path, and CI failure self-repair sections added
