@@ -18,12 +18,12 @@ vi.mock("../../repertoire/skills", () => ({
   loadSkill: vi.fn(),
 }))
 
-vi.mock("../../engine/graph-client", () => ({
+vi.mock("../../repertoire/graph-client", () => ({
   getProfile: vi.fn(),
   graphRequest: vi.fn(),
 }))
 
-vi.mock("../../engine/ado-client", () => ({
+vi.mock("../../repertoire/ado-client", () => ({
   queryWorkItems: vi.fn(),
   adoRequest: vi.fn(),
 }))
@@ -60,7 +60,7 @@ describe("execTool", () => {
     const config = await import("../../config")
     config.resetConfigCache()
     setTestConfig = config.setTestConfig
-    const tools = await import("../../engine/tools")
+    const tools = await import("../../repertoire/tools")
     execTool = tools.execTool
   })
 
@@ -441,7 +441,7 @@ describe("summarizeArgs", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    const tools = await import("../../engine/tools")
+    const tools = await import("../../repertoire/tools")
     summarizeArgs = tools.summarizeArgs
   })
 
@@ -536,7 +536,7 @@ describe("summarizeArgs", () => {
 describe("tools array export", () => {
   it("exports tools array with expected tool names", async () => {
     vi.resetModules()
-    const { tools } = await import("../../engine/tools")
+    const { tools } = await import("../../repertoire/tools")
     const names = tools.map((t) => t.function.name)
     expect(names).toContain("read_file")
     expect(names).toContain("write_file")
@@ -554,7 +554,7 @@ describe("tools array export", () => {
 describe("finalAnswerTool", () => {
   it("has correct name, description, and schema", async () => {
     vi.resetModules()
-    const { finalAnswerTool } = await import("../../engine/tools")
+    const { finalAnswerTool } = await import("../../repertoire/tools")
     expect(finalAnswerTool.type).toBe("function")
     expect(finalAnswerTool.function.name).toBe("final_answer")
     expect(finalAnswerTool.function.description).toBe(
@@ -569,7 +569,7 @@ describe("finalAnswerTool", () => {
 
   it("is NOT included in the default tools array", async () => {
     vi.resetModules()
-    const { tools } = await import("../../engine/tools")
+    const { tools } = await import("../../repertoire/tools")
     const names = tools.map((t) => t.function.name)
     expect(names).not.toContain("final_answer")
   })
@@ -578,7 +578,7 @@ describe("finalAnswerTool", () => {
 describe("getToolsForChannel", () => {
   it("returns only base tools for cli channel", async () => {
     vi.resetModules()
-    const { getToolsForChannel, tools } = await import("../../engine/tools")
+    const { getToolsForChannel, tools } = await import("../../repertoire/tools")
     const cliTools = getToolsForChannel("cli")
     const names = cliTools.map((t) => t.function.name)
     // Should have all base tools
@@ -597,7 +597,7 @@ describe("getToolsForChannel", () => {
 
   it("returns base tools plus all teams tools for teams channel", async () => {
     vi.resetModules()
-    const { getToolsForChannel, tools } = await import("../../engine/tools")
+    const { getToolsForChannel, tools } = await import("../../repertoire/tools")
     const teamsTools = getToolsForChannel("teams")
     const names = teamsTools.map((t) => t.function.name)
     // Should have all base tools
@@ -617,7 +617,7 @@ describe("getToolsForChannel", () => {
 
   it("returns base tools for undefined channel", async () => {
     vi.resetModules()
-    const { getToolsForChannel, tools } = await import("../../engine/tools")
+    const { getToolsForChannel, tools } = await import("../../repertoire/tools")
     const result = getToolsForChannel(undefined)
     expect(result.length).toBe(tools.length)
   })
@@ -626,10 +626,10 @@ describe("getToolsForChannel", () => {
 describe("execTool with ToolContext", () => {
   it("passes ToolContext to graph_profile handler", async () => {
     vi.resetModules()
-    const { getProfile } = await import("../../engine/graph-client")
+    const { getProfile } = await import("../../repertoire/graph-client")
     vi.mocked(getProfile).mockResolvedValue("Profile: Jane Doe")
 
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: "test-graph-token",
       adoToken: undefined,
@@ -644,7 +644,7 @@ describe("execTool with ToolContext", () => {
 
   it("graph_profile returns AUTH_REQUIRED when graphToken missing", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: undefined,
       adoToken: undefined,
@@ -658,7 +658,7 @@ describe("execTool with ToolContext", () => {
 
   it("graph_profile returns AUTH_REQUIRED when no ToolContext provided", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
 
     const result = await execTool("graph_profile", {})
     expect(result).toBe("AUTH_REQUIRED:graph -- I need access to your Microsoft 365 profile. Please sign in when prompted.")
@@ -666,10 +666,10 @@ describe("execTool with ToolContext", () => {
 
   it("passes ToolContext to ado_work_items handler", async () => {
     vi.resetModules()
-    const { queryWorkItems } = await import("../../engine/ado-client")
+    const { queryWorkItems } = await import("../../repertoire/ado-client")
     vi.mocked(queryWorkItems).mockResolvedValue("Work items: #123 Fix bug")
 
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: undefined,
       adoToken: "test-ado-token",
@@ -684,7 +684,7 @@ describe("execTool with ToolContext", () => {
 
   it("ado_work_items returns AUTH_REQUIRED when adoToken missing", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: undefined,
       adoToken: undefined,
@@ -698,7 +698,7 @@ describe("execTool with ToolContext", () => {
 
   it("ado_work_items rejects invalid organization", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: undefined,
       adoToken: "test-token",
@@ -714,10 +714,10 @@ describe("execTool with ToolContext", () => {
 
   it("ado_work_items uses default query when none provided", async () => {
     vi.resetModules()
-    const { queryWorkItems } = await import("../../engine/ado-client")
+    const { queryWorkItems } = await import("../../repertoire/ado-client")
     vi.mocked(queryWorkItems).mockResolvedValue("Work items found")
 
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: undefined,
       adoToken: "test-token",
@@ -733,10 +733,10 @@ describe("execTool with ToolContext", () => {
 
   it("ado_work_items allows any org when adoOrganizations is empty", async () => {
     vi.resetModules()
-    const { queryWorkItems } = await import("../../engine/ado-client")
+    const { queryWorkItems } = await import("../../repertoire/ado-client")
     vi.mocked(queryWorkItems).mockResolvedValue("Work items found")
 
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: undefined,
       adoToken: "test-token",
@@ -750,7 +750,7 @@ describe("execTool with ToolContext", () => {
 
   it("ado_work_items returns AUTH_REQUIRED when no ToolContext provided", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
 
     const result = await execTool("ado_work_items", { organization: "myorg" })
     expect(result).toBe("AUTH_REQUIRED:ado -- I need access to your Azure DevOps account. Please sign in when prompted.")
@@ -759,7 +759,7 @@ describe("execTool with ToolContext", () => {
   it("base tools work without ToolContext", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockReturnValue("file content")
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
 
     const result = await execTool("read_file", { path: "/tmp/test.txt" })
     expect(result).toBe("file content")
@@ -768,7 +768,7 @@ describe("execTool with ToolContext", () => {
   it("base tools work with ToolContext (context is ignored)", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockReturnValue("file content")
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: "token",
       adoToken: "token",
@@ -786,7 +786,7 @@ describe("summarizeArgs for graph/ado tools", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    const tools = await import("../../engine/tools")
+    const tools = await import("../../repertoire/tools")
     summarizeArgs = tools.summarizeArgs
   })
 
@@ -838,10 +838,10 @@ describe("summarizeArgs for graph/ado tools", () => {
 describe("execTool for generic Graph tools", () => {
   it("graph_query calls graphRequest with GET", async () => {
     vi.resetModules()
-    const { graphRequest } = await import("../../engine/graph-client")
+    const { graphRequest } = await import("../../repertoire/graph-client")
     vi.mocked(graphRequest).mockResolvedValue('{"value": []}')
 
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: "test-token",
       adoToken: undefined,
@@ -856,7 +856,7 @@ describe("execTool for generic Graph tools", () => {
 
   it("graph_query returns AUTH_REQUIRED when graphToken missing", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: undefined,
       adoToken: undefined,
@@ -870,7 +870,7 @@ describe("execTool for generic Graph tools", () => {
 
   it("graph_query returns AUTH_REQUIRED when no ToolContext", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
 
     const result = await execTool("graph_query", { path: "/me" })
     expect(result).toContain("AUTH_REQUIRED:graph")
@@ -878,10 +878,10 @@ describe("execTool for generic Graph tools", () => {
 
   it("graph_mutate calls graphRequest with specified method and body", async () => {
     vi.resetModules()
-    const { graphRequest } = await import("../../engine/graph-client")
+    const { graphRequest } = await import("../../repertoire/graph-client")
     vi.mocked(graphRequest).mockResolvedValue('{"id": "msg-1"}')
 
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: "test-token",
       adoToken: undefined,
@@ -897,10 +897,10 @@ describe("execTool for generic Graph tools", () => {
 
   it("graph_mutate calls graphRequest with PATCH method", async () => {
     vi.resetModules()
-    const { graphRequest } = await import("../../engine/graph-client")
+    const { graphRequest } = await import("../../repertoire/graph-client")
     vi.mocked(graphRequest).mockResolvedValue('{"updated": true}')
 
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: "test-token",
       adoToken: undefined,
@@ -915,10 +915,10 @@ describe("execTool for generic Graph tools", () => {
 
   it("graph_mutate calls graphRequest with DELETE method (no body)", async () => {
     vi.resetModules()
-    const { graphRequest } = await import("../../engine/graph-client")
+    const { graphRequest } = await import("../../repertoire/graph-client")
     vi.mocked(graphRequest).mockResolvedValue('{}')
 
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: "test-token",
       adoToken: undefined,
@@ -933,7 +933,7 @@ describe("execTool for generic Graph tools", () => {
 
   it("graph_mutate rejects invalid method", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: "test-token",
       adoToken: undefined,
@@ -948,7 +948,7 @@ describe("execTool for generic Graph tools", () => {
 
   it("graph_mutate returns AUTH_REQUIRED when graphToken missing", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: undefined,
       adoToken: undefined,
@@ -964,10 +964,10 @@ describe("execTool for generic Graph tools", () => {
 describe("execTool for generic ADO tools", () => {
   it("ado_query calls adoRequest with GET by default", async () => {
     vi.resetModules()
-    const { adoRequest } = await import("../../engine/ado-client")
+    const { adoRequest } = await import("../../repertoire/ado-client")
     vi.mocked(adoRequest).mockResolvedValue('{"value": []}')
 
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: undefined,
       adoToken: "test-token",
@@ -982,10 +982,10 @@ describe("execTool for generic ADO tools", () => {
 
   it("ado_query calls adoRequest with POST for WIQL", async () => {
     vi.resetModules()
-    const { adoRequest } = await import("../../engine/ado-client")
+    const { adoRequest } = await import("../../repertoire/ado-client")
     vi.mocked(adoRequest).mockResolvedValue('{"workItems": []}')
 
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: undefined,
       adoToken: "test-token",
@@ -1001,7 +1001,7 @@ describe("execTool for generic ADO tools", () => {
 
   it("ado_query returns AUTH_REQUIRED when adoToken missing", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: undefined,
       adoToken: undefined,
@@ -1015,7 +1015,7 @@ describe("execTool for generic ADO tools", () => {
 
   it("ado_query returns AUTH_REQUIRED when no ToolContext", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
 
     const result = await execTool("ado_query", { organization: "myorg", path: "/_apis/projects" })
     expect(result).toContain("AUTH_REQUIRED:ado")
@@ -1023,7 +1023,7 @@ describe("execTool for generic ADO tools", () => {
 
   it("ado_query rejects invalid organization", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: undefined,
       adoToken: "test-token",
@@ -1038,10 +1038,10 @@ describe("execTool for generic ADO tools", () => {
 
   it("ado_query allows any org when adoOrganizations is empty", async () => {
     vi.resetModules()
-    const { adoRequest } = await import("../../engine/ado-client")
+    const { adoRequest } = await import("../../repertoire/ado-client")
     vi.mocked(adoRequest).mockResolvedValue('{"value": []}')
 
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: undefined,
       adoToken: "test-token",
@@ -1055,10 +1055,10 @@ describe("execTool for generic ADO tools", () => {
 
   it("ado_mutate calls adoRequest with specified method and body", async () => {
     vi.resetModules()
-    const { adoRequest } = await import("../../engine/ado-client")
+    const { adoRequest } = await import("../../repertoire/ado-client")
     vi.mocked(adoRequest).mockResolvedValue('{"id": 456}')
 
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: undefined,
       adoToken: "test-token",
@@ -1074,7 +1074,7 @@ describe("execTool for generic ADO tools", () => {
 
   it("ado_mutate rejects invalid method", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: undefined,
       adoToken: "test-token",
@@ -1089,7 +1089,7 @@ describe("execTool for generic ADO tools", () => {
 
   it("ado_mutate returns AUTH_REQUIRED when adoToken missing", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: undefined,
       adoToken: undefined,
@@ -1103,7 +1103,7 @@ describe("execTool for generic ADO tools", () => {
 
   it("ado_mutate rejects invalid organization", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: undefined,
       adoToken: "test-token",
@@ -1117,10 +1117,10 @@ describe("execTool for generic ADO tools", () => {
 
   it("ado_mutate allows any org when adoOrganizations is empty", async () => {
     vi.resetModules()
-    const { adoRequest } = await import("../../engine/ado-client")
+    const { adoRequest } = await import("../../repertoire/ado-client")
     vi.mocked(adoRequest).mockResolvedValue('{"id": 1}')
 
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       graphToken: undefined,
       adoToken: "test-token",
@@ -1136,7 +1136,7 @@ describe("execTool for generic ADO tools", () => {
 describe("confirmationRequired export", () => {
   it("exports confirmationRequired set from tools-teams", async () => {
     vi.resetModules()
-    const { confirmationRequired } = await import("../../engine/tools-teams")
+    const { confirmationRequired } = await import("../../repertoire/tools-teams")
     expect(confirmationRequired).toBeInstanceOf(Set)
     expect(confirmationRequired.has("graph_mutate")).toBe(true)
     expect(confirmationRequired.has("ado_mutate")).toBe(true)
@@ -1150,7 +1150,7 @@ describe("confirmationRequired export", () => {
 describe("execTool for docs tools", () => {
   it("graph_docs returns matching endpoints for a query", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
 
     const result = await execTool("graph_docs", { query: "send email" })
     expect(result).toContain("send")
@@ -1160,7 +1160,7 @@ describe("execTool for docs tools", () => {
 
   it("graph_docs returns matching endpoints for calendar", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
 
     const result = await execTool("graph_docs", { query: "calendar events" })
     expect(result).toContain("calendar")
@@ -1168,7 +1168,7 @@ describe("execTool for docs tools", () => {
 
   it("graph_docs returns no results message for non-matching query", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
 
     const result = await execTool("graph_docs", { query: "zzzyyyxxx_nonexistent" })
     expect(result).toContain("No matching")
@@ -1176,7 +1176,7 @@ describe("execTool for docs tools", () => {
 
   it("graph_docs returns top 5 results max", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
 
     // A broad query that should match many endpoints
     const result = await execTool("graph_docs", { query: "me" })
@@ -1186,7 +1186,7 @@ describe("execTool for docs tools", () => {
 
   it("graph_docs is case-insensitive", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
 
     const lower = await execTool("graph_docs", { query: "messages" })
     const upper = await execTool("graph_docs", { query: "MESSAGES" })
@@ -1195,7 +1195,7 @@ describe("execTool for docs tools", () => {
 
   it("ado_docs returns matching endpoints for a query", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
 
     const result = await execTool("ado_docs", { query: "work items" })
     expect(result).toContain("work")
@@ -1204,7 +1204,7 @@ describe("execTool for docs tools", () => {
 
   it("ado_docs returns matching endpoints for pull requests", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
 
     const result = await execTool("ado_docs", { query: "pull request" })
     expect(result).toContain("pull")
@@ -1212,7 +1212,7 @@ describe("execTool for docs tools", () => {
 
   it("ado_docs returns no results message for non-matching query", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
 
     const result = await execTool("ado_docs", { query: "zzzyyyxxx_nonexistent" })
     expect(result).toContain("No matching")
@@ -1220,7 +1220,7 @@ describe("execTool for docs tools", () => {
 
   it("ado_docs returns top 5 results max", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
 
     const result = await execTool("ado_docs", { query: "api" })
     const sections = result.split("\n\n").filter((s: string) => s.trim().length > 0)
@@ -1229,7 +1229,7 @@ describe("execTool for docs tools", () => {
 
   it("ado_docs is case-insensitive", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
 
     const lower = await execTool("ado_docs", { query: "pipeline" })
     const upper = await execTool("ado_docs", { query: "PIPELINE" })
@@ -1238,7 +1238,7 @@ describe("execTool for docs tools", () => {
 
   it("graph_docs handles missing query arg", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
 
     const result = await execTool("graph_docs", {})
     expect(typeof result).toBe("string")
@@ -1246,7 +1246,7 @@ describe("execTool for docs tools", () => {
 
   it("ado_docs handles missing query arg", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../engine/tools")
+    const { execTool } = await import("../../repertoire/tools")
 
     const result = await execTool("ado_docs", {})
     expect(typeof result).toBe("string")
@@ -1256,7 +1256,7 @@ describe("execTool for docs tools", () => {
 describe("getToolsForChannel includes docs tools", () => {
   it("teams channel includes graph_docs and ado_docs", async () => {
     vi.resetModules()
-    const { getToolsForChannel, tools } = await import("../../engine/tools")
+    const { getToolsForChannel, tools } = await import("../../repertoire/tools")
     const teamsTools = getToolsForChannel("teams")
     const names = teamsTools.map((t) => t.function.name)
     expect(names).toContain("graph_docs")
@@ -1267,7 +1267,7 @@ describe("getToolsForChannel includes docs tools", () => {
 
   it("cli channel does NOT include graph_docs or ado_docs", async () => {
     vi.resetModules()
-    const { getToolsForChannel } = await import("../../engine/tools")
+    const { getToolsForChannel } = await import("../../repertoire/tools")
     const cliTools = getToolsForChannel("cli")
     const names = cliTools.map((t) => t.function.name)
     expect(names).not.toContain("graph_docs")
@@ -1280,7 +1280,7 @@ describe("summarizeArgs for docs tools", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    const tools = await import("../../engine/tools")
+    const tools = await import("../../repertoire/tools")
     summarizeArgs = tools.summarizeArgs
   })
 

@@ -64,7 +64,7 @@ vi.mock("openai", () => {
 
 import * as fs from "fs"
 import { execSync, spawnSync } from "child_process"
-import type { ChannelCallbacks } from "../../engine/core"
+import type { ChannelCallbacks } from "../../heart/core"
 
 // Dynamic config helpers -- must be re-imported after vi.resetModules()
 async function setupMinimax(apiKey = "test-key", model = "test-model") {
@@ -97,7 +97,7 @@ async function resetConfig() {
 
 describe("isTransientError", () => {
   it("detects Node.js network error codes", async () => {
-    const { isTransientError } = await import("../../engine/core")
+    const { isTransientError } = await import("../../heart/core")
     for (const code of ["ECONNRESET", "ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT", "EPIPE",
                          "EAI_AGAIN", "EHOSTUNREACH", "ENETUNREACH", "ECONNABORTED"]) {
       const err: any = new Error("fail")
@@ -107,7 +107,7 @@ describe("isTransientError", () => {
   })
 
   it("detects fetch/network errors by message", async () => {
-    const { isTransientError } = await import("../../engine/core")
+    const { isTransientError } = await import("../../heart/core")
     expect(isTransientError(new Error("fetch failed"))).toBe(true)
     expect(isTransientError(new Error("network error"))).toBe(true)
     expect(isTransientError(new Error("socket hang up"))).toBe(true)
@@ -117,7 +117,7 @@ describe("isTransientError", () => {
   })
 
   it("detects HTTP status codes 429 and 5xx", async () => {
-    const { isTransientError } = await import("../../engine/core")
+    const { isTransientError } = await import("../../heart/core")
     for (const status of [429, 500, 502, 503, 504]) {
       const err: any = new Error("server error")
       err.status = status
@@ -126,7 +126,7 @@ describe("isTransientError", () => {
   })
 
   it("returns false for non-transient errors", async () => {
-    const { isTransientError } = await import("../../engine/core")
+    const { isTransientError } = await import("../../heart/core")
     expect(isTransientError(new Error("invalid request"))).toBe(false)
     expect(isTransientError(new Error("authentication failed"))).toBe(false)
     expect(isTransientError("not an error")).toBe(false)
@@ -137,7 +137,7 @@ describe("isTransientError", () => {
   })
 
   it("returns false for context overflow messages (not transient)", async () => {
-    const { isTransientError } = await import("../../engine/core")
+    const { isTransientError } = await import("../../heart/core")
     expect(isTransientError(new Error("context_length_exceeded"))).toBe(false)
     expect(isTransientError(new Error("context window exceeds limit"))).toBe(false)
   })
@@ -206,7 +206,7 @@ describe("runAgent", () => {
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupMinimax()
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     runAgent = core.runAgent
   })
 
@@ -1324,7 +1324,7 @@ describe("runAgent", () => {
       { type: "response.output_text.delta", delta: "hello" },
     ]))
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -1359,7 +1359,7 @@ describe("runAgent", () => {
       { type: "response.output_text.delta", delta: "hello azure" },
     ]))
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -1401,7 +1401,7 @@ describe("runAgent", () => {
       ])
     })
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     const toolStarts: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
@@ -1449,7 +1449,7 @@ describe("runAgent", () => {
       ])
     })
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -1509,7 +1509,7 @@ describe("runAgent", () => {
       ])
     })
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -1585,7 +1585,7 @@ describe("runAgent", () => {
       { type: "response.output_text.delta", delta: "answer" },
     ]))
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -1617,7 +1617,7 @@ describe("runAgent", () => {
       { type: "response.output_item.done", item: messageItem },
     ]))
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -1651,7 +1651,7 @@ describe("runAgent", () => {
       { type: "response.output_item.done", item: messageItem },
     ]))
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -1697,7 +1697,7 @@ describe("runAgent", () => {
       ])
     })
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -2460,7 +2460,7 @@ describe("getClient", () => {
     const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
-      const core = await import("../../engine/core")
+      const core = await import("../../heart/core")
       const callbacks: ChannelCallbacks = {
         onModelStart: () => {},
         onModelStreamStart: () => {},
@@ -2486,7 +2486,7 @@ describe("getClient", () => {
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupMinimax("mm-key", "MiniMax-M2.5")
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     expect(core.getModel()).toBe("MiniMax-M2.5")
     expect(core.getProvider()).toBe("minimax")
   })
@@ -2496,7 +2496,7 @@ describe("getClient", () => {
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupConfig({ providers: { azure: { apiKey: "azure-test-key", endpoint: "https://test.openai.azure.com", deployment: "test-deployment", modelName: "gpt-4o" }, minimax: { apiKey: "mm-key", model: "MiniMax-M2.5" } } })
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     expect(core.getModel()).toBe("gpt-4o")
     expect(core.getProvider()).toBe("azure")
   })
@@ -2506,7 +2506,7 @@ describe("getClient", () => {
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupConfig({ providers: { azure: { apiKey: "azure-test-key" }, minimax: { apiKey: "mm-key", model: "MiniMax-M2.5" } } })
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     expect(core.getModel()).toBe("MiniMax-M2.5")
     expect(core.getProvider()).toBe("minimax")
   })
@@ -2523,7 +2523,7 @@ describe("getClient", () => {
       },
     })
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -2555,7 +2555,7 @@ describe("getClient", () => {
       },
     })
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -2583,7 +2583,7 @@ describe("getClient config integration", () => {
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupAzure("config-az-key", "https://config.openai.azure.com", "config-deploy", "config-model")
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     expect(core.getModel()).toBe("config-model")
     expect(core.getProvider()).toBe("azure")
   })
@@ -2593,7 +2593,7 @@ describe("getClient config integration", () => {
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupMinimax("config-mm-key", "config-mm-model")
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     expect(core.getModel()).toBe("config-mm-model")
     expect(core.getProvider()).toBe("minimax")
   })
@@ -2616,7 +2616,7 @@ describe("getClient config integration", () => {
       },
     })
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     expect(core.getProvider()).toBe("azure")
   })
 
@@ -2625,7 +2625,7 @@ describe("getClient config integration", () => {
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupMinimax("config-mm-key", "config-mm-model")
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     expect(core.getModel()).toBe("config-mm-model")
     expect(core.getProvider()).toBe("minimax")
   })
@@ -2634,7 +2634,7 @@ describe("getClient config integration", () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupMinimax()
-    const { stripLastToolCalls } = await import("../../engine/core")
+    const { stripLastToolCalls } = await import("../../heart/core")
 
     const messages: any[] = [
       { role: "system", content: "sys" },
@@ -2654,7 +2654,7 @@ describe("getClient config integration", () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupMinimax()
-    const { stripLastToolCalls } = await import("../../engine/core")
+    const { stripLastToolCalls } = await import("../../heart/core")
 
     const messages: any[] = [
       { role: "system", content: "sys" },
@@ -2672,7 +2672,7 @@ describe("getClient config integration", () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupMinimax()
-    const { stripLastToolCalls } = await import("../../engine/core")
+    const { stripLastToolCalls } = await import("../../heart/core")
 
     const messages: any[] = [
       { role: "system", content: "sys" },
@@ -2724,7 +2724,7 @@ describe("getClient config integration", () => {
       onError: (err, severity) => errors.push({ error: err, severity }),
     }
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     await core.runAgent([{ role: "system", content: "test" }], callbacks)
 
     expect(errors.length).toBe(1)
@@ -2745,7 +2745,7 @@ describe("getClient config integration", () => {
     const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
-      const core = await import("../../engine/core")
+      const core = await import("../../heart/core")
       const callbacks: ChannelCallbacks = {
         onModelStart: () => {},
         onModelStreamStart: () => {},
@@ -2768,7 +2768,7 @@ describe("getClient config integration", () => {
 
 describe("hasToolIntent", () => {
   it("returns true for each intent phrase", async () => {
-    const { hasToolIntent } = await import("../../engine/core")
+    const { hasToolIntent } = await import("../../heart/core")
     // Explicit intent
     expect(hasToolIntent("let me read that file")).toBe(true)
     expect(hasToolIntent("I'll read that file")).toBe(true)
@@ -2803,7 +2803,7 @@ describe("hasToolIntent", () => {
   })
 
   it("returns false for text without intent phrases", async () => {
-    const { hasToolIntent } = await import("../../engine/core")
+    const { hasToolIntent } = await import("../../heart/core")
     expect(hasToolIntent("Hello")).toBe(false)
     expect(hasToolIntent("Here is the result")).toBe(false)
     expect(hasToolIntent("The file contains data")).toBe(false)
@@ -2811,7 +2811,7 @@ describe("hasToolIntent", () => {
   })
 
   it("is case-insensitive", async () => {
-    const { hasToolIntent } = await import("../../engine/core")
+    const { hasToolIntent } = await import("../../heart/core")
     expect(hasToolIntent("LET ME read that file")).toBe(true)
     expect(hasToolIntent("i'll do that")).toBe(true)
     expect(hasToolIntent("I WILL check")).toBe(true)
@@ -2847,7 +2847,7 @@ describe("kick mechanism", () => {
     mockResponsesCreate.mockReset()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     runAgent = core.runAgent
   })
 
@@ -3096,7 +3096,7 @@ describe("kick mechanism", () => {
       ])
     })
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     const kicks: number[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
@@ -3163,7 +3163,7 @@ describe("tool_choice required and final_answer", () => {
     mockResponsesCreate.mockReset()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     runAgent = core.runAgent
   })
 
@@ -3202,7 +3202,7 @@ describe("tool_choice required and final_answer", () => {
       { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "final_answer", arguments: '{"answer":"done"}' } },
     ]))
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -3457,7 +3457,7 @@ describe("tool_choice required and final_answer", () => {
       ])
     })
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     const toolStarts: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
@@ -3618,7 +3618,7 @@ describe("integration: kick + tool_choice required combined", () => {
     mockResponsesCreate.mockReset()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     runAgent = core.runAgent
   })
 
@@ -4025,7 +4025,7 @@ describe("final_answer injection after narration kick", () => {
     mockResponsesCreate.mockReset()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     runAgent = core.runAgent
   })
 
@@ -4239,7 +4239,7 @@ describe("confirmation system", () => {
     mockResponsesCreate.mockReset()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
 
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     runAgent = core.runAgent
   })
 
@@ -4437,7 +4437,7 @@ describe("confirmation system", () => {
     })
 
     const onConfirmAction = vi.fn().mockResolvedValue("denied")
-    const core = await import("../../engine/core")
+    const core = await import("../../heart/core")
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},

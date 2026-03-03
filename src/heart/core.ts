@@ -1,8 +1,8 @@
 import OpenAI, { AzureOpenAI } from "openai";
 import { getAzureConfig, getMinimaxConfig, getContextConfig } from "../config";
-import { execTool, summarizeArgs, finalAnswerTool, getToolsForChannel } from "./tools";
-import type { ToolContext } from "./tools";
-import { confirmationRequired } from "./tools-teams";
+import { execTool, summarizeArgs, finalAnswerTool, getToolsForChannel } from "../repertoire/tools";
+import type { ToolContext } from "../repertoire/tools";
+import { confirmationRequired } from "../repertoire/tools-teams";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
 import type { AssistantMessageWithReasoning, ResponseItem } from "./streaming";
 import { detectKick } from "./kicks";
@@ -63,8 +63,8 @@ export function getProvider(): "azure" | "minimax" {
 }
 
 // Re-export tools, execTool, summarizeArgs from ./tools for backward compat
-export { tools, execTool, summarizeArgs, getToolsForChannel } from "./tools";
-export type { ToolContext } from "./tools";
+export { tools, execTool, summarizeArgs, getToolsForChannel } from "../repertoire/tools";
+export type { ToolContext } from "../repertoire/tools";
 // Re-export streaming functions for backward compat
 export { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
 export type { TurnResult } from "./streaming";

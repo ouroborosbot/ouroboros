@@ -1,7 +1,7 @@
 import type OpenAI from "openai";
 import * as fs from "fs";
 import { execSync, spawnSync } from "child_process";
-import { listSkills, loadSkill } from "../repertoire/skills";
+import { listSkills, loadSkill } from "./skills";
 import { getIntegrationsConfig } from "../config";
 
 export interface ToolContext {

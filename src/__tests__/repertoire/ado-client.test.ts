@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 const mockFetch = vi.fn()
 vi.stubGlobal("fetch", mockFetch)
 
-import { queryWorkItems, adoRequest } from "../../engine/ado-client"
+import { queryWorkItems, adoRequest } from "../../repertoire/ado-client"
 
 describe("queryWorkItems", () => {
   beforeEach(() => {

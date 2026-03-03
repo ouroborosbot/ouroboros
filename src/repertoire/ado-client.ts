@@ -2,7 +2,7 @@
 // Provides a generic adoRequest() for arbitrary endpoints
 // and a thin queryWorkItems() wrapper for backward compatibility.
 
-import { handleApiError } from "./api-error"
+import { handleApiError } from "../heart/api-error"
 
 const ADO_BASE = "https://dev.azure.com"
 const DEFAULT_API_VERSION = "api-version=7.1"

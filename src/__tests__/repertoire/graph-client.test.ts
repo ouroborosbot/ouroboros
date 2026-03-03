@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 const mockFetch = vi.fn()
 vi.stubGlobal("fetch", mockFetch)
 
-import { getProfile, graphRequest } from "../../engine/graph-client"
+import { getProfile, graphRequest } from "../../repertoire/graph-client"
 
 describe("getProfile", () => {
   beforeEach(() => {

@@ -2,7 +2,7 @@
 // Provides a generic graphRequest() for arbitrary endpoints
 // and a thin getProfile() wrapper for backward compatibility.
 
-import { handleApiError } from "./api-error"
+import { handleApiError } from "../heart/api-error"
 
 const GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 

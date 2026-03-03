@@ -10,5 +10,5 @@ if (!process.argv.includes("--agent")) {
   process.exit(1)
 }
 
-import { startTeamsApp } from "./channels/teams"
+import { startTeamsApp } from "./senses/teams"
 startTeamsApp()

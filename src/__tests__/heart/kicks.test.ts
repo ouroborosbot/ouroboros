@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
-import { hasToolIntent, detectKick } from "../../engine/kicks"
-import type { Kick } from "../../engine/kicks"
+import { hasToolIntent, detectKick } from "../../heart/kicks"
+import type { Kick } from "../../heart/kicks"
 
 describe("hasToolIntent", () => {
   it.each([

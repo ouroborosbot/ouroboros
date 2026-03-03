@@ -34,7 +34,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("readline", () => ({
   createInterface: (...a: any[]) => mocks.createInterface(...a),
 }))
-vi.mock("../../engine/core", () => ({
+vi.mock("../../heart/core", () => ({
   runAgent: (...a: any[]) => mocks.runAgent(...a),
   buildSystem: (...a: any[]) => mocks.buildSystem(...a),
 }))
@@ -69,7 +69,7 @@ vi.mock("../../identity", () => ({
   })),
 }))
 
-import { main } from "../../channels/cli"
+import { main } from "../../senses/cli"
 
 // ── helpers ──
 
