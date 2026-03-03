@@ -687,6 +687,120 @@ describe("contextSection", () => {
     expect(result).toContain("streaming")
     expect(result).not.toContain("no streaming")
   })
+
+  it("renders authority section when checker is present (Teams)", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01" }],
+        tenantMemberships: ["t1"],
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+      checker: {
+        canRead: vi.fn().mockReturnValue(true),
+        canWrite: vi.fn().mockResolvedValue(true),
+        record403: vi.fn(),
+      },
+    }
+    const result = contextSection(ctx)
+    expect(result).toContain("## authority")
+    expect(result).toContain("ado")
+    expect(result).toContain("graph")
+  })
+
+  it("does not render authority section when checker is absent (CLI)", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "cli" as const,
+        availableIntegrations: [] as any[],
+        supportsMarkdown: false,
+        supportsStreaming: true,
+        supportsRichCards: false,
+        maxMessageLength: Infinity,
+      },
+    }
+    const result = contextSection(ctx)
+    expect(result).not.toContain("## authority")
+  })
+
+  it("does not render authority section when context has no checker", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01" }],
+        tenantMemberships: ["t1"],
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+      // No checker
+    }
+    const result = contextSection(ctx)
+    expect(result).not.toContain("## authority")
+  })
+
+  it("authority section mentions write operations are checked", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+      checker: {
+        canRead: vi.fn().mockReturnValue(true),
+        canWrite: vi.fn().mockResolvedValue(true),
+        record403: vi.fn(),
+      },
+    }
+    const result = contextSection(ctx)
+    expect(result).toContain("write")
+    expect(result).toContain("check")
+  })
 })
 
 describe("buildSystem with context", () => {
