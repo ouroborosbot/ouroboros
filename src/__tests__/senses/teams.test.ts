@@ -3822,7 +3822,7 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
     // buildSystem should be called with channel, options, and resolved context
     expect(buildSystem).toHaveBeenCalledWith(
       "teams",
-      expect.anything(),
+      undefined,
       expect.objectContaining({
         friend: expect.objectContaining({ displayName: "Test User" }),
         channel: expect.objectContaining({ channel: "teams" }),
