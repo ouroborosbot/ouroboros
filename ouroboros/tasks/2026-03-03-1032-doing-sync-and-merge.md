@@ -87,7 +87,7 @@ Note: This task is documentation-only. TDD applies if any runtime code is introd
 **Output**: Race Condition Retry, Post-Merge Cleanup, Escalation, and Rules sections added to `subagents/work-merger.md`.
 **Acceptance**: Retry flow uses exponential backoff starting at 30s, doubling each time, with no cap on retries. Each retry outputs a clear message to the user (retry number, wait time, reason). On each retry: re-fetch origin/main, re-merge, re-resolve conflicts using task docs, run tests, `git push --force-with-lease`. Cleanup deletes branch locally and remotely. Escalation section draws clear line between "fixable by agent" and "needs human." Rules section is a numbered list of all invariants (similar to work-planner/work-doer Rules sections).
 
-### ⬜ Unit 5: Update `AGENTS.md` -- extended workflow and branch convention
+### ✅ Unit 5: Update `AGENTS.md` -- extended workflow and branch convention
 **What**: Update `AGENTS.md` to: (1) simplify branch parsing from `[prefix/]<agent>[/feature...]` with `codex/` special-casing to just `<agent>[/<slug>]`, deprecating the old `codex/` prefix, (2) add work-merger to Runtime-Specific Invocation (`$work-merger` for Codex, sub-agent for Claude Code), (3) extend Gate Flow to include sync-and-merge step after work-doer.
 **Output**: Updated `AGENTS.md`.
 **Acceptance**: Branch parsing rule simplified (no `codex/` special-case). Runtime-Specific Invocation lists work-merger for both Codex and Claude Code. Gate Flow includes step 5 (or equivalent) for work-merger after implementation.
