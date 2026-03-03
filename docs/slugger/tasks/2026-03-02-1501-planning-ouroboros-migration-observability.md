@@ -23,6 +23,9 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Lock minimum event catalog coverage per component (entrypoints, channels, engine, mind, tools, config/identity, clients, repertoire) for this phase.
 - Reflect merged upstream runtime layout changes (including `src/wardrobe/phrases.ts` and `src/wardrobe/format.ts`) in observability instrumentation coverage.
 - Keep user-facing output in channel-native paths while routing operational diagnostics through logger sinks (`stderr` + file).
+- Define a machine-readable observability coverage contract (required events + declared logpoints + schema/redaction rules) under `src/observability/coverage/`.
+- Add `npm run audit:observability` to validate observability coverage from test-captured events.
+- Add CI gating so observability coverage audit runs alongside test/coverage checks.
 - Add tests for logger behavior, trace helpers, and instrumentation points.
 - Ensure test/build/coverage remain green with 100% coverage on new code.
 
@@ -44,6 +47,9 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [ ] Trace IDs are generated at turn entry and propagated through core execution.
 - [ ] Existing ad-hoc operational logging in scoped runtime files is replaced or wrapped by structured logging.
 - [ ] Tests cover new observability code and instrumentation behavior.
+- [ ] `npm run audit:observability` exists and fails when required event coverage, schema/policy checks, or declared logpoint coverage is incomplete.
+- [ ] Observability coverage report artifact is produced with measurable results for: event-catalog coverage, schema/redaction compliance, and logpoint coverage.
+- [ ] CI enforces `npm run audit:observability` as a required gate for this phase.
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -72,6 +78,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - `sanitizeKey` parity with sessions is intentional for this phase; collision hardening is explicitly deferred.
 - Upstream `src/wardrobe/*` modules map to existing component taxonomy for this phase (no new component key): `wardrobe/format` events are `component=channels`; `wardrobe/phrases` events are `component=repertoire`.
 - Upstream `src/engine/kicks.ts` is explicitly in-scope for instrumentation and maps to `component=engine` within this phase taxonomy.
+- Observability coverage for this phase is audited in three dimensions: required-event catalog coverage, schema/redaction compliance, and declared-logpoint coverage; all must pass in CI.
 - Minimum required event catalog for this phase is locked by component:
   - entrypoints: `turn.start`, `turn.end`, `turn.error`
   - channels: `channel.message_sent`, `channel.error`
@@ -91,6 +98,8 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/src/engine/kicks.ts`
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/src/wardrobe/phrases.ts`
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/src/wardrobe/format.ts`
+- `/Users/arimendelow/Projects/ouroboros-agent-harness/.github/workflows/coverage.yml`
+- `/Users/arimendelow/Projects/ouroboros-agent-harness/package.json`
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/AGENTS.md`
 
 ## Notes
@@ -111,3 +120,4 @@ Merged `origin/main` into `codex/slugger` before execution planning refresh; ups
 - [2026-03-02 16:15] Synced planning assumptions to merged `origin/main` runtime changes and re-approved for conversion refresh
 - [2026-03-02 16:17] Validation clarification: mapped `src/wardrobe/*` files onto existing event component taxonomy (channels/repertoire)
 - [2026-03-02 16:37] Explicitly added `src/engine/kicks.ts` instrumentation/testing coverage to scope and component taxonomy
+- [PENDING_OBS_AUDIT_TS] Added observability-coverage gate scope (`audit:observability` + CI) with explicit measurable dimensions
