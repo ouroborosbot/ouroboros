@@ -2573,6 +2573,46 @@ describe("runAgent", () => {
     }
   })
 
+  it("injects default fallback prompt when refresh throws a non-Error and no system prompt exists", async () => {
+    vi.resetModules()
+    mockCreate.mockReset()
+    mockResponsesCreate.mockReset()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockRejectedValue("refresh unavailable"),
+    }))
+
+    try {
+      const core = await import("../../heart/core")
+      mockCreate.mockReturnValue(makeStream([makeChunk("hi")]))
+
+      const callbacks: ChannelCallbacks = {
+        onModelStart: () => {},
+        onModelStreamStart: () => {},
+        onTextChunk: () => {},
+        onReasoningChunk: () => {},
+        onToolStart: () => {},
+        onToolEnd: () => {},
+        onError: () => {},
+      }
+
+      const messages: any[] = [
+        { role: "user", content: "hello" },
+      ]
+
+      await core.runAgent(messages, callbacks, "teams")
+
+      expect(messages[0].role).toBe("system")
+      expect(messages[0].content).toBe("You are a helpful assistant.")
+      expect(messages.some((m: any) => m.role === "user" && m.content === "hello")).toBe(true)
+      expect(mockCreate).toHaveBeenCalled()
+    } finally {
+      vi.doUnmock("../../mind/prompt")
+      vi.resetModules()
+    }
+  })
+
   it("still works without channel parameter (backward compatible)", async () => {
     mockCreate.mockReturnValue(makeStream([makeChunk("hi")]))
 
