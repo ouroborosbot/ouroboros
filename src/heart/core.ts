@@ -9,7 +9,7 @@ import { detectKick } from "./kicks";
 import type { KickReason } from "./kicks";
 import type { TurnResult } from "./streaming";
 import type { UsageData } from "../mind/context";
-import { trimMessages, cachedBuildSystem } from "../mind/context";
+import { trimMessages } from "../mind/context";
 import { buildSystem } from "../mind/prompt";
 import type { Channel } from "../mind/prompt";
 
@@ -170,7 +170,7 @@ export async function runAgent(
 
   // Refresh system prompt at start of each turn when channel is provided
   if (channel) {
-    messages[0] = { role: "system", content: cachedBuildSystem(channel, buildSystem, options) };
+    messages[0] = { role: "system", content: await buildSystem(channel, options) };
   }
 
   let kickCount = 0;

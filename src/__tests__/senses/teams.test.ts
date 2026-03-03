@@ -401,12 +401,16 @@ describe("Teams adapter - message handling", () => {
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
     }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(null),
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+
       postTurn: vi.fn(),
     }))
     vi.doMock("../../repertoire/commands", () => ({
@@ -713,12 +717,16 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(null),
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+
       postTurn: vi.fn(),
     }))
 
@@ -765,12 +773,16 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(null),
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+
       postTurn: vi.fn(),
     }))
 
@@ -844,12 +856,16 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(null),
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+
       postTurn: vi.fn(),
     }))
 
@@ -982,12 +998,16 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(null),
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+
       postTurn: vi.fn(),
     }))
 
@@ -1048,12 +1068,16 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(null),
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+
       postTurn: vi.fn(),
     }))
 
@@ -1111,12 +1135,16 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(null),
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+
       postTurn: vi.fn(),
     }))
 
@@ -1652,12 +1680,16 @@ describe("Teams adapter - session persistence", () => {
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
     }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(loadSessionReturn),
       saveSession: vi.fn().mockImplementation((...args: any[]) => { saveSessionCalls.push(args) }),
       deleteSession: vi.fn().mockImplementation((...args: any[]) => { deleteSessionCalls.push(args[0]) }),
       trimMessages: vi.fn().mockImplementation(trimMessagesFn),
-      cachedBuildSystem: vi.fn().mockReturnValue("cached teams prompt"),
+
       postTurn: vi.fn().mockImplementation((...args: any[]) => { postTurnCalls.push(args) }),
     }))
     vi.doMock("../../repertoire/commands", () => ({
@@ -1740,7 +1772,7 @@ describe("Teams adapter - session persistence", () => {
 
     const msgs = runAgentFn.mock.calls[0][0]
     expect(msgs[0].role).toBe("system")
-    expect(msgs[0].content).toBe("cached teams prompt")
+    expect(msgs[0].content).toBe("system prompt")
     expect(msgs.length).toBe(2) // system + user
   })
 
@@ -1972,12 +2004,16 @@ describe("Teams adapter - session persistence", () => {
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: true, disableStreaming: false, port: 3978 }),
     }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(null),
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-      cachedBuildSystem: vi.fn().mockReturnValue("cached teams prompt"),
+
       postTurn: vi.fn(),
     }))
     vi.doMock("../../repertoire/commands", () => ({
@@ -2449,12 +2485,16 @@ describe("Teams adapter - handleTeamsMessage with disableStreaming", () => {
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
     }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(loadSessionReturn),
       saveSession: vi.fn(),
       deleteSession: vi.fn().mockImplementation((...args: any[]) => { deleteSessionCalls.push(args[0]) }),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-      cachedBuildSystem: vi.fn().mockReturnValue("cached teams prompt"),
+
       postTurn: vi.fn().mockImplementation((...args: any[]) => { postTurnCalls.push(args) }),
     }))
     vi.doMock("../../repertoire/commands", () => ({
@@ -2597,12 +2637,16 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(null),
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+
       postTurn: vi.fn(),
     }))
 
@@ -2738,12 +2782,16 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
     }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(null),
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+
       postTurn: vi.fn(),
     }))
 
@@ -2837,12 +2885,16 @@ describe("Teams adapter - confirmation callback", () => {
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
     }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(loadSessionReturn),
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-      cachedBuildSystem: vi.fn().mockReturnValue("cached teams prompt"),
+
       postTurn: vi.fn(),
     }))
     vi.doMock("../../repertoire/commands", () => ({
@@ -3122,12 +3174,16 @@ describe("Teams adapter - confirmation callback", () => {
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
     }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(null),
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-      cachedBuildSystem: vi.fn().mockReturnValue("cached prompt"),
+
       postTurn: vi.fn(),
     }))
     vi.doMock("../../repertoire/commands", () => ({
@@ -3203,12 +3259,16 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
     }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(loadSessionReturn),
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-      cachedBuildSystem: vi.fn().mockReturnValue("cached teams prompt"),
+
       postTurn: vi.fn(),
     }))
     vi.doMock("../../repertoire/commands", () => ({
@@ -3297,12 +3357,16 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: true, port: 3978 }),
     }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
     vi.doMock("../../mind/context", () => ({
       loadSession: vi.fn().mockReturnValue(null),
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-      cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
+
       postTurn: vi.fn(),
     }))
 
