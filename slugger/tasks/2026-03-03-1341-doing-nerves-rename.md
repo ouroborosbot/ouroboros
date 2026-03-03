@@ -78,7 +78,7 @@ Rename the repository's observability namespace and command surface from `observ
 **What**: Validate branch/error-path coverage for updated script logic and tighten implementation without behavior drift.
 **Acceptance**: Updated script/tests are fully covered for new/changed lines and remain green.
 
-### ⬜ Unit 3a: Documentation and Task Path Accuracy — Tests
+### ✅ Unit 3a: Documentation and Task Path Accuracy — Tests
 **What**: Add lightweight assertions/checks or scripted validations (if present) for active docs/commands that must move from `observability` to `nerves`.
 **Acceptance**: Validation fails when active required docs still contain stale subsystem naming.
 
@@ -115,3 +115,4 @@ Rename the repository's observability namespace and command surface from `observ
 - [2026-03-03 14:05] Unit 2a complete: added failing coverage-pipeline contract assertions for `nerves audit` messaging and `nerves_coverage` summary key.
 - [2026-03-03 14:07] Unit 2b complete: implemented `nerves audit` messaging and `nerves_coverage` outputs in coverage CLI/gate; targeted tests and combined gate pass.
 - [2026-03-03 14:08] Unit 2c complete: reran combined coverage gate at 100% with `nerves` pipeline naming and verified clean build.
+- [2026-03-03 14:09] Unit 3a complete: added failing naming-consistency test for active docs/command paths still containing stale `observability` terms.
