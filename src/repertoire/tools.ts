@@ -57,5 +57,6 @@ export function summarizeArgs(name: string, args: Record<string, string>): strin
   if (name === "load_skill") return args.name || "";
   if (name === "claude") return args.prompt?.slice(0, 40) || "";
   if (name === "web_search") return args.query?.slice(0, 40) || "";
+  if (name === "save_friend_note") return args.key || "";
   return JSON.stringify(args).slice(0, 30);
 }
