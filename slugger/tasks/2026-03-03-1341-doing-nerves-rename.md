@@ -16,15 +16,15 @@
 Rename the repository's observability namespace and command surface from `observability` to `nerves` so terminology aligns with the project's body-system naming conventions.
 
 ## Completion Criteria
-- [ ] `src/observability/` is fully renamed to `src/nerves/` (or equivalent file move) with no orphaned runtime usage.
-- [ ] Runtime code compiles and uses `nerves` import paths consistently.
-- [ ] Test suite references `nerves` paths and passes without alias shims.
+- [x] `src/observability/` is fully renamed to `src/nerves/` (or equivalent file move) with no orphaned runtime usage.
+- [x] Runtime code compiles and uses `nerves` import paths consistently.
+- [x] Test suite references `nerves` paths and passes without alias shims.
 - [ ] Coverage and `audit:nerves` gate remain green after rename.
 - [ ] Documentation/path references required for current workflows are updated to the new namespace.
 - [ ] No active (non-historical) user-facing command or doc in this repo still uses `observability` as the subsystem name.
 - [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -58,7 +58,7 @@ Rename the repository's observability namespace and command surface from `observ
 **What**: Add or update tests to fail first for the new namespace/command contract, including `audit:nerves` naming, `src/nerves` import-path expectations, and renamed coverage-cli output defaults.
 **Acceptance**: New/updated tests exist and fail (red) before implementation.
 
-### ⬜ Unit 1b: Namespace and Command Rename — Implementation
+### ✅ Unit 1b: Namespace and Command Rename — Implementation
 **What**: Perform file moves and code edits to rename `src/observability` to `src/nerves` and `src/__tests__/observability` to `src/__tests__/nerves`, update imports/exports, and switch active command usage to `audit:nerves`.
 **Acceptance**: Targeted tests pass (green), runtime/build path references resolve, no warnings.
 
@@ -110,3 +110,4 @@ Rename the repository's observability namespace and command surface from `observ
 - [2026-03-03 13:51] Quality pass complete; acceptance criteria, coverage requirements, and unit-status formatting verified for execution handoff.
 - [2026-03-03 13:59] Unit 0 complete: captured active rename targets and historical exclusions in `rename-inventory.md`.
 - [2026-03-03 14:00] Unit 1a complete: added failing rename contract tests for `audit:nerves` and coverage-gate naming, captured red run output.
+- [2026-03-03 14:02] Unit 1b complete: moved observability module/test trees to `nerves`, updated imports and command wiring, and passed full test suite + build.
