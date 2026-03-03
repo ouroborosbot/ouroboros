@@ -127,3 +127,4 @@ Define and lock runtime hardening requirements for single-replica preview so req
 
 ## Progress Log
 - [2026-03-03 14:43] Created from planning doc.
+- [2026-03-03 14:44] Granularity pass complete: units confirmed atomic and testable with explicit What/Output/Acceptance for each phase.
