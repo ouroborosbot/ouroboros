@@ -230,13 +230,13 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Files**: `src/__tests__/senses/teams.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because teams.ts still uses old wiring.
 
-### ⬜ Unit 9b: Teams adapter wiring -- Implementation
+### ✅ Unit 9b: Teams adapter wiring -- Implementation
 **What**: Update `teams.ts`: (1) In `app.on("message")`, extract `activity.from.aadObjectId`, `activity.conversation.tenantId`, `activity.from.name` into `teamsContext`. (2) In `handleTeamsMessage()`, create `FileFriendStore` with agentKnowledgePath (`getAgentRoot()/friends`) and piiBridgePath (`~/.agentconfigs/{agentName}/friends`). (3) Create `FriendResolver` with aadObjectId or fallback to conversation ID. (4) Pass resolved context to buildSystem (rebuild each turn). (5) Set `toolContext.friendStore`. (6) Use friend UUID for session path. (7) Replace `FileContextStore`/`ContextResolver` imports with `FileFriendStore`/`FriendResolver`.
 **Output**: Updated `teams.ts` with new wiring.
 **Files**: `src/senses/teams.ts`
 **Acceptance**: All Teams tests PASS (green), no warnings.
 
-### ⬜ Unit 9c: Teams adapter -- Coverage & Refactor
+### ✅ Unit 9c: Teams adapter -- Coverage & Refactor
 **What**: Verify 100% coverage on Teams adapter changes.
 **Output**: Coverage report showing 100% on Teams adapter changes.
 **Acceptance**: 100% coverage on new code, tests still green.
@@ -308,3 +308,4 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 - 2026-03-03 15:30 Units 6a-6d complete: getToolsForChannel accepts toolPreferences param, injects matching preferences into integration tool descriptions. No mutation of originals, unknown keys ignored. 100% coverage on tools.ts. Post-tool-layer checkpoint: 1179 tests pass.
 - 2026-03-03 15:33 Units 7a-7c complete: contextSection redesigned with behavioral instructions (ephemerality, name quality, priority, working-memory trust, stale notes, new-friend). Notes in system prompt, toolPreferences not in system prompt. 100% coverage on prompt.ts. 1189 tests pass.
 - 2026-03-03 15:36 Units 8a-8c complete: sessionPath restructured to 3-arg (friendId, channel, key). Auto-creates parent dirs. Callers updated with temporary "default" friendId until Units 9-10 wire real friend UUID. 100% coverage on config.ts. 1189 tests pass.
+- 2026-03-03 15:39 Units 9a-9c complete: Teams adapter wired -- buildSystem called with resolved context, toolContext.friendStore set, sessionPath uses friend UUID, context resolved early. 100% coverage on teams.ts. 1192 tests pass.
