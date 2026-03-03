@@ -137,6 +137,22 @@ describe("ContextResolver", () => {
     expect(typeof ctx.checker!.record403).toBe("function")
   })
 
+  it("authority checker canWrite uses default probe (optimistic true)", async () => {
+    const store = createMockStore()
+    const resolver = new ContextResolver(store, {
+      provider: "aad",
+      externalId: "aad-user-1",
+      tenantId: "tenant-1",
+      displayName: "Jordan",
+      channel: "teams",
+    })
+
+    const ctx = await resolver.resolve()
+    // Default probe always returns true (optimistic)
+    const result = await ctx.checker!.canWrite("ado", "myorg", "createWorkItem")
+    expect(result).toBe(true)
+  })
+
   it("skips authority when availableIntegrations is empty (CLI)", async () => {
     const store = createMockStore()
     const resolver = new ContextResolver(store, {

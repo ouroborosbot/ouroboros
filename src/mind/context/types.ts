@@ -53,6 +53,18 @@ export interface ChannelCapabilities {
   maxMessageLength: number
 }
 
+// -- Authority --
+// Per-turn authority checker: optimistic reads, pre-flight writes.
+// Created at resolve time, discarded after the turn completes.
+export interface AuthorityChecker {
+  /** Optimistic read: true unless a 403 was recorded this turn */
+  canRead(integration: string, scope: string): boolean
+  /** Pre-flight write check: probes Security Namespaces API */
+  canWrite(integration: string, scope: string, action: string): Promise<boolean>
+  /** Record a 403 failure observed during this turn */
+  record403(integration: string, scope: string, action: string): void
+}
+
 // -- Resolved Context --
 // The per-request bundle resolved by the ContextResolver.
 // Phase 1: identity + channel only.
@@ -60,4 +72,5 @@ export interface ChannelCapabilities {
 export interface ResolvedContext {
   readonly identity: FriendIdentity
   readonly channel: ChannelCapabilities
+  readonly checker?: AuthorityChecker
 }
