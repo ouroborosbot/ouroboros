@@ -167,7 +167,7 @@ describe("ChannelCallbacks interface", () => {
 })
 
 describe("runAgent", () => {
-  let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal, options?: { toolChoiceRequired?: boolean; maxKicks?: number }) => Promise<{ usage?: any }>
+  let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal, options?: { toolChoiceRequired?: boolean }) => Promise<{ usage?: any }>
 
   // Helper to create an async iterable from chunks
   function makeStream(chunks: any[]) {
@@ -2820,7 +2820,7 @@ describe("hasToolIntent", () => {
 })
 
 describe("kick mechanism", () => {
-  let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal, options?: { toolChoiceRequired?: boolean; maxKicks?: number }) => Promise<{ usage?: any }>
+  let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal, options?: { toolChoiceRequired?: boolean }) => Promise<{ usage?: any }>
 
   function makeStream(chunks: any[]) {
     return {
@@ -2861,40 +2861,6 @@ describe("kick mechanism", () => {
       return makeStream([makeChunk("here is the result")])
     })
 
-    const kicks: { attempt: number; maxKicks: number }[] = []
-    const callbacks: ChannelCallbacks = {
-      onModelStart: () => {},
-      onModelStreamStart: () => {},
-      onTextChunk: () => {},
-      onReasoningChunk: () => {},
-      onToolStart: () => {},
-      onToolEnd: () => {},
-      onError: () => {},
-      onKick: (attempt: number, maxKicks: number) => kicks.push({ attempt, maxKicks }),
-    }
-
-    const messages: any[] = [{ role: "system", content: "test" }]
-    await runAgent(messages, callbacks)
-
-    expect(kicks).toHaveLength(1)
-    expect(kicks[0]).toEqual({ attempt: 1, maxKicks: 1 })
-    expect(callCount).toBe(2)
-    // Assistant messages: original narration + self-correction, then real response
-    const assistantMessages = messages.filter((m: any) => m.role === "assistant")
-    expect(assistantMessages).toHaveLength(2)
-    expect(assistantMessages[0].content).toContain("let me read that file for you")
-    expect(assistantMessages[0].content).toContain("I narrated instead of acting. Calling the tool now.")
-    expect(assistantMessages[1].content).toBe("here is the result")
-  })
-
-  it("does not kick when maxKicks (default 1) is already exhausted", async () => {
-    let callCount = 0
-    mockCreate.mockImplementation(() => {
-      callCount++
-      // Both calls narrate intent
-      return makeStream([makeChunk("I'll read the file now")])
-    })
-
     const kicks: number[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
@@ -2904,19 +2870,52 @@ describe("kick mechanism", () => {
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: () => {},
-      onKick: (attempt: number) => kicks.push(attempt),
+      onKick: () => kicks.push(1),
     }
 
     const messages: any[] = [{ role: "system", content: "test" }]
     await runAgent(messages, callbacks)
 
-    // First narration triggers kick, second narration does NOT (exhausted)
     expect(kicks).toHaveLength(1)
-    expect(callCount).toBe(2) // original + 1 retry, then normal termination
+    expect(callCount).toBe(2)
+    // Assistant messages: original narration + self-correction, then real response
+    const assistantMessages = messages.filter((m: any) => m.role === "assistant")
+    expect(assistantMessages).toHaveLength(2)
+    expect(assistantMessages[0].content).toContain("let me read that file for you")
+    expect(assistantMessages[0].content).toContain("I narrated instead of acting. Calling the tool now.")
+    expect(assistantMessages[1].content).toBe("here is the result")
+  })
+
+  it("kicks fire unconditionally -- no maxKicks cap, bounded by MAX_TOOL_ROUNDS", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      // All calls narrate intent -- kicks fire every time until MAX_TOOL_ROUNDS
+      return makeStream([makeChunk("I'll read the file now")])
+    })
+
+    const kicks: number[] = []
+    const errors: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err.message),
+      onKick: () => kicks.push(1),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks)
+
+    // Kicks fire unconditionally -- should be capped at MAX_TOOL_ROUNDS (10)
+    expect(kicks.length).toBe(10)
+    expect(errors.some(e => e.includes("tool loop limit"))).toBe(true)
   })
 
   it("kick increments toolRounds and respects MAX_TOOL_ROUNDS", async () => {
-    // Use maxKicks=15 to allow many kicks, but MAX_TOOL_ROUNDS should cap at 10
     let callCount = 0
     mockCreate.mockImplementation(() => {
       callCount++
@@ -2933,11 +2932,11 @@ describe("kick mechanism", () => {
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: (err) => errors.push(err.message),
-      onKick: (attempt: number) => kicks.push(attempt),
+      onKick: () => kicks.push(1),
     }
 
     const messages: any[] = [{ role: "system", content: "test" }]
-    await runAgent(messages, callbacks, undefined, undefined, { maxKicks: 15 })
+    await runAgent(messages, callbacks)
 
     // Kicks should be capped by MAX_TOOL_ROUNDS (10)
     expect(callCount).toBeLessThanOrEqual(11) // initial + up to 10 kicks
@@ -2974,33 +2973,7 @@ describe("kick mechanism", () => {
     expect(assistantMessages.some((m: any) => m.content?.includes("let me check that") && m.content?.includes("I narrated instead of acting."))).toBe(true)
   })
 
-  it("does not kick when maxKicks is set to 0 via options", async () => {
-    let callCount = 0
-    mockCreate.mockImplementation(() => {
-      callCount++
-      return makeStream([makeChunk("let me read the file")])
-    })
-
-    const kicks: number[] = []
-    const callbacks: ChannelCallbacks = {
-      onModelStart: () => {},
-      onModelStreamStart: () => {},
-      onTextChunk: () => {},
-      onReasoningChunk: () => {},
-      onToolStart: () => {},
-      onToolEnd: () => {},
-      onError: () => {},
-      onKick: (attempt: number) => kicks.push(attempt),
-    }
-
-    const messages: any[] = [{ role: "system", content: "test" }]
-    await runAgent(messages, callbacks, undefined, undefined, { maxKicks: 0 })
-
-    expect(kicks).toHaveLength(0)
-    expect(callCount).toBe(1)
-  })
-
-  it("allows up to 2 kicks when maxKicks is set to 2", async () => {
+  it("onKick callback receives no arguments", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
       callCount++
@@ -3010,7 +2983,7 @@ describe("kick mechanism", () => {
       return makeStream([makeChunk("here is the result")])
     })
 
-    const kicks: { attempt: number; maxKicks: number }[] = []
+    const kickArgs: number[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
@@ -3019,16 +2992,15 @@ describe("kick mechanism", () => {
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: () => {},
-      onKick: (attempt: number, maxKicks: number) => kicks.push({ attempt, maxKicks }),
+      onKick: (...args: any[]) => kickArgs.push(args.length),
     }
 
     const messages: any[] = [{ role: "system", content: "test" }]
-    await runAgent(messages, callbacks, undefined, undefined, { maxKicks: 2 })
+    await runAgent(messages, callbacks)
 
-    expect(kicks).toHaveLength(2)
-    expect(kicks[0]).toEqual({ attempt: 1, maxKicks: 2 })
-    expect(kicks[1]).toEqual({ attempt: 2, maxKicks: 2 })
-    expect(callCount).toBe(3) // original + 2 retries
+    // onKick should receive zero arguments
+    expect(kickArgs.length).toBeGreaterThan(0)
+    expect(kickArgs.every(n => n === 0)).toBe(true)
   })
 
   it("onKick callback is optional (no crash if not provided)", async () => {
@@ -3133,7 +3105,7 @@ describe("kick mechanism", () => {
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: () => {},
-      onKick: (attempt: number) => kicks.push(attempt),
+      onKick: () => kicks.push(1),
     }
 
     const messages: any[] = [{ role: "system", content: "test" }]
@@ -3153,7 +3125,7 @@ describe("kick mechanism", () => {
 })
 
 describe("tool_choice required and final_answer", () => {
-  let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal, options?: { toolChoiceRequired?: boolean; maxKicks?: number }) => Promise<{ usage?: any }>
+  let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal, options?: { toolChoiceRequired?: boolean }) => Promise<{ usage?: any }>
 
   function makeStream(chunks: any[]) {
     return {
@@ -3618,7 +3590,7 @@ describe("tool_choice required and final_answer", () => {
 })
 
 describe("integration: kick + tool_choice required combined", () => {
-  let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal, options?: { toolChoiceRequired?: boolean; maxKicks?: number }) => Promise<{ usage?: any }>
+  let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal, options?: { toolChoiceRequired?: boolean }) => Promise<{ usage?: any }>
 
   function makeStream(chunks: any[]) {
     return {
@@ -3672,7 +3644,7 @@ describe("integration: kick + tool_choice required combined", () => {
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: () => {},
-      onKick: (attempt: number) => kicks.push(attempt),
+      onKick: () => kicks.push(1),
     }
 
     const messages: any[] = [{ role: "system", content: "test" }]
@@ -3744,11 +3716,11 @@ describe("integration: kick + tool_choice required combined", () => {
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: (err) => errors.push(err.message),
-      onKick: (attempt: number) => kicks.push(attempt),
+      onKick: () => kicks.push(1),
     }
 
     const messages: any[] = [{ role: "system", content: "test" }]
-    await runAgent(messages, callbacks, undefined, undefined, { maxKicks: 10 })
+    await runAgent(messages, callbacks)
 
     // Should hit MAX_TOOL_ROUNDS (10) combining kicks and tool rounds
     expect(errors.some(e => e.includes("tool loop limit"))).toBe(true)
@@ -3776,7 +3748,7 @@ describe("integration: kick + tool_choice required combined", () => {
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: () => {},
-      onKick: (attempt: number) => kicks.push(attempt),
+      onKick: () => kicks.push(1),
     }
 
     const messages: any[] = [{ role: "system", content: "test" }]
@@ -3813,7 +3785,7 @@ describe("integration: kick + tool_choice required combined", () => {
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: () => {},
-      onKick: (attempt: number) => kicks.push(attempt),
+      onKick: () => kicks.push(1),
     }
 
     const messages: any[] = [{ role: "system", content: "test" }]
@@ -3856,7 +3828,7 @@ describe("integration: kick + tool_choice required combined", () => {
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: () => {},
-      onKick: (attempt: number) => kicks.push(attempt),
+      onKick: () => kicks.push(1),
     }
 
     const messages: any[] = [{ role: "system", content: "test" }]
@@ -3919,7 +3891,7 @@ describe("integration: kick + tool_choice required combined", () => {
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: () => {},
-      onKick: (attempt: number) => kicks.push(attempt),
+      onKick: () => kicks.push(1),
     }
 
     const messages: any[] = [{ role: "system", content: "test" }]
