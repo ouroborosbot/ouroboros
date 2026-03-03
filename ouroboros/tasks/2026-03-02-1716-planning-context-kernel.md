@@ -22,12 +22,11 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 - 1G. System prompt injection -- `buildSystem()` gains a `contextSection()` that renders identity + preferences + channel into the system prompt. Rebuilt per-turn. Gracefully omitted when no context is available.
 - 1H. Wire Identity + Preferences through ONE real ADO operation: per-user default org/project. The existing `ado_work_items` tool drops the required `organization` parameter when preferences provide a default. This is the proof that the kernel works end-to-end before building more layers.
 
-**Phase 2: Authority + Preferences (Demand-Driven)**
+**Phase 2: Authority (Demand-Driven)**
 - 2A. `Authority` type and resolution -- integration-scoped capability profiles using a hybrid model: optimistic on read-path (attempt and learn from 403), pre-flight check on write-path (verify before proposing destructive operations). Cached with TTL + 403-triggered invalidation.
 - 2B. `AuthorityChecker` -- distinguishes read operations (optimistic, learn from failure) from write operations (pre-validated). Provides `canRead(scope)` (always true until 403 disproves) and `canWrite(scope)` (probes API before returning). Pre-flight writes check a lightweight endpoint (e.g., project-level permissions descriptor) rather than attempting the actual mutation.
-- 2C. `Preferences` type and resolution -- global preferences (verbosity, confirmation policy, preview-before-mutation) plus integration-scoped preferences (ADO planning style, auto-assign). Persisted via `ContextStore`.
-- 2D. Wire Authority into existing `ado_mutate` tool -- before executing a mutation, check `canWrite()`. If denied, return a structured explanation instead of attempting and failing. Existing `ado_query` remains optimistic.
-- 2E. Extend system prompt injection with authority constraints and preferences -- `contextSection()` renders "can / CANNOT" authority limits and user preferences into the prompt so the model plans around constraints upfront (see D10).
+- 2C. Wire Authority into existing `ado_mutate` tool -- before executing a mutation, check `canWrite()`. If denied, return a structured explanation instead of attempting and failing. Existing `ado_query` remains optimistic.
+- 2D. Extend system prompt injection with authority constraints -- `contextSection()` renders "can / CANNOT" authority limits into the prompt so the model plans around constraints upfront (see D10). Authority → Identity feedback loop (D11) prunes stale knownScopes.
 
 **Phase 3: ADO Semantic Tools (Full Consumer)**
 - 3A. Per-user default ADO context (defaultOrg, defaultProject, knownProjects) resolved via identity + preferences
@@ -69,7 +68,7 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 - [ ] Channel-aware formatting works for Teams and CLI
 - [ ] Dry-run mode returns structured preview for ADO mutations
 - [ ] Cross-tenant bleed is prevented by authority scoping
-- [ ] System prompt includes resolved context (identity, session, authority constraints, preferences) via `contextSection()` in `buildSystem()`
+- [ ] System prompt includes resolved context (identity, authority constraints, preferences) via `contextSection()` in `buildSystem()`
 - [ ] Authority constraints rendered as explicit "can / CANNOT" in prompt so model plans around limitations
 - [ ] Prompt injection gracefully omitted when no context is available (CLI with no identity, first turn)
 - [ ] 100% test coverage on all new code
@@ -270,8 +269,8 @@ This is a large initiative that should be broken into multiple doing docs. The r
 **Doing Doc 1: Identity + Preferences + Storage Interface (Phase 1)**
 Units 1A-1H. Builds the storage interface, identity, preferences, channel capabilities, lazy resolver, system prompt injection, and wires through one real ADO operation. Proves the kernel end-to-end.
 
-**Doing Doc 2: Authority + Preferences (Phase 2)**
-Units 2A-2E. Builds the hybrid authority model and preferences, wires them into existing tools. Depends on Doing Doc 1.
+**Doing Doc 2: Authority (Phase 2)**
+Units 2A-2D. Builds the hybrid authority model, wires it into existing tools and prompt. Depends on Doing Doc 1.
 
 **Doing Doc 3: ADO Semantic Tools (Phase 3)**
 Units 3A-3F. The new ADO tools that consume the full context kernel. Depends on Doing Doc 2.
@@ -425,9 +424,7 @@ interface LazyResolvedContext {
 - 2026-03-02 17:18 Created planning doc with full codebase analysis
 - 2026-03-02 18:09 Rewrote planning doc: storage interface (not file-based commitment), hybrid authority (not pure 403 learning), lazy resolver (not upfront bag), interleaved phasing (not back-loaded)
 - 2026-03-02 18:22 Added D10: system prompt injection -- context reaches the model via buildSystem(), not just tools. Authority constraints rendered as explicit can/CANNOT. Graceful degradation when no context available.
-- 2026-03-02 18:38 Gap analysis: added Q9-Q15 covering identity bootstrapping, session persistence between turns, working set mutation ownership, buildSystem() API change, resolver error handling, schema versioning, and token/context separation.
-- 2026-03-02 19:15 Added D13 (resolver per-request lifecycle). ChannelCapabilities gains availableIntegrations — prompt only renders integration context for integrations the channel can reach.
-- 2026-03-02 19:30 D3 expanded: availableIntegrations is single source of truth driving tool routing, prompt injection, and resolver. Replaces hardcoded channel === "teams" in getToolsForChannel(). No per-channel switch statements.
-- 2026-03-02 19:22 Rewrote D12 for multi-channel from day one. Hard rules: internal UUID is only primary key, all storage keys use UUID never external IDs, ContextStore gains find() for external ID lookup. ExternalId.provider changed from closed union to extensible string. Added linkedAt to ExternalId. Linking/unlinking UX deferred but data model supports it now.
-- 2026-03-02 19:05 Added D11: Authority → Identity feedback loop. knownScopes is not append-only — 403s prune stale scopes from Identity so prompt stays clean.
-- 2026-03-02 18:55 Eliminated Session layer (D8 rewritten). Five layers → four (Identity, Authority, Preferences, Channel). Conversation history IS the session. Tools are stateless. Working set, execution mode, active scope all removed. Useful bits (knownScopes, defaults) folded into Identity and Preferences. Q6/Q10/Q11 resolved as eliminated. Schema updated: added KnownScope to Identity, schemaVersion to persisted types, removed SessionContext and WorkingSetItem.
+- 2026-03-02 18:47 Gap analysis: added Q9-Q15. Eliminated Session layer (D8 rewritten, five → four layers). Added D11 (Authority → Identity feedback loop, knownScopes pruned on 403).
+- 2026-03-02 19:18 Added D12 (multi-channel identity, internal UUID as only primary key, ContextStore.find()), D13 (resolver per-request lifecycle), availableIntegrations on ChannelCapabilities.
+- 2026-03-02 19:20 D3 expanded: availableIntegrations drives tool routing, prompt injection, and resolver. No per-channel switch statements.
+- 2026-03-02 19:20 Cleaned up: fixed stale "session" refs, moved Preferences fully to Phase 1 (removed Phase 2 duplication), renumbered Phase 2 units.
