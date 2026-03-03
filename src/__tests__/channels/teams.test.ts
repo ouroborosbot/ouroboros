@@ -2183,6 +2183,32 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     expect(sendMessage).not.toHaveBeenCalled()
   })
 
+  it("safeSend catch: when sendMessage throws synchronously, controller is aborted", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    const sendMessage = vi.fn().mockImplementation(() => { throw new Error("sync failure") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onToolEnd("read_file", "test.txt", true)
+    expect(controller.signal.aborted).toBe(true)
+  })
+
+  it("onToolStart flushes text to sendMessage when stream already has content", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    // First: emit text to stream (sets streamHasContent)
+    callbacks.onTextChunk("first response")
+    await callbacks.flush()
+    expect(mockStream.emit).toHaveBeenCalledWith("first response")
+    mockStream.emit.mockClear()
+    // Second: accumulate more text, then onToolStart flushes via sendMessage (streamHasContent=true)
+    callbacks.onTextChunk("second text")
+    callbacks.onToolStart("read_file", { path: "test.txt" })
+    expect(sendMessage).toHaveBeenCalledWith("second text")
+    expect(mockStream.emit).not.toHaveBeenCalled()
+  })
+
   it("onToolEnd success calls sendMessage with formatted result when disableStreaming is true", async () => {
     vi.resetModules()
     const teams = await import("../../channels/teams")
@@ -2262,6 +2288,21 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     expect(mockStream.emit).toHaveBeenCalledTimes(1)
     expect(mockStream.emit).toHaveBeenCalledWith("Hello world!")
     expect(sendMessage).not.toHaveBeenCalled()
+  })
+
+  it("flush() with prior stream content but no sendMessage: text is silently dropped", async () => {
+    vi.resetModules()
+    const teams = await import("../../channels/teams")
+    // No sendMessage provided -- buffered mode without sendMessage
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, undefined, { disableStreaming: true })
+    // First iteration: text goes to emit
+    callbacks.onTextChunk("first response")
+    await callbacks.flush()
+    mockStream.emit.mockClear()
+    // Second iteration: no sendMessage, so text should be silently cleared (not emitted again)
+    callbacks.onTextChunk("second response")
+    await callbacks.flush()
+    expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
   it("flush() with prior stream content: text goes via sendMessage", async () => {
