@@ -1,11 +1,11 @@
 // Context kernel type definitions.
-// All layer types (Identity, Authority, Memory, Channel) and the resolved context.
+// FriendRecord (merged identity + memory), channel capabilities, and resolved context.
 
 // -- Identity Provider --
-// Closed union: "aad" (Azure AD / Teams) or "local" (CLI / OS)
-export type IdentityProvider = "aad" | "local"
+// Closed union: "aad" (Azure AD / Teams), "local" (CLI / OS), "teams-conversation" (fallback)
+export type IdentityProvider = "aad" | "local" | "teams-conversation"
 
-const IDENTITY_PROVIDERS: ReadonlySet<string> = new Set<IdentityProvider>(["aad", "local"])
+const IDENTITY_PROVIDERS: ReadonlySet<string> = new Set<IdentityProvider>(["aad", "local", "teams-conversation"])
 
 export function isIdentityProvider(value: unknown): value is IdentityProvider {
   return typeof value === "string" && IDENTITY_PROVIDERS.has(value)
@@ -22,7 +22,7 @@ export function isIntegration(value: unknown): value is Integration {
 }
 
 // -- External ID --
-// Links an internal FriendIdentity to an external system identity
+// Links an internal FriendRecord to an external system identity
 export interface ExternalId {
   provider: IdentityProvider
   externalId: string
@@ -30,14 +30,18 @@ export interface ExternalId {
   linkedAt: string // ISO date
 }
 
-// -- Friend Identity --
-// The stable internal record for a person the agent interacts with
-export interface FriendIdentity {
-  id: string          // internal, stable, uuid
+// -- Friend Record --
+// The single merged type for a person the agent interacts with.
+// Combines identity (who they are) and memory (what the agent knows about them).
+// Split across two storage backends by PII boundary.
+export interface FriendRecord {
+  id: string                              // stable UUID
   displayName: string
-  externalIds: ExternalId[]
-  tenantMemberships: string[]  // AAD tenant IDs
-  createdAt: string   // ISO date
+  externalIds: ExternalId[]               // PII
+  tenantMemberships: string[]             // PII
+  toolPreferences: Record<string, string> // keyed by integration name
+  notes: Record<string, string>           // general friend knowledge
+  createdAt: string                       // ISO date
   updatedAt: string
   schemaVersion: number
 }
@@ -53,34 +57,45 @@ export interface ChannelCapabilities {
   maxMessageLength: number
 }
 
-// -- Authority --
-// Per-turn authority checker: optimistic reads, pre-flight writes.
-// Created at resolve time, discarded after the turn completes.
-export interface AuthorityChecker {
-  /** Optimistic read: true unless a 403 was recorded this turn */
-  canRead(integration: string, scope: string): boolean
-  /** Pre-flight write check: probes Security Namespaces API */
-  canWrite(integration: string, scope: string, action: string): Promise<boolean>
-  /** Record a 403 failure observed during this turn */
-  record403(integration: string, scope: string, action: string): void
+// -- Resolved Context --
+// The per-request bundle resolved by the FriendResolver.
+// During migration: includes both new (friend) and legacy (identity, memory, checker) fields.
+// Legacy fields will be removed as consumers are updated (Units 5-11).
+export interface ResolvedContext {
+  readonly friend: FriendRecord
+  readonly channel: ChannelCapabilities
+  // Legacy fields -- deprecated, removed after all consumers migrate
+  readonly identity?: FriendIdentity
+  readonly memory?: FriendMemory | null
+  readonly checker?: AuthorityChecker
 }
 
-// -- Friend Memory --
-// Model-managed memory about a friend. The model decides what to store.
-// toolPreferences is freeform Record<string, string> -- no typed schema.
+// ============================================================
+// DEPRECATED: Legacy types kept for backward compat during migration.
+// These will be removed as consumers are updated (Units 2-11).
+// ============================================================
+
+/** @deprecated Use FriendRecord instead */
+export interface FriendIdentity {
+  id: string
+  displayName: string
+  externalIds: ExternalId[]
+  tenantMemberships: string[]
+  createdAt: string
+  updatedAt: string
+  schemaVersion: number
+}
+
+/** @deprecated Merged into FriendRecord */
 export interface FriendMemory {
-  id: string          // matches FriendIdentity.id
+  id: string
   toolPreferences: Record<string, string>
   schemaVersion: number
 }
 
-// -- Resolved Context --
-// The per-request bundle resolved by the ContextResolver.
-// Phase 1: identity + channel only.
-// Phase 2 adds authority, Phase 3 adds memory.
-export interface ResolvedContext {
-  readonly identity: FriendIdentity
-  readonly channel: ChannelCapabilities
-  readonly checker?: AuthorityChecker
-  readonly memory: FriendMemory | null
+/** @deprecated Use ResolvedContext (friend-based) instead */
+export interface AuthorityChecker {
+  canRead(integration: string, scope: string): boolean
+  canWrite(integration: string, scope: string, action: string): Promise<boolean>
+  record403(integration: string, scope: string, action: string): void
 }
