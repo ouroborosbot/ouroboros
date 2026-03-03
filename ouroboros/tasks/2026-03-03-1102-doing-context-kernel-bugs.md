@@ -101,19 +101,19 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Output**: Coverage report showing 100% on `types.ts` and `store.ts`.
 **Acceptance**: 100% coverage on new code, tests still green.
 
-### ⬜ Unit 2a: FileFriendStore (two-backend split) -- Tests
+### ✅ Unit 2a: FileFriendStore (two-backend split) -- Tests
 **What**: Write tests for `FileFriendStore` with two-backend split (agent knowledge path + PII bridge path). Test: constructor auto-creates directories, `get()` merges data from both backends, `put()` splits record across both (agent knowledge gets id/displayName/toolPreferences/notes/createdAt/updatedAt/schemaVersion; PII bridge gets id/externalIds/tenantMemberships/schemaVersion), `delete()` removes from both, `findByExternalId()` scans PII bridge then merges with agent knowledge. Edge cases: missing files return null, corrupted JSON returns null, empty directory returns null from findByExternalId, schema migration. **Critical**: include tests that verify `put()` writes files to BOTH backend paths independently -- read each backend file directly (not via `get()`) to confirm the correct fields landed in the correct location. This catches silent single-backend write failures.
 **Output**: Updated `store-file.test.ts` with FileFriendStore tests.
 **Files**: `src/__tests__/mind/context/store-file.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `FileFriendStore` doesn't exist yet.
 
-### ⬜ Unit 2b: FileFriendStore (two-backend split) -- Implementation
+### ✅ Unit 2b: FileFriendStore (two-backend split) -- Implementation
 **What**: Implement `FileFriendStore` class in `store-file.ts`. Constructor takes two paths (agentKnowledgePath, piiBridgePath) and calls `mkdirSync(path, { recursive: true })` for both. `get(id)` reads both JSON files and merges. `put(id, record)` splits the `FriendRecord` and writes to both locations. `delete(id)` removes from both. `findByExternalId(provider, externalId, tenantId?)` scans PII bridge directory for matching external ID, then reads agent knowledge and merges. Remove old `FileContextStore` and `FileCollectionStore`.
 **Output**: Updated `store-file.ts` with FileFriendStore implementation.
 **Files**: `src/mind/context/store-file.ts`
 **Acceptance**: All store-file tests PASS (green), no warnings. Tests verify that `put()` actually writes files to BOTH backend paths (agent knowledge AND PII bridge) -- not just that the merged `get()` result is correct. This catches the scenario where one backend write silently fails or is skipped.
 
-### ⬜ Unit 2c: FileFriendStore -- Coverage & Refactor
+### ✅ Unit 2c: FileFriendStore -- Coverage & Refactor
 **What**: Verify 100% coverage on FileFriendStore. Test all error paths.
 **Output**: Coverage report showing 100% on `store-file.ts`.
 **Acceptance**: 100% coverage on new code, tests still green.
