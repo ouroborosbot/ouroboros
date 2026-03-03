@@ -272,6 +272,37 @@ describe("runAgent", () => {
     }))
   })
 
+  it("emits engine lifecycle observability events for a successful turn", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
+
+    const emitObservabilityEvent = vi.fn()
+    vi.doMock("../../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+
+    mockCreate.mockReturnValue(
+      makeStream([makeChunk("ok")])
+    )
+
+    const core = await import("../../engine/core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await core.runAgent([{ role: "system", content: "test" }], callbacks)
+
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "engine.turn_start" }))
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "engine.turn_end" }))
+  })
+
   it("fires onModelStreamStart on first content token", async () => {
     mockCreate.mockReturnValue(
       makeStream([makeChunk("hello"), makeChunk(" world")])

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { hasToolIntent, detectKick } from "../../engine/kicks"
 import type { Kick } from "../../engine/kicks"
 
@@ -206,5 +206,21 @@ describe("detectKick", () => {
   it("returns narration kick for sentence-final continues.", () => {
     const kick = detectKick("Backlog theatre continues.")
     expect(kick).toEqual({ reason: "narration", message: expect.stringContaining("narrated") })
+  })
+
+  it("emits engine.error observability event when a kick is detected", async () => {
+    const emitObservabilityEvent = vi.fn()
+    vi.resetModules()
+    vi.doMock("../../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+
+    const kicks = await import("../../engine/kicks")
+    kicks.detectKick("let me check that")
+
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "engine.error",
+      component: "engine",
+    }))
   })
 })
