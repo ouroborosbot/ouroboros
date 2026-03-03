@@ -3,8 +3,8 @@ import * as fs from "fs/promises"
 import * as fsSync from "fs"
 import * as path from "path"
 import * as os from "os"
-import { FileFriendStore } from "../../../mind/context/store-file"
-import type { FriendRecord } from "../../../mind/context/types"
+import { FileFriendStore } from "../../../mind/friends/store-file"
+import type { FriendRecord } from "../../../mind/friends/types"
 
 let tmpDir: string
 let agentKnowledgePath: string

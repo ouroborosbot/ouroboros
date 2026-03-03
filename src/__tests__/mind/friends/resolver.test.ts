@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
-import { FriendResolver } from "../../../mind/context/resolver"
-import type { FriendStore } from "../../../mind/context/store"
-import type { FriendRecord } from "../../../mind/context/types"
+import { FriendResolver } from "../../../mind/friends/resolver"
+import type { FriendStore } from "../../../mind/friends/store"
+import type { FriendRecord } from "../../../mind/friends/types"
 
 function makeFriend(overrides: Partial<FriendRecord> = {}): FriendRecord {
   return {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest"
-import type { FriendStore } from "../../../mind/context/store"
-import type { FriendRecord } from "../../../mind/context/types"
+import type { FriendStore } from "../../../mind/friends/store"
+import type { FriendRecord } from "../../../mind/friends/types"
 
 function makeFriend(overrides: Partial<FriendRecord> = {}): FriendRecord {
   return {
@@ -89,7 +89,7 @@ describe("FriendStore interface contract", () => {
 
   it("has no CollectionStore or ContextStore exports", async () => {
     // Ensure the old interfaces are removed
-    const storeModule = await import("../../../mind/context/store")
+    const storeModule = await import("../../../mind/friends/store")
     expect("CollectionStore" in storeModule).toBe(false)
     expect("ContextStore" in storeModule).toBe(false)
   })

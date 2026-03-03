@@ -2,7 +2,7 @@ import OpenAI, { AzureOpenAI } from "openai";
 import { getAzureConfig, getMinimaxConfig, getContextConfig } from "../config";
 import { execTool, summarizeArgs, finalAnswerTool, getToolsForChannel, isConfirmationRequired } from "../repertoire/tools";
 import type { ToolContext } from "../repertoire/tools";
-import { getChannelCapabilities } from "../mind/context/channel";
+import { getChannelCapabilities } from "../mind/friends/channel";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
 import type { AssistantMessageWithReasoning, ResponseItem } from "./streaming";
 import { detectKick } from "./kicks";

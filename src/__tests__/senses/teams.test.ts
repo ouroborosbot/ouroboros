@@ -14,7 +14,7 @@ vi.mock("../../identity", () => ({
     },
   })),
 }))
-vi.mock("../../mind/context/store-file", () => ({
+vi.mock("../../mind/friends/store-file", () => ({
   FileFriendStore: vi.fn(function (this: any) {
     this.get = vi.fn()
     this.put = vi.fn()
@@ -22,7 +22,7 @@ vi.mock("../../mind/context/store-file", () => ({
     this.findByExternalId = vi.fn()
   }),
 }))
-vi.mock("../../mind/context/resolver", () => ({
+vi.mock("../../mind/friends/resolver", () => ({
   FriendResolver: vi.fn(function (this: any) {
     this.resolve = vi.fn().mockResolvedValue({
       friend: { id: "mock-uuid", displayName: "Test User", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
@@ -1725,7 +1725,7 @@ describe("Teams adapter - session persistence", () => {
       this.delete = vi.fn()
       this.findByExternalId = vi.fn()
     })
-    vi.doMock("../../mind/context/store-file", () => ({
+    vi.doMock("../../mind/friends/store-file", () => ({
       FileFriendStore: MockFileFriendStore,
     }))
     const mockResolve = vi.fn().mockResolvedValue({
@@ -1752,7 +1752,7 @@ describe("Teams adapter - session persistence", () => {
     const MockFriendResolver = vi.fn(function (this: any) {
       this.resolve = mockResolve
     })
-    vi.doMock("../../mind/context/resolver", () => ({
+    vi.doMock("../../mind/friends/resolver", () => ({
       FriendResolver: MockFriendResolver,
     }))
   }
@@ -2080,12 +2080,12 @@ describe("Teams adapter - session persistence", () => {
       registerDefaultCommands: vi.fn(),
       parseSlashCommand: vi.fn().mockReturnValue(null),
     }))
-    vi.doMock("../../mind/context/store-file", () => ({
+    vi.doMock("../../mind/friends/store-file", () => ({
       FileFriendStore: vi.fn(function (this: any) {
         this.get = vi.fn(); this.put = vi.fn(); this.delete = vi.fn(); this.findByExternalId = vi.fn()
       }),
     }))
-    vi.doMock("../../mind/context/resolver", () => ({
+    vi.doMock("../../mind/friends/resolver", () => ({
       FriendResolver: vi.fn(function (this: any) {
         this.resolve = vi.fn().mockResolvedValue({
           friend: { id: "m", displayName: "U", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
@@ -2580,7 +2580,7 @@ describe("Teams adapter - handleTeamsMessage with disableStreaming", () => {
       this.delete = vi.fn()
       this.findByExternalId = vi.fn()
     })
-    vi.doMock("../../mind/context/store-file", () => ({
+    vi.doMock("../../mind/friends/store-file", () => ({
       FileFriendStore: MockFileFriendStore,
     }))
     const mockResolve = vi.fn().mockResolvedValue({
@@ -2607,7 +2607,7 @@ describe("Teams adapter - handleTeamsMessage with disableStreaming", () => {
     const MockFriendResolver = vi.fn(function (this: any) {
       this.resolve = mockResolve
     })
-    vi.doMock("../../mind/context/resolver", () => ({
+    vi.doMock("../../mind/friends/resolver", () => ({
       FriendResolver: MockFriendResolver,
     }))
   }
@@ -3016,7 +3016,7 @@ describe("Teams adapter - confirmation callback", () => {
       this.delete = vi.fn()
       this.findByExternalId = vi.fn()
     })
-    vi.doMock("../../mind/context/store-file", () => ({
+    vi.doMock("../../mind/friends/store-file", () => ({
       FileFriendStore: MockFileFriendStore,
     }))
     const mockResolve = vi.fn().mockResolvedValue({
@@ -3043,7 +3043,7 @@ describe("Teams adapter - confirmation callback", () => {
     const MockFriendResolver = vi.fn(function (this: any) {
       this.resolve = mockResolve
     })
-    vi.doMock("../../mind/context/resolver", () => ({
+    vi.doMock("../../mind/friends/resolver", () => ({
       FriendResolver: MockFriendResolver,
     }))
   }
@@ -3426,7 +3426,7 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
       this.delete = vi.fn()
       this.findByExternalId = vi.fn()
     })
-    vi.doMock("../../mind/context/store-file", () => ({
+    vi.doMock("../../mind/friends/store-file", () => ({
       FileFriendStore: MockFileFriendStore,
     }))
     const mockResolve = vi.fn().mockResolvedValue({
@@ -3453,7 +3453,7 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
     const MockFriendResolver = vi.fn(function (this: any) {
       this.resolve = mockResolve
     })
-    vi.doMock("../../mind/context/resolver", () => ({
+    vi.doMock("../../mind/friends/resolver", () => ({
       FriendResolver: MockFriendResolver,
     }))
   }
@@ -3638,13 +3638,13 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
       this.delete = vi.fn()
       this.findByExternalId = vi.fn()
     })
-    vi.doMock("../../mind/context/store-file", () => ({
+    vi.doMock("../../mind/friends/store-file", () => ({
       FileFriendStore: MockFileFriendStore,
     }))
     const MockFriendResolver = vi.fn(function (this: any) {
       this.resolve = mockResolve
     })
-    vi.doMock("../../mind/context/resolver", () => ({
+    vi.doMock("../../mind/friends/resolver", () => ({
       FriendResolver: MockFriendResolver,
     }))
 
@@ -3685,7 +3685,7 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
     vi.resetModules()
     const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDepsForContext({ runAgentFn })
-    const FriendResolver = (await import("../../mind/context/resolver")).FriendResolver
+    const FriendResolver = (await import("../../mind/friends/resolver")).FriendResolver
     const teams = await import("../../senses/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
 
@@ -3717,7 +3717,7 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
     vi.resetModules()
     const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDepsForContext({ runAgentFn })
-    const FriendResolver = (await import("../../mind/context/resolver")).FriendResolver
+    const FriendResolver = (await import("../../mind/friends/resolver")).FriendResolver
     const teams = await import("../../senses/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
 
@@ -3744,7 +3744,7 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
     vi.resetModules()
     const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDepsForContext({ runAgentFn })
-    const FriendResolver = (await import("../../mind/context/resolver")).FriendResolver
+    const FriendResolver = (await import("../../mind/friends/resolver")).FriendResolver
     const teams = await import("../../senses/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
 
@@ -3780,7 +3780,7 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
     vi.resetModules()
     const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDepsForContext({ runAgentFn })
-    const FileFriendStore = (await import("../../mind/context/store-file")).FileFriendStore
+    const FileFriendStore = (await import("../../mind/friends/store-file")).FileFriendStore
     const teams = await import("../../senses/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
 
