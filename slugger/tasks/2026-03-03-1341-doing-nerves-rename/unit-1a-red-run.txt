@@ -1,0 +1,173 @@
+
+> ouroboros-agent-harness@1.0.0 test
+> vitest run src/__tests__/nerves/rename-contract.test.ts
+
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+ ❯ src/__tests__/nerves/rename-contract.test.ts (2 tests | 2 failed) 8ms
+     × uses audit:nerves script and nerves dist coverage CLI entry 3ms
+     × uses nerves naming in coverage gate script 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/nerves/rename-contract.test.ts > nerves rename contract > uses audit:nerves script and nerves dist coverage CLI entry
+AssertionError: expected undefined to be 'npm run build && node dist/nerves/cov…' // Object.is equality
+
+- Expected: 
+"npm run build && node dist/nerves/coverage/cli-main.js"
+
++ Received: 
+undefined
+
+ ❯ src/__tests__/nerves/rename-contract.test.ts:12:41
+     10|     }
+     11| 
+     12|     expect(pkg.scripts["audit:nerves"]).toBe(
+       |                                         ^
+     13|       "npm run build && node dist/nerves/coverage/cli-main.js",
+     14|     )
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/__tests__/nerves/rename-contract.test.ts > nerves rename contract > uses nerves naming in coverage gate script
+AssertionError: expected '#!/usr/bin/env node\nconst { spawnSyn…' to contain '"audit:nerves"'
+
+- Expected
++ Received
+
+- "audit:nerves"
++ #!/usr/bin/env node
++ const { spawnSync } = require("child_process")
++ const { mkdirSync, writeFileSync, readFileSync, unlinkSync, existsSync } = require("fs")
++ const path = require("path")
++ const os = require("os")
++
++ const REPO_SLUG = "ouroboros-agent-harness"
++ const ROOT = path.join(os.homedir(), ".agentconfigs", "test-runs", REPO_SLUG)
++
++ function npmCmd() {
++   return process.platform === "win32" ? "npm.cmd" : "npm"
++ }
++
++ function runNpm(args) {
++   return spawnSync(npmCmd(), args, { stdio: "inherit" })
++ }
++
++ function createRunId() {
++   return new Date().toISOString().replace(/[:.]/g, "-")
++ }
++
++ function writeJson(filePath, value) {
++   mkdirSync(path.dirname(filePath), { recursive: true })
++   writeFileSync(filePath, JSON.stringify(value, null, 2), "utf8")
++ }
++
++ function readJson(filePath) {
++   return JSON.parse(readFileSync(filePath, "utf8"))
++ }
++
++ function main() {
++   mkdirSync(ROOT, { recursive: true })
++   const runId = createRunId()
++   const runDir = path.join(ROOT, runId)
++   mkdirSync(runDir, { recursive: true })
++
++   const info = {
++     repo_slug: REPO_SLUG,
++     run_id: runId,
++     run_dir: runDir,
++     created_at: new Date().toISOString(),
++   }
++
++   const activePath = path.join(ROOT, ".active-run.json")
++   const latestPath = path.join(ROOT, "latest-run.json")
++   const observabilityCoveragePath = path.join(runDir, "observability-coverage.json")
++   const summaryPath = path.join(runDir, "coverage-gate-summary.json")
++
++   writeJson(activePath, info)
++   writeJson(latestPath, info)
++
++   const vitestExit = runNpm(["run", "test:coverage:vitest"]).status ?? 1
++
++   if (existsSync(activePath)) {
++     unlinkSync(activePath)
++   }
++
++   const auditExit = runNpm([
++     "run",
++     "audit:observability",
++     "--",
++     "--run-dir",
++     runDir,
++     "--output",
++     observabilityCoveragePath,
++   ]).status ?? 1
++
++   let observabilityReport = null
++   if (existsSync(observabilityCoveragePath)) {
++     observabilityReport = readJson(observabilityCoveragePath)
++   }
++
++   const requiredActions = []
++   const codeCoverageStatus = vitestExit === 0 ? "pass" : "fail"
++   if (codeCoverageStatus === "fail") {
++     requiredActions.push({
++       type: "coverage",
++       target: "code-coverage",
++       reason: "vitest coverage gate failed",
++     })
++   }
++
++   const observabilityStatus = observabilityReport?.overall_status === "pass" && auditExit === 0
++     ? "pass"
++     : "fail"
++
++   if (Array.isArray(observabilityReport?.required_actions)) {
++     requiredActions.push(...observabilityReport.required_actions)
++   } else if (observabilityStatus === "fail") {
++     requiredActions.push({
++       type: "logging",
++       target: "observability-audit",
++       reason: "observability audit did not produce a valid report",
++     })
++   }
++
++   const overallStatus =
++     codeCoverageStatus === "pass" && observabilityStatus === "pass" ? "pass" : "fail"
++
++   const summary = {
++     overall_status: overallStatus,
++     code_coverage: {
++       status: codeCoverageStatus,
++     },
++     observability_coverage: observabilityReport?.observability_coverage ?? {
++       status: observabilityStatus,
++     },
++     required_actions: requiredActions,
++   }
++
++   writeJson(summaryPath, summary)
++   console.log(`coverage gate: ${overallStatus} (${summaryPath})`)
++   process.exit(overallStatus === "pass" ? 0 : 1)
++ }
++
++ main()
++
+
+ ❯ src/__tests__/nerves/rename-contract.test.ts:24:24
+     22|     )
+     23| 
+     24|     expect(gateScript).toContain('"audit:nerves"')
+       |                        ^
+     25|     expect(gateScript).toContain('"nerves-coverage.json"')
+     26|     expect(gateScript).toContain('target: "nerves-audit"')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  13:59:56
+   Duration  192ms (transform 36ms, setup 44ms, import 7ms, tests 8ms, environment 0ms)
+
