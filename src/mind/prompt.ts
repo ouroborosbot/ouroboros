@@ -171,6 +171,16 @@ export function contextSection(context?: ResolvedContext): string {
     lines.push("write operations are pre-flight checked -- mutations may be denied if insufficient permissions")
   }
 
+  // Friend preferences (from FriendMemory)
+  const prefs = context.memory?.toolPreferences
+  if (prefs && Object.keys(prefs).length > 0) {
+    lines.push("")
+    lines.push("## friend preferences")
+    for (const [key, value] of Object.entries(prefs)) {
+      lines.push(`- ${key}: ${value}`)
+    }
+  }
+
   return lines.join("\n")
 }
 

@@ -3,13 +3,15 @@ import * as fs from "fs";
 import { execSync, spawnSync } from "child_process";
 import { listSkills, loadSkill } from "./skills";
 import { getIntegrationsConfig } from "../config";
-import type { Integration, ResolvedContext } from "../mind/context/types";
+import type { Integration, ResolvedContext, FriendMemory } from "../mind/context/types";
+import type { CollectionStore } from "../mind/context/store";
 
 export interface ToolContext {
   graphToken?: string;
   adoToken?: string;
   signin: (connectionName: string) => Promise<string | undefined>;
   context?: ResolvedContext;
+  memoryStore?: CollectionStore<FriendMemory>;
 }
 
 export type ToolHandler = (args: Record<string, string>, ctx?: ToolContext) => string | Promise<string>;
@@ -266,6 +268,43 @@ export const baseToolDefinitions: ToolDefinition[] = [
           .join("\n\n");
       } catch (e) {
         return `error: ${e}`;
+      }
+    },
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "save_friend_note",
+        description:
+          "save a preference or note about the current friend. call this when the friend expresses a preference about how they like things done.",
+        parameters: {
+          type: "object",
+          properties: {
+            key: { type: "string", description: "category for the preference (e.g. 'ado', 'general', 'formatting')" },
+            value: { type: "string", description: "the preference to save" },
+          },
+          required: ["key", "value"],
+        },
+      },
+    },
+    handler: async (a, ctx) => {
+      if (!ctx?.context) {
+        return "error: no friend context available -- cannot save note";
+      }
+      if (!ctx.memoryStore) {
+        return "error: memory store not available -- cannot save note";
+      }
+      const friendId = ctx.context.identity.id;
+      try {
+        const existing = await ctx.memoryStore.get(friendId);
+        const memory: FriendMemory = existing
+          ? { ...existing, toolPreferences: { ...existing.toolPreferences, [a.key]: a.value } }
+          : { id: friendId, toolPreferences: { [a.key]: a.value }, schemaVersion: 1 };
+        await ctx.memoryStore.put(friendId, memory);
+        return `saved: ${a.key} = ${a.value}`;
+      } catch (err) {
+        return `error saving note: ${err instanceof Error ? err.message : String(err)}`;
       }
     },
   },
