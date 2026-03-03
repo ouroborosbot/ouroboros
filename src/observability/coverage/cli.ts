@@ -50,8 +50,3 @@ export function runAuditCli(argv: string[]): number {
 
   return report.overall_status === "pass" ? 0 : 1
 }
-
-if (require.main === module) {
-  const code = runAuditCli(process.argv.slice(2))
-  process.exit(code)
-}
