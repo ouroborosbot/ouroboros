@@ -561,4 +561,4 @@ interface ResolvedContext {
 - 2026-03-02 2232 A9+A10: ado_work_items organization parameter becomes optional. Disambiguation cascade: single org → auto-select, multiple → model asks friend, zero → "no ADO organizations found." Same at project level. validateAdoOrg() replaced by discovery flow. Made explicit in unit 1H.
 - 2026-03-02 2240 A12: No chicken-and-egg. Authority Promise is eager-start (A7), buildSystem() awaits it in Phase 2 (D15 already says it becomes async). Already resolved by D6+D15+A7.
 - 2026-03-02 2159 A14: Authority cache keying already resolved by D13 (id+integration+scope). Module-scope Map confirmed as intended home. No doc changes needed.
-- PENDING_TIMESTAMP A15: buildSystem() async from Phase 1. No two-step sync→async migration. All callers updated once in Phase 1; Phase 2 just adds await inside the already-async function. Updated D15, Q12, unit 1G.
+- 2026-03-02 2202 A15: buildSystem() async from Phase 1. No two-step sync->async migration. All callers updated once in Phase 1; Phase 2 just adds await inside the already-async function. Updated D15, Q12, unit 1G.
