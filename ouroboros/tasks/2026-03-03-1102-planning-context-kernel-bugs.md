@@ -69,3 +69,4 @@ The context kernel planning doc explicitly deferred removing FRIENDS.md. The pla
 
 ## Progress Log
 - 2026-03-03 11:03 Created
+- 2026-03-03 11:04 Resolved all open questions from SDK type inspection; added decisions
