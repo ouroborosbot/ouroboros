@@ -168,7 +168,7 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Output**: Coverage report showing 100% on save_friend_note handler.
 **Acceptance**: 100% coverage on new code, tests still green.
 
-### ⬜ Unit 6a: Preference injection into tool descriptions -- Tests
+### ✅ Unit 6a: Preference injection into tool descriptions -- Tests
 **What**: Write tests for `getToolsForChannel()` accepting `toolPreferences?: Record<string, string>` and injecting matching preferences into tool descriptions. Test: no preferences = descriptions unchanged, preference key "ado" appends to all tools with `integration: "ado"`, preference key "graph" appends to `integration: "graph"` tools, unknown preference key is ignored, multiple preferences applied independently, descriptions rebuilt each call (no caching mutation).
 **Output**: Updated `tools.test.ts` with preference injection tests.
 **Files**: `src/__tests__/repertoire/tools.test.ts`
