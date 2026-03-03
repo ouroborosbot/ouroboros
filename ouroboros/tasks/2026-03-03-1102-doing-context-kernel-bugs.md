@@ -196,13 +196,13 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Files**: `src/__tests__/mind/prompt.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because contextSection still uses old identity/memory structure.
 
-### ⬜ Unit 7b: System prompt contextSection -- Implementation
+### ✅ Unit 7b: System prompt contextSection -- Implementation
 **What**: Rewrite `contextSection()` in `prompt.ts` to use `context.friend` instead of `context.identity` + `context.memory`. Remove authority section. Add first-person instructions: memory ephemerality, name quality, priority guidance, working-memory trust, stale notes awareness, new-friend behavior (when notes and toolPreferences both empty). Render `friend.notes` entries in system prompt. Do NOT render `friend.toolPreferences` (those go to tool descriptions only).
 **Output**: Updated `prompt.ts` with redesigned contextSection.
 **Files**: `src/mind/prompt.ts`
 **Acceptance**: All prompt tests PASS (green), no warnings.
 
-### ⬜ Unit 7c: System prompt contextSection -- Coverage & Refactor
+### ✅ Unit 7c: System prompt contextSection -- Coverage & Refactor
 **What**: Verify 100% coverage on contextSection. Test all instruction branches.
 **Output**: Coverage report showing 100% on `prompt.ts` contextSection.
 **Acceptance**: 100% coverage on new code, tests still green.
@@ -306,3 +306,4 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 - 2026-03-03 15:20 Units 4a-4b complete: Directory rename context/ -> friends/. All import paths updated, tsc passes, 1158 tests pass, zero stale mind/context/ references in source.
 - 2026-03-03 15:24 Units 5a-5c complete: save_friend_note redesigned with type/key/content/override params. ToolContext uses friendStore instead of memoryStore. Conflict detection, first-person errors, 100% coverage on tools-base.ts. 1172 tests pass.
 - 2026-03-03 15:30 Units 6a-6d complete: getToolsForChannel accepts toolPreferences param, injects matching preferences into integration tool descriptions. No mutation of originals, unknown keys ignored. 100% coverage on tools.ts. Post-tool-layer checkpoint: 1179 tests pass.
+- 2026-03-03 15:33 Units 7a-7c complete: contextSection redesigned with behavioral instructions (ephemerality, name quality, priority, working-memory trust, stale notes, new-friend). Notes in system prompt, toolPreferences not in system prompt. 100% coverage on prompt.ts. 1189 tests pass.
