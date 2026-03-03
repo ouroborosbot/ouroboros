@@ -333,7 +333,7 @@ Every persisted type (`FriendIdentity`, `FriendMemory`) carries a `schemaVersion
 
 ---
 
-### ⬜ Unit 1A: ContextStore Interface and CollectionStore
+### ✅ Unit 1A: ContextStore Interface and CollectionStore
 
 **What**: Define the `ContextStore` interface with typed `CollectionStore<T>` properties. Phase 1 starts with `identity: CollectionStore<FriendIdentity>` only. This is the storage abstraction that all context persistence goes through -- no context module ever imports `fs` directly.
 
