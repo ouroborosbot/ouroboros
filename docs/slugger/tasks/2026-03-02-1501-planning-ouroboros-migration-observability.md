@@ -100,4 +100,4 @@ Model consumption is primary: logs should be stable, structured, and parseable f
 - [2026-03-02 15:48] Locked required log envelope fields and minimum component event catalog to remove interpretation gaps
 - [2026-03-02 15:50] Planning approved for conversion to doing doc
 - [2026-03-02 16:05] Added session-style append-only NDJSON file persistence (`stderr` + file sinks) and deferred key-collision hardening
-- [PENDING_REVIEW_FIX_TS] Consistency cleanup: aligned sink contract to dual-sink decision, locked key mapping semantics, and required sink abstraction
+- [2026-03-02 16:11] Consistency cleanup: aligned sink contract to dual-sink decision, locked key mapping semantics, and required sink abstraction
