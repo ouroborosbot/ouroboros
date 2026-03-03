@@ -570,3 +570,25 @@ describe("flagsSection rationale", () => {
     expect(result.toLowerCase()).toContain("latency")
   })
 })
+
+describe("prompt observability instrumentation", () => {
+  it("buildSystem emits mind lifecycle events", async () => {
+    vi.resetModules()
+    setupReadFileSync()
+    const emitObservabilityEvent = vi.fn()
+    vi.doMock("../../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    buildSystem("cli")
+
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "mind.step_start" }))
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "mind.step_end" }))
+  })
+})

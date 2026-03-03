@@ -1300,3 +1300,21 @@ describe("summarizeArgs for docs tools", () => {
     expect(summarizeArgs("ado_docs", {})).toBe("")
   })
 })
+
+describe("tools observability instrumentation", () => {
+  it("execTool emits tool lifecycle events", async () => {
+    vi.resetModules()
+    const emitObservabilityEvent = vi.fn()
+    vi.doMock("../../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+
+    vi.mocked(fs.readFileSync).mockReturnValue("file content")
+    const { execTool } = await import("../../engine/tools")
+
+    await execTool("read_file", { path: "/tmp/test.txt" })
+
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "tool.start" }))
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "tool.end" }))
+  })
+})
