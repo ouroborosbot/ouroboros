@@ -1,6 +1,6 @@
 # Doing: Ouroboros Migration — Observability (Phase 2)
 
-**Status**: READY_FOR_EXECUTION
+**Status**: drafting
 **Execution Mode**: direct
 **Created**: 2026-03-02 15:50
 **Planning**: ./2026-03-02-1501-planning-ouroboros-migration-observability.md
@@ -19,7 +19,8 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [ ] `src/observability/` module exists with reusable logger + trace ID primitives.
 - [ ] NDJSON (`json`) is the canonical log format with configurable `logging.level` and dual sinks for this phase (`stderr` + session-style file).
 - [ ] All structured events use required envelope fields: `ts`, `level`, `event`, `trace_id`, `component`, `message`, `meta`.
-- [ ] File sink persists append-only NDJSON events at `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson` without truncating per turn.
+- [ ] Sink abstraction exists and routes each event to configured sinks without instrumentation-site changes.
+- [ ] File sink persists append-only NDJSON events at `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson` without truncating per turn, using session-key parity (CLI=`session`, Teams=`conversationId`).
 - [ ] Runtime paths across `src/` emit event-level structured logs with no chunk-level or sensitive-payload dumps.
 - [ ] Minimum component event catalog is implemented and exercised in tests (entrypoints/channels/engine/mind/tools/config/identity/clients/repertoire).
 - [ ] Trace IDs are generated at turn entry and propagated through core execution.
@@ -53,19 +54,19 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
 ### ⬜ Unit 0: Setup/Research
-**What**: Audit current runtime logging behavior and map required structured events, envelope fields, sink fan-out design, and target files under `src/` (`stderr` + session-style file pathing).
+**What**: Audit current runtime logging behavior and map required structured events, envelope fields, sink abstraction/fan-out design, and target files under `src/` (`stderr` + session-style file pathing).
 **Output**: Baseline event/instrumentation matrix at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-0-baseline-matrix.md`.
-**Acceptance**: Matrix covers required envelope, minimum event catalog, target runtime files, and file sink path contract `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson`.
+**Acceptance**: Matrix covers required envelope, minimum event catalog, target runtime files, and file sink path/key contract `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson` (CLI=`session`, Teams=`conversationId`).
 
 ### ⬜ Unit 1a: Observability Core Module — Red
-**What**: Add failing tests for structured logger/trace primitives, required envelope fields, NDJSON shape, `logging.level`, and sink fan-out behavior (`stderr` + append-only file sink) in `src/__tests__/observability/*.test.ts`.
+**What**: Add failing tests for structured logger/trace primitives, required envelope fields, NDJSON shape, `logging.level`, sink abstraction behavior, and sink fan-out (`stderr` + append-only file sink) in `src/__tests__/observability/*.test.ts`.
 **Output**: New failing observability tests and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-1a-red-run.txt`.
 **Acceptance**: Tests fail for missing `src/observability/` module and missing envelope/config/sink persistence behavior.
 
 ### ⬜ Unit 1b: Observability Core Module — Green
-**What**: Implement `src/observability/` logger and trace helpers (factory + event helpers) with sink fan-out to `stderr` and append-only file persistence.
+**What**: Implement `src/observability/` logger and trace helpers (factory + event helpers) with sink abstraction and fan-out to `stderr` and append-only file persistence.
 **Output**: New module files under `src/observability/` and updated tests.
-**Acceptance**: Unit 1a tests pass with required envelope fields, configurable `logging.level`, and append-only file writes to the session-style path.
+**Acceptance**: Unit 1a tests pass with required envelope fields, configurable `logging.level`, sink abstraction, and append-only file writes to the session-style path.
 
 ### ⬜ Unit 1c: Observability Core Module — Coverage & Refactor
 **What**: Refactor if needed and verify 100% coverage for new observability module code.
@@ -150,6 +151,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - **All artifacts**: Save outputs, logs, data to `./[task-name]/` directory
 - Artifact files listed in this doc are execution evidence only and are not runtime log sinks.
 - Runtime observability sinks for this phase are `stderr` and session-style append-only NDJSON files; collision hardening remains out of scope.
+- Persisted log key mapping is locked to session parity: CLI=`session`, Teams=`conversationId`.
 - **Fixes/blockers**: Spawn sub-agent immediately — don't ask, just do it
 - **Decisions made**: Update docs immediately, commit right away
 
@@ -160,3 +162,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 15:53] Quality pass: verified template completeness, acceptance coverage, and emoji headers; set status to READY_FOR_EXECUTION
 - [2026-03-02 15:58] Clarified that artifact run files are evidence outputs only; runtime logging sink remains stderr-only in this phase
 - [2026-03-02 16:05] Updated units/criteria for session-style append-only NDJSON persistence with dual sinks (`stderr` + file)
+- [PENDING_REVIEW_FIX_TS] Consistency cleanup: required sink abstraction + explicit key mapping; reset status to drafting pending re-review
