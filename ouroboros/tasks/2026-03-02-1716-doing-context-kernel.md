@@ -41,7 +41,7 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 - [ ] System prompt includes resolved context (identity, channel, authority constraints) via `contextSection()` in `buildSystem()`
 - [ ] Authority constraints rendered as explicit "can / CANNOT" in prompt so model plans around limitations
 - [ ] Prompt injection gracefully omitted when no context is available (CLI with no identity, first turn)
-- [ ] `FriendMemory` type exists with `toolPreferences: Record<string, string>`; `ContextStore.memory` collection supports CRUD; a `save_friend_note` tool lets the model persist preferences; `contextSection()` renders toolPreferences into the system prompt when FriendMemory exists (Phase 3, unit 3B)
+- [ ] `FriendMemory` type exists with `toolPreferences: Record<string, string>`; `ContextStore.memory` collection supports CRUD (unit 3Ba); a `save_friend_note` tool lets the model persist preferences; `contextSection()` renders toolPreferences into the system prompt when FriendMemory exists (unit 3Bb)
 - [ ] `buildSystem()` is async; all callers use `await buildSystem()`
 - [ ] `IdentityProvider` and `Integration` are typed unions -- no bare `string` in ExternalId.provider, AuthorityProfile.integration, AuthorityChecker methods, or ChannelCapabilities.availableIntegrations
 - [ ] All tools use `ToolDefinition` wrapper; `getToolsForChannel()` filters by `ToolDefinition.integration` against `availableIntegrations`; separate `confirmationRequired` Set is removed
@@ -90,7 +90,7 @@ interface CollectionStore<T> {
 
 interface ContextStore {
   readonly identity: CollectionStore<FriendIdentity>;
-  // Added in unit 3B (Phase 3):
+  // Added in unit 3Ba (Phase 3):
   // readonly memory: CollectionStore<FriendMemory>;
 }
 
@@ -98,7 +98,7 @@ interface ContextStore {
 
 class FileContextStore implements ContextStore {
   readonly identity: CollectionStore<FriendIdentity>;   // -> context/identity/
-  // Added in unit 3B (Phase 3):
+  // Added in unit 3Ba (Phase 3):
   // readonly memory: CollectionStore<FriendMemory>;     // -> context/memory/
 }
 
@@ -164,7 +164,7 @@ interface ResolvedContext {
   // Added in unit 2A (Phase 2):
   // readonly authority: Promise<AuthorityProfile[]>;
   // readonly checker: AuthorityChecker;
-  // Added in unit 3B (Phase 3):
+  // Added in unit 3Ba (Phase 3):
   // readonly memory: FriendMemory | null;
 }
 
@@ -324,7 +324,7 @@ Every persisted type (`FriendIdentity`, `FriendMemory`) carries a `schemaVersion
 - IDs are always plain strings (UUIDs) -- no slashes, no compound keys, no encoding
 - `ContextStore` has typed collection properties: `identity: CollectionStore<FriendIdentity>`
 - Adding a new persisted type = add one property to `ContextStore`
-- Phase 3 (unit 3B) adds `memory: CollectionStore<FriendMemory>`
+- Phase 3 (unit 3Ba) adds `memory: CollectionStore<FriendMemory>`
 
 **Input**: Codebase after unit 10 restructuring. No context kernel files exist yet.
 **Output**: `src/mind/context/store.ts` with `CollectionStore<T>` and `ContextStore` interfaces. `src/mind/context/types.ts` with `IdentityProvider`, `Integration`, `ExternalId`, `FriendIdentity`, `ChannelCapabilities`, `ResolvedContext` types.
@@ -507,7 +507,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - Returns: `ResolvedContext` with `identity` and `channel`
 - Created by channel adapter, attached to `ToolContext.context`, discarded after turn
 - Phase 2 (unit 2A) adds `authority: Promise<AuthorityProfile[]>` and `checker: AuthorityChecker`
-- Phase 3 (unit 3B) adds `memory: FriendMemory | null`
+- Phase 3 (unit 3Ba) adds `memory: FriendMemory | null`
 
 **Input**: Identity resolution from 1C, channel lookup from 1E.
 **Output**: `ContextResolver` class with `resolve()` method returning `ResolvedContext`.
@@ -552,7 +552,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
   channel: teams (markdown, no streaming, max 4000 chars)
   ```
 - Phase 2 (unit 2D) adds authority constraints section
-- Phase 3 (unit 3B) adds friend preferences section (toolPreferences from FriendMemory)
+- Phase 3 (unit 3Bb) adds friend preferences section (toolPreferences from FriendMemory)
 - `cachedBuildSystem()` is REMOVED (60s TTL cache is wrong with per-friend context)
 - `resetSystemPromptCache()` is REMOVED
 - All callers updated to `await buildSystem()`
@@ -593,48 +593,31 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 ---
 
-### ⬜ Unit 1H: Wire Context Through ado_work_items (End-to-End Proof)
+### ⬜ Unit 1Ha: ToolDefinition Wrapper + Tool Registry Refactor
 
-**What**: Wire the context kernel through ONE real ADO operation to prove the kernel works end-to-end. The existing `ado_work_items` tool gains runtime scope discovery. The `organization` parameter becomes **optional**. This replaces `validateAdoOrg()` with API-based discovery.
+**What**: Introduce the `ToolDefinition` wrapper type and convert all existing tools to use it. Refactor `getToolsForChannel()` and `execTool()` to use the new registry. Remove the separate `confirmationRequired` Set. Update `ToolContext` to add `context?: ResolvedContext` and remove `adoOrganizations`.
 
-**Design (D5, D20, D3):**
-- `ToolContext` gains `context?: ResolvedContext` field (backward-compatible)
+**Design (D3, D5):**
+- `ToolDefinition` co-locates: OpenAI tool schema, handler, integration (optional), confirmationRequired (optional)
+- All existing tools (base + Teams) converted to `ToolDefinition[]` array
+- `getToolsForChannel()` refactored: accepts `ChannelCapabilities`, filters `ToolDefinition[]` by matching `integration` against `availableIntegrations`. Base tools (integration undefined) always included.
+- `execTool()` refactored: looks up `ToolDefinition` by name, calls its handler
+- `confirmationRequired` Set in `tools-teams.ts` removed -- absorbed into `ToolDefinition.confirmationRequired`
+- `ToolContext` gains `context?: ResolvedContext` (optional, backward-compatible)
 - `adoOrganizations` removed from `ToolContext`
-- `validateAdoOrg()` removed
-- `ado.organizations` removed from `OuroborosConfig` / `AdoConfig`
-- When model provides org/project: use them directly
-- When omitted: discover via ADO APIs:
-  - Org discovery: `GET https://app.vssps.visualstudio.com/_apis/accounts?memberId={id}&api-version=7.1`
-  - Project discovery: `GET https://dev.azure.com/{org}/_apis/projects?api-version=7.1`
-  - Disambiguation cascade: single org -> auto-select; multiple -> return list for model; zero -> "no ADO organizations found"
-  - Same logic at project level within an org
-- `ToolDefinition` wrapper type introduced: co-locates OpenAI schema + handler + integration + confirmationRequired
-- All tools converted to `ToolDefinition[]` array
-- `getToolsForChannel()` refactored to filter by `ToolDefinition.integration` against `availableIntegrations`
-- `confirmationRequired` Set removed -- absorbed into `ToolDefinition.confirmationRequired`
-- `execTool()` looks up `ToolDefinition` by name and calls handler
-- Teams adapter creates `ContextResolver`, attaches to `ToolContext.context`
-- CLI adapter gets minimal `ToolContext` with `context` field (identity only, no tokens, no integrations)
 
-**Input**: All preceding Phase 1 units. Existing `ado_work_items` tool.
-**Output**: Context kernel wired end-to-end. Teams channel resolves identity, discovers ADO scopes, runs query. CLI gets identity without integration access.
+**Input**: Existing tool arrays in `tools-base.ts`, `tools-teams.ts`, `tools.ts`. `ChannelCapabilities` from unit 1E.
+**Output**: All tools registered as `ToolDefinition[]`. Routing by integration. ToolContext updated.
 
 **Files modified:**
-- `src/repertoire/tools-base.ts` -- add `context?: ResolvedContext` to `ToolContext`, add `ToolDefinition` interface, remove `adoOrganizations`
-- `src/repertoire/tools.ts` -- refactor `getToolsForChannel()` to use `ChannelCapabilities` + `ToolDefinition[]`, refactor `execTool()` to use `ToolDefinition` lookup
-- `src/repertoire/tools-teams.ts` -- convert tools to `ToolDefinition[]`, remove `confirmationRequired` Set, add scope discovery to `ado_work_items` handler
-- `src/senses/teams.ts` -- create `ContextResolver`, attach to `ToolContext.context`
-- `src/senses/cli.ts` -- create minimal `ToolContext` with resolver (identity only)
-- `src/config.ts` -- remove `ado.organizations` from config types
-- `src/repertoire/ado-client.ts` -- add scope discovery functions (org + project discovery)
+- `src/repertoire/tools-base.ts` -- add `ToolDefinition` interface, add `context?: ResolvedContext` to `ToolContext`, remove `adoOrganizations`, convert base tools to `ToolDefinition[]`
+- `src/repertoire/tools-teams.ts` -- convert Teams tools to `ToolDefinition[]`, remove `confirmationRequired` Set
+- `src/repertoire/tools.ts` -- refactor `getToolsForChannel()` to accept `ChannelCapabilities` and filter by integration, refactor `execTool()` to use `ToolDefinition` lookup
 
 **Files tested:**
-- `src/__tests__/repertoire/tools.test.ts` -- updated for `ToolDefinition` and new `getToolsForChannel`
-- `src/__tests__/repertoire/tools-teams.test.ts` -- updated for `ToolDefinition`, scope discovery
-- `src/__tests__/repertoire/tools-base.test.ts` -- updated for new `ToolContext` shape
-- `src/__tests__/repertoire/ado-client.test.ts` -- scope discovery function tests
-- `src/__tests__/senses/teams.test.ts` -- resolver creation
-- `src/__tests__/senses/cli.test.ts` -- minimal ToolContext with resolver
+- `src/__tests__/repertoire/tools-base.test.ts` -- updated for new `ToolContext` shape, `ToolDefinition`
+- `src/__tests__/repertoire/tools-teams.test.ts` -- updated for `ToolDefinition[]`, no `confirmationRequired` Set
+- `src/__tests__/repertoire/tools.test.ts` -- updated for new `getToolsForChannel` and `execTool`
 
 **Tests required:**
 - `ToolDefinition` wraps tool schema + handler + integration + confirmationRequired
@@ -643,30 +626,104 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - `getToolsForChannel()` filters correctly by integration
 - `execTool()` looks up handler from `ToolDefinition` and calls it
 - `confirmationRequired` read from `ToolDefinition`, not a separate Set
-- `ado_work_items` with org provided: uses directly (no discovery)
-- `ado_work_items` without org: discovers via Accounts API
-- Disambiguation: single org -> auto-select
-- Disambiguation: multiple orgs -> returns list
-- Disambiguation: zero orgs -> returns error message
-- Project disambiguation: same cascade logic
-- `validateAdoOrg()` no longer exists
+- `ToolContext` has `context?: ResolvedContext` (optional)
 - `adoOrganizations` not on `ToolContext`
-- Teams adapter: creates resolver with AAD external ID
-- CLI adapter: creates resolver with local/OS-username external ID
-- CLI: no ADO tools available (empty `availableIntegrations`)
-- Backward compatibility: existing tool handlers still work
+- Backward compatibility: existing tool handlers still work with updated `ToolContext`
 
 **Completion criteria:**
-- [ ] `ToolContext` has `context?: ResolvedContext`, no `adoOrganizations`
 - [ ] `ToolDefinition` type exists with tool + handler + integration + confirmationRequired
 - [ ] All tools registered as `ToolDefinition[]`
 - [ ] `getToolsForChannel()` uses `ChannelCapabilities` + `ToolDefinition.integration`
 - [ ] `confirmationRequired` Set removed
+- [ ] `ToolContext` has `context?: ResolvedContext`, no `adoOrganizations`
+- [ ] Backward compatibility: existing tool handlers still work
+- [ ] 100% test coverage on new/modified code
+- [ ] All tests pass
+
+---
+
+### ⬜ Unit 1Hb: ADO Scope Discovery + ado_work_items Optional Org
+
+**What**: Add scope discovery functions to the ADO client and wire them into `ado_work_items`. The `organization` parameter becomes **optional**. When omitted, the tool discovers orgs/projects via ADO APIs and disambiguates. Remove `validateAdoOrg()` and `ado.organizations` config.
+
+**Design (D20):**
+- Org discovery: `GET https://app.vssps.visualstudio.com/_apis/accounts?memberId={id}&api-version=7.1`
+- Project discovery: `GET https://dev.azure.com/{org}/_apis/projects?api-version=7.1`
+- Disambiguation cascade: single org -> auto-select; multiple -> return list for model to ask friend; zero -> "no ADO organizations found"
+- Same cascade at project level within an org
+- `validateAdoOrg()` removed from `tools-teams.ts`
+- `ado.organizations` removed from `OuroborosConfig` / `AdoConfig`
+- `getAdoConfig()` removed from `config.ts` (unless other ADO config fields remain)
+
+**Input**: `ToolDefinition`-based registry from unit 1Ha. ADO client.
+**Output**: `ado_work_items` works with optional org. Scope discovery available.
+
+**Files modified:**
+- `src/repertoire/ado-client.ts` -- add `discoverOrganizations()` and `discoverProjects()` functions
+- `src/repertoire/tools-teams.ts` -- update `ado_work_items` handler: make org optional, add discovery cascade, remove `validateAdoOrg()`
+- `src/config.ts` -- remove `ado.organizations` from config types, remove `getAdoConfig()` if empty
+
+**Files tested:**
+- `src/__tests__/repertoire/ado-client.test.ts` -- scope discovery function tests
+- `src/__tests__/repertoire/tools-teams.test.ts` -- ado_work_items with optional org
+
+**Tests required:**
+- `discoverOrganizations()` calls Accounts API and returns org list
+- `discoverProjects()` calls Projects API for given org and returns project list
+- `ado_work_items` with org provided: uses directly (no discovery)
+- `ado_work_items` without org: discovers via Accounts API
+- Disambiguation: single org -> auto-select
+- Disambiguation: multiple orgs -> returns list for model
+- Disambiguation: zero orgs -> returns "no ADO organizations found"
+- Project disambiguation: same cascade logic
+- `validateAdoOrg()` no longer exists
+- `ado.organizations` config no longer exists
+- API error in discovery: returns structured error message
+
+**Completion criteria:**
+- [ ] `discoverOrganizations()` and `discoverProjects()` exported from ado-client
 - [ ] `ado_work_items` organization parameter is optional with discovery cascade
 - [ ] `validateAdoOrg()` removed
 - [ ] `ado.organizations` config removed
+- [ ] 100% test coverage on new/modified code
+- [ ] All tests pass
+
+---
+
+### ⬜ Unit 1Hc: Channel Adapter Wiring (Teams + CLI)
+
+**What**: Wire the context kernel into channel adapters. Teams adapter creates `ContextResolver` with AAD external ID and attaches to `ToolContext.context`. CLI adapter gets a minimal `ToolContext` with resolver using OS username. This completes the end-to-end proof.
+
+**Design (D13):**
+- Teams (`handleTeamsMessage()`): extracts AAD userId + tenantId from bot activity. Creates `ContextResolver` with `{ provider: "aad", externalId: activity.from.aadObjectId, tenantId }`. Attaches to `ToolContext.context` alongside OAuth tokens.
+- CLI: extracts OS username. Creates `ContextResolver` with `{ provider: "local", externalId: os.userInfo().username }`. CLI currently doesn't build a `ToolContext` -- Phase 1 adds a minimal one with just the `context` field. No tokens, no integrations.
+- `FileContextStore` created once at app startup, shared across all requests (stateless I/O layer). Startup code resolves base path from config (`getConfigDir() + "/context"`).
+
+**Input**: `ContextResolver` from unit 1F. `ToolContext` from unit 1Ha.
+**Output**: Both channel adapters create resolvers and attach to ToolContext. End-to-end: Teams resolves identity, discovers ADO scopes, runs query. CLI gets identity without integration access.
+
+**Files modified:**
+- `src/senses/teams.ts` -- create `ContextResolver`, attach to `ToolContext.context`
+- `src/senses/cli.ts` -- create minimal `ToolContext` with resolver (identity only)
+- App startup (entry points or config) -- create shared `FileContextStore`
+
+**Files tested:**
+- `src/__tests__/senses/teams.test.ts` -- resolver creation, ToolContext attachment
+- `src/__tests__/senses/cli.test.ts` -- minimal ToolContext with resolver
+
+**Tests required:**
+- Teams adapter: creates resolver with AAD external ID from bot activity
+- Teams adapter: attaches resolver to `ToolContext.context`
+- CLI adapter: creates resolver with local/OS-username external ID
+- CLI adapter: creates minimal `ToolContext` with `context` field
+- CLI: no ADO tools available (empty `availableIntegrations`)
+- Shared `FileContextStore` created from config path
+
+**Completion criteria:**
 - [ ] Teams adapter creates resolver and attaches to ToolContext
 - [ ] CLI adapter creates minimal resolver (identity only)
+- [ ] `FileContextStore` created at startup, shared across requests
+- [ ] End-to-end: identity resolved for both channels
 - [ ] 100% test coverage on new/modified code
 - [ ] All tests pass
 - [ ] No warnings
@@ -892,46 +949,36 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 ---
 
-### ⬜ Unit 3B: FriendMemory Type, Resolution, and Prompt Injection
+### ⬜ Unit 3Ba: FriendMemory Type, Store, and Resolver Integration
 
-**What**: Add the Memory layer -- `FriendMemory` with freeform `toolPreferences`. Add `memory: CollectionStore<FriendMemory>` to `ContextStore`. Create `save_friend_note` tool for writes. Extend `contextSection()` to render toolPreferences in the system prompt.
+**What**: Add the Memory layer data model -- `FriendMemory` type, `memory` collection on `ContextStore`, `FileContextStore` extension, and resolver integration. This unit handles storage and resolution; prompt injection and the save tool are in 3Bb.
 
-**Design (D10, D17):**
+**Design (D17):**
 - `FriendMemory`: id (matches FriendIdentity.id), toolPreferences (Record<string, string>), schemaVersion
 - `ContextStore` gains `memory: CollectionStore<FriendMemory>`
 - `FileContextStore` adds `context/memory/` subdirectory
 - `ResolvedContext` gains `memory: FriendMemory | null` (null if no memory exists yet)
 - Resolver loads memory alongside identity + channel + authority
-- **Reading**: `contextSection()` renders toolPreferences into system prompt when FriendMemory exists:
-  ```
-  ## friend preferences
-  - ado: Prefers issue-first planning. Auto-assign to self. Flat backlog view.
-  ```
-- **Writing**: `save_friend_note` tool -- model calls when friend expresses a preference
 - On read failure or missing file: proceed with null (no memory yet, D16)
-- No memory file created until model writes first note
+- No memory file created until model writes first note (3Bb)
 - `schemaVersion: 1` for initial schema
 
-**Input**: ContextStore from unit 1B. Resolver from unit 1F (extended in 2A). Prompt from unit 1G.
-**Output**: Full memory layer: type, store collection, resolver integration, prompt injection, save tool.
+**Input**: ContextStore from unit 1B. Resolver from unit 1F (extended in 2A).
+**Output**: `FriendMemory` type, store collection, `resolveMemory()` function, resolver extended.
 
 **Files created:**
 - `src/mind/context/memory.ts` -- `resolveMemory()` function, memory helpers
 
 **Files modified:**
-- `src/mind/context/types.ts` -- uncomment `FriendMemory` type, add `memory` to `ResolvedContext`
+- `src/mind/context/types.ts` -- add `FriendMemory` type, add `memory` to `ResolvedContext`
 - `src/mind/context/store.ts` -- add `memory: CollectionStore<FriendMemory>` to `ContextStore`
 - `src/mind/context/store-file.ts` -- add `memory` collection to `FileContextStore`
 - `src/mind/context/resolver.ts` -- extend resolver to load memory
-- `src/mind/prompt.ts` -- extend `contextSection()` with friend preferences section
-- `src/repertoire/tools-teams.ts` (or a new file) -- add `save_friend_note` `ToolDefinition`
 
 **Files tested:**
 - `src/__tests__/mind/context/memory.test.ts`
 - `src/__tests__/mind/context/store-file.test.ts` -- extended for memory collection
 - `src/__tests__/mind/context/resolver.test.ts` -- extended for memory
-- `src/__tests__/mind/prompt.test.ts` -- extended for friend preferences section
-- `src/__tests__/repertoire/` -- save_friend_note tool tests
 
 **Tests required:**
 - `FriendMemory` type with id, toolPreferences, schemaVersion
@@ -940,12 +987,6 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - Resolver loads memory for existing friend: `memory` on `ResolvedContext` is `FriendMemory`
 - Resolver loads memory for new friend (no file): `memory` is null
 - Read failure: `memory` is null (D16)
-- `contextSection()` with memory: renders `## friend preferences` section
-- `contextSection()` without memory (null): no preferences section
-- `contextSection()` with empty toolPreferences: no preferences section
-- `save_friend_note` tool: creates/updates FriendMemory with new preference
-- `save_friend_note` tool: updates existing preference
-- `save_friend_note` tool: write failure logged, not thrown
 - Schema versioning for FriendMemory (migration on read)
 
 **Completion criteria:**
@@ -953,6 +994,47 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - [ ] `ContextStore.memory` collection supports CRUD
 - [ ] `FileContextStore` implements memory collection with `context/memory/` subdirectory
 - [ ] Resolver loads memory into `ResolvedContext`
+- [ ] Error handling per D16
+- [ ] 100% test coverage
+- [ ] All tests pass
+
+---
+
+### ⬜ Unit 3Bb: Friend Preferences Prompt Injection + save_friend_note Tool
+
+**What**: Extend `contextSection()` to render toolPreferences in the system prompt when FriendMemory exists. Create `save_friend_note` tool so the model can persist preferences when a friend expresses one.
+
+**Design (D10):**
+- **Reading**: `contextSection()` renders toolPreferences into system prompt:
+  ```
+  ## friend preferences
+  - ado: Prefers issue-first planning. Auto-assign to self. Flat backlog view.
+  ```
+- **Writing**: `save_friend_note` tool -- model calls when friend expresses a preference. Creates or updates FriendMemory via `ContextStore.memory`.
+- `save_friend_note` registered as `ToolDefinition` (base tool, no integration required -- available in all channels)
+- Empty toolPreferences or null memory: no preferences section in prompt
+
+**Input**: FriendMemory on `ResolvedContext` from unit 3Ba. `contextSection()` from unit 1G/2D.
+**Output**: Prompt includes friend preferences. Model can write preferences.
+
+**Files modified:**
+- `src/mind/prompt.ts` -- extend `contextSection()` with friend preferences section
+- `src/repertoire/tools-base.ts` or new file -- add `save_friend_note` `ToolDefinition`
+
+**Files tested:**
+- `src/__tests__/mind/prompt.test.ts` -- extended for friend preferences section
+- `src/__tests__/repertoire/` -- save_friend_note tool tests
+
+**Tests required:**
+- `contextSection()` with memory: renders `## friend preferences` section
+- `contextSection()` without memory (null): no preferences section
+- `contextSection()` with empty toolPreferences: no preferences section
+- `save_friend_note` tool: creates new FriendMemory with preference
+- `save_friend_note` tool: updates existing preference on existing FriendMemory
+- `save_friend_note` tool: write failure logged, not thrown (D16)
+- `save_friend_note` registered as `ToolDefinition` (no integration required)
+
+**Completion criteria:**
 - [ ] `contextSection()` renders toolPreferences in system prompt when FriendMemory exists
 - [ ] `save_friend_note` tool allows model to persist preferences
 - [ ] Error handling per D16
