@@ -112,7 +112,14 @@ Pure 403 learning means the agent proposes something, attempts it, fails, and th
 - The authority resolver distinguishes read vs. write via an `AuthorityChecker` that tools call with the operation type.
 
 ### D3: Channel Modeling -- Capability Flags, Not Just Enum
-Channel context uses both an identifier (`"cli" | "teams"`) AND capability flags (`supportsMarkdown`, `supportsStreaming`, `supportsRichCards`, `maxMessageLength`). This allows the system to adapt behavior based on what the channel can actually do, rather than hardcoding per-channel behavior. The existing `Channel` type (`"cli" | "teams"`) in `src/mind/prompt.ts` becomes a key into a `ChannelCapabilities` lookup.
+Channel context uses both an identifier (`"cli" | "teams"`) AND capability flags (`supportsMarkdown`, `supportsStreaming`, `supportsRichCards`, `maxMessageLength`, `availableIntegrations`). This allows the system to adapt behavior based on what the channel can actually do, rather than hardcoding per-channel behavior. The existing `Channel` type (`"cli" | "teams"`) in `src/mind/prompt.ts` becomes a key into a `ChannelCapabilities` lookup.
+
+`availableIntegrations` is the single source of truth for what a channel can reach. It drives three consumers — no per-channel switch statements anywhere:
+1. **Tool routing**: `getToolsForChannel()` filters the tool list to only include tools whose integration is in `availableIntegrations`. If Discord declares `["github"]`, it gets GitHub tools but not ADO tools — without any Discord-specific code in the router.
+2. **Prompt injection**: `contextSection()` only renders knownScopes and authority constraints for integrations in the list. CLI users don't see ADO scopes.
+3. **Resolver**: `LazyContextResolver` skips authority resolution entirely if `availableIntegrations` is empty. No wasted API calls for channels that can't use the results.
+
+This replaces the current hardcoded pattern in `getToolsForChannel()` where `channel === "teams"` gates the Teams tool list. The channel capabilities definition becomes the single place to configure what a channel can do.
 
 ### D4: Authority Cache Invalidation -- TTL + Event-Driven
 Authority profiles are cached with a configurable TTL (default: 30 minutes). Additionally, any 403 response from an ADO/Graph API call triggers immediate cache invalidation for that integration scope. This catches permission changes without waiting for TTL expiry.
@@ -236,7 +243,7 @@ New code follows the existing directory pattern:
 ### Key Integration Points for Context Kernel
 1. **runAgent()** in `src/engine/core.ts` line 159 -- receives `channel` param, builds `ToolContext` implicitly. This is where the `LazyContextResolver` should be created and attached to `ToolContext`.
 2. **handleTeamsMessage()** in `src/channels/teams.ts` line 286 -- builds `ToolContext` from OAuth tokens and ADO config. This is where Teams-specific identity resolution happens.
-3. **getToolsForChannel()** in `src/engine/tools.ts` -- returns different tool lists per channel. Semantic ADO tools should be added here.
+3. **getToolsForChannel()** in `src/engine/tools.ts` -- currently hardcodes `channel === "teams"` to gate Teams tools. Refactored to accept `ChannelCapabilities` and filter tools by `availableIntegrations` (see D3). New channels get integration-scoped tools without code changes to the router.
 4. **execTool()** in `src/engine/tools.ts` -- dispatches to handler with `ToolContext`. New semantic tools need handlers registered here.
 5. **sessionPath()** in `src/config.ts` -- `~/.agentconfigs/<agent>/sessions/<channel>/<key>.json`. Context storage follows a parallel pattern via `FileContextStore`.
 6. **confirmationRequired** set in `src/engine/tools-teams.ts` -- semantic ADO mutation tools need to be added here.
@@ -420,6 +427,7 @@ interface LazyResolvedContext {
 - 2026-03-02 18:22 Added D10: system prompt injection -- context reaches the model via buildSystem(), not just tools. Authority constraints rendered as explicit can/CANNOT. Graceful degradation when no context available.
 - 2026-03-02 18:38 Gap analysis: added Q9-Q15 covering identity bootstrapping, session persistence between turns, working set mutation ownership, buildSystem() API change, resolver error handling, schema versioning, and token/context separation.
 - 2026-03-02 19:15 Added D13 (resolver per-request lifecycle). ChannelCapabilities gains availableIntegrations — prompt only renders integration context for integrations the channel can reach.
+- 2026-03-02 19:30 D3 expanded: availableIntegrations is single source of truth driving tool routing, prompt injection, and resolver. Replaces hardcoded channel === "teams" in getToolsForChannel(). No per-channel switch statements.
 - 2026-03-02 19:22 Rewrote D12 for multi-channel from day one. Hard rules: internal UUID is only primary key, all storage keys use UUID never external IDs, ContextStore gains find() for external ID lookup. ExternalId.provider changed from closed union to extensible string. Added linkedAt to ExternalId. Linking/unlinking UX deferred but data model supports it now.
 - 2026-03-02 19:05 Added D11: Authority → Identity feedback loop. knownScopes is not append-only — 403s prune stale scopes from Identity so prompt stays clean.
 - 2026-03-02 18:55 Eliminated Session layer (D8 rewritten). Five layers → four (Identity, Authority, Preferences, Channel). Conversation history IS the session. Tools are stateless. Working set, execution mode, active scope all removed. Useful bits (knownScopes, defaults) folded into Identity and Preferences. Q6/Q10/Q11 resolved as eliminated. Schema updated: added KnownScope to Identity, schemaVersion to persisted types, removed SessionContext and WorkingSetItem.
