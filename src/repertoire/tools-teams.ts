@@ -1,6 +1,6 @@
 import type { ToolDefinition, ToolHandler } from "./tools-base";
 import { getProfile, graphRequest } from "./graph-client";
-import { queryWorkItems, adoRequest } from "./ado-client";
+import { queryWorkItems, adoRequest, discoverOrganizations } from "./ado-client";
 import graphEndpoints from "./data/graph-endpoints.json";
 import adoEndpoints from "./data/ado-endpoints.json";
 
@@ -143,14 +143,13 @@ export const teamsToolDefinitions: ToolDefinition[] = [
       type: "function",
       function: {
         name: "ado_work_items",
-        description: "query or list Azure DevOps work items. provide an organization and optionally a WIQL query.",
+        description: "query or list Azure DevOps work items. provide an organization and optionally a WIQL query. if organization is omitted, discovers available organizations automatically.",
         parameters: {
           type: "object",
           properties: {
-            organization: { type: "string", description: "Azure DevOps organization name" },
+            organization: { type: "string", description: "Azure DevOps organization name (optional -- omit to discover)" },
             query: { type: "string", description: "WIQL query (optional, defaults to recent assigned work items)" },
           },
-          required: ["organization"],
         },
       },
     },
@@ -158,7 +157,23 @@ export const teamsToolDefinitions: ToolDefinition[] = [
       if (!ctx?.adoToken) {
         return "AUTH_REQUIRED:ado -- I need access to your Azure DevOps account. Please sign in when prompted.";
       }
-      const org = args.organization;
+      let org = args.organization;
+      if (!org) {
+        // Discovery cascade: discover orgs, auto-select if single, disambiguate otherwise
+        try {
+          const orgs = await discoverOrganizations(ctx.adoToken);
+          if (orgs.length === 0) {
+            return "No ADO organizations found for your account. Ensure your Azure DevOps account has access to at least one organization.";
+          }
+          if (orgs.length === 1) {
+            org = orgs[0];
+          } else {
+            return `Multiple ADO organizations found. Please specify which organization to use:\n${orgs.map((o) => `- ${o}`).join("\n")}`;
+          }
+        } catch (e) {
+          return `error discovering ADO organizations: ${e instanceof Error ? e.message : String(e)}`;
+        }
+      }
       const query = args.query || DEFAULT_ADO_QUERY;
       return queryWorkItems(ctx.adoToken, org, query);
     },
