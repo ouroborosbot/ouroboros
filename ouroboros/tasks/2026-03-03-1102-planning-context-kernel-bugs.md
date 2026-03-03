@@ -66,6 +66,7 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
   ```
 - Generic `find(predicate)` goes away — can't scan across two backends generically. Replaced by `findByExternalId()` which searches PII bridge files, then reads agent knowledge to return merged record.
 - `FileContextStore` → `FileFriendStore`: constructor takes two paths (agentKnowledgePath, piiBridgePath). `get()` reads both backends and merges. `put()` splits and writes to both. `findByExternalId()` scans PII bridge, then merges.
+- **Directory bootstrap**: Constructor calls `mkdirSync(path, { recursive: true })` for both agent knowledge and PII bridge directories. Directories are guaranteed to exist before any read/write. `findByExternalId()` on an empty directory returns `null` (no files to scan = no match). No caller needs to worry about directory existence.
 
 *Resolver changes:*
 - `ContextResolver` → `FriendResolver`. "Context" is overloaded — the resolver's job is to resolve a friend, so name it that.
@@ -133,7 +134,14 @@ save_friend_note({
 - Description must include `override` guidance in first person: "If I'm replacing or correcting something I already know, I use `override: true`. If I'm saving something new and want to check what I already have first, I omit `override` and review what comes back."
 - The tool is for the agent to manage its own knowledge about friends. The description guides, not controls.
 
+*Validation:*
+- `content` is always required. If missing: return "I need to include `content` when saving a note."
+- `key` is required for `tool_preference` and `note` types. If missing: return "I need to include `key` when saving a tool_preference or note — this is the category name like 'role' or 'ado'."
+- `type` must be one of `"name"`, `"tool_preference"`, `"note"`. If invalid: return "I need to use a valid type: 'name', 'tool_preference', or 'note'."
+- Validation messages are first person — consistent with the tool description voice. The agent self-corrects and retries.
+
 *Implementation:*
+- Validates parameters first (see above)
 - Reads full `FriendRecord` via `ctx.friendStore.get(ctx.context.friend.id)`
 - Updates the appropriate field based on `type`
 - Writes back via `ctx.friendStore.put()` — store handles PII split internally
@@ -193,6 +201,7 @@ Sessions currently live at `~/.agentconfigs/{agentName}/sessions/{channel}/{sess
 - Sessions are tied to the friend's internal UUID, so you can find all sessions for a given friend.
 - Works even without an external ID — the friend gets a UUID on first encounter regardless.
 - `sessionPath()` in `config.ts` changes signature: `sessionPath(friendId: string, channel: string, key: string)`.
+- `sessionPath()` ensures the parent directory exists (`mkdirSync(path, { recursive: true })`) before returning the path. Callers never need to create directories.
 - Callers (`teams.ts`, `cli.ts`) pass the friend ID from the resolved context.
 - No migration of existing sessions. No backwards compatibility. Old sessions at the old path are simply orphaned — they can be deleted manually.
 - `getSessionDir()` may be removed or simplified since the path now depends on friend ID.
@@ -252,6 +261,9 @@ Sessions currently live at `~/.agentconfigs/{agentName}/sessions/{channel}/{sess
 - [ ] System prompt includes priority guidance (friend's request first, social niceties second) when friend context is present
 - [ ] Missing `aadObjectId` handled gracefully: falls back to `teams-conversation` provider with conversation ID as external ID
 - [ ] No empty `externalIds` arrays — resolver always has an external ID to search for
+- [ ] `FileFriendStore` auto-creates directories on construction (`mkdirSync recursive`)
+- [ ] `sessionPath()` auto-creates parent directories before returning path
+- [ ] `save_friend_note` validates required parameters and returns first-person error messages on failure
 - [ ] Session path restructured: `~/.agentconfigs/{agentName}/sessions/{friendUuid}/{channel}/{sessionId}.json`
 - [ ] `sessionPath()` accepts friend ID, callers pass it from resolved context
 - [ ] CLI session path uses friend UUID from CLI identity resolution
@@ -374,3 +386,4 @@ A single person may have multiple external IDs (e.g., AAD identity + conversatio
 - 2026-03-03 13:54 Eighth revision from unhappy-path walkthrough (new friend, ADO, Teams): (1) Priority guidance — friend's request comes first, social niceties woven in naturally. (2) Missing aadObjectId graceful degradation — create FriendRecord with empty externalIds, friend is real even without external ID. (3) Session path restructuring — sessions tied to friend internal UUID: `sessions/{friendUuid}/{channel}/{sessionId}.json`. No migration, no backwards compat.
 - 2026-03-03 14:10 Ninth revision from unhappy-path walkthrough (returning CLI friend, corrections): (1) save_friend_note tool description gets first-person override guidance — agent's tool, not a leash. (2) Working-memory trust instruction — context window is source of truth, saved notes are journal for future me. (3) Stale notes awareness — when learning something that might invalidate related notes, ask and update. (4) CLI external ID: `username@hostname` with provider `"local"` — disambiguates across machines and accounts.
 - 2026-03-03 14:23 Tenth revision from unhappy-path walkthrough (Teams guest, no aadObjectId): Discovered circular dependency — session path requires friend UUID but without external ID, no stable UUID exists. Fix: use conversation ID as fallback external ID (`provider: "teams-conversation"`). Resolver always has something to search for. Added deferred note for external ID linking (merging multiple external IDs to same friend).
+- 2026-03-03 14:29 Eleventh revision from unhappy-path walkthrough (fresh install, email-as-displayName): (1) Directory bootstrap — FileFriendStore auto-creates directories on construction, sessionPath auto-creates parent dirs. (2) save_friend_note parameter validation with first-person error messages.
