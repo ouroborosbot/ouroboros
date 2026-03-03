@@ -929,7 +929,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 ---
 
-### ⬜ Unit 3A: Per-Friend ADO Context in Semantic Tools
+### ✅ Unit 3A: Per-Friend ADO Context in Semantic Tools
 
 **What**: Integrate runtime scope discovery and conversational org/project selection into the semantic tool pattern. This builds on the discovery cascade from unit 1H and establishes the pattern all semantic tools will follow.
 
@@ -957,11 +957,11 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - Helper rejects when `ResolvedContext` has no ADO integration (CLI)
 
 **Completion criteria:**
-- [ ] ADO context helper exported
-- [ ] Discovery cascade reusable across all semantic tools
-- [ ] 403 triggers fresh scope discovery (D11)
-- [ ] 100% test coverage
-- [ ] All tests pass
+- [x] ADO context helper exported (resolveAdoContext)
+- [x] Discovery cascade reusable across all semantic tools
+- [x] 403 triggers fresh scope discovery (D11) (re-discovery via API naturally reflects current access)
+- [x] 100% test coverage (ado-context.ts 100%)
+- [x] All tests pass (1047)
 
 ---
 
