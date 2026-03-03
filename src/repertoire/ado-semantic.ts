@@ -4,6 +4,7 @@
 import type { ToolDefinition, ToolContext } from "./tools-base"
 import { adoRequest } from "./ado-client"
 import { resolveAdoContext } from "./ado-context"
+import { fetchProcessTemplate, deriveHierarchyRules } from "./ado-templates"
 
 // Fields fetched for enriched work items
 const ENRICHED_FIELDS = [
@@ -204,6 +205,83 @@ function formatForChannel(items: FormattedItem[], ctx: ToolContext | undefined, 
   }
 
   return formatPlainText(items)
+}
+
+// Top-level types that are expected to have no parent
+const TOP_LEVEL_TYPES = new Set(["Epic"])
+
+// Shared helper: fetch all work items with enriched fields
+async function fetchAllItems(
+  token: string,
+  organization: string,
+  project: string,
+): Promise<{ items: EnrichedWorkItem[] } | { error: string }> {
+  const wiql = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${project}' ORDER BY [System.ChangedDate] DESC`
+  const wiqlResult = await adoRequest(token, "POST", organization, `/${project}/_apis/wit/wiql`, JSON.stringify({ query: wiql }))
+
+  let wiqlData: WiqlResponse
+  try {
+    wiqlData = JSON.parse(wiqlResult)
+  } catch {
+    return { error: wiqlResult }
+  }
+
+  if (!wiqlData.workItems || wiqlData.workItems.length === 0) {
+    return { items: [] }
+  }
+
+  const ids = wiqlData.workItems.slice(0, 200).map(wi => wi.id)
+  const batchResult = await adoRequest(token, "GET", organization, `/${project}/_apis/wit/workitems?ids=${ids.join(",")}&fields=${ENRICHED_FIELDS}`)
+
+  let batchData: BatchResponse
+  try {
+    batchData = JSON.parse(batchResult)
+  } catch {
+    return { error: batchResult }
+  }
+
+  return { items: batchData.value ?? [] }
+}
+
+// Detect cycles in parent/child graph using DFS
+function detectCycles(items: EnrichedWorkItem[]): number[][] {
+  const parentMap = new Map<number, number>()
+  for (const item of items) {
+    const parent = item.fields["System.Parent"]
+    if (parent != null) {
+      parentMap.set(item.id, parent)
+    }
+  }
+
+  const cycles: number[][] = []
+  const visited = new Set<number>()
+
+  for (const itemId of parentMap.keys()) {
+    if (visited.has(itemId)) continue
+
+    const path: number[] = []
+    const pathSet = new Set<number>()
+    let current: number | undefined = itemId
+
+    while (current !== undefined && !visited.has(current)) {
+      if (pathSet.has(current)) {
+        // Found a cycle -- extract just the cycle portion
+        const cycleStart = path.indexOf(current)
+        cycles.push(path.slice(cycleStart))
+        break
+      }
+      path.push(current)
+      pathSet.add(current)
+      current = parentMap.get(current)
+    }
+
+    // Mark all nodes in path as visited
+    for (const node of path) {
+      visited.add(node)
+    }
+  }
+
+  return cycles
 }
 
 export const adoSemanticToolDefinitions: ToolDefinition[] = [
@@ -681,5 +759,157 @@ export const adoSemanticToolDefinitions: ToolDefinition[] = [
     },
     integration: "ado",
     confirmationRequired: true,
+  },
+
+  // -- ado_detect_orphans --
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "ado_detect_orphans",
+        description: "Find work items that have no parent but should have one (e.g. Tasks with no parent). Top-level types like Epic are excluded.",
+        parameters: {
+          type: "object",
+          properties: {
+            organization: { type: "string", description: "ADO organization (optional)" },
+            project: { type: "string", description: "ADO project (optional)" },
+          },
+        },
+      },
+    },
+    handler: async (args, ctx) => {
+      const authErr = await checkAuth(ctx)
+      if (authErr) return authErr
+
+      const adoCtx = await resolveAdoContext(ctx!.adoToken!, ctx!.context!, { organization: args.organization, project: args.project })
+      if (!adoCtx.ok) return adoCtx.error
+
+      const fetched = await fetchAllItems(ctx!.adoToken!, adoCtx.organization, adoCtx.project)
+      if ("error" in fetched) return fetched.error
+
+      const orphans = fetched.items
+        .filter(wi => {
+          const parent = wi.fields["System.Parent"]
+          const type = wi.fields["System.WorkItemType"] ?? ""
+          return parent == null && !TOP_LEVEL_TYPES.has(type)
+        })
+        .map(wi => ({
+          id: wi.id,
+          title: wi.fields["System.Title"] ?? "",
+          type: wi.fields["System.WorkItemType"] ?? "",
+          state: wi.fields["System.State"] ?? "",
+        }))
+
+      return JSON.stringify({ orphans, organization: adoCtx.organization, project: adoCtx.project })
+    },
+    integration: "ado",
+  },
+
+  // -- ado_detect_cycles --
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "ado_detect_cycles",
+        description: "Detect circular parent/child relationships in work items. Returns any cycles found.",
+        parameters: {
+          type: "object",
+          properties: {
+            organization: { type: "string", description: "ADO organization (optional)" },
+            project: { type: "string", description: "ADO project (optional)" },
+          },
+        },
+      },
+    },
+    handler: async (args, ctx) => {
+      const authErr = await checkAuth(ctx)
+      if (authErr) return authErr
+
+      const adoCtx = await resolveAdoContext(ctx!.adoToken!, ctx!.context!, { organization: args.organization, project: args.project })
+      if (!adoCtx.ok) return adoCtx.error
+
+      const fetched = await fetchAllItems(ctx!.adoToken!, adoCtx.organization, adoCtx.project)
+      if ("error" in fetched) return fetched.error
+
+      const cycles = detectCycles(fetched.items)
+      return JSON.stringify({ cycles, organization: adoCtx.organization, project: adoCtx.project })
+    },
+    integration: "ado",
+  },
+
+  // -- ado_validate_parent_type_rules --
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "ado_validate_parent_type_rules",
+        description: "Check all work items have valid parent types per the project's process template rules.",
+        parameters: {
+          type: "object",
+          properties: {
+            organization: { type: "string", description: "ADO organization (optional)" },
+            project: { type: "string", description: "ADO project (optional)" },
+          },
+        },
+      },
+    },
+    handler: async (args, ctx) => {
+      const authErr = await checkAuth(ctx)
+      if (authErr) return authErr
+
+      const adoCtx = await resolveAdoContext(ctx!.adoToken!, ctx!.context!, { organization: args.organization, project: args.project })
+      if (!adoCtx.ok) return adoCtx.error
+
+      const fetched = await fetchAllItems(ctx!.adoToken!, adoCtx.organization, adoCtx.project)
+      if ("error" in fetched) return fetched.error
+
+      // Fetch process template to derive hierarchy rules
+      const template = await fetchProcessTemplate(ctx!.adoToken!, adoCtx.organization, adoCtx.project)
+      if (!template) {
+        return JSON.stringify({
+          violations: [],
+          message: "Could not fetch process template -- type rule validation skipped.",
+          organization: adoCtx.organization,
+          project: adoCtx.project,
+        })
+      }
+
+      const rules = deriveHierarchyRules(template.templateName, template.workItemTypes)
+
+      // Build ID->type lookup
+      const typeMap = new Map<number, string>()
+      for (const wi of fetched.items) {
+        typeMap.set(wi.id, wi.fields["System.WorkItemType"] ?? "")
+      }
+
+      // Check each item's parent/child type relationship
+      const violations: { childId: number; childType: string; childTitle: string; parentId: number; parentType: string; reason: string }[] = []
+
+      for (const wi of fetched.items) {
+        const parentId = wi.fields["System.Parent"]
+        if (parentId == null) continue
+
+        const childType = wi.fields["System.WorkItemType"] ?? ""
+        const parentType = typeMap.get(parentId)
+        if (!parentType) continue // parent not in fetched set
+
+        const allowedChildren = rules[parentType]
+        if (!allowedChildren || allowedChildren.length === 0) continue // unknown parent type or leaf
+
+        if (!allowedChildren.includes(childType)) {
+          violations.push({
+            childId: wi.id,
+            childType,
+            childTitle: wi.fields["System.Title"] ?? "",
+            parentId,
+            parentType,
+            reason: `${childType} cannot be a child of ${parentType}. Allowed: ${allowedChildren.join(", ")}.`,
+          })
+        }
+      }
+
+      return JSON.stringify({ violations, organization: adoCtx.organization, project: adoCtx.project })
+    },
+    integration: "ado",
   },
 ]
