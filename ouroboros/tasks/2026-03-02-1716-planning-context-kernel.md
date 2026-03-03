@@ -18,12 +18,12 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 - 10. Directory restructuring (prerequisite) -- rename `src/engine/` to `src/heart/` (core loop, streaming, kicks, API error handling), rename `src/channels/` to `src/senses/` (channel adapters), move tool files (`tools.ts`, `tools-base.ts`, `tools-teams.ts`, `ado-client.ts`, `graph-client.ts`, and `data/` endpoint JSON files) from `src/engine/` to `src/repertoire/`. Update all imports across the codebase, all test file paths, and all documentation referencing old paths. This is a mechanical rename with no behavior changes -- all tests must pass identically before and after. Must be done first because all subsequent units reference the new paths.
 - 1A. `ContextStore` interface -- typed collection properties (`identity: CollectionStore<UserIdentity>`, `preferences: CollectionStore<UserPreferences>`), where `CollectionStore<T>` provides `get(id)`, `put(id, value)`, `delete(id)`, `find(predicate)`. IDs are always plain strings (UUIDs), no slashes, no compound keys. All context persistence goes through this interface. No module imports file paths or `fs` directly for context data. `find(predicate)` supports identity resolution by external ID (scan + predicate for file store; proper index for future DB store). Adding a new persisted type = add one property to `ContextStore`.
 - 1B. `FileContextStore` -- first adapter implementing `ContextStore`. Constructor takes a base path (e.g., `~/.agentconfigs/ouroboros/context`); it does not resolve the path itself. Each collection maps to a subdirectory (`context/identity/`, `context/preferences/`), each item to a JSON file (`{uuid}.json`). This is the only module that touches the filesystem for context storage.
-- 1C. `UserIdentity` type and resolution -- internal userId, external ID mappings (AAD, Teams), tenant memberships, integration memberships (ADO orgs). Persisted via `ContextStore`. Includes `knownScopes` — a living record of orgs/projects the user has worked in. Grows when the model successfully interacts with a scope (tool call succeeds → add/update with fresh `lastUsed`). Shrinks when Authority records persistent access denial (403 on a known scope → prune it so the prompt stops showing inaccessible scopes).
-- 1D. `UserPreferences` type and resolution -- global preferences (verbosity, confirmation policy, preview-before-mutation) plus integration-scoped preferences (ADO planning style, auto-assign, default org/project). Persisted via `ContextStore`. The model writes back learned context (e.g., last-used project) as preference updates.
+- 1C. `UserIdentity` type and resolution -- internal userId, external ID mappings (AAD, Teams), tenant memberships. Persisted via `ContextStore`. Includes `knownScopes` — a cached record of orgs/projects the user has access to, populated by querying integration APIs (ADO: `GET /{org}/_apis/projects` returns only projects the authenticated user can see). Refreshed when cache is stale (TTL) or when the user mentions an unknown scope. Not learning-by-doing — the API tells us everything. The model uses knownScopes to disambiguate ("which project?") and the context window tracks the current project within a session.
+- 1D. `UserPreferences` type and resolution -- global preferences (verbosity, confirmation policy, preview-before-mutation) plus integration-scoped preferences (ADO planning style, auto-assign, backlog view style). Persisted via `ContextStore`. No default org/project — org/project selection is conversational (model disambiguates using knownScopes, context window tracks current project within a session).
 - 1E. `ChannelCapabilities` type -- channel identifier (`"cli" | "teams"`) plus capability flags (`supportsMarkdown`, `supportsStreaming`, `supportsRichCards`, `maxMessageLength`) plus `availableIntegrations` declaring which integrations the channel can reach. Pure lookup, no resolution needed. Drives prompt filtering — only render knownScopes/authority for integrations available in the current channel.
 - 1F. `LazyContextResolver` -- the orchestrator that returns a `LazyResolvedContext` object with explicit `Promise<T>` fields for expensive layers. Identity is resolved eagerly (cheap, almost always needed) and available as a direct value. Authority and Preferences are `Promise<T>` fields -- resolved only when a consumer `await`s them (may require I/O, not always needed). Channel is a synchronous lookup. No Proxy objects or getter traps -- standard TypeScript Promise pattern.
 - 1G. System prompt injection -- `buildSystem()` gains a `contextSection()` that renders identity + preferences + channel into the system prompt. Rebuilt per-turn. Gracefully omitted when no context is available.
-- 1H. Wire Identity + Preferences through ONE real ADO operation (Teams channel only): per-user default org/project. The existing `ado_work_items` tool drops the required `organization` parameter when preferences provide a default. This is the proof that the kernel works end-to-end before building more layers. ADO is Teams-only (CLI has `availableIntegrations = []`, no OAuth tokens) so this wiring is tested and exercised exclusively via the Teams channel.
+- 1H. Wire Identity + knownScopes through ONE real ADO operation (Teams channel only): the existing `ado_work_items` tool uses knownScopes to resolve org/project when the model doesn't specify them explicitly. If only one scope exists, use it automatically. If multiple, the model asks the user. This is the proof that the kernel works end-to-end before building more layers. ADO is Teams-only (CLI has `availableIntegrations = []`, no OAuth tokens) so this wiring is tested and exercised exclusively via the Teams channel.
 
 **Phase 2: Authority (Demand-Driven)**
 - 2A. `Authority` type and resolution -- integration-scoped capability profiles using a hybrid model: optimistic on read-path (attempt and learn from 403), pre-flight check on write-path (verify before proposing destructive operations). Cached with TTL + 403-triggered invalidation.
@@ -32,7 +32,7 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 - 2D. Extend system prompt injection with authority constraints -- `contextSection()` renders "can / CANNOT" authority limits into the prompt so the model plans around constraints upfront (see D10). Authority → Identity feedback loop (D11) prunes stale knownScopes.
 
 **Phase 3: ADO Semantic Tools (Full Consumer)**
-- 3A. Per-user default ADO context (defaultOrg, defaultProject, knownProjects) resolved via identity + preferences
+- 3A. Per-user ADO context (knownScopes from API discovery, conversational org/project selection) resolved via identity
 - 3B. Enriched backlog query tool -- single-call `ado_backlog_list` with hierarchy, types, parent info, assignee
 - 3C. Semantic ADO operations -- `ado_create_epic`, `ado_create_issue`, `ado_move_items`, `ado_restructure_backlog`, `ado_validate_structure`, `ado_preview_changes`
 - 3D. Batch operations -- `ado_batch_update` client-side batching with plan validation and per-item results
@@ -62,10 +62,10 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 - [ ] `LazyContextResolver` resolves layers on demand -- Authority and Preferences are not resolved unless a tool accesses them
 - [ ] Authority uses hybrid model: reads are optimistic (403 learning), writes have pre-flight check
 - [ ] Identity persists across sessions via `ContextStore`; Authority caches in memory with TTL; Preferences persist via `ContextStore`
-- [ ] Identity tracks `knownScopes` — evergreen record of orgs/projects the user has worked in, updated automatically
+- [ ] Identity tracks `knownScopes` — cached from integration API discovery (ADO projects API), refreshed on TTL or unknown scope
 - [ ] Tools are stateless — model provides all required context (org, project, IDs) on every call; no ambient session state
 - [ ] ToolContext extension is backward-compatible -- existing tools work unchanged
-- [ ] ADO tools use context kernel for org/project resolution instead of requiring explicit parameters
+- [ ] ADO tools use knownScopes for org/project disambiguation instead of requiring explicit parameters
 - [ ] At least 3 semantic ADO operations exist (create_epic, create_issue, move_items)
 - [ ] Process template detection works for Basic, Agile, and Scrum
 - [ ] Channel-aware formatting works for Teams and CLI
@@ -222,8 +222,10 @@ The context kernel resolves identity, authority, preferences, and channel -- but
 ## user context
 user: Jordan (jordan@contoso.com)
 channel: teams (markdown, no streaming, max 4000 chars)
-known scopes: ado/contoso/Platform, ado/contoso/Infrastructure
-default: ado/contoso/Platform
+known scopes:
+  ado/contoso: Platform, Infrastructure, Mobile
+  ado/fabrikam: Backend
+when the user asks about work items without specifying a project, ask which one.
 
 ## authority constraints
 - ado/contoso/Platform: can read, can create issues, CANNOT create epics, CANNOT delete
@@ -245,8 +247,8 @@ Design rules:
 
 This is wired in Phase 1 (1G) for identity + preferences, and extended in Phase 2 (2D) for authority.
 
-### D11: Authority -> Identity Feedback Loop
-`knownScopes` in Identity is not append-only. When Authority records a persistent 403 on a scope listed in `knownScopes`, it signals Identity to prune that scope. This prevents the system prompt from advertising scopes the user can no longer access. The feedback direction is one-way: Authority informs Identity, never the reverse. Identity doesn't gate Authority -- it just reflects what Authority has learned over time. Implementation: `AuthorityChecker.record403()` accepts an optional callback or event that the identity resolver subscribes to. Alternatively, the resolver pipeline runs a reconciliation step after authority resolution that compares `knownScopes` against cached 403s and prunes stale entries.
+### D11: Authority -> Identity Feedback Loop (Simplified by API Discovery)
+Since `knownScopes` is now populated by querying integration APIs (ADO projects API), the Authority → Identity feedback loop is simpler: a 403 on a known scope triggers a re-query of the projects API, and the scope naturally disappears from the results if access was revoked. No explicit pruning logic needed — just invalidate the knownScopes cache and let the next resolution re-discover what the user can actually access. The feedback direction is still one-way: Authority triggers cache invalidation on Identity, never the reverse.
 
 ### D12: Cross-Channel Identity -- Designed For Multi-Channel From Day One
 Users will talk to the agent from many channels over time -- Teams today, Discord/Telegram/iMessage/web tomorrow. The identity model must make cross-channel linking a natural extension, not a retrofit.
@@ -436,18 +438,14 @@ interface ExternalId {
   linkedAt: string;   // ISO date -- when this external ID was associated with the identity
 }
 
-interface IntegrationMembership {
-  integration: "ado" | "github" | "graph";
-  scope: string;  // e.g., ADO org name, GitHub org name
-}
-
 interface KnownScope {
   integration: "ado" | "github" | "graph";
   org: string;
   project?: string;
-  lastUsed: string;  // ISO date, updated on successful interaction
-  // Pruned from identity when Authority records persistent 403 on this scope.
-  // This keeps the prompt clean — no stale scopes the user can't access.
+  // Populated by querying integration APIs (ADO: GET /{org}/_apis/projects).
+  // Cached with TTL. Re-queried on cache expiry or when Authority records a 403.
+  // Not learning-by-doing — the API tells us what the user can access.
+  discoveredAt: string;  // ISO date, when this scope was last confirmed by the API
 }
 
 interface UserIdentity {
@@ -455,8 +453,7 @@ interface UserIdentity {
   displayName: string;
   externalIds: ExternalId[];
   tenantMemberships: string[];  // AAD tenant IDs
-  integrationMemberships: IntegrationMembership[];
-  knownScopes: KnownScope[];  // evergreen record of orgs/projects user has worked in
+  knownScopes: KnownScope[];  // cached from integration API discovery, not learning-by-doing
   createdAt: string;  // ISO date
   updatedAt: string;
   schemaVersion: number;
@@ -502,8 +499,8 @@ interface AdoPreferences {
   planningStyle: "epic-first" | "issue-first";
   autoAssignToSelf: boolean;
   backlogViewStyle: "flat" | "tree";
-  defaultOrg?: string;
-  defaultProject?: string;
+  // No defaultOrg/defaultProject — org/project selection is conversational.
+  // Model disambiguates using knownScopes, context window tracks current project.
 }
 
 interface UserPreferences {
@@ -558,3 +555,4 @@ interface LazyResolvedContext {
 - 2026-03-03 19:50 Ambiguity audit (A1-A27 identified). Beginning item-by-item resolution.
 - 2026-03-03 19:55 A1: removed list() from ContextStore (YAGNI -- no consumer needs it, find() covers identity resolution).
 - 2026-03-03 20:13 A2+A3 (+A11, A20, A22): replaced generic key-value ContextStore with typed CollectionStore<T> properties. store.identity.get(userId) instead of get("identity/abc-123"). No slashes, no compound keys, IDs are plain UUIDs. FileContextStore constructor takes basePath (no internal path resolution). D13 rewritten: store per-process, resolver per-request, both channel paths specified. CLI adapter added as integration point 3.
+- 2026-03-03 20:26 A4 (knownScopes): replaced learning-by-doing with API discovery. ADO projects API returns what the user can access — no recordKnownScope mechanism needed. Killed defaultOrg/defaultProject from AdoPreferences — org/project selection is conversational (model disambiguates using knownScopes, context window tracks current project). Simplified D11 feedback loop (403 → re-query API, scope disappears naturally). Removed IntegrationMembership type. Updated 1C, 1D, 1H, 3A, D10 example prompt, D11, completion criteria, schema.
