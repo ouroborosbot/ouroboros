@@ -2542,30 +2542,35 @@ describe("runAgent", () => {
       buildSystem: vi.fn().mockRejectedValue(new Error("prompt refresh failed")),
     }))
 
-    const core = await import("../../heart/core")
-    mockCreate.mockReturnValue(makeStream([makeChunk("hi")]))
+    try {
+      const core = await import("../../heart/core")
+      mockCreate.mockReturnValue(makeStream([makeChunk("hi")]))
 
-    const callbacks: ChannelCallbacks = {
-      onModelStart: () => {},
-      onModelStreamStart: () => {},
-      onTextChunk: () => {},
-      onReasoningChunk: () => {},
-      onToolStart: () => {},
-      onToolEnd: () => {},
-      onError: () => {},
+      const callbacks: ChannelCallbacks = {
+        onModelStart: () => {},
+        onModelStreamStart: () => {},
+        onTextChunk: () => {},
+        onReasoningChunk: () => {},
+        onToolStart: () => {},
+        onToolEnd: () => {},
+        onError: () => {},
+      }
+
+      const messages: any[] = [
+        { role: "system", content: "stable fallback prompt" },
+        { role: "user", content: "hello" },
+      ]
+
+      await core.runAgent(messages, callbacks, "teams")
+
+      expect(messages[0].role).toBe("system")
+      expect(messages[0].content).toBe("stable fallback prompt")
+      expect(messages.some((m: any) => m.role === "user" && m.content === "hello")).toBe(true)
+      expect(mockCreate).toHaveBeenCalled()
+    } finally {
+      vi.doUnmock("../../mind/prompt")
+      vi.resetModules()
     }
-
-    const messages: any[] = [
-      { role: "system", content: "stable fallback prompt" },
-      { role: "user", content: "hello" },
-    ]
-
-    await core.runAgent(messages, callbacks, "teams")
-
-    expect(messages[0].role).toBe("system")
-    expect(messages[0].content).toBe("stable fallback prompt")
-    expect(messages.some((m: any) => m.role === "user" && m.content === "hello")).toBe(true)
-    expect(mockCreate).toHaveBeenCalled()
   })
 
   it("still works without channel parameter (backward compatible)", async () => {
