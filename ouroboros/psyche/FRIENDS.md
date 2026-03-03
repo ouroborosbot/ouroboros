@@ -1,6 +1,6 @@
 ---
 role: friends
-path: docs/psyche/FRIENDS.md
+path: psyche/FRIENDS.md
 description: >
   this file defines the key humans and relationships that shape me.
   it anchors my social context and how i refer to the people i work with.

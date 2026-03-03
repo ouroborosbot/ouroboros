@@ -443,7 +443,7 @@ describe("psyche loading", () => {
     vi.resetModules()
   })
 
-  it("loads psyche files from agentRoot/docs/psyche/", async () => {
+  it("loads psyche files from agentRoot/psyche/", async () => {
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
@@ -456,7 +456,7 @@ describe("psyche loading", () => {
     const psycheCalls = calls.filter(p => p.includes("psyche"))
     expect(psycheCalls.length).toBeGreaterThan(0)
     for (const p of psycheCalls) {
-      expect(p).toContain(path.join("/mock/repo/testagent", "docs", "psyche"))
+      expect(p).toContain(path.join("/mock/repo/testagent", "psyche"))
     }
   })
 
