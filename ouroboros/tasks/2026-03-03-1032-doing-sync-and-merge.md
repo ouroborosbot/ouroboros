@@ -27,6 +27,7 @@ Build a new `work-merger` subagent that runs after work-doer completes, fetching
 - [ ] The work-merger doc covers CI failure self-repair: agent fixes failures itself first, escalates only when genuinely stuck
 - [ ] The work-merger doc covers post-merge cleanup: delete feature branch (local + remote)
 - [ ] The work-merger doc covers escalation: when to stop and ask the user (only for genuinely ambiguous issues, not fixable failures)
+- [ ] The work-merger doc covers `gh` CLI preflight checks: installed, authenticated, GitHub remote exists, repo default set. Agent self-repairs what it can, escalates only when human input needed (credentials, OAuth)
 - [ ] Branch naming convention unified and documented: both agents use `<agent>/<slug>`, old `codex/` prefix convention deprecated in AGENTS.md
 - [ ] `CONTRIBUTING.md` updated: sync-and-merge workflow section, unified branch convention (`<agent>/<slug>`), PR-based merge flow
 - [ ] `cross-agent-docs/sync-and-merge-conventions.md` created with shared conventions
@@ -66,10 +67,10 @@ Note: This task is documentation-only. TDD applies if any runtime code is introd
 **Output**: `./2026-03-03-1032-doing-sync-and-merge/outline.md` with section-by-section outline.
 **Acceptance**: Outline exists, covers every completion criterion, and maps each planning decision to a concrete section in the work-merger doc.
 
-### ⬜ Unit 1: Create `subagents/work-merger.md` -- core workflow
-**What**: Author the work-merger subagent definition with YAML frontmatter and the core merge workflow: On Startup (detect agent from branch, find own doing doc), Timestamp & Commit Pattern, and the main Merge Loop (fetch origin/main, merge, handle clean merge vs conflicts).
-**Output**: `subagents/work-merger.md` with frontmatter + On Startup + core merge workflow sections.
-**Acceptance**: File exists with valid YAML frontmatter (`name`, `description`, `model`). On Startup section derives agent name from branch using `<agent>/<slug>` convention. Merge Loop section covers `git fetch origin main`, `git merge origin/main`, and branches for clean merge vs conflict.
+### ⬜ Unit 1: Create `subagents/work-merger.md` -- core workflow and preflight checks
+**What**: Author the work-merger subagent definition with YAML frontmatter and the core merge workflow: On Startup (detect agent from branch, find own doing doc, run `gh` preflight checks), Timestamp & Commit Pattern, and the main Merge Loop (fetch origin/main, merge, handle clean merge vs conflicts). The `gh` preflight checks verify: `gh` is installed, `gh auth status` passes, repo has a GitHub remote, `gh repo set-default` is configured. Agent fixes what it can autonomously (e.g., set repo default, diagnose auth issues) and only escalates to user when human input is truly required (e.g., user must provide credentials or approve an OAuth flow).
+**Output**: `subagents/work-merger.md` with frontmatter + On Startup (including `gh` preflight) + core merge workflow sections.
+**Acceptance**: File exists with valid YAML frontmatter (`name`, `description`, `model`). On Startup section derives agent name from branch using `<agent>/<slug>` convention. On Startup includes `gh` preflight checks covering: (1) `gh` installed, (2) `gh auth status` passes, (3) GitHub remote exists, (4) `gh repo set-default` configured. Preflight distinguishes between self-fixable issues and issues requiring user input. Merge Loop section covers `git fetch origin main`, `git merge origin/main`, and branches for clean merge vs conflict.
 
 ### ⬜ Unit 2: `work-merger.md` -- conflict resolution with task doc discovery
 **What**: Add the conflict resolution section: how to read own doing doc, scan `*/tasks/` directories for other agents' recent doing docs (sorted by YYYY-MM-DD-HHMM filename prefix, most recent first), understand both intents, and resolve conflicts preserving both.

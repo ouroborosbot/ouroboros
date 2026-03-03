@@ -20,6 +20,7 @@ Build a new `work-merger` subagent that runs after work-doer completes, fetching
 - Race condition retry flow: if PR has conflicts (other agent merged while this agent was working), pull updated main, re-resolve conflicts using task docs, run tests, force-push branch, let CI re-run
 - CI failure self-repair: agent attempts to fix CI failures itself first (it wrote the code, has task context), only escalates to user for genuinely ambiguous issues
 - Post-merge cleanup: delete feature branch (local and remote) after PR is merged
+- `gh` CLI preflight checks in On Startup: verify installed, authenticated, GitHub remote configured, repo default set. Agent self-repairs what it can, escalates only for human-required input (credentials, OAuth)
 - Escalation path: stop and ask user only when truly stuck (not for fixable test/lint failures)
 - Branch convention unification: both agents use `<agent>/<slug>` (e.g., `ouroboros/context-kernel`, `slugger/some-feature`). The old `codex/<agent>` prefix convention is deprecated. AGENTS.md branch parsing rules updated accordingly.
 - Update `CONTRIBUTING.md`: document sync-and-merge workflow, unified branch convention (`<agent>/<slug>`), and PR-based merge flow
@@ -46,6 +47,7 @@ Build a new `work-merger` subagent that runs after work-doer completes, fetching
 - [ ] The work-merger doc covers CI failure self-repair: agent fixes failures itself first, escalates only when genuinely stuck
 - [ ] The work-merger doc covers post-merge cleanup: delete feature branch (local + remote)
 - [ ] The work-merger doc covers escalation: when to stop and ask the user (only for genuinely ambiguous issues, not fixable failures)
+- [ ] The work-merger doc covers `gh` CLI preflight checks: installed, authenticated, GitHub remote exists, repo default set. Agent self-repairs what it can, escalates only when human input needed (credentials, OAuth)
 - [ ] Branch naming convention unified and documented: both agents use `<agent>/<slug>`, old `codex/` prefix convention deprecated in AGENTS.md
 - [ ] `CONTRIBUTING.md` updated: sync-and-merge workflow section, unified branch convention (`<agent>/<slug>`), PR-based merge flow
 - [ ] `cross-agent-docs/sync-and-merge-conventions.md` created with shared conventions
