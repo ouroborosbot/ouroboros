@@ -38,6 +38,7 @@ describe("observability/coverage run artifacts", () => {
     const info = createInfo(repoSlug)
     slugsToCleanup.add(repoSlug)
 
+    expect(readLatestRun(repoSlug)).toBeNull()
     expect(getTestRunsRoot(repoSlug)).toContain(`/test-runs/${repoSlug}`)
     expect(info.run_dir).toContain(`/test-runs/${repoSlug}/${info.run_id}`)
     expect(createRunId(new Date("2026-03-02T18:00:00.000Z"))).toBe("2026-03-02T18-00-00-000Z")
@@ -70,5 +71,20 @@ describe("observability/coverage run artifacts", () => {
 
     expect(readActiveRun(repoSlug)).toBeNull()
     expect(readLatestRun(repoSlug)).toBeNull()
+  })
+
+  it("returns null for structurally invalid metadata and tolerates clearing when absent", () => {
+    const repoSlug = `ouro-run-artifacts-${Date.now()}-invalid-shape`
+    slugsToCleanup.add(repoSlug)
+
+    const root = getTestRunsRoot(repoSlug)
+    mkdirSync(root, { recursive: true })
+    writeFileSync(`${root}/.active-run.json`, JSON.stringify({ run_id: "", run_dir: "" }), "utf8")
+    writeFileSync(`${root}/latest-run.json`, JSON.stringify({ run_id: "", run_dir: "" }), "utf8")
+
+    expect(readActiveRun(repoSlug)).toBeNull()
+    expect(readLatestRun(repoSlug)).toBeNull()
+
+    clearActiveRun(`${repoSlug}-missing`)
   })
 })

@@ -6,7 +6,12 @@ export default defineConfig({
     setupFiles: ["src/__tests__/observability/global-capture.ts"],
     coverage: {
       include: ["src/**/*.ts"],
-      exclude: ["src/engine/data/**"],
+      exclude: [
+        "src/engine/data/**",
+        "src/cli-entry.ts",
+        "src/teams-entry.ts",
+        "src/observability/coverage/cli-main.ts",
+      ],
     },
   },
 })

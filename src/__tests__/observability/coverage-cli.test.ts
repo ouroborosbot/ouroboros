@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync } from "fs"
+import { existsSync, mkdtempSync, readFileSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
 
@@ -30,6 +30,8 @@ describe("observability/coverage cli", () => {
   it("writes report output and returns success/failure codes from audit results", async () => {
     const runDir = mkdtempSync(join(tmpdir(), "ouro-observability-cli-"))
     const outputPath = join(runDir, "custom-observability-coverage.json")
+    const eventsPath = join(runDir, "custom-events.ndjson")
+    const logpointsPath = join(runDir, "custom-logpoints.json")
     const auditSpy = vi.fn()
     const stdoutSpy = vi.spyOn(console, "log").mockImplementation(() => {})
 
@@ -46,6 +48,30 @@ describe("observability/coverage cli", () => {
     }))
 
     const { runAuditCli } = await import("../../observability/coverage/cli")
+
+    auditSpy.mockReturnValueOnce({
+      overall_status: "pass",
+      required_actions: [],
+      observability_coverage: {
+        event_catalog: { status: "pass", required: 1, observed: 1, missing: [] },
+        schema_redaction: { status: "pass", checked_events: 1, violations: [] },
+        logpoint_coverage: { status: "pass", declared: 1, observed: 1, missing: [] },
+      },
+    })
+    const defaultOutputCode = runAuditCli([
+      "--run-dir",
+      runDir,
+      "--events-path",
+      eventsPath,
+      "--logpoints-path",
+      logpointsPath,
+    ])
+    expect(defaultOutputCode).toBe(0)
+    expect(auditSpy).toHaveBeenCalledWith({
+      eventsPath,
+      logpointsPath,
+    })
+    expect(existsSync(join(runDir, "observability-coverage.json"))).toBe(true)
 
     auditSpy.mockReturnValueOnce({
       overall_status: "pass",
