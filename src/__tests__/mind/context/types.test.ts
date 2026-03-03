@@ -5,7 +5,7 @@ import {
   type IdentityProvider,
   type Integration,
   type ExternalId,
-  type FriendIdentity,
+  type FriendRecord,
   type ChannelCapabilities,
   type ResolvedContext,
 } from "../../../mind/context/types"
@@ -17,6 +17,10 @@ describe("IdentityProvider type guard", () => {
 
   it("accepts 'local'", () => {
     expect(isIdentityProvider("local")).toBe(true)
+  })
+
+  it("accepts 'teams-conversation'", () => {
+    expect(isIdentityProvider("teams-conversation")).toBe(true)
   })
 
   it("rejects invalid strings", () => {
@@ -80,26 +84,56 @@ describe("ExternalId type", () => {
     }
     expect(id.tenantId).toBe("tenant-456")
   })
+
+  it("constructs with teams-conversation provider", () => {
+    const id: ExternalId = {
+      provider: "teams-conversation",
+      externalId: "conv-id-123",
+      linkedAt: "2026-03-02T00:00:00.000Z",
+    }
+    expect(id.provider).toBe("teams-conversation")
+    expect(id.externalId).toBe("conv-id-123")
+  })
 })
 
-describe("FriendIdentity type", () => {
+describe("FriendRecord type", () => {
   it("constructs with all required fields", () => {
-    const identity: FriendIdentity = {
+    const record: FriendRecord = {
       id: "uuid-1",
       displayName: "Jordan",
       externalIds: [
         { provider: "aad", externalId: "aad-id", tenantId: "t1", linkedAt: "2026-03-02T00:00:00.000Z" },
       ],
       tenantMemberships: ["t1"],
+      toolPreferences: { ado: "flat backlog view" },
+      notes: { role: "engineering manager" },
       createdAt: "2026-03-02T00:00:00.000Z",
       updatedAt: "2026-03-02T00:00:00.000Z",
       schemaVersion: 1,
     }
-    expect(identity.id).toBe("uuid-1")
-    expect(identity.displayName).toBe("Jordan")
-    expect(identity.externalIds).toHaveLength(1)
-    expect(identity.tenantMemberships).toEqual(["t1"])
-    expect(identity.schemaVersion).toBe(1)
+    expect(record.id).toBe("uuid-1")
+    expect(record.displayName).toBe("Jordan")
+    expect(record.externalIds).toHaveLength(1)
+    expect(record.tenantMemberships).toEqual(["t1"])
+    expect(record.toolPreferences.ado).toBe("flat backlog view")
+    expect(record.notes.role).toBe("engineering manager")
+    expect(record.schemaVersion).toBe(1)
+  })
+
+  it("constructs with empty toolPreferences and notes", () => {
+    const record: FriendRecord = {
+      id: "uuid-2",
+      displayName: "Alex",
+      externalIds: [],
+      tenantMemberships: [],
+      toolPreferences: {},
+      notes: {},
+      createdAt: "2026-03-02T00:00:00.000Z",
+      updatedAt: "2026-03-02T00:00:00.000Z",
+      schemaVersion: 1,
+    }
+    expect(Object.keys(record.toolPreferences)).toHaveLength(0)
+    expect(Object.keys(record.notes)).toHaveLength(0)
   })
 })
 
@@ -136,12 +170,14 @@ describe("ChannelCapabilities type", () => {
 })
 
 describe("ResolvedContext type", () => {
-  it("constructs with identity and channel", () => {
-    const identity: FriendIdentity = {
+  it("constructs with friend and channel (no identity, no memory, no checker)", () => {
+    const friend: FriendRecord = {
       id: "uuid-1",
       displayName: "Jordan",
       externalIds: [],
       tenantMemberships: [],
+      toolPreferences: {},
+      notes: {},
       createdAt: "2026-03-02T00:00:00.000Z",
       updatedAt: "2026-03-02T00:00:00.000Z",
       schemaVersion: 1,
@@ -154,8 +190,12 @@ describe("ResolvedContext type", () => {
       supportsRichCards: false,
       maxMessageLength: Infinity,
     }
-    const ctx: ResolvedContext = { identity, channel }
-    expect(ctx.identity).toBe(identity)
+    const ctx: ResolvedContext = { friend, channel }
+    expect(ctx.friend).toBe(friend)
     expect(ctx.channel).toBe(channel)
+    // ResolvedContext should NOT have identity, memory, or checker fields
+    expect("identity" in ctx).toBe(false)
+    expect("memory" in ctx).toBe(false)
+    expect("checker" in ctx).toBe(false)
   })
 })
