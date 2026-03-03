@@ -66,7 +66,7 @@ Rename the repository's observability namespace and command surface from `observ
 **What**: Refactor for clarity if needed while preserving behavior and verify coverage and audit gates for the renamed namespace.
 **Acceptance**: 100% coverage on new code, tests remain green, coverage gate and `audit:nerves` gate pass.
 
-### ⬜ Unit 2a: Coverage/Audit Pipeline Integration — Tests
+### ✅ Unit 2a: Coverage/Audit Pipeline Integration — Tests
 **What**: Add or update tests for coverage-gate integration so required actions/report parsing align with `nerves` naming and artifacts.
 **Acceptance**: Tests fail first for any stale `observability` command/artifact assumptions.
 
@@ -112,3 +112,4 @@ Rename the repository's observability namespace and command surface from `observ
 - [2026-03-03 14:00] Unit 1a complete: added failing rename contract tests for `audit:nerves` and coverage-gate naming, captured red run output.
 - [2026-03-03 14:02] Unit 1b complete: moved observability module/test trees to `nerves`, updated imports and command wiring, and passed full test suite + build.
 - [2026-03-03 14:04] Unit 1c complete: backfilled coverage for `src/nerves/coverage/cli-main.ts`; combined `test:coverage` gate and build both pass at 100%.
+- [2026-03-03 14:05] Unit 2a complete: added failing coverage-pipeline contract assertions for `nerves audit` messaging and `nerves_coverage` summary key.
