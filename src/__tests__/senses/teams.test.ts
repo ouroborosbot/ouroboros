@@ -3799,6 +3799,82 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
     // FileFriendStore should be created only once (singleton), not per-request
     expect(FileFriendStore).toHaveBeenCalledTimes(1)
   })
+
+  it("buildSystem is called with resolved context as third argument", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDepsForContext({ runAgentFn })
+    const { buildSystem } = await import("../../mind/prompt")
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const teamsContext = {
+      graphToken: "g-token",
+      adoToken: "a-token",
+      signin: vi.fn(),
+      aadObjectId: "aad-user-123",
+      tenantId: "tenant-abc",
+      displayName: "Test User",
+    }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123", teamsContext)
+
+    // buildSystem should be called with channel, options, and resolved context
+    expect(buildSystem).toHaveBeenCalledWith(
+      "teams",
+      expect.anything(),
+      expect.objectContaining({
+        friend: expect.objectContaining({ displayName: "Test User" }),
+        channel: expect.objectContaining({ channel: "teams" }),
+      }),
+    )
+  })
+
+  it("toolContext.friendStore is set from the shared store", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDepsForContext({ runAgentFn })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const teamsContext = {
+      graphToken: "g-token",
+      adoToken: "a-token",
+      signin: vi.fn(),
+      aadObjectId: "aad-user-123",
+      tenantId: "tenant-abc",
+      displayName: "Test User",
+    }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123", teamsContext)
+
+    const callArgs = runAgentFn.mock.calls[0]
+    const options = callArgs[4]
+    expect(options.toolContext.friendStore).toBeDefined()
+  })
+
+  it("session path uses friend UUID instead of default", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDepsForContext({ runAgentFn })
+    const { sessionPath } = await import("../../config")
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const teamsContext = {
+      graphToken: "g-token",
+      adoToken: "a-token",
+      signin: vi.fn(),
+      aadObjectId: "aad-user-123",
+      tenantId: "tenant-abc",
+      displayName: "Test User",
+    }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123", teamsContext)
+
+    // sessionPath should be called with the friend UUID ("mock-uuid"), not "default"
+    expect(sessionPath).toHaveBeenCalledWith("mock-uuid", "teams", "conv-123")
+  })
 })
 
 describe("Teams adapter - TeamsCallbacksWithFlush type", () => {
