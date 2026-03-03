@@ -258,7 +258,7 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Output**: Coverage report showing 100% on CLI adapter changes.
 **Acceptance**: 100% coverage on new code, tests still green.
 
-### ⬜ Unit 11a: Agent loop per-turn refresh -- Tests
+### ✅ Unit 11a: Agent loop per-turn refresh -- Tests
 **What**: Write tests for `core.ts` changes. Test: (1) `runAgent()` re-reads friend record from disk each turn via `store.get(friendId)`. (2) System prompt rebuilt with fresh context each turn (buildSystem called with context). (3) `getToolsForChannel()` called with `friend.toolPreferences`. (4) `toolContext` properly typed with `friendStore` instead of `memoryStore`.
 **Output**: Updated `core.test.ts` with per-turn refresh tests.
 **Files**: `src/__tests__/heart/core.test.ts`
