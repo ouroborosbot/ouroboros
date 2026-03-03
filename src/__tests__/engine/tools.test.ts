@@ -124,10 +124,10 @@ describe("execTool", () => {
 
     const result = await execTool("git_commit", {
       message: "test commit",
-      paths: ["docs/psyche/SOUL.md"],
+      paths: ["psyche/SOUL.md"],
     })
 
-    expect(execSync).toHaveBeenCalledWith("git add docs/psyche/SOUL.md", expect.any(Object))
+    expect(execSync).toHaveBeenCalledWith("git add psyche/SOUL.md", expect.any(Object))
     expect(execSync).toHaveBeenCalledWith("git diff --cached --stat", expect.any(Object))
     expect(execSync).toHaveBeenCalledWith(
       'git commit -m "test commit"',
@@ -558,7 +558,7 @@ describe("finalAnswerTool", () => {
     expect(finalAnswerTool.type).toBe("function")
     expect(finalAnswerTool.function.name).toBe("final_answer")
     expect(finalAnswerTool.function.description).toBe(
-      "give your final text response. use this when tool_choice is required and you want to reply with text instead of calling another tool."
+      "give your final text response. use this when you want to reply with text instead of calling another tool."
     )
     expect(finalAnswerTool.function.parameters).toEqual({
       type: "object",
