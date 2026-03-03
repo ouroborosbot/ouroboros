@@ -13,18 +13,50 @@ export { teamsTools } from "./tools-teams";
 // All tool definitions in a single registry
 const allDefinitions: ToolDefinition[] = [...baseToolDefinitions, ...teamsToolDefinitions, ...adoSemanticToolDefinitions];
 
+// Apply a single tool preference to a tool schema, returning a new object.
+function applyPreference(tool: OpenAI.ChatCompletionTool, pref: string): OpenAI.ChatCompletionTool {
+  return {
+    ...tool,
+    function: {
+      ...tool.function,
+      description: `${tool.function.description}\n\nfriend preference: ${pref}`,
+    },
+  };
+}
+
 // Return the appropriate tools list based on channel capabilities.
 // Base tools (no integration) are always included.
 // Teams/integration tools are included only if their integration is in availableIntegrations.
-export function getToolsForChannel(capabilities?: ChannelCapabilities): OpenAI.ChatCompletionTool[] {
+// When toolPreferences is provided, matching preferences are appended to tool descriptions.
+export function getToolsForChannel(
+  capabilities?: ChannelCapabilities,
+  toolPreferences?: Record<string, string>,
+): OpenAI.ChatCompletionTool[] {
   if (!capabilities || capabilities.availableIntegrations.length === 0) {
     return tools;
   }
   const available = new Set(capabilities.availableIntegrations);
-  const integrationTools = [...teamsToolDefinitions, ...adoSemanticToolDefinitions].filter(
+  const integrationDefs = [...teamsToolDefinitions, ...adoSemanticToolDefinitions].filter(
     (d) => d.integration && available.has(d.integration),
   );
-  return [...tools, ...integrationTools.map((d) => d.tool)];
+
+  if (!toolPreferences || Object.keys(toolPreferences).length === 0) {
+    return [...tools, ...integrationDefs.map((d) => d.tool)];
+  }
+
+  // Build a map of integration -> preference text for fast lookup
+  const prefMap = new Map<string, string>();
+  for (const [key, value] of Object.entries(toolPreferences)) {
+    prefMap.set(key, value);
+  }
+
+  // Apply preferences to matching integration tools (new objects, no mutation)
+  const enrichedIntegrationTools = integrationDefs.map((d) => {
+    const pref = d.integration ? prefMap.get(d.integration) : undefined;
+    return pref ? applyPreference(d.tool, pref) : d.tool;
+  });
+
+  return [...tools, ...enrichedIntegrationTools];
 }
 
 // Check whether a tool requires user confirmation before execution.
