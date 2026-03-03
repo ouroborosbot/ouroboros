@@ -95,6 +95,43 @@ describe("hasToolIntent", () => {
     expect(hasToolIntent(text)).toBe(true)
   })
 
+  // Bare "Continuing." / "continuing" patterns
+  it.each([
+    "Continuing.",
+    "continuing",
+    "Continuing",
+    "continuing.",
+  ])("returns true for bare continuing: %s", (text) => {
+    expect(hasToolIntent(text)).toBe(true)
+  })
+
+  // Sentence-final "continues." pattern
+  it.each([
+    "Backlog theatre continues.",
+    "The work continues.",
+  ])("returns true for sentence-final continues: %s", (text) => {
+    expect(hasToolIntent(text)).toBe(true)
+  })
+
+  // "Next up" pattern
+  it.each([
+    "Next up:",
+    "next up:",
+    "Next up, I'll create the task",
+  ])("returns true for next up: %s", (text) => {
+    expect(hasToolIntent(text)).toBe(true)
+  })
+
+  // False negatives — these should NOT match the new patterns
+  it.each([
+    "the process is continuing as expected",
+    "Continuing the work on the project",
+    "The task continues to be complex",
+    "What's next up on the agenda?",
+  ])("returns false for non-intent similar text: %s", (text) => {
+    expect(hasToolIntent(text)).toBe(false)
+  })
+
   it.each([
     "Hello",
     "Here is the result",
@@ -159,5 +196,15 @@ describe("detectKick", () => {
   it("returns null when toolChoiceRequired is false and content is normal", () => {
     const kick = detectKick("the answer is 42", { toolChoiceRequired: false })
     expect(kick).toBeNull()
+  })
+
+  it("returns narration kick for bare Continuing.", () => {
+    const kick = detectKick("Continuing.")
+    expect(kick).toEqual({ reason: "narration", message: expect.stringContaining("narrated") })
+  })
+
+  it("returns narration kick for sentence-final continues.", () => {
+    const kick = detectKick("Backlog theatre continues.")
+    expect(kick).toEqual({ reason: "narration", message: expect.stringContaining("narrated") })
   })
 })

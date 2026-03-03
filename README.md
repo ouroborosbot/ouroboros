@@ -33,9 +33,11 @@ ouroboros/                        # repo root
       teams.ts                    # Teams bot, streaming cards, conversation locks
     repertoire/
       commands.ts                 # slash commands (/exit, /new, /commands)
-      phrases.ts                  # loading phrases (thinking, tool, followup)
       skills.ts                   # skill loader (markdown files on demand)
-    __tests__/                    # 850+ tests, 100% coverage
+    wardrobe/
+      format.ts                   # shared formatters (tool results, kicks, errors)
+      phrases.ts                  # loading phrases (thinking, tool, followup)
+    __tests__/                    # 900+ tests, 100% coverage
   ouroboros/                      # agent directory for "ouroboros"
     agent.json                    # name, configPath, custom phrases
     docs/
@@ -143,7 +145,9 @@ Plus 2 optional:
 
 **Tools**: 11 base tools available in all channels (read_file, write_file, shell, list_directory, git_commit, gh_cli, list_skills, load_skill, get_current_time, claude, web_search). Teams gets 8 additional tools (graph_query, graph_mutate, ado_query, ado_mutate, graph_profile, ado_work_items, graph_docs, ado_docs).
 
-**Phrases** (`repertoire/phrases.ts`): three pools of loading messages rotated during processing. Custom pools come from `agent.json`; defaults are used when not specified. `pickPhrase()` selects randomly but never repeats consecutively.
+**Phrases** (`wardrobe/phrases.ts`): three pools of loading messages rotated during processing. Phrases are required in `agent.json`; if missing, `loadAgentConfig()` writes placeholder phrases and warns. `pickPhrase()` selects randomly but never repeats consecutively.
+
+**Formatting** (`wardrobe/format.ts`): shared formatters for tool results, kicks, and errors. Used by both CLI and Teams adapters for consistent output. `formatToolResult()`, `formatKick()`, `formatError()`.
 
 **Skills** (`repertoire/skills.ts`): markdown files in `{your-dir}/skills/`. Listed with `list_skills`, loaded with `load_skill`. The loaded text is injected into conversation as a tool result.
 

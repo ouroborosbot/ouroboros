@@ -4,6 +4,7 @@ import * as path from "path"
 // Mock fs before importing identity
 vi.mock("fs", () => ({
   readFileSync: vi.fn(),
+  writeFileSync: vi.fn(),
   existsSync: vi.fn(),
 }))
 
@@ -15,6 +16,7 @@ let savedArgv: string[]
 beforeEach(() => {
   savedArgv = [...process.argv]
   vi.mocked(fs.readFileSync).mockReset()
+  vi.mocked(fs.writeFileSync as ReturnType<typeof vi.fn>).mockReset()
   vi.mocked(fs.existsSync).mockReset()
 })
 
@@ -138,7 +140,7 @@ describe("loadAgentConfig", () => {
     expect(config.phrases?.followup).toEqual(["almost done"])
   })
 
-  it("works without phrases field (optional)", async () => {
+  it("auto-fills placeholder phrases when agent.json has no phrases field", async () => {
     process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
     const agentJson = {
       name: "ouroboros",
@@ -151,8 +153,52 @@ describe("loadAgentConfig", () => {
     const config = loadAgentConfig()
 
     expect(config.name).toBe("ouroboros")
-    expect(config.configPath).toBe("~/.agentconfigs/ouroboros/config.json")
-    expect(config.phrases).toBeUndefined()
+    expect(config.phrases).toEqual({
+      thinking: ["working"],
+      tool: ["running tool"],
+      followup: ["processing"],
+    })
+  })
+
+  it("warns and writes placeholders when agent.json is missing phrases", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    const agentJson = {
+      name: "ouroboros",
+      configPath: "~/.agentconfigs/ouroboros/config.json",
+    }
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(agentJson))
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    loadAgentConfig()
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("agent.json is missing phrases"))
+    expect(fs.writeFileSync).toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+
+  it("does NOT warn or write when agent.json already has phrases", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    const agentJson = {
+      name: "ouroboros",
+      configPath: "~/.agentconfigs/ouroboros/config.json",
+      phrases: {
+        thinking: ["thinking hard"],
+        tool: ["doing stuff"],
+        followup: ["almost done"],
+      },
+    }
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(agentJson))
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    loadAgentConfig()
+
+    expect(warnSpy).not.toHaveBeenCalled()
+    expect(fs.writeFileSync).not.toHaveBeenCalled()
+    warnSpy.mockRestore()
   })
 
   it("throws descriptive error when agent.json is missing", async () => {
