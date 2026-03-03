@@ -1,6 +1,6 @@
 # Planning: Rename Observability Namespace and Commands to Nerves
 
-**Status**: approved
+**Status**: done
 **Created**: 2026-03-03 13:41
 
 ## Goal
@@ -26,15 +26,15 @@ Rename the repository's observability namespace and command surface from `observ
 - Rewriting historical prose that references "observability" conceptually where path-level correctness is not required.
 
 ## Completion Criteria
-- [ ] `src/observability/` is fully renamed to `src/nerves/` (or equivalent file move) with no orphaned runtime usage.
-- [ ] Runtime code compiles and uses `nerves` import paths consistently.
-- [ ] Test suite references `nerves` paths and passes without alias shims.
-- [ ] Coverage and `audit:nerves` gate remain green after rename.
-- [ ] Documentation/path references required for current workflows are updated to the new namespace.
-- [ ] No active (non-historical) user-facing command or doc in this repo still uses `observability` as the subsystem name.
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] `src/observability/` is fully renamed to `src/nerves/` (or equivalent file move) with no orphaned runtime usage.
+- [x] Runtime code compiles and uses `nerves` import paths consistently.
+- [x] Test suite references `nerves` paths and passes without alias shims.
+- [x] Coverage and `audit:nerves` gate remain green after rename.
+- [x] Documentation/path references required for current workflows are updated to the new namespace.
+- [x] No active (non-historical) user-facing command or doc in this repo still uses `observability` as the subsystem name.
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -68,3 +68,4 @@ This is intentionally a naming/structure migration task. Behavioral parity is re
 - [2026-03-03 13:41] Created planning doc for nerves namespace rename.
 - [2026-03-03 13:47] Locked full `observability` -> `nerves` rename scope (including command surface) and clarified historical-doc boundary.
 - [2026-03-03 13:49] User approved planning doc; ready for doing conversion.
+- [2026-03-03 14:15] Execution complete: all completion criteria verified and synced from doing evidence.
