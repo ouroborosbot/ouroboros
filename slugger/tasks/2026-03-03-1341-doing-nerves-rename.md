@@ -55,11 +55,11 @@ Rename the repository's observability namespace and command surface from `observ
 **Acceptance**: Inventory distinguishes active rename targets from historical records and is sufficient to drive deterministic edits.
 
 ### ⬜ Unit 1a: Namespace and Command Rename — Tests
-**What**: Add or update tests to fail first for the new namespace/command contract, including `audit:nerves` naming and `src/nerves` import-path expectations.
+**What**: Add or update tests to fail first for the new namespace/command contract, including `audit:nerves` naming, `src/nerves` import-path expectations, and renamed coverage-cli output defaults.
 **Acceptance**: New/updated tests exist and fail (red) before implementation.
 
 ### ⬜ Unit 1b: Namespace and Command Rename — Implementation
-**What**: Perform file moves and code edits to rename `src/observability` to `src/nerves`, update imports/exports and script entrypoints, and switch active command usage to `audit:nerves`.
+**What**: Perform file moves and code edits to rename `src/observability` to `src/nerves` and `src/__tests__/observability` to `src/__tests__/nerves`, update imports/exports, and switch active command usage to `audit:nerves`.
 **Acceptance**: Targeted tests pass (green), runtime/build path references resolve, no warnings.
 
 ### ⬜ Unit 1c: Namespace and Command Rename — Coverage & Refactor
@@ -71,15 +71,15 @@ Rename the repository's observability namespace and command surface from `observ
 **Acceptance**: Tests fail first for any stale `observability` command/artifact assumptions.
 
 ### ⬜ Unit 2b: Coverage/Audit Pipeline Integration — Implementation
-**What**: Update scripts and emitted artifact names/fields where required so the combined gate pipeline consistently references the renamed subsystem.
-**Acceptance**: Coverage gate script and audit command run successfully with renamed paths/labels and produce expected artifacts.
+**What**: Update `package.json`, `scripts/run-coverage-gate.cjs`, and coverage CLI wiring so the combined gate pipeline consistently references the renamed subsystem and command.
+**Acceptance**: Coverage gate script and audit command run successfully using `audit:nerves`, `dist/nerves/coverage/cli-main.js`, and renamed expected artifact paths.
 
 ### ⬜ Unit 2c: Coverage/Audit Pipeline Integration — Coverage & Refactor
 **What**: Validate branch/error-path coverage for updated script logic and tighten implementation without behavior drift.
 **Acceptance**: Updated script/tests are fully covered for new/changed lines and remain green.
 
 ### ⬜ Unit 3a: Documentation and Task Path Accuracy — Tests
-**What**: Add lightweight assertions/checks or scripted validations (if present) for active doc references that must move from `observability` to `nerves`.
+**What**: Add lightweight assertions/checks or scripted validations (if present) for active docs/commands that must move from `observability` to `nerves`.
 **Acceptance**: Validation fails when active required docs still contain stale subsystem naming.
 
 ### ⬜ Unit 3b: Documentation and Task Path Accuracy — Implementation
@@ -106,3 +106,4 @@ Rename the repository's observability namespace and command surface from `observ
 
 ## Progress Log
 - [2026-03-03 13:49] Created from planning doc.
+- [2026-03-03 13:50] Validation pass aligned units to existing repo paths and scripts (`src/observability`, `src/__tests__/observability`, `package.json`, `scripts/run-coverage-gate.cjs`).
