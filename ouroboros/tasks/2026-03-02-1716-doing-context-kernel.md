@@ -1101,7 +1101,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 ---
 
-### ⬜ Unit 3D: Semantic ADO Operations + Dry-Run
+### ✅ Unit 3D: Semantic ADO Operations + Dry-Run
 
 **What**: Create semantic ADO mutation tools: `ado_create_epic`, `ado_create_issue`, `ado_move_items`, `ado_restructure_backlog`, `ado_validate_structure`, `ado_preview_changes`. `ado_preview_changes` is the dry-run tool that returns a structured diff of what a mutation would do before executing.
 
@@ -1144,12 +1144,12 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - All registered as `ToolDefinition` with correct integration and confirmationRequired
 
 **Completion criteria:**
-- [ ] All 6 semantic tools exist and are registered
-- [ ] Authority checked before mutations
-- [ ] Dry-run mode returns structured preview
-- [ ] JSON Patch operations correct
-- [ ] 100% test coverage
-- [ ] All tests pass
+- [x] All 6 semantic tools exist and are registered (ado_create_epic, ado_create_issue, ado_move_items, ado_restructure_backlog, ado_validate_structure, ado_preview_changes)
+- [x] Authority checked before mutations (canWrite pre-flight)
+- [x] Dry-run mode returns structured preview (ado_preview_changes)
+- [x] JSON Patch operations correct (buildCreatePatch, buildReparentPatch)
+- [x] 100% test coverage (ado-semantic.ts 100% lines)
+- [x] All tests pass (1115)
 
 ---
 
@@ -1388,3 +1388,4 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - 2026-03-03 0030 Unit 3Ba complete: FriendMemory type (id, toolPreferences, schemaVersion), memory collection on ContextStore + FileContextStore, resolveMemory() with D16 graceful error handling, resolver loads memory alongside identity/channel/authority. 1062 tests total.
 - 2026-03-03 0034 Unit 3Bb complete: contextSection() renders "## friend preferences" from FriendMemory.toolPreferences (skipped when null/empty). save_friend_note base tool creates/updates FriendMemory via memoryStore on ToolContext. D16 error handling on write failure. 1072 tests total.
 - 2026-03-03 0038 Unit 3C complete: ado_backlog_list semantic tool -- single-call enriched backlog query with WIQL + batch fetch. Returns structured JSON with hierarchy, type, parent, assignee, area path, iteration. Filters: areaPath, iteration, workItemType, state, assignee. Registered via adoSemanticToolDefinitions in tools.ts. 1085 tests total.
+- 2026-03-03 0044 Unit 3D complete: 6 semantic ADO tools: ado_create_epic, ado_create_issue (JSON Patch mutations with canWrite pre-flight), ado_move_items (sequential reparent with partial failure handling), ado_restructure_backlog (bulk reparent), ado_validate_structure (parent/child type rules), ado_preview_changes (dry-run preview). All use resolveAdoContext. 1115 tests total.
