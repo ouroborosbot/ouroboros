@@ -111,7 +111,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 ### ⬜ Unit 4b: Channel Instrumentation Contract — Green
 **What**: Implement channel instrumentation to satisfy cross-channel contract and event catalog expectations.
 **Output**: Updated `src/channels/cli.ts`, `src/channels/teams.ts`, `src/wardrobe/format.ts` and passing tests.
-**Acceptance**: Tests confirm channel UX remains native and operational diagnostics are structured logger events.
+**Acceptance**: Tests confirm channel UX remains native, operational diagnostics are structured logger events, and `src/wardrobe/format.ts` emits `component=channels` events.
 
 ### ⬜ Unit 4c: Channel Instrumentation Contract — Coverage & Refactor
 **What**: Refactor channel instrumentation and verify coverage on newly introduced branches/error paths.
@@ -126,7 +126,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 ### ⬜ Unit 5b: Config/Identity/Clients/Repertoire/Wardrobe Instrumentation — Green
 **What**: Implement required structured event logging for config, identity, client requests, and repertoire load paths, including config helpers needed for session-style logs directory/path resolution.
 **Output**: Updated `src/config.ts`, `src/identity.ts`, `src/engine/ado-client.ts`, `src/engine/graph-client.ts`, `src/repertoire/commands.ts`, `src/repertoire/skills.ts`, `src/wardrobe/phrases.ts` and passing tests.
-**Acceptance**: Required component events are emitted with required envelope, session-style log path resolution works, and tests pass.
+**Acceptance**: Required component events are emitted with required envelope, session-style log path resolution works, `src/wardrobe/phrases.ts` emits `component=repertoire` events, and tests pass.
 
 ### ⬜ Unit 5c: Config/Identity/Clients/Repertoire/Wardrobe Instrumentation — Coverage & Refactor
 **What**: Refactor for consistency and verify complete coverage on new code paths.
@@ -164,4 +164,5 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 16:05] Updated units/criteria for session-style append-only NDJSON persistence with dual sinks (`stderr` + file)
 - [2026-03-02 16:12] Consistency cleanup: required sink abstraction + explicit key mapping; reset status to drafting pending re-review
 - [2026-03-02 16:19] Pass 1 (first draft refresh): incorporated merged `origin/main` runtime/test path changes into work units
-- [PENDING_PASS2_TS] Pass 2 (granularity): clarified Unit 5 ownership to include wardrobe scope without additional unit splits
+- [2026-03-02 16:17] Pass 2 (granularity): clarified Unit 5 ownership to include wardrobe scope without additional unit splits
+- [PENDING_PASS3_TS] Pass 3 (validation): aligned wardrobe component mapping in acceptance criteria with planning decisions and merged codebase
