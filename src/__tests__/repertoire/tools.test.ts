@@ -26,6 +26,7 @@ vi.mock("../../repertoire/graph-client", () => ({
 vi.mock("../../repertoire/ado-client", () => ({
   queryWorkItems: vi.fn(),
   adoRequest: vi.fn(),
+  discoverOrganizations: vi.fn(),
 }))
 
 vi.mock("../../identity", () => ({
@@ -868,6 +869,78 @@ describe("execTool with ToolContext (graph/ado handlers)", () => {
 
     const result = await execTool("ado_work_items", { organization: "myorg" })
     expect(result).toBe("AUTH_REQUIRED:ado -- I need access to your Azure DevOps account. Please sign in when prompted.")
+  })
+
+  it("ado_work_items without org: single org auto-selects", async () => {
+    vi.resetModules()
+    const { queryWorkItems, discoverOrganizations } = await import("../../repertoire/ado-client")
+    vi.mocked(discoverOrganizations).mockResolvedValue(["solo-org"])
+    vi.mocked(queryWorkItems).mockResolvedValue("Work items from solo-org")
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("ado_work_items", {}, ctx)
+    expect(result).toBe("Work items from solo-org")
+    expect(discoverOrganizations).toHaveBeenCalledWith("test-token")
+    expect(queryWorkItems).toHaveBeenCalledWith("test-token", "solo-org", expect.stringContaining("SELECT"))
+  })
+
+  it("ado_work_items without org: multiple orgs returns list for model", async () => {
+    vi.resetModules()
+    const { discoverOrganizations } = await import("../../repertoire/ado-client")
+    vi.mocked(discoverOrganizations).mockResolvedValue(["org-a", "org-b", "org-c"])
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("ado_work_items", {}, ctx)
+    expect(result).toContain("org-a")
+    expect(result).toContain("org-b")
+    expect(result).toContain("org-c")
+    // Should indicate disambiguation is needed
+    expect(result.toLowerCase()).toContain("organization")
+  })
+
+  it("ado_work_items without org: zero orgs returns not found message", async () => {
+    vi.resetModules()
+    const { discoverOrganizations } = await import("../../repertoire/ado-client")
+    vi.mocked(discoverOrganizations).mockResolvedValue([])
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("ado_work_items", {}, ctx)
+    expect(result.toLowerCase()).toContain("no")
+    expect(result.toLowerCase()).toContain("organization")
+  })
+
+  it("ado_work_items without org: discovery error returns structured message", async () => {
+    vi.resetModules()
+    const { discoverOrganizations } = await import("../../repertoire/ado-client")
+    vi.mocked(discoverOrganizations).mockRejectedValue(new Error("API timeout"))
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("ado_work_items", {}, ctx)
+    expect(result).toContain("error")
   })
 
   it("base tools work without ToolContext", async () => {
