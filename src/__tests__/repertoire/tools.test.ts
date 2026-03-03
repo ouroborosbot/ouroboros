@@ -631,8 +631,14 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
     expect(names).toContain("ado_docs")
     // Should have semantic ado tools
     expect(names).toContain("ado_backlog_list")
-    // base tools + 8 teams tools + 1 semantic ado tool
-    expect(result.length).toBe(tools.length + 9)
+    expect(names).toContain("ado_create_epic")
+    expect(names).toContain("ado_create_issue")
+    expect(names).toContain("ado_move_items")
+    expect(names).toContain("ado_restructure_backlog")
+    expect(names).toContain("ado_validate_structure")
+    expect(names).toContain("ado_preview_changes")
+    // base tools + 8 teams tools + 7 semantic ado tools
+    expect(result.length).toBe(tools.length + 15)
   })
 
   it("returns base + graph-only tools when only graph integration", async () => {
@@ -687,8 +693,8 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
     expect(names).not.toContain("graph_docs")
     // Should have semantic ado tools
     expect(names).toContain("ado_backlog_list")
-    // base tools + 4 ado tools + 1 semantic ado tool
-    expect(result.length).toBe(tools.length + 5)
+    // base tools + 4 ado tools + 7 semantic ado tools
+    expect(result.length).toBe(tools.length + 11)
   })
 })
 
@@ -1517,8 +1523,8 @@ describe("getToolsForChannel includes docs tools", () => {
     expect(names).toContain("ado_docs")
     // Should have semantic ado tools
     expect(names).toContain("ado_backlog_list")
-    // base tools + 8 teams tools (4 generic + 2 aliases + 2 docs) + 1 semantic ado tool
-    expect(teamsTools.length).toBe(tools.length + 9)
+    // base tools + 8 teams tools (4 generic + 2 aliases + 2 docs) + 7 semantic ado tools
+    expect(teamsTools.length).toBe(tools.length + 15)
   })
 
   it("cli channel does NOT include graph_docs or ado_docs", async () => {
