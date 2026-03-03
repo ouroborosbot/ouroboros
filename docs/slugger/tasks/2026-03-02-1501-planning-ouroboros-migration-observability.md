@@ -1,6 +1,6 @@
 # Planning: Ouroboros Migration — Observability (Phase 2)
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-03-02 15:01
 
 ## Goal
@@ -21,6 +21,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Add trace ID propagation through turn entrypoints and engine execution path.
 - Instrument runtime paths across `src/` with event-level logging (including channels, engine, mind, clients, config/identity, repertoire, and entrypoints).
 - Lock minimum event catalog coverage per component (entrypoints, channels, engine, mind, tools, config/identity, clients, repertoire) for this phase.
+- Reflect merged upstream runtime layout changes (including `src/wardrobe/phrases.ts` and `src/wardrobe/format.ts`) in observability instrumentation coverage.
 - Keep user-facing output in channel-native paths while routing operational diagnostics through logger sinks (`stderr` + file).
 - Add tests for logger behavior, trace helpers, and instrumentation points.
 - Ensure test/build/coverage remain green with 100% coverage on new code.
@@ -85,11 +86,14 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/src/channels/cli.ts`
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/src/channels/teams.ts`
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/src/engine/core.ts`
+- `/Users/arimendelow/Projects/ouroboros-agent-harness/src/wardrobe/phrases.ts`
+- `/Users/arimendelow/Projects/ouroboros-agent-harness/src/wardrobe/format.ts`
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/AGENTS.md`
 
 ## Notes
 Current codebase still uses ad-hoc `console` logging in channel and entrypoint code; this phase should establish a consistent structured baseline without overreaching into daemon-level ops plumbing.
 Model consumption is primary: logs should be stable, structured, and parseable for behavior analysis and automated verification loops.
+Merged `origin/main` into `codex/slugger` before execution planning refresh; upstream includes CLI/Teams formatting and phrase-module refactors that must be included in instrumentation scope.
 
 ## Progress Log
 - [2026-03-02 15:01] Created
@@ -101,3 +105,4 @@ Model consumption is primary: logs should be stable, structured, and parseable f
 - [2026-03-02 15:50] Planning approved for conversion to doing doc
 - [2026-03-02 16:05] Added session-style append-only NDJSON file persistence (`stderr` + file sinks) and deferred key-collision hardening
 - [2026-03-02 16:11] Consistency cleanup: aligned sink contract to dual-sink decision, locked key mapping semantics, and required sink abstraction
+- [PENDING_MAIN_SYNC_TS] Synced planning assumptions to merged `origin/main` runtime changes and re-approved for conversion refresh
