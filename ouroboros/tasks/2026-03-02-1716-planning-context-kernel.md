@@ -18,7 +18,7 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 - 10. Directory restructuring (prerequisite) -- rename `src/engine/` to `src/heart/` (core loop, streaming, kicks, API error handling), rename `src/channels/` to `src/senses/` (channel adapters), move tool files (`tools.ts`, `tools-base.ts`, `tools-teams.ts`, `ado-client.ts`, `graph-client.ts`, and `data/` endpoint JSON files) from `src/engine/` to `src/repertoire/`. Update all imports across the codebase, all test file paths, and all documentation referencing old paths. This is a mechanical rename with no behavior changes -- all tests must pass identically before and after. Must be done first because all subsequent units reference the new paths.
 - 1A. `ContextStore` interface -- typed collection properties (`identity: CollectionStore<UserIdentity>`, `preferences: CollectionStore<UserPreferences>`), where `CollectionStore<T>` provides `get(id)`, `put(id, value)`, `delete(id)`, `find(predicate)`. IDs are always plain strings (UUIDs), no slashes, no compound keys. All context persistence goes through this interface. No module imports file paths or `fs` directly for context data. `find(predicate)` supports identity resolution by external ID (scan + predicate for file store; proper index for future DB store). Adding a new persisted type = add one property to `ContextStore`.
 - 1B. `FileContextStore` -- first adapter implementing `ContextStore`. Constructor takes a base path (e.g., `~/.agentconfigs/ouroboros/context`); it does not resolve the path itself. Each collection maps to a subdirectory (`context/identity/`, `context/preferences/`), each item to a JSON file (`{uuid}.json`). This is the only module that touches the filesystem for context storage.
-- 1C. `UserIdentity` type and resolution -- internal userId, external ID mappings (AAD, Teams), tenant memberships. Persisted via `ContextStore`. Includes `knownScopes` — a cached record of orgs/projects the user has access to, populated by querying integration APIs (ADO: `GET /{org}/_apis/projects` returns only projects the authenticated user can see). Refreshed when cache is stale (TTL) or when the user mentions an unknown scope. Not learning-by-doing — the API tells us everything. The model uses knownScopes to disambiguate ("which project?") and the context window tracks the current project within a session.
+- 1C. `UserIdentity` type and resolution -- internal userId, external ID mappings (AAD, Teams), tenant memberships. Persisted via `ContextStore`. Includes `knownScopes` — a cached record of orgs/projects the user has access to, populated by querying ADO APIs: (1) `GET https://app.vssps.visualstudio.com/_apis/accounts?memberId={id}` discovers which orgs the user belongs to, (2) `GET https://dev.azure.com/{org}/_apis/projects` discovers which projects they can see per org. This replaces the manual `ado.organizations` config — the user's token is the source of truth. Refreshed when cache is stale (TTL) or when the user mentions an unknown scope. The model uses knownScopes to disambiguate ("which project?") and the context window tracks the current project within a session.
 - 1D. `UserPreferences` type and resolution -- global preferences (verbosity, confirmation policy, preview-before-mutation) plus integration-scoped preferences (ADO planning style, auto-assign, backlog view style). Persisted via `ContextStore`. No default org/project — org/project selection is conversational (model disambiguates using knownScopes, context window tracks current project within a session).
 - 1E. `ChannelCapabilities` type -- channel identifier (`"cli" | "teams"`) plus capability flags (`supportsMarkdown`, `supportsStreaming`, `supportsRichCards`, `maxMessageLength`) plus `availableIntegrations` declaring which integrations the channel can reach. Pure lookup, no resolution needed. Drives prompt filtering — only render knownScopes/authority for integrations available in the current channel.
 - 1F. `LazyContextResolver` -- the orchestrator that returns a `LazyResolvedContext` object with explicit `Promise<T>` fields for expensive layers. Identity is resolved eagerly (cheap, almost always needed) and available as a direct value. Authority and Preferences are `Promise<T>` fields -- resolved only when a consumer `await`s them (may require I/O, not always needed). Channel is a synchronous lookup. No Proxy objects or getter traps -- standard TypeScript Promise pattern.
@@ -163,7 +163,7 @@ This replaces the current hardcoded pattern in `getToolsForChannel()` where `cha
 Authority profiles are cached with a configurable TTL (default: 30 minutes). Additionally, any 403 response from an ADO/Graph API call triggers immediate cache invalidation for that integration scope. This catches permission changes without waiting for TTL expiry.
 
 ### D5: ToolContext Extension -- Backward Compatible
-The existing `ToolContext` interface in `src/repertoire/tools-base.ts` is extended (not replaced) with an optional `context?: LazyResolvedContext` field. This means all existing tool handlers continue to work unchanged. New semantic tools can access context layers on demand. Migration is gradual.
+The existing `ToolContext` interface in `src/repertoire/tools-base.ts` is extended (not replaced) with an optional `context?: LazyResolvedContext` field. The `adoOrganizations` field is removed — org validation moves to knownScopes (see D20). This means existing tool handlers need minor updates (replace `validateAdoOrg()` with knownScopes check), but the overall shape is backward-compatible. New semantic tools access context layers on demand.
 
 ### D6: Resolver -- Lazy via Explicit Promises, Not Upfront
 The previous design resolved all layers into a `ResolvedContext` bag on every tool call. Not every tool needs all four (e.g., `read_file` needs none, `ado_query` needs Identity but not Authority). Full upfront resolution adds latency, especially when Authority requires API calls. The `LazyContextResolver` returns an object with explicit `Promise<T>` fields for expensive layers:
@@ -330,6 +330,23 @@ All top-level source directories MUST map to a part of the agent-creature's body
 - `src/config.ts` -- configuration loading. Top-level because it's cross-cutting.
 - `src/cli-entry.ts`, `src/teams-entry.ts` -- entry points. Top-level by convention.
 
+### D20: API-Discovered Scopes Replace Config-Based Org Allowlist
+The existing `ado.organizations` config and `validateAdoOrg()` function were a pre-context-kernel workaround: manually list allowed orgs, reject anything else. This is replaced by API discovery:
+1. **Org discovery**: `GET https://app.vssps.visualstudio.com/_apis/accounts?memberId={id}` returns all ADO orgs the user belongs to. The user's OAuth token is the source of truth — no manual config needed.
+2. **Project discovery**: `GET https://dev.azure.com/{org}/_apis/projects` returns only projects the user can see within each org.
+3. **knownScopes** on `UserIdentity` caches the discovered orgs + projects with TTL. Refreshed on cache expiry or when the user mentions an unknown scope.
+4. **ADO tools validate org against knownScopes** instead of against a config list. Same safety rail, zero config.
+
+What gets removed:
+- `ado.organizations` from `OuroborosConfig` and `AdoConfig`
+- `adoOrganizations` from `ToolContext`
+- `validateAdoOrg()` from `tools-teams.ts`
+- `getAdoConfig()` from `config.ts` (unless other ADO config fields are added later)
+
+What replaces them:
+- `context.identity.knownScopes` — API-discovered, per-user, cached
+- Org/project validation in tool handlers checks knownScopes instead of a config allowlist
+
 ## Context / References
 
 ### Existing Codebase Architecture (Post-Restructuring)
@@ -339,7 +356,7 @@ Paths reflect the directory restructuring done in unit 10. The agent-creature bo
 - **Heart** (core loop): `src/heart/core.ts` -- `runAgent()` loop, provider selection, streaming, tool execution
 - **Mind** (reasoning): `src/mind/prompt.ts` -- `buildSystem()` assembles system prompt with channel-aware sections; `src/mind/context.ts` -- `saveSession()`, `loadSession()`, `postTurn()`, `trimMessages()`
 - **Repertoire** (capabilities): `src/repertoire/tools-base.ts` (base tools), `src/repertoire/tools-teams.ts` (Teams-only tools including ADO/Graph), `src/repertoire/tools.ts` (channel-aware tool list)
-- **ToolContext interface** (`src/repertoire/tools-base.ts`): `{ graphToken?, adoToken?, signin, adoOrganizations }`
+- **ToolContext interface** (`src/repertoire/tools-base.ts`): `{ graphToken?, adoToken?, signin, adoOrganizations }` — `adoOrganizations` removed by context kernel (D20); org validation moves to knownScopes
 - **ADO client**: `src/repertoire/ado-client.ts` -- generic `adoRequest()` and `queryWorkItems()` wrapper
 - **Graph client**: `src/repertoire/graph-client.ts` -- generic `graphRequest()` and `getProfile()` wrapper
 - **Senses** (channels): `src/senses/cli.ts` (readline REPL), `src/senses/teams.ts` (Teams SDK bot)
@@ -362,6 +379,8 @@ Paths reflect the directory restructuring done in unit 10. The agent-creature bo
 - JSON Patch for work item mutations (content-type: `application/json-patch+json`)
 - Organization scoping: `https://dev.azure.com/{org}/...`
 - API version: 7.1
+- **Org discovery**: `GET https://app.vssps.visualstudio.com/_apis/accounts?memberId={id}&api-version=7.1` — returns all orgs the user is a member of. Requires OAuth scope `vso.profile`.
+- **Project discovery**: `GET https://dev.azure.com/{org}/_apis/projects?api-version=7.1` — returns only projects the authenticated user can see within an org.
 - Process template API: `GET /{org}/{project}/_apis/work/processes`
 - Work item types API: `GET /{org}/{project}/_apis/wit/workitemtypes`
 - Security Namespaces API: `GET /{org}/_apis/security/namespaces` (for authority pre-flight checks)
@@ -556,3 +575,4 @@ interface LazyResolvedContext {
 - 2026-03-03 19:55 A1: removed list() from ContextStore (YAGNI -- no consumer needs it, find() covers identity resolution).
 - 2026-03-03 20:13 A2+A3 (+A11, A20, A22): replaced generic key-value ContextStore with typed CollectionStore<T> properties. store.identity.get(userId) instead of get("identity/abc-123"). No slashes, no compound keys, IDs are plain UUIDs. FileContextStore constructor takes basePath (no internal path resolution). D13 rewritten: store per-process, resolver per-request, both channel paths specified. CLI adapter added as integration point 3.
 - 2026-03-03 20:26 A4 (knownScopes): replaced learning-by-doing with API discovery. ADO projects API returns what the user can access — no recordKnownScope mechanism needed. Killed defaultOrg/defaultProject from AdoPreferences — org/project selection is conversational (model disambiguates using knownScopes, context window tracks current project). Simplified D11 feedback loop (403 → re-query API, scope disappears naturally). Removed IntegrationMembership type. Updated 1C, 1D, 1H, 3A, D10 example prompt, D11, completion criteria, schema.
+- 2026-03-03 20:33 D20: API-discovered scopes replace config-based org allowlist. ADO Accounts API discovers orgs, Projects API discovers projects per org. Kills ado.organizations config, adoOrganizations on ToolContext, validateAdoOrg(). User's OAuth token is source of truth. Added discovery APIs to ADO API Patterns reference. Updated D5, ToolContext interface reference.
