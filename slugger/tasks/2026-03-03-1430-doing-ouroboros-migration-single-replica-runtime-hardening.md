@@ -56,7 +56,7 @@ Define and lock runtime hardening requirements for single-replica preview so req
 **Output**: Baseline matrix at `./2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-0-runtime-baseline.md`.
 **Acceptance**: Matrix lists current behavior, target behavior, and exact file/test touchpoints required for implementation.
 
-### ⬜ Unit 1a: Remote Tool-Surface Safety — Tests
+### ✅ Unit 1a: Remote Tool-Surface Safety — Tests
 **What**: Add failing tests that enforce remote-channel tool restrictions (no local CLI/file/git/gh tools in remote channel capabilities) and required denial messaging language for blocked operations.
 **Output**: Red test artifact at `./2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-1a-red-run.txt`.
 **Acceptance**: Tests fail before implementation and explicitly show remote local-tool exposure/denial-message gaps.
@@ -131,3 +131,4 @@ Define and lock runtime hardening requirements for single-replica preview so req
 - [2026-03-03 14:45] Validation pass complete: verified referenced runtime/workflow paths in current repo and confirmed doing assumptions align with present code layout.
 - [2026-03-03 14:46] Quality pass complete: checklist/testability/emoji-header requirements verified; status set to READY_FOR_EXECUTION.
 - [2026-03-03 14:47] Unit 0 complete: captured current-state runtime hardening contract matrix and target touchpoints in `unit-0-runtime-baseline.md`.
+- [2026-03-03 14:49] Unit 1a complete: added failing remote tool-safety tests and captured red evidence for local-tool exposure and missing denial UX contract.
