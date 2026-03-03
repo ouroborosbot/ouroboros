@@ -54,7 +54,7 @@ Rename the repository's observability namespace and command surface from `observ
 **Output**: Reference inventory artifact in `./2026-03-03-1341-doing-nerves-rename/rename-inventory.md`.
 **Acceptance**: Inventory distinguishes active rename targets from historical records and is sufficient to drive deterministic edits.
 
-### ⬜ Unit 1a: Namespace and Command Rename — Tests
+### ✅ Unit 1a: Namespace and Command Rename — Tests
 **What**: Add or update tests to fail first for the new namespace/command contract, including `audit:nerves` naming, `src/nerves` import-path expectations, and renamed coverage-cli output defaults.
 **Acceptance**: New/updated tests exist and fail (red) before implementation.
 
@@ -109,3 +109,4 @@ Rename the repository's observability namespace and command surface from `observ
 - [2026-03-03 13:50] Validation pass aligned units to existing repo paths and scripts (`src/observability`, `src/__tests__/observability`, `package.json`, `scripts/run-coverage-gate.cjs`).
 - [2026-03-03 13:51] Quality pass complete; acceptance criteria, coverage requirements, and unit-status formatting verified for execution handoff.
 - [2026-03-03 13:59] Unit 0 complete: captured active rename targets and historical exclusions in `rename-inventory.md`.
+- [2026-03-03 14:00] Unit 1a complete: added failing rename contract tests for `audit:nerves` and coverage-gate naming, captured red run output.
