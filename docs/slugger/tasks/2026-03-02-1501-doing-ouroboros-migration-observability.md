@@ -17,8 +17,9 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 
 ## Completion Criteria
 - [ ] `src/observability/` module exists with reusable logger + trace ID primitives.
-- [ ] NDJSON (`json`) is the canonical log format with configurable `logging.level` and stderr sink for this phase.
+- [ ] NDJSON (`json`) is the canonical log format with configurable `logging.level` and dual sinks for this phase (`stderr` + session-style file).
 - [ ] All structured events use required envelope fields: `ts`, `level`, `event`, `trace_id`, `component`, `message`, `meta`.
+- [ ] File sink persists append-only NDJSON events at `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson` without truncating per turn.
 - [ ] Runtime paths across `src/` emit event-level structured logs with no chunk-level or sensitive-payload dumps.
 - [ ] Minimum component event catalog is implemented and exercised in tests (entrypoints/channels/engine/mind/tools/config/identity/clients/repertoire).
 - [ ] Trace IDs are generated at turn entry and propagated through core execution.
@@ -52,19 +53,19 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
 ### ⬜ Unit 0: Setup/Research
-**What**: Audit current runtime logging behavior and map required structured events, envelope fields, and target files under `src/`.
+**What**: Audit current runtime logging behavior and map required structured events, envelope fields, sink fan-out design, and target files under `src/` (`stderr` + session-style file pathing).
 **Output**: Baseline event/instrumentation matrix at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-0-baseline-matrix.md`.
-**Acceptance**: Matrix covers required envelope, minimum event catalog, and target runtime files before code changes.
+**Acceptance**: Matrix covers required envelope, minimum event catalog, target runtime files, and file sink path contract `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson`.
 
 ### ⬜ Unit 1a: Observability Core Module — Red
-**What**: Add failing tests for structured logger/trace primitives, required envelope fields, NDJSON shape, and `logging.level` behavior (new `src/__tests__/observability/*.test.ts`).
+**What**: Add failing tests for structured logger/trace primitives, required envelope fields, NDJSON shape, `logging.level`, and sink fan-out behavior (`stderr` + append-only file sink) in `src/__tests__/observability/*.test.ts`.
 **Output**: New failing observability tests and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-1a-red-run.txt`.
-**Acceptance**: Tests fail for missing `src/observability/` module and missing required envelope/config behavior.
+**Acceptance**: Tests fail for missing `src/observability/` module and missing envelope/config/sink persistence behavior.
 
 ### ⬜ Unit 1b: Observability Core Module — Green
-**What**: Implement `src/observability/` logger and trace helpers (factory + event helpers) to satisfy Unit 1a tests.
+**What**: Implement `src/observability/` logger and trace helpers (factory + event helpers) with sink fan-out to `stderr` and append-only file persistence.
 **Output**: New module files under `src/observability/` and updated tests.
-**Acceptance**: Unit 1a tests pass with required envelope fields and configurable `logging.level`.
+**Acceptance**: Unit 1a tests pass with required envelope fields, configurable `logging.level`, and append-only file writes to the session-style path.
 
 ### ⬜ Unit 1c: Observability Core Module — Coverage & Refactor
 **What**: Refactor if needed and verify 100% coverage for new observability module code.
@@ -122,9 +123,9 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Acceptance**: Tests fail and enumerate missing component-level events before implementation.
 
 ### ⬜ Unit 5b: Config/Identity/Clients/Repertoire Instrumentation — Green
-**What**: Implement required structured event logging for config, identity, client requests, and repertoire load paths.
+**What**: Implement required structured event logging for config, identity, client requests, and repertoire load paths, including config helpers needed for session-style logs directory/path resolution.
 **Output**: Updated `src/config.ts`, `src/identity.ts`, `src/engine/ado-client.ts`, `src/engine/graph-client.ts`, `src/repertoire/commands.ts`, `src/repertoire/phrases.ts`, `src/repertoire/skills.ts` and passing tests.
-**Acceptance**: Required component events are emitted with required envelope and tests pass.
+**Acceptance**: Required component events are emitted with required envelope, session-style log path resolution works, and tests pass.
 
 ### ⬜ Unit 5c: Config/Identity/Clients/Repertoire Instrumentation — Coverage & Refactor
 **What**: Refactor for consistency and verify complete coverage on new code paths.
@@ -132,9 +133,9 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Acceptance**: New config/identity/clients/repertoire instrumentation code is fully covered and tests remain green.
 
 ### ⬜ Unit 6a: End-to-End Event Catalog Verification
-**What**: Run targeted and full test suites validating minimum event catalog coverage and required envelope fields across components.
+**What**: Run targeted and full test suites validating minimum event catalog coverage, required envelope fields, and persisted append-only NDJSON outputs.
 **Output**: Verification matrix at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-6a-event-catalog-verify.md`.
-**Acceptance**: Matrix confirms each required event is covered by tests with no unresolved gaps.
+**Acceptance**: Matrix confirms each required event is covered by tests, persisted files are parseable NDJSON, and no unresolved gaps remain.
 
 ### ⬜ Unit 6b: Final Quality Gate & Completion Audit
 **What**: Run `npm run test`, `npm run test:coverage`, and `npm run build`, then audit completion criteria line-by-line.
@@ -148,6 +149,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Run full test suite before marking unit done
 - **All artifacts**: Save outputs, logs, data to `./[task-name]/` directory
 - Artifact files listed in this doc are execution evidence only and are not runtime log sinks.
+- Runtime observability sinks for this phase are `stderr` and session-style append-only NDJSON files; collision hardening remains out of scope.
 - **Fixes/blockers**: Spawn sub-agent immediately — don't ask, just do it
 - **Decisions made**: Update docs immediately, commit right away
 
@@ -157,3 +159,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 15:52] Validation pass: aligned units to concrete runtime/test files and current repo structure
 - [2026-03-02 15:53] Quality pass: verified template completeness, acceptance coverage, and emoji headers; set status to READY_FOR_EXECUTION
 - [2026-03-02 15:58] Clarified that artifact run files are evidence outputs only; runtime logging sink remains stderr-only in this phase
+- [PENDING_PERSISTENCE_TS] Updated units/criteria for session-style append-only NDJSON persistence with dual sinks (`stderr` + file)
