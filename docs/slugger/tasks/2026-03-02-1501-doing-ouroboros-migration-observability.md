@@ -126,7 +126,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Output**: Coverage note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-4c-coverage.md`.
 **Acceptance**: Channel instrumentation new code is fully covered and tests remain green.
 
-### ⬜ Unit 5a: Config/Identity/Clients/Repertoire/Wardrobe Instrumentation — Red
+### ✅ Unit 5a: Config/Identity/Clients/Repertoire/Wardrobe Instrumentation — Red
 **What**: Add failing tests for minimum event catalog coverage in `src/config.ts`, `src/identity.ts`, `src/engine/ado-client.ts`, `src/engine/graph-client.ts`, `src/repertoire/*`, and `src/wardrobe/phrases.ts`.
 **Output**: Failing tests (`src/__tests__/config.test.ts`, `src/__tests__/identity.test.ts`, `src/__tests__/engine/*client.test.ts`, `src/__tests__/repertoire/*.test.ts`, `src/__tests__/wardrobe/phrases.test.ts`) and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-5a-red-run.txt`.
 **Acceptance**: Tests fail and enumerate missing component-level events before implementation.
@@ -216,3 +216,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 18:02] Unit 4a complete: added failing CLI/Teams/format channel contract tests proving channel-native UX remains while required `channels` structured events are missing
 - [2026-03-02 18:03] Unit 4b complete: instrumented shared channel formatter to emit structured `channel.message_sent` and `channel.error` events while preserving channel-native CLI/Teams output contracts
 - [2026-03-02 18:04] Unit 4c complete: verified full coverage/build after channel contract instrumentation and recorded evidence artifacts
+- [2026-03-02 18:06] Unit 5a complete: added failing event-catalog tests for config/identity, ADO/Graph clients, command/skill loaders, and phrase loading paths
