@@ -271,6 +271,42 @@ describe("createAdoProbe", () => {
     global.fetch = originalFetch
   })
 
+  it("returns true when acesDictionary is missing from ACL entry", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        value: [{}],
+      }),
+    })
+    global.fetch = mockFetch
+
+    const probe = createAdoProbe("test-token")
+    const result = await probe("ado", "myorg", "createWorkItem")
+
+    // Missing acesDictionary: assume optimistic
+    expect(result).toBe(true)
+
+    global.fetch = originalFetch
+  })
+
+  it("handles ACE entry with undefined allow field", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        value: [{ acesDictionary: { "key": {} } }],
+      }),
+    })
+    global.fetch = mockFetch
+
+    const probe = createAdoProbe("test-token")
+    const result = await probe("ado", "myorg", "createWorkItem")
+
+    // undefined allow treated as 0, no permission bit set
+    expect(result).toBe(false)
+
+    global.fetch = originalFetch
+  })
+
   it("returns true when ACE dictionary is empty", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
