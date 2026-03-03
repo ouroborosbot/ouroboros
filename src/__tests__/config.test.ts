@@ -213,7 +213,7 @@ describe("loadConfig", () => {
   it("emits config.load observability event when loading config", async () => {
     vi.resetModules()
     const emitObservabilityEvent = vi.fn()
-    vi.doMock("../observability/runtime", () => ({
+    vi.doMock("../nerves/runtime", () => ({
       emitObservabilityEvent,
     }))
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))

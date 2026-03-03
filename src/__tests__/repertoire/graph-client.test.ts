@@ -298,7 +298,7 @@ describe("graph-client observability contract", () => {
   it("emits client.request_start event for Graph requests", async () => {
     vi.resetModules()
     const emitObservabilityEvent = vi.fn()
-    vi.doMock("../../observability/runtime", () => ({
+    vi.doMock("../../nerves/runtime", () => ({
       emitObservabilityEvent,
     }))
     mockFetch.mockReset()

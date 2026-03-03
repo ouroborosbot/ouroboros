@@ -1,6 +1,6 @@
 import type OpenAI from "openai"
 import { getContextConfig } from "../config"
-import { emitObservabilityEvent } from "../observability/runtime"
+import { emitObservabilityEvent } from "../nerves/runtime"
 import * as fs from "fs"
 import * as path from "path"
 

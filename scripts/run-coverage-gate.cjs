@@ -43,7 +43,7 @@ function main() {
 
   const activePath = path.join(ROOT, ".active-run.json")
   const latestPath = path.join(ROOT, "latest-run.json")
-  const observabilityCoveragePath = path.join(runDir, "observability-coverage.json")
+  const observabilityCoveragePath = path.join(runDir, "nerves-coverage.json")
   const summaryPath = path.join(runDir, "coverage-gate-summary.json")
 
   writeJson(activePath, info)
@@ -57,7 +57,7 @@ function main() {
 
   const auditExit = runNpm([
     "run",
-    "audit:observability",
+    "audit:nerves",
     "--",
     "--run-dir",
     runDir,
@@ -89,8 +89,8 @@ function main() {
   } else if (observabilityStatus === "fail") {
     requiredActions.push({
       type: "logging",
-      target: "observability-audit",
-      reason: "observability audit did not produce a valid report",
+      target: "nerves-audit",
+      reason: "nerves audit did not produce a valid report",
     })
   }
 

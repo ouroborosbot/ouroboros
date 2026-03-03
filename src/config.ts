@@ -2,7 +2,7 @@ import * as fs from "fs"
 import * as path from "path"
 import * as os from "os"
 import { loadAgentConfig, getAgentName } from "./identity"
-import { emitObservabilityEvent } from "./observability/runtime"
+import { emitObservabilityEvent } from "./nerves/runtime"
 
 export interface AzureProviderConfig {
   apiKey: string

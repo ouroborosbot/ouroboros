@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { getAgentRoot } from "../identity";
-import { emitObservabilityEvent } from "../observability/runtime";
+import { emitObservabilityEvent } from "../nerves/runtime";
 
 // Skills live in {agentRoot}/skills/ directory
 export function getSkillsDir(): string {

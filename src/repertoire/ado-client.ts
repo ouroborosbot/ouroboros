@@ -3,7 +3,7 @@
 // and a thin queryWorkItems() wrapper for backward compatibility.
 
 import { handleApiError } from "../heart/api-error"
-import { emitObservabilityEvent } from "../observability/runtime"
+import { emitObservabilityEvent } from "../nerves/runtime"
 
 const ADO_BASE = "https://dev.azure.com"
 const VSSPS_BASE = "https://app.vssps.visualstudio.com"

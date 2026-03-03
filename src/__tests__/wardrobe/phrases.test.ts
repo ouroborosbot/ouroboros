@@ -115,7 +115,7 @@ describe("phrases observability contract", () => {
   it("emits repertoire.load_end when loading phrase pools", async () => {
     vi.resetModules()
     const emitObservabilityEvent = vi.fn()
-    vi.doMock("../../observability/runtime", () => ({
+    vi.doMock("../../nerves/runtime", () => ({
       emitObservabilityEvent,
     }))
 

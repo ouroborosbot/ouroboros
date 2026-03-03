@@ -6,7 +6,7 @@ import { getChannelCapabilities } from "../mind/context/channel";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
 import type { AssistantMessageWithReasoning, ResponseItem } from "./streaming";
 import { detectKick } from "./kicks";
-import { emitObservabilityEvent } from "../observability/runtime";
+import { emitObservabilityEvent } from "../nerves/runtime";
 import type { KickReason } from "./kicks";
 import type { TurnResult } from "./streaming";
 import type { UsageData } from "../mind/context";

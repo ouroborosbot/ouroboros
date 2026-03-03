@@ -3,7 +3,7 @@
 // and a thin getProfile() wrapper for backward compatibility.
 
 import { handleApiError } from "../heart/api-error"
-import { emitObservabilityEvent } from "../observability/runtime"
+import { emitObservabilityEvent } from "../nerves/runtime"
 
 const GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 

@@ -13,14 +13,14 @@ describe("observability/coverage cli", () => {
   it("returns code 2 when no run directory is available", async () => {
     const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {})
 
-    vi.doMock("../../observability/coverage/run-artifacts", () => ({
+    vi.doMock("../../nerves/coverage/run-artifacts", () => ({
       readLatestRun: () => null,
     }))
-    vi.doMock("../../observability/coverage/audit", () => ({
+    vi.doMock("../../nerves/coverage/audit", () => ({
       auditObservabilityCoverage: vi.fn(),
     }))
 
-    const { runAuditCli } = await import("../../observability/coverage/cli")
+    const { runAuditCli } = await import("../../nerves/coverage/cli")
     expect(runAuditCli([])).toBe(2)
     expect(stderrSpy).toHaveBeenCalledWith(
       "observability audit: no run directory found; provide --run-dir",
@@ -29,13 +29,13 @@ describe("observability/coverage cli", () => {
 
   it("writes report output and returns success/failure codes from audit results", async () => {
     const runDir = mkdtempSync(join(tmpdir(), "ouro-observability-cli-"))
-    const outputPath = join(runDir, "custom-observability-coverage.json")
+    const outputPath = join(runDir, "custom-nerves-coverage.json")
     const eventsPath = join(runDir, "custom-events.ndjson")
     const logpointsPath = join(runDir, "custom-logpoints.json")
     const auditSpy = vi.fn()
     const stdoutSpy = vi.spyOn(console, "log").mockImplementation(() => {})
 
-    vi.doMock("../../observability/coverage/run-artifacts", () => ({
+    vi.doMock("../../nerves/coverage/run-artifacts", () => ({
       readLatestRun: () => ({
         repo_slug: "ouroboros-agent-harness",
         run_id: "run-id",
@@ -43,11 +43,11 @@ describe("observability/coverage cli", () => {
         created_at: "2026-03-02T18:00:00.000Z",
       }),
     }))
-    vi.doMock("../../observability/coverage/audit", () => ({
+    vi.doMock("../../nerves/coverage/audit", () => ({
       auditObservabilityCoverage: auditSpy,
     }))
 
-    const { runAuditCli } = await import("../../observability/coverage/cli")
+    const { runAuditCli } = await import("../../nerves/coverage/cli")
 
     auditSpy.mockReturnValueOnce({
       overall_status: "pass",
@@ -71,7 +71,7 @@ describe("observability/coverage cli", () => {
       eventsPath,
       logpointsPath,
     })
-    expect(existsSync(join(runDir, "observability-coverage.json"))).toBe(true)
+    expect(existsSync(join(runDir, "nerves-coverage.json"))).toBe(true)
 
     auditSpy.mockReturnValueOnce({
       overall_status: "pass",

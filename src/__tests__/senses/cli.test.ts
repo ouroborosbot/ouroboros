@@ -658,7 +658,7 @@ describe("CLI adapter - onToolEnd", () => {
 
     vi.resetModules()
     const emitObservabilityEvent = vi.fn()
-    vi.doMock("../../observability/runtime", () => ({
+    vi.doMock("../../nerves/runtime", () => ({
       emitObservabilityEvent,
     }))
     const agent = await import("../../senses/cli")

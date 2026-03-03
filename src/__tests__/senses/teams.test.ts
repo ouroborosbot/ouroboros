@@ -338,7 +338,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
   it("keeps Teams stream output channel-native and emits structured channel events", async () => {
     vi.resetModules()
     const emitObservabilityEvent = vi.fn()
-    vi.doMock("../../observability/runtime", () => ({
+    vi.doMock("../../nerves/runtime", () => ({
       emitObservabilityEvent,
     }))
     const teams = await import("../../senses/teams")

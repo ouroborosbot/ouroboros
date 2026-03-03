@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { createTraceId, ensureTraceId } from "../../observability"
+import { createTraceId, ensureTraceId } from "../../nerves"
 
 describe("observability/trace", () => {
   it("creates non-empty unique trace IDs", () => {
