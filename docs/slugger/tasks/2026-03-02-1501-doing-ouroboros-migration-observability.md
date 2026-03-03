@@ -91,7 +91,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Output**: Updated runtime code and passing trace propagation tests.
 **Acceptance**: Tests confirm trace IDs are generated once per turn and propagated through execution.
 
-### ⬜ Unit 2c: Trace Propagation (Entrypoints/Core) — Coverage & Refactor
+### ✅ Unit 2c: Trace Propagation (Entrypoints/Core) — Coverage & Refactor
 **What**: Refactor trace plumbing as needed and verify coverage for new paths.
 **Output**: Coverage note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-2c-coverage.md`.
 **Acceptance**: Trace propagation code paths are fully covered and tests remain green.
@@ -209,3 +209,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 17:46] Unit 1c complete: added coverage backfill tests (observability defaults/warn + CLI spinner success branch), verified 100% coverage and clean build
 - [2026-03-02 17:48] Unit 2a complete: added failing trace propagation tests for CLI entry, Teams entry, and core model-request metadata propagation
 - [2026-03-02 17:49] Unit 2b complete: added traceId to RunAgentOptions, generated trace IDs at CLI/Teams turn entry, and propagated into core model request metadata
+- [2026-03-02 17:51] Unit 2c complete: verified trace propagation coverage + build; backfilled Azure metadata branch and restored global 100% coverage
