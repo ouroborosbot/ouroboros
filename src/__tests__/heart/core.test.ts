@@ -4032,7 +4032,8 @@ describe("integration: kick + tool_choice required combined", () => {
     const toolNames = usedTools?.map((t: any) => t.function.name) || []
     expect(toolNames).toContain("graph_profile")
     expect(toolNames).toContain("ado_work_items")
-    expect(toolNames).toContain("read_file") // base tool still present
+    expect(toolNames).not.toContain("read_file")
+    expect(toolNames).not.toContain("shell")
   })
 
   it("does not include graph/ado tools for cli channel", async () => {
