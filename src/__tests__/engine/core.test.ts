@@ -2910,8 +2910,9 @@ describe("kick mechanism", () => {
     const messages: any[] = [{ role: "system", content: "test" }]
     await runAgent(messages, callbacks)
 
-    // Kicks fire unconditionally -- should be capped at MAX_TOOL_ROUNDS (10)
-    expect(kicks.length).toBe(10)
+    // Kicks fire unconditionally -- the last kick hits MAX_TOOL_ROUNDS and
+    // terminates before onKick fires, so we get MAX_TOOL_ROUNDS - 1 callbacks
+    expect(kicks.length).toBe(9)
     expect(errors.some(e => e.includes("tool loop limit"))).toBe(true)
   })
 
@@ -3754,8 +3755,9 @@ describe("integration: kick + tool_choice required combined", () => {
     const messages: any[] = [{ role: "system", content: "test" }]
     await runAgent(messages, callbacks, undefined, controller.signal)
 
-    // Kick fires, then abort happens on retry
-    expect(kicks).toHaveLength(1)
+    // First kick fires (narration), then abort causes empty result which
+    // triggers a second kick (empty), then abort is detected at loop top
+    expect(kicks).toHaveLength(2)
     // Messages should not have dangling tool_calls
     const lastMsg = messages[messages.length - 1]
     if (lastMsg.role === "assistant" && lastMsg.tool_calls) {
