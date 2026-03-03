@@ -71,7 +71,7 @@ Define and lock runtime hardening requirements for single-replica preview so req
 **Output**: Coverage artifact at `./2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-1c-coverage-run.txt`.
 **Acceptance**: New/changed code for remote tool gating is fully covered and tests remain green.
 
-### ⬜ Unit 2a: Request-Path Non-Blocking Contract — Tests
+### ✅ Unit 2a: Request-Path Non-Blocking Contract — Tests
 **What**: Add failing tests for non-blocking request-path behavior in logging/prompt/config surfaces (no hot-path blocking sink behavior, non-blocking degradation under sink failure/pressure).
 **Output**: Red test artifact at `./2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-2a-red-run.txt`.
 **Acceptance**: Tests fail and identify current blocking/hot-path assumptions.
@@ -134,3 +134,4 @@ Define and lock runtime hardening requirements for single-replica preview so req
 - [2026-03-03 14:49] Unit 1a complete: added failing remote tool-safety tests and captured red evidence for local-tool exposure and missing denial UX contract.
 - [2026-03-03 14:51] Unit 1b complete: implemented remote-channel local-tool filtering/denial messaging, updated contract tests, and verified full test + build green.
 - [2026-03-03 14:53] Unit 1c complete: verified 100% coverage and clean build after remote tool-safety changes (`unit-1c-coverage-run.txt`, `unit-1c-build-run.txt`).
+- [2026-03-03 14:54] Unit 2a complete: added failing non-blocking sink contract tests and captured red evidence for sink-failure throw behavior.
