@@ -126,4 +126,4 @@ Merged `origin/main` into `codex/slugger` before execution planning refresh; ups
 - [2026-03-02 16:17] Validation clarification: mapped `src/wardrobe/*` files onto existing event component taxonomy (channels/repertoire)
 - [2026-03-02 16:37] Explicitly added `src/engine/kicks.ts` instrumentation/testing coverage to scope and component taxonomy
 - [2026-03-02 16:55] Added observability-coverage gate scope (`audit:observability` + CI) with explicit measurable dimensions
-- [PENDING_CAPTURE_LINK_TS] Locked single-run coverage model: Vitest emits observability artifacts once; audit consumes artifacts without rerunning tests
+- [2026-03-02 17:03] Locked single-run coverage model: Vitest emits observability artifacts once; audit consumes artifacts without rerunning tests
