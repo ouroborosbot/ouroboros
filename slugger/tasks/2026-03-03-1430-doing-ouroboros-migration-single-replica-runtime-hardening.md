@@ -66,7 +66,7 @@ Define and lock runtime hardening requirements for single-replica preview so req
 **Output**: Updated runtime/tool routing code and passing targeted tests.
 **Acceptance**: Remote channels cannot execute local CLI/file/git/gh tools; responses explain multi-user safety rationale and next-step alternatives.
 
-### ⬜ Unit 1c: Remote Tool-Surface Safety — Coverage & Refactor
+### ✅ Unit 1c: Remote Tool-Surface Safety — Coverage & Refactor
 **What**: Backfill tests for edge/error paths of remote tool gating and denial UX contract.
 **Output**: Coverage artifact at `./2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-1c-coverage-run.txt`.
 **Acceptance**: New/changed code for remote tool gating is fully covered and tests remain green.
@@ -133,3 +133,4 @@ Define and lock runtime hardening requirements for single-replica preview so req
 - [2026-03-03 14:47] Unit 0 complete: captured current-state runtime hardening contract matrix and target touchpoints in `unit-0-runtime-baseline.md`.
 - [2026-03-03 14:49] Unit 1a complete: added failing remote tool-safety tests and captured red evidence for local-tool exposure and missing denial UX contract.
 - [2026-03-03 14:51] Unit 1b complete: implemented remote-channel local-tool filtering/denial messaging, updated contract tests, and verified full test + build green.
+- [2026-03-03 14:53] Unit 1c complete: verified 100% coverage and clean build after remote tool-safety changes (`unit-1c-coverage-run.txt`, `unit-1c-build-run.txt`).
