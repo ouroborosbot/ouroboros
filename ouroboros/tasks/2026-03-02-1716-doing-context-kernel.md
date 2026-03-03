@@ -375,7 +375,7 @@ Every persisted type (`FriendIdentity`, `FriendMemory`) carries a `schemaVersion
 
 ---
 
-### ⬜ Unit 1B: FileContextStore Implementation
+### ✅ Unit 1B: FileContextStore Implementation
 
 **What**: Implement `FileContextStore` as the first (and initially only) adapter for `ContextStore`. Constructor takes a base path (e.g., `~/.agentconfigs/ouroboros/context`); it does not resolve the path itself. Each collection maps to a subdirectory, each item to a JSON file.
 
@@ -1372,3 +1372,4 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - 2026-03-02 2309 Pass 4: quality -- all 21 units have emoji headers, completion criteria, test requirements, 100% coverage. No TBD items. No changes needed.
 - 2026-03-02 2328 Unit 10 complete: Directory restructuring -- engine/ -> heart/, channels/ -> senses/, tool files -> repertoire/. All 910 tests pass, clean build.
 - 2026-03-02 2330 Unit 1A complete: ContextStore interface, CollectionStore<T>, all context types with type guards. 21 new tests, 931 total.
+- 2026-03-02 2332 Unit 1B complete: FileContextStore with JSON persistence, schema versioning, error handling. 14 new tests, 945 total.
