@@ -356,3 +356,181 @@ Please investigate and advise.
 ```
 
 This boundary is clear: fixable issues (lint, test, build) are your responsibility. Only escalate when you are genuinely stuck, not on the first failure.
+
+---
+
+## Race Condition Retry
+
+This is the most common real-world scenario. While your PR was waiting for CI (or while you were resolving conflicts), the other agent merged their work to main. Now your PR has merge conflicts and cannot be merged.
+
+### Detection
+
+The race condition is detected when:
+- `gh pr merge` fails because the PR has conflicts with `main`
+- Or CI passes but the merge button reports conflicts
+
+### Retry loop with exponential backoff
+
+Use exponential backoff starting at 30 seconds, doubling each time. **No retry limit** -- keep trying indefinitely until the merge succeeds or you are genuinely stuck on a conflict you cannot resolve.
+
+```
+WAIT_SECONDS=30
+RETRY=0
+
+loop:
+  RETRY=$((RETRY + 1))
+
+  # 1. Communicate clearly to the user
+  echo "Main moved again. Retry #${RETRY}, waiting ${WAIT_SECONDS}s before re-fetching. Other agent is active."
+
+  # 2. Wait
+  sleep ${WAIT_SECONDS}
+
+  # 3. Re-fetch origin/main
+  git fetch origin main
+
+  # 4. Abort the current merge state if needed
+  git merge --abort 2>/dev/null
+
+  # 5. Re-merge
+  git merge origin/main
+
+  # 6. If conflicts: re-resolve using Conflict Resolution (read task docs again)
+  #    If clean: run tests
+
+  # 7. Run tests
+  npm test
+
+  # 8. If tests fail: fix, then continue
+
+  # 9. Force-push (safe -- we own this branch)
+  git push --force-with-lease origin ${BRANCH}
+
+  # 10. PR updates automatically, CI re-runs
+  #     Wait for CI (PR Workflow Step 3)
+
+  # 11. If merge succeeds: break
+  #     If conflicts again: double wait and loop
+  WAIT_SECONDS=$((WAIT_SECONDS * 2))
+  goto loop
+```
+
+### User communication requirements
+
+On **every** retry, output a clear message:
+- Retry number
+- Wait duration
+- Reason
+
+Examples:
+```
+Main moved again. Retry #1, waiting 30s before re-fetching. Other agent is active.
+Main moved again. Retry #2, waiting 60s before re-fetching. Other agent is active.
+Main moved again. Retry #3, waiting 120s before re-fetching. Other agent is active.
+Main moved again. Retry #4, waiting 240s before re-fetching. Other agent is active.
+```
+
+The user wants visibility even when no intervention is needed. Never retry silently.
+
+### When to break the retry loop
+
+- **Success**: PR merges cleanly after CI passes. Done.
+- **Escalate**: A conflict cannot be resolved from task docs (genuinely ambiguous, both agents changed the same logic with incompatible intents). See **Escalation**.
+
+Do NOT break the retry loop for:
+- Repeated CI failures (that is CI Failure Self-Repair, not a race condition)
+- Test failures after merge (that is Conflict Resolution, try harder)
+
+---
+
+## Post-Merge Cleanup
+
+After the PR is successfully merged to main:
+
+### Step 1: Switch to main
+
+```bash
+git checkout main
+git pull origin main
+```
+
+### Step 2: Delete local branch
+
+```bash
+git branch -d ${BRANCH}
+```
+
+Use `-d` (not `-D`). If git refuses because the branch is not fully merged, something went wrong -- investigate.
+
+### Step 3: Delete remote branch
+
+If `--delete-branch` was not used during `gh pr merge`, clean up manually:
+
+```bash
+git push origin --delete ${BRANCH}
+```
+
+If the remote branch is already gone (deleted by `--delete-branch` or by GitHub's auto-delete setting), this will fail harmlessly. Ignore the error.
+
+### Step 4: Verify
+
+```bash
+git log --oneline -5
+```
+
+Confirm the merge commit is visible on main.
+
+---
+
+## Escalation
+
+### When to escalate (STOP and ask the user)
+
+- **Ambiguous conflict**: Both agents changed the same code with incompatible intents, and the doing docs do not clarify how to combine them
+- **Repeated CI failure**: After two self-repair attempts on the same failure
+- **Authentication/credential issues**: `gh auth` problems that require human login
+- **Missing remote**: No GitHub remote configured
+- **Missing `gh`**: CLI not installed
+
+### When NOT to escalate (fix it yourself)
+
+- Test failures after merge (you can read both doing docs and fix it)
+- Lint/type-check errors (you can fix these)
+- Coverage drops (you can add tests)
+- Build failures (you can fix these)
+- `gh repo set-default` not configured (you can set it)
+- First-time CI failure (try to fix before escalating)
+- Race condition (retry with backoff, do not escalate)
+
+### Escalation format
+
+```
+I need help with: <brief description>
+Context: <what I was doing>
+What I tried: <list of attempts>
+Relevant files: <file paths>
+PR: <pr-url> (if applicable)
+```
+
+STOP after escalating. Do not continue until the user responds.
+
+---
+
+## Rules
+
+1. **PR-based merge only** -- never push directly to main. Always create a PR, wait for CI, then merge.
+2. **Merge commits** -- use `--merge`, not `--squash` or `--rebase`. Preserve branch history.
+3. **Always create PR** -- even on fast-path (branch already up-to-date). CI must pass before landing on main.
+4. **Always run tests** -- before pushing, after conflict resolution, after CI fixes. `npm test` must pass.
+5. **Git-informed task doc discovery** -- use `git log origin/main --not HEAD` to find doing docs, not filename timestamps.
+6. **Exponential backoff on retry** -- start at 30s, double each time, no limit. Never retry silently.
+7. **Communicate every retry** -- tell the user the retry number, wait duration, and reason. Every time.
+8. **Self-repair CI failures** -- fix lint, test, build, coverage issues yourself. Escalate only after two failed attempts.
+9. **Clean up after merge** -- delete feature branch locally and remotely.
+10. **Escalate only when genuinely stuck** -- ambiguous conflicts, repeated failures after self-repair, credential issues. Not for fixable problems.
+11. **Own the branch exclusively** -- `--force-with-lease` is safe because no one else pushes to this branch during merge.
+12. **Timestamps from git** -- `git log -1 --date=format:'%Y-%m-%d %H:%M' --format='%ad'`
+13. **Atomic commits** -- one logical change per commit.
+14. **Preserve both intents** -- when resolving conflicts, both agents' work must be present in the result.
+15. **Never skip CI** -- even if you are confident the code is correct. CI is the gate.
+16. **Derive agent from branch** -- parse `<agent>` from the first path segment of the branch name. Never hardcode agent names.
