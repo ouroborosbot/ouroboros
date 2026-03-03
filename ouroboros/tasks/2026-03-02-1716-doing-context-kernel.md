@@ -181,7 +181,7 @@ interface ToolDefinition {
 **NOTE:** These paths reflect the codebase AFTER unit 10 (directory restructuring). Before unit 10, the current paths are `src/engine/` (not `src/heart/`), `src/channels/` (not `src/senses/`), and tool files live in `src/engine/` (not `src/repertoire/`).
 
 - **Entry points**: `src/cli-entry.ts`, `src/teams-entry.ts`
-- **Heart** (core loop): `src/heart/core.ts` -- `runAgent()` loop, provider selection, streaming, tool execution
+- **Heart** (core loop): `src/heart/core.ts` -- `runAgent()` loop, provider selection, streaming, tool execution; `src/heart/api-error.ts` -- API error handling
 - **Mind** (reasoning): `src/mind/prompt.ts` -- `buildSystem()` assembles system prompt; `src/mind/context.ts` -- `saveSession()`, `loadSession()`, `postTurn()`, `trimMessages()`
 - **Repertoire** (capabilities): `src/repertoire/tools-base.ts` (base tools), `src/repertoire/tools-teams.ts` (Teams-only tools), `src/repertoire/tools.ts` (channel-aware tool list)
 - **ADO client**: `src/repertoire/ado-client.ts`
@@ -262,9 +262,10 @@ Every persisted type (`FriendIdentity`, `FriendMemory`) carries a `schemaVersion
 **What**: Rename directories and move files to follow the agent-creature body metaphor (D19). This is a mechanical rename with NO behavior changes. All tests must pass identically before and after.
 
 **Renames:**
-- `src/engine/` -> `src/heart/` (keeps: `core.ts`, `streaming.ts`, `kicks.ts`)
+- `src/engine/` -> `src/heart/` (keeps: `core.ts`, `streaming.ts`, `kicks.ts`, `api-error.ts`)
 - `src/channels/` -> `src/senses/` (keeps: `cli.ts`, `teams.ts`)
 - Tool files move from `src/engine/` -> `src/repertoire/` (moves: `tools.ts`, `tools-base.ts`, `tools-teams.ts`, `ado-client.ts`, `graph-client.ts`, `data/` directory with endpoint JSON files)
+- NOTE: `src/repertoire/` already exists (contains `skills.ts`, `commands.ts`). Tool files are moved INTO the existing directory.
 
 **Files that stay in their current locations (unchanged):**
 - `src/identity.ts` -- agent identity (cross-cutting)
@@ -278,6 +279,7 @@ Every persisted type (`FriendIdentity`, `FriendMemory`) carries a `schemaVersion
 - Rename: `src/engine/core.ts` -> `src/heart/core.ts`
 - Rename: `src/engine/streaming.ts` -> `src/heart/streaming.ts`
 - Rename: `src/engine/kicks.ts` -> `src/heart/kicks.ts`
+- Rename: `src/engine/api-error.ts` -> `src/heart/api-error.ts`
 - Rename: `src/channels/cli.ts` -> `src/senses/cli.ts`
 - Rename: `src/channels/teams.ts` -> `src/senses/teams.ts`
 - Move: `src/engine/tools.ts` -> `src/repertoire/tools.ts`
@@ -287,11 +289,15 @@ Every persisted type (`FriendIdentity`, `FriendMemory`) carries a `schemaVersion
 - Move: `src/engine/graph-client.ts` -> `src/repertoire/graph-client.ts`
 - Move: `src/engine/data/` -> `src/repertoire/data/`
 - Update: ALL imports across the codebase that reference old paths
-- Rename: `src/__tests__/engine/` -> `src/__tests__/heart/` (core, streaming, kicks tests)
-- Rename: `src/__tests__/channels/` -> `src/__tests__/senses/`
-- Move: `src/__tests__/engine/tools*.test.ts` -> `src/__tests__/repertoire/`
-- Move: `src/__tests__/engine/ado-client.test.ts` -> `src/__tests__/repertoire/`
-- Move: `src/__tests__/engine/graph-client.test.ts` -> `src/__tests__/repertoire/`
+- Rename: `src/__tests__/engine/core.test.ts` -> `src/__tests__/heart/core.test.ts`
+- Rename: `src/__tests__/engine/streaming.test.ts` -> `src/__tests__/heart/streaming.test.ts`
+- Rename: `src/__tests__/engine/kicks.test.ts` -> `src/__tests__/heart/kicks.test.ts`
+- Rename: `src/__tests__/engine/api-error.test.ts` -> `src/__tests__/heart/api-error.test.ts`
+- Move: `src/__tests__/engine/tools.test.ts` -> `src/__tests__/repertoire/tools.test.ts` (covers base, teams, and router tests)
+- Move: `src/__tests__/engine/ado-client.test.ts` -> `src/__tests__/repertoire/ado-client.test.ts`
+- Move: `src/__tests__/engine/graph-client.test.ts` -> `src/__tests__/repertoire/graph-client.test.ts`
+- Rename: `src/__tests__/channels/` -> `src/__tests__/senses/` (cli.test.ts, cli-main.test.ts, cli-ux.test.ts, teams.test.ts)
+- NOTE: after move, `src/__tests__/engine/` should be empty and deleted
 
 **Tests required:**
 - All existing tests pass with updated import paths (no new tests needed for a rename)
@@ -306,7 +312,7 @@ Every persisted type (`FriendIdentity`, `FriendMemory`) carries a `schemaVersion
 **Completion criteria:**
 - [ ] No file remains under `src/engine/` or `src/channels/`
 - [ ] `src/repertoire/` exists and contains all tool files + data/
-- [ ] `src/heart/` exists and contains core.ts, streaming.ts, kicks.ts
+- [ ] `src/heart/` exists and contains core.ts, streaming.ts, kicks.ts, api-error.ts
 - [ ] `src/senses/` exists and contains cli.ts, teams.ts
 - [ ] All imports updated -- `grep -r "engine/" src/` and `grep -r "channels/" src/` return zero hits
 - [ ] All tests pass: `npx vitest run`
@@ -561,15 +567,15 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 **Output**: Async `buildSystem()` with optional `context` param. `contextSection()`. No cache.
 
 **Files modified:**
-- `src/mind/prompt.ts` -- make `buildSystem()` async, add `contextSection()`, remove cache
-- `src/mind/context.ts` -- update calls to `buildSystem()` if any
-- `src/heart/core.ts` -- update `await buildSystem()` call
-- `src/senses/cli.ts` -- update call if present
-- `src/senses/teams.ts` -- update call if present
-- Any other callers of `buildSystem()` or `cachedBuildSystem()`
+- `src/mind/prompt.ts` -- make `buildSystem()` async, add `contextSection()`
+- `src/mind/context.ts` -- remove `cachedBuildSystem()` and `resetSystemPromptCache()` (the cache lives here, not in prompt.ts)
+- `src/heart/core.ts` -- replace `cachedBuildSystem(channel, buildSystem, options)` with `await buildSystem(channel, options, context)`
+- `src/senses/cli.ts` -- replace `cachedBuildSystem("cli", buildSystem)` with `await buildSystem("cli", undefined, context)`
+- `src/senses/teams.ts` -- replace `cachedBuildSystem("teams", buildSystem)` with `await buildSystem("teams", undefined, context)`
 
 **Files tested:**
 - `src/__tests__/mind/prompt.test.ts` -- updated tests for async + context injection
+- `src/__tests__/mind/context.test.ts` -- remove/update `cachedBuildSystem` tests
 
 **Tests required:**
 - `buildSystem()` without context: returns prompt without context section (backward-compatible)
@@ -615,9 +621,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - `src/repertoire/tools.ts` -- refactor `getToolsForChannel()` to accept `ChannelCapabilities` and filter by integration, refactor `execTool()` to use `ToolDefinition` lookup
 
 **Files tested:**
-- `src/__tests__/repertoire/tools-base.test.ts` -- updated for new `ToolContext` shape, `ToolDefinition`
-- `src/__tests__/repertoire/tools-teams.test.ts` -- updated for `ToolDefinition[]`, no `confirmationRequired` Set
-- `src/__tests__/repertoire/tools.test.ts` -- updated for new `getToolsForChannel` and `execTool`
+- `src/__tests__/repertoire/tools.test.ts` -- updated for `ToolDefinition`, new `getToolsForChannel`, `execTool`, new `ToolContext` shape (NOTE: this is one combined test file covering all tool concerns -- base, teams, and router)
 
 **Tests required:**
 - `ToolDefinition` wraps tool schema + handler + integration + confirmationRequired
@@ -665,7 +669,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 **Files tested:**
 - `src/__tests__/repertoire/ado-client.test.ts` -- scope discovery function tests
-- `src/__tests__/repertoire/tools-teams.test.ts` -- ado_work_items with optional org
+- `src/__tests__/repertoire/tools.test.ts` -- ado_work_items with optional org (tests are in the combined tools.test.ts)
 
 **Tests required:**
 - `discoverOrganizations()` calls Accounts API and returns org list
@@ -846,7 +850,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - `src/repertoire/ado-client.ts` -- 403 detection/signaling if not already present
 
 **Files tested:**
-- `src/__tests__/repertoire/tools-teams.test.ts` -- authority check tests
+- `src/__tests__/repertoire/tools.test.ts` -- authority check tests (combined tools test file)
 
 **Tests required:**
 - `ado_mutate` with authority allowed: proceeds with API call
