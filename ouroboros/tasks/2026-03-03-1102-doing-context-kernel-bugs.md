@@ -300,3 +300,4 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 - 2026-03-03 14:40 Pass 2 (granularity) complete -- added Output fields to all units, clarified Unit 4 as mechanical refactor
 - 2026-03-03 14:42 Pass 3 (validation) complete -- verified all file paths, class names, interfaces against codebase. Key finding: `src/mind/context.ts` (session mgmt) is distinct from `src/mind/context/` directory, Unit 4a updated with explicit warning
 - 2026-03-03 14:42 Pass 4 (quality) complete -- all 33 unit headers have emoji, all have acceptance criteria, no TBDs, Unit 4b grep clarified to match `mind/context/` (trailing slash) to avoid false-matching `context.ts`
+- 2026-03-03 14:49 Added automated validation checkpoints: Unit 3d (pre-rename tsc+tests), Unit 6d (post-tool-layer tests), Unit 11d (full integration tsc+tests). Strengthened Unit 4b with explicit tsc --noEmit. Strengthened Units 2a/2b with dual-backend write verification requirement.
