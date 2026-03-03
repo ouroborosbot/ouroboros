@@ -84,19 +84,19 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 ### Legend
 ⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
-### ⬜ Unit 1a: FriendRecord type + FriendStore interface -- Tests
+### ✅ Unit 1a: FriendRecord type + FriendStore interface -- Tests
 **What**: Write tests for the new `FriendRecord` type (shape validation, schema version), `IdentityProvider` update (add `"teams-conversation"` to the union), the new `FriendStore` interface (get, put, delete, findByExternalId method signatures), and the updated `ResolvedContext` (uses `friend: FriendRecord` instead of `identity` + `memory`, no `checker?` field). Remove `AuthorityChecker` interface, `FriendMemory` type, and old `ContextStore`/`CollectionStore` interfaces from types. Remove `authority.ts` and its tests.
 **Output**: Updated test files, deleted `authority.test.ts`.
 **Files**: `src/__tests__/mind/context/types.test.ts`, `src/__tests__/mind/context/store.test.ts`, `src/__tests__/mind/context/authority.test.ts` (delete)
 **Acceptance**: Tests exist and FAIL (red) because `FriendRecord`, `FriendStore`, updated `ResolvedContext` don't exist yet. Authority test file deleted.
 
-### ⬜ Unit 1b: FriendRecord type + FriendStore interface -- Implementation
+### ✅ Unit 1b: FriendRecord type + FriendStore interface -- Implementation
 **What**: Implement `FriendRecord` type in `types.ts`, `FriendStore` interface in `store.ts`. Update `ResolvedContext` to `{ friend: FriendRecord, channel: ChannelCapabilities }`. Add `"teams-conversation"` to the `IdentityProvider` union. Remove `AuthorityChecker` interface, `FriendMemory` type, `CollectionStore<T>`, and `ContextStore`. Delete `authority.ts`.
 **Output**: Updated source files, deleted `authority.ts`.
 **Files**: `src/mind/context/types.ts`, `src/mind/context/store.ts`, `src/mind/context/authority.ts` (delete)
 **Acceptance**: All type/store tests PASS (green), no warnings.
 
-### ⬜ Unit 1c: FriendRecord type + FriendStore interface -- Coverage & Refactor
+### ✅ Unit 1c: FriendRecord type + FriendStore interface -- Coverage & Refactor
 **What**: Verify 100% coverage on new types and store interface. Refactor if needed.
 **Output**: Coverage report showing 100% on `types.ts` and `store.ts`.
 **Acceptance**: 100% coverage on new code, tests still green.
