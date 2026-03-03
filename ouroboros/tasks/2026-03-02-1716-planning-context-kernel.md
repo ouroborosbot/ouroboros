@@ -8,12 +8,14 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 
 **DO NOT include time estimates (hours/days) -- planning should focus on scope and criteria, not duration.**
 
+**Documentation is not an afterthought.** Every unit that adds, moves, or restructures files must update all relevant documentation (CLAUDE.md, memory files, cross-agent docs, psyche docs, code comments, markdown references) in the same unit. No deferring doc updates to a later cleanup pass.
+
 ## Scope
 
 ### In Scope
 
 **Phase 1: Identity + Preferences + Storage Interface (Smallest Vertical Slice)**
-- 10. Directory restructuring (prerequisite) -- rename `src/engine/` to `src/heart/` (core loop, streaming, kicks, API error handling), rename `src/channels/` to `src/senses/` (channel adapters), move tool files (`tools.ts`, `tools-base.ts`, `tools-teams.ts`, `ado-client.ts`, `graph-client.ts`, and `data/` endpoint JSON files) from `src/engine/` to `src/repertoire/`. Update all imports across the codebase, all test file paths, AND all documentation (CLAUDE.md, memory files, cross-agent docs, psyche docs, any markdown referencing old paths). This is a mechanical rename with no behavior changes -- all tests must pass identically before and after. Must be done first because all subsequent units reference the new paths. **Doc maintenance rule**: every subsequent unit that adds or moves files must update relevant docs in the same unit, not deferred to a later cleanup pass.
+- 10. Directory restructuring (prerequisite) -- rename `src/engine/` to `src/heart/` (core loop, streaming, kicks, API error handling), rename `src/channels/` to `src/senses/` (channel adapters), move tool files (`tools.ts`, `tools-base.ts`, `tools-teams.ts`, `ado-client.ts`, `graph-client.ts`, and `data/` endpoint JSON files) from `src/engine/` to `src/repertoire/`. Update all imports across the codebase, all test file paths, and all documentation referencing old paths. This is a mechanical rename with no behavior changes -- all tests must pass identically before and after. Must be done first because all subsequent units reference the new paths.
 - 1A. `ContextStore` interface -- generic `get<T>(key)`, `put<T>(key, value)`, `delete(key)`, `list(prefix)`, `find<T>(prefix, predicate)` with typed layer keys. All context persistence goes through this interface. No module imports file paths or `fs` directly for context data. The `find` operation supports identity resolution by external ID (scan + predicate for file store; proper index for future DB store).
 - 1B. `FileContextStore` -- first adapter implementing `ContextStore`. Uses `~/.agentconfigs/<agent>/context/` layout. This is the only module that touches the filesystem for context storage.
 - 1C. `UserIdentity` type and resolution -- internal userId, external ID mappings (AAD, Teams), tenant memberships, integration memberships (ADO orgs). Persisted via `ContextStore`. Includes `knownScopes` — a living record of orgs/projects the user has worked in. Grows when the model successfully interacts with a scope (tool call succeeds → add/update with fresh `lastUsed`). Shrinks when Authority records persistent access denial (403 on a known scope → prune it so the prompt stops showing inaccessible scopes).
@@ -82,6 +84,13 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 - All branches covered (if/else, switch, try/catch)
 - All error paths tested
 - Edge cases: null, empty, boundary values
+
+## Documentation Requirements
+**MANDATORY: docs updated in every unit, not deferred.**
+- Every unit that adds, moves, or renames files must update all documentation referencing those paths in the same unit
+- Includes: CLAUDE.md, memory files, cross-agent docs, psyche docs, planning/doing docs, code comments, README if present
+- No "update docs later" -- if a unit changes structure, the docs reflect it before the unit is marked complete
+- Doing doc reviewers should reject units that leave stale doc references
 
 ## Open Questions
 
@@ -353,6 +362,9 @@ Paths reflect the directory restructuring done in unit 10. The agent-creature bo
 - 100% coverage target with @vitest/coverage-v8
 
 ## Notes
+
+**Standing rule: documentation travels with the code.** Every unit updates all relevant docs (CLAUDE.md, memory, cross-agent, psyche, markdown references) before it can be marked complete. This applies to every doing doc derived from this plan.
+
 This is a large initiative that should be broken into multiple doing docs. The recommended phasing for the doing doc conversion:
 
 **Doing Doc 1: Identity + Preferences + Storage Interface (Phase 1)**
