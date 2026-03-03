@@ -1,6 +1,6 @@
 # Planning: Ouroboros Migration — Observability (Phase 2)
 
-**Status**: approved
+**Status**: NEEDS_REVIEW
 **Created**: 2026-03-02 15:01
 
 ## Goal
@@ -19,7 +19,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Lock key mapping for persisted logs to match existing session keys: CLI uses `session`, Teams uses `conversationId`.
 - Keep log persistence append-only NDJSON (one event per line) so multiple agents can parse/validate behavior directly from files.
 - Add trace ID propagation through turn entrypoints and engine execution path.
-- Instrument runtime paths across `src/` with event-level logging (including channels, engine, mind, clients, config/identity, repertoire, and entrypoints).
+- Instrument runtime paths across `src/` with event-level logging (including channels, engine/core, engine/kicks, mind, clients, config/identity, repertoire, and entrypoints).
 - Lock minimum event catalog coverage per component (entrypoints, channels, engine, mind, tools, config/identity, clients, repertoire) for this phase.
 - Reflect merged upstream runtime layout changes (including `src/wardrobe/phrases.ts` and `src/wardrobe/format.ts`) in observability instrumentation coverage.
 - Keep user-facing output in channel-native paths while routing operational diagnostics through logger sinks (`stderr` + file).
@@ -40,7 +40,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [ ] Sink abstraction exists and routes each event to configured sinks without instrumentation-site changes.
 - [ ] File sink persists append-only NDJSON events at `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson` without truncating per turn, using session-key parity (CLI=`session`, Teams=`conversationId`).
 - [ ] Runtime paths across `src/` emit event-level structured logs with no chunk-level or sensitive-payload dumps.
-- [ ] Minimum component event catalog is implemented and exercised in tests (entrypoints/channels/engine/mind/tools/config/identity/clients/repertoire).
+- [ ] Minimum component event catalog is implemented and exercised in tests (entrypoints/channels/engine including `src/engine/kicks.ts`/mind/tools/config/identity/clients/repertoire).
 - [ ] Trace IDs are generated at turn entry and propagated through core execution.
 - [ ] Existing ad-hoc operational logging in scoped runtime files is replaced or wrapped by structured logging.
 - [ ] Tests cover new observability code and instrumentation behavior.
@@ -71,6 +71,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Persisted logs are append-only NDJSON (one JSON event per line) so agents can arbitrarily read and parse run history.
 - `sanitizeKey` parity with sessions is intentional for this phase; collision hardening is explicitly deferred.
 - Upstream `src/wardrobe/*` modules map to existing component taxonomy for this phase (no new component key): `wardrobe/format` events are `component=channels`; `wardrobe/phrases` events are `component=repertoire`.
+- Upstream `src/engine/kicks.ts` is explicitly in-scope for instrumentation and maps to `component=engine` within this phase taxonomy.
 - Minimum required event catalog for this phase is locked by component:
   - entrypoints: `turn.start`, `turn.end`, `turn.error`
   - channels: `channel.message_sent`, `channel.error`
@@ -87,6 +88,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/src/channels/cli.ts`
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/src/channels/teams.ts`
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/src/engine/core.ts`
+- `/Users/arimendelow/Projects/ouroboros-agent-harness/src/engine/kicks.ts`
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/src/wardrobe/phrases.ts`
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/src/wardrobe/format.ts`
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/AGENTS.md`
@@ -108,3 +110,4 @@ Merged `origin/main` into `codex/slugger` before execution planning refresh; ups
 - [2026-03-02 16:11] Consistency cleanup: aligned sink contract to dual-sink decision, locked key mapping semantics, and required sink abstraction
 - [2026-03-02 16:15] Synced planning assumptions to merged `origin/main` runtime changes and re-approved for conversion refresh
 - [2026-03-02 16:17] Validation clarification: mapped `src/wardrobe/*` files onto existing event component taxonomy (channels/repertoire)
+- [PENDING_KICKS_SCOPE_TS] Explicitly added `src/engine/kicks.ts` instrumentation/testing coverage to scope and component taxonomy
