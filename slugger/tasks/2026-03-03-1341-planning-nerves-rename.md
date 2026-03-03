@@ -1,6 +1,6 @@
 # Planning: Rename Observability Namespace and Commands to Nerves
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-03-03 13:41
 
 ## Goal
@@ -67,3 +67,4 @@ This is intentionally a naming/structure migration task. Behavioral parity is re
 ## Progress Log
 - [2026-03-03 13:41] Created planning doc for nerves namespace rename.
 - [2026-03-03 13:47] Locked full `observability` -> `nerves` rename scope (including command surface) and clarified historical-doc boundary.
+- [2026-03-03 13:49] User approved planning doc; ready for doing conversion.
