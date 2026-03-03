@@ -190,7 +190,7 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Output**: Full test suite green.
 **Acceptance**: `npx vitest run` passes all tests with no failures or warnings.
 
-### ⬜ Unit 7a: System prompt contextSection redesign -- Tests
+### ✅ Unit 7a: System prompt contextSection redesign -- Tests
 **What**: Write tests for updated `contextSection()` in `prompt.ts`. Test: no context = empty string, context with friend renders `friend: displayName`, authority section removed entirely, notes rendered in system prompt (first person), toolPreferences NOT rendered in system prompt, memory ephemerality instruction present when friend context exists, name-quality instruction present with displayName, new-friend instruction present when notes and toolPreferences both empty, new-friend instruction absent when any note or preference exists, priority guidance present, working-memory trust instruction present, stale notes awareness instruction present. Test `buildSystem()` passes context through.
 **Output**: Updated `prompt.test.ts` with contextSection tests.
 **Files**: `src/__tests__/mind/prompt.test.ts`
