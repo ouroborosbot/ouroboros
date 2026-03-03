@@ -957,3 +957,241 @@ describe("authority-aware planning", () => {
     expect(parsed.results[0].success).toBe(true)
   })
 })
+
+describe("ado_detect_orphans tool", () => {
+  beforeEach(() => { vi.resetAllMocks() })
+
+  it("is registered as ToolDefinition with integration 'ado' (read-only)", () => {
+    const def = findTool("ado_detect_orphans")
+    expect(def).toBeDefined()
+    expect(def!.integration).toBe("ado")
+    expect(def!.confirmationRequired).toBeUndefined()
+  })
+
+  it("finds items without parents that should have one", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    // Return work items: a Task with no parent, a Task with parent, an Epic (no parent needed)
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      workItems: [{ id: 100 }, { id: 101 }, { id: 102 }],
+    }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [
+        { id: 100, fields: { "System.Title": "Orphan Task", "System.WorkItemType": "Task", "System.State": "Active", "System.AssignedTo": null, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": null } },
+        { id: 101, fields: { "System.Title": "Parented Task", "System.WorkItemType": "Task", "System.State": "Active", "System.AssignedTo": null, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": 200 } },
+        { id: 102, fields: { "System.Title": "Top Epic", "System.WorkItemType": "Epic", "System.State": "Active", "System.AssignedTo": null, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": null } },
+      ],
+    }))
+
+    const def = findTool("ado_detect_orphans")!
+    const result = await def.handler({}, makeCtx())
+    const parsed = JSON.parse(result)
+    expect(parsed.orphans).toBeDefined()
+    // Task without parent is an orphan; Epic without parent is NOT (top-level)
+    expect(parsed.orphans.some((o: any) => o.id === 100)).toBe(true)
+    expect(parsed.orphans.some((o: any) => o.id === 102)).toBe(false)
+  })
+
+  it("returns empty when all items are properly parented", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      workItems: [{ id: 100 }],
+    }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [
+        { id: 100, fields: { "System.Title": "Good Task", "System.WorkItemType": "Task", "System.State": "Active", "System.AssignedTo": null, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": 200 } },
+      ],
+    }))
+
+    const def = findTool("ado_detect_orphans")!
+    const result = await def.handler({}, makeCtx())
+    const parsed = JSON.parse(result)
+    expect(parsed.orphans).toHaveLength(0)
+  })
+
+  it("handles API error gracefully", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce("ERROR: 500 Server Error")
+
+    const def = findTool("ado_detect_orphans")!
+    const result = await def.handler({}, makeCtx())
+    expect(result).toContain("ERROR")
+  })
+
+  it("requires ADO token", async () => {
+    const def = findTool("ado_detect_orphans")!
+    const result = await def.handler({}, { ...makeCtx(), adoToken: undefined })
+    expect(result).toContain("AUTH_REQUIRED")
+  })
+})
+
+describe("ado_detect_cycles tool", () => {
+  beforeEach(() => { vi.resetAllMocks() })
+
+  it("is registered as ToolDefinition with integration 'ado' (read-only)", () => {
+    const def = findTool("ado_detect_cycles")
+    expect(def).toBeDefined()
+    expect(def!.integration).toBe("ado")
+    expect(def!.confirmationRequired).toBeUndefined()
+  })
+
+  it("detects A->B->C->A cycle", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      workItems: [{ id: 100 }, { id: 101 }, { id: 102 }],
+    }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [
+        { id: 100, fields: { "System.Title": "A", "System.WorkItemType": "Epic", "System.State": "Active", "System.AssignedTo": null, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": 102 } },
+        { id: 101, fields: { "System.Title": "B", "System.WorkItemType": "Feature", "System.State": "Active", "System.AssignedTo": null, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": 100 } },
+        { id: 102, fields: { "System.Title": "C", "System.WorkItemType": "User Story", "System.State": "Active", "System.AssignedTo": null, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": 101 } },
+      ],
+    }))
+
+    const def = findTool("ado_detect_cycles")!
+    const result = await def.handler({}, makeCtx())
+    const parsed = JSON.parse(result)
+    expect(parsed.cycles).toBeDefined()
+    expect(parsed.cycles.length).toBeGreaterThan(0)
+  })
+
+  it("returns empty when no cycles exist", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      workItems: [{ id: 100 }, { id: 101 }],
+    }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [
+        { id: 100, fields: { "System.Title": "Epic", "System.WorkItemType": "Epic", "System.State": "Active", "System.AssignedTo": null, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": null } },
+        { id: 101, fields: { "System.Title": "Story", "System.WorkItemType": "User Story", "System.State": "Active", "System.AssignedTo": null, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": 100 } },
+      ],
+    }))
+
+    const def = findTool("ado_detect_cycles")!
+    const result = await def.handler({}, makeCtx())
+    const parsed = JSON.parse(result)
+    expect(parsed.cycles).toHaveLength(0)
+  })
+
+  it("handles API error gracefully", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce("ERROR: 500 Server Error")
+
+    const def = findTool("ado_detect_cycles")!
+    const result = await def.handler({}, makeCtx())
+    expect(result).toContain("ERROR")
+  })
+
+  it("requires ADO token", async () => {
+    const def = findTool("ado_detect_cycles")!
+    const result = await def.handler({}, { ...makeCtx(), adoToken: undefined })
+    expect(result).toContain("AUTH_REQUIRED")
+  })
+})
+
+describe("ado_validate_parent_type_rules tool", () => {
+  beforeEach(() => { vi.resetAllMocks() })
+
+  it("is registered as ToolDefinition with integration 'ado' (read-only)", () => {
+    const def = findTool("ado_validate_parent_type_rules")
+    expect(def).toBeDefined()
+    expect(def!.integration).toBe("ado")
+    expect(def!.confirmationRequired).toBeUndefined()
+  })
+
+  it("finds type violations (Task parented to Epic in Scrum)", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    // Fetch work items
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      workItems: [{ id: 100 }, { id: 101 }],
+    }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [
+        { id: 100, fields: { "System.Title": "Bad Parent Epic", "System.WorkItemType": "Epic", "System.State": "Active", "System.AssignedTo": null, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": null } },
+        { id: 101, fields: { "System.Title": "Misplaced Task", "System.WorkItemType": "Task", "System.State": "Active", "System.AssignedTo": null, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": 100 } },
+      ],
+    }))
+    // Process template fetch: project properties
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [{ name: "System.ProcessTemplateType", value: "scrum-guid" }],
+    }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ name: "Scrum", typeId: "scrum-guid" }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [
+        { name: "Epic" }, { name: "Feature" }, { name: "Product Backlog Item" }, { name: "Task" }, { name: "Bug" },
+      ],
+    }))
+
+    const def = findTool("ado_validate_parent_type_rules")!
+    const result = await def.handler({}, makeCtx())
+    const parsed = JSON.parse(result)
+    expect(parsed.violations).toBeDefined()
+    expect(parsed.violations.length).toBeGreaterThan(0)
+    // Task #101 is parented to Epic #100 -- in Scrum, Task should be under PBI, not Epic
+    expect(parsed.violations.some((v: any) => v.childId === 101)).toBe(true)
+  })
+
+  it("returns empty when all valid", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      workItems: [{ id: 100 }, { id: 101 }],
+    }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [
+        { id: 100, fields: { "System.Title": "Epic", "System.WorkItemType": "Epic", "System.State": "Active", "System.AssignedTo": null, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": null } },
+        { id: 101, fields: { "System.Title": "Feature", "System.WorkItemType": "Feature", "System.State": "Active", "System.AssignedTo": null, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": 100 } },
+      ],
+    }))
+    // Process template: Agile
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [{ name: "System.ProcessTemplateType", value: "agile-guid" }],
+    }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ name: "Agile", typeId: "agile-guid" }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [
+        { name: "Epic" }, { name: "Feature" }, { name: "User Story" }, { name: "Task" }, { name: "Bug" },
+      ],
+    }))
+
+    const def = findTool("ado_validate_parent_type_rules")!
+    const result = await def.handler({}, makeCtx())
+    const parsed = JSON.parse(result)
+    expect(parsed.violations).toHaveLength(0)
+  })
+
+  it("handles API error gracefully", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce("ERROR: 500 Server Error")
+
+    const def = findTool("ado_validate_parent_type_rules")!
+    const result = await def.handler({}, makeCtx())
+    expect(result).toContain("ERROR")
+  })
+
+  it("proceeds without validation when process template fetch fails", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      workItems: [{ id: 100 }, { id: 101 }],
+    }))
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [
+        { id: 100, fields: { "System.Title": "Epic", "System.WorkItemType": "Epic", "System.State": "Active", "System.AssignedTo": null, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": null } },
+        { id: 101, fields: { "System.Title": "Task under Epic", "System.WorkItemType": "Task", "System.State": "Active", "System.AssignedTo": null, "System.AreaPath": "P", "System.IterationPath": "S1", "System.Parent": 100 } },
+      ],
+    }))
+    // Process template fetch fails
+    vi.mocked(adoRequest).mockResolvedValueOnce("ERROR: 500 Server Error")
+
+    const def = findTool("ado_validate_parent_type_rules")!
+    const result = await def.handler({}, makeCtx())
+    const parsed = JSON.parse(result)
+    // When process template fails, should return empty violations (can't validate)
+    expect(parsed.violations).toHaveLength(0)
+    expect(parsed.message).toContain("template")
+  })
+
+  it("requires ADO token", async () => {
+    const def = findTool("ado_validate_parent_type_rules")!
+    const result = await def.handler({}, { ...makeCtx(), adoToken: undefined })
+    expect(result).toContain("AUTH_REQUIRED")
+  })
+})
