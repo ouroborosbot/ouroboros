@@ -460,9 +460,9 @@ describe("postTurn", () => {
 describe("mind observability instrumentation", () => {
   it("trimMessages emits mind step lifecycle events", async () => {
     vi.resetModules()
-    const emitObservabilityEvent = vi.fn()
+    const emitNervesEvent = vi.fn()
     vi.doMock("../../nerves/runtime", () => ({
-      emitObservabilityEvent,
+      emitNervesEvent,
     }))
 
     const { trimMessages } = await import("../../mind/context")
@@ -476,7 +476,7 @@ describe("mind observability instrumentation", () => {
       200,
     )
 
-    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "mind.step_start" }))
-    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "mind.step_end" }))
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "mind.step_start" }))
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "mind.step_end" }))
   })
 })

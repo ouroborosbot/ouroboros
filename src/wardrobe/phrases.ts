@@ -4,7 +4,7 @@
 // If agent.json has no phrases, loadAgentConfig() auto-fills placeholders.
 
 import { loadAgentConfig } from "../identity"
-import { emitObservabilityEvent } from "../nerves/runtime"
+import { emitNervesEvent } from "../nerves/runtime"
 
 export interface PhrasePools {
   thinking: string[]
@@ -14,14 +14,14 @@ export interface PhrasePools {
 
 // Returns phrase pools from agent.json (always present — loadAgentConfig auto-fills).
 export function getPhrases(): PhrasePools {
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "repertoire.load_start",
     component: "repertoire",
     message: "loading phrase pools",
     meta: {},
   })
   const phrases = loadAgentConfig().phrases
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "repertoire.load_end",
     component: "repertoire",
     message: "loaded phrase pools",

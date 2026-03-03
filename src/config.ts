@@ -2,7 +2,7 @@ import * as fs from "fs"
 import * as path from "path"
 import * as os from "os"
 import { loadAgentConfig, getAgentName } from "./identity"
-import { emitObservabilityEvent } from "./nerves/runtime"
+import { emitNervesEvent } from "./nerves/runtime"
 
 export interface AzureProviderConfig {
   apiKey: string
@@ -124,7 +124,7 @@ function deepMerge(defaults: Record<string, unknown>, partial: Record<string, un
 
 export function loadConfig(): OuroborosConfig {
   if (_cachedConfig) {
-    emitObservabilityEvent({
+    emitNervesEvent({
       event: "config.load",
       component: "config/identity",
       message: "config loaded from cache",
@@ -144,7 +144,7 @@ export function loadConfig(): OuroborosConfig {
     const raw = fs.readFileSync(configPath, "utf-8")
     fileData = JSON.parse(raw) as Record<string, unknown>
   } catch (error) {
-    emitObservabilityEvent({
+    emitNervesEvent({
       level: "warn",
       event: "config_identity.error",
       component: "config/identity",
@@ -158,7 +158,7 @@ export function loadConfig(): OuroborosConfig {
   }
 
   _cachedConfig = deepMerge(DEFAULT_CONFIG as unknown as Record<string, unknown>, fileData) as unknown as OuroborosConfig
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "config.load",
     component: "config/identity",
     message: "config loaded from disk",

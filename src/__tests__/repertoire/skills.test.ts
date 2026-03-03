@@ -181,9 +181,9 @@ describe("skills - clearLoadedSkills", () => {
 describe("skills observability contract", () => {
   it("emits repertoire.load_start when loading a skill", async () => {
     vi.resetModules()
-    const emitObservabilityEvent = vi.fn()
+    const emitNervesEvent = vi.fn()
     vi.doMock("../../nerves/runtime", () => ({
-      emitObservabilityEvent,
+      emitNervesEvent,
     }))
 
     vi.mocked(fs.existsSync).mockReturnValue(true)
@@ -191,7 +191,7 @@ describe("skills observability contract", () => {
     const { loadSkill } = await import("../../repertoire/skills")
     loadSkill("my-skill")
 
-    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
       event: "repertoire.load_start",
       component: "repertoire",
     }))

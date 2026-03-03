@@ -264,16 +264,16 @@ describe("parseSlashCommand", () => {
 describe("commands observability contract", () => {
   it("emits repertoire.load_start event when registering default commands", async () => {
     vi.resetModules()
-    const emitObservabilityEvent = vi.fn()
+    const emitNervesEvent = vi.fn()
     vi.doMock("../../nerves/runtime", () => ({
-      emitObservabilityEvent,
+      emitNervesEvent,
     }))
     const { createCommandRegistry, registerDefaultCommands } = await import("../../repertoire/commands")
     const registry = createCommandRegistry()
 
     registerDefaultCommands(registry)
 
-    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
       event: "repertoire.load_start",
       component: "repertoire",
     }))

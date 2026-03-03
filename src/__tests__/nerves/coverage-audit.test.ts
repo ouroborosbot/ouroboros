@@ -28,7 +28,7 @@ async function runAudit(events: Array<Record<string, unknown>>, logpoints: Recor
   writeFileSync(logpointsPath, JSON.stringify(logpoints, null, 2), "utf8")
 
   const audit = await import("../../nerves/coverage/audit")
-  return audit.auditObservabilityCoverage({
+  return audit.auditNervesCoverage({
     eventsPath,
     logpointsPath,
   })
@@ -43,7 +43,7 @@ async function runAuditWithFiles(eventsContent: string, logpointsContent: string
   writeFileSync(logpointsPath, logpointsContent, "utf8")
 
   const audit = await import("../../nerves/coverage/audit")
-  return audit.auditObservabilityCoverage({
+  return audit.auditNervesCoverage({
     eventsPath,
     logpointsPath,
   })
@@ -56,7 +56,7 @@ async function runAuditWithoutLogpoints(events: Array<Record<string, unknown>>):
   writeFileSync(eventsPath, events.map((e) => JSON.stringify(e)).join("\n") + "\n", "utf8")
 
   const audit = await import("../../nerves/coverage/audit")
-  return audit.auditObservabilityCoverage({
+  return audit.auditNervesCoverage({
     eventsPath,
     logpointsPath: join(runDir, "missing-logpoints.json"),
   })
@@ -70,7 +70,7 @@ async function runAuditMissingEventsFile(logpoints: Record<string, unknown>): Pr
   writeFileSync(logpointsPath, JSON.stringify(logpoints, null, 2), "utf8")
 
   const audit = await import("../../nerves/coverage/audit")
-  return audit.auditObservabilityCoverage({
+  return audit.auditNervesCoverage({
     eventsPath,
     logpointsPath,
   })

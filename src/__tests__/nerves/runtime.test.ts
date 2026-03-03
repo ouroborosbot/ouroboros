@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { emitObservabilityEvent, setRuntimeLogger } from "../../nerves/runtime"
+import { emitNervesEvent, setRuntimeLogger } from "../../nerves/runtime"
 
 describe("observability/runtime", () => {
   afterEach(() => {
@@ -17,28 +17,28 @@ describe("observability/runtime", () => {
     }
     setRuntimeLogger(logger)
 
-    emitObservabilityEvent({
+    emitNervesEvent({
       level: "debug",
       event: "runtime.debug",
       trace_id: "trace-debug",
       component: "observability",
       message: "debug event",
     })
-    emitObservabilityEvent({
+    emitNervesEvent({
       level: "warn",
       event: "runtime.warn",
       trace_id: "trace-warn",
       component: "observability",
       message: "warn event",
     })
-    emitObservabilityEvent({
+    emitNervesEvent({
       level: "error",
       event: "runtime.error",
       trace_id: "trace-error",
       component: "observability",
       message: "error event",
     })
-    emitObservabilityEvent({
+    emitNervesEvent({
       event: "runtime.info",
       trace_id: "trace-info",
       component: "observability",
@@ -71,7 +71,7 @@ describe("observability/runtime", () => {
     })
 
     setRuntimeLogger(null)
-    emitObservabilityEvent({
+    emitNervesEvent({
       event: "runtime.default",
       component: "observability",
       message: "default logger path",
