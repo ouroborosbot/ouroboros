@@ -1,7 +1,7 @@
 # Planning: Inject final_answer Tool After Narration Kick
 
 **Status**: drafting
-**Created**: (pending first commit)
+**Created**: 2026-03-02 17:10
 
 ## Goal
 Handle false-positive narration kicks gracefully by injecting `final_answer` into the tool list after a kick fires. If the kick was correct, the model will call a real tool on retry. If it was a false positive, the model can route its legitimate answer through `final_answer` instead of being discarded.
@@ -65,4 +65,4 @@ Handle false-positive narration kicks gracefully by injecting `final_answer` int
 The existing `final_answer` interception at core.ts:287-301 is fully provider-agnostic and handles sole calls, mixed calls, JSON parse errors, and missing answer fields. No changes needed there -- only the tool list injection point needs to change.
 
 ## Progress Log
-- (pending first commit)
+- 2026-03-02 17:10 Created
