@@ -1317,4 +1317,24 @@ describe("tools observability instrumentation", () => {
     expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "tool.start" }))
     expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "tool.end" }))
   })
+
+  it("execTool emits tool.error with stringified non-Error throws", async () => {
+    vi.resetModules()
+    const emitObservabilityEvent = vi.fn()
+    vi.doMock("../../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw "string failure"
+    })
+    const { execTool } = await import("../../engine/tools")
+
+    await expect(execTool("read_file", { path: "/tmp/test.txt" })).rejects.toBe("string failure")
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+      level: "error",
+      event: "tool.error",
+      message: "string failure",
+    }))
+  })
 })
