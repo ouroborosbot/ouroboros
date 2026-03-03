@@ -6,6 +6,20 @@ import adoEndpoints from "./data/ado-endpoints.json";
 
 const MUTATE_METHODS = ["POST", "PATCH", "DELETE"];
 
+// Map HTTP method to authority action name for canWrite() checks
+const METHOD_TO_ACTION: Record<string, string> = {
+  POST: "createWorkItem",
+  PATCH: "updateWorkItem",
+  DELETE: "deleteWorkItem",
+};
+
+// Check if a tool response indicates a 403 PERMISSION_DENIED and record it on the checker
+function checkAndRecord403(result: string, integration: string, scope: string, action: string, ctx?: import("./tools-base").ToolContext): void {
+  if (result.startsWith("PERMISSION_DENIED") && ctx?.context?.checker) {
+    ctx.context.checker.record403(integration, scope, action);
+  }
+}
+
 const DEFAULT_ADO_QUERY = "SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo] FROM WorkItems WHERE [System.AssignedTo] = @Me AND [System.State] <> 'Closed' ORDER BY [System.ChangedDate] DESC";
 
 export const teamsToolDefinitions: ToolDefinition[] = [
@@ -86,7 +100,9 @@ export const teamsToolDefinitions: ToolDefinition[] = [
         return "AUTH_REQUIRED:ado -- I need access to Azure DevOps. Please sign in when prompted.";
       }
       const method = args.method || "GET";
-      return adoRequest(ctx.adoToken, method, args.organization, args.path, args.body);
+      const result = await adoRequest(ctx.adoToken, method, args.organization, args.path, args.body);
+      checkAndRecord403(result, "ado", args.organization, method, ctx);
+      return result;
     },
     integration: "ado",
   },
@@ -115,7 +131,17 @@ export const teamsToolDefinitions: ToolDefinition[] = [
       if (!MUTATE_METHODS.includes(args.method)) {
         return `Invalid method "${args.method}". Must be one of: ${MUTATE_METHODS.join(", ")}`;
       }
-      return adoRequest(ctx.adoToken, args.method, args.organization, args.path, args.body);
+      // Authority pre-flight check
+      const action = METHOD_TO_ACTION[args.method] || args.method;
+      if (ctx.context?.checker) {
+        const allowed = await ctx.context.checker.canWrite("ado", args.organization, action);
+        if (!allowed) {
+          return `AUTHORITY_DENIED: ${args.method} to ${args.organization} was denied by pre-flight authority check. The current user does not have permission for this operation. Consider using ado_query to read data instead, or ask an admin to grant the required permissions.`;
+        }
+      }
+      const result = await adoRequest(ctx.adoToken, args.method, args.organization, args.path, args.body);
+      checkAndRecord403(result, "ado", args.organization, action, ctx);
+      return result;
     },
     integration: "ado",
     confirmationRequired: true,

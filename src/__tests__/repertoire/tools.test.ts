@@ -1272,6 +1272,7 @@ describe("ado_mutate authority checks (Unit 2C)", () => {
   it("ado_mutate returns structured denial when canWrite() returns false", async () => {
     vi.resetModules()
     const { adoRequest } = await import("../../repertoire/ado-client")
+    vi.mocked(adoRequest).mockClear()
 
     const { execTool } = await import("../../repertoire/tools")
     const ctx = {
