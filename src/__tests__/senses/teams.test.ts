@@ -3456,20 +3456,22 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
       },
     })
 
+    const MockFileContextStore = vi.fn(function (this: any) {
+      this.identity = {
+        get: vi.fn(),
+        put: vi.fn(),
+        delete: vi.fn(),
+        find: vi.fn(),
+      }
+    })
     vi.doMock("../../mind/context/store-file", () => ({
-      FileContextStore: vi.fn().mockImplementation(() => ({
-        identity: {
-          get: vi.fn(),
-          put: vi.fn(),
-          delete: vi.fn(),
-          find: vi.fn(),
-        },
-      })),
+      FileContextStore: MockFileContextStore,
     }))
+    const MockContextResolver = vi.fn(function (this: any) {
+      this.resolve = mockResolve
+    })
     vi.doMock("../../mind/context/resolver", () => ({
-      ContextResolver: vi.fn().mockImplementation(() => ({
-        resolve: mockResolve,
-      })),
+      ContextResolver: MockContextResolver,
     }))
 
     return { runAgentFn, mockResolve }

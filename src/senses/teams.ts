@@ -10,6 +10,10 @@ import { formatToolResult, formatKick, formatError } from "../wardrobe/format"
 import { sessionPath, getTeamsConfig, getTeamsChannelConfig } from "../config"
 import { loadSession, deleteSession, postTurn } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "../repertoire/commands"
+import { FileContextStore } from "../mind/context/store-file"
+import { ContextResolver } from "../mind/context/resolver"
+import * as os from "os"
+import * as path from "path"
 
 // Stream interface matching IStreamer from @microsoft/teams.apps
 interface TeamsStream {
@@ -275,11 +279,25 @@ export async function withConversationLock(convId: string, fn: () => Promise<voi
   await current
 }
 
+// Shared context store singleton -- created once, reused across all requests.
+let _contextStore: InstanceType<typeof FileContextStore> | null = null
+function getContextStore(): InstanceType<typeof FileContextStore> {
+  if (!_contextStore) {
+    const basePath = path.join(os.homedir(), ".agentconfigs", "context")
+    _contextStore = new FileContextStore(basePath)
+  }
+  return _contextStore
+}
+
 // Context from the Teams activity that carries OAuth tokens and signin ability
 export interface TeamsMessageContext {
   graphToken?: string
   adoToken?: string
   signin: (connectionName: string) => Promise<string | undefined>
+  // AAD identity fields (extracted from bot activity)
+  aadObjectId?: string
+  tenantId?: string
+  displayName?: string
 }
 
 // Handle an incoming Teams message
@@ -331,6 +349,19 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
     adoToken: teamsContext.adoToken,
     signin: teamsContext.signin,
   } : undefined
+
+  // Resolve context kernel (identity + channel) when AAD identity is available
+  if (toolContext && teamsContext?.aadObjectId) {
+    const resolver = new ContextResolver(getContextStore(), {
+      provider: "aad" as const,
+      externalId: teamsContext.aadObjectId,
+      tenantId: teamsContext.tenantId,
+      displayName: teamsContext.displayName || "Unknown",
+      channel: "teams",
+    })
+    toolContext.context = await resolver.resolve()
+  }
+
   const agentOptions: RunAgentOptions = {}
   if (toolContext) agentOptions.toolContext = toolContext
   if (disableStreaming) agentOptions.disableStreaming = true

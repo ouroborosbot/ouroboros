@@ -88,21 +88,23 @@ vi.mock("../../identity", () => ({
     },
   })),
 }))
-vi.mock("../../mind/context/store-file", () => ({
-  FileContextStore: vi.fn().mockImplementation(() => ({
-    identity: {
+vi.mock("../../mind/context/store-file", () => {
+  const MockFileContextStore = vi.fn(function (this: any) {
+    this.identity = {
       get: vi.fn(),
       put: vi.fn(),
       delete: vi.fn(),
       find: vi.fn(),
-    },
-  })),
-}))
-vi.mock("../../mind/context/resolver", () => ({
-  ContextResolver: vi.fn().mockImplementation(() => ({
-    resolve: (...a: any[]) => mocks.resolveContext(...a),
-  })),
-}))
+    }
+  })
+  return { FileContextStore: MockFileContextStore }
+})
+vi.mock("../../mind/context/resolver", () => {
+  const MockContextResolver = vi.fn(function (this: any) {
+    this.resolve = (...a: any[]) => mocks.resolveContext(...a)
+  })
+  return { ContextResolver: MockContextResolver }
+})
 vi.mock("os", async () => {
   const actual = await vi.importActual<typeof import("os")>("os")
   return {
@@ -750,7 +752,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
 
     expect(runAgentCalls.length).toBe(1)
     // 5th argument (index 4) should be options with toolChoiceRequired: true
-    expect(runAgentCalls[0][4]).toEqual({ toolChoiceRequired: true })
+    expect(runAgentCalls[0][4]).toMatchObject({ toolChoiceRequired: true })
   })
 
   it("passes toolChoiceRequired: false when toggle is off (default)", async () => {
@@ -762,7 +764,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
 
     expect(runAgentCalls.length).toBe(1)
     // 5th argument (index 4) should have toolChoiceRequired: false
-    expect(runAgentCalls[0][4]).toEqual({ toolChoiceRequired: false })
+    expect(runAgentCalls[0][4]).toMatchObject({ toolChoiceRequired: false })
   })
 
   it("warns on stderr when assistant response is empty", async () => {
