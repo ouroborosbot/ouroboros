@@ -13,6 +13,7 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 ### In Scope
 
 **Phase 1: Identity + Preferences + Storage Interface (Smallest Vertical Slice)**
+- 10. Directory restructuring (prerequisite) -- rename `src/engine/` to `src/heart/` (core loop, streaming, kicks, API error handling), rename `src/channels/` to `src/senses/` (channel adapters), move tool files (`tools.ts`, `tools-base.ts`, `tools-teams.ts`, `ado-client.ts`, `graph-client.ts`, and `data/` endpoint JSON files) from `src/engine/` to `src/repertoire/`. Update all imports across the codebase and all test file paths. This is a mechanical rename with no behavior changes -- all tests must pass identically before and after. Must be done first because all subsequent units reference the new paths.
 - 1A. `ContextStore` interface -- generic `get<T>(key)`, `put<T>(key, value)`, `delete(key)`, `list(prefix)`, `find<T>(prefix, predicate)` with typed layer keys. All context persistence goes through this interface. No module imports file paths or `fs` directly for context data. The `find` operation supports identity resolution by external ID (scan + predicate for file store; proper index for future DB store).
 - 1B. `FileContextStore` -- first adapter implementing `ContextStore`. Uses `~/.agentconfigs/<agent>/context/` layout. This is the only module that touches the filesystem for context storage.
 - 1C. `UserIdentity` type and resolution -- internal userId, external ID mappings (AAD, Teams), tenant memberships, integration memberships (ADO orgs). Persisted via `ContextStore`. Includes `knownScopes` — a living record of orgs/projects the user has worked in. Grows when the model successfully interacts with a scope (tool call succeeds → add/update with fresh `lastUsed`). Shrinks when Authority records persistent access denial (403 on a known scope → prune it so the prompt stops showing inaccessible scopes).
@@ -153,7 +154,7 @@ This replaces the current hardcoded pattern in `getToolsForChannel()` where `cha
 Authority profiles are cached with a configurable TTL (default: 30 minutes). Additionally, any 403 response from an ADO/Graph API call triggers immediate cache invalidation for that integration scope. This catches permission changes without waiting for TTL expiry.
 
 ### D5: ToolContext Extension -- Backward Compatible
-The existing `ToolContext` interface in `src/engine/tools-base.ts` is extended (not replaced) with an optional `context?: LazyResolvedContext` field. This means all existing tool handlers continue to work unchanged. New semantic tools can access context layers on demand. Migration is gradual.
+The existing `ToolContext` interface in `src/repertoire/tools-base.ts` is extended (not replaced) with an optional `context?: LazyResolvedContext` field. This means all existing tool handlers continue to work unchanged. New semantic tools can access context layers on demand. Migration is gradual.
 
 ### D6: Resolver -- Lazy via Explicit Promises, Not Upfront
 The previous design resolved all layers into a `ResolvedContext` bag on every tool call. Not every tool needs all four (e.g., `read_file` needs none, `ado_query` needs Identity but not Authority). Full upfront resolution adds latency, especially when Authority requires API calls. The `LazyContextResolver` returns an object with explicit `Promise<T>` fields for expensive layers:
@@ -180,21 +181,28 @@ The original five-layer design included a `SessionContext` layer with working se
 - **Tools are stateless**: every tool call includes all required context (org, project, IDs). No tool reads from ambient session state. The model must always provide what the tool needs. If the model doesn't know, it asks the user.
 - **The ouroboros metaphor holds**: the conversation *is* the memory. The agent eats its tail (trims old messages) but identity and preferences survive through persisted context. We don't need a parallel memory system for information that lives in the messages.
 
-### D9: File Layout -- New Directories Under Existing Structure
-New code follows the existing directory pattern:
-- `src/context/` -- context kernel types, interfaces, and resolvers
-- `src/context/types.ts` -- all layer type definitions
-- `src/context/store.ts` -- `ContextStore` interface
-- `src/context/store-file.ts` -- `FileContextStore` adapter
-- `src/context/identity.ts` -- UserIdentity resolution
-- `src/context/authority.ts` -- Authority resolution and `AuthorityChecker`
-- `src/context/preferences.ts` -- Preferences resolution
-- `src/context/channel.ts` -- ChannelCapabilities lookup
-- `src/context/resolver.ts` -- `LazyContextResolver`
-- `src/engine/ado-semantic.ts` -- semantic ADO tools (create_epic, move_items, etc.)
-- `src/engine/ado-templates.ts` -- process template detection and hierarchy rules
-- `src/__tests__/context/` -- tests for all context modules
-- `src/__tests__/engine/ado-semantic.test.ts` -- tests for semantic ADO tools
+### D9: File Layout -- Agent-Creature Body Metaphor (see D19)
+New code follows the agent-creature body metaphor (D19). The context kernel lives in `src/mind/` because context IS the agent's reasoning frame. Semantic tools live in `src/repertoire/` because they are capabilities the agent can perform.
+
+**Context kernel files** (`src/mind/context/`):
+- `src/mind/context/types.ts` -- all layer type definitions (UserIdentity, AuthorityProfile, UserPreferences, ChannelCapabilities, LazyResolvedContext)
+- `src/mind/context/store.ts` -- `ContextStore` interface
+- `src/mind/context/store-file.ts` -- `FileContextStore` adapter
+- `src/mind/context/identity.ts` -- UserIdentity resolution (get-or-create, external ID lookup)
+- `src/mind/context/authority.ts` -- Authority resolution and `AuthorityChecker`
+- `src/mind/context/preferences.ts` -- Preferences resolution (load, defaults, write-back)
+- `src/mind/context/channel.ts` -- ChannelCapabilities lookup (hardcoded map)
+- `src/mind/context/resolver.ts` -- `LazyContextResolver` (orchestrator)
+
+**Semantic tool files** (`src/repertoire/`):
+- `src/repertoire/ado-semantic.ts` -- semantic ADO tools (create_epic, move_items, etc.)
+- `src/repertoire/ado-templates.ts` -- process template detection and hierarchy rules
+
+**Test files** (mirror structure):
+- `src/__tests__/mind/context/` -- tests for all context modules
+- `src/__tests__/repertoire/ado-semantic.test.ts` -- tests for semantic ADO tools
+
+Note: `src/mind/` already contains `prompt.ts` and `context.ts` (session management). The new `context/` subdirectory is for the context kernel -- distinct from `context.ts` which handles session save/load/trim. The naming is intentional: `src/mind/context.ts` = session memory, `src/mind/context/` = user context kernel.
 
 ### D10: System Prompt Injection -- Context Reaches the Model, Not Just Tools
 The context kernel resolves identity, authority, preferences, and channel -- but the model can only reason within constraints it can see. Without prompt injection, authority limits are invisible to the model until a tool call fails. This wastes turns and produces bad UX (proposing an epic restructure, then failing on the first API call).
@@ -283,29 +291,50 @@ Tokens (`graphToken`, `adoToken`) remain in `ToolContext`. They are ephemeral pe
 - **Context**: per-user, persisted via `ContextStore`, cached with our own TTL, survives across turns.
 They coexist on the same `ToolContext` object (D5: `context?: LazyResolvedContext`) but serve different purposes. Mixing them would conflate credential management with user knowledge management.
 
+### D19: Source Directory Structure -- Agent-Creature Body Metaphor
+All top-level source directories MUST map to a part of the agent-creature's body. This is not a suggestion -- it is a naming convention enforced across the codebase. No new top-level `src/` directory may be created unless it fits the metaphor.
+
+**The mapping:**
+- **`src/heart/`** -- core agent loop, streaming, API error handling, kick detection. The beating heart that drives the agent's turn-by-turn execution. (Renamed from `src/engine/`)
+- **`src/mind/`** -- prompt construction, context kernel, session memory, reasoning frame. Everything the agent "thinks about" to form responses. Context kernel lives here at `src/mind/context/`. (Already exists)
+- **`src/repertoire/`** -- tools, skills, commands, API clients. The capabilities the agent can perform -- what it knows how to do. Tool definitions, handlers, ADO client, Graph client, slash commands all live here. (Already exists for skills; tool files move here from `src/engine/`)
+- **`src/wardrobe/`** -- formatting, phrases, presentation. How the agent dresses up its output. (Already exists)
+- **`src/senses/`** -- channel adapters (CLI, Teams). How the agent perceives and responds to the outside world. Each channel is a sense. (Renamed from `src/channels/`)
+
+**Renames performed in unit 10 (Phase 1 prerequisite):**
+- `src/engine/` -> `src/heart/` (core.ts, streaming.ts, kicks.ts stay)
+- `src/channels/` -> `src/senses/` (cli.ts, teams.ts stay)
+- Tool files move from `src/engine/` -> `src/repertoire/` (tools.ts, tools-base.ts, tools-teams.ts, ado-client.ts, graph-client.ts, data/)
+
+**Remaining files in their current locations** (unchanged):
+- `src/identity.ts` -- agent identity (name, config). Top-level because it's cross-cutting.
+- `src/config.ts` -- configuration loading. Top-level because it's cross-cutting.
+- `src/cli-entry.ts`, `src/teams-entry.ts` -- entry points. Top-level by convention.
+
 ## Context / References
 
-### Existing Codebase Architecture (Current State)
+### Existing Codebase Architecture (Post-Restructuring)
+Paths reflect the directory restructuring done in unit 10. The agent-creature body metaphor (D19) governs all top-level directories.
+
 - **Entry points**: `src/cli-entry.ts` (CLI), `src/teams-entry.ts` (Teams with dotenv)
-- **Channel adapters**: `src/channels/cli.ts` (readline REPL), `src/channels/teams.ts` (Teams SDK bot)
-- **Engine core**: `src/engine/core.ts` -- `runAgent()` loop, provider selection, streaming, tool execution
-- **Tool system**: `src/engine/tools-base.ts` (base tools), `src/engine/tools-teams.ts` (Teams-only tools including ADO/Graph), `src/engine/tools.ts` (channel-aware tool list)
-- **ToolContext interface** (tools-base.ts:7-12): `{ graphToken?, adoToken?, signin, adoOrganizations }`
-- **ADO client**: `src/engine/ado-client.ts` -- generic `adoRequest()` and `queryWorkItems()` wrapper
-- **Graph client**: `src/engine/graph-client.ts` -- generic `graphRequest()` and `getProfile()` wrapper
+- **Heart** (core loop): `src/heart/core.ts` -- `runAgent()` loop, provider selection, streaming, tool execution
+- **Mind** (reasoning): `src/mind/prompt.ts` -- `buildSystem()` assembles system prompt with channel-aware sections; `src/mind/context.ts` -- `saveSession()`, `loadSession()`, `postTurn()`, `trimMessages()`
+- **Repertoire** (capabilities): `src/repertoire/tools-base.ts` (base tools), `src/repertoire/tools-teams.ts` (Teams-only tools including ADO/Graph), `src/repertoire/tools.ts` (channel-aware tool list)
+- **ToolContext interface** (`src/repertoire/tools-base.ts`): `{ graphToken?, adoToken?, signin, adoOrganizations }`
+- **ADO client**: `src/repertoire/ado-client.ts` -- generic `adoRequest()` and `queryWorkItems()` wrapper
+- **Graph client**: `src/repertoire/graph-client.ts` -- generic `graphRequest()` and `getProfile()` wrapper
+- **Senses** (channels): `src/senses/cli.ts` (readline REPL), `src/senses/teams.ts` (Teams SDK bot)
 - **Identity**: `src/identity.ts` -- agent identity (name, config), NOT user identity
 - **Config**: `src/config.ts` -- `OuroborosConfig` with providers, teams, oauth, ado, context, teamsChannel
-- **Prompt system**: `src/mind/prompt.ts` -- `buildSystem()` assembles system prompt with channel-aware sections
-- **Session management**: `src/mind/context.ts` -- `saveSession()`, `loadSession()`, `postTurn()`, `trimMessages()`
 - **Channel type**: `"cli" | "teams"` defined in `src/mind/prompt.ts`
 
 ### Key Integration Points for Context Kernel
-1. **runAgent()** in `src/engine/core.ts` line 159 -- receives `channel` param, builds `ToolContext` implicitly. This is where the `LazyContextResolver` should be created and attached to `ToolContext`.
-2. **handleTeamsMessage()** in `src/channels/teams.ts` line 286 -- builds `ToolContext` from OAuth tokens and ADO config. This is where Teams-specific identity resolution happens.
-3. **getToolsForChannel()** in `src/engine/tools.ts` -- currently hardcodes `channel === "teams"` to gate Teams tools. Refactored to accept `ChannelCapabilities` and filter tools by `availableIntegrations` (see D3). New channels get integration-scoped tools without code changes to the router.
-4. **execTool()** in `src/engine/tools.ts` -- dispatches to handler with `ToolContext`. New semantic tools need handlers registered here.
+1. **runAgent()** in `src/heart/core.ts` -- receives `channel` param, receives `ToolContext` via `RunAgentOptions.toolContext`. This is where the `LazyContextResolver` (attached to `ToolContext`) is available during tool execution.
+2. **handleTeamsMessage()** in `src/senses/teams.ts` -- builds `ToolContext` from OAuth tokens and ADO config. This is where Teams-specific identity resolution happens and the `LazyContextResolver` should be created and attached to `ToolContext`.
+3. **getToolsForChannel()** in `src/repertoire/tools.ts` -- currently hardcodes `channel === "teams"` to gate Teams tools. Refactored to accept `ChannelCapabilities` and filter tools by `availableIntegrations` (see D3). New channels get integration-scoped tools without code changes to the router.
+4. **execTool()** in `src/repertoire/tools.ts` -- dispatches to handler with `ToolContext`. New semantic tools need handlers registered here.
 5. **sessionPath()** in `src/config.ts` -- `~/.agentconfigs/<agent>/sessions/<channel>/<key>.json`. Context storage follows a parallel pattern via `FileContextStore`.
-6. **confirmationRequired** set in `src/engine/tools-teams.ts` -- semantic ADO mutation tools need to be added here.
+6. **confirmationRequired** set in `src/repertoire/tools-teams.ts` -- semantic ADO mutation tools need to be added here.
 
 ### ADO API Patterns (from ado-client.ts and ado-endpoints.json)
 - WIQL queries for work item search
@@ -327,7 +356,7 @@ They coexist on the same `ToolContext` object (D5: `context?: LazyResolvedContex
 This is a large initiative that should be broken into multiple doing docs. The recommended phasing for the doing doc conversion:
 
 **Doing Doc 1: Identity + Preferences + Storage Interface (Phase 1)**
-Units 1A-1H. Builds the storage interface, identity, preferences, channel capabilities, lazy resolver, system prompt injection, and wires through one real ADO operation. Proves the kernel end-to-end.
+Units 10, 1A-1H. Starts with directory restructuring (unit 10), then builds the storage interface, identity, preferences, channel capabilities, lazy resolver, system prompt injection, and wires through one real ADO operation. Proves the kernel end-to-end.
 
 **Doing Doc 2: Authority (Phase 2)**
 Units 2A-2D. Builds the hybrid authority model, wires it into existing tools and prompt. Depends on Doing Doc 1.
@@ -341,7 +370,7 @@ Units 4A-4C. Process templates, authority-aware planning, structural safety. Dep
 ### Proposed TypeScript Schema (for reference during doing doc conversion)
 
 ```typescript
-// src/context/store.ts
+// src/mind/context/store.ts
 
 // Storage-agnostic interface for context persistence.
 // All context modules go through this -- none import fs directly.
@@ -357,14 +386,14 @@ interface ContextStore {
   find<T>(prefix: string, predicate: (value: T) => boolean): Promise<T | null>;
 }
 
-// src/context/store-file.ts
+// src/mind/context/store-file.ts
 
 // First adapter: file-based storage under ~/.agentconfigs/<agent>/context/
 // Key maps to file path: key "identity/user-123" -> context/identity/user-123.json
 // This is the ONLY module that touches fs for context data.
 class FileContextStore implements ContextStore { /* ... */ }
 
-// src/context/types.ts
+// src/mind/context/types.ts
 
 // --- Layer 1: Identity ---
 interface ExternalId {
