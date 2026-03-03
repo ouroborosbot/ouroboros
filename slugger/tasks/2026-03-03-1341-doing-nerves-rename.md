@@ -20,8 +20,8 @@ Rename the repository's observability namespace and command surface from `observ
 - [x] Runtime code compiles and uses `nerves` import paths consistently.
 - [x] Test suite references `nerves` paths and passes without alias shims.
 - [x] Coverage and `audit:nerves` gate remain green after rename.
-- [ ] Documentation/path references required for current workflows are updated to the new namespace.
-- [ ] No active (non-historical) user-facing command or doc in this repo still uses `observability` as the subsystem name.
+- [x] Documentation/path references required for current workflows are updated to the new namespace.
+- [x] No active (non-historical) user-facing command or doc in this repo still uses `observability` as the subsystem name.
 - [x] 100% test coverage on all new code
 - [x] All tests pass
 - [x] No warnings
@@ -82,7 +82,7 @@ Rename the repository's observability namespace and command surface from `observ
 **What**: Add lightweight assertions/checks or scripted validations (if present) for active docs/commands that must move from `observability` to `nerves`.
 **Acceptance**: Validation fails when active required docs still contain stale subsystem naming.
 
-### ⬜ Unit 3b: Documentation and Task Path Accuracy — Implementation
+### ✅ Unit 3b: Documentation and Task Path Accuracy — Implementation
 **What**: Update active docs and materially incorrect slugger task path mentions impacted by this rename while preserving historical records.
 **Acceptance**: Active docs are updated, historical records remain intentionally untouched, and checks pass.
 
@@ -116,3 +116,4 @@ Rename the repository's observability namespace and command surface from `observ
 - [2026-03-03 14:07] Unit 2b complete: implemented `nerves audit` messaging and `nerves_coverage` outputs in coverage CLI/gate; targeted tests and combined gate pass.
 - [2026-03-03 14:08] Unit 2c complete: reran combined coverage gate at 100% with `nerves` pipeline naming and verified clean build.
 - [2026-03-03 14:09] Unit 3a complete: added failing naming-consistency test for active docs/command paths still containing stale `observability` terms.
+- [2026-03-03 14:11] Unit 3b complete: renamed active runtime/coverage identifiers and symbols to `nerves`, updated imports/tests, and passed full suite + build.
