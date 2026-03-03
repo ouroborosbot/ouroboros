@@ -205,3 +205,154 @@ npm test
 ```
 
 All tests must pass before proceeding to PR Workflow. If tests still fail after resolution, re-examine the doing docs and try again. If genuinely stuck after multiple attempts, escalate to the user (see **Escalation**).
+
+---
+
+## PR Workflow
+
+After the merge is clean and tests pass, create a pull request and merge it to main.
+
+### Step 1: Push the branch
+
+```bash
+git push origin ${BRANCH}
+```
+
+If this is a retry and the branch already exists on the remote:
+```bash
+git push --force-with-lease origin ${BRANCH}
+```
+
+`--force-with-lease` is safe here because work-merger owns this branch exclusively at this point.
+
+### Step 2: Create the pull request
+
+```bash
+gh pr create \
+  --base main \
+  --head "${BRANCH}" \
+  --title "${AGENT}: merge $(echo ${BRANCH} | cut -d'/' -f2-)" \
+  --body "Automated merge of ${BRANCH} into main.
+
+Task: $(basename ${DOING_DOC})
+
+Merge performed by work-merger."
+```
+
+If a PR already exists for this branch (e.g., from a retry), skip creation:
+```bash
+gh pr view "${BRANCH}" --json url 2>/dev/null
+```
+If this returns a URL, the PR already exists. Proceed to Step 3.
+
+### Step 3: Wait for CI
+
+Poll CI status until it completes:
+
+```bash
+gh pr checks "${BRANCH}" --watch
+```
+
+If `--watch` is not available, poll manually:
+```bash
+while true; do
+  STATUS=$(gh pr checks "${BRANCH}" --json 'state' -q '.[].state' 2>/dev/null)
+  if echo "$STATUS" | grep -q "FAILURE"; then
+    echo "CI failed"
+    break
+  elif echo "$STATUS" | grep -qv "PENDING\|IN_PROGRESS"; then
+    echo "CI passed"
+    break
+  fi
+  sleep 30
+done
+```
+
+### Step 4: Handle CI result
+
+**CI passes:**
+- Proceed to Step 5 (merge).
+
+**CI fails:**
+- Proceed to **CI Failure Self-Repair**.
+
+### Step 5: Merge the PR
+
+```bash
+gh pr merge "${BRANCH}" --merge --delete-branch
+```
+
+Use `--merge` (not `--squash` or `--rebase`). Merge commits preserve branch history.
+
+The `--delete-branch` flag handles remote branch cleanup. If it is not supported or fails, handle cleanup manually in **Post-Merge Cleanup**.
+
+If the merge fails due to merge conflicts (another agent merged to main while CI was running), proceed to **Race Condition Retry**.
+
+---
+
+## Fast Path
+
+When the merge result is "Already up to date" (Case A from Merge Loop):
+
+1. The branch has no new commits from main to integrate.
+2. Skip conflict resolution entirely.
+3. **Still create a PR.** The PR serves as a CI gate -- code must pass CI before landing on main.
+4. Push the branch, create PR, wait for CI, merge PR -- same as the normal PR Workflow.
+5. The only difference is that no merge commit is needed before the PR.
+
+The fast path is the common case when the other agent has not pushed anything to main since this branch was created.
+
+---
+
+## CI Failure Self-Repair
+
+When CI fails, do not immediately escalate. You wrote this code (or resolved the merge). Fix it.
+
+### Step 1: Read the CI failure
+
+```bash
+gh pr checks "${BRANCH}" --json 'name,state,detailsUrl'
+```
+
+Examine the failure details. Common failures:
+- Test failures
+- Lint/type-check errors
+- Coverage threshold not met
+- Build failures
+
+### Step 2: Fix the failure
+
+1. Read the failing test output or build log
+2. Identify the root cause
+3. Fix the code
+4. Run tests locally: `npm test`
+5. Run build locally: `npm run build`
+6. Verify the fix resolves the CI failure
+
+### Step 3: Push the fix
+
+```bash
+git add <fixed-files>
+git commit -m "fix: resolve CI failure - <brief description>"
+git push origin ${BRANCH}
+```
+
+CI re-runs automatically on the updated PR.
+
+### Step 4: Wait for CI again
+
+Return to **PR Workflow Step 3** (wait for CI).
+
+### Step 5: Escalate if stuck
+
+If CI fails again after your fix attempt, try once more. After **two consecutive failed self-repair attempts** on the same CI failure, escalate to the user:
+
+```
+CI is failing and I cannot resolve it after 2 attempts.
+Failure: <description>
+What I tried: <list of fixes>
+PR: <pr-url>
+Please investigate and advise.
+```
+
+This boundary is clear: fixable issues (lint, test, build) are your responsibility. Only escalate when you are genuinely stuck, not on the first failure.
