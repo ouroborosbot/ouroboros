@@ -14,7 +14,9 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Add shared observability module under `src/observability/` (logger, trace helpers, factory exports).
 - Define machine-first NDJSON event schema and configurable `logging.level`.
 - Lock required log envelope fields for all structured events: `ts`, `level`, `event`, `trace_id`, `component`, `message`, `meta`.
+- Add explicit sink abstraction (sink interface + sink fan-out) so `stderr`/file sinks are pluggable without changing instrumentation call sites.
 - Persist structured logs with session-style pathing under `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson`.
+- Lock key mapping for persisted logs to match existing session keys: CLI uses `session`, Teams uses `conversationId`.
 - Keep log persistence append-only NDJSON (one event per line) so multiple agents can parse/validate behavior directly from files.
 - Add trace ID propagation through turn entrypoints and engine execution path.
 - Instrument runtime paths across `src/` with event-level logging (including channels, engine, mind, clients, config/identity, repertoire, and entrypoints).
@@ -34,7 +36,8 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [ ] `src/observability/` module exists with reusable logger + trace ID primitives.
 - [ ] NDJSON (`json`) is the canonical log format with configurable `logging.level` and dual sinks for this phase (`stderr` + session-style file).
 - [ ] All structured events use required envelope fields: `ts`, `level`, `event`, `trace_id`, `component`, `message`, `meta`.
-- [ ] File sink persists append-only NDJSON events at `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson` without truncating per turn.
+- [ ] Sink abstraction exists and routes each event to configured sinks without instrumentation-site changes.
+- [ ] File sink persists append-only NDJSON events at `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson` without truncating per turn, using session-key parity (CLI=`session`, Teams=`conversationId`).
 - [ ] Runtime paths across `src/` emit event-level structured logs with no chunk-level or sensitive-payload dumps.
 - [ ] Minimum component event catalog is implemented and exercised in tests (entrypoints/channels/engine/mind/tools/config/identity/clients/repertoire).
 - [ ] Trace IDs are generated at turn entry and propagated through core execution.
@@ -57,11 +60,13 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 ## Decisions Made
 - This planning doc targets migration sequence item #2: Observability.
 - The completed testing-strategy planning/doing task is treated as predecessor and baseline.
-- Logging/output contract for this phase is channel-agnostic: user-facing content stays in channel-native output paths (CLI stdout, Teams APIs, etc.), while structured operational diagnostics flow through the observability path (stderr sink in this phase).
+- Logging/output contract for this phase is channel-agnostic: user-facing content stays in channel-native output paths (CLI stdout, Teams APIs, etc.), while structured operational diagnostics flow through observability sinks (`stderr` + session-style file in this phase).
 - Logging configuration for this phase is machine-first: NDJSON (`json`) is canonical, `logging.level` is configurable, and sinks fan out to `stderr` plus a session-style file sink.
+- Sink architecture for this phase is abstraction-first: instrumentation emits one event shape; sink fan-out handles persistence/transport (`stderr` and file now, future sinks later) without touching runtime call sites.
 - Required instrumentation surface for this phase is full runtime coverage across `src/` with event-level logs (not chunk-level content), while excluding sensitive payload dumps.
 - Required structured log envelope for this phase is locked to: `ts`, `level`, `event`, `trace_id`, `component`, `message`, `meta`.
 - Persisted logs use session-style pathing: `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson`.
+- Persisted log key mapping is locked to current session keys: CLI key=`session`; Teams key=`conversationId`.
 - Persisted logs are append-only NDJSON (one JSON event per line) so agents can arbitrarily read and parse run history.
 - `sanitizeKey` parity with sessions is intentional for this phase; collision hardening is explicitly deferred.
 - Minimum required event catalog for this phase is locked by component:
@@ -95,3 +100,4 @@ Model consumption is primary: logs should be stable, structured, and parseable f
 - [2026-03-02 15:48] Locked required log envelope fields and minimum component event catalog to remove interpretation gaps
 - [2026-03-02 15:50] Planning approved for conversion to doing doc
 - [2026-03-02 16:05] Added session-style append-only NDJSON file persistence (`stderr` + file sinks) and deferred key-collision hardening
+- [PENDING_REVIEW_FIX_TS] Consistency cleanup: aligned sink contract to dual-sink decision, locked key mapping semantics, and required sink abstraction
