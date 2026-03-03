@@ -114,3 +114,4 @@ The work-merger subagent is purely a documentation/workflow artifact -- it instr
 - 2026-03-03 11:07 Added CONTRIBUTING.md to scope, completion criteria, and context references
 - 2026-03-03 11:07 Approved by user
 - 2026-03-03 11:15 Added gh CLI preflight checks to scope and completion criteria (user feedback during doing doc review)
+- 2026-03-03 11:25 Replaced timestamp-sorted task doc discovery with git-informed discovery. Replaced fixed retry with exponential backoff + mandatory user communication. (user feedback during doing doc review)
