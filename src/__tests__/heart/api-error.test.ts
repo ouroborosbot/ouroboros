@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { handleApiError } from "../../engine/api-error"
+import { handleApiError } from "../../heart/api-error"
 
 describe("handleApiError", () => {
   it("returns AUTH_REQUIRED for 401 status", () => {

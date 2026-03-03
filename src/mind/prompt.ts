@@ -1,8 +1,8 @@
 import * as fs from "fs";
 import * as path from "path";
-import { getModel, getProvider } from "../engine/core";
+import { getModel, getProvider } from "../heart/core";
 import { getAzureConfig } from "../config";
-import { finalAnswerTool, getToolsForChannel } from "../engine/tools";
+import { finalAnswerTool, getToolsForChannel } from "../repertoire/tools";
 import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName } from "../identity";
 

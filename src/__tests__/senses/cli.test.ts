@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import type { ChannelCallbacks } from "../../engine/core"
+import type { ChannelCallbacks } from "../../heart/core"
 
 vi.mock("../../identity", () => ({
   getAgentName: vi.fn(() => "testagent"),
@@ -42,12 +42,12 @@ describe("CLI adapter - createCliCallbacks", () => {
   })
 
   it("is exported from agent.ts", async () => {
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     expect(typeof agent.createCliCallbacks).toBe("function")
   })
 
   it("returns an object implementing ChannelCallbacks", async () => {
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     const callbacks = agent.createCliCallbacks()
     expect(typeof callbacks.onModelStart).toBe("function")
     expect(typeof callbacks.onModelStreamStart).toBe("function")
@@ -61,25 +61,25 @@ describe("CLI adapter - createCliCallbacks", () => {
 describe("CLI adapter - renderMarkdown", () => {
   it("renders **bold** as ANSI bold", async () => {
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     expect(agent.renderMarkdown("hello **world**")).toBe("hello \x1b[1mworld\x1b[22m")
   })
 
   it("renders *italic* as ANSI italic", async () => {
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     expect(agent.renderMarkdown("hello *world*")).toBe("hello \x1b[3mworld\x1b[23m")
   })
 
   it("renders `code` as ANSI cyan", async () => {
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     expect(agent.renderMarkdown("use `npm install`")).toBe("use \x1b[36mnpm install\x1b[39m")
   })
 
   it("renders code blocks as ANSI dim", async () => {
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     const input = "code:\n```\nconst x = 1\n```"
     const expected = "code:\n\x1b[2mconst x = 1\x1b[22m"
     expect(agent.renderMarkdown(input)).toBe(expected)
@@ -87,13 +87,13 @@ describe("CLI adapter - renderMarkdown", () => {
 
   it("passes plain text through unchanged", async () => {
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     expect(agent.renderMarkdown("no markdown here")).toBe("no markdown here")
   })
 
   it("does not render markdown inside code blocks", async () => {
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     const input = "```\n**not bold**\n```"
     const expected = "\x1b[2m**not bold**\x1b[22m"
     expect(agent.renderMarkdown(input)).toBe(expected)
@@ -101,13 +101,13 @@ describe("CLI adapter - renderMarkdown", () => {
 
   it("does not render markdown inside inline code", async () => {
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     expect(agent.renderMarkdown("`**not bold**`")).toBe("\x1b[36m**not bold**\x1b[39m")
   })
 
   it("handles bold and italic together", async () => {
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     expect(agent.renderMarkdown("**bold** and *italic*")).toBe(
       "\x1b[1mbold\x1b[22m and \x1b[3mitalic\x1b[23m"
     )
@@ -115,7 +115,7 @@ describe("CLI adapter - renderMarkdown", () => {
 
   it("handles code blocks with language specifier", async () => {
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     const input = "```ts\nconst x = 1\n```"
     const expected = "\x1b[2mconst x = 1\x1b[22m"
     expect(agent.renderMarkdown(input)).toBe(expected)
@@ -123,11 +123,11 @@ describe("CLI adapter - renderMarkdown", () => {
 })
 
 describe("CLI adapter - MarkdownStreamer", () => {
-  let MarkdownStreamer: typeof import("../../channels/cli").MarkdownStreamer
+  let MarkdownStreamer: typeof import("../../senses/cli").MarkdownStreamer
 
   beforeEach(async () => {
     vi.resetModules()
-    const mod = await import("../../channels/cli")
+    const mod = await import("../../senses/cli")
     MarkdownStreamer = mod.MarkdownStreamer
   })
 
@@ -284,7 +284,7 @@ describe("CLI adapter - streaming onTextChunk with MarkdownStreamer", () => {
     stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     callbacks = agent.createCliCallbacks()
   })
 
@@ -354,7 +354,7 @@ describe("CLI adapter - onReasoningChunk and onTextChunk rendering", () => {
     stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     callbacks = agent.createCliCallbacks()
   })
 
@@ -443,7 +443,7 @@ describe("CLI adapter - onModelStart", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onModelStart()
@@ -467,7 +467,7 @@ describe("CLI adapter - onModelStreamStart", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onModelStart()
@@ -484,7 +484,7 @@ describe("CLI adapter - onModelStreamStart", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
 
     // Directly test Spinner.stop() without start() — covers the this.iv === null branch
     const s = new agent.Spinner("test")
@@ -498,7 +498,7 @@ describe("CLI adapter - onModelStreamStart", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
 
     // Start spinner and let the setInterval callback fire
     const s = new agent.Spinner("test")
@@ -520,7 +520,7 @@ describe("CLI adapter - onToolStart", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onToolStart("read_file", { path: "/tmp/test.txt" })
@@ -541,7 +541,7 @@ describe("CLI adapter - onToolStart", () => {
     })
 
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onModelStart()
@@ -568,7 +568,7 @@ describe("CLI adapter - onToolEnd", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onToolStart("read_file", { path: "/tmp/test.txt" })
@@ -591,7 +591,7 @@ describe("CLI adapter - onToolEnd", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onToolStart("read_file", { path: "/tmp/test.txt" })
@@ -614,7 +614,7 @@ describe("CLI adapter - onToolEnd", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onToolStart("get_current_time", {})
@@ -638,7 +638,7 @@ describe("CLI adapter - onError", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onError(new Error("connection failed"), "terminal")
@@ -658,7 +658,7 @@ describe("CLI adapter - onError", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onModelStart() // start spinner
@@ -680,7 +680,7 @@ describe("CLI adapter - onError", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onModelStart() // start spinner
@@ -713,7 +713,7 @@ describe("CLI adapter - phrase rotation", () => {
 
   it("onModelStart uses a THINKING_PHRASES phrase", async () => {
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onModelStart()
@@ -725,7 +725,7 @@ describe("CLI adapter - phrase rotation", () => {
 
   it("onModelStart after tool uses FOLLOWUP_PHRASES", async () => {
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     const callbacks = agent.createCliCallbacks()
 
     // First model call
@@ -747,7 +747,7 @@ describe("CLI adapter - phrase rotation", () => {
     vi.useFakeTimers()
 
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onModelStart()
@@ -768,7 +768,7 @@ describe("CLI adapter - phrase rotation", () => {
     vi.useFakeTimers()
 
     vi.resetModules()
-    const agent = await import("../../channels/cli")
+    const agent = await import("../../senses/cli")
     const callbacks = agent.createCliCallbacks()
 
     callbacks.onModelStart()

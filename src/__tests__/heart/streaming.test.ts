@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import type { ChannelCallbacks } from "../../engine/core"
+import type { ChannelCallbacks } from "../../heart/core"
 
 vi.mock("../../identity", () => ({
   loadAgentConfig: vi.fn(() => ({
@@ -21,8 +21,8 @@ describe("toResponsesTools", () => {
     const config = await import("../../config")
     config.resetConfigCache()
     config.setTestConfig({ providers: { azure: { apiKey: "" }, minimax: { apiKey: "test-key", model: "test-model" } } })
-    const streaming = await import("../../engine/streaming")
-    const toolsMod = await import("../../engine/tools")
+    const streaming = await import("../../heart/streaming")
+    const toolsMod = await import("../../repertoire/tools")
     toResponsesTools = streaming.toResponsesTools
     tools = toolsMod.tools
   })
@@ -114,7 +114,7 @@ describe("toResponsesInput", () => {
     const config = await import("../../config")
     config.resetConfigCache()
     config.setTestConfig({ providers: { azure: { apiKey: "" }, minimax: { apiKey: "test-key", model: "test-model" } } })
-    const core = await import("../../engine/streaming")
+    const core = await import("../../heart/streaming")
     toResponsesInput = core.toResponsesInput
   })
 
@@ -460,7 +460,7 @@ describe("streamChatCompletion", () => {
     const config = await import("../../config")
     config.resetConfigCache()
     config.setTestConfig({ providers: { azure: { apiKey: "" }, minimax: { apiKey: "test-key", model: "test-model" } } })
-    const core = await import("../../engine/streaming")
+    const core = await import("../../heart/streaming")
     streamChatCompletion = core.streamChatCompletion
   })
 
@@ -646,7 +646,7 @@ describe("streamResponsesApi", () => {
     const config = await import("../../config")
     config.resetConfigCache()
     config.setTestConfig({ providers: { azure: { apiKey: "" }, minimax: { apiKey: "test-key", model: "test-model" } } })
-    const core = await import("../../engine/streaming")
+    const core = await import("../../heart/streaming")
     streamResponsesApi = core.streamResponsesApi
   })
 

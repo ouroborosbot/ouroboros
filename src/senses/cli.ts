@@ -1,6 +1,6 @@
 import OpenAI from "openai"
 import * as readline from "readline"
-import { runAgent, ChannelCallbacks } from "../engine/core"
+import { runAgent, ChannelCallbacks } from "../heart/core"
 import { buildSystem } from "../mind/prompt"
 import { pickPhrase, getPhrases } from "../wardrobe/phrases"
 import { formatToolResult, formatKick, formatError } from "../wardrobe/format"

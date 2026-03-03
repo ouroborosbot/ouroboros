@@ -251,7 +251,7 @@ describe("buildSystem", () => {
     })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const { getModel } = await import("../../engine/core")
+    const { getModel } = await import("../../heart/core")
     getModel()
     setTestConfig({
       providers: {
