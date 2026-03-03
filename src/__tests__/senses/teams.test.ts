@@ -3395,6 +3395,197 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
   })
 })
 
+describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
+  function mockTeamsDepsForContext(overrides: {
+    runAgentFn?: any
+  } = {}) {
+    const {
+      runAgentFn = vi.fn().mockResolvedValue({ usage: undefined }),
+    } = overrides
+
+    vi.doMock("../../heart/core", () => ({
+      runAgent: runAgentFn,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      postTurn: vi.fn(),
+    }))
+    vi.doMock("../../repertoire/commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockReturnValue({ handled: false }),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockReturnValue(null),
+    }))
+
+    const mockResolve = vi.fn().mockResolvedValue({
+      identity: {
+        id: "mock-uuid",
+        displayName: "Test User",
+        externalIds: [{ provider: "aad", externalId: "aad-user-123", tenantId: "tenant-abc", linkedAt: "2026-01-01" }],
+        tenantMemberships: ["tenant-abc"],
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams",
+        availableIntegrations: ["graph", "ado"],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    })
+
+    vi.doMock("../../mind/context/store-file", () => ({
+      FileContextStore: vi.fn().mockImplementation(() => ({
+        identity: {
+          get: vi.fn(),
+          put: vi.fn(),
+          delete: vi.fn(),
+          find: vi.fn(),
+        },
+      })),
+    }))
+    vi.doMock("../../mind/context/resolver", () => ({
+      ContextResolver: vi.fn().mockImplementation(() => ({
+        resolve: mockResolve,
+      })),
+    }))
+
+    return { runAgentFn, mockResolve }
+  }
+
+  it("creates ContextResolver with AAD external ID from TeamsMessageContext and attaches to ToolContext", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    const { mockResolve } = mockTeamsDepsForContext({ runAgentFn })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const teamsContext = {
+      graphToken: "g-token",
+      adoToken: "a-token",
+      signin: vi.fn(),
+      aadObjectId: "aad-user-123",
+      tenantId: "tenant-abc",
+      displayName: "Test User",
+    }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123", teamsContext)
+    expect(runAgentFn).toHaveBeenCalled()
+
+    // Check that runAgent was called with toolContext.context (resolved context)
+    const callArgs = runAgentFn.mock.calls[0]
+    const options = callArgs[4]
+    expect(options).toBeDefined()
+    expect(options.toolContext).toBeDefined()
+    expect(options.toolContext.context).toBeDefined()
+    expect(options.toolContext.context.identity.displayName).toBe("Test User")
+    expect(options.toolContext.context.channel.channel).toBe("teams")
+    expect(options.toolContext.context.channel.availableIntegrations).toContain("graph")
+  })
+
+  it("ContextResolver is created with aad provider, externalId, tenantId, and displayName", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDepsForContext({ runAgentFn })
+    const ContextResolver = (await import("../../mind/context/resolver")).ContextResolver
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const teamsContext = {
+      graphToken: "g-token",
+      adoToken: "a-token",
+      signin: vi.fn(),
+      aadObjectId: "aad-user-456",
+      tenantId: "tenant-xyz",
+      displayName: "Jane Doe",
+    }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-456", teamsContext)
+
+    // ContextResolver constructor should have been called with params including aad provider
+    expect(ContextResolver).toHaveBeenCalledWith(
+      expect.anything(), // store
+      expect.objectContaining({
+        provider: "aad",
+        externalId: "aad-user-456",
+        tenantId: "tenant-xyz",
+        displayName: "Jane Doe",
+        channel: "teams",
+      }),
+    )
+  })
+
+  it("handles TeamsMessageContext without AAD fields (backward compat -- no context attached)", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDepsForContext({ runAgentFn })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    // No aadObjectId -- backward compat
+    const teamsContext = {
+      graphToken: "g-token",
+      adoToken: "a-token",
+      signin: vi.fn(),
+    }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-789", teamsContext)
+    expect(runAgentFn).toHaveBeenCalled()
+
+    // toolContext should exist but context should not be set (no AAD identity info)
+    const callArgs = runAgentFn.mock.calls[0]
+    const options = callArgs[4]
+    expect(options.toolContext).toBeDefined()
+    expect(options.toolContext.context).toBeUndefined()
+  })
+
+  it("FileContextStore is created once and shared across multiple handleTeamsMessage calls", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDepsForContext({ runAgentFn })
+    const FileContextStore = (await import("../../mind/context/store-file")).FileContextStore
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const teamsContext = {
+      graphToken: "g-token",
+      adoToken: "a-token",
+      signin: vi.fn(),
+      aadObjectId: "aad-user-123",
+      tenantId: "tenant-abc",
+      displayName: "Test User",
+    }
+
+    await teams.handleTeamsMessage("msg1", mockStream as any, "conv-1", teamsContext)
+    await teams.handleTeamsMessage("msg2", mockStream as any, "conv-2", teamsContext)
+
+    // FileContextStore should be created only once (singleton), not per-request
+    expect(FileContextStore).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe("Teams adapter - TeamsCallbacksWithFlush type", () => {
   it("flush() returns a promise (async) in buffered mode", async () => {
     vi.resetModules()

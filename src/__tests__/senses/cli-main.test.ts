@@ -21,6 +21,25 @@ const mocks = vi.hoisted(() => ({
   parseSlashCommand: vi.fn().mockReturnValue(null),
   getToolChoiceRequired: vi.fn().mockReturnValue(false),
   createInterface: vi.fn(),
+  resolveContext: vi.fn().mockResolvedValue({
+    identity: {
+      id: "mock-uuid",
+      displayName: "testuser",
+      externalIds: [{ provider: "local", externalId: "testuser", linkedAt: "2026-01-01" }],
+      tenantMemberships: [],
+      createdAt: "2026-01-01",
+      updatedAt: "2026-01-01",
+      schemaVersion: 1,
+    },
+    channel: {
+      channel: "cli",
+      availableIntegrations: [],
+      supportsMarkdown: false,
+      supportsStreaming: true,
+      supportsRichCards: false,
+      maxMessageLength: Infinity,
+    },
+  }),
   // per-test registry (rebuilt in beforeEach)
   registry: {
     register: vi.fn(),
@@ -69,6 +88,28 @@ vi.mock("../../identity", () => ({
     },
   })),
 }))
+vi.mock("../../mind/context/store-file", () => ({
+  FileContextStore: vi.fn().mockImplementation(() => ({
+    identity: {
+      get: vi.fn(),
+      put: vi.fn(),
+      delete: vi.fn(),
+      find: vi.fn(),
+    },
+  })),
+}))
+vi.mock("../../mind/context/resolver", () => ({
+  ContextResolver: vi.fn().mockImplementation(() => ({
+    resolve: (...a: any[]) => mocks.resolveContext(...a),
+  })),
+}))
+vi.mock("os", async () => {
+  const actual = await vi.importActual<typeof import("os")>("os")
+  return {
+    ...actual,
+    userInfo: vi.fn(() => ({ username: "testuser" })),
+  }
+})
 
 import { main } from "../../senses/cli"
 
@@ -748,5 +789,29 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
 
     const stderrOutput = stderrChunks.join("")
     expect(stderrOutput).toContain("(empty response)")
+  })
+
+  it("passes ToolContext with resolved context to runAgent", async () => {
+    setupBasic({ inputSequence: ["hello", "/exit"] })
+    const runAgentCalls: any[][] = []
+    mocks.runAgent.mockImplementation(async (...args: any[]) => {
+      runAgentCalls.push(args)
+      return { usage: undefined }
+    })
+
+    await main()
+
+    expect(runAgentCalls.length).toBe(1)
+    const options = runAgentCalls[0][4] // 5th arg is RunAgentOptions
+    expect(options).toBeDefined()
+    expect(options.toolContext).toBeDefined()
+    expect(options.toolContext.context).toBeDefined()
+    // Should have identity from OS username (mocked as "testuser")
+    expect(options.toolContext.context.identity).toBeDefined()
+    expect(options.toolContext.context.identity.displayName).toBe("testuser")
+    // Should have CLI channel capabilities
+    expect(options.toolContext.context.channel).toBeDefined()
+    expect(options.toolContext.context.channel.channel).toBe("cli")
+    expect(options.toolContext.context.channel.availableIntegrations).toEqual([])
   })
 })
