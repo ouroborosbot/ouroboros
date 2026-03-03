@@ -347,3 +347,4 @@ interface LazyResolvedContext {
 
 ## Progress Log
 - 2026-03-02 17:18 Created planning doc with full codebase analysis
+- 2026-03-02 18:09 Rewrote planning doc: storage interface (not file-based commitment), hybrid authority (not pure 403 learning), lazy resolver (not upfront bag), interleaved phasing (not back-loaded)
