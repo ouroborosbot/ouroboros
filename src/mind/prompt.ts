@@ -5,6 +5,7 @@ import { getAzureConfig } from "../config";
 import { finalAnswerTool, getToolsForChannel } from "../repertoire/tools";
 import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName } from "../identity";
+import type { ResolvedContext } from "./context/types";
 
 // Lazy-loaded psyche text cache
 let _psycheCache: { soul: string; identity: string; lore: string; friends: string } | null = null;
@@ -138,7 +139,33 @@ when you have finished all work and want to give a text response, call the \`fin
 \`final_answer\` must be the ONLY tool call in that turn. do not combine it with other tool calls.`;
 }
 
-export function buildSystem(channel: Channel = "cli", options?: BuildSystemOptions): string {
+export function contextSection(context?: ResolvedContext): string {
+  if (!context) return ""
+
+  const lines: string[] = ["## friend context"]
+
+  // Identity
+  const identity = context.identity
+  const emailId = identity.externalIds.find(e => e.provider === "aad")
+  const idDisplay = emailId
+    ? `${identity.displayName} (${emailId.externalId})`
+    : identity.displayName
+  lines.push(`friend: ${idDisplay}`)
+
+  // Channel
+  const ch = context.channel
+  const traits: string[] = []
+  if (ch.supportsMarkdown) traits.push("markdown")
+  if (!ch.supportsStreaming) traits.push("no streaming")
+  if (ch.supportsStreaming) traits.push("streaming")
+  if (ch.supportsRichCards) traits.push("rich cards")
+  if (ch.maxMessageLength !== Infinity) traits.push(`max ${ch.maxMessageLength} chars`)
+  lines.push(`channel: ${ch.channel}${traits.length ? ` (${traits.join(", ")})` : ""}`)
+
+  return lines.join("\n")
+}
+
+export async function buildSystem(channel: Channel = "cli", options?: BuildSystemOptions, context?: ResolvedContext): Promise<string> {
   return [
     soulSection(),
     identitySection(),
@@ -151,6 +178,7 @@ export function buildSystem(channel: Channel = "cli", options?: BuildSystemOptio
     toolsSection(channel, options),
     skillsSection(),
     toolBehaviorSection(options),
+    contextSection(context),
   ]
     .filter(Boolean)
     .join("\n\n");

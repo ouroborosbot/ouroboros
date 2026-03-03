@@ -5,7 +5,7 @@ import { buildSystem } from "../mind/prompt"
 import { pickPhrase, getPhrases } from "../wardrobe/phrases"
 import { formatToolResult, formatKick, formatError } from "../wardrobe/format"
 import { sessionPath } from "../config"
-import { loadSession, deleteSession, cachedBuildSystem, postTurn } from "../mind/context"
+import { loadSession, deleteSession, postTurn } from "../mind/context"
 import type { UsageData } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand, getToolChoiceRequired } from "../repertoire/commands"
 import { getAgentName } from "../identity"
@@ -333,7 +333,7 @@ export async function main() {
   const existing = loadSession(sessPath)
   const messages: OpenAI.ChatCompletionMessageParam[] = existing?.messages && existing.messages.length > 0
     ? existing.messages
-    : [{ role: "system", content: cachedBuildSystem("cli", buildSystem) }]
+    : [{ role: "system", content: await buildSystem("cli") }]
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true })
   const ctrl = new InputController(rl)
@@ -383,7 +383,7 @@ export async function main() {
             break
           } else if (dispatchResult.result.action === "new") {
             messages.length = 0
-            messages.push({ role: "system", content: cachedBuildSystem("cli", buildSystem) })
+            messages.push({ role: "system", content: await buildSystem("cli") })
             deleteSession(sessPath)
             console.log("session cleared")
             process.stdout.write("\x1b[36m> \x1b[0m")

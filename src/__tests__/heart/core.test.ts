@@ -2378,7 +2378,7 @@ describe("runAgent", () => {
     ]
     await runAgent(messages, callbacks, "cli")
 
-    // messages[0] should have been refreshed with cachedBuildSystem("cli", buildSystem)
+    // messages[0] should have been refreshed with await buildSystem("cli")
     expect(messages[0].content).not.toBe("stale old prompt")
     expect(messages[0].role).toBe("system")
   })

@@ -8,14 +8,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 // ── hoisted mock fns (available before vi.mock factories run) ──
 const mocks = vi.hoisted(() => ({
   runAgent: vi.fn().mockResolvedValue({ usage: undefined }),
-  buildSystem: vi.fn().mockReturnValue("system prompt"),
+  buildSystem: vi.fn().mockResolvedValue("system prompt"),
   sessionPath: vi.fn().mockReturnValue("/tmp/test-session.json"),
   getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
   loadSession: vi.fn().mockReturnValue(null),
   saveSession: vi.fn(),
   deleteSession: vi.fn(),
   trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-  cachedBuildSystem: vi.fn().mockReturnValue("system prompt"),
   postTurn: vi.fn(),
   createCommandRegistry: vi.fn(),
   registerDefaultCommands: vi.fn(),
@@ -42,12 +41,14 @@ vi.mock("../../config", () => ({
   sessionPath: (...a: any[]) => mocks.sessionPath(...a),
   getContextConfig: (...a: any[]) => mocks.getContextConfig(...a),
 }))
+vi.mock("../../mind/prompt", () => ({
+  buildSystem: (...a: any[]) => mocks.buildSystem(...a),
+}))
 vi.mock("../../mind/context", () => ({
   loadSession: (...a: any[]) => mocks.loadSession(...a),
   saveSession: (...a: any[]) => mocks.saveSession(...a),
   deleteSession: (...a: any[]) => mocks.deleteSession(...a),
   trimMessages: (...a: any[]) => mocks.trimMessages(...a),
-  cachedBuildSystem: (...a: any[]) => mocks.cachedBuildSystem(...a),
   postTurn: (...a: any[]) => mocks.postTurn(...a),
 }))
 vi.mock("../../repertoire/commands", () => ({
@@ -141,7 +142,7 @@ function resetMocks() {
   mocks.saveSession.mockReset()
   mocks.deleteSession.mockReset()
   mocks.trimMessages.mockReset().mockImplementation((msgs: any) => [...msgs])
-  mocks.cachedBuildSystem.mockReset().mockReturnValue("system prompt")
+  mocks.buildSystem.mockReset().mockResolvedValue("system prompt")
   mocks.postTurn.mockReset()
   mocks.registerDefaultCommands.mockReset()
   mocks.parseSlashCommand.mockReset().mockReturnValue(null)

@@ -1,6 +1,4 @@
 import type OpenAI from "openai"
-import type { Channel } from "./prompt"
-import type { BuildSystemOptions } from "./prompt"
 import { getContextConfig } from "../config"
 import * as fs from "fs"
 import * as path from "path"
@@ -10,27 +8,6 @@ export interface UsageData {
   output_tokens: number
   reasoning_tokens: number
   total_tokens: number
-}
-
-// System prompt cache: per channel, with 60s TTL
-const _promptCache = new Map<string, { value: string; timestamp: number }>()
-
-export function cachedBuildSystem(channel: Channel, buildFn: (ch: Channel, opts?: BuildSystemOptions) => string, options?: BuildSystemOptions): string {
-  let cacheKey = channel as string
-  if (options?.toolChoiceRequired) cacheKey += ":tcr"
-  if (options?.disableStreaming) cacheKey += ":ds"
-  const cached = _promptCache.get(cacheKey)
-  const now = Date.now()
-  if (cached && now - cached.timestamp < 60000) {
-    return cached.value
-  }
-  const value = buildFn(channel, options)
-  _promptCache.set(cacheKey, { value, timestamp: now })
-  return value
-}
-
-export function resetSystemPromptCache(): void {
-  _promptCache.clear()
 }
 
 export function trimMessages(

@@ -8,7 +8,7 @@ import { buildSystem } from "../mind/prompt"
 import { pickPhrase, getPhrases } from "../wardrobe/phrases"
 import { formatToolResult, formatKick, formatError } from "../wardrobe/format"
 import { sessionPath, getTeamsConfig, getTeamsChannelConfig } from "../config"
-import { loadSession, deleteSession, cachedBuildSystem, postTurn } from "../mind/context"
+import { loadSession, deleteSession, postTurn } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "../repertoire/commands"
 
 // Stream interface matching IStreamer from @microsoft/teams.apps
@@ -318,7 +318,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   const existing = loadSession(sessPath)
   const messages: OpenAI.ChatCompletionMessageParam[] = existing?.messages && existing.messages.length > 0
     ? existing.messages
-    : [{ role: "system", content: cachedBuildSystem("teams", buildSystem) }]
+    : [{ role: "system", content: await buildSystem("teams") }]
 
   // Push user message
   messages.push({ role: "user", content: text })
