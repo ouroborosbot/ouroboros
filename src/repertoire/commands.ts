@@ -1,6 +1,6 @@
 import type { Channel } from "../mind/prompt"
 import { getAgentName } from "../identity"
-import { emitObservabilityEvent } from "../observability/runtime"
+import { emitNervesEvent } from "../nerves/runtime"
 
 export interface CommandContext {
   channel: Channel
@@ -63,7 +63,7 @@ export function resetToolChoiceRequired(): void {
 }
 
 export function registerDefaultCommands(registry: CommandRegistry): void {
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "repertoire.load_start",
     component: "repertoire",
     message: "registering default commands",
@@ -105,7 +105,7 @@ export function registerDefaultCommands(registry: CommandRegistry): void {
     },
   })
 
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "repertoire.load_end",
     component: "repertoire",
     message: "registered default commands",

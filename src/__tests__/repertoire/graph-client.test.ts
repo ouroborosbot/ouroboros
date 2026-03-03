@@ -297,9 +297,9 @@ describe("graphRequest", () => {
 describe("graph-client observability contract", () => {
   it("emits client.request_start event for Graph requests", async () => {
     vi.resetModules()
-    const emitObservabilityEvent = vi.fn()
-    vi.doMock("../../observability/runtime", () => ({
-      emitObservabilityEvent,
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({
+      emitNervesEvent,
     }))
     mockFetch.mockReset()
     mockFetch.mockResolvedValue({
@@ -310,7 +310,7 @@ describe("graph-client observability contract", () => {
     const { getProfile } = await import("../../repertoire/graph-client")
     await getProfile("test-token")
 
-    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
       event: "client.request_start",
       component: "clients",
     }))

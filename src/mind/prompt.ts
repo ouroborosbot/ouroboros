@@ -7,7 +7,7 @@ import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName } from "../identity";
 import type { ResolvedContext } from "./context/types";
 import { getChannelCapabilities } from "./context/channel";
-import { emitObservabilityEvent } from "../observability/runtime";
+import { emitNervesEvent } from "../nerves/runtime";
 
 // Lazy-loaded psyche text cache
 let _psycheCache: { soul: string; identity: string; lore: string; friends: string } | null = null;
@@ -187,7 +187,7 @@ export function contextSection(context?: ResolvedContext): string {
 }
 
 export async function buildSystem(channel: Channel = "cli", options?: BuildSystemOptions, context?: ResolvedContext): Promise<string> {
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "mind.step_start",
     component: "mind",
     message: "buildSystem started",
@@ -211,7 +211,7 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     .filter(Boolean)
     .join("\n\n");
 
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "mind.step_end",
     component: "mind",
     message: "buildSystem completed",

@@ -33,10 +33,10 @@ export interface LogpointCoverage {
   missing: string[]
 }
 
-export interface ObservabilityCoverageReport {
+export interface NervesCoverageReport {
   overall_status: "pass" | "fail"
   required_actions: RequiredAction[]
-  observability_coverage: {
+  nerves_coverage: {
     event_catalog: EventCatalogCoverage
     schema_redaction: SchemaRedactionCoverage
     logpoint_coverage: LogpointCoverage
@@ -126,7 +126,7 @@ function validateSchemaAndRedaction(events: ParsedEvent[]): string[] {
   return violations
 }
 
-export function auditObservabilityCoverage(input: AuditInput): ObservabilityCoverageReport {
+export function auditNervesCoverage(input: AuditInput): NervesCoverageReport {
   const events = readEvents(input.eventsPath)
   const observedEventKeys = collectObservedEventKeys(events)
   const requiredEventKeys = getRequiredEventKeys()
@@ -189,7 +189,7 @@ export function auditObservabilityCoverage(input: AuditInput): ObservabilityCove
   return {
     overall_status: overallStatus,
     required_actions: requiredActions,
-    observability_coverage: {
+    nerves_coverage: {
       event_catalog: {
         status: eventCatalogStatus,
         required: requiredEventKeys.length,

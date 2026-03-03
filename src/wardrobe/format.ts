@@ -1,10 +1,10 @@
 // Shared formatting functions for tool results, kicks, and errors.
 // Used by both CLI and Teams adapters for consistent output.
 
-import { emitObservabilityEvent } from "../observability/runtime"
+import { emitNervesEvent } from "../nerves/runtime"
 
 export function formatToolResult(name: string, summary: string, success: boolean): string {
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "channel.message_sent",
     component: "channels",
     message: "formatted tool result for channel output",
@@ -23,7 +23,7 @@ export function formatToolResult(name: string, summary: string, success: boolean
 }
 
 export function formatKick(): string {
-  emitObservabilityEvent({
+  emitNervesEvent({
     event: "channel.message_sent",
     component: "channels",
     message: "formatted kick message for channel output",
@@ -35,7 +35,7 @@ export function formatKick(): string {
 }
 
 export function formatError(error: Error): string {
-  emitObservabilityEvent({
+  emitNervesEvent({
     level: "error",
     event: "channel.error",
     component: "channels",

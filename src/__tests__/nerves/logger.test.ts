@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 
-import { createLogger, registerGlobalLogSink } from "../../observability"
+import { createLogger, registerGlobalLogSink } from "../../nerves"
 
 describe("observability/logger", () => {
   it("emits required envelope fields", () => {

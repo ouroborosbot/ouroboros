@@ -1,7 +1,7 @@
 import { createLogger, ensureTraceId } from "./index"
 import type { LogLevel, Logger, LogEventInput } from "./index"
 
-export interface ObservabilityEvent {
+export interface NervesEvent {
   level?: LogLevel
   event: string
   trace_id?: string
@@ -23,7 +23,7 @@ export function setRuntimeLogger(logger: Logger | null): void {
   runtimeLogger = logger
 }
 
-export function emitObservabilityEvent(event: ObservabilityEvent): void {
+export function emitNervesEvent(event: NervesEvent): void {
   const logger = getRuntimeLogger()
   const payload: LogEventInput = {
     event: event.event,

@@ -657,9 +657,9 @@ describe("CLI adapter - onToolEnd", () => {
     vi.spyOn(process.stdout, "write").mockImplementation(() => true)
 
     vi.resetModules()
-    const emitObservabilityEvent = vi.fn()
-    vi.doMock("../../observability/runtime", () => ({
-      emitObservabilityEvent,
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({
+      emitNervesEvent,
     }))
     const agent = await import("../../senses/cli")
     const callbacks = agent.createCliCallbacks()
@@ -667,7 +667,7 @@ describe("CLI adapter - onToolEnd", () => {
     callbacks.onToolEnd("read_file", "/tmp/test.txt", true)
 
     expect(stderrChunks.join("")).toContain("\u2713 read_file (/tmp/test.txt)")
-    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
       event: "channel.message_sent",
       component: "channels",
     }))

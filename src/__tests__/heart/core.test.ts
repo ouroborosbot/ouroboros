@@ -277,9 +277,9 @@ describe("runAgent", () => {
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupMinimax()
 
-    const emitObservabilityEvent = vi.fn()
-    vi.doMock("../../observability/runtime", () => ({
-      emitObservabilityEvent,
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({
+      emitNervesEvent,
     }))
 
     mockCreate.mockReturnValue(
@@ -299,8 +299,8 @@ describe("runAgent", () => {
 
     await core.runAgent([{ role: "system", content: "test" }], callbacks)
 
-    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "engine.turn_start" }))
-    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "engine.turn_end" }))
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "engine.turn_start" }))
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "engine.turn_end" }))
   })
 
   it("fires onModelStreamStart on first content token", async () => {

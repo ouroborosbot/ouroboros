@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "fs"
 import { dirname, join } from "path"
 
-import { auditObservabilityCoverage } from "./audit"
+import { auditNervesCoverage } from "./audit"
 import { readLatestRun } from "./run-artifacts"
 
 interface CliArgs {
@@ -31,22 +31,22 @@ export function runAuditCli(argv: string[]): number {
   const runDir = args.runDir ?? latestRun?.run_dir
 
   if (!runDir) {
-    console.error("observability audit: no run directory found; provide --run-dir")
+    console.error("nerves audit: no run directory found; provide --run-dir")
     return 2
   }
 
   const eventsPath = args.eventsPath ?? join(runDir, "vitest-events.ndjson")
   const logpointsPath = args.logpointsPath ?? join(runDir, "vitest-logpoints.json")
-  const outputPath = args.output ?? join(runDir, "observability-coverage.json")
+  const outputPath = args.output ?? join(runDir, "nerves-coverage.json")
 
-  const report = auditObservabilityCoverage({
+  const report = auditNervesCoverage({
     eventsPath,
     logpointsPath,
   })
 
   mkdirSync(dirname(outputPath), { recursive: true })
   writeFileSync(outputPath, JSON.stringify(report, null, 2), "utf8")
-  console.log(`observability audit: ${report.overall_status} (${outputPath})`)
+  console.log(`nerves audit: ${report.overall_status} (${outputPath})`)
 
   return report.overall_status === "pass" ? 0 : 1
 }
