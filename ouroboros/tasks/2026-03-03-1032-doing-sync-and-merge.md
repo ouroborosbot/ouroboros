@@ -62,7 +62,7 @@ Note: This task is documentation-only. TDD applies if any runtime code is introd
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Research and outline
+### ✅ Unit 0: Research and outline
 **What**: Read existing subagent definitions (`subagents/work-planner.md`, `subagents/work-doer.md`), `AGENTS.md`, `CONTRIBUTING.md`, `subagents/README.md`, and `cross-agent-docs/testing-conventions.md`. Produce an outline of all sections needed in `work-merger.md`, mapping each planning decision to a specific section.
 **Output**: `./2026-03-03-1032-doing-sync-and-merge/outline.md` with section-by-section outline.
 **Acceptance**: Outline exists, covers every completion criterion, and maps each planning decision to a concrete section in the work-merger doc.
