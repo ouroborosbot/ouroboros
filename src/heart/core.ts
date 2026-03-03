@@ -168,9 +168,21 @@ export async function runAgent(
   const model = getModel();
   const { maxToolOutputChars } = getContextConfig();
 
+  // Per-turn friend refresh: re-read friend record from disk for fresh context
+  const friendStore = options?.toolContext?.friendStore;
+  const friendId = options?.toolContext?.context?.friend?.id;
+  let currentContext = options?.toolContext?.context;
+
+  if (friendStore && friendId) {
+    const freshFriend = await friendStore.get(friendId);
+    if (freshFriend && currentContext) {
+      currentContext = { ...currentContext, friend: freshFriend };
+    }
+  }
+
   // Refresh system prompt at start of each turn when channel is provided
   if (channel) {
-    messages[0] = { role: "system", content: await buildSystem(channel, options) };
+    messages[0] = { role: "system", content: await buildSystem(channel, options, currentContext) };
   }
 
   let kickCount = 0;
@@ -191,7 +203,11 @@ export async function runAgent(
   // Prevent MaxListenersExceeded warning — each iteration adds a listener
   try { require("events").setMaxListeners(MAX_TOOL_ROUNDS + 5, signal); } catch { /* unsupported */ }
 
-  const baseTools = getToolsForChannel(channel ? getChannelCapabilities(channel) : undefined);
+  const toolPreferences = currentContext?.friend?.toolPreferences;
+  const baseTools = getToolsForChannel(
+    channel ? getChannelCapabilities(channel) : undefined,
+    toolPreferences && Object.keys(toolPreferences).length > 0 ? toolPreferences : undefined,
+  );
 
   while (!done) {
     // Compute activeTools per-iteration: include final_answer when
