@@ -313,6 +313,30 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   stream.update(pickPhrase(getPhrases().thinking) + "...")
   await new Promise(r => setImmediate(r))
 
+  // Resolve context kernel (identity + channel) early so we can use the friend UUID for session path
+  const store = getFriendStore()
+  const toolContext: ToolContext | undefined = teamsContext ? {
+    graphToken: teamsContext.graphToken,
+    adoToken: teamsContext.adoToken,
+    signin: teamsContext.signin,
+    friendStore: store,
+  } : undefined
+
+  if (toolContext) {
+    const provider = teamsContext?.aadObjectId ? "aad" as const : "teams-conversation" as const
+    const externalId = teamsContext?.aadObjectId || conversationId
+    const resolver = new FriendResolver(store, {
+      provider,
+      externalId,
+      tenantId: teamsContext?.tenantId,
+      displayName: teamsContext?.displayName || "Unknown",
+      channel: "teams",
+    })
+    toolContext.context = await resolver.resolve()
+  }
+
+  const friendId = toolContext?.context?.friend?.id || "default"
+
   const registry = createCommandRegistry()
   registerDefaultCommands(registry)
 
@@ -322,7 +346,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
     const dispatchResult = registry.dispatch(parsed.command, { channel: "teams" })
     if (dispatchResult.handled && dispatchResult.result) {
       if (dispatchResult.result.action === "new") {
-        const sessPath = sessionPath("default", "teams", conversationId)
+        const sessPath = sessionPath(friendId, "teams", conversationId)
         deleteSession(sessPath)
         stream.emit("session cleared")
         return
@@ -334,11 +358,11 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   }
 
   // Load or create session
-  const sessPath = sessionPath("default", "teams", conversationId)
+  const sessPath = sessionPath(friendId, "teams", conversationId)
   const existing = loadSession(sessPath)
   const messages: OpenAI.ChatCompletionMessageParam[] = existing?.messages && existing.messages.length > 0
     ? existing.messages
-    : [{ role: "system", content: await buildSystem("teams") }]
+    : [{ role: "system", content: await buildSystem("teams", undefined, toolContext?.context) }]
 
   // Push user message
   messages.push({ role: "user", content: text })
@@ -346,25 +370,6 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   // Run agent
   const controller = new AbortController()
   const callbacks = createTeamsCallbacks(stream, controller, sendMessage, { disableStreaming, conversationId })
-  const toolContext: ToolContext | undefined = teamsContext ? {
-    graphToken: teamsContext.graphToken,
-    adoToken: teamsContext.adoToken,
-    signin: teamsContext.signin,
-  } : undefined
-
-  // Resolve context kernel (identity + channel)
-  if (toolContext) {
-    const provider = teamsContext?.aadObjectId ? "aad" as const : "teams-conversation" as const
-    const externalId = teamsContext?.aadObjectId || conversationId
-    const resolver = new FriendResolver(getFriendStore(), {
-      provider,
-      externalId,
-      tenantId: teamsContext?.tenantId,
-      displayName: teamsContext?.displayName || "Unknown",
-      channel: "teams",
-    })
-    toolContext.context = await resolver.resolve()
-  }
 
   const agentOptions: RunAgentOptions = {}
   if (toolContext) agentOptions.toolContext = toolContext
