@@ -175,8 +175,8 @@ export async function runAgent(
 
   if (friendStore && friendId) {
     const freshFriend = await friendStore.get(friendId);
-    if (freshFriend && currentContext) {
-      currentContext = { ...currentContext, friend: freshFriend };
+    if (freshFriend) {
+      currentContext = { ...currentContext!, friend: freshFriend };
     }
   }
 
