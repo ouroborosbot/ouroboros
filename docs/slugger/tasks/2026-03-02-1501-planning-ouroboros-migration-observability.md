@@ -70,6 +70,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Persisted log key mapping is locked to current session keys: CLI key=`session`; Teams key=`conversationId`.
 - Persisted logs are append-only NDJSON (one JSON event per line) so agents can arbitrarily read and parse run history.
 - `sanitizeKey` parity with sessions is intentional for this phase; collision hardening is explicitly deferred.
+- Upstream `src/wardrobe/*` modules map to existing component taxonomy for this phase (no new component key): `wardrobe/format` events are `component=channels`; `wardrobe/phrases` events are `component=repertoire`.
 - Minimum required event catalog for this phase is locked by component:
   - entrypoints: `turn.start`, `turn.end`, `turn.error`
   - channels: `channel.message_sent`, `channel.error`
@@ -106,3 +107,4 @@ Merged `origin/main` into `codex/slugger` before execution planning refresh; ups
 - [2026-03-02 16:05] Added session-style append-only NDJSON file persistence (`stderr` + file sinks) and deferred key-collision hardening
 - [2026-03-02 16:11] Consistency cleanup: aligned sink contract to dual-sink decision, locked key mapping semantics, and required sink abstraction
 - [2026-03-02 16:15] Synced planning assumptions to merged `origin/main` runtime changes and re-approved for conversion refresh
+- [PENDING_COMPONENT_MAP_TS] Validation clarification: mapped `src/wardrobe/*` files onto existing event component taxonomy (channels/repertoire)
