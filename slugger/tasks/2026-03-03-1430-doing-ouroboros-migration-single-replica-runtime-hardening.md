@@ -17,7 +17,7 @@ Define and lock runtime hardening requirements for single-replica preview so req
 
 ## Completion Criteria
 - [ ] Runtime hardening contract is implemented for single-replica preview and applied to active request-path code.
-- [ ] Request-path logging and persistence sinks are non-blocking in practice for expected preview concurrency.
+- [x] Request-path logging and persistence sinks are non-blocking in practice for expected preview concurrency.
 - [x] Tool-surface runtime posture is enforced according to agreed preview policy.
 - [x] Remote channels cannot execute local CLI/file/git/gh tools, and denial UX explains multi-user safety rationale with a clear alternative path.
 - [ ] Concurrency guardrails (limits/timeouts/backpressure behavior) are implemented and covered by tests.
@@ -81,7 +81,7 @@ Define and lock runtime hardening requirements for single-replica preview so req
 **Output**: Updated nerves/prompt/runtime code and passing tests.
 **Acceptance**: Request-path logging/prompt behavior follows non-blocking contract with safe fallback behavior under I/O issues.
 
-### ⬜ Unit 2c: Request-Path Non-Blocking Contract — Coverage & Refactor
+### ✅ Unit 2c: Request-Path Non-Blocking Contract — Coverage & Refactor
 **What**: Cover sink error branches, fallback paths, and pressure cases; refactor for clarity while preserving behavior.
 **Output**: Coverage artifact at `./2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-2c-coverage-run.txt`.
 **Acceptance**: Non-blocking/fallback paths are fully covered and stable.
@@ -136,3 +136,4 @@ Define and lock runtime hardening requirements for single-replica preview so req
 - [2026-03-03 14:53] Unit 1c complete: verified 100% coverage and clean build after remote tool-safety changes (`unit-1c-coverage-run.txt`, `unit-1c-build-run.txt`).
 - [2026-03-03 14:54] Unit 2a complete: added failing non-blocking sink contract tests and captured red evidence for sink-failure throw behavior.
 - [2026-03-03 14:57] Unit 2b complete: implemented non-blocking sink fanout/file behavior with resilient error handling and verified full test + build green (`unit-2b-test-run.txt`, `unit-2b-build-run.txt`).
+- [2026-03-03 14:58] Unit 2c complete: verified 100% coverage and clean build after non-blocking sink hardening (`unit-2c-coverage-run.txt`, `unit-2c-build-run.txt`).
