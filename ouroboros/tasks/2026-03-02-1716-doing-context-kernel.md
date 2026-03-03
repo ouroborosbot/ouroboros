@@ -472,7 +472,7 @@ Every persisted type (`FriendIdentity`, `FriendMemory`) carries a `schemaVersion
 
 ---
 
-### ⬜ Unit 1E: ChannelCapabilities Type and Lookup
+### ✅ Unit 1E: ChannelCapabilities Type and Lookup
 
 **What**: Define `ChannelCapabilities` as a hardcoded `const` map in `channel.ts`, keyed by channel identifier. Channel adapters pass the channel string, the map returns the full capabilities object. Pure lookup, no resolution needed.
 
@@ -1374,3 +1374,4 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - 2026-03-02 2330 Unit 1A complete: ContextStore interface, CollectionStore<T>, all context types with type guards. 21 new tests, 931 total.
 - 2026-03-02 2332 Unit 1B complete: FileContextStore with JSON persistence, schema versioning, error handling. 14 new tests, 945 total.
 - 2026-03-02 2333 Unit 1C complete: FriendIdentity resolution with get-or-create, AAD + local providers. 10 new tests, 955 total.
+- 2026-03-02 2334 Unit 1E complete: ChannelCapabilities lookup, CLI + Teams + unknown defaults. 5 new tests, 960 total.
