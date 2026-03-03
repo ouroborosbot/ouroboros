@@ -1,110 +1,175 @@
-// FileContextStore -- filesystem adapter for ContextStore.
-// This is the ONLY module that imports fs for context data.
-// Each collection maps to a subdirectory, each item to a {id}.json file.
+// FileFriendStore -- filesystem adapter for FriendStore.
+// Splits friend records across two backends by PII boundary:
+// - Agent knowledge (agentKnowledgePath): id, displayName, toolPreferences, notes, createdAt, updatedAt, schemaVersion
+// - PII bridge (piiBridgePath): id, externalIds, tenantMemberships, schemaVersion
 
-import * as fs from "fs/promises"
+import * as fs from "fs"
+import * as fsPromises from "fs/promises"
 import * as path from "path"
-import type { CollectionStore, ContextStore } from "./store"
-import type { FriendIdentity, FriendMemory } from "./types"
+import type { FriendStore } from "./store"
+import type { FriendRecord } from "./types"
 
-export interface MigrationConfig {
-  currentVersion: number
-  migrate: (data: any, fromVersion: number) => any
+// Agent knowledge fields written to {agentKnowledgePath}/{id}.json
+interface AgentKnowledgeData {
+  id: string
+  displayName: string
+  toolPreferences: Record<string, string>
+  notes: Record<string, string>
+  createdAt: string
+  updatedAt: string
+  schemaVersion: number
 }
 
-export interface FileContextStoreOptions {
-  identity?: MigrationConfig
-  memory?: MigrationConfig
+// PII bridge fields written to {piiBridgePath}/{id}.json
+interface PiiBridgeData {
+  id: string
+  externalIds: FriendRecord["externalIds"]
+  tenantMemberships: string[]
+  schemaVersion: number
 }
 
-class FileCollectionStore<T extends { schemaVersion: number }> implements CollectionStore<T> {
-  private readonly dir: string
-  private readonly migration?: MigrationConfig
+export class FileFriendStore implements FriendStore {
+  private readonly agentKnowledgePath: string
+  private readonly piiBridgePath: string
 
-  constructor(basePath: string, collectionName: string, migration?: MigrationConfig) {
-    this.dir = path.join(basePath, collectionName)
-    this.migration = migration
+  constructor(agentKnowledgePath: string, piiBridgePath: string) {
+    this.agentKnowledgePath = agentKnowledgePath
+    this.piiBridgePath = piiBridgePath
+    // Auto-create directories on construction
+    fs.mkdirSync(agentKnowledgePath, { recursive: true })
+    fs.mkdirSync(piiBridgePath, { recursive: true })
   }
 
-  async get(id: string): Promise<T | null> {
-    try {
-      const filePath = path.join(this.dir, `${id}.json`)
-      const raw = await fs.readFile(filePath, "utf-8")
-      let data: T
-      try {
-        data = JSON.parse(raw) as T
-      } catch {
-        // Corrupted JSON -- return null
-        return null
-      }
+  async get(id: string): Promise<FriendRecord | null> {
+    // Read agent knowledge (required)
+    const agentData = await this.readJson<AgentKnowledgeData>(
+      path.join(this.agentKnowledgePath, `${id}.json`),
+    )
+    if (!agentData) return null
 
-      // Schema migration
-      if (this.migration && data.schemaVersion < this.migration.currentVersion) {
-        data = this.migration.migrate(data, data.schemaVersion) as T
-        // Write migrated data back
-        await this.writeFile(id, data)
-      }
+    // Read PII bridge (optional -- defaults to empty arrays)
+    const piiData = await this.readJson<PiiBridgeData>(
+      path.join(this.piiBridgePath, `${id}.json`),
+    )
 
-      return data
-    } catch (err: any) {
-      if (err?.code === "ENOENT") return null
-      return null
+    return this.merge(agentData, piiData)
+  }
+
+  async put(id: string, record: FriendRecord): Promise<void> {
+    // Split into agent knowledge and PII bridge
+    const agentData: AgentKnowledgeData = {
+      id: record.id,
+      displayName: record.displayName,
+      toolPreferences: record.toolPreferences,
+      notes: record.notes,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+      schemaVersion: record.schemaVersion,
     }
-  }
 
-  async put(id: string, value: T): Promise<void> {
-    await fs.mkdir(this.dir, { recursive: true })
-    await this.writeFile(id, value)
+    const piiData: PiiBridgeData = {
+      id: record.id,
+      externalIds: record.externalIds,
+      tenantMemberships: record.tenantMemberships,
+      schemaVersion: record.schemaVersion,
+    }
+
+    // Write to both backends
+    await Promise.all([
+      this.writeJson(path.join(this.agentKnowledgePath, `${id}.json`), agentData),
+      this.writeJson(path.join(this.piiBridgePath, `${id}.json`), piiData),
+    ])
   }
 
   async delete(id: string): Promise<void> {
-    try {
-      await fs.unlink(path.join(this.dir, `${id}.json`))
-    } catch (err: any) {
-      if (err?.code === "ENOENT") return
-      throw err
-    }
+    await Promise.all([
+      this.removeFile(path.join(this.agentKnowledgePath, `${id}.json`)),
+      this.removeFile(path.join(this.piiBridgePath, `${id}.json`)),
+    ])
   }
 
-  async find(predicate: (value: T) => boolean): Promise<T | null> {
+  async findByExternalId(
+    provider: string,
+    externalId: string,
+    tenantId?: string,
+  ): Promise<FriendRecord | null> {
+    // Scan PII bridge directory for matching external ID
     let entries: string[]
     try {
-      entries = await fs.readdir(this.dir)
-    } catch (err: any) {
-      if (err?.code === "ENOENT") return null
+      entries = await fsPromises.readdir(this.piiBridgePath)
+    } catch {
       return null
     }
 
     for (const entry of entries) {
-      /* v8 ignore next -- defensive: skip non-JSON files @preserve */
       if (!entry.endsWith(".json")) continue
-      const id = entry.slice(0, -5) // remove .json
-      const item = await this.get(id)
-      if (item && predicate(item)) return item
+      const piiData = await this.readJson<PiiBridgeData>(
+        path.join(this.piiBridgePath, entry),
+      )
+      if (!piiData) continue
+
+      const match = piiData.externalIds.some(
+        (ext) =>
+          ext.provider === provider &&
+          ext.externalId === externalId &&
+          (tenantId === undefined || ext.tenantId === tenantId),
+      )
+
+      if (match) {
+        // Found match -- read agent knowledge and merge
+        const agentData = await this.readJson<AgentKnowledgeData>(
+          path.join(this.agentKnowledgePath, `${piiData.id}.json`),
+        )
+        if (!agentData) continue
+        return this.merge(agentData, piiData)
+      }
     }
+
     return null
   }
 
-  private async writeFile(id: string, value: T): Promise<void> {
-    const filePath = path.join(this.dir, `${id}.json`)
-    await fs.writeFile(filePath, JSON.stringify(value, null, 2), "utf-8")
+  private merge(
+    agentData: AgentKnowledgeData,
+    piiData: PiiBridgeData | null,
+  ): FriendRecord {
+    return {
+      id: agentData.id,
+      displayName: agentData.displayName,
+      toolPreferences: agentData.toolPreferences,
+      notes: agentData.notes,
+      createdAt: agentData.createdAt,
+      updatedAt: agentData.updatedAt,
+      schemaVersion: agentData.schemaVersion,
+      externalIds: piiData?.externalIds ?? [],
+      tenantMemberships: piiData?.tenantMemberships ?? [],
+    }
   }
-}
 
-export class FileContextStore implements ContextStore {
-  readonly identity: CollectionStore<FriendIdentity>
-  readonly memory: CollectionStore<FriendMemory>
+  private async readJson<T>(filePath: string): Promise<T | null> {
+    try {
+      const raw = await fsPromises.readFile(filePath, "utf-8")
+      try {
+        return JSON.parse(raw) as T
+      } catch {
+        // Corrupted JSON
+        return null
+      }
+    } catch {
+      // File not found or other error
+      return null
+    }
+  }
 
-  constructor(basePath: string, options?: FileContextStoreOptions) {
-    this.identity = new FileCollectionStore<FriendIdentity>(
-      basePath,
-      "identity",
-      options?.identity
-    )
-    this.memory = new FileCollectionStore<FriendMemory>(
-      basePath,
-      "memory",
-      options?.memory
-    )
+  private async writeJson(filePath: string, data: unknown): Promise<void> {
+    await fsPromises.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8")
+  }
+
+  private async removeFile(filePath: string): Promise<void> {
+    try {
+      await fsPromises.unlink(filePath)
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException)?.code === "ENOENT") return
+      throw err
+    }
   }
 }
