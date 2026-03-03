@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 const mockFetch = vi.fn()
 vi.stubGlobal("fetch", mockFetch)
 
-import { queryWorkItems, adoRequest } from "../../repertoire/ado-client"
+import { queryWorkItems, adoRequest, discoverOrganizations, discoverProjects } from "../../repertoire/ado-client"
 
 describe("queryWorkItems", () => {
   beforeEach(() => {
@@ -358,5 +358,180 @@ describe("adoRequest", () => {
     const result = await adoRequest("token", "POST", "myorg", "/_apis/wit/wiql", "bad")
     expect(result).toContain("ERROR")
     expect(result).toContain("400")
+  })
+})
+
+describe("discoverOrganizations", () => {
+  beforeEach(() => {
+    mockFetch.mockReset()
+  })
+
+  it("returns org names from Accounts API", async () => {
+    // First call: profile to get publicAlias
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ publicAlias: "user-123" }),
+      })
+      // Second call: accounts list
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          value: [
+            { accountName: "org1" },
+            { accountName: "org2" },
+          ],
+        }),
+      })
+
+    const result = await discoverOrganizations("test-token")
+    expect(result).toEqual(["org1", "org2"])
+
+    // Verify profile call
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("app.vssps.visualstudio.com/_apis/profile/profiles/me"),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer test-token",
+        }),
+      }),
+    )
+
+    // Verify accounts call with memberId
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("app.vssps.visualstudio.com/_apis/accounts?memberId=user-123"),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer test-token",
+        }),
+      }),
+    )
+  })
+
+  it("returns empty array when no organizations found", async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ publicAlias: "user-123" }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ value: [] }),
+      })
+
+    const result = await discoverOrganizations("test-token")
+    expect(result).toEqual([])
+  })
+
+  it("returns empty array when value is missing", async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ publicAlias: "user-123" }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({}),
+      })
+
+    const result = await discoverOrganizations("test-token")
+    expect(result).toEqual([])
+  })
+
+  it("throws on profile API error", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      statusText: "Unauthorized",
+    })
+
+    await expect(discoverOrganizations("bad-token")).rejects.toThrow()
+  })
+
+  it("throws on accounts API error", async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ publicAlias: "user-123" }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+      })
+
+    await expect(discoverOrganizations("test-token")).rejects.toThrow()
+  })
+
+  it("throws on network error", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("network error"))
+
+    await expect(discoverOrganizations("test-token")).rejects.toThrow("network error")
+  })
+})
+
+describe("discoverProjects", () => {
+  beforeEach(() => {
+    mockFetch.mockReset()
+  })
+
+  it("returns project names from Projects API", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        value: [
+          { name: "Project Alpha" },
+          { name: "Project Beta" },
+        ],
+      }),
+    })
+
+    const result = await discoverProjects("test-token", "myorg")
+    expect(result).toEqual(["Project Alpha", "Project Beta"])
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("dev.azure.com/myorg/_apis/projects"),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer test-token",
+        }),
+      }),
+    )
+  })
+
+  it("returns empty array when no projects found", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ value: [] }),
+    })
+
+    const result = await discoverProjects("test-token", "myorg")
+    expect(result).toEqual([])
+  })
+
+  it("returns empty array when value is missing", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({}),
+    })
+
+    const result = await discoverProjects("test-token", "myorg")
+    expect(result).toEqual([])
+  })
+
+  it("throws on API error", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      statusText: "Forbidden",
+    })
+
+    await expect(discoverProjects("test-token", "myorg")).rejects.toThrow()
+  })
+
+  it("throws on network error", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("network error"))
+
+    await expect(discoverProjects("test-token", "myorg")).rejects.toThrow("network error")
   })
 })
