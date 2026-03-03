@@ -22,20 +22,16 @@ export function formatToolResult(name: string, summary: string, success: boolean
   return "\u2717 " + name + ": " + summary
 }
 
-export function formatKick(attempt: number, maxKicks: number): string {
+export function formatKick(): string {
   emitObservabilityEvent({
     event: "channel.message_sent",
     component: "channels",
     message: "formatted kick message for channel output",
     meta: {
       kind: "kick",
-      attempt,
-      max_kicks: maxKicks,
     },
   })
-
-  const counter = maxKicks > 1 ? " " + attempt + "/" + maxKicks : ""
-  return "\u21BB kick" + counter
+  return "\u21BB kick"
 }
 
 export function formatError(error: Error): string {

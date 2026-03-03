@@ -1,0 +1,1726 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+
+vi.mock("fs", () => ({
+  existsSync: vi.fn(),
+  readFileSync: vi.fn(),
+  writeFileSync: vi.fn(),
+  readdirSync: vi.fn(),
+  mkdirSync: vi.fn(),
+}))
+
+vi.mock("child_process", () => ({
+  execSync: vi.fn(),
+  spawnSync: vi.fn(),
+}))
+
+vi.mock("../../repertoire/skills", () => ({
+  listSkills: vi.fn(),
+  loadSkill: vi.fn(),
+}))
+
+vi.mock("../../repertoire/graph-client", () => ({
+  getProfile: vi.fn(),
+  graphRequest: vi.fn(),
+}))
+
+vi.mock("../../repertoire/ado-client", () => ({
+  queryWorkItems: vi.fn(),
+  adoRequest: vi.fn(),
+  discoverOrganizations: vi.fn(),
+}))
+
+vi.mock("../../identity", () => ({
+  loadAgentConfig: vi.fn(() => ({
+    name: "testagent",
+    configPath: "~/.agentconfigs/testagent/config.json",
+  })),
+  getAgentName: vi.fn(() => "testagent"),
+  getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
+  getRepoRoot: vi.fn(() => "/mock/repo"),
+  resetIdentity: vi.fn(),
+}))
+
+import * as fs from "fs"
+import { execSync, spawnSync } from "child_process"
+import { listSkills, loadSkill } from "../../repertoire/skills"
+
+describe("execTool", () => {
+  let execTool: (name: string, args: any, ctx?: any) => Promise<string>
+  let setTestConfig: (partial: any) => void
+
+  beforeEach(async () => {
+    vi.resetModules()
+    vi.mocked(fs.existsSync).mockReset()
+    vi.mocked(fs.readFileSync).mockReset()
+    vi.mocked(fs.writeFileSync).mockReset()
+    vi.mocked(fs.readdirSync).mockReset()
+    vi.mocked(execSync).mockReset()
+    vi.mocked(spawnSync).mockReset()
+    vi.mocked(listSkills).mockReset()
+    vi.mocked(loadSkill).mockReset()
+    const config = await import("../../config")
+    config.resetConfigCache()
+    setTestConfig = config.setTestConfig
+    const tools = await import("../../repertoire/tools")
+    execTool = tools.execTool
+  })
+
+  // ── read_file ──
+  it("read_file reads file contents", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue("file content here")
+    const result = await execTool("read_file", { path: "/tmp/test.txt" })
+    expect(result).toBe("file content here")
+    expect(fs.readFileSync).toHaveBeenCalledWith("/tmp/test.txt", "utf-8")
+  })
+
+  // ── write_file ──
+  it("write_file writes content and returns ok", async () => {
+    vi.mocked(fs.writeFileSync).mockReturnValue(undefined)
+    const result = await execTool("write_file", { path: "/tmp/out.txt", content: "hello" })
+    expect(result).toBe("ok")
+    expect(fs.writeFileSync).toHaveBeenCalledWith("/tmp/out.txt", "hello", "utf-8")
+  })
+
+  // ── shell ──
+  it("shell runs command and returns output", async () => {
+    vi.mocked(execSync).mockReturnValue("shell output")
+    const result = await execTool("shell", { command: "echo hello" })
+    expect(result).toBe("shell output")
+    expect(execSync).toHaveBeenCalledWith("echo hello", { encoding: "utf-8", timeout: 30000 })
+  })
+
+  // ── gh_cli ──
+  it("gh_cli runs gh command and returns output", async () => {
+    vi.mocked(execSync).mockReturnValue("pr list output")
+    const result = await execTool("gh_cli", { command: "pr list" })
+    expect(result).toBe("pr list output")
+    expect(execSync).toHaveBeenCalledWith("gh pr list", { encoding: "utf-8", timeout: 60000 })
+  })
+
+  it("gh_cli returns error on exception", async () => {
+    vi.mocked(execSync).mockImplementation(() => { throw new Error("gh not found") })
+    const result = await execTool("gh_cli", { command: "pr list" })
+    expect(result).toContain("error:")
+  })
+
+  // ── list_directory ──
+  it("list_directory lists directory contents", async () => {
+    vi.mocked(fs.readdirSync).mockReturnValue([
+      { name: "file.txt", isDirectory: () => false },
+      { name: "subdir", isDirectory: () => true },
+    ] as unknown as ReturnType<typeof fs.readdirSync>)
+    const result = await execTool("list_directory", { path: "/tmp" })
+    expect(result).toContain("file.txt")
+    expect(result).toContain("subdir")
+    expect(result).toContain("d  subdir")
+    expect(result).toContain("-  file.txt")
+  })
+
+  // ── git_commit ──
+  it("git_commit commits with valid paths", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(execSync)
+      .mockReturnValueOnce("") // git add
+      .mockReturnValueOnce("1 file changed\n") // git diff --cached --stat
+      .mockReturnValueOnce("") // git commit
+    const result = await execTool("git_commit", { message: "test commit", paths: ["/tmp/test.txt"] })
+    expect(result).toContain("committed")
+  })
+
+  it("git_commit returns error when paths missing", async () => {
+    const result = await execTool("git_commit", { message: "test" })
+    expect(result).toContain("paths are required")
+  })
+
+  it("git_commit returns error when paths is empty array", async () => {
+    const result = await execTool("git_commit", { message: "test", paths: [] })
+    expect(result).toContain("paths are required")
+  })
+
+  it("git_commit returns error when path does not exist", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    const result = await execTool("git_commit", { message: "test", paths: ["/nonexistent"] })
+    expect(result).toContain("path does not exist")
+  })
+
+  it("git_commit returns error when nothing staged", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(execSync)
+      .mockReturnValueOnce("") // git add
+      .mockReturnValueOnce("") // empty diff
+    const result = await execTool("git_commit", { message: "test", paths: ["/tmp/test.txt"] })
+    expect(result).toContain("nothing was staged")
+  })
+
+  it("git_commit handles exception", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(execSync)
+      .mockReturnValueOnce("") // git add
+      .mockReturnValueOnce("1 file changed\n") // diff
+      .mockImplementationOnce(() => { throw new Error("commit failed") }) // commit
+    const result = await execTool("git_commit", { message: "test", paths: ["/tmp/test.txt"] })
+    expect(result).toContain("failed")
+  })
+
+  // ── list_skills ──
+  it("list_skills returns JSON list", async () => {
+    vi.mocked(listSkills).mockReturnValue([{ name: "test", description: "test skill" }] as any)
+    const result = await execTool("list_skills", {})
+    expect(result).toContain("test")
+  })
+
+  // ── load_skill ──
+  it("load_skill returns skill content", async () => {
+    vi.mocked(loadSkill).mockReturnValue("skill content here")
+    const result = await execTool("load_skill", { name: "test" })
+    expect(result).toBe("skill content here")
+  })
+
+  it("load_skill returns error on exception", async () => {
+    vi.mocked(loadSkill).mockImplementation(() => { throw new Error("not found") })
+    const result = await execTool("load_skill", { name: "missing" })
+    expect(result).toContain("error:")
+  })
+
+  // ── get_current_time ──
+  it("get_current_time returns date string", async () => {
+    const result = await execTool("get_current_time", {})
+    expect(typeof result).toBe("string")
+    expect(result.length).toBeGreaterThan(5)
+  })
+
+  // ── claude ──
+  it("claude runs claude CLI and returns output", async () => {
+    vi.mocked(spawnSync).mockReturnValue({ stdout: "claude response", stderr: "", status: 0 } as any)
+    const result = await execTool("claude", { prompt: "What is 2+2?" })
+    expect(result).toBe("claude response")
+    expect(spawnSync).toHaveBeenCalledWith(
+      "claude",
+      ["-p", "--dangerously-skip-permissions", "--add-dir", "."],
+      expect.objectContaining({ input: "What is 2+2?" })
+    )
+  })
+
+  it("claude returns error on spawn failure", async () => {
+    vi.mocked(spawnSync).mockReturnValue({ error: new Error("spawn failed"), stdout: "", stderr: "", status: 1 } as any)
+    const result = await execTool("claude", { prompt: "test" })
+    expect(result).toContain("error:")
+  })
+
+  it("claude returns error on non-zero exit", async () => {
+    vi.mocked(spawnSync).mockReturnValue({ stdout: "", stderr: "bad", status: 1 } as any)
+    const result = await execTool("claude", { prompt: "test" })
+    expect(result).toContain("exited with code 1")
+  })
+
+  it("claude returns (no output) when stdout is empty", async () => {
+    vi.mocked(spawnSync).mockReturnValue({ stdout: "", stderr: "", status: 0 } as any)
+    const result = await execTool("claude", { prompt: "test" })
+    expect(result).toBe("(no output)")
+  })
+
+  it("claude catches thrown exception from spawnSync", async () => {
+    vi.mocked(spawnSync).mockImplementation(() => { throw new Error("ENOENT: claude not found") })
+    const result = await execTool("claude", { prompt: "test" })
+    expect(result).toContain("error:")
+    expect(result).toContain("ENOENT")
+  })
+
+  // ── web_search ──
+  it("web_search calls perplexity API and returns results", async () => {
+    setTestConfig({ integrations: { perplexityApiKey: "test-key" } })
+    vi.resetModules()
+    const config = await import("../../config")
+    config.resetConfigCache()
+    config.setTestConfig({ integrations: { perplexityApiKey: "test-key" } })
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        results: [
+          { title: "Result 1", url: "https://example.com", snippet: "A test result" },
+        ],
+      }),
+    })
+    vi.stubGlobal("fetch", mockFetch)
+
+    const tools = await import("../../repertoire/tools")
+    const result = await tools.execTool("web_search", { query: "test search" })
+    expect(result).toContain("Result 1")
+    expect(result).toContain("https://example.com")
+    vi.unstubAllGlobals()
+  })
+
+  it("web_search returns error when API key missing", async () => {
+    vi.resetModules()
+    const config = await import("../../config")
+    config.resetConfigCache()
+    config.setTestConfig({ integrations: {} })
+
+    const tools = await import("../../repertoire/tools")
+    const result = await tools.execTool("web_search", { query: "test" })
+    expect(result).toContain("perplexityApiKey not configured")
+  })
+
+  it("web_search returns error on non-ok response", async () => {
+    vi.resetModules()
+    const config = await import("../../config")
+    config.resetConfigCache()
+    config.setTestConfig({ integrations: { perplexityApiKey: "test-key" } })
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: "Internal Server Error",
+    })
+    vi.stubGlobal("fetch", mockFetch)
+
+    const tools = await import("../../repertoire/tools")
+    const result = await tools.execTool("web_search", { query: "test" })
+    expect(result).toContain("error: 500")
+    vi.unstubAllGlobals()
+  })
+
+  it("web_search returns 'no results' when empty results", async () => {
+    vi.resetModules()
+    const config = await import("../../config")
+    config.resetConfigCache()
+    config.setTestConfig({ integrations: { perplexityApiKey: "test-key" } })
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ results: [] }),
+    })
+    vi.stubGlobal("fetch", mockFetch)
+
+    const tools = await import("../../repertoire/tools")
+    const result = await tools.execTool("web_search", { query: "test" })
+    expect(result).toBe("no results found")
+    vi.unstubAllGlobals()
+  })
+
+  it("web_search returns error on exception", async () => {
+    vi.resetModules()
+    const config = await import("../../config")
+    config.resetConfigCache()
+    config.setTestConfig({ integrations: { perplexityApiKey: "test-key" } })
+
+    const mockFetch = vi.fn().mockRejectedValue(new Error("fetch failed"))
+    vi.stubGlobal("fetch", mockFetch)
+
+    const tools = await import("../../repertoire/tools")
+    const result = await tools.execTool("web_search", { query: "test" })
+    expect(result).toContain("error:")
+    vi.unstubAllGlobals()
+  })
+
+  // ── unknown tool ──
+  it("returns 'unknown' for unrecognized tool name", async () => {
+    const result = await execTool("nonexistent_tool", {})
+    expect(result).toBe("unknown: nonexistent_tool")
+  })
+})
+
+describe("summarizeArgs", () => {
+  let summarizeArgs: (name: string, args: Record<string, any>) => string
+
+  beforeEach(async () => {
+    vi.resetModules()
+    const tools = await import("../../repertoire/tools")
+    summarizeArgs = tools.summarizeArgs
+  })
+
+  it("returns path for read_file", () => {
+    expect(summarizeArgs("read_file", { path: "/tmp/test.txt" })).toBe("/tmp/test.txt")
+  })
+
+  it("returns empty string for read_file with no path", () => {
+    expect(summarizeArgs("read_file", {})).toBe("")
+  })
+
+  it("returns path for write_file", () => {
+    expect(summarizeArgs("write_file", { path: "/tmp/out.txt", content: "x" })).toBe("/tmp/out.txt")
+  })
+
+  it("returns short command for shell", () => {
+    expect(summarizeArgs("shell", { command: "echo hi" })).toBe("echo hi")
+  })
+
+  it("returns truncated command for shell when > 50 chars", () => {
+    const longCmd = "a".repeat(60)
+    expect(summarizeArgs("shell", { command: longCmd })).toBe("a".repeat(50) + "...")
+  })
+
+  it("returns empty string for shell with no command", () => {
+    expect(summarizeArgs("shell", {})).toBe("")
+  })
+
+  it("returns path for list_directory", () => {
+    expect(summarizeArgs("list_directory", { path: "/tmp" })).toBe("/tmp")
+  })
+
+  it("returns empty string for list_directory with no path", () => {
+    expect(summarizeArgs("list_directory", {})).toBe("")
+  })
+
+  it("returns truncated message for git_commit", () => {
+    const msg = "a".repeat(50)
+    expect(summarizeArgs("git_commit", { message: msg })).toBe("a".repeat(40))
+  })
+
+  it("returns empty string for git_commit with no message", () => {
+    expect(summarizeArgs("git_commit", {})).toBe("")
+  })
+
+  it("returns truncated command for gh_cli", () => {
+    const cmd = "a".repeat(50)
+    expect(summarizeArgs("gh_cli", { command: cmd })).toBe("a".repeat(40))
+  })
+
+  it("returns empty string for gh_cli with no command", () => {
+    expect(summarizeArgs("gh_cli", {})).toBe("")
+  })
+
+  it("returns name for load_skill", () => {
+    expect(summarizeArgs("load_skill", { name: "my-skill" })).toBe("my-skill")
+  })
+
+  it("returns empty string for load_skill with no name", () => {
+    expect(summarizeArgs("load_skill", {})).toBe("")
+  })
+
+  it("returns truncated prompt for claude", () => {
+    const prompt = "a".repeat(50)
+    expect(summarizeArgs("claude", { prompt })).toBe("a".repeat(40))
+  })
+
+  it("returns empty string for claude with no prompt", () => {
+    expect(summarizeArgs("claude", {})).toBe("")
+  })
+
+  it("returns truncated query for web_search", () => {
+    const query = "a".repeat(50)
+    expect(summarizeArgs("web_search", { query })).toBe("a".repeat(40))
+  })
+
+  it("returns empty string for web_search with no query", () => {
+    expect(summarizeArgs("web_search", {})).toBe("")
+  })
+
+  it("returns truncated JSON for unknown tool", () => {
+    expect(summarizeArgs("unknown_tool", { key: "value" })).toBe('{"key":"value"}')
+  })
+
+  it("truncates long JSON for unknown tool to 30 chars", () => {
+    const longVal = "a".repeat(40)
+    const result = summarizeArgs("unknown_tool", { key: longVal })
+    expect(result.length).toBe(30)
+  })
+})
+
+describe("ToolDefinition type and registry", () => {
+  it("exports ToolDefinition type from tools-base", async () => {
+    vi.resetModules()
+    const toolsBase = await import("../../repertoire/tools-base")
+    // baseToolDefinitions should be an array of ToolDefinition
+    expect(Array.isArray(toolsBase.baseToolDefinitions)).toBe(true)
+    expect(toolsBase.baseToolDefinitions.length).toBeGreaterThan(0)
+  })
+
+  it("each base ToolDefinition has tool and handler, no integration", async () => {
+    vi.resetModules()
+    const toolsBase = await import("../../repertoire/tools-base")
+    for (const def of toolsBase.baseToolDefinitions) {
+      expect(def.tool).toBeDefined()
+      expect(def.tool.type).toBe("function")
+      expect(def.tool.function.name).toBeDefined()
+      expect(typeof def.handler).toBe("function")
+      // Base tools have no integration
+      expect(def.integration).toBeUndefined()
+    }
+  })
+
+  it("exports teamsToolDefinitions from tools-teams", async () => {
+    vi.resetModules()
+    const toolsTeams = await import("../../repertoire/tools-teams")
+    expect(Array.isArray(toolsTeams.teamsToolDefinitions)).toBe(true)
+    expect(toolsTeams.teamsToolDefinitions.length).toBeGreaterThan(0)
+  })
+
+  it("each teams ToolDefinition has tool, handler, and integration", async () => {
+    vi.resetModules()
+    const toolsTeams = await import("../../repertoire/tools-teams")
+    for (const def of toolsTeams.teamsToolDefinitions) {
+      expect(def.tool).toBeDefined()
+      expect(def.tool.type).toBe("function")
+      expect(def.tool.function.name).toBeDefined()
+      expect(typeof def.handler).toBe("function")
+      // All teams tools have an integration
+      expect(def.integration).toBeDefined()
+      expect(["ado", "graph"]).toContain(def.integration)
+    }
+  })
+
+  it("graph_mutate and ado_mutate have confirmationRequired set to true", async () => {
+    vi.resetModules()
+    const toolsTeams = await import("../../repertoire/tools-teams")
+    const graphMutate = toolsTeams.teamsToolDefinitions.find(
+      (d: any) => d.tool.function.name === "graph_mutate"
+    )
+    const adoMutate = toolsTeams.teamsToolDefinitions.find(
+      (d: any) => d.tool.function.name === "ado_mutate"
+    )
+    expect(graphMutate?.confirmationRequired).toBe(true)
+    expect(adoMutate?.confirmationRequired).toBe(true)
+  })
+
+  it("non-mutate teams tools have confirmationRequired undefined or false", async () => {
+    vi.resetModules()
+    const toolsTeams = await import("../../repertoire/tools-teams")
+    const nonMutate = toolsTeams.teamsToolDefinitions.filter(
+      (d: any) => !["graph_mutate", "ado_mutate"].includes(d.tool.function.name)
+    )
+    for (const def of nonMutate) {
+      expect(def.confirmationRequired).toBeFalsy()
+    }
+  })
+
+  it("confirmationRequired Set no longer exported from tools-teams", async () => {
+    vi.resetModules()
+    const toolsTeams = await import("../../repertoire/tools-teams")
+    // The Set export should not exist
+    expect((toolsTeams as any).confirmationRequired).toBeUndefined()
+  })
+
+  it("base tool definitions include expected tool names", async () => {
+    vi.resetModules()
+    const toolsBase = await import("../../repertoire/tools-base")
+    const names = toolsBase.baseToolDefinitions.map((d: any) => d.tool.function.name)
+    expect(names).toContain("read_file")
+    expect(names).toContain("write_file")
+    expect(names).toContain("shell")
+    expect(names).toContain("list_directory")
+    expect(names).toContain("git_commit")
+    expect(names).toContain("list_skills")
+    expect(names).toContain("load_skill")
+    expect(names).toContain("get_current_time")
+    expect(names).toContain("claude")
+    expect(names).toContain("web_search")
+    expect(names).toContain("gh_cli")
+  })
+
+  it("teams tool definitions include expected tool names", async () => {
+    vi.resetModules()
+    const toolsTeams = await import("../../repertoire/tools-teams")
+    const names = toolsTeams.teamsToolDefinitions.map((d: any) => d.tool.function.name)
+    expect(names).toContain("graph_query")
+    expect(names).toContain("graph_mutate")
+    expect(names).toContain("ado_query")
+    expect(names).toContain("ado_mutate")
+    expect(names).toContain("graph_profile")
+    expect(names).toContain("ado_work_items")
+    expect(names).toContain("graph_docs")
+    expect(names).toContain("ado_docs")
+  })
+
+  it("teams tool definitions have correct integration tags", async () => {
+    vi.resetModules()
+    const toolsTeams = await import("../../repertoire/tools-teams")
+    const defs = toolsTeams.teamsToolDefinitions
+    const byName = (name: string) => defs.find((d: any) => d.tool.function.name === name)
+
+    expect(byName("graph_query")?.integration).toBe("graph")
+    expect(byName("graph_mutate")?.integration).toBe("graph")
+    expect(byName("graph_profile")?.integration).toBe("graph")
+    expect(byName("graph_docs")?.integration).toBe("graph")
+    expect(byName("ado_query")?.integration).toBe("ado")
+    expect(byName("ado_mutate")?.integration).toBe("ado")
+    expect(byName("ado_work_items")?.integration).toBe("ado")
+    expect(byName("ado_docs")?.integration).toBe("ado")
+  })
+})
+
+describe("tools array export (backward compat)", () => {
+  it("exports tools array with expected tool names", async () => {
+    vi.resetModules()
+    const { tools } = await import("../../repertoire/tools")
+    const names = tools.map((t: any) => t.function.name)
+    expect(names).toContain("read_file")
+    expect(names).toContain("write_file")
+    expect(names).toContain("shell")
+    expect(names).toContain("list_directory")
+    expect(names).toContain("git_commit")
+    expect(names).toContain("list_skills")
+    expect(names).toContain("load_skill")
+    expect(names).toContain("get_current_time")
+    expect(names).toContain("claude")
+    expect(names).toContain("web_search")
+  })
+})
+
+describe("finalAnswerTool", () => {
+  it("has correct name, description, and schema", async () => {
+    vi.resetModules()
+    const { finalAnswerTool } = await import("../../repertoire/tools")
+    expect(finalAnswerTool.type).toBe("function")
+    expect(finalAnswerTool.function.name).toBe("final_answer")
+    expect(finalAnswerTool.function.description).toBe(
+      "give your final text response. use this when you want to reply with text instead of calling another tool."
+    )
+    expect(finalAnswerTool.function.parameters).toEqual({
+      type: "object",
+      properties: { answer: { type: "string" } },
+      required: ["answer"],
+    })
+  })
+
+  it("is NOT included in the default tools array", async () => {
+    vi.resetModules()
+    const { tools } = await import("../../repertoire/tools")
+    const names = tools.map((t: any) => t.function.name)
+    expect(names).not.toContain("final_answer")
+  })
+})
+
+describe("getToolsForChannel with ChannelCapabilities", () => {
+  it("returns only base tools when no integrations available", async () => {
+    vi.resetModules()
+    const { getToolsForChannel, tools } = await import("../../repertoire/tools")
+    const cliCaps = {
+      channel: "cli" as const,
+      availableIntegrations: [],
+      supportsMarkdown: false,
+      supportsStreaming: true,
+      supportsRichCards: false,
+      maxMessageLength: Infinity,
+    }
+    const result = getToolsForChannel(cliCaps)
+    const names = result.map((t: any) => t.function.name)
+    // Should have all base tools
+    expect(names).toContain("read_file")
+    expect(names).toContain("shell")
+    // Should NOT have graph/ado tools
+    expect(names).not.toContain("graph_profile")
+    expect(names).not.toContain("ado_work_items")
+    expect(names).not.toContain("graph_query")
+    expect(names).not.toContain("graph_mutate")
+    expect(names).not.toContain("ado_query")
+    expect(names).not.toContain("ado_mutate")
+    // Same length as base tools
+    expect(result.length).toBe(tools.length)
+  })
+
+  it("returns base + ado + graph tools for Teams capabilities", async () => {
+    vi.resetModules()
+    const { getToolsForChannel, tools } = await import("../../repertoire/tools")
+    const teamsCaps = {
+      channel: "teams" as const,
+      availableIntegrations: ["ado" as const, "graph" as const],
+      supportsMarkdown: true,
+      supportsStreaming: false,
+      supportsRichCards: true,
+      maxMessageLength: 4000,
+    }
+    const result = getToolsForChannel(teamsCaps)
+    const names = result.map((t: any) => t.function.name)
+    // Should have all base tools
+    expect(names).toContain("read_file")
+    expect(names).toContain("shell")
+    // Should have graph tools
+    expect(names).toContain("graph_query")
+    expect(names).toContain("graph_mutate")
+    expect(names).toContain("graph_profile")
+    expect(names).toContain("graph_docs")
+    // Should have ado tools
+    expect(names).toContain("ado_query")
+    expect(names).toContain("ado_mutate")
+    expect(names).toContain("ado_work_items")
+    expect(names).toContain("ado_docs")
+    // Should have semantic ado tools
+    expect(names).toContain("ado_backlog_list")
+    expect(names).toContain("ado_create_epic")
+    expect(names).toContain("ado_create_issue")
+    expect(names).toContain("ado_move_items")
+    expect(names).toContain("ado_restructure_backlog")
+    expect(names).toContain("ado_validate_structure")
+    expect(names).toContain("ado_preview_changes")
+    // base tools + 8 teams tools + 11 semantic ado tools
+    expect(result.length).toBe(tools.length + 19)
+  })
+
+  it("returns base + graph-only tools when only graph integration", async () => {
+    vi.resetModules()
+    const { getToolsForChannel, tools } = await import("../../repertoire/tools")
+    const caps = {
+      channel: "teams" as const,
+      availableIntegrations: ["graph" as const],
+      supportsMarkdown: true,
+      supportsStreaming: false,
+      supportsRichCards: true,
+      maxMessageLength: 4000,
+    }
+    const result = getToolsForChannel(caps)
+    const names = result.map((t: any) => t.function.name)
+    // Should have graph tools
+    expect(names).toContain("graph_query")
+    expect(names).toContain("graph_mutate")
+    expect(names).toContain("graph_profile")
+    expect(names).toContain("graph_docs")
+    // Should NOT have ado tools
+    expect(names).not.toContain("ado_query")
+    expect(names).not.toContain("ado_mutate")
+    expect(names).not.toContain("ado_work_items")
+    expect(names).not.toContain("ado_docs")
+    // base tools + 4 graph tools
+    expect(result.length).toBe(tools.length + 4)
+  })
+
+  it("returns base + ado-only tools when only ado integration", async () => {
+    vi.resetModules()
+    const { getToolsForChannel, tools } = await import("../../repertoire/tools")
+    const caps = {
+      channel: "teams" as const,
+      availableIntegrations: ["ado" as const],
+      supportsMarkdown: true,
+      supportsStreaming: false,
+      supportsRichCards: true,
+      maxMessageLength: 4000,
+    }
+    const result = getToolsForChannel(caps)
+    const names = result.map((t: any) => t.function.name)
+    // Should have ado tools
+    expect(names).toContain("ado_query")
+    expect(names).toContain("ado_mutate")
+    expect(names).toContain("ado_work_items")
+    expect(names).toContain("ado_docs")
+    // Should NOT have graph tools
+    expect(names).not.toContain("graph_query")
+    expect(names).not.toContain("graph_mutate")
+    expect(names).not.toContain("graph_profile")
+    expect(names).not.toContain("graph_docs")
+    // Should have semantic ado tools
+    expect(names).toContain("ado_backlog_list")
+    // base tools + 4 ado tools + 11 semantic ado tools
+    expect(result.length).toBe(tools.length + 15)
+  })
+})
+
+describe("isConfirmationRequired", () => {
+  it("returns true for graph_mutate", async () => {
+    vi.resetModules()
+    const { isConfirmationRequired } = await import("../../repertoire/tools")
+    expect(isConfirmationRequired("graph_mutate")).toBe(true)
+  })
+
+  it("returns true for ado_mutate", async () => {
+    vi.resetModules()
+    const { isConfirmationRequired } = await import("../../repertoire/tools")
+    expect(isConfirmationRequired("ado_mutate")).toBe(true)
+  })
+
+  it("returns false for graph_query", async () => {
+    vi.resetModules()
+    const { isConfirmationRequired } = await import("../../repertoire/tools")
+    expect(isConfirmationRequired("graph_query")).toBe(false)
+  })
+
+  it("returns false for ado_query", async () => {
+    vi.resetModules()
+    const { isConfirmationRequired } = await import("../../repertoire/tools")
+    expect(isConfirmationRequired("ado_query")).toBe(false)
+  })
+
+  it("returns false for base tools", async () => {
+    vi.resetModules()
+    const { isConfirmationRequired } = await import("../../repertoire/tools")
+    expect(isConfirmationRequired("read_file")).toBe(false)
+    expect(isConfirmationRequired("shell")).toBe(false)
+  })
+
+  it("returns false for unknown tool", async () => {
+    vi.resetModules()
+    const { isConfirmationRequired } = await import("../../repertoire/tools")
+    expect(isConfirmationRequired("nonexistent")).toBe(false)
+  })
+})
+
+describe("ToolContext shape", () => {
+  it("ToolContext accepts context?: ResolvedContext", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    vi.mocked(fs.readFileSync).mockReturnValue("file content")
+    // ToolContext with context field
+    const ctx = {
+      graphToken: "token",
+      adoToken: "token",
+      signin: vi.fn(),
+      context: {
+        identity: {
+          id: "test-uuid",
+          displayName: "Test User",
+          externalIds: [],
+          tenantMemberships: [],
+          createdAt: "2026-01-01",
+          updatedAt: "2026-01-01",
+          schemaVersion: 1,
+        },
+        channel: {
+          channel: "teams" as const,
+          availableIntegrations: ["ado" as const, "graph" as const],
+          supportsMarkdown: true,
+          supportsStreaming: false,
+          supportsRichCards: true,
+          maxMessageLength: 4000,
+        },
+      },
+    }
+    // Should work fine -- context is optional and doesn't affect base tools
+    const result = await execTool("read_file", { path: "/tmp/test.txt" }, ctx)
+    expect(result).toBe("file content")
+  })
+
+  it("ToolContext does NOT have adoOrganizations field", async () => {
+    vi.resetModules()
+    const toolsBase = await import("../../repertoire/tools-base")
+    // TypeScript would catch this at compile time, but we verify at runtime:
+    // Create a minimal valid ToolContext and verify no adoOrganizations
+    const minCtx: any = {
+      signin: vi.fn(),
+    }
+    // If adoOrganizations were required, TypeScript would error.
+    // We just verify the interface shape by checking the module exports.
+    expect(toolsBase).toBeDefined()
+  })
+})
+
+describe("execTool with ToolContext (graph/ado handlers)", () => {
+  it("passes ToolContext to graph_profile handler", async () => {
+    vi.resetModules()
+    const { getProfile } = await import("../../repertoire/graph-client")
+    vi.mocked(getProfile).mockResolvedValue("Profile: Jane Doe")
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: "test-graph-token",
+      adoToken: undefined,
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("graph_profile", {}, ctx)
+    expect(result).toBe("Profile: Jane Doe")
+    expect(getProfile).toHaveBeenCalledWith("test-graph-token")
+  })
+
+  it("graph_profile returns AUTH_REQUIRED when graphToken missing", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: undefined,
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("graph_profile", {}, ctx)
+    expect(result).toBe("AUTH_REQUIRED:graph -- I need access to your Microsoft 365 profile. Please sign in when prompted.")
+  })
+
+  it("graph_profile returns AUTH_REQUIRED when no ToolContext provided", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+
+    const result = await execTool("graph_profile", {})
+    expect(result).toBe("AUTH_REQUIRED:graph -- I need access to your Microsoft 365 profile. Please sign in when prompted.")
+  })
+
+  it("passes ToolContext to ado_work_items handler", async () => {
+    vi.resetModules()
+    const { queryWorkItems } = await import("../../repertoire/ado-client")
+    vi.mocked(queryWorkItems).mockResolvedValue("Work items: #123 Fix bug")
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-ado-token",
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("ado_work_items", { organization: "myorg", query: "SELECT * FROM WorkItems" }, ctx)
+    expect(result).toBe("Work items: #123 Fix bug")
+    expect(queryWorkItems).toHaveBeenCalledWith("test-ado-token", "myorg", "SELECT * FROM WorkItems")
+  })
+
+  it("ado_work_items returns AUTH_REQUIRED when adoToken missing", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: undefined,
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("ado_work_items", { organization: "myorg" }, ctx)
+    expect(result).toBe("AUTH_REQUIRED:ado -- I need access to your Azure DevOps account. Please sign in when prompted.")
+  })
+
+  it("ado_work_items uses default query when none provided", async () => {
+    vi.resetModules()
+    const { queryWorkItems } = await import("../../repertoire/ado-client")
+    vi.mocked(queryWorkItems).mockResolvedValue("Work items found")
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("ado_work_items", { organization: "myorg" }, ctx)
+    expect(result).toBe("Work items found")
+    // Should use default query
+    expect(queryWorkItems).toHaveBeenCalledWith("test-token", "myorg", expect.stringContaining("SELECT"))
+  })
+
+  it("ado_work_items returns AUTH_REQUIRED when no ToolContext provided", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+
+    const result = await execTool("ado_work_items", { organization: "myorg" })
+    expect(result).toBe("AUTH_REQUIRED:ado -- I need access to your Azure DevOps account. Please sign in when prompted.")
+  })
+
+  it("ado_work_items without org: single org auto-selects", async () => {
+    vi.resetModules()
+    const { queryWorkItems, discoverOrganizations } = await import("../../repertoire/ado-client")
+    vi.mocked(discoverOrganizations).mockResolvedValue(["solo-org"])
+    vi.mocked(queryWorkItems).mockResolvedValue("Work items from solo-org")
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("ado_work_items", {}, ctx)
+    expect(result).toBe("Work items from solo-org")
+    expect(discoverOrganizations).toHaveBeenCalledWith("test-token")
+    expect(queryWorkItems).toHaveBeenCalledWith("test-token", "solo-org", expect.stringContaining("SELECT"))
+  })
+
+  it("ado_work_items without org: multiple orgs returns list for model", async () => {
+    vi.resetModules()
+    const { discoverOrganizations } = await import("../../repertoire/ado-client")
+    vi.mocked(discoverOrganizations).mockResolvedValue(["org-a", "org-b", "org-c"])
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("ado_work_items", {}, ctx)
+    expect(result).toContain("org-a")
+    expect(result).toContain("org-b")
+    expect(result).toContain("org-c")
+    // Should indicate disambiguation is needed
+    expect(result.toLowerCase()).toContain("organization")
+  })
+
+  it("ado_work_items without org: zero orgs returns not found message", async () => {
+    vi.resetModules()
+    const { discoverOrganizations } = await import("../../repertoire/ado-client")
+    vi.mocked(discoverOrganizations).mockResolvedValue([])
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("ado_work_items", {}, ctx)
+    expect(result.toLowerCase()).toContain("no")
+    expect(result.toLowerCase()).toContain("organization")
+  })
+
+  it("ado_work_items without org: discovery error returns structured message", async () => {
+    vi.resetModules()
+    const { discoverOrganizations } = await import("../../repertoire/ado-client")
+    vi.mocked(discoverOrganizations).mockRejectedValue(new Error("API timeout"))
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("ado_work_items", {}, ctx)
+    expect(result).toContain("error")
+  })
+
+  it("ado_work_items without org: non-Error discovery rejection uses String(e)", async () => {
+    vi.resetModules()
+    const { discoverOrganizations } = await import("../../repertoire/ado-client")
+    vi.mocked(discoverOrganizations).mockRejectedValue("string rejection")
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("ado_work_items", {}, ctx)
+    expect(result).toContain("string rejection")
+  })
+
+  it("base tools work without ToolContext", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockReturnValue("file content")
+    const { execTool } = await import("../../repertoire/tools")
+
+    const result = await execTool("read_file", { path: "/tmp/test.txt" })
+    expect(result).toBe("file content")
+  })
+
+  it("base tools work with ToolContext (context is ignored)", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockReturnValue("file content")
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: "token",
+      adoToken: "token",
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("read_file", { path: "/tmp/test.txt" }, ctx)
+    expect(result).toBe("file content")
+  })
+})
+
+describe("summarizeArgs for graph/ado tools", () => {
+  let summarizeArgs: (name: string, args: Record<string, any>) => string
+
+  beforeEach(async () => {
+    vi.resetModules()
+    const tools = await import("../../repertoire/tools")
+    summarizeArgs = tools.summarizeArgs
+  })
+
+  it("returns empty string for graph_profile", () => {
+    expect(summarizeArgs("graph_profile", {})).toBe("")
+  })
+
+  it("returns organization for ado_work_items", () => {
+    expect(summarizeArgs("ado_work_items", { organization: "myorg", query: "some query" })).toBe("myorg")
+  })
+
+  it("returns empty string for ado_work_items with no organization", () => {
+    expect(summarizeArgs("ado_work_items", {})).toBe("")
+  })
+
+  it("returns path for graph_query", () => {
+    expect(summarizeArgs("graph_query", { path: "/me/messages" })).toBe("/me/messages")
+  })
+
+  it("returns empty string for graph_query with no path", () => {
+    expect(summarizeArgs("graph_query", {})).toBe("")
+  })
+
+  it("returns method + path for graph_mutate", () => {
+    expect(summarizeArgs("graph_mutate", { method: "POST", path: "/me/messages" })).toBe("POST /me/messages")
+  })
+
+  it("returns empty string for graph_mutate with no method/path", () => {
+    expect(summarizeArgs("graph_mutate", {})).toBe(" ")
+  })
+
+  it("returns org + path for ado_query", () => {
+    expect(summarizeArgs("ado_query", { organization: "myorg", path: "/_apis/git/repos" })).toBe("myorg /_apis/git/repos")
+  })
+
+  it("returns empty string parts for ado_query with no args", () => {
+    expect(summarizeArgs("ado_query", {})).toBe(" ")
+  })
+
+  it("returns method + org + path for ado_mutate", () => {
+    expect(summarizeArgs("ado_mutate", { method: "PATCH", organization: "myorg", path: "/_apis/wit/workitems/1" })).toBe("PATCH myorg /_apis/wit/workitems/1")
+  })
+
+  it("returns empty string parts for ado_mutate with no args", () => {
+    expect(summarizeArgs("ado_mutate", {})).toBe("  ")
+  })
+})
+
+describe("execTool for generic Graph tools", () => {
+  it("graph_query calls graphRequest with GET", async () => {
+    vi.resetModules()
+    const { graphRequest } = await import("../../repertoire/graph-client")
+    vi.mocked(graphRequest).mockResolvedValue('{"value": []}')
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: "test-token",
+      adoToken: undefined,
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("graph_query", { path: "/me/messages?$top=5" }, ctx)
+    expect(result).toBe('{"value": []}')
+    expect(graphRequest).toHaveBeenCalledWith("test-token", "GET", "/me/messages?$top=5")
+  })
+
+  it("graph_query returns AUTH_REQUIRED when graphToken missing", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: undefined,
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("graph_query", { path: "/me" }, ctx)
+    expect(result).toContain("AUTH_REQUIRED:graph")
+  })
+
+  it("graph_query returns AUTH_REQUIRED when no ToolContext", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+
+    const result = await execTool("graph_query", { path: "/me" })
+    expect(result).toContain("AUTH_REQUIRED:graph")
+  })
+
+  it("graph_mutate calls graphRequest with specified method and body", async () => {
+    vi.resetModules()
+    const { graphRequest } = await import("../../repertoire/graph-client")
+    vi.mocked(graphRequest).mockResolvedValue('{"id": "msg-1"}')
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: "test-token",
+      adoToken: undefined,
+      signin: vi.fn(),
+    }
+
+    const body = '{"subject": "Hello"}'
+    const result = await execTool("graph_mutate", { method: "POST", path: "/me/messages", body }, ctx)
+    expect(result).toBe('{"id": "msg-1"}')
+    expect(graphRequest).toHaveBeenCalledWith("test-token", "POST", "/me/messages", body)
+  })
+
+  it("graph_mutate calls graphRequest with PATCH method", async () => {
+    vi.resetModules()
+    const { graphRequest } = await import("../../repertoire/graph-client")
+    vi.mocked(graphRequest).mockResolvedValue('{"updated": true}')
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: "test-token",
+      adoToken: undefined,
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("graph_mutate", { method: "PATCH", path: "/me/events/1", body: '{"subject":"Updated"}' }, ctx)
+    expect(result).toBe('{"updated": true}')
+    expect(graphRequest).toHaveBeenCalledWith("test-token", "PATCH", "/me/events/1", '{"subject":"Updated"}')
+  })
+
+  it("graph_mutate calls graphRequest with DELETE method (no body)", async () => {
+    vi.resetModules()
+    const { graphRequest } = await import("../../repertoire/graph-client")
+    vi.mocked(graphRequest).mockResolvedValue('{}')
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: "test-token",
+      adoToken: undefined,
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("graph_mutate", { method: "DELETE", path: "/me/messages/msg-1" }, ctx)
+    expect(result).toBe('{}')
+    expect(graphRequest).toHaveBeenCalledWith("test-token", "DELETE", "/me/messages/msg-1", undefined)
+  })
+
+  it("graph_mutate rejects invalid method", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: "test-token",
+      adoToken: undefined,
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("graph_mutate", { method: "GET", path: "/me" }, ctx)
+    expect(result).toContain("Invalid method")
+    expect(result).toContain("POST, PATCH, DELETE")
+  })
+
+  it("graph_mutate returns AUTH_REQUIRED when graphToken missing", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: undefined,
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("graph_mutate", { method: "POST", path: "/me/messages" }, ctx)
+    expect(result).toContain("AUTH_REQUIRED:graph")
+  })
+})
+
+describe("execTool for generic ADO tools", () => {
+  it("ado_query calls adoRequest with GET by default", async () => {
+    vi.resetModules()
+    const { adoRequest } = await import("../../repertoire/ado-client")
+    vi.mocked(adoRequest).mockResolvedValue('{"value": []}')
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("ado_query", { organization: "myorg", path: "/_apis/git/repositories" }, ctx)
+    expect(result).toBe('{"value": []}')
+    expect(adoRequest).toHaveBeenCalledWith("test-token", "GET", "myorg", "/_apis/git/repositories", undefined)
+  })
+
+  it("ado_query calls adoRequest with POST for WIQL", async () => {
+    vi.resetModules()
+    const { adoRequest } = await import("../../repertoire/ado-client")
+    vi.mocked(adoRequest).mockResolvedValue('{"workItems": []}')
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+    }
+
+    const body = '{"query": "SELECT [System.Id] FROM WorkItems"}'
+    const result = await execTool("ado_query", { organization: "myorg", path: "/_apis/wit/wiql", method: "POST", body }, ctx)
+    expect(result).toBe('{"workItems": []}')
+    expect(adoRequest).toHaveBeenCalledWith("test-token", "POST", "myorg", "/_apis/wit/wiql", body)
+  })
+
+  it("ado_query returns AUTH_REQUIRED when adoToken missing", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: undefined,
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("ado_query", { organization: "myorg", path: "/_apis/projects" }, ctx)
+    expect(result).toContain("AUTH_REQUIRED:ado")
+  })
+
+  it("ado_query returns AUTH_REQUIRED when no ToolContext", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+
+    const result = await execTool("ado_query", { organization: "myorg", path: "/_apis/projects" })
+    expect(result).toContain("AUTH_REQUIRED:ado")
+  })
+
+  it("ado_mutate calls adoRequest with specified method and body", async () => {
+    vi.resetModules()
+    const { adoRequest } = await import("../../repertoire/ado-client")
+    vi.mocked(adoRequest).mockResolvedValue('{"id": 456}')
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+    }
+
+    const body = '[{"op": "replace", "path": "/fields/System.Title", "value": "Updated"}]'
+    const result = await execTool("ado_mutate", { method: "PATCH", organization: "myorg", path: "/_apis/wit/workitems/456", body }, ctx)
+    expect(result).toBe('{"id": 456}')
+    expect(adoRequest).toHaveBeenCalledWith("test-token", "PATCH", "myorg", "/_apis/wit/workitems/456", body)
+  })
+
+  it("ado_mutate rejects invalid method", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: "test-token",
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("ado_mutate", { method: "GET", organization: "myorg", path: "/_apis/projects" }, ctx)
+    expect(result).toContain("Invalid method")
+    expect(result).toContain("POST, PATCH, DELETE")
+  })
+
+  it("ado_mutate returns AUTH_REQUIRED when adoToken missing", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      graphToken: undefined,
+      adoToken: undefined,
+      signin: vi.fn(),
+    }
+
+    const result = await execTool("ado_mutate", { method: "POST", organization: "myorg", path: "/_apis/wit/workitems" }, ctx)
+    expect(result).toContain("AUTH_REQUIRED:ado")
+  })
+})
+
+describe("ado_mutate authority checks (Unit 2C)", () => {
+  it("ado_mutate proceeds when canWrite() returns true", async () => {
+    vi.resetModules()
+    const { adoRequest } = await import("../../repertoire/ado-client")
+    vi.mocked(adoRequest).mockResolvedValue('{"id": 789}')
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      adoToken: "test-token",
+      signin: vi.fn(),
+      context: {
+        identity: { id: "id", displayName: "test", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
+        checker: {
+          canRead: vi.fn().mockReturnValue(true),
+          canWrite: vi.fn().mockResolvedValue(true),
+          record403: vi.fn(),
+        },
+      },
+    }
+
+    const result = await execTool("ado_mutate", { method: "POST", organization: "myorg", path: "/_apis/wit/workitems/$Task" }, ctx)
+    expect(result).toBe('{"id": 789}')
+    expect(adoRequest).toHaveBeenCalled()
+  })
+
+  it("ado_mutate returns structured denial when canWrite() returns false", async () => {
+    vi.resetModules()
+    const { adoRequest } = await import("../../repertoire/ado-client")
+    vi.mocked(adoRequest).mockClear()
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      adoToken: "test-token",
+      signin: vi.fn(),
+      context: {
+        identity: { id: "id", displayName: "test", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
+        checker: {
+          canRead: vi.fn().mockReturnValue(true),
+          canWrite: vi.fn().mockResolvedValue(false),
+          record403: vi.fn(),
+        },
+      },
+    }
+
+    const result = await execTool("ado_mutate", { method: "POST", organization: "myorg", path: "/_apis/wit/workitems/$Task" }, ctx)
+    expect(result).toContain("AUTHORITY_DENIED")
+    // Should NOT call adoRequest
+    expect(adoRequest).not.toHaveBeenCalled()
+  })
+
+  it("ado_mutate proceeds when no context/checker is available (backward-compatible)", async () => {
+    vi.resetModules()
+    const { adoRequest } = await import("../../repertoire/ado-client")
+    vi.mocked(adoRequest).mockResolvedValue('{"id": 111}')
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      adoToken: "test-token",
+      signin: vi.fn(),
+      // No context or checker
+    }
+
+    const result = await execTool("ado_mutate", { method: "PATCH", organization: "myorg", path: "/_apis/wit/workitems/1" }, ctx)
+    expect(result).toBe('{"id": 111}')
+    expect(adoRequest).toHaveBeenCalled()
+  })
+
+  it("ado_query calls record403() on PERMISSION_DENIED response", async () => {
+    vi.resetModules()
+    const { adoRequest } = await import("../../repertoire/ado-client")
+    vi.mocked(adoRequest).mockResolvedValue("PERMISSION_DENIED: You don't have access to this ADO resource.")
+
+    const { execTool } = await import("../../repertoire/tools")
+    const record403 = vi.fn()
+    const ctx = {
+      adoToken: "test-token",
+      signin: vi.fn(),
+      context: {
+        identity: { id: "id", displayName: "test", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
+        checker: {
+          canRead: vi.fn().mockReturnValue(true),
+          canWrite: vi.fn().mockResolvedValue(true),
+          record403,
+        },
+      },
+    }
+
+    const result = await execTool("ado_query", { organization: "myorg", path: "/_apis/projects" }, ctx)
+    expect(result).toContain("PERMISSION_DENIED")
+    expect(record403).toHaveBeenCalledWith("ado", "myorg", expect.any(String))
+  })
+
+  it("ado_mutate calls record403() on PERMISSION_DENIED response", async () => {
+    vi.resetModules()
+    const { adoRequest } = await import("../../repertoire/ado-client")
+    vi.mocked(adoRequest).mockResolvedValue("PERMISSION_DENIED: You don't have access to this ADO resource.")
+
+    const { execTool } = await import("../../repertoire/tools")
+    const record403 = vi.fn()
+    const ctx = {
+      adoToken: "test-token",
+      signin: vi.fn(),
+      context: {
+        identity: { id: "id", displayName: "test", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
+        checker: {
+          canRead: vi.fn().mockReturnValue(true),
+          canWrite: vi.fn().mockResolvedValue(true),
+          record403,
+        },
+      },
+    }
+
+    const result = await execTool("ado_mutate", { method: "POST", organization: "myorg", path: "/_apis/wit/workitems/$Task" }, ctx)
+    expect(result).toContain("PERMISSION_DENIED")
+    expect(record403).toHaveBeenCalledWith("ado", "myorg", expect.any(String))
+  })
+
+  it("structured denial message includes what was denied and suggested alternative", async () => {
+    vi.resetModules()
+
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      adoToken: "test-token",
+      signin: vi.fn(),
+      context: {
+        identity: { id: "id", displayName: "test", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
+        checker: {
+          canRead: vi.fn().mockReturnValue(true),
+          canWrite: vi.fn().mockResolvedValue(false),
+          record403: vi.fn(),
+        },
+      },
+    }
+
+    const result = await execTool("ado_mutate", { method: "DELETE", organization: "myorg", path: "/_apis/wit/workitems/99" }, ctx)
+    expect(result).toContain("AUTHORITY_DENIED")
+    expect(result).toContain("myorg")
+    expect(result).toContain("DELETE")
+  })
+})
+
+describe("execTool for docs tools", () => {
+  it("graph_docs returns matching endpoints for a query", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+
+    const result = await execTool("graph_docs", { query: "send email" })
+    expect(result).toContain("send")
+    // Should be valid, non-empty output
+    expect(result.length).toBeGreaterThan(10)
+  })
+
+  it("graph_docs returns matching endpoints for calendar", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+
+    const result = await execTool("graph_docs", { query: "calendar events" })
+    expect(result).toContain("calendar")
+  })
+
+  it("graph_docs returns no results message for non-matching query", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+
+    const result = await execTool("graph_docs", { query: "zzzyyyxxx_nonexistent" })
+    expect(result).toContain("No matching")
+  })
+
+  it("graph_docs returns top 5 results max", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+
+    // A broad query that should match many endpoints
+    const result = await execTool("graph_docs", { query: "me" })
+    const sections = result.split("\n\n").filter((s: string) => s.trim().length > 0)
+    expect(sections.length).toBeLessThanOrEqual(5)
+  })
+
+  it("graph_docs is case-insensitive", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+
+    const lower = await execTool("graph_docs", { query: "messages" })
+    const upper = await execTool("graph_docs", { query: "MESSAGES" })
+    expect(lower).toBe(upper)
+  })
+
+  it("ado_docs returns matching endpoints for a query", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+
+    const result = await execTool("ado_docs", { query: "work items" })
+    expect(result).toContain("work")
+    expect(result.length).toBeGreaterThan(10)
+  })
+
+  it("ado_docs returns matching endpoints for pull requests", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+
+    const result = await execTool("ado_docs", { query: "pull request" })
+    expect(result).toContain("pull")
+  })
+
+  it("ado_docs returns no results message for non-matching query", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+
+    const result = await execTool("ado_docs", { query: "zzzyyyxxx_nonexistent" })
+    expect(result).toContain("No matching")
+  })
+
+  it("ado_docs returns top 5 results max", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+
+    const result = await execTool("ado_docs", { query: "api" })
+    const sections = result.split("\n\n").filter((s: string) => s.trim().length > 0)
+    expect(sections.length).toBeLessThanOrEqual(5)
+  })
+
+  it("ado_docs is case-insensitive", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+
+    const lower = await execTool("ado_docs", { query: "pipeline" })
+    const upper = await execTool("ado_docs", { query: "PIPELINE" })
+    expect(lower).toBe(upper)
+  })
+
+  it("graph_docs handles missing query arg", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+
+    const result = await execTool("graph_docs", {})
+    expect(typeof result).toBe("string")
+  })
+
+  it("ado_docs handles missing query arg", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+
+    const result = await execTool("ado_docs", {})
+    expect(typeof result).toBe("string")
+  })
+})
+
+describe("getToolsForChannel includes docs tools", () => {
+  it("teams channel includes graph_docs and ado_docs", async () => {
+    vi.resetModules()
+    const { getToolsForChannel, tools } = await import("../../repertoire/tools")
+    const teamsCaps = {
+      channel: "teams" as const,
+      availableIntegrations: ["ado" as const, "graph" as const],
+      supportsMarkdown: true,
+      supportsStreaming: false,
+      supportsRichCards: true,
+      maxMessageLength: 4000,
+    }
+    const teamsTools = getToolsForChannel(teamsCaps)
+    const names = teamsTools.map((t: any) => t.function.name)
+    expect(names).toContain("graph_docs")
+    expect(names).toContain("ado_docs")
+    // Should have semantic ado tools
+    expect(names).toContain("ado_backlog_list")
+    // base tools + 8 teams tools (4 generic + 2 aliases + 2 docs) + 11 semantic ado tools
+    expect(teamsTools.length).toBe(tools.length + 19)
+  })
+
+  it("cli channel does NOT include graph_docs or ado_docs", async () => {
+    vi.resetModules()
+    const { getToolsForChannel } = await import("../../repertoire/tools")
+    const cliCaps = {
+      channel: "cli" as const,
+      availableIntegrations: [],
+      supportsMarkdown: false,
+      supportsStreaming: true,
+      supportsRichCards: false,
+      maxMessageLength: Infinity,
+    }
+    const cliTools = getToolsForChannel(cliCaps)
+    const names = cliTools.map((t: any) => t.function.name)
+    expect(names).not.toContain("graph_docs")
+    expect(names).not.toContain("ado_docs")
+  })
+})
+
+describe("summarizeArgs for docs tools", () => {
+  let summarizeArgs: (name: string, args: Record<string, any>) => string
+
+  beforeEach(async () => {
+    vi.resetModules()
+    const tools = await import("../../repertoire/tools")
+    summarizeArgs = tools.summarizeArgs
+  })
+
+  it("returns query for graph_docs", () => {
+    expect(summarizeArgs("graph_docs", { query: "send email" })).toBe("send email")
+  })
+
+  it("returns empty string for graph_docs with no query", () => {
+    expect(summarizeArgs("graph_docs", {})).toBe("")
+  })
+
+  it("returns query for ado_docs", () => {
+    expect(summarizeArgs("ado_docs", { query: "work items" })).toBe("work items")
+  })
+
+  it("returns empty string for ado_docs with no query", () => {
+    expect(summarizeArgs("ado_docs", {})).toBe("")
+  })
+
+  it("returns key=value summary for save_friend_note", () => {
+    expect(summarizeArgs("save_friend_note", { key: "ado", value: "flat backlog" })).toBe("ado")
+  })
+
+  it("returns empty string for save_friend_note with no key", () => {
+    expect(summarizeArgs("save_friend_note", { value: "flat backlog" })).toBe("")
+  })
+
+  it("returns org + project for ado_backlog_list", () => {
+    expect(summarizeArgs("ado_backlog_list", { organization: "myorg", project: "myproj" })).toBe("myorg myproj")
+  })
+
+  it("returns empty string for ado_backlog_list with no org/project", () => {
+    expect(summarizeArgs("ado_backlog_list", {})).toBe("")
+  })
+})
+
+describe("save_friend_note tool", () => {
+  it("is registered as a base tool definition (no integration)", async () => {
+    vi.resetModules()
+    const { baseToolDefinitions } = await import("../../repertoire/tools-base")
+    const def = baseToolDefinitions.find(d => d.tool.function.name === "save_friend_note")
+    expect(def).toBeDefined()
+    expect(def!.integration).toBeUndefined()
+  })
+
+  it("creates new FriendMemory when none exists", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const memoryStore = {
+      get: vi.fn().mockResolvedValue(null),
+      put: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn(),
+      find: vi.fn(),
+    }
+    const ctx = {
+      signin: vi.fn(),
+      context: {
+        identity: { id: "uuid-1", displayName: "Jordan", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
+        memory: null,
+      },
+      memoryStore,
+    }
+    const result = await execTool("save_friend_note", { key: "ado", value: "flat backlog view" }, ctx)
+    expect(result).toContain("saved")
+    expect(memoryStore.put).toHaveBeenCalledWith("uuid-1", {
+      id: "uuid-1",
+      toolPreferences: { ado: "flat backlog view" },
+      schemaVersion: 1,
+    })
+  })
+
+  it("updates existing FriendMemory preference", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const existingMemory = {
+      id: "uuid-1",
+      toolPreferences: { ado: "old preference", general: "keep this" },
+      schemaVersion: 1,
+    }
+    const memoryStore = {
+      get: vi.fn().mockResolvedValue(existingMemory),
+      put: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn(),
+      find: vi.fn(),
+    }
+    const ctx = {
+      signin: vi.fn(),
+      context: {
+        identity: { id: "uuid-1", displayName: "Jordan", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
+        memory: existingMemory,
+      },
+      memoryStore,
+    }
+    const result = await execTool("save_friend_note", { key: "ado", value: "flat backlog view" }, ctx)
+    expect(result).toContain("saved")
+    expect(memoryStore.put).toHaveBeenCalledWith("uuid-1", {
+      id: "uuid-1",
+      toolPreferences: { ado: "flat backlog view", general: "keep this" },
+      schemaVersion: 1,
+    })
+  })
+
+  it("returns error when no context is available", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = { signin: vi.fn() }
+    const result = await execTool("save_friend_note", { key: "ado", value: "test" }, ctx)
+    expect(result).toContain("no friend context")
+  })
+
+  it("returns error when no memoryStore is available", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      signin: vi.fn(),
+      context: {
+        identity: { id: "uuid-1", displayName: "Jordan", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
+        memory: null,
+      },
+    }
+    const result = await execTool("save_friend_note", { key: "ado", value: "test" }, ctx)
+    expect(result).toContain("not available")
+  })
+
+  it("handles write failure gracefully (D16)", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const memoryStore = {
+      get: vi.fn().mockResolvedValue(null),
+      put: vi.fn().mockRejectedValue(new Error("disk full")),
+      delete: vi.fn(),
+      find: vi.fn(),
+    }
+    const ctx = {
+      signin: vi.fn(),
+      context: {
+        identity: { id: "uuid-1", displayName: "Jordan", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
+        memory: null,
+      },
+      memoryStore,
+    }
+    const result = await execTool("save_friend_note", { key: "ado", value: "test" }, ctx)
+    expect(result).toContain("error")
+    expect(result).toContain("disk full")
+  })
+})

@@ -16,116 +16,20 @@ vi.mock("../../config", () => ({
 
 import * as fs from "fs"
 
-// estimateTokens tests removed in Unit 3a -- estimateTokens is deleted
+// cachedBuildSystem and resetSystemPromptCache removed in Unit 1G
+// (per-friend context makes 60s TTL cache incorrect)
 
-describe("cachedBuildSystem", () => {
+describe("removed cache functions", () => {
   beforeEach(() => { vi.resetModules() })
 
-  it("calls buildFn on first call and returns result", async () => {
-    const { cachedBuildSystem, resetSystemPromptCache } = await import("../../mind/context")
-    resetSystemPromptCache()
-    const buildFn = vi.fn().mockReturnValue("system prompt v1")
-    const result = cachedBuildSystem("cli", buildFn)
-    expect(result).toBe("system prompt v1")
-    expect(buildFn).toHaveBeenCalledWith("cli", undefined)
-    expect(buildFn).toHaveBeenCalledTimes(1)
+  it("cachedBuildSystem no longer exists", async () => {
+    const context = await import("../../mind/context")
+    expect("cachedBuildSystem" in context).toBe(false)
   })
 
-  it("returns cached result on second call within 60s", async () => {
-    const { cachedBuildSystem, resetSystemPromptCache } = await import("../../mind/context")
-    resetSystemPromptCache()
-    const buildFn = vi.fn().mockReturnValue("system prompt v1")
-    cachedBuildSystem("cli", buildFn)
-    const result2 = cachedBuildSystem("cli", buildFn)
-    expect(result2).toBe("system prompt v1")
-    expect(buildFn).toHaveBeenCalledTimes(1)
-  })
-
-  it("re-invokes buildFn after 60 seconds", async () => {
-    const { cachedBuildSystem, resetSystemPromptCache } = await import("../../mind/context")
-    resetSystemPromptCache()
-    const buildFn = vi.fn()
-      .mockReturnValueOnce("system prompt v1")
-      .mockReturnValueOnce("system prompt v2")
-
-    cachedBuildSystem("cli", buildFn)
-
-    // Advance time by 61 seconds
-    vi.useFakeTimers()
-    vi.advanceTimersByTime(61000)
-    const result = cachedBuildSystem("cli", buildFn)
-    vi.useRealTimers()
-
-    expect(result).toBe("system prompt v2")
-    expect(buildFn).toHaveBeenCalledTimes(2)
-  })
-
-  it("maintains separate caches per channel", async () => {
-    const { cachedBuildSystem, resetSystemPromptCache } = await import("../../mind/context")
-    resetSystemPromptCache()
-    const buildFn = vi.fn()
-      .mockReturnValueOnce("cli prompt")
-      .mockReturnValueOnce("teams prompt")
-
-    const r1 = cachedBuildSystem("cli", buildFn)
-    const r2 = cachedBuildSystem("teams", buildFn)
-
-    expect(r1).toBe("cli prompt")
-    expect(r2).toBe("teams prompt")
-    expect(buildFn).toHaveBeenCalledTimes(2)
-    expect(buildFn).toHaveBeenCalledWith("cli", undefined)
-    expect(buildFn).toHaveBeenCalledWith("teams", undefined)
-  })
-
-  it("uses separate cache key when toolChoiceRequired is true", async () => {
-    const { cachedBuildSystem, resetSystemPromptCache } = await import("../../mind/context")
-    resetSystemPromptCache()
-    const buildFn = vi.fn()
-      .mockReturnValueOnce("normal prompt")
-      .mockReturnValueOnce("tcr prompt")
-
-    const r1 = cachedBuildSystem("cli", buildFn)
-    const r2 = cachedBuildSystem("cli", buildFn, { toolChoiceRequired: true })
-
-    expect(r1).toBe("normal prompt")
-    expect(r2).toBe("tcr prompt")
-    expect(buildFn).toHaveBeenCalledTimes(2)
-  })
-
-  it("uses separate cache key when disableStreaming is true", async () => {
-    const { cachedBuildSystem, resetSystemPromptCache } = await import("../../mind/context")
-    resetSystemPromptCache()
-    const buildFn = vi.fn()
-      .mockReturnValueOnce("normal prompt")
-      .mockReturnValueOnce("ds prompt")
-
-    const r1 = cachedBuildSystem("teams", buildFn)
-    const r2 = cachedBuildSystem("teams", buildFn, { disableStreaming: true })
-
-    expect(r1).toBe("normal prompt")
-    expect(r2).toBe("ds prompt")
-    expect(buildFn).toHaveBeenCalledTimes(2)
-  })
-
-  it("cache key distinguishes toolChoiceRequired and disableStreaming combinations", async () => {
-    const { cachedBuildSystem, resetSystemPromptCache } = await import("../../mind/context")
-    resetSystemPromptCache()
-    const buildFn = vi.fn()
-      .mockReturnValueOnce("plain")
-      .mockReturnValueOnce("ds only")
-      .mockReturnValueOnce("tcr only")
-      .mockReturnValueOnce("both")
-
-    const r1 = cachedBuildSystem("teams", buildFn)
-    const r2 = cachedBuildSystem("teams", buildFn, { disableStreaming: true })
-    const r3 = cachedBuildSystem("teams", buildFn, { toolChoiceRequired: true })
-    const r4 = cachedBuildSystem("teams", buildFn, { toolChoiceRequired: true, disableStreaming: true })
-
-    expect(r1).toBe("plain")
-    expect(r2).toBe("ds only")
-    expect(r3).toBe("tcr only")
-    expect(r4).toBe("both")
-    expect(buildFn).toHaveBeenCalledTimes(4)
+  it("resetSystemPromptCache no longer exists", async () => {
+    const context = await import("../../mind/context")
+    expect("resetSystemPromptCache" in context).toBe(false)
   })
 })
 

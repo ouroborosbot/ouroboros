@@ -1,0 +1,302 @@
+import type { ToolDefinition, ToolHandler } from "./tools-base";
+import { getProfile, graphRequest } from "./graph-client";
+import { queryWorkItems, adoRequest, discoverOrganizations } from "./ado-client";
+import graphEndpoints from "./data/graph-endpoints.json";
+import adoEndpoints from "./data/ado-endpoints.json";
+
+const MUTATE_METHODS = ["POST", "PATCH", "DELETE"];
+
+// Map HTTP method to authority action name for canWrite() checks
+const METHOD_TO_ACTION: Record<string, string> = {
+  POST: "createWorkItem",
+  PATCH: "updateWorkItem",
+  DELETE: "deleteWorkItem",
+};
+
+// Check if a tool response indicates a 403 PERMISSION_DENIED and record it on the checker
+function checkAndRecord403(result: string, integration: string, scope: string, action: string, ctx?: import("./tools-base").ToolContext): void {
+  if (result.startsWith("PERMISSION_DENIED") && ctx?.context?.checker) {
+    ctx.context.checker.record403(integration, scope, action);
+  }
+}
+
+const DEFAULT_ADO_QUERY = "SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo] FROM WorkItems WHERE [System.AssignedTo] = @Me AND [System.State] <> 'Closed' ORDER BY [System.ChangedDate] DESC";
+
+export const teamsToolDefinitions: ToolDefinition[] = [
+  // -- Generic Graph tools --
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "graph_query",
+        description: "GET any Microsoft Graph API endpoint. Use graph_docs first to look up the correct path.",
+        parameters: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Graph API path after /v1.0, e.g. /me/messages?$top=5" },
+          },
+          required: ["path"],
+        },
+      },
+    },
+    handler: async (args, ctx) => {
+      if (!ctx?.graphToken) {
+        return "AUTH_REQUIRED:graph -- I need access to Microsoft Graph. Please sign in when prompted.";
+      }
+      return graphRequest(ctx.graphToken, "GET", args.path);
+    },
+    integration: "graph",
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "graph_mutate",
+        description: "POST/PATCH/DELETE any Microsoft Graph API endpoint. Use graph_docs first to look up the correct path.",
+        parameters: {
+          type: "object",
+          properties: {
+            method: { type: "string", enum: ["POST", "PATCH", "DELETE"], description: "HTTP method" },
+            path: { type: "string", description: "Graph API path after /v1.0" },
+            body: { type: "string", description: "JSON request body (optional)" },
+          },
+          required: ["method", "path"],
+        },
+      },
+    },
+    handler: async (args, ctx) => {
+      if (!ctx?.graphToken) {
+        return "AUTH_REQUIRED:graph -- I need access to Microsoft Graph. Please sign in when prompted.";
+      }
+      if (!MUTATE_METHODS.includes(args.method)) {
+        return `Invalid method "${args.method}". Must be one of: ${MUTATE_METHODS.join(", ")}`;
+      }
+      return graphRequest(ctx.graphToken, args.method, args.path, args.body);
+    },
+    integration: "graph",
+    confirmationRequired: true,
+  },
+  // -- Generic ADO tools --
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "ado_query",
+        description: "GET or POST (for WIQL read queries) any Azure DevOps API endpoint. Use ado_docs first to look up the correct path.",
+        parameters: {
+          type: "object",
+          properties: {
+            organization: { type: "string", description: "Azure DevOps organization name" },
+            path: { type: "string", description: "ADO API path after /{org}, e.g. /_apis/wit/wiql" },
+            method: { type: "string", enum: ["GET", "POST"], description: "HTTP method (defaults to GET)" },
+            body: { type: "string", description: "JSON request body (optional, used with POST for WIQL)" },
+          },
+          required: ["organization", "path"],
+        },
+      },
+    },
+    handler: async (args, ctx) => {
+      if (!ctx?.adoToken) {
+        return "AUTH_REQUIRED:ado -- I need access to Azure DevOps. Please sign in when prompted.";
+      }
+      const method = args.method || "GET";
+      const result = await adoRequest(ctx.adoToken, method, args.organization, args.path, args.body);
+      checkAndRecord403(result, "ado", args.organization, method, ctx);
+      return result;
+    },
+    integration: "ado",
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "ado_mutate",
+        description: "POST/PATCH/DELETE any Azure DevOps API endpoint for actual mutations. Use ado_docs first to look up the correct path.",
+        parameters: {
+          type: "object",
+          properties: {
+            method: { type: "string", enum: ["POST", "PATCH", "DELETE"], description: "HTTP method" },
+            organization: { type: "string", description: "Azure DevOps organization name" },
+            path: { type: "string", description: "ADO API path after /{org}" },
+            body: { type: "string", description: "JSON request body (optional)" },
+          },
+          required: ["method", "organization", "path"],
+        },
+      },
+    },
+    handler: async (args, ctx) => {
+      if (!ctx?.adoToken) {
+        return "AUTH_REQUIRED:ado -- I need access to Azure DevOps. Please sign in when prompted.";
+      }
+      if (!MUTATE_METHODS.includes(args.method)) {
+        return `Invalid method "${args.method}". Must be one of: ${MUTATE_METHODS.join(", ")}`;
+      }
+      // Authority pre-flight check
+      /* v8 ignore next -- fallback unreachable: method is validated against MUTATE_METHODS above @preserve */
+      const action = METHOD_TO_ACTION[args.method] || args.method;
+      if (ctx.context?.checker) {
+        const allowed = await ctx.context.checker.canWrite("ado", args.organization, action);
+        if (!allowed) {
+          return `AUTHORITY_DENIED: ${args.method} to ${args.organization} was denied by pre-flight authority check. The current user does not have permission for this operation. Consider using ado_query to read data instead, or ask an admin to grant the required permissions.`;
+        }
+      }
+      const result = await adoRequest(ctx.adoToken, args.method, args.organization, args.path, args.body);
+      checkAndRecord403(result, "ado", args.organization, action, ctx);
+      return result;
+    },
+    integration: "ado",
+    confirmationRequired: true,
+  },
+  // -- Convenience aliases (backward compat) --
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "graph_profile",
+        description: "get the current user's Microsoft 365 profile (name, email, job title, department, office location)",
+        parameters: { type: "object", properties: {} },
+      },
+    },
+    handler: async (_args, ctx) => {
+      if (!ctx?.graphToken) {
+        return "AUTH_REQUIRED:graph -- I need access to your Microsoft 365 profile. Please sign in when prompted.";
+      }
+      return getProfile(ctx.graphToken);
+    },
+    integration: "graph",
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "ado_work_items",
+        description: "query or list Azure DevOps work items. provide an organization and optionally a WIQL query. if organization is omitted, discovers available organizations automatically.",
+        parameters: {
+          type: "object",
+          properties: {
+            organization: { type: "string", description: "Azure DevOps organization name (optional -- omit to discover)" },
+            query: { type: "string", description: "WIQL query (optional, defaults to recent assigned work items)" },
+          },
+        },
+      },
+    },
+    handler: async (args, ctx) => {
+      if (!ctx?.adoToken) {
+        return "AUTH_REQUIRED:ado -- I need access to your Azure DevOps account. Please sign in when prompted.";
+      }
+      let org = args.organization;
+      if (!org) {
+        // Discovery cascade: discover orgs, auto-select if single, disambiguate otherwise
+        try {
+          const orgs = await discoverOrganizations(ctx.adoToken);
+          if (orgs.length === 0) {
+            return "No ADO organizations found for your account. Ensure your Azure DevOps account has access to at least one organization.";
+          }
+          if (orgs.length === 1) {
+            org = orgs[0];
+          } else {
+            return `Multiple ADO organizations found. Please specify which organization to use:\n${orgs.map((o) => `- ${o}`).join("\n")}`;
+          }
+        } catch (e) {
+          return `error discovering ADO organizations: ${e instanceof Error ? e.message : String(e)}`;
+        }
+      }
+      const query = args.query || DEFAULT_ADO_QUERY;
+      return queryWorkItems(ctx.adoToken, org, query);
+    },
+    integration: "ado",
+  },
+  // -- Documentation tools --
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "graph_docs",
+        description: "Search the Microsoft Graph API endpoint index. Use before calling graph_query or graph_mutate to find the correct path, method, and required scopes.",
+        parameters: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Search query, e.g. 'send email' or 'calendar events'" },
+          },
+          required: ["query"],
+        },
+      },
+    },
+    handler: (args) => {
+      return searchEndpoints(graphEndpoints as EndpointEntry[], args.query || "");
+    },
+    integration: "graph",
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "ado_docs",
+        description: "Search the Azure DevOps API endpoint index. Use before calling ado_query or ado_mutate to find the correct path, method, and parameters.",
+        parameters: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Search query, e.g. 'work items' or 'pull requests'" },
+          },
+          required: ["query"],
+        },
+      },
+    },
+    handler: (args) => {
+      return searchEndpoints(adoEndpoints as EndpointEntry[], args.query || "");
+    },
+    integration: "ado",
+  },
+];
+
+// Backward-compat: extract just the OpenAI tool schemas
+export const teamsTools: import("openai").default.ChatCompletionTool[] = teamsToolDefinitions.map((d) => d.tool);
+
+// Backward-compat: extract just the handlers by name
+export const teamsToolHandlers: Record<string, ToolHandler> = Object.fromEntries(
+  teamsToolDefinitions.map((d) => [d.tool.function.name, d.handler]),
+);
+
+// Search endpoint index by case-insensitive substring match on description + path.
+// Returns top 5 matches formatted for the LLM.
+interface EndpointEntry {
+  path: string;
+  method: string;
+  description: string;
+  params: string;
+  scopes?: string;
+}
+
+function searchEndpoints(entries: EndpointEntry[], query: string): string {
+  const q = query.toLowerCase();
+  const matches = entries.filter((e) => {
+    const haystack = `${e.description} ${e.path}`.toLowerCase();
+    return haystack.includes(q);
+  });
+
+  if (matches.length === 0) {
+    return `No matching endpoints found for "${query}". Try a broader search term.`;
+  }
+
+  return matches.slice(0, 5).map((e) => {
+    const lines = [
+      `${e.method} ${e.path}`,
+      `  ${e.description}`,
+      `  Params: ${e.params || "none"}`,
+    ];
+    if (e.scopes) lines.push(`  Scopes: ${e.scopes}`);
+    return lines.join("\n");
+  }).join("\n\n");
+}
+
+export function summarizeTeamsArgs(name: string, args: Record<string, string>): string | undefined {
+  if (name === "graph_profile") return "";
+  if (name === "ado_work_items") return args.organization || "";
+  if (name === "graph_query") return args.path || "";
+  if (name === "graph_mutate") return `${args.method || ""} ${args.path || ""}`;
+  if (name === "ado_query") return `${args.organization || ""} ${args.path || ""}`;
+  if (name === "ado_mutate") return `${args.method || ""} ${args.organization || ""} ${args.path || ""}`;
+  if (name === "graph_docs") return args.query || "";
+  if (name === "ado_docs") return args.query || "";
+  return undefined;
+}
