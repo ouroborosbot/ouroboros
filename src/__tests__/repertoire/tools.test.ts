@@ -1593,12 +1593,12 @@ describe("summarizeArgs for docs tools", () => {
     expect(summarizeArgs("ado_docs", {})).toBe("")
   })
 
-  it("returns key=value summary for save_friend_note", () => {
-    expect(summarizeArgs("save_friend_note", { key: "ado", value: "flat backlog" })).toBe("ado")
+  it("returns type+key summary for save_friend_note", () => {
+    expect(summarizeArgs("save_friend_note", { type: "tool_preference", key: "ado", content: "flat backlog" })).toBe("ado")
   })
 
-  it("returns empty string for save_friend_note with no key", () => {
-    expect(summarizeArgs("save_friend_note", { value: "flat backlog" })).toBe("")
+  it("returns type for save_friend_note name type (no key)", () => {
+    expect(summarizeArgs("save_friend_note", { type: "name", content: "Jordan" })).toBe("")
   })
 
   it("returns org + project for ado_backlog_list", () => {
@@ -1611,6 +1611,41 @@ describe("summarizeArgs for docs tools", () => {
 })
 
 describe("save_friend_note tool", () => {
+  // Helper: create a mock FriendRecord
+  function makeFriend(overrides: Record<string, any> = {}) {
+    return {
+      id: "uuid-1",
+      displayName: "Jordan",
+      externalIds: [{ provider: "aad", externalId: "aad-1", linkedAt: "2026-01-01" }],
+      tenantMemberships: ["t1"],
+      toolPreferences: {},
+      notes: {},
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      schemaVersion: 1,
+      ...overrides,
+    }
+  }
+
+  // Helper: create a mock ToolContext with friendStore
+  function makeCtx(overrides: Record<string, any> = {}) {
+    const friend = overrides.friend ?? makeFriend(overrides.friendOverrides)
+    const friendStore = overrides.friendStore ?? {
+      get: vi.fn().mockResolvedValue(friend),
+      put: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn(),
+      findByExternalId: vi.fn(),
+    }
+    return {
+      signin: vi.fn(),
+      context: {
+        friend,
+        channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
+      },
+      friendStore,
+    }
+  }
+
   it("is registered as a base tool definition (no integration)", async () => {
     vi.resetModules()
     const { baseToolDefinitions } = await import("../../repertoire/tools-base")
@@ -1619,107 +1654,218 @@ describe("save_friend_note tool", () => {
     expect(def!.integration).toBeUndefined()
   })
 
-  it("creates new FriendMemory when none exists", async () => {
+  it("tool description includes first-person override guidance", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../repertoire/tools")
-    const memoryStore = {
-      get: vi.fn().mockResolvedValue(null),
-      put: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn(),
-      find: vi.fn(),
-    }
-    const ctx = {
-      signin: vi.fn(),
-      context: {
-        identity: { id: "uuid-1", displayName: "Jordan", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
-        channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
-        memory: null,
-      },
-      memoryStore,
-    }
-    const result = await execTool("save_friend_note", { key: "ado", value: "flat backlog view" }, ctx)
-    expect(result).toContain("saved")
-    expect(memoryStore.put).toHaveBeenCalledWith("uuid-1", {
-      id: "uuid-1",
-      toolPreferences: { ado: "flat backlog view" },
-      schemaVersion: 1,
-    })
+    const { baseToolDefinitions } = await import("../../repertoire/tools-base")
+    const def = baseToolDefinitions.find(d => d.tool.function.name === "save_friend_note")!
+    expect(def.tool.function.description).toContain("override")
   })
 
-  it("updates existing FriendMemory preference", async () => {
+  // -- Validation tests --
+
+  it("returns first-person error when content is missing", async () => {
     vi.resetModules()
     const { execTool } = await import("../../repertoire/tools")
-    const existingMemory = {
-      id: "uuid-1",
-      toolPreferences: { ado: "old preference", general: "keep this" },
-      schemaVersion: 1,
-    }
-    const memoryStore = {
-      get: vi.fn().mockResolvedValue(existingMemory),
-      put: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn(),
-      find: vi.fn(),
-    }
-    const ctx = {
-      signin: vi.fn(),
-      context: {
-        identity: { id: "uuid-1", displayName: "Jordan", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
-        channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
-        memory: existingMemory,
-      },
-      memoryStore,
-    }
-    const result = await execTool("save_friend_note", { key: "ado", value: "flat backlog view" }, ctx)
-    expect(result).toContain("saved")
-    expect(memoryStore.put).toHaveBeenCalledWith("uuid-1", {
-      id: "uuid-1",
-      toolPreferences: { ado: "flat backlog view", general: "keep this" },
-      schemaVersion: 1,
-    })
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "note", key: "role" }, ctx)
+    expect(result).toMatch(/content/i)
+    expect(result).toMatch(/i need|required/i)
+  })
+
+  it("returns first-person error when key is missing for tool_preference type", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "tool_preference", content: "flat backlog" }, ctx)
+    expect(result).toMatch(/key/i)
+    expect(result).toMatch(/i need|required/i)
+  })
+
+  it("returns first-person error when key is missing for note type", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "note", content: "engineering manager" }, ctx)
+    expect(result).toMatch(/key/i)
+    expect(result).toMatch(/i need|required/i)
+  })
+
+  it("returns first-person error when type is invalid", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "invalid", key: "k", content: "v" }, ctx)
+    expect(result).toMatch(/type/i)
   })
 
   it("returns error when no context is available", async () => {
     vi.resetModules()
     const { execTool } = await import("../../repertoire/tools")
     const ctx = { signin: vi.fn() }
-    const result = await execTool("save_friend_note", { key: "ado", value: "test" }, ctx)
+    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "eng" }, ctx)
     expect(result).toContain("no friend context")
   })
 
-  it("returns error when no memoryStore is available", async () => {
+  it("returns error when no friendStore is available", async () => {
     vi.resetModules()
     const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       signin: vi.fn(),
       context: {
-        identity: { id: "uuid-1", displayName: "Jordan", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        friend: makeFriend(),
         channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
-        memory: null,
       },
     }
-    const result = await execTool("save_friend_note", { key: "ado", value: "test" }, ctx)
+    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "eng" }, ctx)
     expect(result).toContain("not available")
   })
 
-  it("handles write failure gracefully (D16)", async () => {
+  // -- type: "name" tests --
+
+  it("type 'name' updates displayName and notes['name']", async () => {
     vi.resetModules()
     const { execTool } = await import("../../repertoire/tools")
-    const memoryStore = {
-      get: vi.fn().mockResolvedValue(null),
-      put: vi.fn().mockRejectedValue(new Error("disk full")),
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "name", content: "Jordan Lee" }, ctx)
+    expect(result).toContain("saved")
+    expect(ctx.friendStore.put).toHaveBeenCalledWith(
+      "uuid-1",
+      expect.objectContaining({
+        displayName: "Jordan Lee",
+        notes: { name: "Jordan Lee" },
+      }),
+    )
+  })
+
+  it("type 'name' does not require key parameter", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "name", content: "Alex" }, ctx)
+    expect(result).toContain("saved")
+  })
+
+  // -- type: "tool_preference" tests --
+
+  it("type 'tool_preference' saves new preference", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "tool_preference", key: "ado", content: "flat backlog view" }, ctx)
+    expect(result).toContain("saved")
+    expect(ctx.friendStore.put).toHaveBeenCalledWith(
+      "uuid-1",
+      expect.objectContaining({
+        toolPreferences: { ado: "flat backlog view" },
+      }),
+    )
+  })
+
+  it("type 'tool_preference' with existing value and no override returns conflict", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx({ friendOverrides: { toolPreferences: { ado: "old preference" } } })
+    const result = await execTool("save_friend_note", { type: "tool_preference", key: "ado", content: "new preference" }, ctx)
+    // Should NOT have written to disk
+    expect(ctx.friendStore.put).not.toHaveBeenCalled()
+    // Should return existing value and merge instruction
+    expect(result).toContain("old preference")
+    expect(result).toMatch(/override|merge/i)
+  })
+
+  it("type 'tool_preference' with existing value and override=true overwrites", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx({ friendOverrides: { toolPreferences: { ado: "old preference" } } })
+    const result = await execTool("save_friend_note", { type: "tool_preference", key: "ado", content: "new preference", override: "true" }, ctx)
+    expect(result).toContain("saved")
+    expect(ctx.friendStore.put).toHaveBeenCalledWith(
+      "uuid-1",
+      expect.objectContaining({
+        toolPreferences: { ado: "new preference" },
+      }),
+    )
+  })
+
+  // -- type: "note" tests --
+
+  it("type 'note' saves new note", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "engineering manager" }, ctx)
+    expect(result).toContain("saved")
+    expect(ctx.friendStore.put).toHaveBeenCalledWith(
+      "uuid-1",
+      expect.objectContaining({
+        notes: { role: "engineering manager" },
+      }),
+    )
+  })
+
+  it("type 'note' with existing value and no override returns conflict", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx({ friendOverrides: { notes: { role: "old role" } } })
+    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "new role" }, ctx)
+    expect(ctx.friendStore.put).not.toHaveBeenCalled()
+    expect(result).toContain("old role")
+    expect(result).toMatch(/override|merge/i)
+  })
+
+  it("type 'note' with existing value and override=true overwrites", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx({ friendOverrides: { notes: { role: "old role" } } })
+    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "new role", override: "true" }, ctx)
+    expect(result).toContain("saved")
+    expect(ctx.friendStore.put).toHaveBeenCalledWith(
+      "uuid-1",
+      expect.objectContaining({
+        notes: { role: "new role" },
+      }),
+    )
+  })
+
+  // -- Disk write / no in-memory mutation tests --
+
+  it("writes to disk via friendStore.put, reads fresh record via friendStore.get", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const friend = makeFriend()
+    const friendStore = {
+      get: vi.fn().mockResolvedValue(friend),
+      put: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn(),
-      find: vi.fn(),
+      findByExternalId: vi.fn(),
     }
     const ctx = {
       signin: vi.fn(),
-      context: {
-        identity: { id: "uuid-1", displayName: "Jordan", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
-        channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
-        memory: null,
-      },
-      memoryStore,
+      context: { friend, channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity } },
+      friendStore,
     }
-    const result = await execTool("save_friend_note", { key: "ado", value: "test" }, ctx)
+    await execTool("save_friend_note", { type: "note", key: "role", content: "manager" }, ctx)
+    // Should have called get first to read fresh record
+    expect(friendStore.get).toHaveBeenCalledWith("uuid-1")
+    // Should have called put to write
+    expect(friendStore.put).toHaveBeenCalled()
+  })
+
+  it("handles write failure gracefully", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const friendStore = {
+      get: vi.fn().mockResolvedValue(makeFriend()),
+      put: vi.fn().mockRejectedValue(new Error("disk full")),
+      delete: vi.fn(),
+      findByExternalId: vi.fn(),
+    }
+    const ctx = {
+      signin: vi.fn(),
+      context: { friend: makeFriend(), channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity } },
+      friendStore,
+    }
+    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "test" }, ctx)
     expect(result).toContain("error")
     expect(result).toContain("disk full")
   })
