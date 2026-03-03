@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import { createLogger } from "../../observability"
 
@@ -82,5 +82,79 @@ describe("observability/logger", () => {
     expect(left).toHaveLength(1)
     expect(right).toHaveLength(1)
     expect(left[0]).toEqual(right[0])
+  })
+
+  it("supports warn level emissions", () => {
+    const received: Array<Record<string, unknown>> = []
+    const logger = createLogger({
+      level: "debug",
+      sinks: [(entry) => received.push(entry as Record<string, unknown>)],
+    })
+
+    logger.warn({
+      event: "tool.warn",
+      trace_id: "trace-3",
+      component: "tools",
+      message: "slow tool",
+      meta: { timeoutMs: 5000 },
+    })
+
+    expect(received).toHaveLength(1)
+    expect(received[0]?.level).toBe("warn")
+    expect(received[0]?.event).toBe("tool.warn")
+  })
+
+  it("uses default stderr sink when no sinks are provided", () => {
+    const chunks: string[] = []
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
+      chunks.push(chunk.toString())
+      return true
+    })
+
+    const logger = createLogger({ level: "info" })
+    logger.info({
+      event: "turn.start",
+      trace_id: "trace-default",
+      component: "entrypoints",
+      message: "started",
+      meta: {},
+    })
+
+    expect(chunks.length).toBeGreaterThan(0)
+    const payload = JSON.parse(chunks[0]!.trim()) as Record<string, unknown>
+    expect(payload.level).toBe("info")
+    expect(payload.event).toBe("turn.start")
+
+    stderrSpy.mockRestore()
+  })
+
+  it("defaults log level to info when level is omitted", () => {
+    const chunks: string[] = []
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
+      chunks.push(chunk.toString())
+      return true
+    })
+
+    const logger = createLogger()
+    logger.debug({
+      event: "turn.debug",
+      trace_id: "trace-default-level",
+      component: "entrypoints",
+      message: "debug",
+      meta: {},
+    })
+    logger.info({
+      event: "turn.info",
+      trace_id: "trace-default-level",
+      component: "entrypoints",
+      message: "info",
+      meta: {},
+    })
+
+    expect(chunks).toHaveLength(1)
+    const payload = JSON.parse(chunks[0]!.trim()) as Record<string, unknown>
+    expect(payload.event).toBe("turn.info")
+
+    stderrSpy.mockRestore()
   })
 })
