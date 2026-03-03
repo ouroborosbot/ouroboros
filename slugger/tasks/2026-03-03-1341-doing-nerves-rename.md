@@ -74,7 +74,7 @@ Rename the repository's observability namespace and command surface from `observ
 **What**: Update `package.json`, `scripts/run-coverage-gate.cjs`, and coverage CLI wiring so the combined gate pipeline consistently references the renamed subsystem and command.
 **Acceptance**: Coverage gate script and audit command run successfully using `audit:nerves`, `dist/nerves/coverage/cli-main.js`, and renamed expected artifact paths.
 
-### ⬜ Unit 2c: Coverage/Audit Pipeline Integration — Coverage & Refactor
+### ✅ Unit 2c: Coverage/Audit Pipeline Integration — Coverage & Refactor
 **What**: Validate branch/error-path coverage for updated script logic and tighten implementation without behavior drift.
 **Acceptance**: Updated script/tests are fully covered for new/changed lines and remain green.
 
@@ -114,3 +114,4 @@ Rename the repository's observability namespace and command surface from `observ
 - [2026-03-03 14:04] Unit 1c complete: backfilled coverage for `src/nerves/coverage/cli-main.ts`; combined `test:coverage` gate and build both pass at 100%.
 - [2026-03-03 14:05] Unit 2a complete: added failing coverage-pipeline contract assertions for `nerves audit` messaging and `nerves_coverage` summary key.
 - [2026-03-03 14:07] Unit 2b complete: implemented `nerves audit` messaging and `nerves_coverage` outputs in coverage CLI/gate; targeted tests and combined gate pass.
+- [2026-03-03 14:08] Unit 2c complete: reran combined coverage gate at 100% with `nerves` pipeline naming and verified clean build.
