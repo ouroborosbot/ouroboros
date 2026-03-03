@@ -142,9 +142,9 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Acceptance**: `tsc --noEmit` passes, all existing tests pass with new paths.
 
 ### ⬜ Unit 4b: Directory rename -- Verification
-**What**: Run full test suite to verify no broken imports. Grep for any remaining `mind/context` references (excluding planning/doing docs and node_modules).
-**Output**: Grep results showing zero stale references.
-**Acceptance**: Zero references to `mind/context` in source code, all tests pass.
+**What**: Run full test suite to verify no broken imports. Grep for any remaining `mind/context/` references (with trailing slash -- `mind/context.ts` is a separate file that should NOT be matched). Exclude planning/doing docs and node_modules from grep.
+**Output**: Grep results showing zero stale references to `mind/context/`.
+**Acceptance**: Zero references to `mind/context/` in source code, all tests pass.
 
 ### ⬜ Unit 5a: save_friend_note redesign -- Tests
 **What**: Write tests for redesigned `save_friend_note` tool in `tools-base.ts`. Test: new parameters (`type`, `key`, `content`, `override`), validation (missing content returns first-person error, missing key for tool_preference/note returns first-person error, invalid type returns first-person error), `type: "name"` updates displayName and notes["name"], `type: "tool_preference"` with conflict detection (existing value + no override = returns existing + merge instruction, with override = overwrites), `type: "note"` with same conflict behavior, writes to disk via `friendStore.put()`, no in-memory mutation, updated tool description with first-person override guidance. Test the broadened description text.
@@ -281,3 +281,7 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 
 ## Progress Log
 - 2026-03-03 14:34 Created from planning doc
+- 2026-03-03 14:37 Pass 1 (first draft) complete
+- 2026-03-03 14:40 Pass 2 (granularity) complete -- added Output fields to all units, clarified Unit 4 as mechanical refactor
+- 2026-03-03 14:42 Pass 3 (validation) complete -- verified all file paths, class names, interfaces against codebase. Key finding: `src/mind/context.ts` (session mgmt) is distinct from `src/mind/context/` directory, Unit 4a updated with explicit warning
+- 2026-03-03 14:42 Pass 4 (quality) complete -- all 33 unit headers have emoji, all have acceptance criteria, no TBDs, Unit 4b grep clarified to match `mind/context/` (trailing slash) to avoid false-matching `context.ts`
