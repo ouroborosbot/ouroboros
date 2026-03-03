@@ -18,8 +18,8 @@ Define and lock runtime hardening requirements for single-replica preview so req
 ## Completion Criteria
 - [ ] Runtime hardening contract is implemented for single-replica preview and applied to active request-path code.
 - [ ] Request-path logging and persistence sinks are non-blocking in practice for expected preview concurrency.
-- [ ] Tool-surface runtime posture is enforced according to agreed preview policy.
-- [ ] Remote channels cannot execute local CLI/file/git/gh tools, and denial UX explains multi-user safety rationale with a clear alternative path.
+- [x] Tool-surface runtime posture is enforced according to agreed preview policy.
+- [x] Remote channels cannot execute local CLI/file/git/gh tools, and denial UX explains multi-user safety rationale with a clear alternative path.
 - [ ] Concurrency guardrails (limits/timeouts/backpressure behavior) are implemented and covered by tests.
 - [ ] System-prompt rebuild path has explicit safety behavior (freshness + consistency) covered by tests.
 - [ ] Load-validation artifacts exist and demonstrate agreed preview thresholds: 10 concurrent remote conversations, p95 first-feedback <= 2s, p95 final <= 9s for simple no-tool turns, p95 final <= 30s for tool/external turns, and error rate < 1%.
@@ -61,7 +61,7 @@ Define and lock runtime hardening requirements for single-replica preview so req
 **Output**: Red test artifact at `./2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-1a-red-run.txt`.
 **Acceptance**: Tests fail before implementation and explicitly show remote local-tool exposure/denial-message gaps.
 
-### ⬜ Unit 1b: Remote Tool-Surface Safety — Implementation
+### ✅ Unit 1b: Remote Tool-Surface Safety — Implementation
 **What**: Implement channel-aware tool allowlisting and denial-path messaging so remote users get safe alternatives instead of opaque refusal.
 **Output**: Updated runtime/tool routing code and passing targeted tests.
 **Acceptance**: Remote channels cannot execute local CLI/file/git/gh tools; responses explain multi-user safety rationale and next-step alternatives.
@@ -132,3 +132,4 @@ Define and lock runtime hardening requirements for single-replica preview so req
 - [2026-03-03 14:46] Quality pass complete: checklist/testability/emoji-header requirements verified; status set to READY_FOR_EXECUTION.
 - [2026-03-03 14:47] Unit 0 complete: captured current-state runtime hardening contract matrix and target touchpoints in `unit-0-runtime-baseline.md`.
 - [2026-03-03 14:49] Unit 1a complete: added failing remote tool-safety tests and captured red evidence for local-tool exposure and missing denial UX contract.
+- [2026-03-03 14:51] Unit 1b complete: implemented remote-channel local-tool filtering/denial messaging, updated contract tests, and verified full test + build green.
