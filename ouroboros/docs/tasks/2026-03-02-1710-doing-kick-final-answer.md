@@ -104,14 +104,14 @@ Tests to update:
 Tests to update for message text:
 - `src/__tests__/engine/kicks.test.ts`: kick message assertions
 - `src/__tests__/engine/core.test.ts`: any assertions on kick message content
-- `src/__tests__/engine/tools-base.test.ts` (if exists): finalAnswerTool description assertions
+- `src/__tests__/engine/tools.test.ts` (lines 554-563): `finalAnswerTool` description assertion -- update expected text from tool_choice-specific to general-purpose
 
 **Acceptance**: New tests exist, compile, and FAIL (red) because `activeTools` is still computed once before the loop. Message text assertions updated to match planned new text.
 
 ### ⬜ Unit 2b: Inject final_answer after narration kick -- Implementation
 
 **What**: Make the tests from 2a pass:
-- `src/engine/core.ts`: Move `activeTools` computation inside the while loop. Track `lastKickReason` (set to `kick.reason` when a kick fires). Compute: `activeTools = (options?.toolChoiceRequired || lastKickReason === "narration") ? [...baseTools, finalAnswerTool] : baseTools`
+- `src/engine/core.ts`: Move `activeTools` computation inside the while loop. Add `import type { KickReason } from "./kicks"`. Track `let lastKickReason: KickReason | null = null` (set to `kick.reason` when a kick fires). Compute: `const activeTools = (options?.toolChoiceRequired || lastKickReason === "narration") ? [...baseTools, finalAnswerTool] : baseTools`
 - `src/engine/kicks.ts`: Update narration kick message to: `"I narrated instead of acting. Calling the tool now -- if I've already finished, I can use final_answer."`
 - `src/engine/tools-base.ts`: Update `finalAnswerTool.description` to be general-purpose: `"give your final text response. use this when you want to reply with text instead of calling another tool."`
 
