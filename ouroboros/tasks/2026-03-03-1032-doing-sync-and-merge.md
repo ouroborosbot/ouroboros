@@ -123,3 +123,4 @@ Note: This task is documentation-only. TDD applies if any runtime code is introd
 ## Progress Log
 - 2026-03-03 11:09 Created from planning doc
 - 2026-03-03 11:15 Added gh CLI preflight checks to Unit 1 and completion criteria (user feedback)
+- 2026-03-03 11:25 Updated Unit 2: git-informed task doc discovery replaces timestamp heuristic. Updated Unit 4: exponential backoff (no retry limit) with mandatory user communication on each retry. (user feedback)
