@@ -26,6 +26,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Define a machine-readable observability coverage contract (required events + declared logpoints + schema/redaction rules) under `src/observability/coverage/`.
 - Add `npm run audit:observability` to validate observability coverage from test-captured events.
 - Add CI gating so observability coverage audit runs alongside test/coverage checks.
+- Link observability coverage to the same unit-test execution run: tests emit audit artifacts once, and audit reads artifacts without rerunning tests.
 - Add tests for logger behavior, trace helpers, and instrumentation points.
 - Ensure test/build/coverage remain green with 100% coverage on new code.
 
@@ -49,6 +50,8 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [ ] Tests cover new observability code and instrumentation behavior.
 - [ ] `npm run audit:observability` exists and fails when required event coverage, schema/policy checks, or declared logpoint coverage is incomplete.
 - [ ] Observability coverage report artifact is produced with measurable results for: event-catalog coverage, schema/redaction compliance, and logpoint coverage.
+- [ ] Unit-test runs write observability audit artifacts to dedicated paths (`./.artifacts/observability/vitest-events.ndjson` and `./.artifacts/observability/vitest-logpoints.json`) instead of operational sinks.
+- [ ] `npm run audit:observability` consumes those artifacts directly (no second test run).
 - [ ] CI enforces `npm run audit:observability` as a required gate for this phase.
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
@@ -79,6 +82,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - Upstream `src/wardrobe/*` modules map to existing component taxonomy for this phase (no new component key): `wardrobe/format` events are `component=channels`; `wardrobe/phrases` events are `component=repertoire`.
 - Upstream `src/engine/kicks.ts` is explicitly in-scope for instrumentation and maps to `component=engine` within this phase taxonomy.
 - Observability coverage for this phase is audited in three dimensions: required-event catalog coverage, schema/redaction compliance, and declared-logpoint coverage; all must pass in CI.
+- Observability coverage is coupled to test execution: Vitest capture mode produces audit artifacts, and audit is strictly a post-processing step over those artifacts.
 - Minimum required event catalog for this phase is locked by component:
   - entrypoints: `turn.start`, `turn.end`, `turn.error`
   - channels: `channel.message_sent`, `channel.error`
@@ -100,6 +104,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/src/wardrobe/format.ts`
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/.github/workflows/coverage.yml`
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/package.json`
+- `/Users/arimendelow/Projects/ouroboros-agent-harness/vitest.config.ts`
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/AGENTS.md`
 
 ## Notes
@@ -121,3 +126,4 @@ Merged `origin/main` into `codex/slugger` before execution planning refresh; ups
 - [2026-03-02 16:17] Validation clarification: mapped `src/wardrobe/*` files onto existing event component taxonomy (channels/repertoire)
 - [2026-03-02 16:37] Explicitly added `src/engine/kicks.ts` instrumentation/testing coverage to scope and component taxonomy
 - [2026-03-02 16:55] Added observability-coverage gate scope (`audit:observability` + CI) with explicit measurable dimensions
+- [PENDING_CAPTURE_LINK_TS] Locked single-run coverage model: Vitest emits observability artifacts once; audit consumes artifacts without rerunning tests
