@@ -92,7 +92,7 @@ Note: This task is documentation-only. TDD applies if any runtime code is introd
 **Output**: Updated `AGENTS.md`.
 **Acceptance**: Branch parsing rule simplified (no `codex/` special-case). Runtime-Specific Invocation lists work-merger for both Codex and Claude Code. Gate Flow includes step 5 (or equivalent) for work-merger after implementation.
 
-### ⬜ Unit 6: Update `subagents/README.md` -- work-merger install and docs
+### ✅ Unit 6: Update `subagents/README.md` -- work-merger install and docs
 **What**: Update `subagents/README.md` to: (1) add work-merger to the Available sub-agents table, (2) add install commands for both Claude Code (symlink) and Codex skill (hard-link + optional `openai.yaml`), (3) extend the Workflow section to include the sync-and-merge step.
 **Output**: Updated `subagents/README.md`.
 **Acceptance**: Table has work-merger row. Claude Code install section includes work-merger symlink. Codex install section includes `mkdir`, hard-link, and optional `openai.yaml` for work-merger. Workflow section has step 4 (or equivalent) for sync-and-merge.
