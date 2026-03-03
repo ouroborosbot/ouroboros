@@ -2510,6 +2510,64 @@ describe("runAgent", () => {
     expect(messages[0].role).toBe("system")
   })
 
+  it("preserves non-system history when refreshing system prompt", async () => {
+    mockCreate.mockReturnValue(makeStream([makeChunk("hi")]))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [
+      { role: "user", content: "hello from history" },
+    ]
+    await runAgent(messages, callbacks, "cli")
+
+    expect(messages[0].role).toBe("system")
+    expect(messages.some((m: any) => m.role === "user" && m.content === "hello from history")).toBe(true)
+  })
+
+  it("falls back to existing system prompt when prompt refresh fails", async () => {
+    vi.resetModules()
+    mockCreate.mockReset()
+    mockResponsesCreate.mockReset()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockRejectedValue(new Error("prompt refresh failed")),
+    }))
+
+    const core = await import("../../heart/core")
+    mockCreate.mockReturnValue(makeStream([makeChunk("hi")]))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [
+      { role: "system", content: "stable fallback prompt" },
+      { role: "user", content: "hello" },
+    ]
+
+    await core.runAgent(messages, callbacks, "teams")
+
+    expect(messages[0].role).toBe("system")
+    expect(messages[0].content).toBe("stable fallback prompt")
+    expect(messages.some((m: any) => m.role === "user" && m.content === "hello")).toBe(true)
+    expect(mockCreate).toHaveBeenCalled()
+  })
+
   it("still works without channel parameter (backward compatible)", async () => {
     mockCreate.mockReturnValue(makeStream([makeChunk("hi")]))
 
