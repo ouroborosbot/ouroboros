@@ -462,3 +462,5 @@ Wiring:
 - 2026-03-02 16:06 Unit 7b complete: dual-mode rendering implemented -- streaming mode uses safeEmit with formatToolResult/formatKick/formatError, buffered mode uses safeSend, async flush with first-to-emit/subsequent-to-sendMessage, onKick added, handleTeamsMessage passes sendMessage, 900 tests pass, build clean
 - 2026-03-02 16:07 Unit 7c complete: teams.ts 100% (Stmts/Branch/Funcs/Lines), added 3 coverage tests (safeSend catch, flushTextBuffer with streamHasContent, flush without sendMessage), 903 tests pass
 - 2026-03-02 16:08 Unit 8 complete: 903 tests pass, 0 fail, build clean. Coverage: all new code 100%, overall 99.92% stmts / 99.87% branches / 100% funcs / 100% lines. Only uncovered branch is pre-existing cli.ts:56
+- 2026-03-02 16:10 Unit 9 complete: README.md updated with src/wardrobe/ directory, format.ts, phrases.ts descriptions, test count 900+. CONTRIBUTING.md unchanged (no stale references).
+- 2026-03-02 16:10 ALL UNITS COMPLETE. Status: done. 903 tests, 100% coverage on all new code, build clean.
