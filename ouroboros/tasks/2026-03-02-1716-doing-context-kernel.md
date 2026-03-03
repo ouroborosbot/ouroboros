@@ -514,7 +514,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 ---
 
-### ⬜ Unit 1F: ContextResolver -- Identity + Channel
+### ✅ Unit 1F: ContextResolver -- Identity + Channel
 
 **What**: Build the `ContextResolver` that resolves identity (from store) and channel (from lookup) into a `ResolvedContext` object. In Phase 1, all resolution is cheap -- no Promises needed yet. Phase 2 adds authority with explicit `Promise<T>` fields (eager-start, API call fires at resolver build time). Phase 3 adds memory.
 
@@ -1375,3 +1375,4 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - 2026-03-02 2332 Unit 1B complete: FileContextStore with JSON persistence, schema versioning, error handling. 14 new tests, 945 total.
 - 2026-03-02 2333 Unit 1C complete: FriendIdentity resolution with get-or-create, AAD + local providers. 10 new tests, 955 total.
 - 2026-03-02 2334 Unit 1E complete: ChannelCapabilities lookup, CLI + Teams + unknown defaults. 5 new tests, 960 total.
+- 2026-03-02 2335 Unit 1F complete: ContextResolver resolves identity + channel into ResolvedContext. 6 new tests, 966 total.
