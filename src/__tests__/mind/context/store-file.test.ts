@@ -250,6 +250,22 @@ describe("FileFriendStore", () => {
       expect(found).not.toBeNull()
     })
 
+    it("skips entry when PII matches but agent knowledge is missing", async () => {
+      const store = new FileFriendStore(agentKnowledgePath, piiBridgePath)
+      // Write PII bridge file directly (no corresponding agent knowledge file)
+      await fs.writeFile(
+        path.join(piiBridgePath, "orphan-uuid.json"),
+        JSON.stringify({
+          id: "orphan-uuid",
+          externalIds: [{ provider: "aad", externalId: "orphan-aad", linkedAt: "2026-03-02T00:00:00.000Z" }],
+          tenantMemberships: [],
+          schemaVersion: 1,
+        }),
+      )
+      const found = await store.findByExternalId("aad", "orphan-aad")
+      expect(found).toBeNull()
+    })
+
     it("skips corrupted PII files and continues scanning", async () => {
       const store = new FileFriendStore(agentKnowledgePath, piiBridgePath)
       // Write corrupted PII file first
@@ -270,6 +286,31 @@ describe("FileFriendStore", () => {
       // findByExternalId without tenantId should still match
       const found = await store.findByExternalId("aad", "aad-id-1")
       expect(found).not.toBeNull()
+    })
+  })
+
+  describe("findByExternalId() error paths", () => {
+    it("returns null when PII bridge directory does not exist (readdir fails)", async () => {
+      // Create store with a path that we then remove before searching
+      const store = new FileFriendStore(agentKnowledgePath, piiBridgePath)
+      // Remove PII bridge directory to force readdir to fail
+      await fs.rm(piiBridgePath, { recursive: true, force: true })
+      const found = await store.findByExternalId("aad", "any-id")
+      expect(found).toBeNull()
+    })
+  })
+
+  describe("delete() error paths", () => {
+    it("throws on non-ENOENT error (e.g., permission denied)", async () => {
+      const store = new FileFriendStore(agentKnowledgePath, piiBridgePath)
+      await store.put("uuid-1", makeFriend())
+      // Make agent knowledge directory read-only so unlink fails with EACCES/EPERM
+      await fs.chmod(agentKnowledgePath, 0o444)
+      try {
+        await expect(store.delete("uuid-1")).rejects.toThrow()
+      } finally {
+        await fs.chmod(agentKnowledgePath, 0o755)
+      }
     })
   })
 
