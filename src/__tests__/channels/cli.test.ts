@@ -647,6 +647,33 @@ describe("CLI adapter - onToolEnd", () => {
 
     vi.restoreAllMocks()
   })
+
+  it("keeps stderr output channel-native and emits structured channel events", async () => {
+    const stderrChunks: string[] = []
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
+      stderrChunks.push(chunk.toString())
+      return true
+    })
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true)
+
+    vi.resetModules()
+    const emitObservabilityEvent = vi.fn()
+    vi.doMock("../../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+    const agent = await import("../../channels/cli")
+    const callbacks = agent.createCliCallbacks()
+
+    callbacks.onToolEnd("read_file", "/tmp/test.txt", true)
+
+    expect(stderrChunks.join("")).toContain("\u2713 read_file (/tmp/test.txt)")
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "channel.message_sent",
+      component: "channels",
+    }))
+
+    vi.restoreAllMocks()
+  })
 })
 
 describe("CLI adapter - onError", () => {

@@ -335,6 +335,24 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
+  it("keeps Teams stream output channel-native and emits structured channel events", async () => {
+    vi.resetModules()
+    const emitObservabilityEvent = vi.fn()
+    vi.doMock("../../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+    const teams = await import("../../channels/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+
+    callbacks.onToolEnd("read_file", "package.json", true)
+
+    expect(mockStream.emit).toHaveBeenCalledWith("\n\n\u2713 read_file (package.json)\n\n")
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "channel.message_sent",
+      component: "channels",
+    }))
+  })
+
   // --- Streaming-mode onKick: inline via stream.emit ---
 
   it("onKick emits inline formatted kick via stream.emit", async () => {
