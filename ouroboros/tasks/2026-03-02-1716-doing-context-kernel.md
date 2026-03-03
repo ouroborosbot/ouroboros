@@ -1371,3 +1371,4 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - 2026-03-02 2309 Pass 3: validation -- found 4 issues: (1) api-error.ts missing from unit 10 renames, (2) cachedBuildSystem lives in context.ts not prompt.ts, (3) test files are combined tools.test.ts not separate tools-base/tools-teams, (4) src/repertoire/ already exists. All fixed.
 - 2026-03-02 2309 Pass 4: quality -- all 21 units have emoji headers, completion criteria, test requirements, 100% coverage. No TBD items. No changes needed.
 - 2026-03-02 2328 Unit 10 complete: Directory restructuring -- engine/ -> heart/, channels/ -> senses/, tool files -> repertoire/. All 910 tests pass, clean build.
+- 2026-03-02 2330 Unit 1A complete: ContextStore interface, CollectionStore<T>, all context types with type guards. 21 new tests, 931 total.
