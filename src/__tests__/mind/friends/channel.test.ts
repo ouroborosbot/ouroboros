@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
-import { getChannelCapabilities } from "../../../mind/context/channel"
-import { isIntegration } from "../../../mind/context/types"
+import { getChannelCapabilities } from "../../../mind/friends/channel"
+import { isIntegration } from "../../../mind/friends/types"
 
 describe("getChannelCapabilities", () => {
   it("returns CLI capabilities with empty integrations", () => {

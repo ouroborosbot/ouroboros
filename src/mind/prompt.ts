@@ -5,8 +5,8 @@ import { getAzureConfig } from "../config";
 import { finalAnswerTool, getToolsForChannel } from "../repertoire/tools";
 import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName } from "../identity";
-import type { ResolvedContext } from "./context/types";
-import { getChannelCapabilities } from "./context/channel";
+import type { ResolvedContext } from "./friends/types";
+import { getChannelCapabilities } from "./friends/channel";
 
 // Lazy-loaded psyche text cache
 let _psycheCache: { soul: string; identity: string; lore: string; friends: string } | null = null;

@@ -91,7 +91,7 @@ vi.mock("../../identity", () => ({
     },
   })),
 }))
-vi.mock("../../mind/context/store-file", () => {
+vi.mock("../../mind/friends/store-file", () => {
   const MockFileFriendStore = vi.fn(function (this: any) {
     this.get = vi.fn()
     this.put = vi.fn()
@@ -100,7 +100,7 @@ vi.mock("../../mind/context/store-file", () => {
   })
   return { FileFriendStore: MockFileFriendStore }
 })
-vi.mock("../../mind/context/resolver", () => {
+vi.mock("../../mind/friends/resolver", () => {
   const MockFriendResolver = vi.fn(function (this: any) {
     this.resolve = (...a: any[]) => mocks.resolveContext(...a)
   })

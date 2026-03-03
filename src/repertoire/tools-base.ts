@@ -3,8 +3,8 @@ import * as fs from "fs";
 import { execSync, spawnSync } from "child_process";
 import { listSkills, loadSkill } from "./skills";
 import { getIntegrationsConfig } from "../config";
-import type { Integration, ResolvedContext, FriendMemory } from "../mind/context/types";
-import type { CollectionStore } from "../mind/context/store";
+import type { Integration, ResolvedContext, FriendMemory } from "../mind/friends/types";
+import type { CollectionStore } from "../mind/friends/store";
 
 export interface ToolContext {
   graphToken?: string;

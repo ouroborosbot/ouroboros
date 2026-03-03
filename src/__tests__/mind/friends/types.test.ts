@@ -8,7 +8,7 @@ import {
   type FriendRecord,
   type ChannelCapabilities,
   type ResolvedContext,
-} from "../../../mind/context/types"
+} from "../../../mind/friends/types"
 
 describe("IdentityProvider type guard", () => {
   it("accepts 'aad'", () => {

@@ -11,8 +11,8 @@ import { loadSession, deleteSession, postTurn } from "../mind/context"
 import type { UsageData } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand, getToolChoiceRequired } from "../repertoire/commands"
 import { getAgentName, getAgentRoot } from "../identity"
-import { FileFriendStore } from "../mind/context/store-file"
-import { FriendResolver } from "../mind/context/resolver"
+import { FileFriendStore } from "../mind/friends/store-file"
+import { FriendResolver } from "../mind/friends/resolver"
 import type { ToolContext } from "../repertoire/tools"
 
 // readline.Interface exposes undocumented mutable line/cursor for in-progress input
