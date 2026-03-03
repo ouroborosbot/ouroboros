@@ -2,7 +2,7 @@
 
 ## Test Runs
 - Targeted event-catalog suites: `npm run test -- src/__tests__/engine/core.test.ts src/__tests__/engine/kicks.test.ts src/__tests__/mind/context.test.ts src/__tests__/mind/prompt.test.ts src/__tests__/engine/tools.test.ts src/__tests__/channels/cli.test.ts src/__tests__/channels/teams.test.ts src/__tests__/config.test.ts src/__tests__/identity.test.ts src/__tests__/engine/ado-client.test.ts src/__tests__/engine/graph-client.test.ts src/__tests__/repertoire/commands.test.ts src/__tests__/repertoire/skills.test.ts src/__tests__/wardrobe/phrases.test.ts src/__tests__/wardrobe/format.test.ts`
-  - Evidence: `docs/slugger/tasks/2026-03-02-1501-doing-ouroboros-migration-observability/unit-7a-targeted-test-output.txt`
+  - Evidence: `slugger/tasks/2026-03-02-1501-doing-ouroboros-migration-observability/unit-7a-targeted-test-output.txt`
   - Result: pass (15 files, 810 tests)
 - Full mandatory gate: `npm run test:coverage`
   - Evidence: `/Users/arimendelow/.agentconfigs/test-runs/ouroboros-agent-harness/2026-03-03T02-42-35-165Z/final-coverage-output.txt`
