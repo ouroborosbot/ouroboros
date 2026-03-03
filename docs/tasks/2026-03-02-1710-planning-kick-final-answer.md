@@ -1,6 +1,6 @@
 # Planning: Inject final_answer Tool After Narration Kick
 
-**Status**: drafting
+**Status**: NEEDS_REVIEW
 **Created**: 2026-03-02 17:10
 
 ## Goal
@@ -9,9 +9,9 @@ Handle false-positive narration kicks gracefully by injecting `final_answer` int
 ## Scope
 
 ### In Scope
-- Move `activeTools` computation inside the while loop (or make it reactive) so it can include `final_answer` after a kick
-- After any kick fires (narration, empty, tool_required), include `final_answer` in the tool list for the retry iteration
-- Update the narration kick message to hint at `final_answer` as an escape hatch
+- Move `activeTools` computation inside the while loop (or make it reactive) so it can include `final_answer` after a narration kick
+- After a narration kick fires, include `final_answer` in the tool list for the retry iteration
+- Update the narration kick message to explicitly name `final_answer` as an escape hatch
 - Update `finalAnswerTool.description` to be general-purpose (not tied to `tool_choice required` only)
 - Tests: new cases for "after kick, final_answer is in tool list" and "model calls final_answer after narration kick -- terminates cleanly"
 - Update existing tests whose assertions depend on the old kick message text or tool list composition
@@ -24,12 +24,12 @@ Handle false-positive narration kicks gracefully by injecting `final_answer` int
 - Changes to Azure Responses API path (the tool injection is provider-agnostic since `activeTools` feeds both paths)
 
 ## Completion Criteria
-- [ ] `activeTools` is computed per-iteration, including `final_answer` when `kickCount > 0` or `toolChoiceRequired`
-- [ ] Narration kick message updated to mention `final_answer` as option
-- [ ] `finalAnswerTool.description` is general-purpose
+- [ ] `activeTools` is computed per-iteration, including `final_answer` when narration kick has fired (`kickCount > 0` and last kick was narration) or `toolChoiceRequired`
+- [ ] Narration kick message updated to explicitly name `final_answer`
+- [ ] `finalAnswerTool.description` is general-purpose (not tied to tool_choice required)
 - [ ] Test: after narration kick, `final_answer` is present in tools sent to API
 - [ ] Test: model calls `final_answer` after narration kick -- terminates cleanly with extracted answer
-- [ ] Test: after empty kick, `final_answer` is present in tools sent to API
+- [ ] Test: after empty kick, `final_answer` is NOT in tools (narration-only injection)
 - [ ] Existing kick tests updated for new message text
 - [ ] Existing `final_answer` tests still pass
 - [ ] 100% test coverage on all new code
@@ -44,11 +44,11 @@ Handle false-positive narration kicks gracefully by injecting `final_answer` int
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [ ] Should `final_answer` be injected after ALL kick types (empty, narration, tool_required) or only narration? Empty kicks seem like they should always retry. Tool_required kicks already have `final_answer` (since `toolChoiceRequired` adds it). Proposal: inject after narration kicks only, since empty kicks are never false positives and tool_required already has the escape hatch.
-- [ ] Should the narration kick message be updated to explicitly name `final_answer`, or just hint at it more subtly? Explicit naming teaches the model the tool exists.
+(all resolved)
 
 ## Decisions Made
-- (none yet)
+- Inject `final_answer` after narration kicks only. Empty kicks are never false positives (empty response is always wrong). Tool_required kicks already have `final_answer` via `toolChoiceRequired`. Narration kicks are the sole source of false positives.
+- Kick message explicitly names `final_answer`. The model needs to know the tool exists to use it. Message: `"I narrated instead of acting. Calling the tool now -- if I've already finished, I can use final_answer."`
 
 ## Context / References
 - `src/engine/core.ts` line 194-195: `activeTools` is computed once before the while loop
@@ -66,3 +66,4 @@ The existing `final_answer` interception at core.ts:287-301 is fully provider-ag
 
 ## Progress Log
 - 2026-03-02 17:10 Created
+- (pending) Resolved open questions, finalized scope to narration-only injection
