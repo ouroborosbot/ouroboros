@@ -279,6 +279,8 @@ Identity resolution is always "get or create." When a friend first interacts wit
 ### D15: buildSystem() API Change -- Explicit Optional Context Parameter
 `buildSystem()` currently takes `(channel, options?)`. To render the context section (identity, channel capabilities), it needs access to `ResolvedContext`. The solution is an explicit optional parameter: `buildSystem(channel, options?, context?)`. When `context` is absent, the context section is omitted entirely (graceful degradation — the agent works exactly as it does today). In Phase 1, `buildSystem()` stays synchronous because `ResolvedContext` is fully resolved (no Promises). In Phase 2, it becomes async when authority (Promise) is added. Backward-compatible: callers that don't pass context get the same behavior as before.
 
+**`cachedBuildSystem()` is removed.** The existing 60s TTL cache in `src/mind/context.ts` caches by channel — with per-friend context, this would serve the wrong friend's identity. System prompt construction is string concatenation, not expensive enough to cache. Callers call `buildSystem()` directly. `resetSystemPromptCache()` is also removed. Caching can be re-added later if profiling shows a need.
+
 ### D16: Resolver Error Handling -- Per-Layer Strategy
 Each context layer has its own error handling strategy. No layer failure should crash the agent.
 - **Identity**: on `ContextStore` read failure (corrupted file, permissions error), auto-create a fresh identity with defaults (same as D14 bootstrapping). On write failure, log and continue -- the identity will be re-created next turn.
@@ -555,3 +557,4 @@ interface ResolvedContext {
 - 2026-03-02 2210 Renamed "user" → "friend" throughout. People who talk to the agent are friends, not users. Type renames: UserIdentity → FriendIdentity, UserMemory → FriendMemory. Field rename: userId → id on FriendIdentity/FriendMemory. Doc language: "per-user" → "per-friend", "the user" → "the friend" in all non-progress-log, non-historical sections. Kept "AAD userId" where it refers to the external system's field name. Kept "user" in progress log entries.
 - 2026-03-02 2220 A6: ChannelCapabilities lives in a hardcoded const map in channel.ts keyed by channel identifier. Already answered by D3 + D9 — just made it explicit in unit 1E.
 - 2026-03-02 2225 A7: Authority Promise is eager-start, not lazy. Created at resolver build time — API call fires immediately. Nearly every Teams turn needs authority anyway. Resolver skips entirely for CLI (no integrations). Clarified in D6.
+- 2026-03-02 2228 A8: Kill cachedBuildSystem(). 60s TTL cache keyed by channel is wrong with per-friend context — would serve wrong friend's identity. buildSystem() is cheap string concatenation, no cache needed. Added to D15.
