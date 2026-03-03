@@ -10,6 +10,7 @@ import { formatToolResult, formatKick, formatError } from "../wardrobe/format"
 import { sessionPath, getTeamsConfig, getTeamsChannelConfig } from "../config"
 import { loadSession, deleteSession, cachedBuildSystem, postTurn } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "../repertoire/commands"
+import { createTraceId } from "../observability"
 
 // Stream interface matching IStreamer from @microsoft/teams.apps
 interface TeamsStream {
@@ -326,6 +327,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   // Run agent
   const controller = new AbortController()
   const callbacks = createTeamsCallbacks(stream, controller, sendMessage, { disableStreaming, conversationId })
+  const traceId = createTraceId()
   const toolContext: ToolContext | undefined = teamsContext ? {
     graphToken: teamsContext.graphToken,
     adoToken: teamsContext.adoToken,
@@ -333,6 +335,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
     adoOrganizations: getAdoConfig().organizations,
   } : undefined
   const agentOptions: RunAgentOptions = { maxKicks: 3 }
+  agentOptions.traceId = traceId
   if (toolContext) agentOptions.toolContext = toolContext
   if (disableStreaming) agentOptions.disableStreaming = true
   if (getTeamsChannelConfig().skipConfirmation) agentOptions.skipConfirmation = true
