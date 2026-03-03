@@ -89,3 +89,4 @@ The work-merger subagent is purely a documentation/workflow artifact -- it instr
 
 ## Progress Log
 - 2026-03-03 10:33 Created
+- 2026-03-03 10:39 Incorporated user decisions: merge commits, PR-based merge, fast-path, dynamic discovery with recency bias, gh CLI
