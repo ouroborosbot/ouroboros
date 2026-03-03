@@ -201,3 +201,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 17:36] Locked non-agent OS-level test-run artifact root (`~/.agentconfigs/test-runs/<repo_slug>/<run_id>/`) and colocated final/capture outputs there
 - [2026-03-02 17:38] Pass 1 (first draft refresh): re-validated doing doc against latest planning updates; no structural changes needed
 - [2026-03-02 17:38] Pass 2 (granularity): confirmed units are atomic/testable and require no additional splits
+- [2026-03-02 17:39] Pass 3 (validation): verified referenced runtime/test/config/workflow file paths exist and match current repo
