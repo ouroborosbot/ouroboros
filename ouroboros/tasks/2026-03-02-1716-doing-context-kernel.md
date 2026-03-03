@@ -556,7 +556,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 ---
 
-### ⬜ Unit 1G: System Prompt Injection -- buildSystem() Async + contextSection()
+### ✅ Unit 1G: System Prompt Injection -- buildSystem() Async + contextSection()
 
 **What**: Make `buildSystem()` async from Phase 1 and add a `contextSection()` that renders identity + channel into the system prompt. Async from the start to avoid a mid-stream signature change when Phase 2 adds `await context.authority`. Remove `cachedBuildSystem()` and `resetSystemPromptCache()`.
 
@@ -1376,3 +1376,4 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - 2026-03-02 2333 Unit 1C complete: FriendIdentity resolution with get-or-create, AAD + local providers. 10 new tests, 955 total.
 - 2026-03-02 2334 Unit 1E complete: ChannelCapabilities lookup, CLI + Teams + unknown defaults. 5 new tests, 960 total.
 - 2026-03-02 2335 Unit 1F complete: ContextResolver resolves identity + channel into ResolvedContext. 6 new tests, 966 total.
+- 2026-03-02 2342 Unit 1G complete: async buildSystem(), contextSection(), removed cachedBuildSystem/resetSystemPromptCache. 969 tests total.
