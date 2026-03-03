@@ -20,7 +20,7 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 - 1B. `FileContextStore` -- first adapter implementing `ContextStore`. Constructor takes a base path (e.g., `~/.agentconfigs/ouroboros/context`); it does not resolve the path itself. Each collection maps to a subdirectory (`context/identity/`, `context/preferences/`), each item to a JSON file (`{uuid}.json`). This is the only module that touches the filesystem for context storage.
 - 1C. `UserIdentity` type and resolution -- internal userId, external ID mappings (AAD, Teams), tenant memberships, display name. Persisted via `ContextStore`. This is the only layer that truly needs persistence — the UUID ↔ external ID mapping can't be re-derived from an API.
 - 1D. `UserPreferences` type and resolution -- global preferences (verbosity, confirmation policy, preview-before-mutation) plus integration-scoped preferences (ADO planning style, auto-assign, backlog view style). Built-in defaults live in code. Preferences file is only created when the user makes a non-default choice — don't persist what you can re-derive. No default org/project — org/project selection is conversational (model disambiguates using discovered scopes, context window tracks current project).
-- 1E. `ChannelCapabilities` type -- channel identifier (`"cli" | "teams"`) plus capability flags (`supportsMarkdown`, `supportsStreaming`, `supportsRichCards`, `maxMessageLength`) plus `availableIntegrations` declaring which integrations the channel can reach. Pure lookup, no resolution needed. Drives prompt filtering — only render knownScopes/authority for integrations available in the current channel.
+- 1E. `ChannelCapabilities` type -- channel identifier (`"cli" | "teams"`) plus capability flags (`supportsMarkdown`, `supportsStreaming`, `supportsRichCards`, `maxMessageLength`) plus `availableIntegrations` declaring which integrations the channel can reach. Pure lookup, no resolution needed. Drives tool routing and prompt filtering.
 - 1F. `ContextResolver` -- resolves identity (from store) and preferences (from store) into a `ResolvedContext` object. In Phase 1, all resolution is cheap (file reads + pure lookup) so everything resolves eagerly — no lazy Promises needed yet. Laziness (explicit `Promise<T>` fields) is introduced in Phase 2 when authority resolution requires API calls. Channel capabilities are a synchronous lookup, always available.
 - 1G. System prompt injection -- `buildSystem()` gains a `contextSection()` that renders identity + preferences + channel into the system prompt. Rebuilt per-turn. Gracefully omitted when no context is available.
 - 1H. Wire context through ONE real ADO operation (Teams channel only): the existing `ado_work_items` tool gains runtime scope discovery — when the model doesn't specify org/project explicitly, the tool handler discovers the user's orgs/projects via ADO APIs (Accounts API → Projects API), caches in memory, and either auto-selects (single scope) or returns the list for the model to ask the user. This is the proof that the kernel works end-to-end. ADO is Teams-only (CLI has `availableIntegrations = []`, no OAuth tokens) so this wiring is tested exclusively via the Teams channel.
@@ -29,7 +29,7 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 - 2A. `Authority` type and resolution -- integration-scoped capability profiles using a hybrid model: optimistic on read-path (attempt and learn from 403), pre-flight check on write-path (verify before proposing destructive operations). Cached with TTL + 403-triggered invalidation.
 - 2B. `AuthorityChecker` -- distinguishes read operations (optimistic, learn from failure) from write operations (pre-validated). Provides `canRead(scope)` (always true until 403 disproves) and `canWrite(scope)` (probes API before returning). Pre-flight writes check a lightweight endpoint (e.g., project-level permissions descriptor) rather than attempting the actual mutation.
 - 2C. Wire Authority into existing `ado_mutate` tool -- before executing a mutation, check `canWrite()`. If denied, return a structured explanation instead of attempting and failing. Existing `ado_query` remains optimistic.
-- 2D. Extend system prompt injection with authority constraints -- `contextSection()` renders "can / CANNOT" authority limits into the prompt so the model plans around constraints upfront (see D10). Authority 403s invalidate the in-memory scope cache (D11).
+- 2D. Extend system prompt injection with authority constraints -- `contextSection()` renders "can / CANNOT" authority limits into the prompt so the model plans around constraints upfront (see D10).
 
 **Phase 3: ADO Semantic Tools (Full Consumer)**
 - 3A. Per-user ADO context (runtime scope discovery, conversational org/project selection) integrated into semantic tools
@@ -62,7 +62,7 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 - [ ] `ContextResolver` resolves identity + preferences eagerly in Phase 1; laziness introduced in Phase 2 for authority
 - [ ] Authority uses hybrid model: reads are optimistic (403 learning), writes have pre-flight check
 - [ ] Identity persists across sessions via `ContextStore`; Authority caches in memory with TTL; Preferences persist via `ContextStore`
-- [ ] ADO scope discovery works at runtime via Accounts API + Projects API; results cached in memory (not persisted)
+- [ ] ADO scope discovery works at runtime via Accounts API + Projects API; conversation carries results forward (no caching)
 - [ ] Tools are stateless — model provides all required context (org, project, IDs) on every call; no ambient session state
 - [ ] ToolContext extension is backward-compatible -- existing tools work unchanged
 - [ ] ADO tools use runtime scope discovery for org/project disambiguation instead of config allowlist
@@ -150,7 +150,7 @@ Channel context uses both an identifier (`"cli" | "teams"`) AND capability flags
 
 `availableIntegrations` is the single source of truth for what a channel can reach. ADO is Teams-only for the foreseeable future -- CLI has no OAuth tokens and therefore no integration access. This drives three consumers -- no per-channel switch statements anywhere:
 1. **Tool routing**: `getToolsForChannel()` filters the tool list to only include tools whose integration is in `availableIntegrations`. If Discord declares `["github"]`, it gets GitHub tools but not ADO tools -- without any Discord-specific code in the router.
-2. **Prompt injection**: `contextSection()` only renders knownScopes and authority constraints for integrations in the list. CLI users don't see ADO scopes because CLI has no integrations.
+2. **Prompt injection**: `contextSection()` only renders authority constraints for integrations in the list. CLI users don't see ADO constraints because CLI has no integrations.
 3. **Resolver**: `ContextResolver` skips authority resolution (Phase 2) if `availableIntegrations` is empty. No wasted API calls for channels that can't use the results.
 
 Channel integration mapping:
@@ -174,7 +174,7 @@ The existing `ToolContext` interface in `src/repertoire/tools-base.ts` is extend
 
 ### D7: Phasing -- Interleaved, Not Back-Loaded
 The previous design built all foundation (types, resolvers, storage, pipeline) before any consumer touched it. That is too much untested infrastructure. The revised phasing:
-- Phase 1 builds Identity + Preferences + Storage Interface + Channel + runtime scope discovery, then immediately wires them through ONE real ADO operation in the Teams channel. This proves the kernel end-to-end with real data.
+- Phase 1 builds Identity + Preferences + Storage Interface + Channel, then immediately wires them through ONE real ADO operation (with inline scope discovery) in the Teams channel. This proves the kernel end-to-end with real data.
 - Phase 2 builds Authority only after Phase 1's consumer proves the pattern works. Authority is wired into existing `ado_mutate`; authority constraints are added to the prompt.
 - Phase 3 adds semantic ADO tools that pull on all layers.
 - Phase 4 adds intelligence features (process templates, structural safety).
@@ -238,7 +238,7 @@ when the user asks about work items without specifying a project, ask which one.
 Design rules:
 - **Rebuilt per-turn**: `buildSystem()` already runs each turn. Preferences may be updated mid-conversation (e.g., model learns a new scope), so the prompt must reflect the latest persisted state.
 - **Authority constraints are explicit**: rendered as "can / CANNOT" so the model plans around limitations upfront rather than discovering them at tool execution time.
-- **Resolver feeds it**: `contextSection()` reads from `ResolvedContext` (identity, preferences) and the in-memory scope cache (discovered scopes). Identity and preferences are always available (resolved eagerly). Scopes are rendered only if they've been discovered during this session (i.e., after an ADO tool call triggered discovery). Authority constraints (Phase 2) rendered only after authority resolution.
+- **Resolver feeds it**: `contextSection()` reads from `ResolvedContext` (identity, preferences, channel). Identity and preferences are always available (resolved eagerly). Scopes are NOT in the prompt — they're a tool-level concern (discovered inline by ADO tool handler, conversation carries them forward). Authority constraints (Phase 2) rendered after authority resolution.
 - **Graceful degradation**: if no context is available yet (first turn, CLI with no identity configured), the section is omitted entirely. The agent works exactly as it does today.
 - **No duplication**: channel info already in `runtimeInfoSection()` gets its flags from `ChannelCapabilities` instead of hardcoded strings, but the section name and position stay the same.
 - **No session state in prompt**: the conversation history is the session. The model knows what it queried, what it created, and what the user is focused on from the messages. The prompt only carries persistent context (identity, authority, preferences) and static context (channel capabilities).
