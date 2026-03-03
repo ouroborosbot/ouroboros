@@ -530,4 +530,102 @@ export const adoSemanticToolDefinitions: ToolDefinition[] = [
     },
     integration: "ado",
   },
+
+  // -- ado_batch_update --
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "ado_batch_update",
+        description:
+          "Execute multiple ADO operations in a single batch. Supports create, update, and reparent operations. Returns per-item results.",
+        parameters: {
+          type: "object",
+          properties: {
+            organization: { type: "string", description: "ADO organization (optional)" },
+            project: { type: "string", description: "ADO project (optional)" },
+            operations: {
+              type: "string",
+              description: "JSON array of operations. Each: { type: 'create'|'update'|'reparent', workItemId?: number, workItemType?: string, fields?: Record<string, string>, newParentId?: number }",
+            },
+          },
+          required: ["operations"],
+        },
+      },
+    },
+    handler: async (args, ctx) => {
+      const authErr = await checkAuth(ctx)
+      if (authErr) return authErr
+
+      const adoCtx = await resolveAdoContext(ctx!.adoToken!, ctx!.context!, { organization: args.organization, project: args.project })
+      if (!adoCtx.ok) return adoCtx.error
+
+      const writeErr = await checkWriteAuthority(ctx!, adoCtx.organization)
+      if (writeErr) return writeErr
+
+      interface BatchOp {
+        type: "create" | "update" | "reparent"
+        workItemId?: number
+        workItemType?: string
+        fields?: Record<string, string>
+        newParentId?: number
+      }
+
+      let operations: BatchOp[]
+      try {
+        operations = JSON.parse(args.operations)
+      } catch {
+        return "error: operations must be a valid JSON array"
+      }
+
+      const results: { index: number, type: string, success: boolean, id?: number, error?: string }[] = []
+
+      for (let i = 0; i < operations.length; i++) {
+        const op = operations[i]
+        try {
+          let apiResult: string
+
+          if (op.type === "create") {
+            const patchOps: JsonPatchOp[] = Object.entries(op.fields || {}).map(([key, value]) => ({
+              op: "add" as const,
+              path: `/fields/${key}`,
+              value,
+            }))
+            const wiType = op.workItemType || "Task"
+            apiResult = await adoRequest(ctx!.adoToken!, "POST", adoCtx.organization, `/${adoCtx.project}/_apis/wit/workitems/$${wiType}`, JSON.stringify(patchOps))
+          } else if (op.type === "update") {
+            const patchOps: JsonPatchOp[] = Object.entries(op.fields || {}).map(([key, value]) => ({
+              op: "replace" as const,
+              path: `/fields/${key}`,
+              value,
+            }))
+            apiResult = await adoRequest(ctx!.adoToken!, "PATCH", adoCtx.organization, `/${adoCtx.project}/_apis/wit/workitems/${op.workItemId}`, JSON.stringify(patchOps))
+          } else if (op.type === "reparent") {
+            const patchOps = buildReparentPatch(String(op.newParentId))
+            apiResult = await adoRequest(ctx!.adoToken!, "PATCH", adoCtx.organization, `/${adoCtx.project}/_apis/wit/workitems/${op.workItemId}`, JSON.stringify(patchOps))
+          } else {
+            results.push({ index: i, type: op.type, success: false, error: `Unknown operation type: ${op.type}` })
+            continue
+          }
+
+          try {
+            const parsed = JSON.parse(apiResult)
+            if (parsed.id) {
+              results.push({ index: i, type: op.type, success: true, id: parsed.id })
+            } else {
+              results.push({ index: i, type: op.type, success: false, error: apiResult })
+            }
+          } catch {
+            results.push({ index: i, type: op.type, success: false, error: apiResult })
+          }
+        } catch (err) {
+          results.push({ index: i, type: op.type, success: false, error: err instanceof Error ? err.message : String(err) })
+        }
+      }
+
+      return JSON.stringify({ results, organization: adoCtx.organization, project: adoCtx.project })
+    },
+    integration: "ado",
+    confirmationRequired: true,
+  },
 ]
