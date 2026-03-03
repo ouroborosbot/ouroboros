@@ -66,32 +66,32 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 - Typed per-friend preference schemas (killed — verbosity, confirmationPolicy, riskTolerance are agent-level concerns defined in psyche, not per-friend preferences)
 
 ## Completion Criteria
-- [ ] `ContextStore` interface defined with typed collection properties; Phase 1: `identity` only; Phase 3 adds `memory`. Each `CollectionStore<T>` provides `get`/`put`/`delete`/`find`; `FileContextStore` implements it
-- [ ] No context module imports `fs` directly -- all persistence goes through `ContextStore`
-- [ ] All four context layers (Identity, Authority, Memory, Channel) have TypeScript types and resolution functions (phased: Identity + Channel in Phase 1, Authority in Phase 2, Memory in Phase 3)
-- [ ] `ContextResolver` resolves identity + channel eagerly in Phase 1; Phase 2 adds authority (eager-start Promise, D6); Phase 3 adds memory
-- [ ] Authority uses hybrid model: reads are optimistic (403 learning), writes have pre-flight check via Security Namespaces API (Q8)
-- [ ] Identity persists across sessions via `ContextStore`; Authority is learned fresh per-turn (checker on resolver, memoized within turn, discarded after); FriendMemory (toolPreferences) persists via `ContextStore` (Phase 3)
-- [ ] ADO scope discovery works at runtime via Accounts API + Projects API; conversation carries results forward (no caching)
-- [ ] Tools are stateless — model provides all required context (org, project, IDs) on every call; no ambient session state
-- [ ] ToolContext extension is backward-compatible -- existing tools work unchanged
-- [ ] ADO tools use runtime scope discovery for org/project disambiguation instead of config allowlist
-- [ ] At least 3 semantic ADO operations exist (create_epic, create_issue, move_items)
-- [ ] Process template detection works for Basic, Agile, and Scrum
-- [ ] Channel-aware formatting works for Teams and CLI
-- [ ] Dry-run mode returns structured preview for ADO mutations
-- [ ] Authority is scoped per-friend per-turn -- `AuthorityChecker` lives on the resolver (per-request), memoizes within the turn, discarded after (D13). Conversation history carries authority knowledge across turns.
-- [ ] System prompt includes resolved context (identity, channel, authority constraints) via `contextSection()` in `buildSystem()`
-- [ ] Authority constraints rendered as explicit "can / CANNOT" in prompt so model plans around limitations
-- [ ] Prompt injection gracefully omitted when no context is available (CLI with no identity, first turn)
-- [ ] `FriendMemory` type exists with `toolPreferences: Record<string, string>`; `ContextStore.memory` collection supports CRUD; a `save_friend_note` tool lets the model persist preferences; `contextSection()` renders toolPreferences into the system prompt when FriendMemory exists (Phase 3, unit 3B)
-- [ ] `buildSystem()` is async; all callers use `await buildSystem()` (A15)
-- [ ] `IdentityProvider` and `Integration` are typed unions -- no bare `string` in ExternalId.provider, AuthorityProfile.integration, AuthorityChecker methods, or ChannelCapabilities.availableIntegrations (A16)
-- [ ] All tools use `ToolDefinition` wrapper; `getToolsForChannel()` filters by `ToolDefinition.integration` against `availableIntegrations`; separate `confirmationRequired` Set is removed (A21)
-- [ ] `validateAdoOrg()`, `adoOrganizations` on ToolContext, and `ado.organizations` config are removed -- replaced by runtime API discovery (D20)
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] `ContextStore` interface defined with typed collection properties; Phase 1: `identity` only; Phase 3 adds `memory`. Each `CollectionStore<T>` provides `get`/`put`/`delete`/`find`; `FileContextStore` implements it
+- [x] No context module imports `fs` directly -- all persistence goes through `ContextStore`
+- [x] All four context layers (Identity, Authority, Memory, Channel) have TypeScript types and resolution functions (phased: Identity + Channel in Phase 1, Authority in Phase 2, Memory in Phase 3)
+- [x] `ContextResolver` resolves identity + channel eagerly in Phase 1; Phase 2 adds authority (eager-start Promise, D6); Phase 3 adds memory
+- [x] Authority uses hybrid model: reads are optimistic (403 learning), writes have pre-flight check via Security Namespaces API (Q8)
+- [x] Identity persists across sessions via `ContextStore`; Authority is learned fresh per-turn (checker on resolver, memoized within turn, discarded after); FriendMemory (toolPreferences) persists via `ContextStore` (Phase 3)
+- [x] ADO scope discovery works at runtime via Accounts API + Projects API; conversation carries results forward (no caching)
+- [x] Tools are stateless -- model provides all required context (org, project, IDs) on every call; no ambient session state
+- [x] ToolContext extension is backward-compatible -- existing tools work unchanged
+- [x] ADO tools use runtime scope discovery for org/project disambiguation instead of config allowlist
+- [x] At least 3 semantic ADO operations exist (create_epic, create_issue, move_items)
+- [x] Process template detection works for Basic, Agile, and Scrum
+- [x] Channel-aware formatting works for Teams and CLI
+- [x] Dry-run mode returns structured preview for ADO mutations
+- [x] Authority is scoped per-friend per-turn -- `AuthorityChecker` lives on the resolver (per-request), memoizes within the turn, discarded after (D13). Conversation history carries authority knowledge across turns.
+- [x] System prompt includes resolved context (identity, channel, authority constraints) via `contextSection()` in `buildSystem()`
+- [x] Authority constraints rendered as explicit "can / CANNOT" in prompt so model plans around limitations
+- [x] Prompt injection gracefully omitted when no context is available (CLI with no identity, first turn)
+- [x] `FriendMemory` type exists with `toolPreferences: Record<string, string>`; `ContextStore.memory` collection supports CRUD; a `save_friend_note` tool lets the model persist preferences; `contextSection()` renders toolPreferences into the system prompt when FriendMemory exists (Phase 3, unit 3B)
+- [x] `buildSystem()` is async; all callers use `await buildSystem()` (A15)
+- [x] `IdentityProvider` and `Integration` are typed unions -- no bare `string` in ExternalId.provider, AuthorityProfile.integration, AuthorityChecker methods, or ChannelCapabilities.availableIntegrations (A16)
+- [x] All tools use `ToolDefinition` wrapper; `getToolsForChannel()` filters by `ToolDefinition.integration` against `availableIntegrations`; separate `confirmationRequired` Set is removed (A21)
+- [x] `validateAdoOrg()`, `adoOrganizations` on ToolContext, and `ado.organizations` config are removed -- replaced by runtime API discovery (D20)
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
