@@ -1557,4 +1557,123 @@ describe("summarizeArgs for docs tools", () => {
   it("returns empty string for ado_docs with no query", () => {
     expect(summarizeArgs("ado_docs", {})).toBe("")
   })
+
+  it("returns key=value summary for save_friend_note", () => {
+    expect(summarizeArgs("save_friend_note", { key: "ado", value: "flat backlog" })).toBe("ado")
+  })
+})
+
+describe("save_friend_note tool", () => {
+  it("is registered as a base tool definition (no integration)", async () => {
+    vi.resetModules()
+    const { baseToolDefinitions } = await import("../../repertoire/tools-base")
+    const def = baseToolDefinitions.find(d => d.tool.function.name === "save_friend_note")
+    expect(def).toBeDefined()
+    expect(def!.integration).toBeUndefined()
+  })
+
+  it("creates new FriendMemory when none exists", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const memoryStore = {
+      get: vi.fn().mockResolvedValue(null),
+      put: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn(),
+      find: vi.fn(),
+    }
+    const ctx = {
+      signin: vi.fn(),
+      context: {
+        identity: { id: "uuid-1", displayName: "Jordan", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
+        memory: null,
+      },
+      memoryStore,
+    }
+    const result = await execTool("save_friend_note", { key: "ado", value: "flat backlog view" }, ctx)
+    expect(result).toContain("saved")
+    expect(memoryStore.put).toHaveBeenCalledWith("uuid-1", {
+      id: "uuid-1",
+      toolPreferences: { ado: "flat backlog view" },
+      schemaVersion: 1,
+    })
+  })
+
+  it("updates existing FriendMemory preference", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const existingMemory = {
+      id: "uuid-1",
+      toolPreferences: { ado: "old preference", general: "keep this" },
+      schemaVersion: 1,
+    }
+    const memoryStore = {
+      get: vi.fn().mockResolvedValue(existingMemory),
+      put: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn(),
+      find: vi.fn(),
+    }
+    const ctx = {
+      signin: vi.fn(),
+      context: {
+        identity: { id: "uuid-1", displayName: "Jordan", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
+        memory: existingMemory,
+      },
+      memoryStore,
+    }
+    const result = await execTool("save_friend_note", { key: "ado", value: "flat backlog view" }, ctx)
+    expect(result).toContain("saved")
+    expect(memoryStore.put).toHaveBeenCalledWith("uuid-1", {
+      id: "uuid-1",
+      toolPreferences: { ado: "flat backlog view", general: "keep this" },
+      schemaVersion: 1,
+    })
+  })
+
+  it("returns error when no context is available", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = { signin: vi.fn() }
+    const result = await execTool("save_friend_note", { key: "ado", value: "test" }, ctx)
+    expect(result).toContain("no friend context")
+  })
+
+  it("returns error when no memoryStore is available", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = {
+      signin: vi.fn(),
+      context: {
+        identity: { id: "uuid-1", displayName: "Jordan", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
+        memory: null,
+      },
+    }
+    const result = await execTool("save_friend_note", { key: "ado", value: "test" }, ctx)
+    expect(result).toContain("not available")
+  })
+
+  it("handles write failure gracefully (D16)", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const memoryStore = {
+      get: vi.fn().mockResolvedValue(null),
+      put: vi.fn().mockRejectedValue(new Error("disk full")),
+      delete: vi.fn(),
+      find: vi.fn(),
+    }
+    const ctx = {
+      signin: vi.fn(),
+      context: {
+        identity: { id: "uuid-1", displayName: "Jordan", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
+        memory: null,
+      },
+      memoryStore,
+    }
+    const result = await execTool("save_friend_note", { key: "ado", value: "test" }, ctx)
+    expect(result).toContain("error")
+    expect(result).toContain("disk full")
+  })
 })

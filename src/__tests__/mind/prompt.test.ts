@@ -771,6 +771,97 @@ describe("contextSection", () => {
     expect(result).not.toContain("## authority")
   })
 
+  it("renders friend preferences when memory has toolPreferences", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+      memory: {
+        id: "uuid-1",
+        toolPreferences: {
+          ado: "Prefers issue-first planning. Auto-assign to self.",
+          general: "Likes concise responses.",
+        },
+        schemaVersion: 1,
+      },
+    }
+    const result = contextSection(ctx)
+    expect(result).toContain("## friend preferences")
+    expect(result).toContain("ado: Prefers issue-first planning. Auto-assign to self.")
+    expect(result).toContain("general: Likes concise responses.")
+  })
+
+  it("does not render preferences section when memory is null", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "cli" as const,
+        availableIntegrations: [] as any[],
+        supportsMarkdown: false,
+        supportsStreaming: true,
+        supportsRichCards: false,
+        maxMessageLength: Infinity,
+      },
+      memory: null,
+    }
+    const result = contextSection(ctx)
+    expect(result).not.toContain("## friend preferences")
+  })
+
+  it("does not render preferences section when toolPreferences is empty", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      identity: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+      memory: {
+        id: "uuid-1",
+        toolPreferences: {},
+        schemaVersion: 1,
+      },
+    }
+    const result = contextSection(ctx)
+    expect(result).not.toContain("## friend preferences")
+  })
+
   it("authority section mentions write operations are checked", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
