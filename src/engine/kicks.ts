@@ -109,11 +109,11 @@ const TOOL_INTENT_PATTERNS = [
   /\bthe plan is\b/i,
   /\btool calls only\b/i,
 
-  // Bare "Continuing." / "continuing" — standalone continuation signal
-  /^continuing\.?$/i,
+  // "Continuing" at start of any line — narration filler (multiline so ^ matches after \n)
+  /^continuing\b/im,
 
-  // Sentence-final "continues." — e.g. "Backlog theatre continues."
-  /\bcontinues\.\s*$/i,
+  // "continues" anywhere — progress narration ("The work continues", "continues to be complex")
+  /\bcontinues\b/i,
 
   // "Next up" at start of text — e.g. "Next up:", "Next up, I'll..."
   /^next up\b/i,
