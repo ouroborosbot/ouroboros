@@ -965,7 +965,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 ---
 
-### ⬜ Unit 3Ba: FriendMemory Type, Store, and Resolver Integration
+### ✅ Unit 3Ba: FriendMemory Type, Store, and Resolver Integration
 
 **What**: Add the Memory layer data model -- `FriendMemory` type, `memory` collection on `ContextStore`, `FileContextStore` extension, and resolver integration. This unit handles storage and resolution; prompt injection and the save tool are in 3Bb.
 
@@ -1006,13 +1006,13 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - Schema versioning for FriendMemory (migration on read)
 
 **Completion criteria:**
-- [ ] `FriendMemory` type exists with `toolPreferences: Record<string, string>`
-- [ ] `ContextStore.memory` collection supports CRUD
-- [ ] `FileContextStore` implements memory collection with `context/memory/` subdirectory
-- [ ] Resolver loads memory into `ResolvedContext`
-- [ ] Error handling per D16
-- [ ] 100% test coverage
-- [ ] All tests pass
+- [x] `FriendMemory` type exists with `toolPreferences: Record<string, string>`
+- [x] `ContextStore.memory` collection supports CRUD
+- [x] `FileContextStore` implements memory collection with `context/memory/` subdirectory
+- [x] Resolver loads memory into `ResolvedContext`
+- [x] Error handling per D16
+- [x] 100% test coverage (memory.ts 100%, resolver.ts 100%)
+- [x] All tests pass (1062)
 
 ---
 
