@@ -90,7 +90,7 @@ Tests to update:
 **What**: Verify 100% coverage on changed code. Ensure no dead code remains from maxKicks removal. Run full test suite.
 **Acceptance**: 100% coverage on all changed lines. All tests green. No warnings.
 
-### ⬜ Unit 2a: Inject final_answer after narration kick -- Tests
+### ✅ Unit 2a: Inject final_answer after narration kick -- Tests
 
 **What**: Write new tests for the core behavior change AND update existing tests that assert on kick message text or `finalAnswerTool.description`:
 - After a narration kick fires, `final_answer` should be in the tools sent to the API on the retry iteration
@@ -108,7 +108,7 @@ Tests to update for message text:
 
 **Acceptance**: New tests exist, compile, and FAIL (red) because `activeTools` is still computed once before the loop. Message text assertions updated to match planned new text.
 
-### ⬜ Unit 2b: Inject final_answer after narration kick -- Implementation
+### ✅ Unit 2b: Inject final_answer after narration kick -- Implementation
 
 **What**: Make the tests from 2a pass:
 - `src/engine/core.ts`: Move `activeTools` computation inside the while loop. Add `import type { KickReason } from "./kicks"`. Track `let lastKickReason: KickReason | null = null` (set to `kick.reason` when a kick fires). Compute: `const activeTools = (options?.toolChoiceRequired || lastKickReason === "narration") ? [...baseTools, finalAnswerTool] : baseTools`
@@ -145,3 +145,5 @@ Tests to update for message text:
 - 2026-03-02 17:52 Unit 1a complete: test changes for no-arg onKick and removed maxKicks. 4 tests RED.
 - 2026-03-02 17:52 Unit 1b complete: production code changes. 905 tests GREEN. Build clean.
 - 2026-03-02 17:53 Unit 1c complete: 100% coverage on all changed files. No dead maxKicks code. No refactoring needed.
+- 2026-03-02 17:55 Unit 2a complete: 5 new tests + 4 updated assertions. 9 tests RED.
+- 2026-03-02 17:55 Unit 2b complete: activeTools per-iteration, lastKickReason tracking, updated messages. 910 tests GREEN. Build clean.
