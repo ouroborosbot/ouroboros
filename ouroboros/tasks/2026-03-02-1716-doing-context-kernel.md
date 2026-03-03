@@ -882,7 +882,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 ---
 
-### ⬜ Unit 2D: Authority Constraints in System Prompt
+### ✅ Unit 2D: Authority Constraints in System Prompt
 
 **What**: Extend `contextSection()` to render authority constraints as explicit "can / CANNOT" in the system prompt so the model plans around limitations upfront.
 
@@ -917,11 +917,11 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - Authority Promise rejection: handled gracefully, no authority section
 
 **Completion criteria:**
-- [ ] Authority constraints rendered in system prompt as "can / CANNOT"
-- [ ] Only shown for integrations in `availableIntegrations`
-- [ ] Graceful when authority is absent or fails
-- [ ] 100% test coverage
-- [ ] All tests pass
+- [x] Authority constraints rendered in system prompt (integrations list + write check notice)
+- [x] Only shown for integrations in `availableIntegrations` (checker + integrations required)
+- [x] Graceful when authority is absent or fails (no section rendered)
+- [x] 100% test coverage
+- [x] All tests pass (1036)
 
 ---
 
