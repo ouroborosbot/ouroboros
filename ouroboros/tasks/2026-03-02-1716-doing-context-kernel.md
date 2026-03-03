@@ -611,7 +611,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 ---
 
-### ⬜ Unit 1Ha: ToolDefinition Wrapper + Tool Registry Refactor
+### ✅ Unit 1Ha: ToolDefinition Wrapper + Tool Registry Refactor
 
 **What**: Introduce the `ToolDefinition` wrapper type and convert all existing tools to use it. Refactor `getToolsForChannel()` and `execTool()` to use the new registry. Remove the separate `confirmationRequired` Set. Update `ToolContext` to add `context?: ResolvedContext` and remove `adoOrganizations`.
 
