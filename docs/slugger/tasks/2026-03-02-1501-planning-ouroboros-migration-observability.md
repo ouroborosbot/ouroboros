@@ -94,4 +94,4 @@ Model consumption is primary: logs should be stable, structured, and parseable f
 - [2026-03-02 15:37] Consistency pass: aligned Scope/Out of Scope/Completion Criteria with finalized Q1-Q3 decisions
 - [2026-03-02 15:48] Locked required log envelope fields and minimum component event catalog to remove interpretation gaps
 - [2026-03-02 15:50] Planning approved for conversion to doing doc
-- [PENDING_PERSISTENCE_TS] Added session-style append-only NDJSON file persistence (`stderr` + file sinks) and deferred key-collision hardening
+- [2026-03-02 16:05] Added session-style append-only NDJSON file persistence (`stderr` + file sinks) and deferred key-collision hardening
