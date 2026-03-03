@@ -392,7 +392,7 @@ Wiring:
 **Output**: Updated `src/channels/teams.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 7c: Teams dual-mode rendering -- Coverage
+### ✅ Unit 7c: Teams dual-mode rendering -- Coverage
 **What**: Verify all branches: streaming vs buffered, success/failure tool results, kick counter, transient/terminal errors, stopped state for each, first-flush-to-primary vs subsequent-to-sendMessage, no-text-fallback.
 **Output**: Coverage report
 **Acceptance**: 100% coverage, all tests green
