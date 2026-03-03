@@ -98,7 +98,17 @@ Before any PR operations, verify:
 
 Self-fixable issues (agent handles): repo default not set. Human-required issues (escalate): `gh` not installed, not authenticated, no GitHub remote.
 
-## 10. Ownership and Applicability
+## 10. Branch Protection (TODO)
+
+When this repository is made public, set up GitHub branch protection on `main`:
+
+- **Require status checks to pass** (specifically the `coverage` check)
+- **Require pull request before merging** (no direct pushes)
+- **No force pushes** to main
+
+This is currently enforced by convention via work-merger, but not at the GitHub level. Private repos on free-tier GitHub cannot use branch protection rules or rulesets.
+
+## 11. Ownership and Applicability
 
 - This is a shared policy for all agents.
 - Agent-specific process details can extend this, but cannot relax these requirements.
