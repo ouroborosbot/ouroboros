@@ -324,7 +324,7 @@ Note: the current CLI writes `"✗ name: error"` (literal word "error") on tool 
 
 ---
 
-### ⬜ Unit 7a: Teams dual-mode rendering + sendMessage -- Tests
+### ✅ Unit 7a: Teams dual-mode rendering + sendMessage -- Tests
 **Depends on**: Unit 4 (format.ts), Unit 5 (error severity)
 **What**: Add/update tests in `src/__tests__/channels/teams.test.ts`:
 
