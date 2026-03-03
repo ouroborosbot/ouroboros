@@ -6,6 +6,7 @@ import { confirmationRequired } from "./tools-teams";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
 import type { AssistantMessageWithReasoning, ResponseItem } from "./streaming";
 import { detectKick } from "./kicks";
+import type { KickReason } from "./kicks";
 import type { TurnResult } from "./streaming";
 import type { UsageData } from "../mind/context";
 import { trimMessages, cachedBuildSystem } from "../mind/context";
@@ -178,6 +179,7 @@ export async function runAgent(
   let lastUsage: UsageData | undefined;
   let overflowRetried = false;
   let retryCount = 0;
+  let lastKickReason: KickReason | null = null;
 
   // For Azure Responses API: maintain native input array with original output
   // items (reasoning, function_calls) in correct order.  Initialized from CC
@@ -190,9 +192,13 @@ export async function runAgent(
   try { require("events").setMaxListeners(MAX_TOOL_ROUNDS + 5, signal); } catch { /* unsupported */ }
 
   const baseTools = getToolsForChannel(channel);
-  const activeTools = options?.toolChoiceRequired ? [...baseTools, finalAnswerTool] : baseTools;
 
   while (!done) {
+    // Compute activeTools per-iteration: include final_answer when
+    // toolChoiceRequired is set OR after a narration kick (false-positive escape hatch)
+    const activeTools = (options?.toolChoiceRequired || lastKickReason === "narration")
+      ? [...baseTools, finalAnswerTool]
+      : baseTools;
     // Yield so pending I/O (stdin Ctrl-C) can be processed between iterations
     await new Promise((r) => setImmediate(r));
     if (signal?.aborted) break;
@@ -261,6 +267,7 @@ export async function runAgent(
         const kick = detectKick(result.content, options);
         if (kick) {
           kickCount++;
+          lastKickReason = kick.reason;
           toolRounds++;
           if (toolRounds >= MAX_TOOL_ROUNDS) {
             callbacks.onError(new Error(`tool loop limit reached (${MAX_TOOL_ROUNDS} rounds)`), "terminal");

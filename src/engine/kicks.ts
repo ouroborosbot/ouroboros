@@ -26,7 +26,7 @@ export interface Kick {
 
 const KICK_MESSAGES: Record<KickReason, string> = {
   empty: "I sent an empty message by accident — let me try again.",
-  narration: "I narrated instead of acting. Calling the tool now.",
+  narration: "I narrated instead of acting. Calling the tool now -- if I've already finished, I can use final_answer.",
   tool_required: "tool-required is on — I need to call a tool. use /tool-required to turn it off.",
 };
 
