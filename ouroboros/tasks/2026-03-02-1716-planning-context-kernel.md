@@ -18,9 +18,9 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 - 1C. `UserIdentity` type and resolution -- internal userId, external ID mappings (AAD, Teams), tenant memberships, integration memberships (ADO orgs). Persisted via `ContextStore`. Includes `knownScopes` — a living record of orgs/projects the user has worked in. Grows when the model successfully interacts with a scope (tool call succeeds → add/update with fresh `lastUsed`). Shrinks when Authority records persistent access denial (403 on a known scope → prune it so the prompt stops showing inaccessible scopes).
 - 1D. `UserPreferences` type and resolution -- global preferences (verbosity, confirmation policy, preview-before-mutation) plus integration-scoped preferences (ADO planning style, auto-assign, default org/project). Persisted via `ContextStore`. The model writes back learned context (e.g., last-used project) as preference updates.
 - 1E. `ChannelCapabilities` type -- channel identifier (`"cli" | "teams"`) plus capability flags (`supportsMarkdown`, `supportsStreaming`, `supportsRichCards`, `maxMessageLength`) plus `availableIntegrations` declaring which integrations the channel can reach. Pure lookup, no resolution needed. Drives prompt filtering — only render knownScopes/authority for integrations available in the current channel.
-- 1F. `LazyContextResolver` -- the orchestrator that creates a proxy/accessor object where each layer is resolved on first access, not upfront. Identity is resolved eagerly (cheap, almost always needed). Authority and Preferences are resolved lazily (may require I/O, not always needed). Channel is a synchronous lookup.
+- 1F. `LazyContextResolver` -- the orchestrator that returns a `LazyResolvedContext` object with explicit `Promise<T>` fields for expensive layers. Identity is resolved eagerly (cheap, almost always needed) and available as a direct value. Authority and Preferences are `Promise<T>` fields -- resolved only when a consumer `await`s them (may require I/O, not always needed). Channel is a synchronous lookup. No Proxy objects or getter traps -- standard TypeScript Promise pattern.
 - 1G. System prompt injection -- `buildSystem()` gains a `contextSection()` that renders identity + preferences + channel into the system prompt. Rebuilt per-turn. Gracefully omitted when no context is available.
-- 1H. Wire Identity + Preferences through ONE real ADO operation: per-user default org/project. The existing `ado_work_items` tool drops the required `organization` parameter when preferences provide a default. This is the proof that the kernel works end-to-end before building more layers.
+- 1H. Wire Identity + Preferences through ONE real ADO operation (Teams channel only): per-user default org/project. The existing `ado_work_items` tool drops the required `organization` parameter when preferences provide a default. This is the proof that the kernel works end-to-end before building more layers. ADO is Teams-only (CLI has `availableIntegrations = []`, no OAuth tokens) so this wiring is tested and exercised exclusively via the Teams channel.
 
 **Phase 2: Authority (Demand-Driven)**
 - 2A. `Authority` type and resolution -- integration-scoped capability profiles using a hybrid model: optimistic on read-path (attempt and learn from 403), pre-flight check on write-path (verify before proposing destructive operations). Cached with TTL + 403-triggered invalidation.
@@ -83,26 +83,51 @@ Build a four-layer Context Kernel (Identity, Authority, Preferences, Channel) th
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [x] Q1: Should the `ContextResolver` pipeline be synchronous or async? **Resolved**: async. Authority resolution requires API calls. The full pipeline is async, but the lazy resolver means only the layers actually accessed pay the async cost.
-- [x] Q2: How should we model the identity-to-external-ID mapping when the same person uses CLI (no AAD identity) and Teams (has AAD identity)? **Resolved**: see D12 (cross-channel identity). Each channel has its own resolution path. Cross-channel linking is opt-in. For now, CLI and Teams identities are separate.
-- [x] Q3: Should authority profiles be eagerly fetched at session start or lazily fetched on first tool call that needs them? **Resolved**: lazy with cache. The `LazyContextResolver` does not resolve authority until a tool actually accesses it. Once resolved, cached for session duration with configurable TTL.
-- [ ] Q4: For process template detection, should we cache templates per-project or per-org? ADO allows different process templates per project within an org. Recommendation: cache per-project, since that's the scoping level.
-- [ ] Q5: Should preferences be editable via slash commands (e.g., `/set verbosity detailed`) or only via config file? Recommendation: both -- slash commands for runtime changes that also persist via `ContextStore`, config file for initial setup.
-- [x] Q6: How should we handle session context when the same user is in Teams and CLI simultaneously? **Resolved (superseded)**: no longer relevant — Session layer was eliminated (see D8). Conversation history is per-channel via existing `sessionPath()`. Identity and Preferences are per-user, shared across channels.
-- [ ] Q7: Should the semantic ADO tools (create_epic, move_items, etc.) replace the generic ado_query/ado_mutate tools, or coexist alongside them? Recommendation: coexist -- semantic tools are the preferred path for common operations, but generic tools remain for edge cases and advanced users.
-- [ ] Q8: For the authority pre-flight check on writes, what lightweight ADO endpoint should we probe? The Security Namespaces API (`/_apis/security/namespaces`) can check project-level permissions without attempting the mutation. Alternatively, the Permissions API (`/_apis/permissions`) can check specific permission bits. Recommendation: use the Security Namespaces API; it gives granular results and is documented.
-- [ ] Q9: **Identity bootstrapping** -- who creates the `UserIdentity` record the first time a user interacts? For Teams, the activity carries an AAD userId — something needs to do a "resolve or create" (look up by external ID, or mint a new internal UUID). For CLI, when does the OS-username-keyed identity get created? This is the first-contact flow and it's unspecified. Recommendation: identity resolution is always "get or create" — if no identity exists for the external ID (Teams) or OS username (CLI), create one automatically with sensible defaults. No manual setup required.
-- [x] Q10: **Session persistence between turns** -- **Resolved (eliminated)**: Session layer was removed (see D8). No structured session state to persist. Conversation history continues to be saved via existing `saveSession()`. Persistent user knowledge (known scopes, defaults) lives in Identity and Preferences via `ContextStore`.
-- [x] Q11: **Working set mutation -- who writes it?** **Resolved (eliminated)**: no working set. The conversation history is the working set. Tool results are in the messages. If the model needs to reference previous results after context trimming, it re-queries. Tools are stateless.
-- [ ] Q12: **`buildSystem()` API change** -- D10 says `buildSystem()` gains `contextSection()`, but it currently takes `(channel, options?)`. To render identity, session, authority, it needs `LazyResolvedContext`. How does it receive it? Options: (a) pass as a new parameter `buildSystem(channel, options?, context?)`, (b) module-level state set before calling `buildSystem()`, (c) make `buildSystem()` accept a context provider callback. Recommendation: (a) — explicit parameter, optional, backward-compatible. When absent, context section is omitted (graceful degradation). `buildSystem()` becomes async since it may need to await lazy authority/preferences for rendering.
-- [ ] Q13: **Resolver error handling** -- what happens when `ContextStore.get()` fails (corrupted file, permissions error)? When identity resolution finds no record? When the authority pre-flight check times out or the ADO API is unreachable? Options: (a) resolver returns partial context with missing layers set to defaults, (b) resolver throws and the caller falls back to no-context mode, (c) each layer has its own error strategy (identity: create default, authority: assume allowed, preferences: use defaults). Recommendation: (c) — layer-specific. Identity: auto-create on miss (see Q9). Authority: on error assume optimistic (same as if never resolved — no constraints in prompt, 403 learning kicks in at tool time). Preferences: fall back to built-in defaults. No layer failure should crash the agent.
-- [ ] Q14: **Schema versioning** -- the original doc had "B4. Schema versioning for all persisted context types" but the rewrite dropped it. If we persist `UserIdentity` and `UserPreferences` via `ContextStore` and later add fields, what happens when reading old data? Recommendation: every persisted type carries a `schemaVersion: number` field. On read, if the version is older than current, apply a migration function (add new fields with defaults, remove deprecated fields). Migrations are simple functions, not a framework. Version 1 is the initial schema.
-- [ ] Q15: **Token relationship** -- `ToolContext` currently carries `graphToken` and `adoToken` per-turn (fetched fresh from Bot Service token store each message). The new `LazyResolvedContext` is added alongside it (D5). Should tokens eventually move into the context kernel, or remain separate? Recommendation: remain separate. Tokens are ephemeral per-turn credentials managed by an external service (Azure Bot Service). The context kernel manages persistent/cached *user knowledge* (who you are, what you can do, what you prefer). Tokens are the *mechanism* for API calls; context is the *reasoning frame* for decisions. Mixing them conflates two different lifecycles. ToolContext keeps tokens; LazyResolvedContext keeps context. They coexist on the same object but serve different purposes.
+
+### Resolved
+- [x] Q1: Should the `ContextResolver` pipeline be synchronous or async? **Resolved (D6)**: async. The lazy resolver uses explicit `Promise<T>` for layers that require I/O. Only layers actually accessed pay the async cost.
+- [x] Q2: How should we model the identity-to-external-ID mapping when the same person uses CLI and Teams? **Resolved (D12)**: each channel has its own resolution path. Cross-channel linking is opt-in. CLI and Teams identities are separate for now.
+- [x] Q3: Should authority profiles be eagerly fetched or lazily fetched? **Resolved (D6)**: lazy with cache. Authority is a `Promise<AuthorityProfile[]>` on the resolved context, not fetched until awaited.
+- [x] Q6: How should we handle session context when the same user is in Teams and CLI simultaneously? **Resolved (D8, superseded)**: Session layer was eliminated. Conversation history is per-channel. Identity and Preferences are per-user, shared across channels.
+- [x] Q9: Identity bootstrapping -- who creates the `UserIdentity` on first interaction? **Resolved (D14)**: always "get or create." Auto-create with sensible defaults, no manual setup.
+- [x] Q10: Session persistence between turns? **Resolved (D8, eliminated)**: no structured session state. Conversation history saved via existing `saveSession()`. Persistent knowledge lives in Identity and Preferences via `ContextStore`.
+- [x] Q11: Working set mutation -- who writes it? **Resolved (D8, eliminated)**: no working set. Conversation history is the working set. Tools are stateless.
+- [x] Q12: `buildSystem()` API change -- how does it receive `LazyResolvedContext`? **Resolved (D15)**: explicit optional parameter, backward-compatible. Becomes async.
+- [x] Q13: Resolver error handling -- what happens when layers fail? **Resolved (D16)**: per-layer error strategy. No layer failure crashes the agent.
+- [x] Q14: Schema versioning for persisted types? **Resolved (D17)**: `schemaVersion` field + migration functions on read.
+- [x] Q15: Should tokens move into the context kernel? **Resolved (D18)**: no. Tokens stay in `ToolContext`, context stays in `LazyResolvedContext`. Different lifecycles.
+
+### Open (deferred -- not blocking Phase 1)
+
+- [ ] Q4: **Process template cache scoping (Phase 4)**
+  ADO allows different process templates per project within the same org. When we build process template awareness (Phase 4, unit 4A), should we cache the fetched template definition per-project or per-org?
+  - **Per-project** (recommended): matches ADO's scoping. Each project can have a different process (Basic, Agile, Scrum). Caching per-org would return wrong results if projects differ.
+  - **Per-org**: fewer cache entries but incorrect if projects use different templates.
+  - **Decision needed before**: Phase 4 doing doc creation.
+
+- [ ] Q5: **Preference editing mechanism (Phase 3+)**
+  Should user preferences be editable via slash commands at runtime (e.g., `/set verbosity detailed`), via config file only, or both?
+  - **Both** (recommended): slash commands for runtime changes that persist via `ContextStore`. Config file for initial setup and bulk configuration. Slash commands are more discoverable; config file is more powerful.
+  - **Config file only**: simpler to implement, but poor discoverability.
+  - **Slash commands only**: no way to pre-configure before first interaction.
+  - **Decision needed before**: Phase 3 doing doc creation (when preference-consuming tools are built).
+
+- [ ] Q7: **Semantic vs generic ADO tool coexistence (Phase 3)**
+  Should the new semantic ADO tools (`ado_create_epic`, `ado_move_items`, etc.) replace the existing generic `ado_query`/`ado_mutate` tools, or coexist alongside them?
+  - **Coexist** (recommended): semantic tools are the preferred path for common operations. Generic tools remain as an escape hatch for edge cases, advanced queries, and operations not yet covered by semantic tools. The model naturally prefers semantic tools when available.
+  - **Replace**: cleaner tool list, but loses flexibility for uncommon operations.
+  - **Decision needed before**: Phase 3 doing doc creation.
+
+- [ ] Q8: **Authority pre-flight endpoint selection (Phase 2)**
+  For the hybrid authority model's write-path pre-flight check (D2), which ADO API endpoint should `canWrite()` probe to verify permissions without attempting the mutation?
+  - **Security Namespaces API** (`/_apis/security/namespaces`) (recommended): returns granular permission bits per namespace. Well-documented. Can check specific actions (create work item, delete, etc.) without side effects.
+  - **Permissions API** (`/_apis/permissions`): can check specific permission bits but less commonly used in ADO integrations.
+  - **Decision needed before**: Phase 2 doing doc creation (unit 2B: `AuthorityChecker` implementation).
 
 ## Decisions Made
 
 ### D1: Architecture -- Storage Interface, Not File-Based Commitment
-The context kernel defines a `ContextStore` interface (`get`, `put`, `delete`, `list`) that all persistence flows through. `FileContextStore` is the first (and initially only) adapter. The schema, resolution logic, and all consumer code never import `fs` or know where bytes live. This means swapping to a database, blob store, or API-backed store in the future requires implementing one interface -- not refactoring every module. The file layout under `~/.agentconfigs/<agent>/context/` is an implementation detail of `FileContextStore`, not an architectural commitment.
+The context kernel defines a `ContextStore` interface (`get`, `put`, `delete`, `list`, `find`) that all persistence flows through. `FileContextStore` is the first (and initially only) adapter. The schema, resolution logic, and all consumer code never import `fs` or know where bytes live. This means swapping to a database, blob store, or API-backed store in the future requires implementing one interface -- not refactoring every module. The file layout under `~/.agentconfigs/<agent>/context/` is an implementation detail of `FileContextStore`, not an architectural commitment.
 
 ### D2: Authority -- Hybrid Model, Not Pure 403 Learning
 Pure 403 learning means the agent proposes something, attempts it, fails, and then learns -- bad UX for destructive or visible operations (e.g., reparenting 50 work items, only to fail on item 1). The authority system uses a hybrid approach:
@@ -113,10 +138,14 @@ Pure 403 learning means the agent proposes something, attempts it, fails, and th
 ### D3: Channel Modeling -- Capability Flags, Not Just Enum
 Channel context uses both an identifier (`"cli" | "teams"`) AND capability flags (`supportsMarkdown`, `supportsStreaming`, `supportsRichCards`, `maxMessageLength`, `availableIntegrations`). This allows the system to adapt behavior based on what the channel can actually do, rather than hardcoding per-channel behavior. The existing `Channel` type (`"cli" | "teams"`) in `src/mind/prompt.ts` becomes a key into a `ChannelCapabilities` lookup.
 
-`availableIntegrations` is the single source of truth for what a channel can reach. It drives three consumers — no per-channel switch statements anywhere:
-1. **Tool routing**: `getToolsForChannel()` filters the tool list to only include tools whose integration is in `availableIntegrations`. If Discord declares `["github"]`, it gets GitHub tools but not ADO tools — without any Discord-specific code in the router.
-2. **Prompt injection**: `contextSection()` only renders knownScopes and authority constraints for integrations in the list. CLI users don't see ADO scopes.
+`availableIntegrations` is the single source of truth for what a channel can reach. ADO is Teams-only for the foreseeable future -- CLI has no OAuth tokens and therefore no integration access. This drives three consumers -- no per-channel switch statements anywhere:
+1. **Tool routing**: `getToolsForChannel()` filters the tool list to only include tools whose integration is in `availableIntegrations`. If Discord declares `["github"]`, it gets GitHub tools but not ADO tools -- without any Discord-specific code in the router.
+2. **Prompt injection**: `contextSection()` only renders knownScopes and authority constraints for integrations in the list. CLI users don't see ADO scopes because CLI has no integrations.
 3. **Resolver**: `LazyContextResolver` skips authority resolution entirely if `availableIntegrations` is empty. No wasted API calls for channels that can't use the results.
+
+Channel integration mapping:
+- **CLI**: `availableIntegrations = []` -- no OAuth, no tokens, no integration access. Identity and preferences still work (local file-based), but no ADO/Graph/GitHub tools.
+- **Teams**: `availableIntegrations = ["ado", "graph"]` -- OAuth-backed via Azure Bot Service token store. ADO and Graph tools available.
 
 This replaces the current hardcoded pattern in `getToolsForChannel()` where `channel === "teams"` gates the Teams tool list. The channel capabilities definition becomes the single place to configure what a channel can do.
 
@@ -126,35 +155,49 @@ Authority profiles are cached with a configurable TTL (default: 30 minutes). Add
 ### D5: ToolContext Extension -- Backward Compatible
 The existing `ToolContext` interface in `src/engine/tools-base.ts` is extended (not replaced) with an optional `context?: LazyResolvedContext` field. This means all existing tool handlers continue to work unchanged. New semantic tools can access context layers on demand. Migration is gradual.
 
-### D6: Resolver -- Lazy, Not Upfront
-The previous design resolved all layers into a `ResolvedContext` bag on every tool call. Not every tool needs all four (e.g., `read_file` needs none, `ado_query` needs Identity but not Authority). Full upfront resolution adds latency, especially when Authority requires API calls. The `LazyContextResolver` returns a proxy where:
-- **Identity** is resolved eagerly (cheap local lookup, almost always needed by tools that use context at all).
-- **Authority** is resolved on first access (may require API call for pre-flight check).
-- **Preferences** are resolved on first access (file I/O via `ContextStore`).
-- **Channel** is a synchronous lookup (pure data, no I/O).
-Layers that are never accessed in a given tool call pay zero cost.
+### D6: Resolver -- Lazy via Explicit Promises, Not Upfront
+The previous design resolved all layers into a `ResolvedContext` bag on every tool call. Not every tool needs all four (e.g., `read_file` needs none, `ado_query` needs Identity but not Authority). Full upfront resolution adds latency, especially when Authority requires API calls. The `LazyContextResolver` returns an object with explicit `Promise<T>` fields for expensive layers:
+- **Identity** (`UserIdentity`): resolved eagerly (cheap local lookup, almost always needed by tools that use context at all). Available as a direct value, not a Promise.
+- **Authority** (`Promise<AuthorityProfile[]>`): resolved on first `await` (may require API call for pre-flight check). Callers that never await it pay zero cost.
+- **Preferences** (`Promise<UserPreferences>`): resolved on first `await` (file I/O via `ContextStore`). Callers that never await it pay zero cost.
+- **Channel** (`ChannelCapabilities`): synchronous lookup (pure data, no I/O). Available as a direct value.
+
+The Promise pattern is standard TypeScript -- no Proxy objects, no getter traps, no magic. Consumers explicitly `await context.authority` or `await context.preferences` when they need those layers. The Promise is created once (lazy initialization) and cached -- subsequent awaits return the same resolved value.
 
 ### D7: Phasing -- Interleaved, Not Back-Loaded
 The previous design built all foundation (types, resolvers, storage, pipeline) before any consumer touched it. That is too much untested infrastructure. The revised phasing:
-- Phase 1 builds Identity + Preferences + Storage Interface + Channel, then immediately wires them through ONE real ADO operation (per-user default org/project). This proves the kernel end-to-end with real data.
+- Phase 1 builds Identity + Preferences + Storage Interface + Channel, then immediately wires them through ONE real ADO operation (per-user default org/project) in the Teams channel. This proves the kernel end-to-end with real data.
 - Phase 2 builds Authority only after Phase 1's consumer proves the pattern works. Authority is wired into existing `ado_mutate`; authority constraints are added to the prompt.
 - Phase 3 adds semantic ADO tools that pull on all layers.
 - Phase 4 adds intelligence features (process templates, structural safety).
 Each phase delivers working, tested, consumer-visible functionality -- not just infrastructure.
 
-### D11: Authority → Identity Feedback Loop
-`knownScopes` in Identity is not append-only. When Authority records a persistent 403 on a scope listed in `knownScopes`, it signals Identity to prune that scope. This prevents the system prompt from advertising scopes the user can no longer access. The feedback direction is one-way: Authority informs Identity, never the reverse. Identity doesn't gate Authority — it just reflects what Authority has learned over time. Implementation: `AuthorityChecker.record403()` accepts an optional callback or event that the identity resolver subscribes to. Alternatively, the resolver pipeline runs a reconciliation step after authority resolution that compares `knownScopes` against cached 403s and prunes stale entries.
-
 ### D8: No Session Layer -- Conversation History IS the Session
 The original five-layer design included a `SessionContext` layer with working set, active scope, and execution mode. This was eliminated because:
 - **Working set** duplicates tool results already in conversation history. If history is trimmed, the model can re-query rather than maintaining a parallel cache.
 - **Execution mode** (`discussion` / `planning` / `mutation`) duplicates the model's natural conversational intent inference. Tracking it as explicit state adds overhead without adding information.
-- **Active scope** is better modeled as persistent user knowledge in Preferences (`knownScopes`, `defaultOrg`, `defaultProject`) — learned and updated automatically, not ephemeral.
+- **Active scope** is better modeled as persistent user knowledge in Preferences (`knownScopes`, `defaultOrg`, `defaultProject`) -- learned and updated automatically, not ephemeral.
 - **Tools are stateless**: every tool call includes all required context (org, project, IDs). No tool reads from ambient session state. The model must always provide what the tool needs. If the model doesn't know, it asks the user.
 - **The ouroboros metaphor holds**: the conversation *is* the memory. The agent eats its tail (trims old messages) but identity and preferences survive through persisted context. We don't need a parallel memory system for information that lives in the messages.
 
+### D9: File Layout -- New Directories Under Existing Structure
+New code follows the existing directory pattern:
+- `src/context/` -- context kernel types, interfaces, and resolvers
+- `src/context/types.ts` -- all layer type definitions
+- `src/context/store.ts` -- `ContextStore` interface
+- `src/context/store-file.ts` -- `FileContextStore` adapter
+- `src/context/identity.ts` -- UserIdentity resolution
+- `src/context/authority.ts` -- Authority resolution and `AuthorityChecker`
+- `src/context/preferences.ts` -- Preferences resolution
+- `src/context/channel.ts` -- ChannelCapabilities lookup
+- `src/context/resolver.ts` -- `LazyContextResolver`
+- `src/engine/ado-semantic.ts` -- semantic ADO tools (create_epic, move_items, etc.)
+- `src/engine/ado-templates.ts` -- process template detection and hierarchy rules
+- `src/__tests__/context/` -- tests for all context modules
+- `src/__tests__/engine/ado-semantic.test.ts` -- tests for semantic ADO tools
+
 ### D10: System Prompt Injection -- Context Reaches the Model, Not Just Tools
-The context kernel resolves identity, authority, preferences, channel, and session — but the model can only reason within constraints it can see. Without prompt injection, authority limits are invisible to the model until a tool call fails. This wastes turns and produces bad UX (proposing an epic restructure, then failing on the first API call).
+The context kernel resolves identity, authority, preferences, and channel -- but the model can only reason within constraints it can see. Without prompt injection, authority limits are invisible to the model until a tool call fails. This wastes turns and produces bad UX (proposing an epic restructure, then failing on the first API call).
 
 `buildSystem()` already runs per-turn and assembles sections. It gains a new `contextSection()` that renders the resolved context into the system prompt:
 
@@ -178,27 +221,30 @@ default: ado/contoso/Platform
 Design rules:
 - **Rebuilt per-turn**: `buildSystem()` already runs each turn. Preferences may be updated mid-conversation (e.g., model learns a new scope), so the prompt must reflect the latest persisted state.
 - **Authority constraints are explicit**: rendered as "can / CANNOT" so the model plans around limitations upfront rather than discovering them at tool execution time.
-- **Lazy resolver feeds it**: `contextSection()` awaits only the layers it needs. Identity is always rendered (cheap, eager). Authority and preferences are rendered only if resolved (i.e., only after a tool has triggered their lazy resolution — we don't force-resolve them just for the prompt on turns where no integration tools are used).
+- **Lazy resolver feeds it**: `contextSection()` awaits only the layers it needs. Identity is always rendered (cheap, eager). Authority and preferences are rendered only if resolved (i.e., only after a tool has triggered their lazy resolution -- we don't force-resolve them just for the prompt on turns where no integration tools are used).
 - **Graceful degradation**: if no context is available yet (first turn, CLI with no identity configured), the section is omitted entirely. The agent works exactly as it does today.
 - **No duplication**: channel info already in `runtimeInfoSection()` gets its flags from `ChannelCapabilities` instead of hardcoded strings, but the section name and position stay the same.
 - **No session state in prompt**: the conversation history is the session. The model knows what it queried, what it created, and what the user is focused on from the messages. The prompt only carries persistent context (identity, authority, preferences) and static context (channel capabilities).
 
-This is wired in Phase 1 (1G) for identity + preferences, and extended in Phase 2 (2E) for authority.
+This is wired in Phase 1 (1G) for identity + preferences, and extended in Phase 2 (2D) for authority.
+
+### D11: Authority -> Identity Feedback Loop
+`knownScopes` in Identity is not append-only. When Authority records a persistent 403 on a scope listed in `knownScopes`, it signals Identity to prune that scope. This prevents the system prompt from advertising scopes the user can no longer access. The feedback direction is one-way: Authority informs Identity, never the reverse. Identity doesn't gate Authority -- it just reflects what Authority has learned over time. Implementation: `AuthorityChecker.record403()` accepts an optional callback or event that the identity resolver subscribes to. Alternatively, the resolver pipeline runs a reconciliation step after authority resolution that compares `knownScopes` against cached 403s and prunes stale entries.
 
 ### D12: Cross-Channel Identity -- Designed For Multi-Channel From Day One
-Users will talk to the agent from many channels over time — Teams today, Discord/Telegram/iMessage/web tomorrow. The identity model must make cross-channel linking a natural extension, not a retrofit.
+Users will talk to the agent from many channels over time -- Teams today, Discord/Telegram/iMessage/web tomorrow. The identity model must make cross-channel linking a natural extension, not a retrofit.
 
 **Hard rules:**
-1. **Internal UUID is the only primary key.** Every channel-specific identity is just an entry in `externalIds[]`. No system — storage keys, authority cache keys, preference lookups — ever uses an external ID as a primary key. Everything keys off the internal UUID.
+1. **Internal UUID is the only primary key.** Every channel-specific identity is just an entry in `externalIds[]`. No system -- storage keys, authority cache keys, preference lookups -- ever uses an external ID as a primary key. Everything keys off the internal UUID.
 2. **`ContextStore` keys for preferences/authority use internal UUID, never external IDs.** Pattern: `preferences/{userId}`, `authority/{userId}/{integration}/{scope}`. If we accidentally key by AAD ID, adding Discord later requires a migration. Don't.
-3. **Identity resolution is always: external ID → lookup → internal UUID.** The `ContextStore` interface needs a secondary index or query path for this — "find the `UserIdentity` whose `externalIds[]` contains `{ provider: "teams", externalId: "abc-123" }`." A simple `get(key)` isn't enough. See updated `ContextStore` interface below.
+3. **Identity resolution is always: external ID -> lookup -> internal UUID.** The `ContextStore` interface needs a secondary index or query path for this -- "find the `UserIdentity` whose `externalIds[]` contains `{ provider: "teams", externalId: "abc-123" }`." A simple `get(key)` isn't enough. See `find()` on `ContextStore`.
 4. **Linking = adding an external ID to an existing `UserIdentity`.** If Jordan uses Teams (AAD) and later uses Discord, the Discord channel resolves to no existing identity, prompts the user to link, and adds the Discord external ID to Jordan's existing `UserIdentity`. One user, many external IDs, one set of preferences and knownScopes.
 5. **Unlinking = removing an external ID.** The user can detach a channel identity. If only one external ID remains, the `UserIdentity` persists (it's keyed by UUID, not by external ID).
 
 **Channel-specific resolution paths (current):**
 - **Teams**: AAD userId + tenantId from bot activity. Look up by `{ provider: "aad", externalId: "...", tenantId: "..." }`.
 - **CLI**: no OAuth. Keyed by OS username. Look up by `{ provider: "local", externalId: os.userInfo().username }`.
-- **Future channels** (Discord, Telegram, web): each provides its own external ID. Same pattern — look up by external ID, get-or-create `UserIdentity`.
+- **Future channels** (Discord, Telegram, web): each provides its own external ID. Same pattern -- look up by external ID, get-or-create `UserIdentity`.
 
 **What we build now vs later:**
 - **Now**: identity resolution with get-or-create, `ContextStore` with external ID lookup, `externalIds[]` as an array on `UserIdentity`. The data model supports multiple external IDs from day one.
@@ -207,21 +253,35 @@ Users will talk to the agent from many channels over time — Teams today, Disco
 ### D13: Resolver Lifecycle -- Per-Request, Not Per-Process
 The Teams bot is a single long-lived process serving multiple users. The `LazyContextResolver` MUST be instantiated per-request (per-incoming-message), not per-process. Each message from a different Teams user needs its own resolver with its own identity. This matches the existing pattern where `ToolContext` is built fresh in `handleTeamsMessage()` per-message. The resolver is created there, attached to `ToolContext`, and discarded after the turn completes. In-memory caches (Authority TTL) live at module scope and are keyed by userId+integration+scope, so they survive across requests for the same user without leaking across users.
 
-### D9: File Layout -- New Directories Under Existing Structure
-New code follows the existing directory pattern:
-- `src/context/` -- context kernel types, interfaces, and resolvers
-- `src/context/types.ts` -- all layer type definitions
-- `src/context/store.ts` -- `ContextStore` interface
-- `src/context/store-file.ts` -- `FileContextStore` adapter
-- `src/context/identity.ts` -- UserIdentity resolution
-- `src/context/authority.ts` -- Authority resolution and `AuthorityChecker`
-- `src/context/preferences.ts` -- Preferences resolution
-- `src/context/channel.ts` -- ChannelCapabilities lookup
-- `src/context/resolver.ts` -- `LazyContextResolver`
-- `src/engine/ado-semantic.ts` -- semantic ADO tools (create_epic, move_items, etc.)
-- `src/engine/ado-templates.ts` -- process template detection and hierarchy rules
-- `src/__tests__/context/` -- tests for all context modules
-- `src/__tests__/engine/ado-semantic.test.ts` -- tests for semantic ADO tools
+### D14: Identity Bootstrapping -- Always Get-or-Create
+Identity resolution is always "get or create." When a user first interacts with the agent, if no `UserIdentity` exists for the channel's external ID, one is created automatically with sensible defaults:
+- **Teams**: the bot activity carries an AAD userId and tenantId. The resolver calls `ContextStore.find("identity", ...)` to look up by external ID. If not found, it mints a new internal UUID, creates a `UserIdentity` with the AAD external ID, and persists it. Display name comes from the bot activity or a Graph API call.
+- **CLI**: keyed by OS username (`os.userInfo().username`). Same get-or-create pattern. Display name defaults to the OS username.
+- No manual setup required. No onboarding flow. The user just starts talking and identity is created transparently on first contact.
+
+### D15: buildSystem() API Change -- Explicit Optional Context Parameter
+`buildSystem()` currently takes `(channel, options?)`. To render the context section (identity, authority, preferences), it needs access to `LazyResolvedContext`. The solution is an explicit optional parameter: `buildSystem(channel, options?, context?)`. When `context` is absent, the context section is omitted entirely (graceful degradation -- the agent works exactly as it does today). When present, `buildSystem()` becomes async because it may need to `await context.authority` and `await context.preferences` for rendering. This is backward-compatible: callers that don't pass context get the same synchronous behavior as before.
+
+### D16: Resolver Error Handling -- Per-Layer Strategy
+Each context layer has its own error handling strategy. No layer failure should crash the agent.
+- **Identity**: on `ContextStore` read failure (corrupted file, permissions error), auto-create a fresh identity with defaults (same as D14 bootstrapping). On write failure, log and continue -- the identity will be re-created next turn.
+- **Authority**: on error (API timeout, unreachable ADO endpoint, corrupted cache), assume optimistic -- same behavior as if authority was never resolved. No constraints in prompt. 403 learning kicks in at tool execution time as normal.
+- **Preferences**: on read failure, fall back to built-in defaults (`verbosity: "normal"`, `confirmationPolicy: "mutations-only"`, etc.). On write failure, log and continue -- preference update will be retried next time.
+- **Channel**: pure lookup, no I/O, cannot fail in practice. If the channel identifier is unknown, use a minimal default capabilities set.
+
+### D17: Schema Versioning -- Migration Functions on Read
+Every persisted type (`UserIdentity`, `UserPreferences`) carries a `schemaVersion: number` field. On read from `ContextStore`, if the stored version is older than the current code's expected version, a migration function runs:
+- Adds new fields with sensible defaults.
+- Removes deprecated fields.
+- Bumps `schemaVersion` to current.
+- Writes the migrated record back to `ContextStore` (so migration only runs once per record).
+Migrations are simple pure functions (old data in, new data out), not a framework. Version 1 is the initial schema. Each version bump has one migration function. They compose: v1 -> v2 -> v3 if needed.
+
+### D18: Token Separation -- Tokens Stay in ToolContext, Context Stays in LazyResolvedContext
+Tokens (`graphToken`, `adoToken`) remain in `ToolContext`. They are ephemeral per-turn credentials fetched fresh from Azure Bot Service's token store on each incoming message. The context kernel (`LazyResolvedContext`) manages persistent/cached user knowledge: who you are (Identity), what you can do (Authority), what you prefer (Preferences), and what the channel supports (Channel). These are different lifecycles:
+- **Tokens**: per-turn, externally managed, expire independently, never persisted by us.
+- **Context**: per-user, persisted via `ContextStore`, cached with our own TTL, survives across turns.
+They coexist on the same `ToolContext` object (D5: `context?: LazyResolvedContext`) but serve different purposes. Mixing them would conflate credential management with user knowledge management.
 
 ## Context / References
 
@@ -402,15 +462,18 @@ interface ChannelCapabilities {
   maxMessageLength: number;
   defaultVerbosity: "concise" | "normal" | "detailed";
   defaultConfirmationFriction: "low" | "medium" | "high";
-  // CLI: availableIntegrations = [] (no OAuth, no tokens)
-  // Teams: availableIntegrations = ["ado", "github", "graph"] (OAuth-backed)
+  // CLI: availableIntegrations = [] -- no OAuth, no tokens, no integration access.
+  //   Identity and preferences work (local file-based) but no ADO/Graph/GitHub tools.
+  // Teams: availableIntegrations = ["ado", "graph"] -- OAuth-backed via Bot Service token store.
+  //   ADO is Teams-only for the foreseeable future.
   // Prompt injection only renders knownScopes/authority for integrations in this list.
 }
 
 // --- Lazy Resolved Context (output of resolver) ---
-// Layers are resolved on first property access, not all upfront.
-// Identity: resolved eagerly (cheap). Authority, Preferences: lazy (may require I/O).
-// Channel: synchronous lookup. No session layer — conversation history is the session.
+// Explicit Promise pattern: expensive layers are Promise<T> fields, resolved on first await.
+// Identity: resolved eagerly (cheap, direct value). Authority, Preferences: Promise<T> (lazy, async).
+// Channel: synchronous lookup (direct value). No session layer -- conversation history is the session.
+// No Proxy objects or getter traps -- standard TypeScript Promises.
 interface LazyResolvedContext {
   readonly identity: UserIdentity;           // eager
   readonly channel: ChannelCapabilities;      // eager (pure lookup)
