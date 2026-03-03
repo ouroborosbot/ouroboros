@@ -86,7 +86,7 @@ Define and lock runtime hardening requirements for single-replica preview so req
 **Output**: Coverage artifact at `./2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-2c-coverage-run.txt`.
 **Acceptance**: Non-blocking/fallback paths are fully covered and stable.
 
-### ⬜ Unit 3a: Concurrency Guardrails and Prompt-Rebuild Safety — Tests
+### ✅ Unit 3a: Concurrency Guardrails and Prompt-Rebuild Safety — Tests
 **What**: Add failing tests for per-conversation and global guardrails (in-flight/queue/timeout posture) and prompt-rebuild freshness/consistency safety.
 **Output**: Red test artifact at `./2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-3a-red-run.txt`.
 **Acceptance**: Tests fail before implementation and capture missing guardrail/freshness behavior.
@@ -137,3 +137,4 @@ Define and lock runtime hardening requirements for single-replica preview so req
 - [2026-03-03 14:54] Unit 2a complete: added failing non-blocking sink contract tests and captured red evidence for sink-failure throw behavior.
 - [2026-03-03 14:57] Unit 2b complete: implemented non-blocking sink fanout/file behavior with resilient error handling and verified full test + build green (`unit-2b-test-run.txt`, `unit-2b-build-run.txt`).
 - [2026-03-03 14:58] Unit 2c complete: verified 100% coverage and clean build after non-blocking sink hardening (`unit-2c-coverage-run.txt`, `unit-2c-build-run.txt`).
+- [2026-03-03 15:01] Unit 3a complete: added failing tests for global in-flight Teams guardrails and prompt-refresh safety/consistency; captured red evidence in `unit-3a-red-run.txt`.
