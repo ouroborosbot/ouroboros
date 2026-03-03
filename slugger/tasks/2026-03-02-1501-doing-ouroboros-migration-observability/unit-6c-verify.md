@@ -4,7 +4,7 @@
 - Command:
   - `npm run test:coverage`
 - Combined gate output log:
-  - `docs/slugger/tasks/2026-03-02-1501-doing-ouroboros-migration-observability/unit-6c-gate-run.txt`
+  - `slugger/tasks/2026-03-02-1501-doing-ouroboros-migration-observability/unit-6c-gate-run.txt`
 - Run directory:
   - `/Users/arimendelow/.agentconfigs/test-runs/ouroboros-agent-harness/2026-03-03T02-32-12-937Z`
 
