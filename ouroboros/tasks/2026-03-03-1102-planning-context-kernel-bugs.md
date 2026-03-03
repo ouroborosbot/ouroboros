@@ -1,7 +1,7 @@
 # Planning: Fix Context Kernel Integration Bugs
 
-**Status**: drafting
-**Created**: (pending first commit)
+**Status**: NEEDS_REVIEW
+**Created**: 2026-03-03 11:03
 
 ## Goal
 Fix three bugs preventing the context kernel from functioning in production: missing AAD field extraction in the Teams handler, system prompt never receiving resolved context, and context store path being global instead of per-agent.
@@ -38,23 +38,26 @@ Fix three bugs preventing the context kernel from functioning in production: mis
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [ ] Bug 2: Should we rebuild the system message each turn, or inject context as a separate system-role message? Rebuilding is simpler and keeps the existing `buildSystem(channel, options, context)` signature working. Injecting a separate message avoids re-reading psyche files but adds complexity. Leaning toward rebuild since psyche files are already cached in `_psycheCache`.
-- [ ] Bug 2 (Teams): The system prompt is created once when the session is new (line 339). For existing sessions, the system message was created in a prior request. Should we update the existing system message in `messages[0]` on each turn, or always prepend a fresh one?
-- [ ] Bug 1: Which properties on the Bot Framework `Activity` object carry `aadObjectId`, `tenantId`, and `displayName`? Need to verify the shape of `ctx` in the `app.on("message")` handler.
+- [x] Bug 2: Should we rebuild the system message each turn, or inject context as a separate system-role message? **Resolved: rebuild.** Psyche files are cached in `_psycheCache`, so rebuilding is cheap. The `buildSystem(channel, options, context)` signature already accepts context.
+- [x] Bug 2 (Teams): For existing sessions, the system message was created in a prior request. Should we update `messages[0]` or prepend fresh? **Resolved: update `messages[0]`.** The system message is always the first message in the array. Replace its content with a fresh `buildSystem()` call that includes resolved context. This ensures context is always current even across session reloads.
+- [x] Bug 1: Which properties on the Bot Framework `Activity` object carry AAD fields? **Resolved via SDK types.** `Activity.from` is type `Account` with `aadObjectId?: string` and `name: string`. `Activity.conversation` is type `ConversationAccount` with `tenantId?: string`. So: `activity.from.aadObjectId`, `activity.conversation.tenantId`, `activity.from.name`.
 
 ## Decisions Made
-- (none yet)
+- Bug 2 fix: Rebuild the system message on each turn by calling `buildSystem(channel, options, context)` and replacing `messages[0].content`. This is cheap because psyche files are cached and the `buildSystem` signature already supports it.
+- Bug 1 field mapping: `activity.from.aadObjectId` -> `teamsContext.aadObjectId`, `activity.conversation.tenantId` -> `teamsContext.tenantId`, `activity.from.name` -> `teamsContext.displayName`. These are the standard Bot Framework SDK fields from `@microsoft/teams.api`.
+- Bug 3 path: Use `path.join(getAgentRoot(), "context")` in both cli.ts and teams.ts. The `getAgentRoot()` function returns the agent's root directory (e.g., `/path/to/ouroboros`).
+- CLI bug 2 fix: Pass `resolvedContext` to `buildSystem("cli", undefined, resolvedContext)` at cli.ts:359. The context is already resolved 7 lines above.
 
 ## Context / References
-- `src/senses/teams.ts` -- Teams channel adapter, contains bugs 1 and 3
-- `src/senses/cli.ts` -- CLI channel adapter, contains bugs 2 (CLI variant) and 3
+- `src/senses/teams.ts` -- Teams channel adapter, contains bugs 1, 2 (Teams), and 3
+- `src/senses/cli.ts` -- CLI channel adapter, contains bugs 2 (CLI) and 3
 - `src/mind/prompt.ts` -- `buildSystem()` already accepts optional `context` parameter (line 188)
 - `src/mind/context/resolver.ts` -- `ContextResolver` class (working correctly)
 - `src/identity.ts` -- `getAgentRoot()` function for per-agent paths
 - `src/__tests__/senses/teams.test.ts` -- existing Teams tests
-- `src/__tests__/senses/cli.test.ts` -- existing CLI tests (if present)
 - `src/__tests__/mind/prompt.test.ts` -- existing prompt tests
 - Original context kernel planning: `ouroboros/tasks/2026-03-02-1716-planning-context-kernel.md`
+- SDK types: `@microsoft/teams.api` `Account` type has `aadObjectId?: string`, `name: string`; `ConversationAccount` has `tenantId?: string`; `Activity.from: Account`, `Activity.conversation: ConversationAccount`
 
 ## Notes
 **Deferred: FRIENDS.md migration (carry forward, do not implement)**
@@ -65,4 +68,4 @@ The context kernel planning doc explicitly deferred removing FRIENDS.md. The pla
 - For now, FRIENDS.md stays as-is
 
 ## Progress Log
-- (pending first commit) Created
+- 2026-03-03 11:03 Created
