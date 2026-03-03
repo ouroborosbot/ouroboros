@@ -76,7 +76,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Output**: New module files under `src/observability/` and updated tests.
 **Acceptance**: Unit 1a tests pass with required envelope fields, configurable `logging.level`, sink abstraction, and append-only file writes to the session-style path.
 
-### ⬜ Unit 1c: Observability Core Module — Coverage & Refactor
+### ✅ Unit 1c: Observability Core Module — Coverage & Refactor
 **What**: Refactor if needed and verify 100% coverage for new observability module code.
 **Output**: Coverage verification note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-1c-coverage.md`.
 **Acceptance**: New observability module code is fully covered and tests remain green.
@@ -206,3 +206,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 17:42] Unit 0 complete: baseline matrix captured current runtime logging, locked envelope/event/sink contracts, and mapped all in-scope files
 - [2026-03-02 17:43] Unit 1a complete: added failing observability core tests and captured red run evidence (missing module/envelope/sink behavior)
 - [2026-03-02 17:44] Unit 1b complete: implemented observability core module (trace helpers, level filtering, sink fan-out, stderr + NDJSON file sinks); tests green and build clean
+- [2026-03-02 17:46] Unit 1c complete: added coverage backfill tests (observability defaults/warn + CLI spinner success branch), verified 100% coverage and clean build
