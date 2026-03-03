@@ -117,7 +117,7 @@ Tests to update for message text:
 
 **Acceptance**: All new tests PASS (green). All existing tests PASS. No warnings.
 
-### ⬜ Unit 2c: Inject final_answer after narration kick -- Coverage and Refactor
+### ✅ Unit 2c: Inject final_answer after narration kick -- Coverage and Refactor
 
 **What**: Verify 100% coverage on all new/changed code. Run full test suite. Check for any remaining test assertions that reference old kick message text.
 **Acceptance**: 100% coverage. All tests green. No warnings.
@@ -147,3 +147,4 @@ Tests to update for message text:
 - 2026-03-02 17:53 Unit 1c complete: 100% coverage on all changed files. No dead maxKicks code. No refactoring needed.
 - 2026-03-02 17:55 Unit 2a complete: 5 new tests + 4 updated assertions. 9 tests RED.
 - 2026-03-02 17:55 Unit 2b complete: activeTools per-iteration, lastKickReason tracking, updated messages. 910 tests GREEN. Build clean.
+- 2026-03-02 17:56 Unit 2c complete: 100% coverage on all changed files. No old message text remaining. No refactoring needed.
