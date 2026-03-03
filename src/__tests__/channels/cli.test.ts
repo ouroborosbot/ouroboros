@@ -508,6 +508,27 @@ describe("CLI adapter - onModelStreamStart", () => {
 
     vi.restoreAllMocks()
   })
+
+  it("stop with success message writes green check output", async () => {
+    const stderrChunks: string[] = []
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
+      stderrChunks.push(chunk.toString())
+      return true
+    })
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true)
+
+    vi.resetModules()
+    const agent = await import("../../channels/cli")
+
+    const s = new agent.Spinner("test")
+    s.stop("done")
+
+    const output = stderrChunks.join("")
+    expect(output).toContain("\u2713")
+    expect(output).toContain("done")
+
+    vi.restoreAllMocks()
+  })
 })
 
 describe("CLI adapter - onToolStart", () => {
