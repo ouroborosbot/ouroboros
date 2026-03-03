@@ -1059,7 +1059,7 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 
 ---
 
-### ⬜ Unit 3C: Enriched Backlog Query Tool (ado_backlog_list)
+### ✅ Unit 3C: Enriched Backlog Query Tool (ado_backlog_list)
 
 **What**: Create `ado_backlog_list` -- a single-call backlog query that returns enriched work items with hierarchy, types, parent info, and assignee. This is the read-side semantic tool that replaces multi-step WIQL + batch fetch workflows.
 
@@ -1092,12 +1092,12 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - Registered as `ToolDefinition` with `integration: "ado"`
 
 **Completion criteria:**
-- [ ] `ado_backlog_list` tool exists and is registered
-- [ ] Returns enriched work items with hierarchy + metadata
-- [ ] Supports common filters
-- [ ] Uses ADO context helper for org/project
-- [ ] 100% test coverage
-- [ ] All tests pass
+- [x] `ado_backlog_list` tool exists and is registered (integration: "ado")
+- [x] Returns enriched work items with hierarchy + metadata (id, title, type, state, assignedTo, areaPath, iteration, parent)
+- [x] Supports common filters (areaPath, iteration, workItemType, state, assignee)
+- [x] Uses ADO context helper for org/project (resolveAdoContext)
+- [x] 100% test coverage (ado-semantic.ts 100%)
+- [x] All tests pass (1085)
 
 ---
 
@@ -1387,3 +1387,4 @@ Teams: { channel: "teams", availableIntegrations: ["ado", "graph"], supportsMark
 - 2026-03-03 0023 Unit 3A complete: resolveAdoContext() helper extracts org/project from args or runs discovery cascade. Single org/project auto-selected, multiple returns disambiguation. CLI rejection (no ADO integration). Error handling: catch-all returns error message. 1047 tests total.
 - 2026-03-03 0030 Unit 3Ba complete: FriendMemory type (id, toolPreferences, schemaVersion), memory collection on ContextStore + FileContextStore, resolveMemory() with D16 graceful error handling, resolver loads memory alongside identity/channel/authority. 1062 tests total.
 - 2026-03-03 0034 Unit 3Bb complete: contextSection() renders "## friend preferences" from FriendMemory.toolPreferences (skipped when null/empty). save_friend_note base tool creates/updates FriendMemory via memoryStore on ToolContext. D16 error handling on write failure. 1072 tests total.
+- 2026-03-03 0038 Unit 3C complete: ado_backlog_list semantic tool -- single-call enriched backlog query with WIQL + batch fetch. Returns structured JSON with hierarchy, type, parent, assignee, area path, iteration. Filters: areaPath, iteration, workItemType, state, assignee. Registered via adoSemanticToolDefinitions in tools.ts. 1085 tests total.
