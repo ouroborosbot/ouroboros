@@ -136,9 +136,9 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Acceptance**: 100% coverage on new code, tests still green.
 
 ### ⬜ Unit 4a: Directory rename context -> friends -- Execute
-**What**: Rename `src/mind/context/` to `src/mind/friends/` and `src/__tests__/mind/context/` to `src/__tests__/mind/friends/`. Update ALL import paths across the entire codebase that reference `mind/context/` to `mind/friends/`. This is a mechanical refactor (no new logic), so strict TDD red/green cycle does not apply. Instead: rename, update imports, verify.
-**Output**: All files moved, all imports updated.
-**Files**: All files importing from `mind/context/`
+**What**: Rename `src/mind/context/` directory to `src/mind/friends/` and `src/__tests__/mind/context/` to `src/__tests__/mind/friends/`. Update ALL import paths across the entire codebase that reference `mind/context/` (with trailing slash or further path component like `mind/context/types`) to `mind/friends/`. IMPORTANT: `src/mind/context.ts` (the session management file, no trailing slash) is a separate file and must NOT be renamed or have its imports changed. Imports like `from "../mind/context"` refer to `context.ts`, not the directory. Only imports with a path component after `context/` (e.g., `mind/context/types`, `mind/context/store-file`) are renamed. This is a mechanical refactor (no new logic), so strict TDD red/green cycle does not apply. Instead: rename, update imports, verify.
+**Output**: All files in `context/` directory moved to `friends/`, all deep imports updated.
+**Files**: All files importing from `mind/context/` (with further path component)
 **Acceptance**: `tsc --noEmit` passes, all existing tests pass with new paths.
 
 ### ⬜ Unit 4b: Directory rename -- Verification
