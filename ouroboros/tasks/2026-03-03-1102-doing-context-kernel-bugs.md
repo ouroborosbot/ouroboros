@@ -270,7 +270,7 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Files**: `src/heart/core.ts`
 **Acceptance**: All core tests PASS (green), no warnings.
 
-### ⬜ Unit 11c: Agent loop -- Coverage & Refactor
+### ✅ Unit 11c: Agent loop -- Coverage & Refactor
 **What**: Verify 100% coverage on core.ts changes.
 **Output**: Coverage report showing 100% on core.ts changes.
 **Acceptance**: 100% coverage on new code, tests still green.
@@ -311,3 +311,4 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 - 2026-03-03 15:39 Units 9a-9c complete: Teams adapter wired -- buildSystem called with resolved context, toolContext.friendStore set, sessionPath uses friend UUID, context resolved early. 100% coverage on teams.ts. 1192 tests pass.
 - 2026-03-03 15:41 Units 10a-10c complete: CLI adapter wired -- buildSystem called with resolved context, toolContext.friendStore set, sessionPath uses friend UUID. New code fully covered. 1195 tests pass.
 - 2026-03-03 15:46 Unit 11a complete: 3 failing tests for per-turn friend refresh (friendStore.get, toolPreferences in getToolsForChannel, buildSystem with fresh context). 1195 pass, 3 fail (red).
+- 2026-03-03 15:48 Units 11b-11c complete: Per-turn friend refresh in runAgent -- friendStore.get re-reads friend from disk, fresh context passed to buildSystem, toolPreferences passed to getToolsForChannel. Non-null assertion on unreachable branch, added null-return test for 100% coverage on core.ts. 1199 tests pass.
