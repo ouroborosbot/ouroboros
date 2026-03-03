@@ -118,17 +118,17 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Output**: Coverage note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-4c-coverage.md`.
 **Acceptance**: Channel instrumentation new code is fully covered and tests remain green.
 
-### ⬜ Unit 5a: Config/Identity/Clients/Repertoire Instrumentation — Red
+### ⬜ Unit 5a: Config/Identity/Clients/Repertoire/Wardrobe Instrumentation — Red
 **What**: Add failing tests for minimum event catalog coverage in `src/config.ts`, `src/identity.ts`, `src/engine/ado-client.ts`, `src/engine/graph-client.ts`, `src/repertoire/*`, and `src/wardrobe/phrases.ts`.
 **Output**: Failing tests (`src/__tests__/config.test.ts`, `src/__tests__/identity.test.ts`, `src/__tests__/engine/*client.test.ts`, `src/__tests__/repertoire/*.test.ts`, `src/__tests__/wardrobe/phrases.test.ts`) and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-5a-red-run.txt`.
 **Acceptance**: Tests fail and enumerate missing component-level events before implementation.
 
-### ⬜ Unit 5b: Config/Identity/Clients/Repertoire Instrumentation — Green
+### ⬜ Unit 5b: Config/Identity/Clients/Repertoire/Wardrobe Instrumentation — Green
 **What**: Implement required structured event logging for config, identity, client requests, and repertoire load paths, including config helpers needed for session-style logs directory/path resolution.
 **Output**: Updated `src/config.ts`, `src/identity.ts`, `src/engine/ado-client.ts`, `src/engine/graph-client.ts`, `src/repertoire/commands.ts`, `src/repertoire/skills.ts`, `src/wardrobe/phrases.ts` and passing tests.
 **Acceptance**: Required component events are emitted with required envelope, session-style log path resolution works, and tests pass.
 
-### ⬜ Unit 5c: Config/Identity/Clients/Repertoire Instrumentation — Coverage & Refactor
+### ⬜ Unit 5c: Config/Identity/Clients/Repertoire/Wardrobe Instrumentation — Coverage & Refactor
 **What**: Refactor for consistency and verify complete coverage on new code paths.
 **Output**: Coverage note at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-5c-coverage.md`.
 **Acceptance**: New config/identity/clients/repertoire instrumentation code is fully covered and tests remain green.
@@ -163,4 +163,5 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 15:58] Clarified that artifact run files are evidence outputs only; runtime logging sink remains stderr-only in this phase
 - [2026-03-02 16:05] Updated units/criteria for session-style append-only NDJSON persistence with dual sinks (`stderr` + file)
 - [2026-03-02 16:12] Consistency cleanup: required sink abstraction + explicit key mapping; reset status to drafting pending re-review
-- [PENDING_PASS1_TS] Pass 1 (first draft refresh): incorporated merged `origin/main` runtime/test path changes into work units
+- [2026-03-02 16:19] Pass 1 (first draft refresh): incorporated merged `origin/main` runtime/test path changes into work units
+- [PENDING_PASS2_TS] Pass 2 (granularity): clarified Unit 5 ownership to include wardrobe scope without additional unit splits
