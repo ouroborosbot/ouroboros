@@ -32,6 +32,19 @@ function makeCtx(overrides?: any) {
   }
 }
 
+function makeCtxWithChecker(canWriteResult = true) {
+  return makeCtx({
+    context: {
+      ...makeCtx().context,
+      checker: {
+        canRead: vi.fn().mockReturnValue(true),
+        canWrite: vi.fn().mockResolvedValue(canWriteResult),
+        record403: vi.fn(),
+      },
+    },
+  })
+}
+
 describe("ado_backlog_list tool", () => {
   beforeEach(() => {
     vi.resetAllMocks()
@@ -204,5 +217,302 @@ describe("ado_backlog_list tool", () => {
     const wiqlCall = vi.mocked(adoRequest).mock.calls[0]
     expect(wiqlCall[2]).toBe("explicit-org") // org parameter
     expect(wiqlCall[3]).toContain("explicit-proj") // path includes project
+  })
+})
+
+describe("ado_create_epic tool", () => {
+  beforeEach(() => { vi.resetAllMocks() })
+
+  it("is registered with integration 'ado' and confirmationRequired", () => {
+    const def = findTool("ado_create_epic")
+    expect(def).toBeDefined()
+    expect(def!.integration).toBe("ado")
+    expect(def!.confirmationRequired).toBe(true)
+  })
+
+  it("creates an epic with correct JSON Patch operations", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 200, fields: { "System.Title": "New Epic" } }))
+
+    const def = findTool("ado_create_epic")!
+    const result = await def.handler({ title: "New Epic", areaPath: "Platform\\Team A" }, makeCtxWithChecker())
+    expect(result).toContain("200")
+    // Verify the PATCH body sent to ADO
+    const call = vi.mocked(adoRequest).mock.calls[0]
+    expect(call[1]).toBe("POST")
+    const body = JSON.parse(call[4]!)
+    expect(body).toEqual(expect.arrayContaining([
+      expect.objectContaining({ op: "add", path: "/fields/System.Title", value: "New Epic" }),
+    ]))
+  })
+
+  it("checks canWrite before executing", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    const ctx = makeCtxWithChecker(false)
+    const def = findTool("ado_create_epic")!
+    const result = await def.handler({ title: "Denied Epic" }, ctx)
+    expect(result).toContain("AUTHORITY_DENIED")
+    expect(adoRequest).not.toHaveBeenCalled()
+  })
+
+  it("returns error when no ADO token", async () => {
+    const def = findTool("ado_create_epic")!
+    const result = await def.handler({ title: "test" }, { ...makeCtx(), adoToken: undefined })
+    expect(result).toContain("AUTH_REQUIRED")
+  })
+})
+
+describe("ado_create_issue tool", () => {
+  beforeEach(() => { vi.resetAllMocks() })
+
+  it("is registered with integration 'ado' and confirmationRequired", () => {
+    const def = findTool("ado_create_issue")
+    expect(def).toBeDefined()
+    expect(def!.integration).toBe("ado")
+    expect(def!.confirmationRequired).toBe(true)
+  })
+
+  it("creates an issue with title, description, area path, and parent", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 300, fields: { "System.Title": "Story A" } }))
+
+    const def = findTool("ado_create_issue")!
+    const result = await def.handler({
+      title: "Story A",
+      description: "Description here",
+      areaPath: "Platform\\Team A",
+      parentId: "100",
+    }, makeCtxWithChecker())
+    expect(result).toContain("300")
+    const call = vi.mocked(adoRequest).mock.calls[0]
+    const body = JSON.parse(call[4]!)
+    expect(body).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: "/fields/System.Title", value: "Story A" }),
+      expect.objectContaining({ path: "/fields/System.Description", value: "Description here" }),
+    ]))
+  })
+
+  it("checks canWrite before executing", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    const ctx = makeCtxWithChecker(false)
+    const def = findTool("ado_create_issue")!
+    const result = await def.handler({ title: "Denied" }, ctx)
+    expect(result).toContain("AUTHORITY_DENIED")
+  })
+})
+
+describe("ado_move_items tool", () => {
+  beforeEach(() => { vi.resetAllMocks() })
+
+  it("is registered with integration 'ado' and confirmationRequired", () => {
+    const def = findTool("ado_move_items")
+    expect(def).toBeDefined()
+    expect(def!.integration).toBe("ado")
+    expect(def!.confirmationRequired).toBe(true)
+  })
+
+  it("reparents work items to a new parent", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    // First call: update item 101 parent
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 101 }))
+    // Second call: update item 102 parent
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 102 }))
+
+    const def = findTool("ado_move_items")!
+    const result = await def.handler({
+      workItemIds: "101,102",
+      newParentId: "200",
+    }, makeCtxWithChecker())
+    const parsed = JSON.parse(result)
+    expect(parsed.moved).toHaveLength(2)
+  })
+
+  it("checks canWrite before executing", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    const ctx = makeCtxWithChecker(false)
+    const def = findTool("ado_move_items")!
+    const result = await def.handler({ workItemIds: "101", newParentId: "200" }, ctx)
+    expect(result).toContain("AUTHORITY_DENIED")
+  })
+
+  it("handles partial failure", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 101 }))
+    vi.mocked(adoRequest).mockResolvedValueOnce("PERMISSION_DENIED: 403")
+
+    const def = findTool("ado_move_items")!
+    const result = await def.handler({ workItemIds: "101,102", newParentId: "200" }, makeCtxWithChecker())
+    const parsed = JSON.parse(result)
+    expect(parsed.moved.length + parsed.errors.length).toBe(2)
+  })
+})
+
+describe("ado_preview_changes tool", () => {
+  beforeEach(() => { vi.resetAllMocks() })
+
+  it("is registered with integration 'ado' (no confirmationRequired -- read-only)", () => {
+    const def = findTool("ado_preview_changes")
+    expect(def).toBeDefined()
+    expect(def!.integration).toBe("ado")
+    expect(def!.confirmationRequired).toBeUndefined()
+  })
+
+  it("returns structured preview without executing mutations", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+
+    const def = findTool("ado_preview_changes")!
+    const result = await def.handler({
+      operation: "create_epic",
+      title: "Preview Epic",
+      areaPath: "Platform\\Team A",
+    }, makeCtx())
+    const parsed = JSON.parse(result)
+    expect(parsed.preview).toBe(true)
+    expect(parsed.operations).toBeDefined()
+    expect(parsed.operations.length).toBeGreaterThan(0)
+    // No actual API call should have been made
+    expect(adoRequest).not.toHaveBeenCalled()
+  })
+
+  it("shows operations for create_issue with parent", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+
+    const def = findTool("ado_preview_changes")!
+    const result = await def.handler({
+      operation: "create_issue",
+      title: "Preview Story",
+      parentId: "100",
+    }, makeCtx())
+    const parsed = JSON.parse(result)
+    expect(parsed.preview).toBe(true)
+    expect(parsed.operations.some((op: any) => op.path === "/fields/System.Title")).toBe(true)
+  })
+
+  it("shows operations for move_items", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+
+    const def = findTool("ado_preview_changes")!
+    const result = await def.handler({
+      operation: "move_items",
+      workItemIds: "101,102",
+      newParentId: "200",
+    }, makeCtx())
+    const parsed = JSON.parse(result)
+    expect(parsed.preview).toBe(true)
+    expect(parsed.operations).toHaveLength(2)
+  })
+
+  it("returns error for unknown operation", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+
+    const def = findTool("ado_preview_changes")!
+    const result = await def.handler({ operation: "unknown_op" }, makeCtx())
+    expect(result).toContain("Unknown operation")
+  })
+})
+
+describe("ado_validate_structure tool", () => {
+  beforeEach(() => { vi.resetAllMocks() })
+
+  it("is registered with integration 'ado' (no confirmationRequired -- read-only)", () => {
+    const def = findTool("ado_validate_structure")
+    expect(def).toBeDefined()
+    expect(def!.integration).toBe("ado")
+  })
+
+  it("validates parent/child type rules and returns violations", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    // Fetch parent work item
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [{ id: 100, fields: { "System.WorkItemType": "Task" } }],
+    }))
+
+    const def = findTool("ado_validate_structure")!
+    const result = await def.handler({
+      parentId: "100",
+      childType: "Epic",
+    }, makeCtx())
+    const parsed = JSON.parse(result)
+    expect(parsed.valid).toBe(false)
+    expect(parsed.violations.length).toBeGreaterThan(0)
+  })
+
+  it("returns valid when parent/child relationship is correct", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({
+      value: [{ id: 100, fields: { "System.WorkItemType": "Epic" } }],
+    }))
+
+    const def = findTool("ado_validate_structure")!
+    const result = await def.handler({
+      parentId: "100",
+      childType: "User Story",
+    }, makeCtx())
+    const parsed = JSON.parse(result)
+    expect(parsed.valid).toBe(true)
+  })
+
+  it("returns error when parent not found", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ value: [] }))
+
+    const def = findTool("ado_validate_structure")!
+    const result = await def.handler({ parentId: "999", childType: "User Story" }, makeCtx())
+    expect(result).toContain("not found")
+  })
+})
+
+describe("ado_restructure_backlog tool", () => {
+  beforeEach(() => { vi.resetAllMocks() })
+
+  it("is registered with integration 'ado' and confirmationRequired", () => {
+    const def = findTool("ado_restructure_backlog")
+    expect(def).toBeDefined()
+    expect(def!.integration).toBe("ado")
+    expect(def!.confirmationRequired).toBe(true)
+  })
+
+  it("performs bulk reparent operations", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValue(JSON.stringify({ id: 101 }))
+
+    const def = findTool("ado_restructure_backlog")!
+    const result = await def.handler({
+      operations: JSON.stringify([
+        { workItemId: 101, newParentId: 200 },
+        { workItemId: 102, newParentId: 200 },
+      ]),
+    }, makeCtxWithChecker())
+    const parsed = JSON.parse(result)
+    expect(parsed.results).toHaveLength(2)
+  })
+
+  it("checks canWrite before executing", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    const ctx = makeCtxWithChecker(false)
+    const def = findTool("ado_restructure_backlog")!
+    const result = await def.handler({
+      operations: JSON.stringify([{ workItemId: 101, newParentId: 200 }]),
+    }, ctx)
+    expect(result).toContain("AUTHORITY_DENIED")
+  })
+
+  it("handles partial failures and continues", async () => {
+    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
+    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 101 }))
+    vi.mocked(adoRequest).mockResolvedValueOnce("PERMISSION_DENIED: 403")
+
+    const def = findTool("ado_restructure_backlog")!
+    const result = await def.handler({
+      operations: JSON.stringify([
+        { workItemId: 101, newParentId: 200 },
+        { workItemId: 102, newParentId: 200 },
+      ]),
+    }, makeCtxWithChecker())
+    const parsed = JSON.parse(result)
+    expect(parsed.results).toHaveLength(2)
+    // At least one success and one failure
+    expect(parsed.results.some((r: any) => r.success)).toBe(true)
+    expect(parsed.results.some((r: any) => !r.success)).toBe(true)
   })
 })
