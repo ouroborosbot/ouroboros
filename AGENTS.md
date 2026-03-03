@@ -21,6 +21,7 @@ Task docs go in `<agent>/tasks/` with naming scheme `YYYY-MM-DD-HHMM-{planning|d
 
 ### Gate Flow
 
+0. **Branch**: Verify the current branch follows `<agent>/<slug>`. If on `main` or an ambiguous branch, STOP and create/switch to the correct branch before proceeding. This is always the first step — no planning, converting, or implementing without a proper branch.
 1. **Plan**: Launch `work-planner`. It produces/updates a planning doc under `<agent>/tasks/`.
 2. **Review**: Show the user the planning doc path and STOP. Wait for explicit user approval.
 3. **Convert**: Only after user approves the planning doc, re-run `work-planner` to convert to a doing doc in the same `<agent>/tasks/` directory. User must also review and sign off on the doing doc before implementation.
