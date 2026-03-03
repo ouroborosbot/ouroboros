@@ -1,6 +1,6 @@
 # Planning: Sync-and-Merge System for Multi-Agent Collaboration
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-03-03 10:33
 
 ## Goal
