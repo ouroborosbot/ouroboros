@@ -23,7 +23,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [ ] File sink persists append-only NDJSON events at `~/.agentconfigs/<agent>/logs/<channel>/<sanitizeKey(key)>.ndjson` without truncating per turn, using session-key parity (CLI=`session`, Teams=`conversationId`).
 - [ ] Runtime paths across `src/` emit event-level structured logs with no chunk-level or sensitive-payload dumps.
 - [ ] Minimum component event catalog is implemented and exercised in tests (entrypoints/channels/engine including `src/engine/kicks.ts`/mind/tools/config/identity/clients/repertoire).
-- [ ] Trace IDs are generated at turn entry and propagated through core execution.
+- [x] Trace IDs are generated at turn entry and propagated through core execution.
 - [ ] Existing ad-hoc operational logging in scoped runtime files is replaced or wrapped by structured logging.
 - [ ] Tests cover new observability code and instrumentation behavior.
 - [ ] `npm run audit:observability` exists and fails when required event coverage, schema/policy checks, or declared logpoint coverage is incomplete.
@@ -86,7 +86,7 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 **Output**: Failing trace propagation tests (channel + core suites) and red run artifact at `./2026-03-02-1501-doing-ouroboros-migration-observability/unit-2a-red-run.txt`.
 **Acceptance**: Tests fail before implementation and explicitly show missing trace propagation behavior.
 
-### ⬜ Unit 2b: Trace Propagation (Entrypoints/Core) — Green
+### ✅ Unit 2b: Trace Propagation (Entrypoints/Core) — Green
 **What**: Implement trace ID generation and propagation through `src/channels/cli.ts`, `src/channels/teams.ts`, and `src/engine/core.ts`.
 **Output**: Updated runtime code and passing trace propagation tests.
 **Acceptance**: Tests confirm trace IDs are generated once per turn and propagated through execution.
@@ -208,3 +208,4 @@ Introduce a structured observability foundation (logger + trace IDs) so turn exe
 - [2026-03-02 17:44] Unit 1b complete: implemented observability core module (trace helpers, level filtering, sink fan-out, stderr + NDJSON file sinks); tests green and build clean
 - [2026-03-02 17:46] Unit 1c complete: added coverage backfill tests (observability defaults/warn + CLI spinner success branch), verified 100% coverage and clean build
 - [2026-03-02 17:48] Unit 2a complete: added failing trace propagation tests for CLI entry, Teams entry, and core model-request metadata propagation
+- [2026-03-02 17:49] Unit 2b complete: added traceId to RunAgentOptions, generated trace IDs at CLI/Teams turn entry, and propagated into core model request metadata
