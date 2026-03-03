@@ -135,7 +135,7 @@ Fix two wiring bugs preventing the context kernel from functioning (AAD field ex
 **Output**: Coverage report showing 100% on `resolver.ts`.
 **Acceptance**: 100% coverage on new code, tests still green.
 
-### ⬜ Unit 3d: Pre-rename validation checkpoint
+### ✅ Unit 3d: Pre-rename validation checkpoint
 **What**: Run `npx tsc --noEmit` and `npx vitest run` to verify all type/interface changes from Units 1-3 compile and pass before the directory rename in Unit 4 churns all import paths. This is the cheapest point to catch type errors -- after the rename, every failure is obscured by import path noise.
 **Output**: Clean `tsc --noEmit` output (exit 0), full test suite green.
 **Acceptance**: `npx tsc --noEmit` exits 0 with no errors, `npx vitest run` passes all tests with no failures or warnings.
