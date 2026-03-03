@@ -12,6 +12,18 @@
 - **spawn**: Spawn sub-agent for each unit (parallel/autonomous)
 - **direct**: Execute units sequentially in current session (default)
 
+## What This Ships
+
+**Phase 1 (10 units)** — The foundation. Restructure the codebase into the agent-creature metaphor (heart/mind/repertoire/senses), then build the context kernel's storage layer (`ContextStore` → `FileContextStore` → JSON files), identity resolution (UUID ↔ external ID mapping, get-or-create), channel capabilities (hardcoded map driving tool routing), a per-request resolver that builds `ResolvedContext`, and system prompt injection. Then prove it works end-to-end: refactor all tools into `ToolDefinition` wrappers, add ADO scope discovery via real APIs, and wire both channel adapters (Teams + CLI) through the kernel. By the end of Phase 1, the agent knows *who* it's talking to and *what the channel can do*.
+
+**Phase 2 (4 units)** — Authority. The agent learns *what the friend can do*. Hybrid model: optimistic reads (try it, learn from 403), pre-flight writes (probe Security Namespaces API before proposing mutations). Per-turn checker, no cache. Wire it into `ado_mutate` so denied writes get explained, not attempted. Render "can / CANNOT" constraints into the system prompt so the model plans around limitations.
+
+**Phase 3 (7 units)** — Semantic tools + memory. The agent gets *smart ADO operations* (`ado_backlog_list`, `ado_create_epic`, `ado_move_items`, batch operations, dry-run previews, channel-aware formatting) and *learns about friends* (freeform `FriendMemory` with `toolPreferences` rendered in the system prompt, `save_friend_note` tool for the model to persist what it learns).
+
+**Phase 4 (3 units)** — Intelligence. Process template awareness (Basic/Agile/Scrum hierarchy rules), authority-aware planning (adapt plans when friend lacks permissions), structural safety tools (detect orphans, cycles, invalid parent/child types).
+
+**The arc:** Bot that calls APIs → agent that knows who you are, what you can do, what you prefer, and what the channel supports — then reasons within those constraints before acting.
+
 ## Objective
 Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that transforms the ouroboros agent from a bot that calls REST APIs into a constraint-aware reasoning engine operating within identity, authority, and channel boundaries.
 
