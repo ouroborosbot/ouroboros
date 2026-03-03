@@ -47,6 +47,48 @@ describe("nerves/runtime-hardening gate contract", () => {
     )
   })
 
+  it("fails with artifact action when in-memory payload shape is invalid", async () => {
+    const gate = await import("../../nerves/runtime-hardening/gate")
+    const report = gate.evaluateRuntimeHardening({
+      artifactPath: "/tmp/runtime-hardening-invalid-payload.json",
+      payload: {},
+    })
+
+    expect(report.overall_status).toBe("fail")
+    expect(report.required_actions[0]?.reason).toContain("invalid runtime hardening payload shape")
+  })
+
+  it("fails when in-memory payload is an array", async () => {
+    const gate = await import("../../nerves/runtime-hardening/gate")
+    const report = gate.evaluateRuntimeHardening({
+      artifactPath: "/tmp/runtime-hardening-invalid-array.json",
+      payload: [],
+    })
+
+    expect(report.overall_status).toBe("fail")
+    expect(report.required_actions[0]?.reason).toContain("invalid runtime hardening payload shape")
+  })
+
+  it("fails when schema_version and target_concurrency types are invalid", async () => {
+    const gate = await import("../../nerves/runtime-hardening/gate")
+    const report = gate.evaluateRuntimeHardening({
+      artifactPath: "/tmp/runtime-hardening-invalid-types.json",
+      payload: {
+        schema_version: 1,
+        target_concurrency: "10",
+        metrics: {
+          first_feedback_p95_ms: 1000,
+          simple_turn_final_p95_ms: 3000,
+          tool_turn_final_p95_ms: 10000,
+          error_rate: 0,
+        },
+      },
+    })
+
+    expect(report.overall_status).toBe("fail")
+    expect(report.required_actions[0]?.reason).toContain("invalid runtime hardening payload shape")
+  })
+
   it("passes when split SLO metrics satisfy preview thresholds", async () => {
     const gate = await import("../../nerves/runtime-hardening/gate")
     const report = gate.evaluateRuntimeHardening({
@@ -85,5 +127,31 @@ describe("nerves/runtime-hardening gate contract", () => {
 
     const report = gate.evaluateRuntimeHardening({ artifactPath })
     expect(report.overall_status).toBe("pass")
+  })
+
+  it("fails with artifact action when artifact file is unreadable JSON", async () => {
+    const gate = await import("../../nerves/runtime-hardening/gate")
+    const runDir = mkdtempSync(join(tmpdir(), "ouro-runtime-hardening-"))
+    const artifactPath = join(runDir, "runtime-hardening-load-validation.json")
+    writeFileSync(artifactPath, "{not-json", "utf8")
+
+    const report = gate.evaluateRuntimeHardening({ artifactPath })
+    expect(report.overall_status).toBe("fail")
+    expect(report.required_actions[0]?.reason).toContain("unreadable runtime hardening artifact")
+  })
+
+  it("fails with artifact action when file schema is invalid", async () => {
+    const gate = await import("../../nerves/runtime-hardening/gate")
+    const runDir = mkdtempSync(join(tmpdir(), "ouro-runtime-hardening-"))
+    const artifactPath = join(runDir, "runtime-hardening-load-validation.json")
+    writeFileSync(artifactPath, JSON.stringify({
+      schema_version: "1.0.0",
+      target_concurrency: 10,
+      metrics: {},
+    }), "utf8")
+
+    const report = gate.evaluateRuntimeHardening({ artifactPath })
+    expect(report.overall_status).toBe("fail")
+    expect(report.required_actions[0]?.reason).toContain("invalid runtime hardening artifact schema")
   })
 })
