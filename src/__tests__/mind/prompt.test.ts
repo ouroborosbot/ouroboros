@@ -688,14 +688,16 @@ describe("contextSection", () => {
     expect(result).not.toContain("no streaming")
   })
 
-  it("renders authority section when checker is present (Teams)", async () => {
+  it("renders notes section when friend has notes", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
-      identity: {
+      friend: {
         id: "uuid-1",
         displayName: "Jordan",
-        externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01" }],
-        tenantMemberships: ["t1"],
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: { role: "engineering manager", project: "ouroboros" },
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -708,16 +710,10 @@ describe("contextSection", () => {
         supportsRichCards: true,
         maxMessageLength: 28000,
       },
-      checker: {
-        canRead: vi.fn().mockReturnValue(true),
-        canWrite: vi.fn().mockResolvedValue(true),
-        record403: vi.fn(),
-      },
     }
     const result = contextSection(ctx)
-    expect(result).toContain("## authority")
-    expect(result).toContain("ado")
-    expect(result).toContain("graph")
+    expect(result).toContain("role: engineering manager")
+    expect(result).toContain("project: ouroboros")
   })
 
   it("does not render authority section when checker is absent (CLI)", async () => {
@@ -771,14 +767,16 @@ describe("contextSection", () => {
     expect(result).not.toContain("## authority")
   })
 
-  it("renders friend preferences when memory has toolPreferences", async () => {
+  it("does not render notes section when notes is empty", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
-      identity: {
+      friend: {
         id: "uuid-1",
         displayName: "Jordan",
         externalIds: [],
         tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -791,19 +789,9 @@ describe("contextSection", () => {
         supportsRichCards: true,
         maxMessageLength: 28000,
       },
-      memory: {
-        id: "uuid-1",
-        toolPreferences: {
-          ado: "Prefers issue-first planning. Auto-assign to self.",
-          general: "Likes concise responses.",
-        },
-        schemaVersion: 1,
-      },
     }
     const result = contextSection(ctx)
-    expect(result).toContain("## friend preferences")
-    expect(result).toContain("ado: Prefers issue-first planning. Auto-assign to self.")
-    expect(result).toContain("general: Likes concise responses.")
+    expect(result).not.toContain("what I know")
   })
 
   it("does not render preferences section when memory is null", async () => {
@@ -862,14 +850,16 @@ describe("contextSection", () => {
     expect(result).not.toContain("## friend preferences")
   })
 
-  it("authority section mentions write operations are checked", async () => {
+  it("does not render authority section (removed)", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
-      identity: {
+      friend: {
         id: "uuid-1",
         displayName: "Jordan",
         externalIds: [],
         tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -882,15 +872,9 @@ describe("contextSection", () => {
         supportsRichCards: true,
         maxMessageLength: 28000,
       },
-      checker: {
-        canRead: vi.fn().mockReturnValue(true),
-        canWrite: vi.fn().mockResolvedValue(true),
-        record403: vi.fn(),
-      },
     }
     const result = contextSection(ctx)
-    expect(result).toContain("write")
-    expect(result).toContain("check")
+    expect(result).not.toContain("## authority")
   })
 })
 

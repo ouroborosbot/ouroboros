@@ -145,12 +145,13 @@ export function contextSection(context?: ResolvedContext): string {
 
   const lines: string[] = ["## friend context"]
 
-  // Identity
-  const identity = context.identity
-  const emailId = identity.externalIds.find(e => e.provider === "aad")
+  // Identity -- use friend field if available, fall back to legacy identity
+  const friendOrIdentity = context.friend ?? context.identity
+  if (!friendOrIdentity) return ""
+  const emailId = friendOrIdentity.externalIds.find(e => e.provider === "aad")
   const idDisplay = emailId
-    ? `${identity.displayName} (${emailId.externalId})`
-    : identity.displayName
+    ? `${friendOrIdentity.displayName} (${emailId.externalId})`
+    : friendOrIdentity.displayName
   lines.push(`friend: ${idDisplay}`)
 
   // Channel
@@ -164,20 +165,13 @@ export function contextSection(context?: ResolvedContext): string {
   /* v8 ignore next -- empty-traits branch unreachable: streaming/no-streaming always adds a trait @preserve */
   lines.push(`channel: ${ch.channel}${traits.length ? ` (${traits.join(", ")})` : ""}`)
 
-  // Authority
-  if (context.checker && ch.availableIntegrations.length > 0) {
+  // Friend notes (from FriendRecord -- rendered in system prompt)
+  const friend = context.friend
+  const notes = friend?.notes
+  if (notes && Object.keys(notes).length > 0) {
     lines.push("")
-    lines.push("## authority")
-    lines.push(`integrations: ${ch.availableIntegrations.join(", ")}`)
-    lines.push("write operations are pre-flight checked -- mutations may be denied if insufficient permissions")
-  }
-
-  // Friend preferences (from FriendMemory)
-  const prefs = context.memory?.toolPreferences
-  if (prefs && Object.keys(prefs).length > 0) {
-    lines.push("")
-    lines.push("## friend preferences")
-    for (const [key, value] of Object.entries(prefs)) {
+    lines.push("## what I know about this friend")
+    for (const [key, value] of Object.entries(notes)) {
       lines.push(`- ${key}: ${value}`)
     }
   }
