@@ -141,4 +141,4 @@ Tests to update for message text:
 - 2026-03-02 17:43 Pass 2 - Granularity: merged Unit 3 (message text updates) into Unit 2a, renumbered Unit 4 to Unit 3, clarified Unit 1a acceptance
 - 2026-03-02 17:44 Pass 3 - Validation: fixed tools-base.test.ts reference to tools.test.ts, added KickReason import detail to Unit 2b
 - 2026-03-02 17:44 Pass 4 - Quality: all checks pass, status set to READY_FOR_EXECUTION
-- PLACEHOLDER Unit 0 complete
+- 2026-03-02 17:47 Unit 0 complete: all references verified against current codebase. 908 tests passing. Inventory confirmed: core.ts:83/90/176/263/274/195, format.ts:11, cli.ts:309-316, teams.ts:193-200/335, plus 5 test files.
