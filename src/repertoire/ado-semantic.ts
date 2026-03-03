@@ -115,20 +115,8 @@ async function checkAuth(ctx: ToolContext | undefined): Promise<string | null> {
   return null
 }
 
-async function checkWriteAuthority(ctx: ToolContext, org: string): Promise<string | null> {
-  if (ctx.context?.checker) {
-    try {
-      const allowed = await ctx.context.checker.canWrite("ado", org, "createWorkItem")
-      if (!allowed) {
-        return `AUTHORITY_DENIED: Write operation to ${org} was denied by pre-flight authority check.`
-      }
-    } catch {
-      // D16 error handling: probe failure -> proceed optimistically
-      return null
-    }
-  }
-  return null
-}
+// Authority pre-flight checks removed (AuthorityChecker eliminated).
+// All writes proceed optimistically; 403s are handled at the API response level.
 
 function buildPreviewOps(operation: string, args: Record<string, string>): JsonPatchOp[] | null {
   switch (operation) {
@@ -400,8 +388,6 @@ export const adoSemanticToolDefinitions: ToolDefinition[] = [
       /* v8 ignore next -- error return tested via ado_backlog_list @preserve */
       if (!adoCtx.ok) return adoCtx.error
 
-      const writeErr = await checkWriteAuthority(ctx!, adoCtx.organization)
-      if (writeErr) return writeErr
 
       const ops = buildCreatePatch(args)
       /* v8 ignore next -- non-null assertion guarded by checkAuth above @preserve */
@@ -444,8 +430,6 @@ export const adoSemanticToolDefinitions: ToolDefinition[] = [
       /* v8 ignore next -- error return tested via ado_backlog_list @preserve */
       if (!adoCtx.ok) return adoCtx.error
 
-      const writeErr = await checkWriteAuthority(ctx!, adoCtx.organization)
-      if (writeErr) return writeErr
 
       const wiType = args.workItemType || "Issue"
       const ops = buildCreatePatch(args)
@@ -486,8 +470,6 @@ export const adoSemanticToolDefinitions: ToolDefinition[] = [
       /* v8 ignore next -- error return tested via ado_backlog_list @preserve */
       if (!adoCtx.ok) return adoCtx.error
 
-      const writeErr = await checkWriteAuthority(ctx!, adoCtx.organization)
-      if (writeErr) return writeErr
 
       const ids = args.workItemIds.split(",").map(s => s.trim()).filter(Boolean)
       const ops = buildReparentPatch(args.newParentId)
@@ -543,8 +525,6 @@ export const adoSemanticToolDefinitions: ToolDefinition[] = [
       /* v8 ignore next -- error return tested via ado_backlog_list @preserve */
       if (!adoCtx.ok) return adoCtx.error
 
-      const writeErr = await checkWriteAuthority(ctx!, adoCtx.organization)
-      if (writeErr) return writeErr
 
       let operations: { workItemId: number, newParentId: number }[]
       try {
@@ -720,8 +700,6 @@ export const adoSemanticToolDefinitions: ToolDefinition[] = [
       /* v8 ignore next -- error return tested via ado_backlog_list @preserve */
       if (!adoCtx.ok) return adoCtx.error
 
-      const writeErr = await checkWriteAuthority(ctx!, adoCtx.organization)
-      if (writeErr) return writeErr
 
       interface BatchOp {
         type: "create" | "update" | "reparent"
