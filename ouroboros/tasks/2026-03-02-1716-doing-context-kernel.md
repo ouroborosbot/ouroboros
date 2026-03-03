@@ -76,7 +76,7 @@ Build a four-layer Context Kernel (Identity, Authority, Memory, Channel) that tr
 
 ## Reference: TypeScript Schema
 
-This schema governs all type definitions across units. Implement exactly as specified.
+This schema is a design reference from the planning doc, not a literal spec. Use it as the starting point for type definitions — adapt signatures, field names, and structure as needed during implementation, as long as the design intent holds.
 
 ```typescript
 // src/mind/context/store.ts
