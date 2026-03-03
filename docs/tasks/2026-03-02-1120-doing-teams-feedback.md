@@ -361,7 +361,7 @@ Both modes:
 **Output**: Failing tests
 **Acceptance**: Tests FAIL (red) because implementation not yet changed
 
-### ⬜ Unit 7b: Teams dual-mode rendering + sendMessage -- Implementation
+### ✅ Unit 7b: Teams dual-mode rendering + sendMessage -- Implementation
 **What**: Dual-mode rendering based on Unit 0 manual testing. The pattern is designed for reuse: any channel that lacks streaming uses the buffered path (sendMessage for standalone messages, first text to primary output, subsequent to sendMessage). Future channels (iMessage, Slack, etc.) follow the same pattern — only the `sendMessage` implementation changes.
 
 New state and helpers in `createTeamsCallbacks`:
