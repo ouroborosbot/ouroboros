@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { formatToolResult, formatKick, formatError } from "../../wardrobe/format"
 
 describe("formatToolResult", () => {
@@ -36,5 +36,22 @@ describe("formatError", () => {
 
   it("handles empty error message", () => {
     expect(formatError(new Error(""))).toBe("Error: ")
+  })
+})
+
+describe("format observability contract", () => {
+  it("emits channels message event when formatting tool output", async () => {
+    vi.resetModules()
+    const emitObservabilityEvent = vi.fn()
+    vi.doMock("../../observability/runtime", () => ({
+      emitObservabilityEvent,
+    }))
+    const format = await import("../../wardrobe/format")
+
+    expect(format.formatToolResult("read_file", "package.json", true)).toBe("✓ read_file (package.json)")
+    expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "channel.message_sent",
+      component: "channels",
+    }))
   })
 })
