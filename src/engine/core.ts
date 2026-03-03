@@ -90,6 +90,7 @@ export interface RunAgentOptions {
   maxKicks?: number;
   skipConfirmation?: boolean;
   toolContext?: ToolContext;
+  traceId?: string;
 }
 
 // Re-export kick utilities for backward compat
@@ -167,6 +168,7 @@ export async function runAgent(
   const provider = getProvider();
   const model = getModel();
   const { maxToolOutputChars } = getContextConfig();
+  const traceId = options?.traceId;
 
   // Refresh system prompt at start of each turn when channel is provided
   if (channel) {
@@ -220,6 +222,7 @@ export async function runAgent(
           store: false,
           include: ["reasoning.encrypted_content"],
         };
+        if (traceId) azureParams.metadata = { trace_id: traceId };
         if (options?.toolChoiceRequired) azureParams.tool_choice = "required";
         result = await streamResponsesApi(
           client,
@@ -234,6 +237,7 @@ export async function runAgent(
       } else {
         const createParams: Record<string, unknown> = { messages, tools: activeTools, stream: true };
         if (model) createParams.model = model;
+        if (traceId) createParams.metadata = { trace_id: traceId };
         if (options?.toolChoiceRequired) createParams.tool_choice = "required";
         result = await streamChatCompletion(client, createParams, callbacks, signal);
       }

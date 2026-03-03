@@ -707,7 +707,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
 
     expect(runAgentCalls.length).toBe(1)
     // 5th argument (index 4) should be options with toolChoiceRequired: true
-    expect(runAgentCalls[0][4]).toEqual({ toolChoiceRequired: true })
+    expect(runAgentCalls[0][4]).toEqual(expect.objectContaining({ toolChoiceRequired: true }))
   })
 
   it("passes toolChoiceRequired: false when toggle is off (default)", async () => {
@@ -719,7 +719,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
 
     expect(runAgentCalls.length).toBe(1)
     // 5th argument (index 4) should have toolChoiceRequired: false
-    expect(runAgentCalls[0][4]).toEqual({ toolChoiceRequired: false })
+    expect(runAgentCalls[0][4]).toEqual(expect.objectContaining({ toolChoiceRequired: false }))
   })
 
   it("creates and passes a traceId option to runAgent at CLI turn entry", async () => {

@@ -9,6 +9,7 @@ import { loadSession, deleteSession, cachedBuildSystem, postTurn } from "../mind
 import type { UsageData } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand, getToolChoiceRequired } from "../repertoire/commands"
 import { getAgentName } from "../identity"
+import { createTraceId } from "../observability"
 
 // readline.Interface exposes undocumented mutable line/cursor for in-progress input
 type ReadlineInternals = readline.Interface & { line: string; cursor: number }
@@ -407,10 +408,14 @@ export async function main() {
       addHistory(history, input)
 
       currentAbort = new AbortController()
+      const traceId = createTraceId()
       ctrl.suppress(() => currentAbort!.abort())
       let result: { usage?: UsageData } | undefined
       try {
-        result = await runAgent(messages, cliCallbacks, "cli", currentAbort.signal, { toolChoiceRequired: getToolChoiceRequired() })
+        result = await runAgent(messages, cliCallbacks, "cli", currentAbort.signal, {
+          toolChoiceRequired: getToolChoiceRequired(),
+          traceId,
+        })
       } catch {
         // AbortError — silently return to prompt
       }
