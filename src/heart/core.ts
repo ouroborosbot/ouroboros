@@ -366,14 +366,8 @@ export async function runAgent(
           } catch {
             answer = result.content;
           }
-          // Truncate if answer exceeds channel's maxMessageLength to prevent 413 errors
-          if (answer && channel) {
-            const { maxMessageLength } = getChannelCapabilities(channel);
-            if (maxMessageLength !== Infinity && answer.length > maxMessageLength) {
-              answer = answer.slice(0, maxMessageLength - 20) + "\n\n[truncated]";
-            }
-          }
-          // Emit the answer through the callback pipeline so channels receive it
+          // Emit the answer through the callback pipeline so channels receive it.
+          // Never truncate — channel adapters handle splitting long messages.
           if (answer) callbacks.onTextChunk(answer);
           // Keep the full assistant message (with tool_calls) for debuggability,
           // plus a synthetic tool response so the conversation stays valid on resume.

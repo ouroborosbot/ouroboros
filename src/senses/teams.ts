@@ -34,6 +34,34 @@ export function stripMentions(text: string): string {
   return text.replace(/<at>[^<]*<\/at>/g, "").trim()
 }
 
+// Teams message size limit. Exceeding ~28KB causes 413 errors on Copilot Chat.
+// 4000 chars is a safe practical ceiling for markdown content.
+const MAX_MESSAGE_LENGTH = 4000
+
+// Split text into chunks that fit within maxLen, breaking at paragraph
+// boundaries (\n\n), then line boundaries (\n), then word boundaries.
+// Never loses content — all text is preserved across chunks.
+export function splitMessage(text: string, maxLen: number): string[] {
+  if (text.length <= maxLen) return [text]
+  const chunks: string[] = []
+  let remaining = text
+  while (remaining.length > 0) {
+    if (remaining.length <= maxLen) {
+      chunks.push(remaining)
+      break
+    }
+    // Find best split point: paragraph > line > word > hard cut
+    const slice = remaining.slice(0, maxLen)
+    let splitAt = slice.lastIndexOf("\n\n")
+    if (splitAt <= 0) splitAt = slice.lastIndexOf("\n")
+    if (splitAt <= 0) splitAt = slice.lastIndexOf(" ")
+    if (splitAt <= 0) splitAt = maxLen // hard cut as last resort
+    chunks.push(remaining.slice(0, splitAt))
+    remaining = remaining.slice(splitAt).replace(/^[\n ]+/, "") // trim leading whitespace from next chunk
+  }
+  return chunks
+}
+
 // Options for createTeamsCallbacks controlling streaming behavior.
 export interface TeamsCallbackOptions {
   disableStreaming?: boolean
@@ -139,12 +167,15 @@ export function createTeamsCallbacks(
 
   // Flush accumulated text buffer. First flush goes to safeEmit (primary
   // output gets real content). Subsequent flushes go to safeSend.
+  // Long messages are split to stay within Teams message size limits.
   function flushTextBuffer(): void {
     if (!textBuffer) return
+    const chunks = splitMessage(textBuffer, MAX_MESSAGE_LENGTH)
     if (!streamHasContent) {
-      safeEmit(textBuffer)
+      safeEmit(chunks[0])
+      for (let i = 1; i < chunks.length; i++) safeSend(chunks[i])
     } else {
-      safeSend(textBuffer)
+      for (const chunk of chunks) safeSend(chunk)
     }
     textBuffer = ""
   }
@@ -254,10 +285,14 @@ export function createTeamsCallbacks(
       : undefined,
     flush: async () => {
       if (textBuffer) {
+        const chunks = splitMessage(textBuffer, MAX_MESSAGE_LENGTH)
         if (!streamHasContent) {
-          safeEmit(textBuffer)
+          safeEmit(chunks[0])
+          for (let i = 1; i < chunks.length; i++) {
+            if (sendMessage) await sendMessage(chunks[i])
+          }
         } else if (sendMessage) {
-          await sendMessage(textBuffer)
+          for (const chunk of chunks) await sendMessage(chunk)
         }
         textBuffer = ""
       } else if (!streamHasContent) {

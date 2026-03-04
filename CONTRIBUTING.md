@@ -37,6 +37,10 @@ For the full testing policy (TDD flow, CI gate, mocking conventions, verificatio
 
 For merge strategy, conflict resolution, retry, and escalation policy, see [cross-agent-docs/sync-and-merge-conventions.md](cross-agent-docs/sync-and-merge-conventions.md).
 
+## P0: Never Lose User-Facing Content
+
+Any text generated for the end user MUST reach them. Truncation, silent drops, and size-limit failures are all content loss. When output exceeds a channel's message size limit, **split and send in chunks** — never truncate. This applies everywhere: final_answer delivery, tool result summaries, error messages. If content was meant for the user to see, they see all of it.
+
 ## Code
 
 - `src/` is shared harness infrastructure — test thoroughly, keep 100% coverage, no agent-specific logic
