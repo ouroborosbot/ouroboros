@@ -556,7 +556,11 @@ export function startTeamsApp(): void {
       displayName: activity.from?.name,
     }
 
-    const ctxSend = async (t: string) => { await ctx.send(t) }
+    const ctxSend = async (t: string) => {
+      // Use send with replyToId (not reply, which adds a blockquote).
+      // replyToId anchors the message after the user's message in Copilot Chat.
+      await ctx.send({ type: "message", text: t, replyToId: activity.id })
+    }
     try {
       await withConversationLock(convId, () => handleTeamsMessage(text, stream, convId, teamsContext, disableStreaming, ctxSend))
     } catch (err: unknown) {
