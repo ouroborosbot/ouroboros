@@ -1,0 +1,57 @@
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+{"ts":"2026-03-04T21:38:48.179Z","level":"info","event":"repertoire.load_start","trace_id":"a39dca30-98c8-4d24-bf8d-3a3bdd11be94","component":"repertoire","message":"loading phrase pools","meta":{}}
+{"ts":"2026-03-04T21:38:48.180Z","level":"info","event":"repertoire.load_end","trace_id":"7085bbc9-7270-4920-9842-510342c0b7fc","component":"repertoire","message":"loaded phrase pools","meta":{"thinking_count":1,"tool_count":1,"followup_count":1}}
+{"ts":"2026-03-04T21:38:48.181Z","level":"info","event":"repertoire.load_start","trace_id":"af36e99f-7429-4539-bc61-f892ce26a41a","component":"repertoire","message":"loading phrase pools","meta":{}}
+{"ts":"2026-03-04T21:38:48.181Z","level":"info","event":"repertoire.load_end","trace_id":"b268f10d-3fe1-4187-b290-21c293234d0f","component":"repertoire","message":"loaded phrase pools","meta":{"thinking_count":1,"tool_count":1,"followup_count":1}}
+{"ts":"2026-03-04T21:38:48.197Z","level":"info","event":"repertoire.load_start","trace_id":"0a01502b-0e79-4cf5-b67c-77b6b6391d68","component":"repertoire","message":"loading phrase pools","meta":{}}
+{"ts":"2026-03-04T21:38:48.197Z","level":"info","event":"repertoire.load_end","trace_id":"0cb59f7d-0827-41a2-8883-c0ec7c52a53a","component":"repertoire","message":"loaded phrase pools","meta":{"thinking_count":1,"tool_count":1,"followup_count":1}}
+{"ts":"2026-03-04T21:38:48.212Z","level":"info","event":"repertoire.load_start","trace_id":"2c01887e-a6ff-43d9-8f78-b8e33da97fcc","component":"repertoire","message":"loading phrase pools","meta":{}}
+{"ts":"2026-03-04T21:38:48.212Z","level":"info","event":"repertoire.load_end","trace_id":"2705e8d1-a65d-4690-bd84-4a4f795f50e7","component":"repertoire","message":"loaded phrase pools","meta":{"thinking_count":1,"tool_count":1,"followup_count":1}}
+{"ts":"2026-03-04T21:38:48.227Z","level":"info","event":"channel.message_sent","trace_id":"5b1e2694-cb05-478d-a516-72b0035c3ecd","component":"channels","message":"formatted tool result for channel output","meta":{"kind":"tool_result","name":"read_file","success":true,"has_summary":true}}
+{"ts":"2026-03-04T21:38:48.229Z","level":"info","event":"channel.message_sent","trace_id":"07cfb902-dd3e-423d-a4b5-71dba34f9c29","component":"channels","message":"formatted tool result for channel output","meta":{"kind":"tool_result","name":"get_current_time","success":true,"has_summary":false}}
+{"ts":"2026-03-04T21:38:48.230Z","level":"info","event":"channel.message_sent","trace_id":"a3e51757-866f-48be-9e28-6a125383c83e","component":"channels","message":"formatted tool result for channel output","meta":{"kind":"tool_result","name":"read_file","success":false,"has_summary":true}}
+{"ts":"2026-03-04T21:38:48.232Z","level":"info","event":"channel.message_sent","trace_id":"9c072b4a-5a3d-4ecc-b07f-0ccb1537b6e0","component":"channels","message":"formatted tool result for channel output","meta":{"kind":"tool_result","name":"read_file","success":true,"has_summary":true}}
+{"ts":"2026-03-04T21:38:49.788Z","level":"info","event":"repertoire.load_start","trace_id":"22fb8891-95a0-4be0-92d1-b8f3f2b2b8f4","component":"repertoire","message":"loading phrase pools","meta":{}}
+{"ts":"2026-03-04T21:38:49.788Z","level":"info","event":"repertoire.load_end","trace_id":"7b3effe9-80db-4d6e-9dda-9f2fe74594bc","component":"repertoire","message":"loaded phrase pools","meta":{"thinking_count":1,"tool_count":1,"followup_count":1}}
+{"ts":"2026-03-04T21:38:48.291Z","level":"info","event":"repertoire.load_start","trace_id":"94f84cd9-58c6-43a5-9e84-a38b33c360e0","component":"repertoire","message":"loading phrase pools","meta":{}}
+{"ts":"2026-03-04T21:38:48.291Z","level":"info","event":"repertoire.load_end","trace_id":"032059af-f5f6-4aa0-9eea-7c7c440fbdf4","component":"repertoire","message":"loaded phrase pools","meta":{"thinking_count":1,"tool_count":1,"followup_count":1}}
+ ✓ src/__tests__/senses/teams.test.ts (152 tests) 914ms
+     ✓ exports createTeamsCallbacks  440ms
+{"ts":"2026-03-04T21:38:48.928Z","level":"warn","event":"config_identity.error","trace_id":"0d3824fc-94f5-48af-a9e2-cf205ea57175","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"Unexpected end of JSON input"}}
+{"ts":"2026-03-04T21:38:48.930Z","level":"info","event":"config.load","trace_id":"e90d058a-c2c2-493b-98e9-b47e2fba18b4","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T21:38:48.931Z","level":"info","event":"config.load","trace_id":"234c3f0e-56e6-4896-aa12-d762ed5445a1","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-04T21:38:48.931Z","level":"info","event":"config.load","trace_id":"93d59191-c797-4a7c-9820-41c684adcae2","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-04T21:38:48.931Z","level":"info","event":"config.load","trace_id":"3a851d2e-4e97-4641-9696-40b40c2f46c4","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-04T21:38:48.931Z","level":"info","event":"engine.turn_start","trace_id":"26790886-d27a-486f-b36d-735b0aeeeed9","component":"engine","message":"runAgent turn started","meta":{"channel":"unknown","provider":"minimax"}}
+{"ts":"2026-03-04T21:38:48.933Z","level":"info","event":"engine.turn_end","trace_id":"fa5b0455-0b9c-4adc-b38e-9d6cfa23e21e","component":"engine","message":"runAgent turn completed","meta":{"done":true}}
+{"ts":"2026-03-04T21:38:48.934Z","level":"warn","event":"config_identity.error","trace_id":"c63c09c8-486d-4991-9b36-392ca1743355","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"Unexpected end of JSON input"}}
+{"ts":"2026-03-04T21:38:48.934Z","level":"info","event":"config.load","trace_id":"90133f5f-b563-4baa-98bc-bbff10a9bec9","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T21:38:48.935Z","level":"info","event":"config.load","trace_id":"bf9d26ab-723a-4095-a8b4-e0cc8cc5f8f8","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-04T21:38:48.935Z","level":"info","event":"config.load","trace_id":"c57553af-df26-4ec4-8943-74c2dfb1e99b","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-04T21:38:48.935Z","level":"info","event":"config.load","trace_id":"5bc27603-9df9-4694-af37-00d974dfd711","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-04T21:38:48.935Z","level":"info","event":"engine.turn_start","trace_id":"156343c2-90f6-48e3-b50b-521d17a0a13e","component":"engine","message":"runAgent turn started","meta":{"channel":"unknown","provider":"minimax"}}
+{"ts":"2026-03-04T21:38:48.936Z","level":"info","event":"engine.turn_end","trace_id":"892348ad-58f0-4029-8fae-8cffaf6e3847","component":"engine","message":"runAgent turn completed","meta":{"done":true}}
+{"ts":"2026-03-04T21:38:48.937Z","level":"warn","event":"config_identity.error","trace_id":"ac7383e2-a4ae-4dc7-8a80-fe6b90cdc244","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"Unexpected end of JSON input"}}
+{"ts":"2026-03-04T21:38:48.937Z","level":"info","event":"config.load","trace_id":"41878c63-ada4-4f66-b0e2-f1a6e150c2bb","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T21:38:48.938Z","level":"info","event":"config.load","trace_id":"070437c2-34fd-4d56-9120-4da09250d870","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-04T21:38:48.938Z","level":"info","event":"config.load","trace_id":"97f3fe74-db0e-421f-8a25-36821e249836","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-04T21:38:48.938Z","level":"info","event":"config.load","trace_id":"8ab3ce71-b2a1-43a0-8902-563380150909","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-04T21:38:48.938Z","level":"info","event":"engine.turn_start","trace_id":"trace-abc","component":"engine","message":"runAgent turn started","meta":{"channel":"unknown","provider":"minimax"}}
+{"ts":"2026-03-04T21:38:48.939Z","level":"info","event":"engine.turn_end","trace_id":"trace-abc","component":"engine","message":"runAgent turn completed","meta":{"done":true}}
+{"ts":"2026-03-04T21:38:48.939Z","level":"warn","event":"config_identity.error","trace_id":"2f8caa8d-2d0e-4ef5-978a-ae6e8404ba24","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"Unexpected end of JSON input"}}
+{"ts":"2026-03-04T21:38:48.939Z","level":"info","event":"config.load","trace_id":"e603647d-65ac-495e-983c-8fa29aff7093","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T21:38:48.941Z","level":"warn","event":"config_identity.error","trace_id":"818651ce-9802-4c9a-9782-ae82d18b6662","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"Unexpected end of JSON input"}}
+{"ts":"2026-03-04T21:38:48.941Z","level":"info","event":"config.load","trace_id":"b33ed0fd-88f6-4a42-a859-3840a25f4b8b","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T21:38:48.943Z","level":"info","event":"config.load","trace_id":"85bd9bc0-91d9-494e-a7e1-50ec96271911","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-04T21:38:48.943Z","level":"info","event":"config.load","trace_id":"6d0646e4-14b0-4e1a-b8fc-b80eda606e05","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-04T21:38:48.943Z","level":"info","event":"config.load","trace_id":"197d5756-2831-4a9f-833e-1da23433701e","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+ ✓ src/__tests__/heart/core.test.ts (156 tests) 459ms
+ ✓ src/__tests__/heart/turn-coordinator.test.ts (7 tests) 41ms
+
+ Test Files  3 passed (3)
+      Tests  315 passed (315)
+   Start at  13:38:47
+   Duration  2.15s (transform 387ms, setup 63ms, import 297ms, tests 1.41s, environment 0ms)
+
