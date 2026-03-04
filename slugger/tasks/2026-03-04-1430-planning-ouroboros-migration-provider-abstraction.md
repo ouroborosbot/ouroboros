@@ -11,6 +11,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 ## Scope
 
 ### In Scope
+- Run storage/config migration first so refactor work targets final paths/contracts from the start.
 - Replace `src/heart/core.ts` provider singleton selection (`getClient/getProvider/getModel`) with provider interface + registry.
 - Keep Azure and MiniMax runtime behavior parity during the refactor.
 - Move provider-specific streaming/input state handling out of the engine loop into provider implementations.
@@ -26,6 +27,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
   - move legacy runtime directories (`sessions`, `logs`, `friends`, test-run artifacts) into `~/.agentstate/...`,
   - run explicit migration once and then require new paths only (no runtime fallback path support).
 - Add a repo migration runbook at `cross-agent-docs/agent-storage-migration-playbook.md` for other agents/Claude to follow after pulling changes.
+- Migration delivery is docs-only: no migration script. The runbook must include explicit move instructions, rationale, verification steps, and instruction to delete the migration playbook after successful completion on the target machine.
 - Add/adjust tests to maintain 100% coverage on all new code and preserve existing behavior contracts.
 
 ### Out of Scope
@@ -46,6 +48,8 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [ ] Missing/expired provider credentials fail fast with explicit re-auth guidance; no silent fallback.
 - [ ] A migration runbook exists in-repo for cross-machine post-pull reorganization of legacy `~/.agentconfigs` data.
 - [ ] Legacy `~/.agentconfigs` data migrates via explicit one-time migration (no runtime back-compat branches in normal execution code), with no data loss and clear operator messages.
+- [ ] Migration executes before provider abstraction refactor work so implementation targets final storage/config contracts.
+- [ ] Migration runbook is docs-only (no script) and includes post-migration instruction to delete the migration file after completion on the target machine.
 - [ ] All relevant docs are updated for the new provider/config/storage contracts (including `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, and `cross-agent-docs/agent-storage-migration-playbook.md`).
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
@@ -73,6 +77,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - Migration support for other machines is mandatory: legacy `~/.agentconfigs` must be handled with a documented, agent-executable runbook.
 - Migration must be safe and deterministic on other machines: no destructive deletes during first migration; prefer move-with-fallback or copy-then-verify semantics.
 - Runtime code must stay lean: no long-lived back-compat reads/writes for legacy `~/.agentconfigs` paths after migration.
+- Migration is manual-doc guided (Claude executes instructions from markdown); no dedicated migration script will be added.
 - Missing/expired credentials must hard-fail with explicit operator/user guidance; no silent fallback behavior.
 
 ## Context / References
@@ -99,3 +104,4 @@ Keep scope disciplined: runtime provider abstraction + provider integrations onl
 - 2026-03-04 14:55 Added explicit first-run migration semantics for legacy `~/.agentconfigs` on other machines and fixed runbook location for Claude pickup
 - 2026-03-04 14:56 Re-scoped migration to one-time only; removed runtime back-compat expectation for legacy `~/.agentconfigs` paths
 - 2026-03-04 15:01 Added completion criterion requiring all relevant repo docs to be updated for new config/storage/provider contracts
+- 2026-03-04 15:03 Reordered work so migration happens first; constrained migration delivery to markdown instructions only (no script), including post-completion deletion of the migration playbook on target machine
