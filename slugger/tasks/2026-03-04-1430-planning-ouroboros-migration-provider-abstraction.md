@@ -21,7 +21,11 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - Move `context` block from `config.json` into each agent's `agent.json` alongside `phrases` and other agent-level runtime settings.
 - Reorganize local machine directories so secrets live in `~/.agentsecrets/<agent>/`, while runtime/session/log/PII/test artifacts live in `~/.agentstate/<agent>/` or `~/.agentstate/test-runs/<repo_slug>/`.
 - Include migration/back-compat handling so existing `~/.agentconfigs` data on other machines is migrated safely with explicit operator-visible guidance.
-- Add a repo migration runbook for other agents/Claude to follow after pulling changes.
+- Add one-time migration behavior for pulled branches on other machines:
+  - move legacy `~/.agentconfigs/<agent>/config.json` to `~/.agentsecrets/<agent>/config.json` (providers/teams retained),
+  - move legacy runtime directories (`sessions`, `logs`, `friends`, test-run artifacts) into `~/.agentstate/...`,
+  - keep idempotent fallback reads from legacy paths with warning logs until migration completes.
+- Add a repo migration runbook at `cross-agent-docs/agent-storage-migration-playbook.md` for other agents/Claude to follow after pulling changes.
 - Add/adjust tests to maintain 100% coverage on all new code and preserve existing behavior contracts.
 
 ### Out of Scope
@@ -41,6 +45,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [ ] `config.json` retains `providers` + `teams`; `context` is loaded from `agent.json`.
 - [ ] Missing/expired provider credentials fail fast with explicit re-auth guidance; no silent fallback.
 - [ ] A migration runbook exists in-repo for cross-machine post-pull reorganization of legacy `~/.agentconfigs` data.
+- [ ] Legacy `~/.agentconfigs` data migrates idempotently on first run (or explicit migration command), with no data loss and clear warning/error messages.
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -65,6 +70,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - Follow repo configuration policy: no environment variables.
 - `config.json` keeps `providers` and `teams` blocks; `context` moves into `agent.json`.
 - Migration support for other machines is mandatory: legacy `~/.agentconfigs` must be handled with a documented, agent-executable runbook.
+- Migration must be safe and deterministic on other machines: no destructive deletes during first migration; prefer move-with-fallback or copy-then-verify semantics.
 - Missing/expired credentials must hard-fail with explicit operator/user guidance; no silent fallback behavior.
 
 ## Context / References
@@ -88,3 +94,4 @@ Keep scope disciplined: runtime provider abstraction + provider integrations onl
 - 2026-03-04 14:37 Updated scope to OpenClaw-compatible Anthropic setup-token + OpenAI Codex OAuth flows; set status to NEEDS_REVIEW
 - 2026-03-04 14:46 Incorporated user decisions: defer OpenAI API-key, enforce no-silent-fallback auth failures, and split secrets/state paths (`.agentsecrets` + `.agentstate`)
 - 2026-03-04 14:54 Locked config layout decisions (`providers` + `teams` stay in config.json; `context` moves to agent.json) and added explicit cross-machine migration runbook requirement
+- 2026-03-04 14:57 Added explicit first-run migration semantics for legacy `~/.agentconfigs` on other machines and fixed runbook location for Claude pickup
