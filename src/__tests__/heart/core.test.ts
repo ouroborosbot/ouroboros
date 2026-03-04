@@ -3909,6 +3909,92 @@ describe("tool_choice required and final_answer", () => {
     expect(toolResults).toHaveLength(1)
     expect(toolResults[0].content).toBe("(delivered)")
   })
+
+  it("truncates final_answer text exceeding channel maxMessageLength (teams)", async () => {
+    const longText = "x".repeat(5000) // Teams max is 4000
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: JSON.stringify({ answer: longText }) } },
+        ]),
+      ])
+    )
+
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, "teams", undefined, { toolChoiceRequired: true })
+
+    expect(textChunks).toHaveLength(1)
+    // Should be truncated to maxMessageLength - 20 + "\n\n[truncated]"
+    expect(textChunks[0].length).toBeLessThan(5000)
+    expect(textChunks[0]).toContain("[truncated]")
+  })
+
+  it("does NOT truncate final_answer text within channel maxMessageLength", async () => {
+    const shortText = "hello, this is a short response"
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: JSON.stringify({ answer: shortText }) } },
+        ]),
+      ])
+    )
+
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, "teams", undefined, { toolChoiceRequired: true })
+
+    expect(textChunks).toEqual([shortText])
+  })
+
+  it("does NOT truncate when maxMessageLength is Infinity (cli/no channel)", async () => {
+    const longText = "x".repeat(50000)
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: JSON.stringify({ answer: longText }) } },
+        ]),
+      ])
+    )
+
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    // No channel passed -- defaults to CLI which has Infinity maxMessageLength
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    expect(textChunks).toEqual([longText])
+    expect(textChunks[0]).not.toContain("[truncated]")
+  })
 })
 
 describe("integration: kick + tool_choice required combined", () => {
