@@ -106,3 +106,4 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 
 ## Progress Log
 - 2026-03-03 21:50 Created from planning doc.
+- 2026-03-03 21:51 Pass 1 complete: created first draft doing doc with explicit unit boundaries and artifacts contract.
