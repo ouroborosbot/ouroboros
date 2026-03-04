@@ -12,22 +12,22 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 
 ### Test Results Summary
 
-Two surfaces tested, both in buffered mode:
+Four configurations tested:
 
-| Bug | Copilot Chat | Standard Teams 1:1 |
-|-----|-------------|-------------------|
-| Bug 1: displayName "Unknown" | YES | Not verified (different session) |
-| Bug 2: Out-of-order messages | YES -- messages render above user msg | NO -- buffered mode works clean |
-| Bug 3: Cold first encounter | YES | YES -- "hello. what are we sorting today?" |
-| Bug 4: Kick loop | YES (4x identical response) | Not triggered (no tool calls in test) |
-| Bug 5: Response spam | YES (consequence of 4+2) | Not triggered |
-| Bug 6: Platform timeout | YES (consequence of 4) | Not triggered |
+| Bug | Copilot + buffered | Copilot + streaming | Standard + buffered | Standard + streaming |
+|-----|-------------------|-------------------|-------------------|---------------------|
+| Bug 1: displayName "Unknown" | YES | Not verified | Not verified | Not verified |
+| Bug 2: Out-of-order messages | YES | NO (correct order) | NO | NO |
+| Bug 3: Cold first encounter | YES | Not verified | YES | Not verified |
+| Bug 4: Kick loop | YES (4x identical response) | Not triggered | Not triggered | Not triggered |
+| Bug 5: Response spam | YES (consequence of 4+2) | Not triggered | Not triggered | Not triggered |
+| Bug 6: Platform timeout | YES (consequence of 4) | Not triggered | Not triggered | Not triggered |
 
 Key facts:
-- Bug 1 (AAD extraction): code bug is the same on both surfaces. Whether `activity.from.aadObjectId` is populated may differ per surface -- Gate 1 testing will confirm.
-- Bug 2 (out-of-order messages): Copilot-surface-specific. Buffered mode in standard Teams does NOT produce out-of-order messages. The issue is how the Copilot Chat surface renders `ctx.send()` / `safeSend()` messages -- each creates a separate persistent message that appears out of order (above the user's message or in the wrong sequence).
+- Bug 1 (AAD extraction): code bug is the same on all configurations. Whether `activity.from.aadObjectId` is populated may differ per surface -- Gate 1 testing will confirm.
+- Bug 2 (out-of-order messages): requires BOTH Copilot Chat surface AND buffered mode (nostream). Copilot + streaming: messages arrive in correct order (slow over devtunnel but ordered). Standard Teams + buffered: clean. Standard Teams + streaming: clean. The issue is specifically how the Copilot Chat surface renders `ctx.send()` / `safeSend()` messages when buffered -- each creates a separate persistent message that appears out of order.
 - Bug 3 (cold first encounter): surface-agnostic. Confirmed on both surfaces.
-- Bug 4 (kick false positives): the pattern matching runs in `core.ts` (surface-agnostic), but the visible symptoms (kick messages appearing as separate messages) are Copilot-surface-specific via Bug 2.
+- Bug 4 (kick false positives): the pattern matching runs in `core.ts` (surface-agnostic), but the visible symptoms (kick messages appearing as separate messages) are specific to Copilot + buffered via Bug 2.
 
 ### Gated Fix Structure
 
@@ -61,14 +61,16 @@ displayName: activity.from?.name,
 
 The fields are already available -- `activity` is destructured from `ctx` at line 458. Optional chaining handles the case where any field is absent. The existing conversation-ID fallback at line 344-345 handles the case where `aadObjectId` is not populated (which may happen on the Copilot Chat surface -- Gate 1 testing will confirm).
 
-**Bug 2: Out-of-order messages on Copilot Chat surface**
+**Bug 2: Out-of-order messages on Copilot Chat in buffered mode**
+
+Requires the intersection of two conditions: Copilot Chat surface AND buffered mode (`disableStreaming=true`). Copilot Chat with streaming enabled delivers messages in correct order (confirmed via devtunnel -- slow but ordered). Standard Teams in buffered mode also works clean. The bug is specific to how the Copilot Chat surface renders separate `ctx.send()` messages when buffered.
 
 In `createTeamsCallbacks` (`src/senses/teams.ts:59-252`), when `disableStreaming=true` (buffered mode):
 - `onToolEnd` (line 194-195) calls `safeSend(msg)` -- sends tool result as separate bot message
 - `onKick` (line 203-204) calls `safeSend(msg)` -- sends kick notification as separate bot message
 - `onError` terminal branch (line 215-216) calls `safeSend(msg)` -- sends error as separate bot message
 
-`safeSend` calls `sendMessage` (which is `ctx.send()` at line 508). On the Copilot Chat surface, each `ctx.send()` creates a separate persistent message that renders out of order -- tool results and kick notifications appear above the user's message or in the wrong sequence, and the actual response gets duplicated below. These are real messages showing up in the wrong place, not invisible artifacts. On standard 1:1 Teams in buffered mode, this does NOT produce out-of-order messages -- the surface renders them differently.
+`safeSend` calls `sendMessage` (which is `ctx.send()` at line 508). On the Copilot Chat surface in buffered mode, each `ctx.send()` creates a separate persistent message that renders out of order -- tool results and kick notifications appear above the user's message or in the wrong sequence, and the actual response gets duplicated below. These are real messages showing up in the wrong place, not invisible artifacts.
 
 Fix: change `safeSend(msg)` to `safeUpdate(msg)` for all three callbacks in the buffered branch. `safeUpdate` shows transient status text that doesn't persist as a separate message. This matches the pattern already used by `onToolStart` (line 188) and transient errors (line 213).
 
@@ -128,7 +130,7 @@ Three changes:
 ---
 
 ### Out of Scope
-- Streaming mode changes (Bug 2 is Copilot-surface-specific in buffered mode; streaming emits inline)
+- Streaming mode changes (Bug 2 is specific to Copilot + buffered; Copilot + streaming delivers in correct order)
 - Comprehensive kick system redesign (fix immediate false positives; broader context-aware redesign deferred)
 - Changes to `save_friend_note` tool behavior (tool works correctly)
 - Changes to `FriendResolver` or `FriendStore` (work correctly given correct inputs)
@@ -178,7 +180,7 @@ Three changes:
 
 ## Decisions Made
 - Bug 1 is the top priority. The bot must know who the user is. Three-line fix with optional chaining handles both surfaces.
-- Bug 2 is Copilot-surface-specific. `ctx.send()` in Copilot Chat produces separate messages that render out of order. Standard Teams in buffered mode does not exhibit this. Fix: safeSend to safeUpdate in buffered branch.
+- Bug 2 requires both Copilot Chat surface AND buffered mode. Copilot + streaming delivers in correct order. Standard Teams + buffered works clean. Fix: safeSend to safeUpdate in buffered branch.
 - Bug 4 pattern matching is surface-agnostic (core.ts). Visible symptoms are Copilot-specific via Bug 2. Remove 6 overbroad patterns, rewrite kick message.
 - Bug 3 confirmed on both surfaces. System prompt instruction is aspirational, not directive.
 - Bug 5 = Bug 4 + Bug 2. Bug 6 = Bug 4. Both resolve automatically.
