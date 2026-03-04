@@ -1,7 +1,7 @@
 # Planning: GitHub Issue Tool
 
 **Status**: drafting
-**Created**: (pending initial commit)
+**Created**: 2026-03-04 00:32
 
 ## Goal
 Allow agents using the ouroboros harness to open GitHub issues on the repo, enabling them to create backlog items, report bugs, and suggest improvements when they identify work that should be tracked.
@@ -66,3 +66,4 @@ Allow agents using the ouroboros harness to open GitHub issues on the repo, enab
 The agent already has a `gh_cli` tool that can run arbitrary `gh` commands. The value of a dedicated `open_github_issue` tool is: (1) it's discoverable -- the agent sees it in its tool list and knows it can open issues without guessing, (2) it's safer -- constrained to issue creation rather than arbitrary `gh` commands, (3) it produces structured output rather than raw CLI text, and (4) it can have `confirmationRequired` specifically for issue creation without blocking all `gh` usage.
 
 ## Progress Log
+- 2026-03-04 00:32 Created
