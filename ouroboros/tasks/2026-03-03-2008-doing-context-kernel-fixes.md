@@ -240,7 +240,7 @@ Also test `toolsSection()` (Issue E):
 **Output**: New test case
 **Acceptance**: Test exists and FAILS (red) because current description says "instead of calling another tool"
 
-### ⬜ Unit 7b: Issue C (finalAnswerTool description) -- Implementation
+### ✅ Unit 7b: Issue C (finalAnswerTool description) -- Implementation
 **What**: In `src/repertoire/tools-base.ts` at line 359-360, change the description from:
 `"give your final text response. use this when you want to reply with text instead of calling another tool."`
 to something like:
