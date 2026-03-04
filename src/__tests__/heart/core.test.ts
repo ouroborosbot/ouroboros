@@ -166,6 +166,14 @@ describe("ChannelCallbacks interface", () => {
   })
 })
 
+describe("RunAgentOptions trace propagation contract", () => {
+  it("supports a traceId field in RunAgentOptions", async () => {
+    const core = await import("../../heart/core")
+    const options: core.RunAgentOptions = { traceId: "trace-123" }
+    expect((options as any).traceId).toBe("trace-123")
+  })
+})
+
 describe("runAgent", () => {
   let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal, options?: { toolChoiceRequired?: boolean }) => Promise<{ usage?: any }>
 
@@ -232,6 +240,67 @@ describe("runAgent", () => {
 
     expect(order[0]).toBe("onModelStart")
     expect(order[1]).toBe("api_call")
+  })
+
+  it("propagates traceId option into model request metadata", async () => {
+    mockCreate.mockReturnValue(
+      makeStream([makeChunk("ok")])
+    )
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent(
+      [{ role: "system", content: "test" }],
+      callbacks,
+      undefined,
+      undefined,
+      { traceId: "trace-abc" } as any,
+    )
+
+    expect(mockCreate).toHaveBeenCalled()
+    const params = mockCreate.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(params).toEqual(expect.objectContaining({
+      metadata: expect.objectContaining({ trace_id: "trace-abc" }),
+    }))
+  })
+
+  it("emits engine lifecycle observability events for a successful turn", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
+
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({
+      emitNervesEvent,
+    }))
+
+    mockCreate.mockReturnValue(
+      makeStream([makeChunk("ok")])
+    )
+
+    const core = await import("../../heart/core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await core.runAgent([{ role: "system", content: "test" }], callbacks)
+
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "engine.turn_start" }))
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "engine.turn_end" }))
   })
 
   it("fires onModelStreamStart on first content token", async () => {
@@ -1379,6 +1448,40 @@ describe("runAgent", () => {
     // config cleanup handled by resetConfigCache in beforeEach
   })
 
+  it("Azure: propagates traceId option into responses metadata", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
+
+    mockResponsesCreate.mockReturnValue(makeResponsesStream([
+      { type: "response.output_text.delta", delta: "hello azure trace" },
+    ]))
+
+    const core = await import("../../heart/core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await core.runAgent(
+      [{ role: "system", content: "test" }],
+      callbacks,
+      undefined,
+      undefined,
+      { traceId: "trace-azure" } as any,
+    )
+
+    const params = mockResponsesCreate.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(params).toEqual(expect.objectContaining({
+      metadata: { trace_id: "trace-azure" },
+    }))
+  })
+
   it("Azure tool-use turn: tool executed, result pushed, loop continues", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
@@ -2405,6 +2508,109 @@ describe("runAgent", () => {
     // messages[0] should have been refreshed
     expect(messages[0].content).not.toBe("stale old prompt")
     expect(messages[0].role).toBe("system")
+  })
+
+  it("preserves non-system history when refreshing system prompt", async () => {
+    mockCreate.mockReturnValue(makeStream([makeChunk("hi")]))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [
+      { role: "user", content: "hello from history" },
+    ]
+    await runAgent(messages, callbacks, "cli")
+
+    expect(messages[0].role).toBe("system")
+    expect(messages.some((m: any) => m.role === "user" && m.content === "hello from history")).toBe(true)
+  })
+
+  it("falls back to existing system prompt when prompt refresh fails", async () => {
+    vi.resetModules()
+    mockCreate.mockReset()
+    mockResponsesCreate.mockReset()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockRejectedValue(new Error("prompt refresh failed")),
+    }))
+
+    try {
+      const core = await import("../../heart/core")
+      mockCreate.mockReturnValue(makeStream([makeChunk("hi")]))
+
+      const callbacks: ChannelCallbacks = {
+        onModelStart: () => {},
+        onModelStreamStart: () => {},
+        onTextChunk: () => {},
+        onReasoningChunk: () => {},
+        onToolStart: () => {},
+        onToolEnd: () => {},
+        onError: () => {},
+      }
+
+      const messages: any[] = [
+        { role: "system", content: "stable fallback prompt" },
+        { role: "user", content: "hello" },
+      ]
+
+      await core.runAgent(messages, callbacks, "teams")
+
+      expect(messages[0].role).toBe("system")
+      expect(messages[0].content).toBe("stable fallback prompt")
+      expect(messages.some((m: any) => m.role === "user" && m.content === "hello")).toBe(true)
+      expect(mockCreate).toHaveBeenCalled()
+    } finally {
+      vi.doUnmock("../../mind/prompt")
+      vi.resetModules()
+    }
+  })
+
+  it("injects default fallback prompt when refresh throws a non-Error and no system prompt exists", async () => {
+    vi.resetModules()
+    mockCreate.mockReset()
+    mockResponsesCreate.mockReset()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockRejectedValue("refresh unavailable"),
+    }))
+
+    try {
+      const core = await import("../../heart/core")
+      mockCreate.mockReturnValue(makeStream([makeChunk("hi")]))
+
+      const callbacks: ChannelCallbacks = {
+        onModelStart: () => {},
+        onModelStreamStart: () => {},
+        onTextChunk: () => {},
+        onReasoningChunk: () => {},
+        onToolStart: () => {},
+        onToolEnd: () => {},
+        onError: () => {},
+      }
+
+      const messages: any[] = [
+        { role: "user", content: "hello" },
+      ]
+
+      await core.runAgent(messages, callbacks, "teams")
+
+      expect(messages[0].role).toBe("system")
+      expect(messages[0].content).toBe("You are a helpful assistant.")
+      expect(messages.some((m: any) => m.role === "user" && m.content === "hello")).toBe(true)
+      expect(mockCreate).toHaveBeenCalled()
+    } finally {
+      vi.doUnmock("../../mind/prompt")
+      vi.resetModules()
+    }
   })
 
   it("still works without channel parameter (backward compatible)", async () => {
@@ -3929,7 +4135,8 @@ describe("integration: kick + tool_choice required combined", () => {
     const toolNames = usedTools?.map((t: any) => t.function.name) || []
     expect(toolNames).toContain("graph_profile")
     expect(toolNames).toContain("ado_work_items")
-    expect(toolNames).toContain("read_file") // base tool still present
+    expect(toolNames).not.toContain("read_file")
+    expect(toolNames).not.toContain("shell")
   })
 
   it("does not include graph/ado tools for cli channel", async () => {

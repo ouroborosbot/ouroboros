@@ -4,6 +4,7 @@
 // If agent.json has no phrases, loadAgentConfig() auto-fills placeholders.
 
 import { loadAgentConfig } from "../identity"
+import { emitNervesEvent } from "../nerves/runtime"
 
 export interface PhrasePools {
   thinking: string[]
@@ -13,7 +14,24 @@ export interface PhrasePools {
 
 // Returns phrase pools from agent.json (always present — loadAgentConfig auto-fills).
 export function getPhrases(): PhrasePools {
-  return loadAgentConfig().phrases
+  emitNervesEvent({
+    event: "repertoire.load_start",
+    component: "repertoire",
+    message: "loading phrase pools",
+    meta: {},
+  })
+  const phrases = loadAgentConfig().phrases
+  emitNervesEvent({
+    event: "repertoire.load_end",
+    component: "repertoire",
+    message: "loaded phrase pools",
+    meta: {
+      thinking_count: phrases.thinking.length,
+      tool_count: phrases.tool.length,
+      followup_count: phrases.followup.length,
+    },
+  })
+  return phrases
 }
 
 // Pick a random phrase from a pool, avoiding immediate repeats.

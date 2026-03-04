@@ -1,0 +1,98 @@
+
+> ouroboros-agent-harness@1.0.0 test:coverage
+> node scripts/run-coverage-gate.cjs
+
+
+> ouroboros-agent-harness@1.0.0 test:coverage:vitest
+> vitest run --coverage
+
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+      Coverage enabled with v8
+
+ ✓ src/__tests__/channels/teams.test.ts (142 tests) 988ms
+     ✓ exports createTeamsCallbacks  456ms
+ ✓ src/__tests__/engine/core.test.ts (144 tests) 456ms
+ ✓ src/__tests__/channels/cli.test.ts (58 tests) 269ms
+ ✓ src/__tests__/engine/tools.test.ts (118 tests) 130ms
+ ✓ src/__tests__/channels/cli-main.test.ts (30 tests) 118ms
+ ✓ src/__tests__/channels/cli-ux.test.ts (16 tests) 94ms
+ ✓ src/__tests__/mind/prompt.test.ts (37 tests) 80ms
+ ✓ src/__tests__/engine/streaming.test.ts (68 tests) 70ms
+ ✓ src/__tests__/mind/context.test.ts (38 tests) 35ms
+ ✓ src/__tests__/config.test.ts (41 tests) 26ms
+ ✓ src/__tests__/identity.test.ts (21 tests) 22ms
+ ✓ src/__tests__/repertoire/commands.test.ts (28 tests) 30ms
+ ✓ src/__tests__/repertoire/skills.test.ts (17 tests) 18ms
+ ✓ src/__tests__/observability/coverage-cli.test.ts (2 tests) 19ms
+ ✓ src/__tests__/engine/kicks.test.ts (101 tests) 15ms
+ ✓ src/__tests__/wardrobe/phrases.test.ts (10 tests) 14ms
+ ✓ src/__tests__/engine/ado-client.test.ts (24 tests) 14ms
+ ✓ src/__tests__/engine/graph-client.test.ts (22 tests) 13ms
+ ✓ src/__tests__/wardrobe/format.test.ts (9 tests) 8ms
+ ✓ src/__tests__/observability/coverage-audit.test.ts (5 tests) 8ms
+ ✓ src/__tests__/observability/logger.test.ts (8 tests) 6ms
+ ✓ src/__tests__/observability/runtime.test.ts (2 tests) 6ms
+ ✓ src/__tests__/observability/coverage-run-artifacts.test.ts (3 tests) 7ms
+ ✓ src/__tests__/observability/sinks.test.ts (1 test) 4ms
+ ✓ src/__tests__/observability/coverage-contract.test.ts (2 tests) 3ms
+ ✓ src/__tests__/observability/trace.test.ts (2 tests) 2ms
+ ✓ src/__tests__/engine/api-error.test.ts (9 tests) 2ms
+ ✓ src/__tests__/setup.test.ts (1 test) 1ms
+
+ Test Files  28 passed (28)
+      Tests  959 passed (959)
+   Start at  18:32:13
+   Duration  7.18s (transform 564ms, setup 271ms, import 643ms, tests 2.46s, environment 2ms)
+
+ % Coverage report from v8
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |   98.84 |    97.73 |     100 |   99.18 |                   
+ src               |   91.83 |    90.24 |     100 |   91.83 |                   
+  cli-entry.ts     |       0 |        0 |     100 |       0 | 8-14              
+  config.ts        |     100 |      100 |     100 |     100 |                   
+  identity.ts      |     100 |      100 |     100 |     100 |                   
+  teams-entry.ts   |       0 |        0 |     100 |       0 | 8-14              
+ src/channels      |     100 |      100 |     100 |     100 |                   
+  cli.ts           |     100 |      100 |     100 |     100 |                   
+  teams.ts         |     100 |      100 |     100 |     100 |                   
+ src/engine        |     100 |      100 |     100 |     100 |                   
+  ado-client.ts    |     100 |      100 |     100 |     100 |                   
+  api-error.ts     |     100 |      100 |     100 |     100 |                   
+  core.ts          |     100 |      100 |     100 |     100 |                   
+  graph-client.ts  |     100 |      100 |     100 |     100 |                   
+  kicks.ts         |     100 |      100 |     100 |     100 |                   
+  streaming.ts     |     100 |      100 |     100 |     100 |                   
+  tools-base.ts    |     100 |      100 |     100 |     100 |                   
+  tools-teams.ts   |     100 |      100 |     100 |     100 |                   
+  tools.ts         |     100 |      100 |     100 |     100 |                   
+ src/mind          |     100 |      100 |     100 |     100 |                   
+  context.ts       |     100 |      100 |     100 |     100 |                   
+  prompt.ts        |     100 |      100 |     100 |     100 |                   
+ src/observability |     100 |      100 |     100 |     100 |                   
+  index.ts         |     100 |      100 |     100 |     100 |                   
+  runtime.ts       |     100 |      100 |     100 |     100 |                   
+ ...ility/coverage |   92.41 |    80.85 |     100 |   96.87 |                   
+  audit.ts         |   94.36 |    78.72 |     100 |   96.92 | 73,101            
+  cli.ts           |   87.87 |    83.33 |     100 |   92.59 | 55-56             
+  contract.ts      |     100 |      100 |     100 |     100 |                   
+  run-artifacts.ts |   91.17 |     82.6 |     100 |     100 | 50,59,71-74       
+ src/repertoire    |     100 |      100 |     100 |     100 |                   
+  commands.ts      |     100 |      100 |     100 |     100 |                   
+  skills.ts        |     100 |      100 |     100 |     100 |                   
+ src/wardrobe      |     100 |      100 |     100 |     100 |                   
+  format.ts        |     100 |      100 |     100 |     100 |                   
+  phrases.ts       |     100 |      100 |     100 |     100 |                   
+-------------------|---------|----------|---------|---------|-------------------
+
+> ouroboros-agent-harness@1.0.0 audit:observability
+> npm run build && node dist/observability/coverage/cli.js --run-dir /Users/arimendelow/.agentconfigs/test-runs/ouroboros-agent-harness/2026-03-03T02-32-12-937Z --output /Users/arimendelow/.agentconfigs/test-runs/ouroboros-agent-harness/2026-03-03T02-32-12-937Z/observability-coverage.json
+
+
+> ouroboros-agent-harness@1.0.0 build
+> tsc
+
+observability audit: pass (/Users/arimendelow/.agentconfigs/test-runs/ouroboros-agent-harness/2026-03-03T02-32-12-937Z/observability-coverage.json)
+coverage gate: pass (/Users/arimendelow/.agentconfigs/test-runs/ouroboros-agent-harness/2026-03-03T02-32-12-937Z/coverage-gate-summary.json)

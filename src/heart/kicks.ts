@@ -137,16 +137,38 @@ export function detectKick(
   const isEmpty = !content?.trim();
 
   if (isEmpty) {
+    emitNervesEvent({
+      level: "error",
+      event: "engine.error",
+      component: "engine",
+      message: "empty assistant content detected",
+      meta: { reason: "empty" },
+    });
     return { reason: "empty", message: KICK_MESSAGES.empty };
   }
 
   if (hasToolIntent(content)) {
+    emitNervesEvent({
+      level: "error",
+      event: "engine.error",
+      component: "engine",
+      message: "narration-style response detected",
+      meta: { reason: "narration" },
+    });
     return { reason: "narration", message: KICK_MESSAGES.narration };
   }
 
   if (options?.toolChoiceRequired) {
+    emitNervesEvent({
+      level: "error",
+      event: "engine.error",
+      component: "engine",
+      message: "tool-required mode response missing tool call",
+      meta: { reason: "tool_required" },
+    });
     return { reason: "tool_required", message: KICK_MESSAGES.tool_required };
   }
 
   return null;
 }
+import { emitNervesEvent } from "../nerves/runtime";

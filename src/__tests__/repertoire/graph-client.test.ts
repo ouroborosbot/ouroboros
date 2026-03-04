@@ -104,6 +104,13 @@ describe("getProfile", () => {
     const result = await getProfile("token")
     expect(result).toContain("NETWORK_ERROR")
   })
+
+  it("returns NETWORK_ERROR on non-Error fetch failure", async () => {
+    mockFetch.mockRejectedValue("fetch failed as string")
+
+    const result = await getProfile("token")
+    expect(result).toContain("NETWORK_ERROR")
+  })
 })
 
 describe("graphRequest", () => {
@@ -267,6 +274,13 @@ describe("graphRequest", () => {
     expect(result).toContain("NETWORK_ERROR")
   })
 
+  it("returns NETWORK_ERROR on non-Error fetch failure", async () => {
+    mockFetch.mockRejectedValue("network failure string")
+
+    const result = await graphRequest("token", "GET", "/me")
+    expect(result).toContain("NETWORK_ERROR")
+  })
+
   it("returns error string on generic 4xx", async () => {
     mockFetch.mockResolvedValue({
       ok: false,
@@ -277,5 +291,28 @@ describe("graphRequest", () => {
     const result = await graphRequest("token", "POST", "/me/messages", "{bad json")
     expect(result).toContain("ERROR")
     expect(result).toContain("400")
+  })
+})
+
+describe("graph-client observability contract", () => {
+  it("emits client.request_start event for Graph requests", async () => {
+    vi.resetModules()
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({
+      emitNervesEvent,
+    }))
+    mockFetch.mockReset()
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ displayName: "Jane" }),
+    })
+
+    const { getProfile } = await import("../../repertoire/graph-client")
+    await getProfile("test-token")
+
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "client.request_start",
+      component: "clients",
+    }))
   })
 })

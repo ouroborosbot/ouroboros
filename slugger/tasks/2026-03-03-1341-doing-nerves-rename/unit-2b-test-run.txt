@@ -1,0 +1,16 @@
+
+> ouroboros-agent-harness@1.0.0 test
+> vitest run src/__tests__/nerves/coverage-cli.test.ts src/__tests__/nerves/rename-contract.test.ts src/__tests__/nerves/coverage-audit.test.ts
+
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+ ✓ src/__tests__/nerves/rename-contract.test.ts (2 tests) 2ms
+ ✓ src/__tests__/nerves/coverage-cli.test.ts (2 tests) 21ms
+ ✓ src/__tests__/nerves/coverage-audit.test.ts (11 tests) 15ms
+
+ Test Files  3 passed (3)
+      Tests  15 passed (15)
+   Start at  14:07:09
+   Duration  529ms (transform 70ms, setup 63ms, import 40ms, tests 37ms, environment 0ms)
+

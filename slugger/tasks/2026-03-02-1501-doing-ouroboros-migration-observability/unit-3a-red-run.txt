@@ -1,0 +1,533 @@
+
+> ouroboros-agent-harness@1.0.0 test
+> vitest run src/__tests__/engine/core.test.ts src/__tests__/engine/kicks.test.ts src/__tests__/mind/context.test.ts src/__tests__/mind/prompt.test.ts src/__tests__/engine/tools.test.ts
+
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+ ❯ src/__tests__/engine/kicks.test.ts (101 tests | 1 failed) 15ms
+     ✓ returns true for intent phrase: let me read that file 1ms
+     ✓ returns true for intent phrase: I'll check that for you 0ms
+     ✓ returns true for intent phrase: I will look into it 0ms
+     ✓ returns true for intent phrase: I would like to help with that 0ms
+     ✓ returns true for intent phrase: I want to read the code 0ms
+     ✓ returns true for intent phrase: I'm going to run the command 0ms
+     ✓ returns true for intent phrase: going to check the logs 0ms
+     ✓ returns true for intent phrase: I am going to investigate 0ms
+     ✓ returns true for intent phrase: i'm querying project capabilities next 0ms
+     ✓ returns true for intent phrase: i'm checking the database now 0ms
+     ✓ returns true for intent phrase: I am running the tests 0ms
+     ✓ returns true for intent phrase: I'm investigating the error 0ms
+     ✓ returns true for intent phrase: I need to check the database 0ms
+     ✓ returns true for intent phrase: I should look at the logs 0ms
+     ✓ returns true for intent phrase: I can help with that 0ms
+     ✓ returns true for intent phrase: I have to check the logs first 0ms
+     ✓ returns true for intent phrase: we have to investigate this error 0ms
+     ✓ returns true for intent phrase: I must verify the configuration 0ms
+     ✓ returns true for intent phrase: we must check the API response 0ms
+     ✓ returns true for intent phrase: we need to know which process it uses 0ms
+     ✓ returns true for intent phrase: we should check the endpoint 0ms
+     ✓ returns true for intent phrase: we can query the API for that 0ms
+     ✓ returns true for intent phrase: we'll figure it out 0ms
+     ✓ returns true for intent phrase: we will check that next 0ms
+     ✓ returns true for intent phrase: we're going to need the project id 0ms
+     ✓ returns true for intent phrase: we are going to query the capabilities 0ms
+     ✓ returns true for intent phrase: let's check the logs 0ms
+     ✓ returns true for intent phrase: entering execution mode. 0ms
+     ✓ returns true for intent phrase: starting with the first file 0ms
+     ✓ returns true for intent phrase: proceeding to the next step 1ms
+     ✓ returns true for intent phrase: switching to plan B 0ms
+     ✓ returns true for intent phrase: first, I will check the logs 0ms
+     ✓ returns true for intent phrase: first I need to read the file 0ms
+     ✓ returns true for intent phrase: now I will investigate 0ms
+     ✓ returns true for intent phrase: now we need to know which process it uses 0ms
+     ✓ returns true for intent phrase: next turn will be strict TDD repair 0ms
+     ✓ returns true for intent phrase: next, I should look at the code 0ms
+     ✓ returns true for intent phrase: next I will check the tests 0ms
+     ✓ returns true for intent phrase: next, we should verify 0ms
+     ✓ returns true for intent phrase: next we query the API 0ms
+     ✓ returns true for intent phrase: then I check the database 0ms
+     ✓ returns true for intent phrase: then we query the project capabilities 0ms
+     ✓ returns true for intent phrase: after that we can create the work item 0ms
+     ✓ returns true for intent phrase: once I have the data I can proceed 0ms
+     ✓ returns true for intent phrase: once we know the process template 0ms
+     ✓ returns true for intent phrase: before I do that, a quick check 0ms
+     ✓ returns true for intent phrase: before we proceed, one more thing 0ms
+     ✓ returns true for intent phrase: I'm about to call the API 0ms
+     ✓ returns true for intent phrase: we're about to find out 0ms
+     ✓ returns true for intent phrase: gonna check the logs real quick 0ms
+     ✓ returns true for intent phrase: allow me to take a look 0ms
+     ✓ returns true for intent phrase: time to check the logs 0ms
+     ✓ returns true for intent phrase: moving on to the next step 0ms
+     ✓ returns true for intent phrase: moving to phase 2 0ms
+     ✓ returns true for intent phrase: my next step is to read the file 0ms
+     ✓ returns true for intent phrase: my plan is to refactor this 0ms
+     ✓ returns true for intent phrase: the plan is to query each endpoint 0ms
+     ✓ returns true for intent phrase: tool calls only from here on 0ms
+     ✓ is case-insensitive: LET ME check that 0ms
+     ✓ is case-insensitive: i'll do it 0ms
+     ✓ is case-insensitive: I WILL handle this 0ms
+     ✓ handles curly quotes/apostrophes: I’ll read that file 0ms
+     ✓ handles curly quotes/apostrophes: I‘m going to check 0ms
+     ✓ handles curly quotes/apostrophes: I′ll do that 0ms
+     ✓ returns true for bare continuing: Continuing. 0ms
+     ✓ returns true for bare continuing: continuing 0ms
+     ✓ returns true for bare continuing: Continuing 0ms
+     ✓ returns true for bare continuing: continuing. 0ms
+     ✓ returns true for sentence-final continues: Backlog theatre continues. 0ms
+     ✓ returns true for sentence-final continues: The work continues. 0ms
+     ✓ returns true for next up: Next up: 0ms
+     ✓ returns true for next up: next up: 0ms
+     ✓ returns true for next up: Next up, I'll create the task 0ms
+     ✓ returns false for non-intent similar text: the process is continuing as expected 0ms
+     ✓ returns false for non-intent similar text: Continuing the work on the project 0ms
+     ✓ returns false for non-intent similar text: The task continues to be complex 0ms
+     ✓ returns false for non-intent similar text: What's next up on the agenda? 0ms
+     ✓ returns false for non-intent text: Hello 0ms
+     ✓ returns false for non-intent text: Here is the result 0ms
+     ✓ returns false for non-intent text: The file contains data 0ms
+     ✓ returns false for non-intent text:  0ms
+     ✓ returns false for non-intent text: the tenant supports all four system processes. 0ms
+     ✓ returns false for non-intent text: we persist. 0ms
+     ✓ returns false for non-intent text: done. the work item has been created. 0ms
+     ✓ returns false for non-intent text: the error is on line 42 0ms
+     ✓ returns false for non-intent text: I found 3 matching files 0ms
+     ✓ returns false for non-intent text: everything looks good 0ms
+     ✓ returns false for non-intent text: that completed successfully 0ms
+     ✓ returns false for non-intent text: the answer is 42 0ms
+     ✓ returns empty kick for empty string 0ms
+     ✓ returns empty kick for whitespace-only content 0ms
+     ✓ returns narration kick for content with intent phrases 0ms
+     ✓ returns tool_required kick when toolChoiceRequired is true and content has no intent 0ms
+     ✓ returns null for normal content without toolChoiceRequired 0ms
+     ✓ prioritizes empty over narration 0ms
+     ✓ prioritizes narration over tool_required 0ms
+     ✓ tool_required message mentions /tool-required command 0ms
+     ✓ returns null when toolChoiceRequired is false and content is normal 0ms
+     ✓ returns narration kick for bare Continuing. 0ms
+     ✓ returns narration kick for sentence-final continues. 0ms
+     × emits engine.error observability event when a kick is detected 6ms
+ ❯ src/__tests__/mind/context.test.ts (38 tests | 1 failed) 33ms
+     ✓ calls buildFn on first call and returns result 14ms
+     ✓ returns cached result on second call within 60s 1ms
+     ✓ re-invokes buildFn after 60 seconds 1ms
+     ✓ maintains separate caches per channel 1ms
+     ✓ uses separate cache key when toolChoiceRequired is true 0ms
+     ✓ uses separate cache key when disableStreaming is true 0ms
+     ✓ cache key distinguishes toolChoiceRequired and disableStreaming combinations 0ms
+     ✓ when actualTokenCount exceeds maxTokens, messages are trimmed 0ms
+     ✓ when actualTokenCount is under maxTokens, no trimming occurs 1ms
+     ✓ system prompt (index 0) is always preserved 0ms
+     ✓ trims to target: maxTokens * (1 - contextMargin/100) 0ms
+     ✓ when actualTokenCount is 0, no trimming occurs (cold start) 1ms
+     ✓ when actualTokenCount is undefined, no trimming occurs (cold start) 0ms
+     ✓ no trimming when message count is high but tokens are under maxTokens 0ms
+     ✓ single message (system only) -- nothing to trim 0ms
+     ✓ all messages would be trimmed -- only system remains 0ms
+     ✓ does not mutate input array 0ms
+     ✓ no trimming when actualTokenCount is undefined regardless of message count 0ms
+     ✓ writes messages wrapped in versioned envelope 0ms
+     ✓ creates parent directories recursively 0ms
+     ✓ includes lastUsage in JSON envelope when provided 0ms
+     ✓ omits lastUsage from envelope when not provided 0ms
+     ✓ returns { messages, lastUsage } from valid session file 0ms
+     ✓ returns lastUsage: undefined when not present in saved file 0ms
+     ✓ returns null when file is missing (ENOENT) 0ms
+     ✓ returns null when file contains invalid JSON 0ms
+     ✓ returns null when version is unrecognized 0ms
+     ✓ returns null on other read errors 0ms
+     ✓ removes the session file 0ms
+     ✓ is a no-op when file is missing (ENOENT) 0ms
+     ✓ re-throws non-ENOENT errors 0ms
+     ✓ trims messages when usage.input_tokens exceeds maxTokens and saves with lastUsage 0ms
+     ✓ does not trim when usage is undefined (cold start) but still saves session 0ms
+     ✓ does not trim when usage.input_tokens is under maxTokens, saves with lastUsage 0ms
+     ✓ mutates messages array in place (splice, not copy) 0ms
+     ✓ saves with (possibly trimmed) messages and usage 0ms
+     ✓ handles empty messages array (only system prompt) 0ms
+     × trimMessages emits mind step lifecycle events 5ms
+ ❯ src/__tests__/mind/prompt.test.ts (37 tests | 1 failed) 103ms
+     ✓ includes soul section with personality 57ms
+     ✓ includes identity section with Ouroboros name 2ms
+     ✓ includes lore section 1ms
+     ✓ includes friends section 1ms
+     ✓ includes runtime info section for cli channel 1ms
+     ✓ includes runtime info section for teams channel 1ms
+     ✓ defaults to cli channel 1ms
+     ✓ includes date section with current date 1ms
+     ✓ includes tools section with tool names 2ms
+     ✓ includes skills section from listSkills 1ms
+     ✓ omits skills section when no skills available 1ms
+     ✓ does NOT export isOwnCodebase (removed) 1ms
+     ✓ includes azure provider string when azure config is set 1ms
+     ✓ uses 'default' deployment when azure deployment is not set 1ms
+     ✓ reads soul content from SOUL.md file 2ms
+     ✓ reads identity content from IDENTITY.md file 2ms
+     ✓ includes tool behavior section when toolChoiceRequired is true 1ms
+     ✓ does NOT include tool behavior section when toolChoiceRequired is false 1ms
+     ✓ does NOT include tool behavior section when options is undefined 1ms
+     ✓ includes flags section when disableStreaming is true and channel is teams 1ms
+     ✓ does NOT include flags section when disableStreaming is true but channel is cli 1ms
+     ✓ does NOT include flags section when disableStreaming is false 1ms
+     ✓ does NOT include flags section when disableStreaming is undefined 1ms
+     ✓ always includes agent name and cwd 1ms
+     ✓ includes note about self-modification 1ms
+     ✓ cli channel includes boot greeting 1ms
+     ✓ teams channel includes concise behavior 1ms
+     ✓ loads psyche files from agentRoot/docs/psyche/ 2ms
+     ✓ handles missing psyche files gracefully (empty string, no crash) 1ms
+     ✓ caches psyche text after first load 2ms
+     ✓ resetPsycheCache clears cached psyche text 1ms
+     ✓ mentions devtunnel relay buffering (microsoft/dev-tunnels#518) 1ms
+     ✓ mentions 60-second hard timeout 1ms
+     ✓ mentions no HTTP/2 support on devtunnels 1ms
+     ✓ mentions Teams throttles streaming updates to 1 req/sec 1ms
+     ✓ mentions buffering avoids compounding latency 1ms
+     × buildSystem emits mind lifecycle events 5ms
+ ❯ src/__tests__/engine/tools.test.ts (117 tests | 1 failed) 129ms
+     ✓ read_file reads file contents 49ms
+     ✓ write_file writes content and returns ok 1ms
+     ✓ shell runs command and returns output 1ms
+     ✓ gh_cli runs gh command and returns output 1ms
+     ✓ gh_cli returns error on exception 1ms
+     ✓ list_directory lists entries with d/- prefix 1ms
+     ✓ git_commit stages explicit paths and commits 1ms
+     ✓ git_commit returns post-it if nothing staged 1ms
+     ✓ git_commit returns post-it if file does not exist 1ms
+     ✓ git_commit requires paths 0ms
+     ✓ git_commit returns post-it for empty paths array 1ms
+     ✓ git_commit returns post-it for non-array paths 1ms
+     ✓ git_commit catches exceptions and returns failure 1ms
+     ✓ git_commit handles whitespace-only diff as nothing staged 0ms
+     ✓ list_skills returns JSON of skills 0ms
+     ✓ load_skill returns skill content 1ms
+     ✓ load_skill returns error on exception 0ms
+     ✓ get_current_time returns formatted date string 15ms
+     ✓ claude spawns claude process and returns stdout 1ms
+     ✓ claude returns error when spawnSync has error property 0ms
+     ✓ claude returns error when exit code is non-zero 0ms
+     ✓ claude returns '(no output)' when stdout is empty 1ms
+     ✓ claude catches thrown exceptions 1ms
+     ✓ web_search returns error when perplexityApiKey not configured 1ms
+     ✓ web_search returns results on success 1ms
+     ✓ web_search returns error on non-ok response 1ms
+     ✓ web_search returns 'no results found' when results array is empty 1ms
+     ✓ web_search returns 'no results found' when results is undefined 0ms
+     ✓ web_search catches fetch exceptions 1ms
+     ✓ returns 'unknown' for unrecognized tool name 0ms
+     ✓ returns path for read_file 0ms
+     ✓ returns empty string for read_file with no path 0ms
+     ✓ returns path for write_file 0ms
+     ✓ returns short command for shell 0ms
+     ✓ returns truncated command for shell when > 50 chars 0ms
+     ✓ returns empty string for shell with no command 0ms
+     ✓ returns path for list_directory 0ms
+     ✓ returns empty string for list_directory with no path 0ms
+     ✓ returns truncated message for git_commit 0ms
+     ✓ returns empty string for git_commit with no message 0ms
+     ✓ returns truncated command for gh_cli 1ms
+     ✓ returns empty string for gh_cli with no command 1ms
+     ✓ returns name for load_skill 1ms
+     ✓ returns empty string for load_skill with no name 1ms
+     ✓ returns truncated prompt for claude 0ms
+     ✓ returns empty string for claude with no prompt 0ms
+     ✓ returns truncated query for web_search 0ms
+     ✓ returns empty string for web_search with no query 0ms
+     ✓ returns truncated JSON for unknown tool 0ms
+     ✓ truncates long JSON for unknown tool to 30 chars 0ms
+     ✓ exports tools array with expected tool names 1ms
+     ✓ has correct name, description, and schema 1ms
+     ✓ is NOT included in the default tools array 1ms
+     ✓ returns only base tools for cli channel 1ms
+     ✓ returns base tools plus all teams tools for teams channel 1ms
+     ✓ returns base tools for undefined channel 0ms
+     ✓ passes ToolContext to graph_profile handler 0ms
+     ✓ graph_profile returns AUTH_REQUIRED when graphToken missing 0ms
+     ✓ graph_profile returns AUTH_REQUIRED when no ToolContext provided 1ms
+     ✓ passes ToolContext to ado_work_items handler 1ms
+     ✓ ado_work_items returns AUTH_REQUIRED when adoToken missing 1ms
+     ✓ ado_work_items rejects invalid organization 1ms
+     ✓ ado_work_items uses default query when none provided 1ms
+     ✓ ado_work_items allows any org when adoOrganizations is empty 0ms
+     ✓ ado_work_items returns AUTH_REQUIRED when no ToolContext provided 0ms
+     ✓ base tools work without ToolContext 0ms
+     ✓ base tools work with ToolContext (context is ignored) 0ms
+     ✓ returns empty string for graph_profile 0ms
+     ✓ returns organization for ado_work_items 0ms
+     ✓ returns empty string for ado_work_items with no organization 0ms
+     ✓ returns path for graph_query 1ms
+     ✓ returns empty string for graph_query with no path 0ms
+     ✓ returns method + path for graph_mutate 0ms
+     ✓ returns empty string for graph_mutate with no method/path 0ms
+     ✓ returns org + path for ado_query 1ms
+     ✓ returns empty string parts for ado_query with no args 0ms
+     ✓ returns method + org + path for ado_mutate 0ms
+     ✓ returns empty string parts for ado_mutate with no args 0ms
+     ✓ graph_query calls graphRequest with GET 0ms
+     ✓ graph_query returns AUTH_REQUIRED when graphToken missing 0ms
+     ✓ graph_query returns AUTH_REQUIRED when no ToolContext 0ms
+     ✓ graph_mutate calls graphRequest with specified method and body 0ms
+     ✓ graph_mutate calls graphRequest with PATCH method 1ms
+     ✓ graph_mutate calls graphRequest with DELETE method (no body) 0ms
+     ✓ graph_mutate rejects invalid method 0ms
+     ✓ graph_mutate returns AUTH_REQUIRED when graphToken missing 0ms
+     ✓ ado_query calls adoRequest with GET by default 0ms
+     ✓ ado_query calls adoRequest with POST for WIQL 0ms
+     ✓ ado_query returns AUTH_REQUIRED when adoToken missing 0ms
+     ✓ ado_query returns AUTH_REQUIRED when no ToolContext 0ms
+     ✓ ado_query rejects invalid organization 0ms
+     ✓ ado_query allows any org when adoOrganizations is empty 0ms
+     ✓ ado_mutate calls adoRequest with specified method and body 1ms
+     ✓ ado_mutate rejects invalid method 0ms
+     ✓ ado_mutate returns AUTH_REQUIRED when adoToken missing 0ms
+     ✓ ado_mutate rejects invalid organization 0ms
+     ✓ ado_mutate allows any org when adoOrganizations is empty 0ms
+     ✓ exports confirmationRequired set from tools-teams 0ms
+     ✓ graph_docs returns matching endpoints for a query 0ms
+     ✓ graph_docs returns matching endpoints for calendar 0ms
+     ✓ graph_docs returns no results message for non-matching query 0ms
+     ✓ graph_docs returns top 5 results max 0ms
+     ✓ graph_docs is case-insensitive 0ms
+     ✓ ado_docs returns matching endpoints for a query 0ms
+     ✓ ado_docs returns matching endpoints for pull requests 1ms
+     ✓ ado_docs returns no results message for non-matching query 0ms
+     ✓ ado_docs returns top 5 results max 0ms
+     ✓ ado_docs is case-insensitive 0ms
+     ✓ graph_docs handles missing query arg 0ms
+     ✓ ado_docs handles missing query arg 0ms
+     ✓ teams channel includes graph_docs and ado_docs 0ms
+     ✓ cli channel does NOT include graph_docs or ado_docs 0ms
+     ✓ returns query for graph_docs 0ms
+     ✓ returns empty string for graph_docs with no query 0ms
+     ✓ returns query for ado_docs 0ms
+     ✓ returns empty string for ado_docs with no query 0ms
+     × execTool emits tool lifecycle events 5ms
+ ❯ src/__tests__/engine/core.test.ts (144 tests | 1 failed) 494ms
+     ✓ detects Node.js network error codes 53ms
+     ✓ detects fetch/network errors by message 0ms
+     ✓ detects HTTP status codes 429 and 5xx 0ms
+     ✓ returns false for non-transient errors 0ms
+     ✓ returns false for context overflow messages (not transient) 0ms
+     ✓ accepts an object with all required callback signatures 0ms
+     ✓ supports a traceId field in RunAgentOptions 0ms
+     ✓ fires onModelStart before API call 3ms
+     ✓ propagates traceId option into model request metadata 3ms
+     × emits engine lifecycle observability events for a successful turn 12ms
+     ✓ fires onModelStreamStart on first content token 1ms
+     ✓ routes inline think tags to onReasoningChunk and answer to onTextChunk (single chunk) 1ms
+     ✓ routes inline think tags split across chunks 2ms
+     ✓ content-only (no think tags) goes only to onTextChunk 1ms
+     ✓ think-only content goes only to onReasoningChunk 1ms
+     ✓ handles multiple think blocks in content 1ms
+     ✓ handles partial think tag at chunk boundary 1ms
+     ✓ handles think tags split across many chunks 1ms
+     ✓ handles partial close tag at chunk boundary inside think block 1ms
+     ✓ flushes remaining content buffer as text at end of stream 2ms
+     ✓ flushes remaining reasoning buffer at end of stream (unclosed think) 2ms
+     ✓ retains partial close tag prefix in reasoning buffer across chunks 1ms
+     ✓ flushes partial close tag prefix as reasoning at end of stream 1ms
+     ✓ handles empty reasoning before partial close tag prefix 1ms
+     ✓ handles empty content chunks in think tag processing 1ms
+     ✓ ends loop when response has no tool calls 1ms
+     ✓ fires onToolStart before tool execution and onToolEnd after 2ms
+     ✓ loops back for another model call after tool execution 1ms
+     ✓ fires onError on API errors with terminal severity and ends loop 1ms
+     ✓ pushes assistant message with content onto messages array 1ms
+     ✓ pushes assistant message with tool_calls and tool result messages 1ms
+     ✓ does NOT push user message (adapter responsibility) 1ms
+     ✓ handles tool call with arguments split across chunks 1ms
+     ✓ handles multiple tool calls in a single response 2ms
+     ✓ fires onToolEnd with success=false when tool throws 1ms
+     ✓ skips chunks with no delta 1ms
+     ✓ handles invalid JSON in tool call arguments gracefully 1ms
+     ✓ wraps non-Error thrown values in Error in onError callback 1ms
+     ✓ pushes assistant message without content when only tool calls are returned 1ms
+     ✓ handles tool call chunks with missing id and function name 1ms
+     ✓ handles tool call chunk with no function arguments 15ms
+     ✓ uses minimax model from config when set 2ms
+     ✓ calls onReasoningChunk for reasoning_content 1ms
+     ✓ calls onReasoningChunk for reasoning-only stream (kicks then gets real response) 1ms
+     ✓ stops immediately when signal is pre-aborted 1ms
+     ✓ stops streaming when signal is aborted mid-stream 1ms
+     ✓ breaks out of loop cleanly when signal aborted during catch 1ms
+     ✓ skips remaining tools when signal is aborted mid-tool-execution 1ms
+     ✓ fires onModelStreamStart on first reasoning_content token 1ms
+     ✓ calls onReasoningChunk for each reasoning chunk 1ms
+     ✓ handles multiple reasoning_content chunks before content 1ms
+     ✓ Azure provider calls mockResponsesCreate with Responses API params 3ms
+     ✓ Azure text-only response: assistant message pushed in CC format, loop ends 2ms
+     ✓ Azure: propagates traceId option into responses metadata 2ms
+     ✓ Azure tool-use turn: tool executed, result pushed, loop continues 2ms
+     ✓ Azure native input: output items + function_call_output in correct order 2ms
+     ✓ Azure native input: same array reference reused across iterations 2ms
+     ✓ does not pass reasoning params for MiniMax provider 1ms
+     ✓ MiniMax path calls mockCreate, not mockResponsesCreate 1ms
+     ✓ Azure: stores reasoning items as _reasoning_items on assistant message 2ms
+     ✓ Azure: does not set _reasoning_items when outputItems has no reasoning items 2ms
+     ✓ Azure: stores only reasoning items when outputItems has mixed types 2ms
+     ✓ Azure: azureInput.push still happens for each outputItem (existing behavior preserved) 2ms
+     ✓ MiniMax: does not set _reasoning_items (outputItems always empty) 1ms
+     ✓ returns usage from single API call (no tool calls) 1ms
+     ✓ returns usage from last API call when multiple tool rounds 1ms
+     ✓ returns undefined usage when no usage data available 1ms
+     ✓ returns undefined usage on error 1ms
+     ✓ recovers from Azure context_length_exceeded error by trimming and retrying 1ms
+     ✓ recovers from Azure overflow via error message (no .code) 1ms
+     ✓ recovers from MiniMax context window exceeds limit error 1ms
+     ✓ surfaces error via onError when retry also fails with overflow 1ms
+     ✓ does not catch non-overflow errors with overflow recovery 1ms
+     ✓ strips tool calls before trimming on mid-turn overflow 1ms
+     ✓ handles overflow error with empty message property 1ms
+     ✓ overflow on cold start with only system message still retries 1ms
+     ✓ retries on transient network errors with backoff and transient severity 3ms
+     ✓ gives up after MAX_RETRIES transient failures with terminal final error 3ms
+     ✓ aborts retry wait on signal abort 2ms
+     ✓ skips retry wait immediately when signal is already aborted 1ms
+     ✓ resets retry count after successful call 1ms
+     ✓ detects HTTP 429 and 5xx as transient errors 1ms
+     ✓ refreshes system prompt at start of runAgent when channel is passed 1ms
+     ✓ refreshes system prompt for teams channel 1ms
+     ✓ still works without channel parameter (backward compatible) 1ms
+     ✓ exits when no env vars are set 1ms
+     ✓ uses MiniMax when minimax config is set 1ms
+     ✓ prefers Azure when all Azure config is set 1ms
+     ✓ falls back to MiniMax when Azure config is incomplete 1ms
+     ✓ caches client across multiple runAgent invocations 1ms
+     ✓ omits model param in createParams when model is empty 1ms
+     ✓ uses azure config from config.json when apiKey is present 1ms
+     ✓ uses minimax config from config.json when apiKey is present 1ms
+     ✓ prefers azure when both providers are configured in config.json 1ms
+     ✓ config.json is the sole source for provider selection 1ms
+     ✓ stripLastToolCalls pops trailing tool messages 1ms
+     ✓ stripLastToolCalls removes empty assistant after stripping tool_calls 2ms
+     ✓ stripLastToolCalls is a no-op when no trailing tools 1ms
+     ✓ fires onError when tool loop limit is reached 2ms
+     ✓ exits when neither provider configured in config 1ms
+     ✓ returns true for each intent phrase 0ms
+     ✓ returns false for text without intent phrases 0ms
+     ✓ is case-insensitive 0ms
+     ✓ fires onKick when model narrates intent without tool calls, then retries 1ms
+     ✓ does not kick when maxKicks (default 1) is already exhausted 1ms
+     ✓ kick increments toolRounds and respects MAX_TOOL_ROUNDS 2ms
+     ✓ pushes self-correction message before retry 1ms
+     ✓ does not kick when maxKicks is set to 0 via options 1ms
+     ✓ allows up to 2 kicks when maxKicks is set to 2 1ms
+     ✓ onKick callback is optional (no crash if not provided) 1ms
+     ✓ malformed assistant message is NOT in history after kick 1ms
+     ✓ Azure: kick cleans up azureInput output items and forces rebuild on retry 2ms
+     ✓ passes tool_choice: required in MiniMax createParams when toolChoiceRequired is true 1ms
+     ✓ passes tool_choice: required in Azure createParams when toolChoiceRequired is true 1ms
+     ✓ includes final_answer tool in tools list when toolChoiceRequired is true 1ms
+     ✓ does NOT include final_answer tool when toolChoiceRequired is false/undefined 1ms
+     ✓ does NOT pass tool_choice when toolChoiceRequired is not set 1ms
+     ✓ final_answer sole call: extracts answer text and terminates loop 1ms
+     ✓ final_answer mixed with other tool calls: other tools execute, final_answer rejected, loop continues 1ms
+     ✓ final_answer with empty answer arg: uses empty string 1ms
+     ✓ final_answer is never passed to execTool (intercepted before execution) 1ms
+     ✓ Azure: mixed final_answer rejection pushes to azureInput 2ms
+     ✓ final_answer with invalid JSON arguments: falls back to result.content 1ms
+     ✓ final_answer with valid JSON but no answer field: falls back to result.content 1ms
+     ✓ final_answer with invalid JSON and no content: falls back to empty string 1ms
+     ✓ final_answer with valid JSON, no answer field, and no content: falls back to empty string 1ms
+     ✓ kick fires when toolChoiceRequired is true and model narrates intent 2ms
+     ✓ after kick, model returns final_answer -- terminates cleanly 1ms
+     ✓ MAX_TOOL_ROUNDS budget accounts for kicks + tool rounds together 1ms
+     ✓ abort during kick attempt -- clean stop, no dangling messages 1ms
+     ✓ empty content with no tool_calls -- kicks (empty response is always wrong) 1ms
+     ✓ intent phrase only in model content triggers kick, not in tool results 1ms
+     ✓ final_answer with very long text -- full text preserved 1ms
+     ✓ toolChoiceRequired kicks even when content is empty (reasoning-only response) 1ms
+     ✓ uses getToolsForChannel to select tools based on channel 1ms
+     ✓ does not include graph/ado tools for cli channel 1ms
+     ✓ passes toolContext to execTool when calling graph/ado tools 147ms
+     ✓ confirmation tool + confirmed executes normally 75ms
+     ✓ confirmation tool + denied returns cancelled message 4ms
+     ✓ confirmation tool + no callback returns cancelled (safe default) 2ms
+     ✓ non-confirmation tool executes normally without invoking callback 2ms
+     ✓ Azure: confirmation denied pushes cancelled to azureInput 2ms
+     ✓ skipConfirmation bypasses confirmation for mutate tools 17ms
+     ✓ truncates tool output exceeding maxToolOutputChars 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/engine/core.test.ts > runAgent > emits engine lifecycle observability events for a successful turn
+AssertionError: expected "vi.fn()" to be called with arguments: [ ObjectContaining{…} ]
+
+Number of calls: 0
+
+ ❯ src/__tests__/engine/core.test.ts:302:36
+    300|     await core.runAgent([{ role: "system", content: "test" }], callbac…
+    301| 
+    302|     expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectC…
+       |                                    ^
+    303|     expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectC…
+    304|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/__tests__/engine/kicks.test.ts > detectKick > emits engine.error observability event when a kick is detected
+AssertionError: expected "vi.fn()" to be called with arguments: [ ObjectContaining{…} ]
+
+Number of calls: 0
+
+ ❯ src/__tests__/engine/kicks.test.ts:221:36
+    219|     kicks.detectKick("let me check that")
+    220| 
+    221|     expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectC…
+       |                                    ^
+    222|       event: "engine.error",
+    223|       component: "engine",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/__tests__/engine/tools.test.ts > tools observability instrumentation > execTool emits tool lifecycle events
+AssertionError: expected "vi.fn()" to be called with arguments: [ ObjectContaining{…} ]
+
+Number of calls: 0
+
+ ❯ src/__tests__/engine/tools.test.ts:1317:36
+    1315|     await execTool("read_file", { path: "/tmp/test.txt" })
+    1316| 
+    1317|     expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectC…
+       |                                    ^
+    1318|     expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectC…
+    1319|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/__tests__/mind/context.test.ts > mind observability instrumentation > trimMessages emits mind step lifecycle events
+AssertionError: expected "vi.fn()" to be called with arguments: [ ObjectContaining{…} ]
+
+Number of calls: 0
+
+ ❯ src/__tests__/mind/context.test.ts:575:36
+    573|     )
+    574| 
+    575|     expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectC…
+       |                                    ^
+    576|     expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectC…
+    577|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/__tests__/mind/prompt.test.ts > prompt observability instrumentation > buildSystem emits mind lifecycle events
+AssertionError: expected "vi.fn()" to be called with arguments: [ ObjectContaining{…} ]
+
+Number of calls: 0
+
+ ❯ src/__tests__/mind/prompt.test.ts:591:36
+    589|     buildSystem("cli")
+    590| 
+    591|     expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectC…
+       |                                    ^
+    592|     expect(emitObservabilityEvent).toHaveBeenCalledWith(expect.objectC…
+    593|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  5 failed (5)
+      Tests  5 failed | 432 passed (437)
+   Start at  17:53:47
+   Duration  844ms (transform 1.11s, setup 0ms, import 1.07s, tests 774ms, environment 0ms)
+

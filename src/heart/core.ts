@@ -6,6 +6,7 @@ import { getChannelCapabilities } from "../mind/friends/channel";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
 import type { AssistantMessageWithReasoning, ResponseItem } from "./streaming";
 import { detectKick } from "./kicks";
+import { emitNervesEvent } from "../nerves/runtime";
 import type { KickReason } from "./kicks";
 import type { TurnResult } from "./streaming";
 import type { UsageData } from "../mind/context";
@@ -90,12 +91,25 @@ export interface RunAgentOptions {
   disableStreaming?: boolean;
   skipConfirmation?: boolean;
   toolContext?: ToolContext;
+  traceId?: string;
 }
 
 // Re-export kick utilities for backward compat
 export { hasToolIntent } from "./kicks";
 
 export const MAX_TOOL_ROUNDS = 10;
+
+function upsertSystemPrompt(
+  messages: OpenAI.ChatCompletionMessageParam[],
+  systemText: string,
+): void {
+  const systemMessage: OpenAI.ChatCompletionSystemMessageParam = { role: "system", content: systemText };
+  if (messages[0]?.role === "system") {
+    messages[0] = systemMessage;
+  } else {
+    messages.unshift(systemMessage);
+  }
+}
 
 // Remove orphan tool_calls from the last assistant message and any
 // trailing tool-result messages that lack a matching tool_call.
@@ -167,6 +181,14 @@ export async function runAgent(
   const provider = getProvider();
   const model = getModel();
   const { maxToolOutputChars } = getContextConfig();
+  const traceId = options?.traceId;
+  emitNervesEvent({
+    event: "engine.turn_start",
+    trace_id: traceId,
+    component: "engine",
+    message: "runAgent turn started",
+    meta: { channel: channel ?? "unknown", provider },
+  });
 
   // Per-turn friend refresh: re-read friend record from disk for fresh context
   const friendStore = options?.toolContext?.friendStore;
@@ -180,9 +202,31 @@ export async function runAgent(
     }
   }
 
-  // Refresh system prompt at start of each turn when channel is provided
+  // Refresh system prompt at start of each turn when channel is provided.
+  // If refresh fails, keep existing system prompt (or inject a minimal safe fallback)
+  // so turn execution remains consistent and non-fatal.
   if (channel) {
-    messages[0] = { role: "system", content: await buildSystem(channel, options, currentContext) };
+    try {
+      const refreshed = await buildSystem(channel, options, currentContext);
+      upsertSystemPrompt(messages, refreshed);
+    } catch (error) {
+      const hadExistingSystemPrompt = messages[0]?.role === "system" && typeof messages[0].content === "string";
+      const existingSystemText = hadExistingSystemPrompt ? (messages[0].content as string) : undefined;
+      const fallback = existingSystemText ?? "You are a helpful assistant.";
+      upsertSystemPrompt(messages, fallback);
+      emitNervesEvent({
+        level: "warn",
+        event: "mind.step_error",
+        trace_id: traceId,
+        component: "mind",
+        message: "buildSystem refresh failed; using fallback prompt",
+        meta: {
+          channel,
+          reason: error instanceof Error ? error.message : String(error),
+          used_existing_prompt: hadExistingSystemPrompt,
+        },
+      });
+    }
   }
 
   let kickCount = 0;
@@ -240,6 +284,7 @@ export async function runAgent(
           store: false,
           include: ["reasoning.encrypted_content"],
         };
+        if (traceId) azureParams.metadata = { trace_id: traceId };
         if (options?.toolChoiceRequired) azureParams.tool_choice = "required";
         result = await streamResponsesApi(
           client,
@@ -254,6 +299,7 @@ export async function runAgent(
       } else {
         const createParams: Record<string, unknown> = { messages, tools: activeTools, stream: true };
         if (model) createParams.model = model;
+        if (traceId) createParams.metadata = { trace_id: traceId };
         if (options?.toolChoiceRequired) createParams.tool_choice = "required";
         result = await streamChatCompletion(client, createParams, callbacks, signal);
       }
@@ -423,9 +469,24 @@ export async function runAgent(
         continue;
       }
       callbacks.onError(e instanceof Error ? e : new Error(String(e)), "terminal");
+      emitNervesEvent({
+        level: "error",
+        event: "engine.error",
+        trace_id: traceId,
+        component: "engine",
+        message: e instanceof Error ? e.message : String(e),
+        meta: {},
+      });
       stripLastToolCalls(messages);
       done = true;
     }
   }
+  emitNervesEvent({
+    event: "engine.turn_end",
+    trace_id: traceId,
+    component: "engine",
+    message: "runAgent turn completed",
+    meta: { done },
+  });
   return { usage: lastUsage };
 }

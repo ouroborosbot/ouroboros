@@ -260,3 +260,22 @@ describe("parseSlashCommand", () => {
     expect(parseSlashCommand("//double")).toBeNull()
   })
 })
+
+describe("commands observability contract", () => {
+  it("emits repertoire.load_start event when registering default commands", async () => {
+    vi.resetModules()
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({
+      emitNervesEvent,
+    }))
+    const { createCommandRegistry, registerDefaultCommands } = await import("../../repertoire/commands")
+    const registry = createCommandRegistry()
+
+    registerDefaultCommands(registry)
+
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "repertoire.load_start",
+      component: "repertoire",
+    }))
+  })
+})

@@ -212,4 +212,20 @@ describe("detectKick", () => {
     const kick = detectKick("Backlog theatre continues.")
     expect(kick).toEqual({ reason: "narration", message: expect.stringContaining("narrated") })
   })
+
+  it("emits engine.error observability event when a kick is detected", async () => {
+    const emitNervesEvent = vi.fn()
+    vi.resetModules()
+    vi.doMock("../../nerves/runtime", () => ({
+      emitNervesEvent,
+    }))
+
+    const kicks = await import("../../heart/kicks")
+    kicks.detectKick("let me check that")
+
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "engine.error",
+      component: "engine",
+    }))
+  })
 })

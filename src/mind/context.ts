@@ -1,5 +1,6 @@
 import type OpenAI from "openai"
 import { getContextConfig } from "../config"
+import { emitNervesEvent } from "../nerves/runtime"
 import * as fs from "fs"
 import * as path from "path"
 
@@ -16,9 +17,21 @@ export function trimMessages(
   contextMargin: number,
   actualTokenCount?: number,
 ): OpenAI.ChatCompletionMessageParam[] {
+  emitNervesEvent({
+    event: "mind.step_start",
+    component: "mind",
+    message: "trimMessages started",
+    meta: { maxTokens, contextMargin, messageCount: messages.length, actualTokenCount: actualTokenCount ?? null },
+  })
   const overTokens = actualTokenCount ? actualTokenCount > maxTokens : false
 
   if (!overTokens) {
+    emitNervesEvent({
+      event: "mind.step_end",
+      component: "mind",
+      message: "trimMessages completed without trimming",
+      meta: { trimmed: false, messageCount: messages.length },
+    })
     return [...messages]
   }
 
@@ -38,7 +51,14 @@ export function trimMessages(
     cutIndex++
   }
 
-  return [messages[0], ...messages.slice(cutIndex)]
+  const trimmed = [messages[0], ...messages.slice(cutIndex)]
+  emitNervesEvent({
+    event: "mind.step_end",
+    component: "mind",
+    message: "trimMessages completed with trimming",
+    meta: { trimmed: true, originalCount: messages.length, finalCount: trimmed.length },
+  })
+  return trimmed
 }
 
 export function saveSession(filePath: string, messages: OpenAI.ChatCompletionMessageParam[], lastUsage?: UsageData): void {

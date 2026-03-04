@@ -1,0 +1,4 @@
+
+> ouroboros-agent-harness@1.0.0 build
+> tsc
+

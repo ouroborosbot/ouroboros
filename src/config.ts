@@ -2,6 +2,7 @@ import * as fs from "fs"
 import * as path from "path"
 import * as os from "os"
 import { loadAgentConfig, getAgentName } from "./identity"
+import { emitNervesEvent } from "./nerves/runtime"
 
 export interface AzureProviderConfig {
   apiKey: string
@@ -37,6 +38,7 @@ export interface TeamsChannelConfig {
   skipConfirmation: boolean
   disableStreaming: boolean
   port: number
+  maxConcurrentConversations: number
 }
 
 export interface IntegrationsConfig {
@@ -87,6 +89,7 @@ const DEFAULT_CONFIG: OuroborosConfig = {
     skipConfirmation: true,
     disableStreaming: false,
     port: 3978,
+    maxConcurrentConversations: 10,
   },
   integrations: {
     perplexityApiKey: "",
@@ -122,7 +125,15 @@ function deepMerge(defaults: Record<string, unknown>, partial: Record<string, un
 }
 
 export function loadConfig(): OuroborosConfig {
-  if (_cachedConfig) return _cachedConfig
+  if (_cachedConfig) {
+    emitNervesEvent({
+      event: "config.load",
+      component: "config/identity",
+      message: "config loaded from cache",
+      meta: { source: "cache" },
+    })
+    return _cachedConfig
+  }
 
   const configPath = resolveConfigPath()
 
@@ -134,11 +145,30 @@ export function loadConfig(): OuroborosConfig {
   try {
     const raw = fs.readFileSync(configPath, "utf-8")
     fileData = JSON.parse(raw) as Record<string, unknown>
-  } catch {
+  } catch (error) {
+    emitNervesEvent({
+      level: "warn",
+      event: "config_identity.error",
+      component: "config/identity",
+      message: "config read failed; defaults applied",
+      meta: {
+        phase: "loadConfig",
+        reason: error instanceof Error ? error.message : String(error),
+      },
+    })
     // ENOENT or parse error -- use defaults
   }
 
   _cachedConfig = deepMerge(DEFAULT_CONFIG as unknown as Record<string, unknown>, fileData) as unknown as OuroborosConfig
+  emitNervesEvent({
+    event: "config.load",
+    component: "config/identity",
+    message: "config loaded from disk",
+    meta: {
+      source: "disk",
+      used_defaults_only: Object.keys(fileData).length === 0,
+    },
+  })
   return _cachedConfig
 }
 
@@ -193,6 +223,15 @@ export function getIntegrationsConfig(): IntegrationsConfig {
   return { ...config.integrations }
 }
 
+export function getSessionDir(): string {
+  return path.join(os.homedir(), ".agentconfigs", getAgentName(), "sessions")
+}
+
+export function getLogsDir(): string {
+  return path.join(os.homedir(), ".agentconfigs", getAgentName(), "logs")
+}
+
+
 function sanitizeKey(key: string): string {
   return key.replace(/[/:]/g, "_")
 }
@@ -201,4 +240,8 @@ export function sessionPath(friendId: string, channel: string, key: string): str
   const dir = path.join(os.homedir(), ".agentconfigs", getAgentName(), "sessions", friendId, channel)
   fs.mkdirSync(dir, { recursive: true })
   return path.join(dir, sanitizeKey(key) + ".json")
+}
+
+export function logPath(channel: string, key: string): string {
+  return path.join(getLogsDir(), channel, sanitizeKey(key) + ".ndjson")
 }
