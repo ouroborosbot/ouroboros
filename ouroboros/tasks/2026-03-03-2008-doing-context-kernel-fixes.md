@@ -100,7 +100,7 @@ Test via `createTeamsCallbacks` in `src/__tests__/senses/teams.test.ts`.
 **Output**: New test cases in `src/__tests__/senses/teams.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `safeSend` is still fire-and-forget
 
-### ⬜ Unit 2b: Bug 2 (safeSend serialization) -- Implementation
+### ✅ Unit 2b: Bug 2 (safeSend serialization) -- Implementation
 **What**: Replace fire-and-forget `catchAsync(sendMessage(text))` in `safeSend` (`src/senses/teams.ts:117-124`) with promise chain serialization:
 ```typescript
 let sendChain = Promise.resolve()
