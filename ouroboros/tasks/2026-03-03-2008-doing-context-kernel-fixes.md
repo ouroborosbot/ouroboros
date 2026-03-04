@@ -380,3 +380,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-04 11:07 Unit 5c complete: core.ts 100% coverage (stmts/branches/funcs/lines). All 1263 tests pass across 45 files. No refactoring needed
 - 2026-03-04 11:09 Unit 6a complete: 5 failing tests -- toolBehaviorSection defaults-on, decision-tree framing, anti-no-op pattern, final_answer clarification, toolsSection defaults-on. 58 existing tests pass
 - 2026-03-04 11:10 Unit 6b complete: toolBehaviorSection guard ?? true, prompt rewritten with decision-tree/anti-no-op/clarification. toolsSection guard ?? true. 63 tests pass, build clean
+- 2026-03-04 11:11 Unit 6c complete: prompt.ts 100% coverage (stmts/branches/funcs/lines). All 1268 tests pass across 45 files. No refactoring needed
