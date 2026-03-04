@@ -378,3 +378,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-04 11:05 Unit 5a complete: 3 failing tests for toolChoiceRequired opt-out -- tool_choice and finalAnswerTool should not be set when toolChoiceRequired: false (MiniMax + Azure). 2 defaults-on tests renamed for clarity
 - 2026-03-04 11:06 Unit 5b complete: toolChoiceRequired defaults true via ?? operator. activeTools and tool_choice conditionally set. 140 tests pass, build clean
 - 2026-03-04 11:07 Unit 5c complete: core.ts 100% coverage (stmts/branches/funcs/lines). All 1263 tests pass across 45 files. No refactoring needed
+- 2026-03-04 11:09 Unit 6a complete: 5 failing tests -- toolBehaviorSection defaults-on, decision-tree framing, anti-no-op pattern, final_answer clarification, toolsSection defaults-on. 58 existing tests pass
