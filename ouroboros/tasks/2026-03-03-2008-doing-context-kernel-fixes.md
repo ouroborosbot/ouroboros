@@ -19,9 +19,9 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 
 ## Completion Criteria
 ### Gate 1: Identity + Out-of-Order Messages
-- [ ] `teamsContext` populates `aadObjectId`, `tenantId`, and `displayName` from `activity`
-- [ ] Friend record has real display name when AAD name is available
-- [ ] Conversation-ID fallback works when AAD fields are absent
+- [x] `teamsContext` populates `aadObjectId`, `tenantId`, and `displayName` from `activity`
+- [x] Friend record has real display name when AAD name is available
+- [x] Conversation-ID fallback works when AAD fields are absent
 - [ ] `safeSend` serialized via promise chain -- concurrent `ctx.send()` calls no longer race
 - [ ] Failed send in chain halts subsequent sends (via `markStopped()`) -- verified by test
 - [ ] User confirms on Copilot Chat: messages arrive in correct order, displayName populated or fallback confirmed
@@ -86,7 +86,7 @@ displayName: activity.from?.name,
 **Output**: Modified `src/senses/teams.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 1c: Bug 1 (AAD extraction) -- Coverage & Refactor
+### ✅ Unit 1c: Bug 1 (AAD extraction) -- Coverage & Refactor
 **What**: Verify 100% coverage on the modified `teamsContext` construction. Ensure both paths are covered: AAD fields present (provider="aad") and absent (provider="teams-conversation" fallback).
 **Output**: Coverage report showing full branch coverage
 **Acceptance**: 100% coverage on new/modified code, tests still green
