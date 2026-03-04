@@ -319,7 +319,7 @@ The channel capabilities are already available via `getChannelCapabilities(chann
 **Output**: Modified `src/heart/core.ts`, `src/senses/teams.ts`, `src/__tests__/heart/core.test.ts`
 **Acceptance**: No doubled refusal text. Valid final_answer supersedes streamed noise. All tests pass
 
-### ⬜ Unit 14a: Remove artificial tool loop limit
+### ✅ Unit 14a: Remove artificial tool loop limit
 **What**: Remove `toolRounds`, `MAX_TOOL_ROUNDS`, and the associated check from `src/heart/core.ts`. The harness is code for the model to use — it should provide feedback on errors, not enforce arbitrary limits. Natural limits already exist: context overflow (handled by `isContextOverflow`), user abort (handled by `signal.aborted`), API errors (handled by retry/error callbacks).
 
 Remove:
