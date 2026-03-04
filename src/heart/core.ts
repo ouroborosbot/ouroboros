@@ -285,7 +285,7 @@ export async function runAgent(
           include: ["reasoning.encrypted_content"],
         };
         if (traceId) azureParams.metadata = { trace_id: traceId };
-        if (options?.toolChoiceRequired) azureParams.tool_choice = "required";
+        if (options?.toolChoiceRequired || lastKickReason) azureParams.tool_choice = "required";
         result = await streamResponsesApi(
           client,
           azureParams,
@@ -300,7 +300,7 @@ export async function runAgent(
         const createParams: Record<string, unknown> = { messages, tools: activeTools, stream: true };
         if (model) createParams.model = model;
         if (traceId) createParams.metadata = { trace_id: traceId };
-        if (options?.toolChoiceRequired) createParams.tool_choice = "required";
+        if (options?.toolChoiceRequired || lastKickReason) createParams.tool_choice = "required";
         result = await streamChatCompletion(client, createParams, callbacks, signal);
       }
 
