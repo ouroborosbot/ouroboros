@@ -2022,7 +2022,7 @@ describe("Teams adapter - session persistence", () => {
     expect(order[1]).toBe("start-2")
   })
 
-  it("enforces global in-flight conversation cap with deterministic overload response", async () => {
+  it("does not hard-reject concurrent conversations while one turn is in-flight", async () => {
     vi.resetModules()
     let releaseFirst: (() => void) | undefined
     const firstTurn = new Promise<void>((resolve) => { releaseFirst = resolve })
@@ -2049,10 +2049,10 @@ describe("Teams adapter - session persistence", () => {
     expect(runAgentFn).toHaveBeenCalledTimes(1)
 
     await teams.handleTeamsMessage("second", stream2 as any, "conv-2")
-    const overloadText = stream2.emit.mock.calls.map((c: any[]) => String(c[0] ?? "")).join("\n")
-    expect(overloadText).toContain("single-replica preview")
-    expect(overloadText).toContain("retry")
-    expect(runAgentFn).toHaveBeenCalledTimes(1)
+    const emitted = stream2.emit.mock.calls.map((c: any[]) => String(c[0] ?? "")).join("\n")
+    expect(emitted).not.toContain("single-replica preview")
+    expect(emitted).not.toContain("maximum concurrent conversations")
+    expect(runAgentFn).toHaveBeenCalledTimes(2)
 
     releaseFirst?.()
     await firstMessage

@@ -1,0 +1,94 @@
+import { describe, it, expect } from "vitest"
+
+describe("turn coordinator", () => {
+  it("serializes turn execution for the same conversation key", async () => {
+    const { createTurnCoordinator } = await import("../../heart/turn-coordinator")
+    const coordinator = createTurnCoordinator()
+    const order: string[] = []
+    let callCount = 0
+
+    await Promise.all([
+      coordinator.withTurnLock("teams:conv-1", async () => {
+        const id = callCount++
+        order.push(`start-${id}`)
+        await new Promise((r) => setTimeout(r, 10))
+        order.push(`end-${id}`)
+      }),
+      coordinator.withTurnLock("teams:conv-1", async () => {
+        const id = callCount++
+        order.push(`start-${id}`)
+        await new Promise((r) => setTimeout(r, 10))
+        order.push(`end-${id}`)
+      }),
+    ])
+
+    expect(order).toEqual(["start-0", "end-0", "start-1", "end-1"])
+  })
+
+  it("allows parallel turn execution for different conversation keys", async () => {
+    const { createTurnCoordinator } = await import("../../heart/turn-coordinator")
+    const coordinator = createTurnCoordinator()
+    const order: string[] = []
+
+    await Promise.all([
+      coordinator.withTurnLock("teams:conv-1", async () => {
+        order.push("start-1")
+        await new Promise((r) => setTimeout(r, 10))
+        order.push("end-1")
+      }),
+      coordinator.withTurnLock("teams:conv-2", async () => {
+        order.push("start-2")
+        await new Promise((r) => setTimeout(r, 10))
+        order.push("end-2")
+      }),
+    ])
+
+    expect(order[0]).toBe("start-1")
+    expect(order[1]).toBe("start-2")
+  })
+
+  it("preserves steering follow-ups as ordered discrete messages", async () => {
+    const { createTurnCoordinator } = await import("../../heart/turn-coordinator")
+    const coordinator = createTurnCoordinator()
+    const key = "teams:conv-order"
+
+    coordinator.enqueueFollowUp(key, { conversationId: "conv-order", text: "step 1", receivedAt: 1 })
+    coordinator.enqueueFollowUp(key, { conversationId: "conv-order", text: "step 2", receivedAt: 2 })
+    coordinator.enqueueFollowUp(key, { conversationId: "conv-order", text: "step 3", receivedAt: 3 })
+
+    const drained = coordinator.drainFollowUps(key)
+    expect(drained.map((m) => m.text)).toEqual(["step 1", "step 2", "step 3"])
+    expect(drained.map((m) => m.conversationId)).toEqual(["conv-order", "conv-order", "conv-order"])
+  })
+
+  it("keeps buffered follow-ups available across turn boundaries until drained", async () => {
+    const { createTurnCoordinator } = await import("../../heart/turn-coordinator")
+    const coordinator = createTurnCoordinator()
+    const key = "teams:conv-carry"
+
+    await coordinator.withTurnLock(key, async () => {
+      coordinator.enqueueFollowUp(key, { conversationId: "conv-carry", text: "carry me", receivedAt: 1 })
+    })
+
+    const carried = coordinator.drainFollowUps(key)
+    expect(carried).toHaveLength(1)
+    expect(carried[0].text).toBe("carry me")
+
+    const emptyAfterDrain = coordinator.drainFollowUps(key)
+    expect(emptyAfterDrain).toEqual([])
+  })
+
+  it("does not dedupe steering follow-ups in this task scope", async () => {
+    const { createTurnCoordinator } = await import("../../heart/turn-coordinator")
+    const coordinator = createTurnCoordinator()
+    const key = "teams:conv-no-dedupe"
+
+    coordinator.enqueueFollowUp(key, { conversationId: "conv-no-dedupe", text: "same", receivedAt: 1 })
+    coordinator.enqueueFollowUp(key, { conversationId: "conv-no-dedupe", text: "same", receivedAt: 2 })
+
+    const drained = coordinator.drainFollowUps(key)
+    expect(drained).toHaveLength(2)
+    expect(drained[0].text).toBe("same")
+    expect(drained[1].text).toBe("same")
+  })
+})
