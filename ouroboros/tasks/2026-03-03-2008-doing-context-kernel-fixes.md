@@ -364,7 +364,7 @@ When `answer` is undefined (retry path):
 **Output**: Modified `src/heart/core.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 14d: final_answer answer extraction -- coverage & refactor
+### ✅ Unit 14d: final_answer answer extraction -- coverage & refactor
 **What**: Verify 100% coverage on the modified `isSoleFinalAnswer` block. All paths covered: valid answer, quoted string, truncated JSON retry, wrong-shape retry, retry then succeed. Verify Azure Responses API path stays in sync during retry (azureInput gets function_call_output).
 **Output**: Coverage report
 **Acceptance**: 100% coverage on modified code, all tests green
