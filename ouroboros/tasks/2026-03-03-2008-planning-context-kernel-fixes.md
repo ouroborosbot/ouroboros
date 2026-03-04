@@ -17,7 +17,7 @@ Two surfaces tested, both in buffered mode:
 | Bug | Copilot Chat | Standard Teams 1:1 |
 |-----|-------------|-------------------|
 | Bug 1: displayName "Unknown" | YES | Not verified (different session) |
-| Bug 2: Phantom messages | YES | NO -- buffered mode works clean |
+| Bug 2: Out-of-order messages | YES -- messages render above user msg | NO -- buffered mode works clean |
 | Bug 3: Cold first encounter | YES | YES -- "hello. what are we sorting today?" |
 | Bug 4: Kick loop | YES (4x identical response) | Not triggered (no tool calls in test) |
 | Bug 5: Response spam | YES (consequence of 4+2) | Not triggered |
@@ -25,13 +25,13 @@ Two surfaces tested, both in buffered mode:
 
 Key facts:
 - Bug 1 (AAD extraction): code bug is the same on both surfaces. Whether `activity.from.aadObjectId` is populated may differ per surface -- Gate 1 testing will confirm.
-- Bug 2 (phantom messages): Copilot-surface-specific. Buffered mode in standard Teams does NOT produce phantom messages. The issue is how the Copilot Chat surface renders `ctx.send()` / `safeSend()` messages -- each shows as a separate persistent message in Copilot but not in standard Teams.
+- Bug 2 (out-of-order messages): Copilot-surface-specific. Buffered mode in standard Teams does NOT produce out-of-order messages. The issue is how the Copilot Chat surface renders `ctx.send()` / `safeSend()` messages -- each creates a separate persistent message that appears out of order (above the user's message or in the wrong sequence).
 - Bug 3 (cold first encounter): surface-agnostic. Confirmed on both surfaces.
 - Bug 4 (kick false positives): the pattern matching runs in `core.ts` (surface-agnostic), but the visible symptoms (kick messages appearing as separate messages) are Copilot-surface-specific via Bug 2.
 
 ### Gated Fix Structure
 
-**Gate 1: Bug 1 (AAD extraction) + Bug 2 (phantom messages)**
+**Gate 1: Bug 1 (AAD extraction) + Bug 2 (out-of-order messages)**
 Bug 1 is the most fundamental fix -- the bot must know who the user is. Bug 2 is a mechanical three-line change. User tests after.
 
 **Gate 2: Bug 4 (kick false positives)**
@@ -44,7 +44,7 @@ Prompt tuning. User tests on both surfaces after.
 
 ---
 
-#### GATE 1: Identity + Phantom Messages
+#### GATE 1: Identity + Out-of-Order Messages
 
 **Bug 1 (CRITICAL): Bot doesn't know who the user is**
 
@@ -61,18 +61,18 @@ displayName: activity.from?.name,
 
 The fields are already available -- `activity` is destructured from `ctx` at line 458. Optional chaining handles the case where any field is absent. The existing conversation-ID fallback at line 344-345 handles the case where `aadObjectId` is not populated (which may happen on the Copilot Chat surface -- Gate 1 testing will confirm).
 
-**Bug 2: Phantom messages on Copilot Chat surface**
+**Bug 2: Out-of-order messages on Copilot Chat surface**
 
 In `createTeamsCallbacks` (`src/senses/teams.ts:59-252`), when `disableStreaming=true` (buffered mode):
 - `onToolEnd` (line 194-195) calls `safeSend(msg)` -- sends tool result as separate bot message
 - `onKick` (line 203-204) calls `safeSend(msg)` -- sends kick notification as separate bot message
 - `onError` terminal branch (line 215-216) calls `safeSend(msg)` -- sends error as separate bot message
 
-`safeSend` calls `sendMessage` (which is `ctx.send()` at line 508). On the Copilot Chat surface, each `ctx.send()` creates a new persistent message visible to the user. On standard 1:1 Teams in buffered mode, this does NOT produce phantom messages -- the surface renders them differently.
+`safeSend` calls `sendMessage` (which is `ctx.send()` at line 508). On the Copilot Chat surface, each `ctx.send()` creates a separate persistent message that renders out of order -- tool results and kick notifications appear above the user's message or in the wrong sequence, and the actual response gets duplicated below. These are real messages showing up in the wrong place, not invisible artifacts. On standard 1:1 Teams in buffered mode, this does NOT produce out-of-order messages -- the surface renders them differently.
 
 Fix: change `safeSend(msg)` to `safeUpdate(msg)` for all three callbacks in the buffered branch. `safeUpdate` shows transient status text that doesn't persist as a separate message. This matches the pattern already used by `onToolStart` (line 188) and transient errors (line 213).
 
-**Gate 1 checkpoint:** User tests on Copilot Chat. Expects: no phantom messages, displayName populated (or confirmed that Copilot Chat doesn't provide `activity.from.name`, in which case the conversation-ID fallback is correct behavior).
+**Gate 1 checkpoint:** User tests on Copilot Chat. Expects: no out-of-order messages (tool results and kicks should not appear as separate messages), displayName populated (or confirmed that Copilot Chat doesn't provide `activity.from.name`, in which case the conversation-ID fallback is correct behavior).
 
 ---
 
@@ -96,7 +96,7 @@ Kick message rewrite: must not match any remaining pattern. Verify with unit tes
 
 Update existing tests: `kicks.test.ts:25` expects "I can help with that" -> true. Must be updated. Add regression tests with conversational responses that must NOT trigger kicks.
 
-**Bug 5: Response spam** -- consequence of Bug 4 (kick loop) + Bug 2 (phantom messages on Copilot). Resolves when both are fixed.
+**Bug 5: Response spam** -- consequence of Bug 4 (kick loop) + Bug 2 (out-of-order messages on Copilot). Resolves when both are fixed.
 
 **Bug 6: Platform timeout** -- consequence of Bug 4 (10 API round trips). Resolves when Bug 4 is fixed.
 
@@ -136,12 +136,12 @@ Three changes:
 
 ## Completion Criteria
 
-### Gate 1: Identity + Phantom Messages
+### Gate 1: Identity + Out-of-Order Messages
 - [ ] `teamsContext` populates `aadObjectId`, `tenantId`, and `displayName` from `activity`
 - [ ] Friend record has real display name when AAD name is available
 - [ ] Conversation-ID fallback works when AAD fields are absent
 - [ ] `onToolEnd`, `onKick`, and terminal `onError` use `safeUpdate` in buffered mode
-- [ ] User confirms on Copilot Chat: no phantom messages, displayName populated or fallback confirmed
+- [ ] User confirms on Copilot Chat: tool results and kicks do not appear as separate out-of-order messages, displayName populated or fallback confirmed
 
 ### Gate 2: Kick False Positives
 - [ ] 6 overbroad patterns removed from `TOOL_INTENT_PATTERNS`
@@ -178,7 +178,7 @@ Three changes:
 
 ## Decisions Made
 - Bug 1 is the top priority. The bot must know who the user is. Three-line fix with optional chaining handles both surfaces.
-- Bug 2 is Copilot-surface-specific. Standard Teams in buffered mode does NOT show phantom messages. Fix: safeSend to safeUpdate in buffered branch.
+- Bug 2 is Copilot-surface-specific. `ctx.send()` in Copilot Chat produces separate messages that render out of order. Standard Teams in buffered mode does not exhibit this. Fix: safeSend to safeUpdate in buffered branch.
 - Bug 4 pattern matching is surface-agnostic (core.ts). Visible symptoms are Copilot-specific via Bug 2. Remove 6 overbroad patterns, rewrite kick message.
 - Bug 3 confirmed on both surfaces. System prompt instruction is aspirational, not directive.
 - Bug 5 = Bug 4 + Bug 2. Bug 6 = Bug 4. Both resolve automatically.
@@ -226,3 +226,4 @@ Three changes:
 - 2026-03-03 20:34 Corrected scoping per-bug
 - 2026-03-03 20:35 Bug 3 confirmed on both surfaces
 - 2026-03-03 20:40 Correction pass: Bug 1 elevated to top priority, Bug 2 is Copilot-surface-specific (not buffered-mode), corrected test results table, tightened throughout
+- [pending timestamp] Renamed Bug 2 from "phantom messages" to "out-of-order messages" -- messages are real, rendering out of order on Copilot surface
