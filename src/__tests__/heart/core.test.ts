@@ -1175,18 +1175,16 @@ describe("runAgent", () => {
     expect(textChunks).toEqual(["answer"])
   })
 
-  it("calls onReasoningChunk for reasoning-only stream (kicks then gets real response)", async () => {
-    let callCount = 0
-    mockCreate.mockImplementation(() => {
-      callCount++
-      if (callCount === 1) {
-        return makeStream([
-          { choices: [{ delta: { reasoning_content: "still thinking" } }] },
-        ])
-      }
-      // After kick for empty response, model responds with content
-      return makeStream([makeChunk("got it")])
-    })
+  it("calls onReasoningChunk for reasoning-only stream (no tool calls, accepted as-is)", async () => {
+    // With kick detection disabled and tool_choice: required, the model
+    // should not normally return text-only, but if it does, the response
+    // is accepted as-is. This test verifies reasoning chunks are captured.
+    mockCreate.mockReturnValue(
+      makeStream([
+        { choices: [{ delta: { reasoning_content: "still thinking" } }] },
+        makeChunk("got it"),
+      ])
+    )
 
     const reasoningChunks: string[] = []
     const textChunks: string[] = []
@@ -1303,16 +1301,13 @@ describe("runAgent", () => {
   })
 
   it("fires onModelStreamStart on first reasoning_content token", async () => {
-    let callCount = 0
-    mockCreate.mockImplementation(() => {
-      callCount++
-      if (callCount === 1) {
-        return makeStream([
-          { choices: [{ delta: { reasoning_content: "hmm" } }] },
-        ])
-      }
-      return makeStream([makeChunk("ok")])
-    })
+    // With kick detection disabled, a reasoning-only response is accepted
+    // as-is (single API call, no retry).
+    mockCreate.mockReturnValue(
+      makeStream([
+        { choices: [{ delta: { reasoning_content: "hmm" } }] },
+      ])
+    )
 
     const calls: string[] = []
     const callbacks: ChannelCallbacks = {
@@ -1326,8 +1321,8 @@ describe("runAgent", () => {
     }
 
     await runAgent([{ role: "system", content: "test" }], callbacks)
-    // streamStart fires once for reasoning, once for retry
-    expect(calls).toEqual(["streamStart", "streamStart"])
+    // streamStart fires once (no retry -- kick detection disabled)
+    expect(calls).toEqual(["streamStart"])
   })
 
   it("calls onReasoningChunk for each reasoning chunk", async () => {
@@ -3057,7 +3052,8 @@ describe("kick mechanism", () => {
     runAgent = core.runAgent
   })
 
-  it("fires onKick when model narrates intent without tool calls, then retries", async () => {
+  // Kick detection disabled — see core.ts
+  it.skip("fires onKick when model narrates intent without tool calls, then retries", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
       callCount++
@@ -3092,7 +3088,8 @@ describe("kick mechanism", () => {
     expect(assistantMessages[1].content).toBe("here is the result")
   })
 
-  it("kicks fire unconditionally -- no maxKicks cap, bounded by MAX_TOOL_ROUNDS", async () => {
+  // Kick detection disabled — see core.ts
+  it.skip("kicks fire unconditionally -- no maxKicks cap, bounded by MAX_TOOL_ROUNDS", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
       callCount++
@@ -3122,7 +3119,8 @@ describe("kick mechanism", () => {
     expect(errors.some(e => e.includes("tool loop limit"))).toBe(true)
   })
 
-  it("kick increments toolRounds and respects MAX_TOOL_ROUNDS", async () => {
+  // Kick detection disabled — see core.ts
+  it.skip("kick increments toolRounds and respects MAX_TOOL_ROUNDS", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
       callCount++
@@ -3150,7 +3148,8 @@ describe("kick mechanism", () => {
     expect(errors.some(e => e.includes("tool loop limit"))).toBe(true)
   })
 
-  it("pushes self-correction message before retry", async () => {
+  // Kick detection disabled — see core.ts
+  it.skip("pushes self-correction message before retry", async () => {
     let callCount = 0
     mockCreate.mockImplementation((params: any) => {
       callCount++
@@ -3180,7 +3179,8 @@ describe("kick mechanism", () => {
     expect(assistantMessages.some((m: any) => m.content?.includes("let me check that") && m.content?.includes("I narrated instead of acting. Using the tool now -- if done, calling final_answer."))).toBe(true)
   })
 
-  it("onKick callback receives no arguments", async () => {
+  // Kick detection disabled — see core.ts
+  it.skip("onKick callback receives no arguments", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
       callCount++
@@ -3210,7 +3210,8 @@ describe("kick mechanism", () => {
     expect(kickArgs.every(n => n === 0)).toBe(true)
   })
 
-  it("onKick callback is optional (no crash if not provided)", async () => {
+  // Kick detection disabled — see core.ts
+  it.skip("onKick callback is optional (no crash if not provided)", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
       callCount++
@@ -3237,7 +3238,8 @@ describe("kick mechanism", () => {
     expect(callCount).toBe(2)
   })
 
-  it("malformed assistant message is NOT in history after kick", async () => {
+  // Kick detection disabled — see core.ts
+  it.skip("malformed assistant message is NOT in history after kick", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
       callCount++
@@ -3269,7 +3271,8 @@ describe("kick mechanism", () => {
     expect(assistantMessages[1].content).toBe("the file says hello")
   })
 
-  it("Azure: kick cleans up azureInput output items and forces rebuild on retry", async () => {
+  // Kick detection disabled — see core.ts
+  it.skip("Azure: kick cleans up azureInput output items and forces rebuild on retry", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupAzure()
@@ -3451,7 +3454,7 @@ describe("tool_choice required and final_answer", () => {
     expect(toolNames).toContain("final_answer")
   })
 
-  it("does NOT include final_answer tool when toolChoiceRequired is false/undefined", async () => {
+  it("ALWAYS includes final_answer tool even when toolChoiceRequired is false/undefined", async () => {
     mockCreate.mockReturnValue(makeStream([makeChunk("hello")]))
 
     const callbacks: ChannelCallbacks = {
@@ -3467,10 +3470,10 @@ describe("tool_choice required and final_answer", () => {
     await runAgent([{ role: "system", content: "test" }], callbacks)
     const params = mockCreate.mock.calls[0][0]
     const toolNames = params.tools.map((t: any) => t.function.name)
-    expect(toolNames).not.toContain("final_answer")
+    expect(toolNames).toContain("final_answer")
   })
 
-  it("does NOT pass tool_choice when toolChoiceRequired is not set", async () => {
+  it("ALWAYS passes tool_choice: required even when toolChoiceRequired is not set", async () => {
     mockCreate.mockReturnValue(makeStream([makeChunk("hello")]))
 
     const callbacks: ChannelCallbacks = {
@@ -3485,7 +3488,7 @@ describe("tool_choice required and final_answer", () => {
 
     await runAgent([{ role: "system", content: "test" }], callbacks)
     const params = mockCreate.mock.calls[0][0]
-    expect(params.tool_choice).toBeUndefined()
+    expect(params.tool_choice).toBe("required")
   })
 
   it("final_answer sole call: extracts answer text and terminates loop", async () => {
@@ -3828,7 +3831,8 @@ describe("integration: kick + tool_choice required combined", () => {
     runAgent = core.runAgent
   })
 
-  it("kick fires when toolChoiceRequired is true and model narrates intent", async () => {
+  // Kick detection disabled — see core.ts
+  it.skip("kick fires when toolChoiceRequired is true and model narrates intent", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
       callCount++
@@ -3863,7 +3867,8 @@ describe("integration: kick + tool_choice required combined", () => {
     expect(lastAssistant.content).toBe("done")
   })
 
-  it("after kick, model returns final_answer -- terminates cleanly", async () => {
+  // Kick detection disabled — see core.ts
+  it.skip("after kick, model returns final_answer -- terminates cleanly", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
       callCount++
@@ -3897,7 +3902,8 @@ describe("integration: kick + tool_choice required combined", () => {
     expect(lastAssistant.tool_calls).toBeUndefined()
   })
 
-  it("MAX_TOOL_ROUNDS budget accounts for kicks + tool rounds together", async () => {
+  // Kick detection disabled — see core.ts
+  it.skip("MAX_TOOL_ROUNDS budget accounts for kicks + tool rounds together", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue("data")
     let callCount = 0
     mockCreate.mockImplementation(() => {
@@ -3933,7 +3939,8 @@ describe("integration: kick + tool_choice required combined", () => {
     expect(errors.some(e => e.includes("tool loop limit"))).toBe(true)
   })
 
-  it("abort during kick attempt -- clean stop, no dangling messages", async () => {
+  // Kick detection disabled — see core.ts
+  it.skip("abort during kick attempt -- clean stop, no dangling messages", async () => {
     const controller = new AbortController()
     let callCount = 0
     mockCreate.mockImplementation(() => {
@@ -3972,7 +3979,8 @@ describe("integration: kick + tool_choice required combined", () => {
     }
   })
 
-  it("empty content with no tool_calls -- kicks (empty response is always wrong)", async () => {
+  // Kick detection disabled — see core.ts
+  it.skip("empty content with no tool_calls -- kicks (empty response is always wrong)", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
       callCount++
@@ -4074,7 +4082,8 @@ describe("integration: kick + tool_choice required combined", () => {
     expect(assistantMsg.content.length).toBe(100000)
   })
 
-  it("toolChoiceRequired kicks even when content is empty (reasoning-only response)", async () => {
+  // Kick detection disabled — see core.ts
+  it.skip("toolChoiceRequired kicks even when content is empty (reasoning-only response)", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
       callCount++
@@ -4246,7 +4255,8 @@ describe("tool_choice forcing after kick (Bug 4)", () => {
     runAgent = core.runAgent
   })
 
-  it("MiniMax: sets tool_choice=required on the call AFTER a narration kick (no toolChoiceRequired option)", async () => {
+  // Kick detection disabled — see core.ts
+  it.skip("MiniMax: sets tool_choice=required on the call AFTER a narration kick (no toolChoiceRequired option)", async () => {
     const paramsPerCall: any[] = []
     let callCount = 0
     mockCreate.mockImplementation((params: any) => {
@@ -4282,7 +4292,8 @@ describe("tool_choice forcing after kick (Bug 4)", () => {
     expect(paramsPerCall[1].tool_choice).toBe("required")
   })
 
-  it("Azure: sets tool_choice=required on the call AFTER a narration kick (no toolChoiceRequired option)", async () => {
+  // Kick detection disabled — see core.ts
+  it.skip("Azure: sets tool_choice=required on the call AFTER a narration kick (no toolChoiceRequired option)", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupAzure()
@@ -4327,7 +4338,8 @@ describe("tool_choice forcing after kick (Bug 4)", () => {
     expect(paramsPerCall[1].tool_choice).toBe("required")
   })
 
-  it("MiniMax: sets tool_choice=required after an empty kick (any kick, not just narration)", async () => {
+  // Kick detection disabled — see core.ts
+  it.skip("MiniMax: sets tool_choice=required after an empty kick (any kick, not just narration)", async () => {
     const paramsPerCall: any[] = []
     let callCount = 0
     mockCreate.mockImplementation((params: any) => {
@@ -4395,7 +4407,8 @@ describe("final_answer injection after narration kick", () => {
     runAgent = core.runAgent
   })
 
-  it("after narration kick, final_answer is present in tools sent to API", async () => {
+  // Kick detection disabled — see core.ts (final_answer is now always in tools)
+  it.skip("after narration kick, final_answer is present in tools sent to API", async () => {
     const toolsPerCall: any[][] = []
     let callCount = 0
     mockCreate.mockImplementation((params: any) => {
@@ -4432,7 +4445,8 @@ describe("final_answer injection after narration kick", () => {
     expect(secondToolNames).toContain("final_answer")
   })
 
-  it("after empty kick, final_answer is NOT in tools (narration-only injection)", async () => {
+  // Kick detection disabled — see core.ts (final_answer is now always in tools)
+  it.skip("after empty kick, final_answer is NOT in tools (narration-only injection)", async () => {
     const toolsPerCall: any[][] = []
     let callCount = 0
     mockCreate.mockImplementation((params: any) => {
@@ -4467,7 +4481,8 @@ describe("final_answer injection after narration kick", () => {
     expect(secondToolNames).toContain("final_answer")
   })
 
-  it("model calls final_answer after narration kick -- terminates cleanly", async () => {
+  // Kick detection disabled — see core.ts (final_answer is now always in tools)
+  it.skip("model calls final_answer after narration kick -- terminates cleanly", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
       callCount++
@@ -4502,7 +4517,8 @@ describe("final_answer injection after narration kick", () => {
     expect(lastAssistant.tool_calls).toBeUndefined()
   })
 
-  it("activeTools computed per-iteration -- first call has no final_answer, after kick it does", async () => {
+  // Kick detection disabled — see core.ts (final_answer is now always in tools)
+  it.skip("activeTools computed per-iteration -- first call has no final_answer, after kick it does", async () => {
     const toolsPerCall: any[][] = []
     let callCount = 0
     mockCreate.mockImplementation((params: any) => {

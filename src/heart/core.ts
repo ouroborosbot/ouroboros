@@ -5,9 +5,10 @@ import type { ToolContext } from "../repertoire/tools";
 import { getChannelCapabilities } from "../mind/friends/channel";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
 import type { AssistantMessageWithReasoning, ResponseItem } from "./streaming";
-import { detectKick } from "./kicks";
+// Kick detection preserved but disabled — see comment in agent loop below.
+// import { detectKick } from "./kicks";
+// import type { KickReason } from "./kicks";
 import { emitNervesEvent } from "../nerves/runtime";
-import type { KickReason } from "./kicks";
 import type { TurnResult } from "./streaming";
 import type { UsageData } from "../mind/context";
 import { trimMessages } from "../mind/context";
@@ -229,13 +230,14 @@ export async function runAgent(
     }
   }
 
-  let kickCount = 0;
+  // kickCount and lastKickReason preserved but unused while kick detection is disabled.
+  // let kickCount = 0;
+  // let lastKickReason: KickReason | null = null;
   let done = false;
   let toolRounds = 0;
   let lastUsage: UsageData | undefined;
   let overflowRetried = false;
   let retryCount = 0;
-  let lastKickReason: KickReason | null = null;
 
   // For Azure Responses API: maintain native input array with original output
   // items (reasoning, function_calls) in correct order.  Initialized from CC
@@ -254,12 +256,10 @@ export async function runAgent(
   );
 
   while (!done) {
-    // Compute activeTools per-iteration: include final_answer when
-    // toolChoiceRequired is set OR after any kick (escape hatch so the
-    // model can cleanly exit instead of calling no-op tools)
-    const activeTools = (options?.toolChoiceRequired || lastKickReason)
-      ? [...baseTools, finalAnswerTool]
-      : baseTools;
+    // Always include final_answer so the model can signal completion.
+    // With tool_choice: required always set, the model must call a tool
+    // every turn — final_answer is how it exits cleanly.
+    const activeTools = [...baseTools, finalAnswerTool];
     // Yield so pending I/O (stdin Ctrl-C) can be processed between iterations
     await new Promise((r) => setImmediate(r));
     if (signal?.aborted) break;
@@ -286,7 +286,7 @@ export async function runAgent(
           include: ["reasoning.encrypted_content"],
         };
         if (traceId) azureParams.metadata = { trace_id: traceId };
-        if (options?.toolChoiceRequired || lastKickReason) azureParams.tool_choice = "required";
+        azureParams.tool_choice = "required";
         result = await streamResponsesApi(
           client,
           azureParams,
@@ -301,7 +301,7 @@ export async function runAgent(
         const createParams: Record<string, unknown> = { messages, tools: activeTools, stream: true };
         if (model) createParams.model = model;
         if (traceId) createParams.metadata = { trace_id: traceId };
-        if (options?.toolChoiceRequired || lastKickReason) createParams.tool_choice = "required";
+        createParams.tool_choice = "required";
         result = await streamChatCompletion(client, createParams, callbacks, signal);
       }
 
@@ -327,26 +327,30 @@ export async function runAgent(
         (msg as AssistantMessageWithReasoning)._reasoning_items = reasoningItems;
       }
       if (!result.toolCalls.length) {
-        const kick = detectKick(result.content, options);
-        if (kick) {
-          kickCount++;
-          lastKickReason = kick.reason;
-          toolRounds++;
-          if (toolRounds >= MAX_TOOL_ROUNDS) {
-            callbacks.onError(new Error(`tool loop limit reached (${MAX_TOOL_ROUNDS} rounds)`), "terminal");
-            done = true;
-            continue;
-          }
-          callbacks.onKick?.();
-          // Preserve original content with self-correction appended
-          const kickContent = result.content
-            ? result.content + "\n\n" + kick.message
-            : kick.message;
-          messages.push({ role: "assistant", content: kickContent });
-          // Discard azureInput so it's rebuilt from messages on retry
-          azureInput = null;
-          continue;
-        }
+        // Kick detection is disabled while tool_choice: required + final_answer
+        // is the primary loop control mechanism. The model should never reach
+        // this path (tool_choice: required forces a tool call), but if it does,
+        // accept the response as-is rather than risk false-positive kicks.
+        //
+        // Preserved for future use — re-enable by uncommenting:
+        // const kick = detectKick(result.content, options);
+        // if (kick) {
+        //   kickCount++;
+        //   lastKickReason = kick.reason;
+        //   toolRounds++;
+        //   if (toolRounds >= MAX_TOOL_ROUNDS) {
+        //     callbacks.onError(new Error(`tool loop limit reached (${MAX_TOOL_ROUNDS} rounds)`), "terminal");
+        //     done = true;
+        //     continue;
+        //   }
+        //   callbacks.onKick?.();
+        //   const kickContent = result.content
+        //     ? result.content + "\n\n" + kick.message
+        //     : kick.message;
+        //   messages.push({ role: "assistant", content: kickContent });
+        //   azureInput = null;
+        //   continue;
+        // }
         messages.push(msg);
         done = true;
       } else {
