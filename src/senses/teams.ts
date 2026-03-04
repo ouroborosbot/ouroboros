@@ -503,6 +503,9 @@ export function startTeamsApp(): void {
           return undefined
         }
       },
+      aadObjectId: activity.from?.aadObjectId,
+      tenantId: activity.conversation?.tenantId,
+      displayName: activity.from?.name,
     }
 
     const ctxSend = async (t: string) => { await ctx.send(t) }
