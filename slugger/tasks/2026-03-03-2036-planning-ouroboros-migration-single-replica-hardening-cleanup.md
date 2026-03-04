@@ -14,12 +14,16 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 - Apply value-first cleanup: remove changes that are not providing current value.
 - Apply placement cleanup: move changes that belong in a different place.
 - Limit cleanup scope to the recent runtime/deployment-hardening task footprint and direct aftermath.
+- Retain the runtime behavior hardening that provides current product/runtime value.
+- Remove synthetic runtime-hardening gate scaffolding that is currently not meaningful signal.
+- Keep task docs and task artifacts for auditability.
 - Produce an explicit self-audit of mistakes made in that task and map each to corrective action.
 - Define file-level acceptance checks proving unrelated work remains untouched.
 
 ### Out of Scope
 - Re-doing the entire migration topic from scratch.
 - Modifying work that was not made in the runtime/deployment-hardening task being cleaned up.
+- Deleting task files created for audit trail (`slugger/tasks/...`) from this task set.
 - Introducing new architecture/policy not explicitly approved during this planning thread.
 - Implementing any code changes before planning approval.
 
@@ -27,6 +31,9 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 - [ ] Cleanup principles are locked: remove non-value changes and relocate misplaced changes.
 - [ ] Scope boundary is locked: only task-owned runtime/deployment-hardening changes are touched.
 - [ ] A file-by-file cleanup inventory exists with disposition per item: keep/remove/move.
+- [ ] Runtime behavior hardening changes are retained and validated.
+- [ ] Synthetic runtime-hardening gate stack is removed from runtime tree and mandatory CI coverage gate flow.
+- [ ] Task planning/doing/audit artifacts are retained for future auditing.
 - [ ] A self-audit explicitly states what I got wrong and how each issue is corrected.
 - [ ] Validation criteria are concrete and testable (including untouched-file guarantees).
 - [ ] 100% test coverage on all new code
@@ -45,8 +52,8 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 - [x] Which current files/changes do you consider "nonsense" and why?
 - [x] Which existing behavior must remain untouched during cleanup?
 - [x] What evidence will count as "cleaned up correctly" for signoff?
-- [ ] Confirm exact candidate change-set boundary for cleanup (which commits/files are included).
-- [ ] Confirm signoff artifact format (short rationale table vs detailed per-file notes).
+- [x] Confirm exact candidate change-set boundary for cleanup (which commits/files are included).
+- [x] Confirm signoff artifact format (short rationale table vs detailed per-file notes).
 
 ## Decisions Made
 - Start new planning doc (do not resume previous completed planning docs).
@@ -55,6 +62,10 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 - This is a cleanup pass, not a redo of the whole topic.
 - Priority order is locked: (1) remove non-value changes, (2) move misplaced changes.
 - Do not touch changes outside the runtime/deployment-hardening task footprint.
+- Keep all task files/artifacts for this task set; do not prune audit trail files.
+- Runtime behavior hardening is intended value and should be preserved.
+- Synthetic runtime-hardening gate stack is currently meaningless signal and is cleanup target for removal.
+- Signoff evidence format: concise file-by-file inventory table (`keep/remove/move` + one-line rationale) plus test/build/CI verification summary.
 
 ## Context / References
 - `/Users/arimendelow/Projects/ouroboros-agent-harness` current branch: `slugger/single-replica-hardening-cleanup`
@@ -63,6 +74,18 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 
 ## Notes
 Starting from current `main` state (including reverts already applied).
+
+Cleanup boundary (current lock):
+- **Keep** runtime behavior hardening and associated tests in:
+  `src/repertoire/tools.ts`, `src/senses/teams.ts`, `src/heart/core.ts`,
+  `src/nerves/index.ts`, `src/config.ts`,
+  and corresponding runtime tests under `src/__tests__/...`.
+- **Remove** synthetic runtime-hardening gate scaffolding:
+  `src/nerves/runtime-hardening/*`,
+  `scripts/run-runtime-hardening-load-validation.cjs`,
+  runtime-hardening CI wiring in `scripts/run-coverage-gate.cjs` and `package.json`.
+- **Keep** task docs and artifacts under:
+  `slugger/tasks/2026-03-03-1430-*`.
 
 Self-audit (what I got wrong in the recent hardening PR work):
 - I introduced synthetic runtime/SLO scaffolding as if it were high-confidence value before validating that it was useful now.
