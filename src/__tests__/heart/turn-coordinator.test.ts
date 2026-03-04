@@ -91,4 +91,32 @@ describe("turn coordinator", () => {
     expect(drained[0].text).toBe("same")
     expect(drained[1].text).toBe("same")
   })
+
+  it("reports active turn state during execution", async () => {
+    const { createTurnCoordinator } = await import("../../heart/turn-coordinator")
+    const coordinator = createTurnCoordinator()
+
+    await coordinator.withTurnLock("teams:conv-active", async () => {
+      expect(coordinator.isTurnActive("teams:conv-active")).toBe(true)
+    })
+
+    expect(coordinator.isTurnActive("teams:conv-active")).toBe(false)
+  })
+
+  it("continues processing future turns after a turn fails", async () => {
+    const { createTurnCoordinator } = await import("../../heart/turn-coordinator")
+    const coordinator = createTurnCoordinator()
+
+    await expect(
+      coordinator.withTurnLock("teams:conv-error", async () => {
+        throw new Error("boom")
+      }),
+    ).rejects.toThrow("boom")
+
+    let ran = false
+    await coordinator.withTurnLock("teams:conv-error", async () => {
+      ran = true
+    })
+    expect(ran).toBe(true)
+  })
 })
