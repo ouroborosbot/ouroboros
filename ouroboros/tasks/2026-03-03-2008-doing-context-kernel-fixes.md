@@ -385,7 +385,7 @@ Changes:
 **Output**: Modified `src/senses/teams.ts`, `src/__tests__/senses/teams.test.ts`
 **Acceptance**: Full text sent without preemptive splitting. Error recovery splits on failure. All tests pass, 100% coverage.
 
-### ⬜ Unit 16a: Async delivery for platform 15s timeout -- tests
+### ✅ Unit 16a: Async delivery for platform 15s timeout -- tests
 **What**: The Copilot platform enforces a hard 15-second timeout for the initial `stream.emit()`. `stream.update()` (thinking phrases) does NOT satisfy this — the platform wants actual content. When the agent takes >15s, the stream dies and shows "Sorry, something went wrong." MS docs recommend: send an initial response within 15s, deliver real content as a follow-up message via `sendActivity`/`ctx.send`.
 
 Write failing tests in `src/__tests__/senses/teams.test.ts` verifying:
