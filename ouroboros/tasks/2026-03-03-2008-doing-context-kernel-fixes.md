@@ -50,9 +50,13 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [x] Truncated JSON and wrong-shape JSON trigger retry (model gets another chance)
 - [x] Retry does not count against toolRounds (error recovery, not a tool round -- toolRounds removed entirely)
 - [x] Preemptive message splitting removed — full message sent, split only on error recovery
-- [x] Dead-stream fallback — flush() routes through sendMessage when stream is stopped
-- [x] Async delivery pattern for 15s platform timeout — deadline timer emits acknowledgment, real content via sendMessage
-- [ ] User confirms on Teams: model uses final_answer cleanly, no 413 errors, no "Sorry something went wrong", prompt sections emit correctly
+- [x] Dead-stream fallback -- flush() routes through sendMessage when stream is stopped
+- [x] ~~Async delivery pattern for 15s platform timeout -- deadline timer emits acknowledgment, real content via sendMessage~~ (REVERTED: replaced by chunked streaming)
+- [ ] Deadline timer (units 16a-16c) reverted cleanly
+- [ ] `--disable-streaming` / buffered mode removed entirely (no `disableStreaming`, no `buffered` flag, no `teams:no-stream` script, no `flagsSection`)
+- [ ] Chunked streaming implemented -- periodic flush every ~1.5s via `flushTextBuffer()`
+- [ ] Single unified streaming mode (no dual-mode branching)
+- [ ] User confirms on Teams: model uses final_answer cleanly, no 413 errors, no "Sorry something went wrong", prompt sections emit correctly, responses arrive in periodic chunks (not per-token, not all-at-once)
 
 ### Gate 3: Friend Context Instructions
 - [ ] Friend context instructions at prompt.ts:178-194 rewritten to be directive with displayName interpolation and aggressive saving
@@ -382,10 +386,12 @@ Changes:
 4. Update tests: existing split assertions → assert full text sent. Add error recovery test.
 5. Keep `splitMessage` exported (used for recovery + still unit-tested)
 
+**Note (post-completion)**: Dead-stream fallback (commit 406bffe) was added on top of this unit -- `flush()` routes through `sendMessage` when `stopped && sendMessage`. This remains valid and useful independent of the deadline timer work.
+
 **Output**: Modified `src/senses/teams.ts`, `src/__tests__/senses/teams.test.ts`
 **Acceptance**: Full text sent without preemptive splitting. Error recovery splits on failure. All tests pass, 100% coverage.
 
-### ✅ Unit 16a: Async delivery for platform 15s timeout -- tests
+### ⏪ Unit 16a: Async delivery for platform 15s timeout -- tests (REVERTED)
 **What**: The Copilot platform enforces a hard 15-second timeout for the initial `stream.emit()`. `stream.update()` (thinking phrases) does NOT satisfy this — the platform wants actual content. When the agent takes >15s, the stream dies and shows "Sorry, something went wrong." MS docs recommend: send an initial response within 15s, deliver real content as a follow-up message via `sendActivity`/`ctx.send`.
 
 Write failing tests in `src/__tests__/senses/teams.test.ts` verifying:
@@ -399,7 +405,7 @@ Use `vi.useFakeTimers()` to control the 12s deadline.
 **Output**: New test cases in `src/__tests__/senses/teams.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because no deadline timer exists yet
 
-### ✅ Unit 16b: Async delivery for platform 15s timeout -- implementation
+### ⏪ Unit 16b: Async delivery for platform 15s timeout -- implementation (REVERTED)
 **What**: Implement the deadline timer in `createTeamsCallbacks` (`src/senses/teams.ts`):
 
 1. Add constant `STREAM_DEADLINE_MS = 12_000` (12s, with 3s safety margin before 15s platform timeout)
@@ -421,10 +427,157 @@ Both streaming and buffered modes get the timer. In streaming mode, the first `o
 **Output**: Modified `src/senses/teams.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ✅ Unit 16c: Async delivery -- coverage & refactor
+### ⏪ Unit 16c: Async delivery -- coverage & refactor (REVERTED)
 **What**: Verify 100% coverage on the deadline timer logic. All paths covered: fast path (timer cancelled), slow path (timer fires, sendMessage delivery), abort cleanup, streaming mode cancellation.
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new/modified code, all tests green
+
+> **Reverted**: Units 16a-16c implemented a 12s deadline timer that emits an acknowledgment message and routes content through `sendMessage`. Live testing revealed this approach is wrong for two reasons: (1) the deadline fires on every query in buffered mode because even fast responses take >12s through devtunnel (the timer can't distinguish "model is slow" from "network is slow"), showing a useless "one moment" message on every response, and (2) investigation found the real problem is per-token streaming causing 100+ HTTP POSTs throttled at 1 req/sec by Teams, not the 15s platform timeout. The correct fix is chunked streaming (periodic flush every ~1.5-2s), which keeps the stream alive, reduces HTTP roundtrips to ~10-15, and makes the deadline timer unnecessary. See Units 17-19 below.
+
+> **Research findings** (documented for context):
+> - Streaming is outbound HTTP POSTs to Bot Framework Connector Service, not through devtunnel ([MS docs: streaming UX](https://learn.microsoft.com/en-us/microsoftteams/platform/bots/streaming-ux))
+> - Teams throttles streaming to 1 req/sec with exponential backoff retries
+> - SDK re-sends ALL cumulative text with each chunk -- payload grows linearly
+> - SDK flushes sequentially -- each chunk must complete before next sends
+> - SDK debounces at 500ms but throttle is 1/sec -- half the requests get throttled
+> - The `--disable-streaming` rationale ("devtunnel buffers chunked responses") was wrong -- the slowness is from Teams platform throttling, not devtunnel
+> - Buffered mode works in Teams 1:1 but breaks Copilot (15s platform timeout: [MS answers](https://learn.microsoft.com/en-us/answers/questions/2288017/m365-custom-engine-agents-timeout-message-after-15))
+> - Async messaging pattern exists but is complex: [MS docs](https://learn.microsoft.com/en-us/microsoft-365-copilot/extensibility/custom-engine-agent-asynchronous-flow)
+> - Streaming unavailable with function calling: same streaming-ux doc
+> - DevtoolsPlugin for local dev: [MS docs](https://learn.microsoft.com/en-us/microsoftteams/platform/teams-sdk/developer-tools/devtools/chat)
+
+### GATE 2 FOLLOW-UP CONTINUED: Chunked Streaming
+
+These units replace units 16a-16c (deadline timer) and the `--disable-streaming` / buffered mode with a single unified approach: **chunked streaming**. Instead of per-token streaming (throttled, unusably slow) or buffering everything (breaks Copilot 15s timeout), we accumulate text in `textBuffer` and flush via `safeEmit` every ~1.5-2 seconds on a periodic timer.
+
+**Benefits**:
+- Keeps the stream alive (first emit well within 15s -- Copilot happy)
+- Reduces HTTP roundtrips from hundreds to ~10-15 per response
+- Stays within 1 req/sec Teams throttle
+- Works identically through devtunnel or in production
+- Eliminates dual-mode complexity (no more streaming vs buffered branching)
+
+### ⬜ Unit 17a: Revert deadline timer (units 16a-16c) -- git revert
+**What**: Revert the commits that implemented the deadline timer. The commits to revert are all commits after 406bffe on this branch (see `git log --oneline 406bffe..HEAD` -- skip doc-only commits, revert the code commits: `73ba07d`, `6c2b1af`, `e4bd591`, and the revert-of-revert `8763d81`). The goal is to return `src/senses/teams.ts` and `src/__tests__/senses/teams.test.ts` to their state at commit 406bffe (before deadline timer was added). Verify with `git diff 406bffe -- src/senses/teams.ts src/__tests__/senses/teams.test.ts` that the diff is empty after reverting. If git revert is messy (due to the revert-of-revert chain), use `git checkout 406bffe -- src/senses/teams.ts src/__tests__/senses/teams.test.ts` and commit.
+**Output**: Clean revert commit(s). `src/senses/teams.ts` and `src/__tests__/senses/teams.test.ts` match their 406bffe state.
+**Acceptance**: `git diff 406bffe -- src/senses/teams.ts src/__tests__/senses/teams.test.ts` shows no diff. All tests pass (the deadline timer tests are gone). Build clean.
+
+### ⬜ Unit 18a: Remove disableStreaming / buffered mode -- tests
+**What**: Write tests verifying the unified chunked streaming behavior (no dual-mode branching). Tests should verify:
+1. `createTeamsCallbacks` no longer accepts `disableStreaming` option (or ignores it)
+2. `onTextChunk` always accumulates in `textBuffer` (never calls `safeEmit` per-token)
+3. `onReasoningChunk` always accumulates in `reasoningBuf` (never calls `safeUpdate` per-token)
+4. `onToolEnd`, `onKick`, `onError` no longer branch on `buffered` flag -- all use `safeUpdate` for status/results
+5. `onToolStart` always flushes `textBuffer` before showing tool status
+
+These tests replace the "createTeamsCallbacks with disableStreaming" describe block. Keep tests for: `safeSend` serialization, `sendChain` error handling, `flushTextBuffer`, `flush()`, dead-stream fallback, error recovery splitting.
+
+Also verify the removal propagates:
+6. `handleTeamsMessage` no longer accepts `disableStreaming` parameter
+7. `startTeamsApp` no longer reads `--disable-streaming` from `process.argv` or `getTeamsChannelConfig().disableStreaming`
+8. `TeamsCallbackOptions.disableStreaming` is removed from the interface
+9. `RunAgentOptions.disableStreaming` is removed
+10. `BuildSystemOptions.disableStreaming` is removed
+11. `flagsSection` is removed or returns empty (no longer needed)
+12. `TeamsChannelConfig.disableStreaming` is removed from config interface
+
+**Output**: Updated tests in `src/__tests__/senses/teams.test.ts`, `src/__tests__/heart/core.test.ts`, `src/__tests__/mind/prompt.test.ts`, `src/__tests__/config.test.ts`
+**Acceptance**: Tests exist and FAIL because the `buffered` flag and dual-mode branching still exist
+
+### ⬜ Unit 18b: Remove disableStreaming / buffered mode -- implementation
+**What**: Remove all `disableStreaming` / `buffered` mode code across the codebase:
+
+**`src/senses/teams.ts`**:
+1. Remove `disableStreaming` from `TeamsCallbackOptions` interface (line 74)
+2. Remove `const buffered = options?.disableStreaming === true` (line 100)
+3. `onReasoningChunk`: remove `if (!buffered)` guard -- always skip per-token `safeUpdate` (chunked streaming will handle reasoning display via the flush timer, similar to how buffered mode worked)
+4. `onTextChunk`: remove `if (buffered)` branch -- always accumulate in `textBuffer` (never `safeEmit` per-token)
+5. `onToolStart`: remove `if (buffered)` -- always call `flushTextBuffer()` before tool status
+6. `onToolEnd`: remove `if (buffered)` branch -- always use `safeUpdate` (not `safeEmit`)
+7. `onKick`: remove `if (buffered)` branch -- always use `safeUpdate` (not `safeEmit`)
+8. `onError`: remove `else if (buffered)` branch -- terminal errors use `safeSend`, transient use `safeUpdate`
+9. `handleTeamsMessage`: remove `disableStreaming` parameter, remove `agentOptions.disableStreaming` setting
+10. `startTeamsApp`: remove `--disable-streaming` argv check, remove `getTeamsChannelConfig().disableStreaming` check, remove `disableStreaming` from `withConversationLock` call, update startup log message
+11. Update the module-level comment block (lines 83-93) to describe the unified chunked streaming approach
+
+**`src/heart/core.ts`**:
+12. Remove `disableStreaming` from `RunAgentOptions` interface (line 95)
+
+**`src/mind/prompt.ts`**:
+13. Remove `disableStreaming` from `BuildSystemOptions` interface (line 112)
+14. Remove `flagsSection` function entirely (lines 115-134) -- no longer needed
+15. Remove `flagsSection` call from `buildSystem`
+
+**`src/config.ts`**:
+16. Remove `disableStreaming` from `TeamsChannelConfig` interface (line 39)
+17. Remove `disableStreaming: false` from `DEFAULT_CONFIG` (line 90)
+
+**`package.json`**:
+18. Remove `teams:no-stream` script
+
+**Output**: Modified files listed above
+**Acceptance**: All tests PASS (green), no warnings. No references to `disableStreaming` or `buffered` remain in `src/` (except possibly test file comments explaining what was removed). `npm run teams:no-stream` no longer exists.
+
+### ⬜ Unit 18c: Remove disableStreaming / buffered mode -- coverage & refactor
+**What**: Verify 100% coverage on all modified code paths. With the `buffered` branching removed, there should be fewer branches to cover. Verify:
+1. `onTextChunk` always accumulates (single path)
+2. `onReasoningChunk` always accumulates (single path)
+3. `onToolEnd/onKick/onError` unified paths covered
+4. `handleTeamsMessage` and `startTeamsApp` modified paths covered
+5. No references to `disableStreaming`, `buffered`, `--disable-streaming`, `teams:no-stream` remain in `src/`
+**Output**: Coverage report
+**Acceptance**: 100% coverage on modified code, all tests green, no warnings
+
+### ⬜ Unit 19a: Chunked streaming (periodic flush timer) -- tests
+**What**: Write failing tests in `src/__tests__/senses/teams.test.ts` for the periodic flush timer. Use `vi.useFakeTimers()`. Tests should verify:
+1. **Periodic flush fires**: after `onTextChunk` accumulates text, advancing time by the flush interval (~1500-2000ms) triggers `flushTextBuffer()` -- first flush goes to `safeEmit`, subsequent to `safeSend`
+2. **Multiple flushes**: text accumulated across multiple intervals is flushed periodically -- each interval flushes whatever has accumulated since last flush
+3. **No flush when empty**: if no text has accumulated, the timer tick is a no-op (no empty `safeEmit` or `safeSend` calls)
+4. **Timer starts on first `onTextChunk`**: the flush timer is not running until text starts arriving (avoid unnecessary timers during reasoning-only phases)
+5. **Timer cleared on abort**: when `controller.abort()` fires, the flush timer is cleaned up (no leaked intervals)
+6. **Timer cleared on `flush()`**: when `flush()` is called (end of turn), the periodic timer is stopped and any remaining buffer is flushed
+7. **Timer cleared on `markStopped()`**: when the stream dies (403), the periodic timer is cleaned up
+8. **First flush within 15s**: even with slow token generation, the first periodic flush happens well within 15s (Copilot platform timeout) -- e.g., if flush interval is 1.5s, first flush at 1.5s after first token
+9. **Reasoning phase**: during `onReasoningChunk`-only phase (no text yet), the flush timer is NOT started -- phrase rotation timer handles keep-alive during reasoning. Once `onTextChunk` starts, the flush timer starts.
+10. **`flush()` at end of turn**: `flush()` flushes remaining buffer and stops the periodic timer. If stream has content (`streamHasContent`), remaining text goes to `sendMessage`. If not, goes to `safeEmit`.
+
+**Output**: New test cases in `src/__tests__/senses/teams.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because no periodic flush timer exists yet
+
+### ⬜ Unit 19b: Chunked streaming (periodic flush timer) -- implementation
+**What**: Implement the periodic flush timer in `createTeamsCallbacks` (`src/senses/teams.ts`):
+
+1. Add constant `FLUSH_INTERVAL_MS = 1_500` (1.5s -- stays within 1 req/sec Teams throttle with margin, first flush well within 15s Copilot timeout). Export for testability.
+2. Add state: `let flushTimer: NodeJS.Timeout | null = null`
+3. Add `startFlushTimer()`: if `flushTimer` is null, start `setInterval(() => flushTextBuffer(), FLUSH_INTERVAL_MS)`. Idempotent -- calling when timer already running is a no-op.
+4. Add `stopFlushTimer()`: clear `flushTimer` interval if set, set to null. Idempotent.
+5. In `onTextChunk`: after accumulating `textBuffer += text`, call `startFlushTimer()` to ensure periodic flushing is active.
+6. In `markStopped()`: call `stopFlushTimer()` (alongside existing `stopPhraseRotation()` and `cancelDeadline()` cleanup).
+7. In controller abort handler: call `stopFlushTimer()` (alongside existing `cancelDeadline()`).
+8. In `flush()`: call `stopFlushTimer()` before flushing remaining buffer. This prevents the periodic timer from firing after the turn ends.
+9. `flushTextBuffer()` is already implemented and handles first-flush-to-emit vs subsequent-to-send logic. No changes needed to it.
+10. Remove the `STREAM_DEADLINE_MS` constant and `deadlineFired`/`deadlineTimer` state (already reverted in Unit 17a, but verify).
+11. Remove `cancelDeadline()` function and its calls (already reverted in Unit 17a, but verify).
+
+The phrase rotation timer (1.5s interval for `safeUpdate`) continues to run during reasoning phases, keeping the stream alive with status updates. Once `onTextChunk` starts, the flush timer takes over for content delivery. Both timers can coexist -- phrase rotation updates status, flush timer delivers content.
+
+**Output**: Modified `src/senses/teams.ts`
+**Acceptance**: All tests PASS (green), no warnings. Periodic flush timer starts on first text chunk, flushes every 1.5s, cleans up properly.
+
+### ⬜ Unit 19c: Chunked streaming -- coverage & refactor
+**What**: Verify 100% coverage on the periodic flush timer logic. All paths covered:
+1. Timer start (first `onTextChunk` starts timer)
+2. Timer tick with accumulated text (flushes)
+3. Timer tick with empty buffer (no-op)
+4. Timer cleanup on abort
+5. Timer cleanup on markStopped
+6. Timer cleanup on flush()
+7. Multiple flushes across intervals
+8. Interaction with dead-stream fallback (stopped + sendMessage path in flush)
+9. First flush to safeEmit, subsequent to safeSend
+
+**Output**: Coverage report
+**Acceptance**: 100% coverage on new/modified code, all tests green, no warnings
 
 ---
 
@@ -438,9 +591,13 @@ Both streaming and buffered modes get the timer. In streaming mode, the first `o
 - `final_answer` text appears in chat (emitted via `onTextChunk`)
 - Truncated `final_answer` retries automatically (model gets second chance)
 - No doubled refusal text or streamed noise in final output
-- No "Sorry, something went wrong" for long-running responses (async delivery pattern handles >15s platform timeout)
-- Fast responses (<12s) delivered on the stream as "Ouroboros"
-- Slow responses (>12s) show brief acknowledgment on stream, real content follows via sendMessage
+- Chunked streaming delivers content in periodic flushes (~1.5s intervals) -- not per-token, not all-at-once
+- First content arrives well within 15s Copilot platform timeout (first flush at ~1.5s after first token)
+- No "Sorry, something went wrong" -- periodic flushes keep the stream alive
+- HTTP roundtrips reduced from hundreds to ~10-15 per response (stays within 1 req/sec Teams throttle)
+- No `--disable-streaming` flag, no dual-mode branching -- single unified streaming approach
+- `flagsSection` removed from prompt (no longer needed)
+- `teams:no-stream` npm script removed
 **Also resolves**: Bug 5 (response spam) and Bug 6 (platform timeout).
 **Proceed to Gate 3 only after user confirms.**
 
