@@ -2841,6 +2841,37 @@ describe("Teams adapter - safeSend serialization (Bug 2)", () => {
     expect(sendMessage).toHaveBeenCalledTimes(1)
     expect(controller.signal.aborted).toBe(true)
   })
+
+  it("chained send rejection halts the chain via markStopped()", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+
+    let resolve1!: () => void
+    const promise1 = new Promise<void>(r => { resolve1 = r })
+
+    const sendMessage = vi.fn()
+      .mockImplementationOnce(() => promise1) // first send: succeeds when resolved
+      .mockRejectedValueOnce(new Error("second send failed")) // second send: rejects
+
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+
+    // First send starts synchronously (chain idle)
+    callbacks.onToolEnd("tool_a", "result_a", true)
+    // Second send chains (chain busy)
+    callbacks.onToolEnd("tool_b", "result_b", true)
+
+    expect(sendMessage).toHaveBeenCalledTimes(1) // only first started so far
+
+    // Complete the first send successfully
+    resolve1()
+    await promise1
+    // Wait for the chain continuation
+    await new Promise(r => setTimeout(r, 50))
+
+    // Second send fired and rejected -- markStopped() should have been called
+    expect(sendMessage).toHaveBeenCalledTimes(2)
+    expect(controller.signal.aborted).toBe(true)
+  })
 })
 
 describe("Teams adapter - handleTeamsMessage with disableStreaming", () => {
