@@ -129,7 +129,7 @@ Add `sendChain` variable before `safeSend` definition. No changes to call sites 
 
 ### GATE 2: Kick Escape Hatch + Self-Trigger
 
-### ⬜ Unit 3a: Bug 4 (tool_choice forcing) -- Tests
+### ✅ Unit 3a: Bug 4 (tool_choice forcing) -- Tests
 **What**: Write failing tests for `tool_choice = "required"` when `lastKickReason` is truthy. Tests should verify that after any kick (not just narration), the next API call includes `tool_choice: "required"` for both Azure (Responses API) and non-Azure (Chat Completions) paths. Test in `src/__tests__/heart/core.test.ts`. Also verify all existing kick test expectations remain unchanged.
 **Output**: New test cases in `src/__tests__/heart/core.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `tool_choice` is only set when `options.toolChoiceRequired` is true, not when `lastKickReason` is truthy
