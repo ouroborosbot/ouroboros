@@ -35,8 +35,8 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [ ] User confirms on Copilot Chat: no kick loop, no response spam, no timeout
 
 ### Gate 2 Follow-up: tool_choice + final_answer Hardening
-- [ ] `toolChoiceRequired` defaults to `true` in core.ts (still overridable via options)
-- [ ] `tool_choice` and `activeTools` setting restored to conditional on `toolChoiceRequired` (but now defaults on)
+- [x] `toolChoiceRequired` defaults to `true` in core.ts (still overridable via options)
+- [x] `tool_choice` and `activeTools` setting restored to conditional on `toolChoiceRequired` (but now defaults on)
 - [ ] `toolBehaviorSection()` prompt rewritten: decision-tree framing, anti-no-op pattern
 - [ ] `toolsSection()` correctly includes `finalAnswerTool` when `toolChoiceRequired` defaults on
 - [ ] `finalAnswerTool` description reframed as primary response mechanism
@@ -198,7 +198,7 @@ Update the comment at lines 259-261 to reflect "defaults to true, overridable vi
 **Output**: Modified `src/heart/core.ts`
 **Acceptance**: All tests PASS (green), no warnings. The Unit 3a/3b kick tests still pass (kick override preserved).
 
-### ⬜ Unit 5c: Issue A (toolChoiceRequired default) -- Coverage & Refactor
+### ✅ Unit 5c: Issue A (toolChoiceRequired default) -- Coverage & Refactor
 **What**: Verify 100% coverage on modified `runAgent` logic. Both `toolChoiceRequired: true` (default) and `toolChoiceRequired: false` branches must be covered for activeTools and tool_choice setting. Kick override path must also be covered.
 **Output**: Coverage report showing full branch coverage
 **Acceptance**: 100% coverage on new/modified code, all tests green, no warnings
