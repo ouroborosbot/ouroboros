@@ -376,3 +376,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-04 10:53 Added Gate 2 follow-up units (5a-9c) for Issues A-F: toolChoiceRequired default, toolBehaviorSection prompt, finalAnswerTool description, onTextChunk coverage, response truncation
 - 2026-03-04 10:58 Added Unit 10a: codify tool description voice standard in CONTRIBUTING.md; updated completion criteria
 - 2026-03-04 11:05 Unit 5a complete: 3 failing tests for toolChoiceRequired opt-out -- tool_choice and finalAnswerTool should not be set when toolChoiceRequired: false (MiniMax + Azure). 2 defaults-on tests renamed for clarity
+- 2026-03-04 11:06 Unit 5b complete: toolChoiceRequired defaults true via ?? operator. activeTools and tool_choice conditionally set. 140 tests pass, build clean
