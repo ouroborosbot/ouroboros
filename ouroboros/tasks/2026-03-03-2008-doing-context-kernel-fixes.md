@@ -2,7 +2,7 @@
 
 **Status**: drafting
 **Execution Mode**: pending
-**Created**: (pending commit)
+**Created**: 2026-03-03 21:59
 **Planning**: ./2026-03-03-2008-planning-context-kernel-fixes.md
 **Artifacts**: ./2026-03-03-2008-doing-context-kernel-fixes/
 
@@ -149,7 +149,7 @@ Note: KICK_MESSAGES is not exported. The test should import `detectKick` and use
 **Acceptance**: Test exists and FAILS (red) because current kick message contains "I can"
 
 ### ⬜ Unit 3d: Bug 4 (kick message self-trigger) -- Implementation
-**What**: Rewrite the narration kick message at `src/heart/kicks.ts:29` to avoid triggering any `TOOL_INTENT_PATTERNS`. Current: `"I narrated instead of acting. Calling the tool now -- if I've already finished, I can use final_answer."` -- contains "I can" (matches `/\bi can\b/i`) and "Calling" (matches `/\bi'm \w+ing\b/i` -- wait, no, "Calling" alone doesn't match that). Main issue is "I can". Replace with something like: `"I narrated instead of acting. Using the tool now -- if done, calling final_answer."` Verify the rewritten message does not match any pattern in `TOOL_INTENT_PATTERNS`.
+**What**: Rewrite the narration kick message at `src/heart/kicks.ts:29` to avoid triggering any `TOOL_INTENT_PATTERNS`. Current message contains "I can" which matches `/\bi can\b/i`. Replace with a message that conveys the same meaning without matching any pattern. Example: `"I narrated instead of acting. Using the tool now -- if done, calling final_answer."` Verify the rewritten message does not match any pattern in `TOOL_INTENT_PATTERNS` by running `hasToolIntent()` against it.
 **Output**: Modified `src/heart/kicks.ts`
 **Acceptance**: All tests PASS (green), no warnings. The self-trigger test now passes.
 
@@ -213,4 +213,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - **Gated execution**: Do NOT proceed past a gate checkpoint until user confirms testing passed
 
 ## Progress Log
-- (pending) Created from planning doc
+- 2026-03-03 21:59 Created from planning doc (Pass 1 -- First Draft)
