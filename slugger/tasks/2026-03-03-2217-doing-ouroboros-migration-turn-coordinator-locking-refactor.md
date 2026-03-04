@@ -118,6 +118,6 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 - 2026-03-04 10:51 Pass 4 complete: quality checks passed (emoji headers present, no TBDs, criteria testable) and status set to READY_FOR_EXECUTION.
 - 2026-03-04 10:54 Updated doing scope to include explicit steering follow-up behavior and related regression coverage.
 - 2026-03-04 11:19 Updated doing contract to preserve+inject all steering follow-ups and prohibit adapter-authored steering plain-text acknowledgements.
-- 2026-03-04 11:39 Expanded doing contract details: dedupe by `activity.id`, ordered discrete injection, boundary-only injection, carry-forward semantics, and confirmation explicitly out of scope.
-- 2026-03-04 11:53 Generalized doing dedupe contract to channel message identity and locked no steering-specific buffer cap (existing context trimming/window applies).
+- 2026-03-04 11:39 Historical (superseded at 12:21): expanded doing contract details including dedupe by `activity.id`, ordered discrete injection, boundary-only injection, carry-forward semantics, and confirmation explicitly out of scope.
+- 2026-03-04 11:53 Historical (superseded at 12:21): generalized doing dedupe contract to channel message identity and locked no steering-specific buffer cap (existing context trimming/window applies).
 - 2026-03-04 12:21 Removed follow-up dedupe/idempotency from doing scope to match locked no-scope-expansion direction.
