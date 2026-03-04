@@ -227,3 +227,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-03 22:36 Unit 3b complete: 2 one-line changes in core.ts -- added || lastKickReason to both tool_choice conditions. All 158 core tests pass, build clean
 - 2026-03-03 22:37 Unit 3c complete: 1 failing test verifying narration kick message does not self-trigger hasToolIntent(). Fails because message contains "I can" matching /\bi can\b/i
 - 2026-03-03 22:39 Unit 3d complete: Rewrote narration kick message from "...I can use final_answer" to "...if done, calling final_answer". 0 pattern matches verified. All 158 core + 107 kicks tests pass, build clean
+- 2026-03-03 22:40 Unit 3e complete: core.ts and kicks.ts both 100% coverage (stmts/branches/funcs/lines). All 342 heart tests pass across 4 files. No refactoring needed. Build clean
