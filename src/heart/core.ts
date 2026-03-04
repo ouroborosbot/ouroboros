@@ -182,6 +182,7 @@ export async function runAgent(
   const provider = getProvider();
   const model = getModel();
   const { maxToolOutputChars } = getContextConfig();
+  const toolChoiceRequired = options?.toolChoiceRequired ?? true;
   const traceId = options?.traceId;
   emitNervesEvent({
     event: "engine.turn_start",
@@ -256,10 +257,11 @@ export async function runAgent(
   );
 
   while (!done) {
-    // Always include final_answer so the model can signal completion.
-    // With tool_choice: required always set, the model must call a tool
-    // every turn — final_answer is how it exits cleanly.
-    const activeTools = [...baseTools, finalAnswerTool];
+    // When toolChoiceRequired is true (the default), include final_answer
+    // so the model can signal completion. With tool_choice: required, the
+    // model must call a tool every turn — final_answer is how it exits.
+    // Overridable via options.toolChoiceRequired = false (e.g. CLI).
+    const activeTools = toolChoiceRequired ? [...baseTools, finalAnswerTool] : baseTools;
     // Yield so pending I/O (stdin Ctrl-C) can be processed between iterations
     await new Promise((r) => setImmediate(r));
     if (signal?.aborted) break;
@@ -286,7 +288,7 @@ export async function runAgent(
           include: ["reasoning.encrypted_content"],
         };
         if (traceId) azureParams.metadata = { trace_id: traceId };
-        azureParams.tool_choice = "required";
+        if (toolChoiceRequired) azureParams.tool_choice = "required";
         result = await streamResponsesApi(
           client,
           azureParams,
@@ -301,7 +303,7 @@ export async function runAgent(
         const createParams: Record<string, unknown> = { messages, tools: activeTools, stream: true };
         if (model) createParams.model = model;
         if (traceId) createParams.metadata = { trace_id: traceId };
-        createParams.tool_choice = "required";
+        if (toolChoiceRequired) createParams.tool_choice = "required";
         result = await streamChatCompletion(client, createParams, callbacks, signal);
       }
 
