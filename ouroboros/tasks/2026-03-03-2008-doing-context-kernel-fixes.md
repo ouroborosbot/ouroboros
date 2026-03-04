@@ -333,7 +333,7 @@ Update tests: remove or update the tool loop limit test that asserts `MAX_TOOL_R
 **Output**: Modified `src/heart/core.ts`, `src/__tests__/heart/core.test.ts`
 **Acceptance**: All tests pass, no references to `toolRounds` or `MAX_TOOL_ROUNDS` remain in src/
 
-### ⬜ Unit 14b: final_answer answer extraction -- tests
+### ✅ Unit 14b: final_answer answer extraction -- tests
 **What**: Write failing tests in `src/__tests__/heart/core.test.ts` verifying the full answer extraction logic for `isSoleFinalAnswer`:
 1. `{"answer":"text"}` → uses `parsed.answer` (existing, should pass)
 2. `"just a string"` (valid JSON string) → uses the string directly as the answer
