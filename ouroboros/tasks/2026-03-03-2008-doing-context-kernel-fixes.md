@@ -264,7 +264,7 @@ If any coverage gaps exist, write additional tests.
 **Output**: Coverage report or new tests if gaps found
 **Acceptance**: 100% coverage on the final_answer interception block (lines 357-377), all tests green
 
-### ⬜ Unit 9a: Issue F (response size / 413 error) -- Tests
+### ✅ Unit 9a: Issue F (response size / 413 error) -- Tests
 **What**: Write tests verifying:
 1. The system prompt for Teams channel includes `max 4000 chars` (already present via `channelCapabilities.maxMessageLength` in `contextSection`)
 2. The `toolBehaviorSection` or `final_answer` description reminds the model of message length constraints (optional -- verify if the existing channel traits line is sufficient)
