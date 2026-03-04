@@ -399,7 +399,7 @@ Use `vi.useFakeTimers()` to control the 12s deadline.
 **Output**: New test cases in `src/__tests__/senses/teams.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because no deadline timer exists yet
 
-### ⬜ Unit 16b: Async delivery for platform 15s timeout -- implementation
+### ✅ Unit 16b: Async delivery for platform 15s timeout -- implementation
 **What**: Implement the deadline timer in `createTeamsCallbacks` (`src/senses/teams.ts`):
 
 1. Add constant `STREAM_DEADLINE_MS = 12_000` (12s, with 3s safety margin before 15s platform timeout)
