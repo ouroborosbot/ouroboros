@@ -20,10 +20,13 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 - [ ] `teamsChannel.maxConcurrentConversations` is fully removed from config schema/defaults/accessors and call sites.
 - [ ] A shared turn coordinator exists and is used by Teams for per-conversation serialization.
 - [ ] Same-conversation follow-up messages during active turns are all preserved and injected into the active turn between model calls.
+- [ ] Steering follow-up capture is deduped by activity identity so retry-delivered duplicates are not injected multiple times.
+- [ ] Steering follow-ups are injected as ordered discrete user messages (not dropped, reordered, or collapsed with lost boundaries).
+- [ ] Steering injection occurs only at model-call boundaries; no in-flight model-call mutation occurs.
+- [ ] Buffered follow-ups that miss a boundary are carried into the next turn for the same conversation.
 - [ ] Steering path introduces no adapter-authored plain-text acknowledgement messages to users.
 - [ ] Model receives all follow-up user messages for steering (none dropped).
 - [ ] Single active-turn ownership per conversation is preserved; different conversations remain parallelizable.
-- [ ] Existing confirmation flow remains deadlock-safe with the coordinator in place.
 - [ ] Tests are updated to cover coordinator contract, steering injection contract, and removed cap behavior.
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
@@ -53,26 +56,29 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
 ### ⬜ Unit 0: Setup/Research
-**What**: Lock baseline callsites and contracts for migration from Teams-local lock/cap to shared turn coordinator + steering injection path; enumerate references to `withConversationLock`, `_inFlightTeamsTurns`, `maxConcurrentConversations`, and current same-conversation follow-up handling points.
+**What**: Lock baseline callsites and contracts for migration from Teams-local lock/cap to shared turn coordinator + steering injection path; enumerate references to `withConversationLock`, `_inFlightTeamsTurns`, `maxConcurrentConversations`, and current same-conversation follow-up handling points. Identify exact model-call boundaries in `heart/core.ts` that are safe steering injection points.
 **Output**: `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-locking-refactor/unit-0-baseline.md`
-**Acceptance**: Baseline inventory covers all active callsites and identifies exact tests/contracts to update for coordinator and preserve-all steering behavior.
+**Acceptance**: Baseline inventory covers runtime/test callsites, safe injection boundary map, and explicit contract cases (dedupe, ordering, carry-forward).
 
 ### ⬜ Unit 1a: Turn Coordinator & Cap Removal — Tests
 **What**: Write failing tests for the refactor contract:
 - shared coordinator serializes same key and permits parallel different keys
 - Teams path no longer emits cap-reject overload message or checks in-flight cap gate
 - Teams path preserves all same-conversation mid-turn follow-up messages and injects them between model calls
+- Teams path dedupes follow-ups by activity identity and does not inject duplicates on retry
+- Teams path preserves message boundaries/order when injecting follow-ups (discrete user messages in chronological order)
+- Teams path carries buffered follow-ups into next turn when no boundary consumed them in the active turn
 - Teams path does not emit adapter-authored plain-text steering acknowledgements
 - `teamsChannel.maxConcurrentConversations` removed from config/types/defaults/tests
 **Output**: `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-locking-refactor/unit-1a-red-run.txt`
 **Acceptance**: New/updated tests fail on current behavior before implementation.
 
 ### ⬜ Unit 1b: Turn Coordinator & Cap Removal — Implementation
-**What**: Implement shared turn coordinator, migrate Teams to use it, add preserve-all steering injection handling for same-conversation mid-turn follow-ups, and remove cap-gate/config field and related runtime code/tests.
+**What**: Implement shared turn coordinator, migrate Teams to use it, add preserve-all steering injection handling for same-conversation mid-turn follow-ups, and remove cap-gate/config field and related runtime code/tests. Implement steering buffer entry shape `{ activityId, conversationId, text, receivedAt }` and dedupe semantics keyed by `activityId`.
 **Output**:
 - `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-locking-refactor/unit-1b-test-run.txt`
 - `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-locking-refactor/unit-1b-build-run.txt`
-**Acceptance**: Unit 1a tests pass; Teams turn handling uses coordinator ownership semantics, preserves+injects all follow-up messages for model visibility, emits no adapter-authored steering plain text, avoids hard cap rejection, and removes `maxConcurrentConversations`.
+**Acceptance**: Unit 1a tests pass; Teams turn handling uses coordinator ownership semantics, dedupes by `activityId`, preserves+injects all follow-up messages for model visibility with ordered discrete boundaries, uses boundary-only injection with carry-forward, emits no adapter-authored steering plain text, avoids hard cap rejection, and removes `maxConcurrentConversations`.
 
 ### ⬜ Unit 1c: Turn Coordinator & Cap Removal — Coverage & Refactor
 **What**: Run coverage gate, backfill any uncovered branches introduced by coordinator/cap-removal changes, and refactor for clarity.
@@ -81,10 +87,10 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 - `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-locking-refactor/unit-1c-build-run.txt`
 **Acceptance**: 100% coverage on changed code, tests green, build green, no warnings.
 
-### ⬜ Unit 2a: Confirmation + Steering Safety Regression Validation
-**What**: Validate confirmation flow remains deadlock-safe after coordinator migration and steering path (pre-lock confirmation resolution, same-conversation ownership, and preserve-all follow-up steering injection behavior).
+### ⬜ Unit 2a: Steering Safety Regression Validation
+**What**: Validate steering path safety after coordinator migration (same-conversation ownership, preserve-all follow-up injection behavior, dedupe behavior, boundary-only injection, and carry-forward behavior).
 **Output**: `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-locking-refactor/unit-2a-test-run.txt`
-**Acceptance**: Confirmation and steering-related Teams tests pass with coordinator path active and no deadlock regressions.
+**Acceptance**: Steering-related Teams tests pass with coordinator path active and no ordering, duplication, or boundary regressions.
 
 ### ⬜ Unit 2b: Final Verification & Audit
 **What**: Run final full verification and produce concise final audit mapping completion criteria to evidence artifacts.
