@@ -94,4 +94,4 @@ Keep scope disciplined: runtime provider abstraction + provider integrations onl
 - 2026-03-04 14:37 Updated scope to OpenClaw-compatible Anthropic setup-token + OpenAI Codex OAuth flows; set status to NEEDS_REVIEW
 - 2026-03-04 14:46 Incorporated user decisions: defer OpenAI API-key, enforce no-silent-fallback auth failures, and split secrets/state paths (`.agentsecrets` + `.agentstate`)
 - 2026-03-04 14:54 Locked config layout decisions (`providers` + `teams` stay in config.json; `context` moves to agent.json) and added explicit cross-machine migration runbook requirement
-- 2026-03-04 14:57 Added explicit first-run migration semantics for legacy `~/.agentconfigs` on other machines and fixed runbook location for Claude pickup
+- 2026-03-04 14:55 Added explicit first-run migration semantics for legacy `~/.agentconfigs` on other machines and fixed runbook location for Claude pickup
