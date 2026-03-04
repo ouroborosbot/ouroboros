@@ -92,6 +92,7 @@ export interface RunAgentOptions {
   skipConfirmation?: boolean;
   toolContext?: ToolContext;
   traceId?: string;
+  drainSteeringFollowUps?: () => Array<{ text: string }>;
 }
 
 // Re-export kick utilities for backward compat
@@ -259,6 +260,14 @@ export async function runAgent(
     const activeTools = (options?.toolChoiceRequired || lastKickReason === "narration")
       ? [...baseTools, finalAnswerTool]
       : baseTools;
+    const steeringFollowUps = options?.drainSteeringFollowUps?.() ?? [];
+    if (steeringFollowUps.length > 0) {
+      for (const followUp of steeringFollowUps) {
+        messages.push({ role: "user", content: followUp.text });
+      }
+      // Rebuild Azure native input from canonical messages after injection.
+      azureInput = null;
+    }
     // Yield so pending I/O (stdin Ctrl-C) can be processed between iterations
     await new Promise((r) => setImmediate(r));
     if (signal?.aborted) break;
