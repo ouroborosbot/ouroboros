@@ -62,7 +62,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Baseline and file map
+### ✅ Unit 0: Baseline and file map
 **What**: Capture current branch baseline for provider/config/loading code paths and current tests before edits.
 **Output**: Baseline notes file in artifacts directory with command outputs and touched-file map for `src/config.ts`, `src/identity.ts`, `src/heart/core.ts`, `src/heart/streaming.ts`, `src/mind/prompt.ts`, `src/senses/{cli,teams}.ts`, and related `src/__tests__/**`.
 **Acceptance**: Baseline artifact exists and identifies all files to change for migration, provider abstraction, and provider integrations.
@@ -188,3 +188,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 15:35 Validation pass: aligned units to actual repository files and current legacy path usage (`.agentconfigs`) to be migrated
 - 2026-03-04 15:35 Added manual validation gates for live Anthropic setup-token and OpenAI Codex OAuth verification with required artifacts
 - 2026-03-04 15:38 Quality pass: confirmed unit headers/acceptance completeness and set status to READY_FOR_EXECUTION
+- 2026-03-04 15:44 Unit 0 complete: captured branch baseline, scripts, and touched-file map in `unit-0-baseline.md`
