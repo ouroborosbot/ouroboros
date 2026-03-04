@@ -10,10 +10,10 @@ import { sessionPath } from "../config"
 import { loadSession, deleteSession, postTurn } from "../mind/context"
 import type { UsageData } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand, getToolChoiceRequired } from "../repertoire/commands"
-import { getAgentName } from "../identity"
+import { getAgentName, getAgentRoot } from "../identity"
 import { createTraceId } from "../nerves"
-import { FileContextStore } from "../mind/context/store-file"
-import { ContextResolver } from "../mind/context/resolver"
+import { FileFriendStore } from "../mind/friends/store-file"
+import { FriendResolver } from "../mind/friends/resolver"
 import type { ToolContext } from "../repertoire/tools"
 
 // readline.Interface exposes undocumented mutable line/cursor for in-progress input
@@ -332,17 +332,18 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
 }
 
 export async function main() {
-  const sessPath = sessionPath("cli", "session")
   const registry = createCommandRegistry()
   registerDefaultCommands(registry)
 
   // Resolve context kernel (identity + channel) for CLI
-  const storePath = path.join(os.homedir(), ".agentconfigs", "context")
-  const contextStore = new FileContextStore(storePath)
+  const agentKnowledgePath = path.join(getAgentRoot(), "friends")
+  const piiBridgePath = path.join(os.homedir(), ".agentconfigs", getAgentName(), "friends")
+  const friendStore = new FileFriendStore(agentKnowledgePath, piiBridgePath)
   const username = os.userInfo().username
-  const resolver = new ContextResolver(contextStore, {
+  const hostname = os.hostname()
+  const resolver = new FriendResolver(friendStore, {
     provider: "local" as const,
-    externalId: username,
+    externalId: `${username}@${hostname}`,
     displayName: username,
     channel: "cli",
   })
@@ -351,13 +352,17 @@ export async function main() {
     /* v8 ignore next -- CLI has no OAuth sign-in; this no-op satisfies the interface @preserve */
     signin: async () => undefined,
     context: resolvedContext,
+    friendStore,
   }
+
+  const friendId = resolvedContext.friend.id
+  const sessPath = sessionPath(friendId, "cli", "session")
 
   // Load existing session or start fresh
   const existing = loadSession(sessPath)
   const messages: OpenAI.ChatCompletionMessageParam[] = existing?.messages && existing.messages.length > 0
     ? existing.messages
-    : [{ role: "system", content: await buildSystem("cli") }]
+    : [{ role: "system", content: await buildSystem("cli", undefined, resolvedContext) }]
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true })
   const ctrl = new InputController(rl)

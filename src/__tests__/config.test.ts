@@ -358,52 +358,49 @@ describe("getContextConfig", () => {
 
 })
 
-describe("getSessionDir", () => {
-  beforeEach(async () => {
-    vi.resetModules()
-  })
-
-  it("returns sessions directory using agent name from identity module", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
-
-    const { getSessionDir } = await import("../config")
-    const dir = getSessionDir()
-
-    // Should use getAgentName() ("testagent") instead of hardcoded "ouroboros"
-    expect(dir).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "sessions"))
-  })
-})
-
 describe("sessionPath", () => {
   beforeEach(async () => {
     vi.resetModules()
+    vi.mocked(fs.mkdirSync).mockReset()
   })
 
-  it("returns correct path for cli channel using agent name", async () => {
+  it("returns correct path with friendId, channel, and key (3-arg signature)", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
 
     const { sessionPath } = await import("../config")
-    const p = sessionPath("cli", "session")
+    const p = sessionPath("uuid-abc-123", "cli", "session")
 
-    expect(p).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "sessions", "cli", "session.json"))
+    expect(p).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "sessions", "uuid-abc-123", "cli", "session.json"))
   })
 
-  it("returns correct path for teams channel with conversation id", async () => {
+  it("returns correct path for teams channel with friendId", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
 
     const { sessionPath } = await import("../config")
-    const p = sessionPath("teams", "conv-123")
+    const p = sessionPath("uuid-xyz-456", "teams", "conv-123")
 
-    expect(p).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "sessions", "teams", "conv-123.json"))
+    expect(p).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "sessions", "uuid-xyz-456", "teams", "conv-123.json"))
   })
 
   it("sanitizes key by replacing slashes and colons with underscores", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
 
     const { sessionPath } = await import("../config")
-    const p = sessionPath("teams", "a]conv/id:123")
+    const p = sessionPath("uuid-1", "teams", "a]conv/id:123")
 
-    expect(p).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "sessions", "teams", "a]conv_id_123.json"))
+    expect(p).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "sessions", "uuid-1", "teams", "a]conv_id_123.json"))
+  })
+
+  it("auto-creates parent directories", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { sessionPath } = await import("../config")
+    sessionPath("uuid-1", "cli", "session")
+
+    expect(fs.mkdirSync).toHaveBeenCalledWith(
+      path.join(os.homedir(), ".agentconfigs", "testagent", "sessions", "uuid-1", "cli"),
+      { recursive: true },
+    )
   })
 })
 

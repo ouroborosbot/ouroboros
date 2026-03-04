@@ -12,8 +12,9 @@ import { loadSession, deleteSession, postTurn } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "../repertoire/commands"
 import { createTraceId } from "../nerves"
 import { emitNervesEvent } from "../nerves/runtime"
-import { FileContextStore } from "../mind/context/store-file"
-import { ContextResolver } from "../mind/context/resolver"
+import { FileFriendStore } from "../mind/friends/store-file"
+import { FriendResolver } from "../mind/friends/resolver"
+import { getAgentRoot, getAgentName } from "../identity"
 import * as os from "os"
 import * as path from "path"
 
@@ -282,14 +283,15 @@ export async function withConversationLock(convId: string, fn: () => Promise<voi
   await current
 }
 
-// Shared context store singleton -- created once, reused across all requests.
-let _contextStore: InstanceType<typeof FileContextStore> | null = null
-function getContextStore(): InstanceType<typeof FileContextStore> {
-  if (!_contextStore) {
-    const basePath = path.join(os.homedir(), ".agentconfigs", "context")
-    _contextStore = new FileContextStore(basePath)
+// Shared friend store singleton -- created once, reused across all requests.
+let _friendStore: InstanceType<typeof FileFriendStore> | null = null
+function getFriendStore(): InstanceType<typeof FileFriendStore> {
+  if (!_friendStore) {
+    const agentKnowledgePath = path.join(getAgentRoot(), "friends")
+    const piiBridgePath = path.join(os.homedir(), ".agentconfigs", getAgentName(), "friends")
+    _friendStore = new FileFriendStore(agentKnowledgePath, piiBridgePath)
   }
-  return _contextStore
+  return _friendStore
 }
 
 // Context from the Teams activity that carries OAuth tokens and signin ability
@@ -329,6 +331,30 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   stream.update(pickPhrase(getPhrases().thinking) + "...")
   await new Promise(r => setImmediate(r))
 
+  // Resolve context kernel (identity + channel) early so we can use the friend UUID for session path
+  const store = getFriendStore()
+  const toolContext: ToolContext | undefined = teamsContext ? {
+    graphToken: teamsContext.graphToken,
+    adoToken: teamsContext.adoToken,
+    signin: teamsContext.signin,
+    friendStore: store,
+  } : undefined
+
+  if (toolContext) {
+    const provider = teamsContext?.aadObjectId ? "aad" as const : "teams-conversation" as const
+    const externalId = teamsContext?.aadObjectId || conversationId
+    const resolver = new FriendResolver(store, {
+      provider,
+      externalId,
+      tenantId: teamsContext?.tenantId,
+      displayName: teamsContext?.displayName || "Unknown",
+      channel: "teams",
+    })
+    toolContext.context = await resolver.resolve()
+  }
+
+  const friendId = toolContext?.context?.friend?.id || "default"
+
   const registry = createCommandRegistry()
   registerDefaultCommands(registry)
 
@@ -338,7 +364,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
     const dispatchResult = registry.dispatch(parsed.command, { channel: "teams" })
     if (dispatchResult.handled && dispatchResult.result) {
       if (dispatchResult.result.action === "new") {
-        const sessPath = sessionPath("teams", conversationId)
+        const sessPath = sessionPath(friendId, "teams", conversationId)
         deleteSession(sessPath)
         stream.emit("session cleared")
         return
@@ -350,11 +376,11 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   }
 
   // Load or create session
-  const sessPath = sessionPath("teams", conversationId)
+  const sessPath = sessionPath(friendId, "teams", conversationId)
   const existing = loadSession(sessPath)
   const messages: OpenAI.ChatCompletionMessageParam[] = existing?.messages && existing.messages.length > 0
     ? existing.messages
-    : [{ role: "system", content: await buildSystem("teams") }]
+    : [{ role: "system", content: await buildSystem("teams", undefined, toolContext?.context) }]
 
   // Push user message
   messages.push({ role: "user", content: text })
@@ -363,23 +389,6 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   const controller = new AbortController()
   const callbacks = createTeamsCallbacks(stream, controller, sendMessage, { disableStreaming, conversationId })
   const traceId = createTraceId()
-  const toolContext: ToolContext | undefined = teamsContext ? {
-    graphToken: teamsContext.graphToken,
-    adoToken: teamsContext.adoToken,
-    signin: teamsContext.signin,
-  } : undefined
-
-  // Resolve context kernel (identity + channel) when AAD identity is available
-  if (toolContext && teamsContext?.aadObjectId) {
-    const resolver = new ContextResolver(getContextStore(), {
-      provider: "aad" as const,
-      externalId: teamsContext.aadObjectId,
-      tenantId: teamsContext.tenantId,
-      displayName: teamsContext.displayName || "Unknown",
-      channel: "teams",
-    })
-    toolContext.context = await resolver.resolve()
-  }
 
   const agentOptions: RunAgentOptions = {}
   agentOptions.traceId = traceId

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { execTool, getToolsForChannel } from "../../repertoire/tools"
 import type { ToolContext } from "../../repertoire/tools"
-import { getChannelCapabilities } from "../../mind/context/channel"
+import { getChannelCapabilities } from "../../mind/friends/channel"
 
 describe("remote channel tool safety", () => {
   it("does not expose local cli/file/git/gh tools to remote channel tool lists", () => {

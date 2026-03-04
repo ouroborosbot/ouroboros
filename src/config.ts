@@ -223,20 +223,19 @@ export function getIntegrationsConfig(): IntegrationsConfig {
   return { ...config.integrations }
 }
 
-export function getSessionDir(): string {
-  return path.join(os.homedir(), ".agentconfigs", getAgentName(), "sessions")
-}
-
 export function getLogsDir(): string {
   return path.join(os.homedir(), ".agentconfigs", getAgentName(), "logs")
 }
+
 
 function sanitizeKey(key: string): string {
   return key.replace(/[/:]/g, "_")
 }
 
-export function sessionPath(channel: string, key: string): string {
-  return path.join(getSessionDir(), channel, sanitizeKey(key) + ".json")
+export function sessionPath(friendId: string, channel: string, key: string): string {
+  const dir = path.join(os.homedir(), ".agentconfigs", getAgentName(), "sessions", friendId, channel)
+  fs.mkdirSync(dir, { recursive: true })
+  return path.join(dir, sanitizeKey(key) + ".json")
 }
 
 export function logPath(channel: string, key: string): string {
