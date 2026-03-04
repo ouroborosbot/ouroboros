@@ -316,3 +316,4 @@ This is prompt tuning. The code structure of `contextSection()` doesn't change -
 - 2026-03-03 21:12 Bug 2 root cause found: safeSend is fire-and-forget (catchAsync attaches .catch() but never awaits). Multiple ctx.send() race. Fix: serialize via promise chain. Removed options A/B/C, resolved open question.
 - 2026-03-03 21:19 Bug 4 reframed: patterns are intentionally aggressive, stay as-is. Root cause is missing tool_choice forcing after kick. Three small changes total. Removed all pattern removal references and kickCount >= 2 logic.
 - 2026-03-03 21:42 Bug 4 simplified: check `lastKickReason` (truthy) not `=== "narration"`. After ANY kick, force tool_choice. Even simpler condition.
+- 2026-03-03 21:49 Bug 3 simplified: prompt tuning of ~4 lines in contextSection(), not five separate changes. Reframed as single rewrite task.
