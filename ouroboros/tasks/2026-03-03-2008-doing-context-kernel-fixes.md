@@ -274,7 +274,7 @@ Focus: the truncation test should verify that when `final_answer` returns text l
 **Output**: New test cases
 **Acceptance**: Tests exist. Truncation test FAILS (red) because no truncation logic exists yet.
 
-### ⬜ Unit 9b: Issue F (response size / 413 error) -- Implementation
+### ✅ Unit 9b: Issue F (response size / 413 error) -- Implementation
 **What**: Add truncation safety net in `src/heart/core.ts` at the `final_answer` interception block (around line 368). After parsing the answer text:
 1. Get `maxMessageLength` from channel capabilities (pass channel caps into scope or look up from channel parameter)
 2. If `answer.length > maxMessageLength` and `maxMessageLength !== Infinity`, truncate to `maxMessageLength - 20` chars and append `\n\n[truncated]`
