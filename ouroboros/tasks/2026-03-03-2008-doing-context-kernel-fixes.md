@@ -75,7 +75,7 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 **Output**: New test cases in `src/__tests__/senses/teams.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `teamsContext` doesn't populate AAD fields yet
 
-### ⬜ Unit 1b: Bug 1 (AAD extraction) -- Implementation
+### ✅ Unit 1b: Bug 1 (AAD extraction) -- Implementation
 **What**: Add three fields to the `teamsContext` object literal at `src/senses/teams.ts:492-506`:
 ```
 aadObjectId: activity.from?.aadObjectId,
