@@ -214,3 +214,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 
 ## Progress Log
 - 2026-03-03 21:59 Created from planning doc (Pass 1 -- First Draft)
+- 2026-03-03 21:59 Pass 2 -- Granularity (cleaned up Unit 3d description)
