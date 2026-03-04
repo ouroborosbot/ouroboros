@@ -16,10 +16,10 @@
 Clean up the recent runtime/deployment-hardening work by removing changes that are not currently providing value and moving misplaced changes into appropriate locations, while leaving unrelated work untouched.
 
 ## Completion Criteria
-- [ ] Cleanup principles are locked: remove non-value changes and relocate misplaced changes.
-- [ ] Scope boundary is locked: only task-owned runtime/deployment-hardening changes are touched.
-- [ ] A file-by-file cleanup inventory exists with disposition per item: keep/remove/move.
-- [ ] Cleanup inventory explicitly resolves every task-owned changed path with no `TBD` entries.
+- [x] Cleanup principles are locked: remove non-value changes and relocate misplaced changes.
+- [x] Scope boundary is locked: only task-owned runtime/deployment-hardening changes are touched.
+- [x] A file-by-file cleanup inventory exists with disposition per item: keep/remove/move.
+- [x] Cleanup inventory explicitly resolves every task-owned changed path with no `TBD` entries.
 - [ ] Runtime behavior hardening changes are retained and validated.
 - [ ] Synthetic runtime-hardening gate stack is removed from runtime tree and mandatory CI coverage gate flow.
 - [ ] Task planning/doing/audit artifacts are retained for future auditing.
@@ -52,7 +52,7 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Baseline Inventory Lock
+### ✅ Unit 0: Baseline Inventory Lock
 **What**: Produce a complete `main..HEAD` file inventory and lock per-path disposition (`keep/remove/move`) as the execution baseline for cleanup.
 **Output**: `./2026-03-03-2036-doing-ouroboros-migration-single-replica-hardening-cleanup/unit-0-inventory.md`.
 **Acceptance**: Every changed path in task-owned scope is accounted for with no `TBD` entries; keep/remove rules match approved planning doc.
@@ -117,3 +117,4 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 - 2026-03-03 21:52 Pass 2 complete: granularity pass tightened unit acceptance details and split synthetic-removal assertions into explicit atomic checks.
 - 2026-03-03 21:53 Pass 3 complete: validated referenced paths/contracts against current codebase (runtime-hardening module and scripts present; retained runtime hardening paths verified), no structural corrections needed.
 - 2026-03-03 21:52 Pass 4 complete: quality scan verified checklist/testability/emoji requirements and set status to READY_FOR_EXECUTION.
+- 2026-03-03 21:55 Unit 0 complete: baseline inventory locked at 50/50 `main..HEAD` paths with explicit keep/remove dispositions and no `TBD` entries (`unit-0-inventory.md`).
