@@ -61,7 +61,7 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 **What**: Add failing tests that assert synthetic runtime-hardening gate wiring must be absent from final state:
 - no runtime-hardening scripts in `package.json`
 - no runtime-hardening branch/summary/action wiring in mandatory coverage gate script
-- no runtime-hardening CLI module contract entrypoints expected for CI
+- no runtime-hardening CLI module contract entrypoints expected in CI wiring
 **Output**: Red run artifact `./2026-03-03-2036-doing-ouroboros-migration-single-replica-hardening-cleanup/unit-1a-red-run.txt`.
 **Acceptance**: New cleanup contract tests fail against current branch state before implementation.
 
@@ -115,3 +115,4 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 - 2026-03-03 21:50 Created from planning doc.
 - 2026-03-03 21:51 Pass 1 complete: created first draft doing doc with explicit unit boundaries and artifacts contract.
 - 2026-03-03 21:52 Pass 2 complete: granularity pass tightened unit acceptance details and split synthetic-removal assertions into explicit atomic checks.
+- 2026-03-03 21:53 Pass 3 complete: validated referenced paths/contracts against current codebase (runtime-hardening module and scripts present; retained runtime hardening paths verified), no structural corrections needed.
