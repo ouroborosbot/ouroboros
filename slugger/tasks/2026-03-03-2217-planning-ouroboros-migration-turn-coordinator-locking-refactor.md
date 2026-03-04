@@ -73,3 +73,4 @@ Default proposal: implement a shared coordinator utility keyed by `{channel}:{co
 - 2026-03-03 22:29 Locked full removal of `teamsChannel.maxConcurrentConversations` and removed compatibility/deprecation path from scope.
 - 2026-03-04 10:48 Planning approved.
 - 2026-03-04 10:54 Updated plan to require explicit steering follow-up feedback for same-conversation mid-turn messages (no silent queue UX).
+- 2026-03-04 11:19 Updated steering contract: preserve all follow-up messages, inject between model calls, and avoid adapter-authored steering plain text.

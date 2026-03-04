@@ -110,3 +110,4 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 - 2026-03-04 10:51 Pass 3 complete: validated referenced runtime/test paths and current cap/lock callsites (`teams.ts`, `config.ts`, `teams.test.ts`, `config.test.ts`); no corrections required.
 - 2026-03-04 10:51 Pass 4 complete: quality checks passed (emoji headers present, no TBDs, criteria testable) and status set to READY_FOR_EXECUTION.
 - 2026-03-04 10:54 Updated doing scope to include explicit steering follow-up behavior and related regression coverage.
+- 2026-03-04 11:19 Updated doing contract to preserve+inject all steering follow-ups and prohibit adapter-authored steering plain-text acknowledgements.
