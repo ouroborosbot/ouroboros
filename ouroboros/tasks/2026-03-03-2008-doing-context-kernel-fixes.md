@@ -41,7 +41,7 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [x] `toolsSection()` correctly includes `finalAnswerTool` when `toolChoiceRequired` defaults on
 - [x] `finalAnswerTool` description reframed as primary response mechanism
 - [x] `final_answer` text emitted via `callbacks.onTextChunk` -- test coverage verified
-- [ ] Response size constraint visible in prompt; truncation safety net in place
+- [x] Response size constraint visible in prompt; truncation safety net in place
 - [ ] Tool description voice standard codified in CONTRIBUTING.md
 - [ ] User confirms on Teams: model uses final_answer cleanly, no 413 errors, prompt sections emit correctly
 
@@ -284,7 +284,7 @@ The channel capabilities are already available via `getChannelCapabilities(chann
 **Output**: Modified `src/heart/core.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 9c: Issue F -- Coverage & Refactor
+### ✅ Unit 9c: Issue F -- Coverage & Refactor
 **What**: Verify 100% coverage on the truncation logic. Cover: no truncation needed (under limit), truncation triggered (over limit), Infinity maxMessageLength (no truncation), no channel (no truncation).
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new/modified code, all tests green
