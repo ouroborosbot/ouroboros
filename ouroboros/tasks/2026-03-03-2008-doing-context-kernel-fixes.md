@@ -384,3 +384,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-04 11:11 Unit 7a complete: 1 failing test for finalAnswerTool description -- asserts "respond to the user" and rejects "instead of calling another tool"
 - 2026-03-04 11:12 Unit 7b complete: finalAnswerTool description reframed to "respond to the user with your message. call this tool when you are ready to deliver your response." Build clean
 - 2026-03-04 11:13 Unit 7c complete: tools-base.ts 100% coverage. All 1268 tests pass. No refactoring needed
+- 2026-03-04 11:14 Unit 8a complete: core.ts 100% coverage. final_answer interception block fully covered by 7 existing tests: parsed answer, JSON fallback, empty args, invalid JSON, no content, mixed-call rejection. No gaps
