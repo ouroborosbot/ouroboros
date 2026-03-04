@@ -327,3 +327,4 @@ Five changes:
 - 2026-03-03 20:51 Bug 3 expanded: added proactive saving (bot doesn't call save_friend_note on its own), aggressive ephemerality instruction ("save anything" not "something important"), 5 changes now instead of 3
 - 2026-03-03 20:55 Bug 4 expanded: two root causes -- (a) overbroad patterns, (b) final_answer escape hatch available but not forced. Fix both: prune patterns AND force tool_choice after N consecutive kicks
 - 2026-03-03 20:56 Bug 4 tightened: all code paths verified with line numbers (core.ts:259-261, 288, 303, 346), removed speculative language, concrete fix location identified
+- 2026-03-03 21:02 Added cross-cutting themes (4 themes for work-doer context) and restructured Context/References into fix-site references per bug + supporting references
