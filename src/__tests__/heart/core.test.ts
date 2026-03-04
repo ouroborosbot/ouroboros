@@ -3920,6 +3920,223 @@ describe("tool_choice required and final_answer", () => {
 
     expect(textChunks).toEqual([longText])
   })
+
+  // -- Unit 14b: final_answer answer extraction tests --
+
+  it("final_answer with JSON string argument: uses string directly as answer", async () => {
+    // Model passes a plain JSON string instead of {"answer":"..."}
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: '"just a plain string response"' } },
+        ]),
+      ])
+    )
+
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    // The plain string should be emitted as the answer
+    expect(textChunks).toEqual(["just a plain string response"])
+    // Should terminate (done = true)
+    expect(mockCreate).toHaveBeenCalledTimes(1)
+    // Synthetic tool response present
+    const toolResults = messages.filter((m: any) => m.role === "tool")
+    expect(toolResults).toHaveLength(1)
+    expect(toolResults[0].content).toBe("(delivered)")
+  })
+
+  it("final_answer with truncated JSON: retries by pushing error and continuing loop", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        // First call: truncated JSON (invalid)
+        return makeStream([
+          makeChunk(undefined, [
+            { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"answer":"this is truncated...' } },
+          ]),
+        ])
+      }
+      // Second call: model retries successfully
+      return makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_2", function: { name: "final_answer", arguments: '{"answer":"complete response"}' } },
+        ]),
+      ])
+    })
+
+    const textChunks: string[] = []
+    const errors: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: (err) => errors.push(err.message),
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    // Should have made 2 API calls (retry after truncation)
+    expect(callCount).toBe(2)
+    // The error result should be in messages (assistant msg + tool error from first attempt)
+    const toolMsgs = messages.filter((m: any) => m.role === "tool")
+    const errorToolMsg = toolMsgs.find((m: any) => m.tool_call_id === "call_1")
+    expect(errorToolMsg).toBeDefined()
+    expect(errorToolMsg.content).toContain("incomplete or malformed")
+    // The successful answer should be emitted
+    expect(textChunks).toEqual(["complete response"])
+    // No terminal errors
+    expect(errors).toEqual([])
+  })
+
+  it("final_answer with wrong-shape JSON (no answer field): retries", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        // First call: valid JSON but wrong shape (no "answer" key)
+        return makeStream([
+          makeChunk(undefined, [
+            { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"text":"hello","response":"world"}' } },
+          ]),
+        ])
+      }
+      // Second call: correct shape
+      return makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_2", function: { name: "final_answer", arguments: '{"answer":"correct answer"}' } },
+        ]),
+      ])
+    })
+
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    // Should have retried
+    expect(callCount).toBe(2)
+    // Error message pushed for first attempt
+    const toolMsgs = messages.filter((m: any) => m.role === "tool")
+    const errorToolMsg = toolMsgs.find((m: any) => m.tool_call_id === "call_1")
+    expect(errorToolMsg).toBeDefined()
+    expect(errorToolMsg.content).toContain("incomplete or malformed")
+    // Final answer emitted from second attempt
+    expect(textChunks).toEqual(["correct answer"])
+  })
+
+  it("final_answer retry then succeed: emits answer on successful retry", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        // First call: invalid JSON
+        return makeStream([
+          makeChunk(undefined, [
+            { index: 0, id: "call_1", function: { name: "final_answer", arguments: "not json at all" } },
+          ]),
+        ])
+      }
+      // Second call: valid answer
+      return makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_2", function: { name: "final_answer", arguments: '{"answer":"success after retry"}' } },
+        ]),
+      ])
+    })
+
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    expect(callCount).toBe(2)
+    // The successful answer from retry is emitted
+    expect(textChunks).toEqual(["success after retry"])
+    // Both tool results present: error for first, delivered for second
+    const toolMsgs = messages.filter((m: any) => m.role === "tool")
+    expect(toolMsgs).toHaveLength(2)
+    expect(toolMsgs[0].tool_call_id).toBe("call_1")
+    expect(toolMsgs[0].content).toContain("incomplete or malformed")
+    expect(toolMsgs[1].tool_call_id).toBe("call_2")
+    expect(toolMsgs[1].content).toBe("(delivered)")
+  })
+
+  it("final_answer retry clears streamed noise via onClearText on both attempts", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        // First call: noise content + truncated JSON
+        return makeStream([
+          makeChunk("some noise from streaming", [
+            { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"answer":"truncated...' } },
+          ]),
+        ])
+      }
+      // Second call: more noise + valid answer
+      return makeStream([
+        makeChunk("more noise", [
+          { index: 0, id: "call_2", function: { name: "final_answer", arguments: '{"answer":"clean answer"}' } },
+        ]),
+      ])
+    })
+
+    let clearCount = 0
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onClearText: () => { clearCount++; textChunks.length = 0 },
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    // onClearText should be called on both attempts (once for retry, once for success)
+    expect(clearCount).toBe(2)
+    // Only the final clean answer should remain
+    expect(textChunks).toEqual(["clean answer"])
+  })
 })
 
 describe("integration: kick + tool_choice required combined", () => {
