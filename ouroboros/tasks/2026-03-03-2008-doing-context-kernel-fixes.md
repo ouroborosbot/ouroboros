@@ -28,10 +28,10 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 
 ### Gate 2: Kick Escape Hatch + Self-Trigger
 - [x] `tool_choice = "required"` set when `lastKickReason` is truthy at core.ts:288 and core.ts:303
-- [ ] Kick message rewritten to not self-trigger `hasToolIntent()` -- verified by unit test
+- [x] Kick message rewritten to not self-trigger `hasToolIntent()` -- verified by unit test
 - [ ] All existing kick patterns and test expectations unchanged
 - [x] New tests for `tool_choice` forcing after any kick
-- [ ] New test verifying kick message does not trigger `hasToolIntent()`
+- [x] New test verifying kick message does not trigger `hasToolIntent()`
 - [ ] User confirms on Copilot Chat: no kick loop, no response spam, no timeout
 
 ### Gate 3: Friend Context Instructions
@@ -148,7 +148,7 @@ Note: KICK_MESSAGES is not exported. The test should import `detectKick` and use
 **Output**: New test case in `src/__tests__/heart/kicks.test.ts`
 **Acceptance**: Test exists and FAILS (red) because current kick message contains "I can"
 
-### ⬜ Unit 3d: Bug 4 (kick message self-trigger) -- Implementation
+### ✅ Unit 3d: Bug 4 (kick message self-trigger) -- Implementation
 **What**: Rewrite the narration kick message at `src/heart/kicks.ts:29` to avoid triggering any `TOOL_INTENT_PATTERNS`. Current message contains "I can" which matches `/\bi can\b/i`. Replace with a message that conveys the same meaning without matching any pattern. Example: `"I narrated instead of acting. Using the tool now -- if done, calling final_answer."` Verify the rewritten message does not match any pattern in `TOOL_INTENT_PATTERNS` by running `hasToolIntent()` against it.
 **Output**: Modified `src/heart/kicks.ts`
 **Acceptance**: All tests PASS (green), no warnings. The self-trigger test now passes.
