@@ -1,6 +1,6 @@
 # Planning: Ouroboros Migration - Turn Coordinator Locking Refactor
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-03-03 22:17
 
 ## Goal
