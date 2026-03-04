@@ -153,6 +153,15 @@ describe("hasToolIntent", () => {
   ])("returns false for non-intent text: %s", (text) => {
     expect(hasToolIntent(text)).toBe(false)
   })
+
+  it("narration kick message does NOT self-trigger hasToolIntent", () => {
+    // The narration kick message is injected as assistant content.
+    // If it triggers hasToolIntent(), the next iteration will detect it
+    // as narration again, causing an infinite kick loop (Bug 4).
+    const narrationKickMessage = detectKick("let me check that")!.message
+    expect(narrationKickMessage).toBeDefined()
+    expect(hasToolIntent(narrationKickMessage)).toBe(false)
+  })
 })
 
 describe("detectKick", () => {
