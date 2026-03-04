@@ -57,7 +57,7 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 **Output**: `./2026-03-03-2036-doing-ouroboros-migration-single-replica-hardening-cleanup/unit-0-inventory.md`.
 **Acceptance**: Every changed path in task-owned scope is accounted for with no `TBD` entries; keep/remove rules match approved planning doc.
 
-### ⬜ Unit 1a: Synthetic Gate Removal Contract — Tests (Red)
+### ✅ Unit 1a: Synthetic Gate Removal Contract — Tests (Red)
 **What**: Add failing tests that assert synthetic runtime-hardening gate wiring must be absent from final state:
 - no runtime-hardening scripts in `package.json`
 - no runtime-hardening branch/summary/action wiring in mandatory coverage gate script
@@ -118,3 +118,4 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 - 2026-03-03 21:53 Pass 3 complete: validated referenced paths/contracts against current codebase (runtime-hardening module and scripts present; retained runtime hardening paths verified), no structural corrections needed.
 - 2026-03-03 21:52 Pass 4 complete: quality scan verified checklist/testability/emoji requirements and set status to READY_FOR_EXECUTION.
 - 2026-03-03 21:55 Unit 0 complete: baseline inventory locked at 50/50 `main..HEAD` paths with explicit keep/remove dispositions and no `TBD` entries (`unit-0-inventory.md`).
+- 2026-03-03 21:57 Unit 1a complete: added synthetic gate removal contract assertions in `src/__tests__/nerves/rename-contract.test.ts`; captured intentional red run in `unit-1a-red-run.txt`.
