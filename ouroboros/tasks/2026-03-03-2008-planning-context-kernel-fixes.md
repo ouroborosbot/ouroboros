@@ -225,4 +225,4 @@ Three changes:
 - 2026-03-03 20:31 Restructured with gated fix groups
 - 2026-03-03 20:34 Corrected scoping per-bug
 - 2026-03-03 20:35 Bug 3 confirmed on both surfaces
-- [pending timestamp] Correction pass: Bug 1 elevated to top priority, Bug 2 is Copilot-surface-specific (not buffered-mode), corrected test results table, tightened throughout
+- 2026-03-03 20:40 Correction pass: Bug 1 elevated to top priority, Bug 2 is Copilot-surface-specific (not buffered-mode), corrected test results table, tightened throughout
