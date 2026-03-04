@@ -34,9 +34,10 @@ export function stripMentions(text: string): string {
   return text.replace(/<at>[^<]*<\/at>/g, "").trim()
 }
 
-// Teams message size limit. Exceeding ~28KB causes 413 errors on Copilot Chat.
-// 4000 chars is a safe practical ceiling for markdown content.
-const MAX_MESSAGE_LENGTH = 4000
+// Recovery chunk size for error-recovery splitting. When a full-text send fails
+// (e.g. 413 from Teams), we split into chunks of this size and retry.
+// Not used preemptively — the harness tries to send the full message first.
+const RECOVERY_CHUNK_SIZE = 4000
 
 // Split text into chunks that fit within maxLen, breaking at paragraph
 // boundaries (\n\n), then line boundaries (\n), then word boundaries.
@@ -167,15 +168,13 @@ export function createTeamsCallbacks(
 
   // Flush accumulated text buffer. First flush goes to safeEmit (primary
   // output gets real content). Subsequent flushes go to safeSend.
-  // Long messages are split to stay within Teams message size limits.
+  // No preemptive splitting — sends full text. Error recovery happens in flush().
   function flushTextBuffer(): void {
     if (!textBuffer) return
-    const chunks = splitMessage(textBuffer, MAX_MESSAGE_LENGTH)
     if (!streamHasContent) {
-      safeEmit(chunks[0])
-      for (let i = 1; i < chunks.length; i++) safeSend(chunks[i])
+      safeEmit(textBuffer)
     } else {
-      for (const chunk of chunks) safeSend(chunk)
+      safeSend(textBuffer)
     }
     textBuffer = ""
   }
@@ -288,16 +287,19 @@ export function createTeamsCallbacks(
       : undefined,
     flush: async () => {
       if (textBuffer) {
-        const chunks = splitMessage(textBuffer, MAX_MESSAGE_LENGTH)
-        if (!streamHasContent) {
-          safeEmit(chunks[0])
-          for (let i = 1; i < chunks.length; i++) {
-            if (sendMessage) await sendMessage(chunks[i])
-          }
-        } else if (sendMessage) {
-          for (const chunk of chunks) await sendMessage(chunk)
-        }
+        const text = textBuffer
         textBuffer = ""
+        if (!streamHasContent) {
+          safeEmit(text)
+        } else if (sendMessage) {
+          try {
+            await sendMessage(text)
+          } catch {
+            // Send failed (e.g. 413 size error) — split and retry
+            const chunks = splitMessage(text, RECOVERY_CHUNK_SIZE)
+            for (const chunk of chunks) await sendMessage(chunk)
+          }
+        }
       } else if (!streamHasContent) {
         safeEmit("(completed with tool calls only \u2014 no text response)")
       }

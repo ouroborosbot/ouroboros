@@ -2761,23 +2761,22 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     expect(sendMessage).not.toHaveBeenCalled()
   })
 
-  it("flush() splits long text: first chunk to emit, rest to sendMessage", async () => {
+  it("flush() sends full text without preemptive splitting (first flush to emit)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
-    // Generate text that exceeds 4000 chars (Teams MAX_MESSAGE_LENGTH)
+    // Text exceeds old 4000-char limit — should still be sent as one piece
     const longText = "a".repeat(3000) + "\n\n" + "b".repeat(3000)
     callbacks.onTextChunk(longText)
     await callbacks.flush()
-    // First chunk to emit, second to sendMessage
+    // Full text to emit (no splitting)
     expect(mockStream.emit).toHaveBeenCalledTimes(1)
-    expect(mockStream.emit).toHaveBeenCalledWith("a".repeat(3000))
-    expect(sendMessage).toHaveBeenCalledTimes(1)
-    expect(sendMessage).toHaveBeenCalledWith("b".repeat(3000))
+    expect(mockStream.emit).toHaveBeenCalledWith(longText)
+    expect(sendMessage).not.toHaveBeenCalled()
   })
 
-  it("flush() splits long text after prior content: all chunks to sendMessage", async () => {
+  it("flush() sends full text via sendMessage after prior content (no preemptive splitting)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
@@ -2787,17 +2786,40 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     await callbacks.flush()
     mockStream.emit.mockClear()
     sendMessage.mockClear()
-    // Second flush with long text
+    // Second flush with long text — sent as one message
     const longText = "x".repeat(3000) + "\n\n" + "y".repeat(3000)
     callbacks.onTextChunk(longText)
     await callbacks.flush()
     expect(mockStream.emit).not.toHaveBeenCalled()
-    expect(sendMessage).toHaveBeenCalledTimes(2)
-    expect(sendMessage).toHaveBeenNthCalledWith(1, "x".repeat(3000))
-    expect(sendMessage).toHaveBeenNthCalledWith(2, "y".repeat(3000))
+    expect(sendMessage).toHaveBeenCalledTimes(1)
+    expect(sendMessage).toHaveBeenCalledWith(longText)
   })
 
-  it("flushTextBuffer splits long text: first chunk to emit, rest to safeSend", async () => {
+  it("flush() splits and retries when sendMessage fails (error recovery)", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const longText = "a".repeat(3000) + "\n\n" + "b".repeat(3000)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    // First flush sets streamHasContent (goes to safeEmit, not sendMessage)
+    callbacks.onTextChunk("first")
+    await callbacks.flush()
+    // Reset completely — clear history AND queued implementations
+    sendMessage.mockReset()
+    // Full-text send rejects (e.g. 413), subsequent chunk sends succeed
+    sendMessage.mockRejectedValueOnce(new Error("413 Request Entity Too Large"))
+    sendMessage.mockResolvedValue(undefined)
+    // Second flush with long text — full send fails, splits and retries
+    callbacks.onTextChunk(longText)
+    await callbacks.flush()
+    // First call was the full text (rejected), then two split chunks
+    expect(sendMessage).toHaveBeenCalledTimes(3)
+    expect(sendMessage).toHaveBeenNthCalledWith(1, longText)
+    expect(sendMessage).toHaveBeenNthCalledWith(2, "a".repeat(3000))
+    expect(sendMessage).toHaveBeenNthCalledWith(3, "b".repeat(3000))
+  })
+
+  it("flushTextBuffer sends full text without splitting", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
@@ -2807,13 +2829,10 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     callbacks.onTextChunk(longText)
     // onToolStart triggers flushTextBuffer
     callbacks.onToolStart("test_tool", { arg: "val" })
-    // First chunk to emit
+    // Full text sent to emit (no splitting)
     expect(mockStream.emit).toHaveBeenCalledTimes(1)
-    expect(mockStream.emit).toHaveBeenCalledWith("a".repeat(3000))
-    // safeSend fires asynchronously via promise chain — wait a tick
-    await new Promise(r => setTimeout(r, 10))
-    expect(sendMessage).toHaveBeenCalledTimes(1)
-    expect(sendMessage).toHaveBeenCalledWith("b".repeat(3000))
+    expect(mockStream.emit).toHaveBeenCalledWith(longText)
+    expect(sendMessage).not.toHaveBeenCalled()
   })
 
   it("when disableStreaming is false, onTextChunk emits directly (no buffering)", async () => {

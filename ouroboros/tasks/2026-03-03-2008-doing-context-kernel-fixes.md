@@ -369,6 +369,19 @@ When `answer` is undefined (retry path):
 **Output**: Coverage report
 **Acceptance**: 100% coverage on modified code, all tests green
 
+### ✅ Unit 15a: Remove preemptive message splitting -- try full send, split on error recovery
+**What**: Remove preemptive `splitMessage` from `flushTextBuffer()` and `flush()` in `src/senses/teams.ts`. Same philosophy as removing MAX_TOOL_ROUNDS: don't enforce artificial limits in code, handle failures gracefully.
+
+Changes:
+1. Rename `MAX_MESSAGE_LENGTH` to `RECOVERY_CHUNK_SIZE` (only used for error recovery)
+2. `flushTextBuffer()`: send full `textBuffer` without splitting — `safeEmit` or `safeSend` as before
+3. `flush()`: send full `textBuffer` without splitting. Wrap `sendMessage` calls in try/catch — on failure, split with `splitMessage(textBuffer, RECOVERY_CHUNK_SIZE)` and retry each chunk
+4. Update tests: existing split assertions → assert full text sent. Add error recovery test.
+5. Keep `splitMessage` exported (used for recovery + still unit-tested)
+
+**Output**: Modified `src/senses/teams.ts`, `src/__tests__/senses/teams.test.ts`
+**Acceptance**: Full text sent without preemptive splitting. Error recovery splits on failure. All tests pass, 100% coverage.
+
 ---
 
 ### GATE 2 CHECKPOINT
@@ -466,3 +479,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-04 13:53 Unit 14b complete: 5 failing tests for final_answer extraction -- JSON string, truncated JSON retry, wrong-shape retry, retry-then-succeed, noise clearing on both attempts. All 5 fail, 143 existing pass
 - 2026-03-04 13:57 Unit 14c complete: rewrite isSoleFinalAnswer extraction -- JSON string support, retry on truncated/wrong-shape JSON, onClearText on both attempts. Updated 5 existing tests for retry behavior. 1286 tests pass, build clean
 - 2026-03-04 13:59 Unit 14d complete: core.ts 100% coverage (stmts/branches/funcs/lines). Added Azure retry test for function_call_output sync. 1287 tests pass across 45 files. No refactoring needed
+- 2026-03-04 14:38 Unit 15a complete: removed preemptive splitting from flushTextBuffer() and flush(). Renamed MAX_MESSAGE_LENGTH to RECOVERY_CHUNK_SIZE. flush() now tries full send, splits on error recovery. Updated 3 tests + added error recovery test. 1288 tests pass across 45 files
