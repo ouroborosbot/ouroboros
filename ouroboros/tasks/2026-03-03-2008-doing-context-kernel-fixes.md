@@ -46,9 +46,9 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [x] Copilot Chat message ordering fixed via replyToId anchoring
 - [x] Tool description voice standard codified in CONTRIBUTING.md
 - [x] Streamed content noise cleared when valid final_answer exists (onClearText)
-- [ ] Robust final_answer extraction: `parsed.answer` and quoted JSON string both work
-- [ ] Truncated JSON and wrong-shape JSON trigger retry (model gets another chance)
-- [ ] Retry does not count against toolRounds (error recovery, not a tool round)
+- [x] Robust final_answer extraction: `parsed.answer` and quoted JSON string both work
+- [x] Truncated JSON and wrong-shape JSON trigger retry (model gets another chance)
+- [x] Retry does not count against toolRounds (error recovery, not a tool round -- toolRounds removed entirely)
 - [ ] User confirms on Teams: model uses final_answer cleanly, no 413 errors, prompt sections emit correctly
 
 ### Gate 3: Friend Context Instructions
@@ -344,7 +344,7 @@ Update tests: remove or update the tool loop limit test that asserts `MAX_TOOL_R
 **Output**: New test cases in `src/__tests__/heart/core.test.ts`
 **Acceptance**: Tests exist and FAIL for cases 2, 3, 4 (current code doesn't handle these)
 
-### ⬜ Unit 14c: final_answer answer extraction -- implementation
+### ✅ Unit 14c: final_answer answer extraction -- implementation
 **What**: Rewrite the answer extraction in `isSoleFinalAnswer` block of `src/heart/core.ts`:
 ```
 try parse JSON:
