@@ -1,6 +1,6 @@
 # Doing: Ouroboros Migration — Single-Replica Hardening Cleanup
 
-**Status**: READY_FOR_EXECUTION
+**Status**: COMPLETED
 **Execution Mode**: direct
 **Created**: 2026-03-03 21:50
 **Planning**: ./2026-03-03-2036-planning-ouroboros-migration-single-replica-hardening-cleanup.md
@@ -20,14 +20,14 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 - [x] Scope boundary is locked: only task-owned runtime/deployment-hardening changes are touched.
 - [x] A file-by-file cleanup inventory exists with disposition per item: keep/remove/move.
 - [x] Cleanup inventory explicitly resolves every task-owned changed path with no `TBD` entries.
-- [ ] Runtime behavior hardening changes are retained and validated.
+- [x] Runtime behavior hardening changes are retained and validated.
 - [x] Synthetic runtime-hardening gate stack is removed from runtime tree and mandatory CI coverage gate flow.
-- [ ] Task planning/doing/audit artifacts are retained for future auditing.
-- [ ] A self-audit explicitly states what I got wrong and how each issue is corrected.
-- [ ] Validation criteria are concrete and testable (including untouched-file guarantees).
+- [x] Task planning/doing/audit artifacts are retained for future auditing.
+- [x] A self-audit explicitly states what I got wrong and how each issue is corrected.
+- [x] Validation criteria are concrete and testable (including untouched-file guarantees).
 - [x] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -79,7 +79,7 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 - `./2026-03-03-2036-doing-ouroboros-migration-single-replica-hardening-cleanup/unit-1c-build-run.txt`
 **Acceptance**: 100% coverage on changed code, tests green, build green, no warnings.
 
-### ⬜ Unit 2a: Runtime Hardening Retention Verification
+### ✅ Unit 2a: Runtime Hardening Retention Verification
 **What**: Verify retained runtime hardening behaviors still hold after synthetic stack removal via targeted tests and evidence capture:
 - remote local-tool blocking behavior
 - teams concurrency cap behavior
@@ -88,12 +88,12 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 **Output**: `./2026-03-03-2036-doing-ouroboros-migration-single-replica-hardening-cleanup/unit-2a-runtime-retention.txt`.
 **Acceptance**: Targeted runtime behavior tests all pass and map explicitly to retained keep-list files.
 
-### ⬜ Unit 2b: Task Audit Retention Verification
+### ✅ Unit 2b: Task Audit Retention Verification
 **What**: Verify task planning/doing/audit artifacts from `slugger/tasks/2026-03-03-1430-*` remain present and tracked after cleanup.
 **Output**: `./2026-03-03-2036-doing-ouroboros-migration-single-replica-hardening-cleanup/unit-2b-task-audit-manifest.txt`.
 **Acceptance**: Manifest confirms task docs/artifacts retained; no cleanup step deletes audit files.
 
-### ⬜ Unit 2c: Final Verification and Cleanup Audit
+### ✅ Unit 2c: Final Verification and Cleanup Audit
 **What**: Run final verification (`npm test`, `npm run test:coverage`, `npm run build`) and produce concise file-by-file cleanup inventory table (`keep/remove/move`) with one-line rationale plus completion-criteria mapping.
 **Output**:
 - `./2026-03-03-2036-doing-ouroboros-migration-single-replica-hardening-cleanup/unit-2c-test-run.txt`
@@ -117,7 +117,10 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 - 2026-03-03 21:52 Pass 2 complete: granularity pass tightened unit acceptance details and split synthetic-removal assertions into explicit atomic checks.
 - 2026-03-03 21:53 Pass 3 complete: validated referenced paths/contracts against current codebase (runtime-hardening module and scripts present; retained runtime hardening paths verified), no structural corrections needed.
 - 2026-03-03 21:52 Pass 4 complete: quality scan verified checklist/testability/emoji requirements and set status to READY_FOR_EXECUTION.
-- 2026-03-03 21:55 Unit 0 complete: baseline inventory locked at 50/50 `main..HEAD` paths with explicit keep/remove dispositions and no `TBD` entries (`unit-0-inventory.md`).
+- 2026-03-03 21:55 Unit 0 complete: baseline inventory locked at 51/51 `main..HEAD` paths with explicit keep/remove dispositions and no `TBD` entries (`unit-0-inventory.md`).
 - 2026-03-03 21:57 Unit 1a complete: added synthetic gate removal contract assertions in `src/__tests__/nerves/rename-contract.test.ts`; captured intentional red run in `unit-1a-red-run.txt`.
 - 2026-03-03 21:59 Unit 1b complete: removed synthetic runtime-hardening stack and CI wiring (`package.json`, `scripts/run-coverage-gate.cjs`, runtime-hardening module/tests, load-validation script) and captured green runs in `unit-1b-test-run.txt` + `unit-1b-build-run.txt`.
 - 2026-03-03 22:00 Unit 1c complete: coverage gate (`npm run test:coverage`) and build are green with 100% coverage; artifacts saved in `unit-1c-coverage-run.txt` + `unit-1c-build-run.txt`.
+- 2026-03-03 22:01 Unit 2a complete: targeted retained-behavior tests are green (`tools-remote-safety`, `teams`, `heart/core`, `non-blocking-sinks`) with explicit behavior-to-file mapping in `unit-2a-runtime-retention.txt`.
+- 2026-03-03 22:02 Unit 2b complete: manifest validation confirms all `slugger/tasks/2026-03-03-1430-*` planning/doing/audit files remain tracked and present (`unit-2b-task-audit-manifest.txt`).
+- 2026-03-03 22:04 Unit 2c complete: final verification is green (`npm test`, `npm run test:coverage`, `npm run build`) and cleanup self-audit/evidence map captured in `final-audit.md`.

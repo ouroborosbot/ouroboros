@@ -63,6 +63,6 @@ Generated from `git diff --name-status main..HEAD` on branch `slugger/single-rep
 No move actions are approved for this cleanup pass. Any path previously considered "misplaced" in this pass is removed (if synthetic gate stack) or retained in place (if runtime behavior hardening).
 
 ## Validation
-- Changed-path count in baseline: 50
-- Inventory rows above: 50
+- Changed-path count in baseline: 51
+- Inventory rows above: 51
 - `TBD` entries: 0
