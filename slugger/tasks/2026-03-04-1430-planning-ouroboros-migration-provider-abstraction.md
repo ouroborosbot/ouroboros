@@ -117,4 +117,4 @@ Keep scope disciplined: runtime provider abstraction + provider integrations onl
 - 2026-03-04 15:01 Added completion criterion requiring all relevant repo docs to be updated for new config/storage/provider contracts
 - 2026-03-04 15:08 Reordered work so migration happens first; constrained migration delivery to markdown instructions only (no script), including post-completion deletion of the migration playbook on target machine
 - 2026-03-04 15:10 Made `agent.json` path explicit in plan (`<repo>/<agent>/agent.json`) to remove migration ambiguity
-- 2026-03-04 15:15 Renamed config target to `secrets.json`, locked `agent.json.configPath`, and clarified minimal provider/model contract (`azure|minimax|anthropic|openai-codex`)
+- 2026-03-04 15:16 Renamed config target to `secrets.json`, locked `agent.json.configPath`, and clarified minimal provider/model contract (`azure|minimax|anthropic|openai-codex`)
