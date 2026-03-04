@@ -222,34 +222,88 @@ Five changes:
 - Gated structure: Gate 1 (Bug 1 + 2), Gate 2 (Bug 4), Gate 3 (Bug 3). User tests between gates.
 
 ## Context / References
-- `src/senses/teams.ts:492-506` -- teamsContext missing AAD fields (Bug 1)
-- `src/senses/teams.ts:458` -- activity destructured from ctx (Bug 1)
-- `src/senses/teams.ts:298-305` -- TeamsMessageContext interface (Bug 1)
-- `src/senses/teams.ts:344-350` -- resolver AAD fallback logic (Bug 1)
-- `src/senses/teams.ts:59-252` -- createTeamsCallbacks (Bug 2)
-- `src/senses/teams.ts:117-124` -- safeSend (Bug 2)
-- `src/senses/teams.ts:104-113` -- safeUpdate (Bug 2 fix pattern)
-- `src/senses/teams.ts:191-198` -- onToolEnd buffered branch (Bug 2)
-- `src/senses/teams.ts:200-207` -- onKick buffered branch (Bug 2)
-- `src/senses/teams.ts:209-219` -- onError buffered branch (Bug 2)
-- `src/senses/teams.ts:508` -- ctxSend = ctx.send() (Bug 2)
-- `src/mind/prompt.ts:144-206` -- contextSection (Bug 3)
-- `src/mind/prompt.ts:181` -- name quality instruction (Bug 3)
-- `src/mind/prompt.ts:184` -- ephemerality / save_friend_note instruction (Bug 3)
-- `src/mind/prompt.ts:193-194` -- new-friend instruction (Bug 3)
-- `src/heart/kicks.ts:29` -- narration kick message self-trigger (Bug 4)
-- `src/heart/kicks.ts:33-120` -- TOOL_INTENT_PATTERNS (Bug 4)
-- `src/heart/core.ts:100` -- MAX_TOOL_ROUNDS = 10 (Bug 4/6)
-- `src/heart/core.ts:259-261` -- final_answer injected into activeTools after kick (Bug 4b)
-- `src/heart/core.ts:288` -- tool_choice = "required" only when options.toolChoiceRequired (Bug 4b -- not set after kicks)
-- `src/heart/core.ts:303` -- same for non-Azure path (Bug 4b)
-- `src/heart/core.ts:328-348` -- kick detection loop (Bug 4)
-- `src/__tests__/heart/kicks.test.ts:25` -- false-positive test expectation (Bug 4)
+
+### Fix Sites (for work-doer)
+
+**Bug 1 -- `src/senses/teams.ts:492-506`:**
+- Add `aadObjectId: activity.from?.aadObjectId` to teamsContext object literal
+- Add `tenantId: activity.conversation?.tenantId` to teamsContext object literal
+- Add `displayName: activity.from?.name` to teamsContext object literal
+- `activity` is available at line 458: `const { stream, activity, api, signin } = ctx`
+
+**Bug 2 -- `src/senses/teams.ts` buffered branch in `createTeamsCallbacks`:**
+- Line 194-195: `onToolEnd` -- change `safeSend(msg)` to `safeUpdate(msg)`
+- Line 203-204: `onKick` -- change `safeSend(msg)` to `safeUpdate(msg)`
+- Line 209+: `onError` terminal -- change `safeSend(msg)` to `safeUpdate(msg)`
+- Reference pattern: `onToolStart` (line 188) already uses `safeUpdate`
+
+**Bug 3 -- `src/mind/prompt.ts`:**
+- Line 178: priority guidance -- rewrite to clarify "help first, then get to know them"
+- Line 181: name quality instruction -- rewrite with displayName interpolation
+- Line 184: ephemerality instruction -- rewrite from "something important" to aggressive save-anything bar
+- Line 193-194: new-friend instruction -- rewrite from aspirational to directive
+
+**Bug 4a -- `src/heart/kicks.ts`:**
+- Line 36: remove `/\bi'll\b/i`
+- Line 37: remove `/\bi will\b/i`
+- Line 47: remove `/\bi'm \w+ing\b/i`
+- Line 48: remove `/\bi am \w+ing\b/i`
+- Line 52: remove `/\bi should\b/i`
+- Line 53: remove `/\bi can\b/i`
+- Line 29: rewrite kick message -- must not contain "I can" (self-trigger), must explicitly direct model to call `final_answer`
+
+**Bug 4b -- `src/heart/core.ts`:**
+- Line 288 (Azure path): after `kickCount >= 2`, set `tool_choice = { type: "function", function: { name: "final_answer" } }`
+- Line 303 (non-Azure path): same
+- Line 259-261: `final_answer` injected into `activeTools` when `lastKickReason === "narration"` (existing, works correctly)
+- Line 328-348: kick detection loop (existing, `kickCount` already tracked at line 331)
+- Line 346: `azureInput = null` forces rebuild from messages after kick (existing, works correctly)
+
+### Supporting References
+
+- `src/senses/teams.ts:298-305` -- TeamsMessageContext interface (declares aadObjectId?, tenantId?, displayName?)
+- `src/senses/teams.ts:344-350` -- resolver AAD fallback logic
+- `src/senses/teams.ts:104-113` -- safeUpdate implementation (Bug 2 fix pattern)
+- `src/senses/teams.ts:117-124` -- safeSend implementation (Bug 2 current behavior)
+- `src/senses/teams.ts:508` -- ctxSend = ctx.send()
+- `src/mind/prompt.ts:144-206` -- contextSection function
+- `src/heart/kicks.ts:33-120` -- full TOOL_INTENT_PATTERNS array
+- `src/heart/core.ts:100` -- MAX_TOOL_ROUNDS = 10
+- `src/__tests__/heart/kicks.test.ts:25` -- false-positive test expectation ("I can help with that" -> true, must update)
 - `src/__tests__/senses/teams.test.ts` -- existing Teams tests
 - `src/__tests__/mind/prompt.test.ts` -- existing prompt tests
 - `src/wardrobe/format.ts` -- formatToolResult, formatKick, formatError
 
 ## Notes
+
+### Cross-Cutting Themes (for work-doer context)
+
+**Theme 1: "Defined but never wired"**
+- Bug 1: `TeamsMessageContext` interface defines `aadObjectId`, `tenantId`, `displayName` (teams.ts:303-305) but line 492 never sets them from the activity
+- Bug 4b: `final_answer` injected into tool list (core.ts:259) but `tool_choice` never forces it (core.ts:288/303 only check `toolChoiceRequired`)
+- Pattern: escape hatches and data paths exist architecturally but aren't connected at the call site
+
+**Theme 2: "Works in streaming, breaks in buffered on Copilot"**
+- Bug 2: `onToolEnd` (teams.ts:194-195) and `onKick` (teams.ts:203-204) use `safeSend(msg)` in buffered mode -- creates separate new messages. Streaming uses `safeEmit("\n\n" + msg + "\n\n")` which appends inline.
+- `onError` terminal case (teams.ts:209+) also uses `safeSend` in buffered mode
+- Streaming is self-healing (everything in one stream). Buffered creates discrete messages that Copilot Chat renders out of order.
+
+**Theme 3: "Aspirational instructions the model ignores"**
+- prompt.ts:181: "i prefer to use whatever name my friend prefers" -- vague, no action
+- prompt.ts:184: "to remember something important about my friend" -- model decides nothing is important enough
+- prompt.ts:194: "i should learn their name and how they like to work" -- aspirational, not directive
+- kicks.ts:29: "Calling the tool now -- if I've already finished, I can use final_answer" -- suggests but doesn't compel
+
+**Theme 4: "Patterns that match normal English"**
+- kicks.ts:36: `/\bi'll\b/i` -- "I'll show your backlog"
+- kicks.ts:37: `/\bi will\b/i` -- "I will default to grid"
+- kicks.ts:47: `/\bi'm \w+ing\b/i` -- "I'm glad", "I'm happy", "I'm sorry"
+- kicks.ts:48: `/\bi am \w+ing\b/i` -- same
+- kicks.ts:52: `/\bi should\b/i` -- "I should mention"
+- kicks.ts:53: `/\bi can\b/i` -- "I can help" AND self-triggers from kick message itself (line 29: "I can use final_answer")
+
+### Quick Reference
+
 **Patterns to remove (6):** `/\bi'll\b/i`, `/\bi will\b/i`, `/\bi can\b/i`, `/\bi should\b/i`, `/\bi'm \w+ing\b/i`, `/\bi am \w+ing\b/i`
 
 **Patterns to keep:** `/\blet me\b/i`, `/\bi need to\b/i`, `/\bi'm going to\b/i`, `/\bgoing to\b/i`, all obligation/plural/temporal/sequential/gerund/movement/self-narration patterns, `/\bcontinues\b/i`, `/^continuing\b/im`, `/^next up\b/i`
