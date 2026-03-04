@@ -40,7 +40,7 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [x] `toolBehaviorSection()` prompt rewritten: decision-tree framing, anti-no-op pattern
 - [x] `toolsSection()` correctly includes `finalAnswerTool` when `toolChoiceRequired` defaults on
 - [x] `finalAnswerTool` description reframed as primary response mechanism
-- [ ] `final_answer` text emitted via `callbacks.onTextChunk` -- test coverage verified
+- [x] `final_answer` text emitted via `callbacks.onTextChunk` -- test coverage verified
 - [ ] Response size constraint visible in prompt; truncation safety net in place
 - [ ] Tool description voice standard codified in CONTRIBUTING.md
 - [ ] User confirms on Teams: model uses final_answer cleanly, no 413 errors, prompt sections emit correctly
@@ -253,7 +253,7 @@ to something like:
 **Output**: Coverage report
 **Acceptance**: 100% coverage, all tests green
 
-### ⬜ Unit 8a: Issue D (final_answer onTextChunk emission) -- Test Coverage Verification
+### ✅ Unit 8a: Issue D (final_answer onTextChunk emission) -- Test Coverage Verification
 **What**: Verify existing test coverage for the `final_answer` -> `callbacks.onTextChunk` path in `src/heart/core.ts` (lines 357-377). This was implemented in commits 43762ec and d7c184b. Check:
 1. Test exists verifying `onTextChunk` is called with the parsed answer text when `final_answer` is the sole tool call
 2. Test covers the JSON parse fallback (when `result.toolCalls[0].arguments` is malformed, falls back to `result.content`)
