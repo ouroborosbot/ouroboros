@@ -94,7 +94,7 @@ function dateSection(): string {
 
 function toolsSection(channel: Channel, options?: BuildSystemOptions): string {
   const channelTools = getToolsForChannel(getChannelCapabilities(channel));
-  const activeTools = options?.toolChoiceRequired ? [...channelTools, finalAnswerTool] : channelTools;
+  const activeTools = (options?.toolChoiceRequired ?? true) ? [...channelTools, finalAnswerTool] : channelTools;
   const list = activeTools
     .map((t) => `- ${t.function.name}: ${t.function.description}`)
     .join("\n");
@@ -134,11 +134,14 @@ streaming to Teams is disabled. my text responses are buffered and sent as a sin
 }
 
 function toolBehaviorSection(options?: BuildSystemOptions): string {
-  if (!options?.toolChoiceRequired) return "";
+  if (!(options?.toolChoiceRequired ?? true)) return "";
   return `## tool behavior
-tool_choice is set to "required" — you MUST call a tool on every turn.
-when you have finished all work and want to give a text response, call the \`final_answer\` tool with your response text.
-\`final_answer\` must be the ONLY tool call in that turn. do not combine it with other tool calls.`;
+tool_choice is set to "required" -- i must call a tool on every turn.
+- need more information? i call a tool.
+- ready to respond to the user? i call \`final_answer\`.
+\`final_answer\` is a tool call -- it satisfies the tool_choice requirement.
+\`final_answer\` must be the ONLY tool call in that turn. do not combine it with other tool calls.
+do NOT call \`get_current_time\` or other no-op tools just before \`final_answer\`. if i am done, i call \`final_answer\` directly.`;
 }
 
 export function contextSection(context?: ResolvedContext): string {
