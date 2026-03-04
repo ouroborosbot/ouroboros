@@ -308,4 +308,4 @@ The current kick system is a blunt instrument -- pattern matching on response te
 - 2026-03-03 20:26 Added Copilot Chat vs 1:1 Teams activity shape investigation note to Bug 1
 - 2026-03-03 20:31 Restructured with gated fix groups, added standard-Teams-works finding
 - 2026-03-03 20:34 Corrected scoping: Bug 4 is surface-agnostic (core.ts), Bug 2 is buffered-mode-specific, Bug 1 unknown
-- [pending timestamp] Standard Teams test confirms Bug 3 on both surfaces: bot is cold and transactional, no new-friend behavior. Strengthened Bug 3 analysis -- instruction is aspirational not directive
+- 2026-03-03 20:35 Standard Teams test confirms Bug 3 on both surfaces: bot is cold and transactional, no new-friend behavior. Strengthened Bug 3 analysis -- instruction is aspirational not directive
