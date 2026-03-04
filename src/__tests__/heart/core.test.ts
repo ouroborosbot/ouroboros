@@ -3684,6 +3684,55 @@ describe("tool_choice required and final_answer", () => {
     // config cleanup handled by resetConfigCache in beforeEach
   })
 
+  it("Azure: truncated final_answer retries and pushes function_call_output to azureInput", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
+
+    let callCount = 0
+    mockResponsesCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        // First call: truncated JSON
+        return makeResponsesStream([
+          { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "final_answer", arguments: "" } },
+          { type: "response.function_call_arguments.delta", delta: '{"answer":"truncated...' },
+          { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "final_answer", arguments: '{"answer":"truncated...' } },
+        ])
+      }
+      // Second call: valid answer
+      return makeResponsesStream([
+        { type: "response.output_item.added", item: { type: "function_call", call_id: "c2", name: "final_answer", arguments: "" } },
+        { type: "response.function_call_arguments.delta", delta: '{"answer":"complete"}' },
+        { type: "response.output_item.done", item: { type: "function_call", call_id: "c2", name: "final_answer", arguments: '{"answer":"complete"}' } },
+      ])
+    })
+
+    const core = await import("../../heart/core")
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await core.runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    // Should have retried
+    expect(callCount).toBe(2)
+    // Error tool result for first attempt
+    const toolMsgs = messages.filter((m: any) => m.role === "tool")
+    expect(toolMsgs[0].tool_call_id).toBe("c1")
+    expect(toolMsgs[0].content).toContain("incomplete or malformed")
+    // Valid answer from retry
+    expect(textChunks).toEqual(["complete"])
+  })
+
   it("final_answer with invalid JSON arguments: retries (does not re-emit already-streamed content)", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
