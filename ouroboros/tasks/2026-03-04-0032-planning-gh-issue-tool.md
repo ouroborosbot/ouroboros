@@ -71,4 +71,4 @@ The agent already has a `gh_cli` tool that can run arbitrary `gh` commands. The 
 
 ## Progress Log
 - 2026-03-04 00:32 Created
-- (pending) Resolved open questions: repo targeting (derive from git remote), labels (free-form CSV), tool name (open_github_issue)
+- 2026-03-04 00:36 Resolved open questions: repo targeting (derive from git remote), labels (free-form CSV), tool name (open_github_issue)
