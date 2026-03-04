@@ -46,6 +46,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [ ] Missing/expired provider credentials fail fast with explicit re-auth guidance; no silent fallback.
 - [ ] A migration runbook exists in-repo for cross-machine post-pull reorganization of legacy `~/.agentconfigs` data.
 - [ ] Legacy `~/.agentconfigs` data migrates via explicit one-time migration (no runtime back-compat branches in normal execution code), with no data loss and clear operator messages.
+- [ ] All relevant docs are updated for the new provider/config/storage contracts (including `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, and `cross-agent-docs/agent-storage-migration-playbook.md`).
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -97,3 +98,4 @@ Keep scope disciplined: runtime provider abstraction + provider integrations onl
 - 2026-03-04 14:54 Locked config layout decisions (`providers` + `teams` stay in config.json; `context` moves to agent.json) and added explicit cross-machine migration runbook requirement
 - 2026-03-04 14:55 Added explicit first-run migration semantics for legacy `~/.agentconfigs` on other machines and fixed runbook location for Claude pickup
 - 2026-03-04 14:56 Re-scoped migration to one-time only; removed runtime back-compat expectation for legacy `~/.agentconfigs` paths
+- 2026-03-04 15:01 Added completion criterion requiring all relevant repo docs to be updated for new config/storage/provider contracts
