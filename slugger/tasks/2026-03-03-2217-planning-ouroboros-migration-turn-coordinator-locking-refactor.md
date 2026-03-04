@@ -94,3 +94,4 @@ Default proposal:
 - 2026-03-04 11:19 Updated steering contract: preserve all follow-up messages, inject between model calls, and avoid adapter-authored steering plain text.
 - 2026-03-04 11:39 Locked detailed steering injection contract: dedupe by `activity.id`, ordered discrete injection, boundary-only injection, carry-forward semantics, and confirmation out of scope.
 - 2026-03-04 11:53 Generalized dedupe contract to channel message identity (Teams mapping as adapter detail) and locked no steering-specific buffer cap.
+- 2026-03-04 12:21 Removed follow-up dedupe/idempotency from plan scope; preserve-all steering now forwards follow-ups as received.
