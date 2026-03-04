@@ -1255,6 +1255,172 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
   })
 })
 
+describe("Teams adapter - startTeamsApp AAD extraction (Bug 1)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("extracts aadObjectId, tenantId, and displayName from activity into teamsContext", async () => {
+    vi.resetModules()
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
+    vi.doMock("../../heart/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      postTurn: vi.fn(),
+    }))
+
+    // Mock FriendResolver to capture constructor args
+    const MockFriendResolver = vi.fn(function (this: any) {
+      this.resolve = vi.fn().mockResolvedValue({
+        friend: { id: "mock-uuid", displayName: "Alice AAD", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
+        channel: { channel: "teams", availableIntegrations: ["graph", "ado"], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
+      })
+    })
+    vi.doMock("../../mind/friends/resolver", () => ({
+      FriendResolver: MockFriendResolver,
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: {
+        text: "hello",
+        conversation: { id: "conv-aad", tenantId: "tenant-from-activity" },
+        from: { id: "user-456", aadObjectId: "aad-obj-from-activity", name: "Alice AAD" },
+        channelId: "msteams",
+      },
+      api: {
+        users: { token: { get: vi.fn().mockResolvedValue({ token: "t" }) } },
+      },
+      signin: vi.fn(),
+    })
+
+    // FriendResolver should have been called with AAD provider because the
+    // message handler extracted aadObjectId from the activity into teamsContext
+    expect(MockFriendResolver).toHaveBeenCalledWith(
+      expect.anything(), // store
+      expect.objectContaining({
+        provider: "aad",
+        externalId: "aad-obj-from-activity",
+        tenantId: "tenant-from-activity",
+        displayName: "Alice AAD",
+        channel: "teams",
+      }),
+    )
+  })
+
+  it("falls back to teams-conversation provider when activity lacks AAD fields", async () => {
+    vi.resetModules()
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
+    vi.doMock("../../heart/core", () => ({
+      runAgent: mockRunAgent,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      postTurn: vi.fn(),
+    }))
+
+    // Mock FriendResolver to capture constructor args
+    const MockFriendResolver = vi.fn(function (this: any) {
+      this.resolve = vi.fn().mockResolvedValue({
+        friend: { id: "mock-uuid", displayName: "Unknown", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
+        channel: { channel: "teams", availableIntegrations: ["graph", "ado"], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
+      })
+    })
+    vi.doMock("../../mind/friends/resolver", () => ({
+      FriendResolver: MockFriendResolver,
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: {
+        text: "hello",
+        conversation: { id: "conv-no-aad" },
+        from: { id: "user-789" },
+        channelId: "msteams",
+      },
+      api: {
+        users: { token: { get: vi.fn().mockResolvedValue({ token: "t" }) } },
+      },
+      signin: vi.fn(),
+    })
+
+    // Without AAD fields, should fall back to teams-conversation provider
+    expect(MockFriendResolver).toHaveBeenCalledWith(
+      expect.anything(), // store
+      expect.objectContaining({
+        provider: "teams-conversation",
+        externalId: "conv-no-aad",
+        displayName: "Unknown",
+        channel: "teams",
+      }),
+    )
+  })
+})
+
 describe("Teams adapter - unhandledRejection guard", () => {
   afterEach(() => {
     // Clean up any __agentHandler listeners we registered
