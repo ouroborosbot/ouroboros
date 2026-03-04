@@ -297,15 +297,12 @@ export async function withConversationLock(convId: string, fn: () => Promise<voi
   await current
 }
 
-// Shared friend store singleton -- created once, reused across all requests.
-let _friendStore: InstanceType<typeof FileFriendStore> | null = null
+// Create a fresh friend store per request so mkdirSync re-runs if directories
+// are deleted while the process is alive.
 function getFriendStore(): InstanceType<typeof FileFriendStore> {
-  if (!_friendStore) {
-    const agentKnowledgePath = path.join(getAgentRoot(), "friends")
-    const piiBridgePath = path.join(os.homedir(), ".agentconfigs", getAgentName(), "friends")
-    _friendStore = new FileFriendStore(agentKnowledgePath, piiBridgePath)
-  }
-  return _friendStore
+  const agentKnowledgePath = path.join(getAgentRoot(), "friends")
+  const piiBridgePath = path.join(os.homedir(), ".agentconfigs", getAgentName(), "friends")
+  return new FileFriendStore(agentKnowledgePath, piiBridgePath)
 }
 
 // Context from the Teams activity that carries OAuth tokens and signin ability
