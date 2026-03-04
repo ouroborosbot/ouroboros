@@ -1,6 +1,6 @@
 # Doing: Ouroboros Migration - Turn Coordinator Steering Contract
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-03-04 10:49
 **Planning**: ./2026-03-03-2217-planning-ouroboros-migration-turn-coordinator-steering-contract.md
@@ -16,22 +16,22 @@
 Remove Teams hard reject-on-cap behavior and replace silent same-conversation waiting with model-visible steering behavior, using a channel-agnostic turn coordinator for turn ownership.
 
 ## Completion Criteria
-- [ ] Teams no longer hard-rejects messages based on a static concurrent-turn cap.
-- [ ] `teamsChannel.maxConcurrentConversations` is fully removed from config schema/defaults/accessors and call sites.
-- [ ] A shared turn coordinator exists and is used by Teams for per-conversation serialization.
-- [ ] Same-conversation follow-up messages during active turns are all preserved and injected into the active turn between model calls.
-- [ ] No steering follow-up dedupe/idempotency layer is introduced in this task.
-- [ ] Steering follow-ups are injected as ordered discrete user messages (not dropped, reordered, or collapsed with lost boundaries).
-- [ ] Steering injection occurs only at model-call boundaries; no in-flight model-call mutation occurs.
-- [ ] Buffered follow-ups that miss a boundary are carried into the next turn for the same conversation.
-- [ ] No steering-specific buffer cap is introduced; steering follow-ups use existing context/window and trimming behavior.
-- [ ] Steering path introduces no adapter-authored plain-text acknowledgement messages to users.
-- [ ] Model receives all follow-up user messages for steering (none dropped).
-- [ ] Single active-turn ownership per conversation is preserved; different conversations remain parallelizable.
-- [ ] Tests are updated to cover coordinator contract, steering injection contract, and removed cap behavior.
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] Teams no longer hard-rejects messages based on a static concurrent-turn cap.
+- [x] `teamsChannel.maxConcurrentConversations` is fully removed from config schema/defaults/accessors and call sites.
+- [x] A shared turn coordinator exists and is used by Teams for per-conversation serialization.
+- [x] Same-conversation follow-up messages during active turns are all preserved and injected into the active turn between model calls.
+- [x] No steering follow-up dedupe/idempotency layer is introduced in this task.
+- [x] Steering follow-ups are injected as ordered discrete user messages (not dropped, reordered, or collapsed with lost boundaries).
+- [x] Steering injection occurs only at model-call boundaries; no in-flight model-call mutation occurs.
+- [x] Buffered follow-ups that miss a boundary are carried into the next turn for the same conversation.
+- [x] No steering-specific buffer cap is introduced; steering follow-ups use existing context/window and trimming behavior.
+- [x] Steering path introduces no adapter-authored plain-text acknowledgement messages to users.
+- [x] Model receives all follow-up user messages for steering (none dropped).
+- [x] Single active-turn ownership per conversation is preserved; different conversations remain parallelizable.
+- [x] Tests are updated to cover coordinator contract, steering injection contract, and removed cap behavior.
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -93,7 +93,7 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 **Output**: `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-steering-contract/unit-2a-test-run.txt`
 **Acceptance**: Steering-related Teams tests pass with coordinator path active and no ordering or boundary regressions.
 
-### ⬜ Unit 2b: Final Verification & Audit
+### ✅ Unit 2b: Final Verification & Audit
 **What**: Run final full verification and produce concise final audit mapping completion criteria to evidence artifacts.
 **Output**:
 - `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-steering-contract/unit-2b-test-run.txt`
@@ -127,3 +127,5 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 - 2026-03-04 13:33 Unit 1b complete: implemented shared turn coordinator, removed Teams hard cap/config field, and wired boundary-based steering drain into `runAgent`.
 - 2026-03-04 13:38 Unit 1c complete: closed coverage gaps for steering injection and coordinator edge cases; `npm run test:coverage` and build now pass.
 - 2026-03-04 13:39 Unit 2a complete: steering-focused regression suite passed across coordinator, core boundary injection, and Teams channel behavior.
+- 2026-03-04 13:40 Unit 2b complete: full test suite, coverage gate, and build all passed; final audit document produced.
+- 2026-03-04 13:40 All units complete and completion criteria synchronized to verified evidence.
