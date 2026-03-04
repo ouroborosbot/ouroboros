@@ -41,8 +41,14 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [x] `toolsSection()` correctly includes `finalAnswerTool` when `toolChoiceRequired` defaults on
 - [x] `finalAnswerTool` description reframed as primary response mechanism
 - [x] `final_answer` text emitted via `callbacks.onTextChunk` -- test coverage verified
-- [x] Response size constraint visible in prompt; truncation safety net in place
+- [x] Long messages split into chunks (never truncated, never lose content)
+- [x] P0 "Never Lose User-Facing Content" codified in CONTRIBUTING.md
+- [x] Copilot Chat message ordering fixed via replyToId anchoring
 - [x] Tool description voice standard codified in CONTRIBUTING.md
+- [x] Streamed content noise cleared when valid final_answer exists (onClearText)
+- [ ] Robust final_answer extraction: `parsed.answer` and quoted JSON string both work
+- [ ] Truncated JSON and wrong-shape JSON trigger retry (model gets another chance)
+- [ ] Retry does not count against toolRounds (error recovery, not a tool round)
 - [ ] User confirms on Teams: model uses final_answer cleanly, no 413 errors, prompt sections emit correctly
 
 ### Gate 3: Friend Context Instructions
@@ -298,6 +304,71 @@ The channel capabilities are already available via `getChannelCapabilities(chann
 **Output**: Updated `CONTRIBUTING.md`
 **Acceptance**: The convention is documented, consistent with existing doc style
 
+### ✅ Unit 11a: Message splitting -- replace truncation with chunked delivery
+**What**: Remove truncation logic from core.ts. Add `splitMessage()` to teams.ts that splits at paragraph > line > word > hard-cut boundaries. Update `flushTextBuffer()` and `flush()` to split long messages: first chunk to `safeEmit`, rest to `safeSend`. Add `MAX_MESSAGE_LENGTH = 4000` constant. Tests for splitMessage (7 cases) and flush splitting (3 cases). P0 "Never Lose User-Facing Content" section added to CONTRIBUTING.md.
+**Output**: Modified `src/senses/teams.ts`, `src/heart/core.ts`, `src/__tests__/senses/teams.test.ts`, `src/__tests__/heart/core.test.ts`, `CONTRIBUTING.md`
+**Acceptance**: No content is ever truncated or lost. All tests pass, 100% coverage on splitMessage
+
+### ✅ Unit 12a: Copilot Chat message ordering -- replyToId anchoring
+**What**: Follow-up messages from `safeSend` appeared above the user's message in Copilot Chat because `ctx.send(text)` creates messages without `replyToId`. Fix: change to `ctx.send({ type: "message", text, replyToId: activity.id })`. This anchors follow-up messages after the user's inbound activity without the blockquote that `ctx.reply()` adds. No impact on standard Teams 1:1 (replyToId ignored, always chronological).
+**Output**: Modified `src/senses/teams.ts`
+**Acceptance**: Follow-up chunks appear in correct order in Copilot Chat
+
+### ✅ Unit 13a: final_answer noise suppression -- onClearText callback
+**What**: When the model returns both `content` (e.g. refusal noise) AND a valid `final_answer` tool call, the streamed content was already in `textBuffer` and the final_answer text was appended -- showing both. Fix: add `onClearText?: () => void` to `ChannelCallbacks`. In `isSoleFinalAnswer` block, call `onClearText()` before emitting `parsed.answer`. In teams.ts, implement as `textBuffer = ""`. Also: stop falling back to `result.content` when JSON parsing fails (it was already streamed, re-emitting doubles it).
+**Output**: Modified `src/heart/core.ts`, `src/senses/teams.ts`, `src/__tests__/heart/core.test.ts`
+**Acceptance**: No doubled refusal text. Valid final_answer supersedes streamed noise. All tests pass
+
+### ⬜ Unit 14a: Remove artificial tool loop limit
+**What**: Remove `toolRounds`, `MAX_TOOL_ROUNDS`, and the associated check from `src/heart/core.ts`. The harness is code for the model to use — it should provide feedback on errors, not enforce arbitrary limits. Natural limits already exist: context overflow (handled by `isContextOverflow`), user abort (handled by `signal.aborted`), API errors (handled by retry/error callbacks).
+
+Remove:
+- `export const MAX_TOOL_ROUNDS = 10` (line 104)
+- `let toolRounds = 0` (line 241)
+- `setMaxListeners(MAX_TOOL_ROUNDS + 5, signal)` → use a fixed generous value (e.g. 50)
+- `toolRounds++` and the `if (toolRounds >= MAX_TOOL_ROUNDS)` block (lines 394-402) including `stripLastToolCalls` and error emission
+- Commented-out `toolRounds` references in the kick detection block (lines 345-347)
+
+Update tests: remove or update the tool loop limit test that asserts `MAX_TOOL_ROUNDS` behavior. Remove skipped tests that reference `MAX_TOOL_ROUNDS`.
+**Output**: Modified `src/heart/core.ts`, `src/__tests__/heart/core.test.ts`
+**Acceptance**: All tests pass, no references to `toolRounds` or `MAX_TOOL_ROUNDS` remain in src/
+
+### ⬜ Unit 14b: final_answer answer extraction -- tests
+**What**: Write failing tests in `src/__tests__/heart/core.test.ts` verifying the full answer extraction logic for `isSoleFinalAnswer`:
+1. `{"answer":"text"}` → uses `parsed.answer` (existing, should pass)
+2. `"just a string"` (valid JSON string) → uses the string directly as the answer
+3. `{"answer":"truncated...` (invalid JSON) → retries: pushes tool error result and continues the loop
+4. `{"text":"hello"}` (valid JSON, no `answer` field) → retries: pushes tool error result
+5. On successful retry after truncation, the valid answer is emitted normally
+6. Streamed `content` noise is cleared (via `onClearText`) before emitting answer or retrying
+**Output**: New test cases in `src/__tests__/heart/core.test.ts`
+**Acceptance**: Tests exist and FAIL for cases 2, 3, 4 (current code doesn't handle these)
+
+### ⬜ Unit 14c: final_answer answer extraction -- implementation
+**What**: Rewrite the answer extraction in `isSoleFinalAnswer` block of `src/heart/core.ts`:
+```
+try parse JSON:
+  typeof parsed === "string" → answer = parsed
+  parsed.answer exists       → answer = parsed.answer
+  else                       → answer = undefined (will retry)
+catch:
+  → answer = undefined (truncated/invalid JSON, will retry)
+```
+When `answer` is defined: clear noise (`onClearText`), emit via `onTextChunk`, push message + `(delivered)`, done.
+When `answer` is undefined (retry path):
+1. Clear noise: `callbacks.onClearText?.()`
+2. Push assistant message with tool_calls (keeps conversation valid)
+3. Push tool result: `"your final_answer was incomplete or malformed. call final_answer again with your complete response."`
+4. Keep azureInput in sync if applicable
+5. `continue` the loop (do NOT set `done = true`)
+**Output**: Modified `src/heart/core.ts`
+**Acceptance**: All tests PASS (green), no warnings
+
+### ⬜ Unit 14d: final_answer answer extraction -- coverage & refactor
+**What**: Verify 100% coverage on the modified `isSoleFinalAnswer` block. All paths covered: valid answer, quoted string, truncated JSON retry, wrong-shape retry, retry then succeed. Verify Azure Responses API path stays in sync during retry (azureInput gets function_call_output).
+**Output**: Coverage report
+**Acceptance**: 100% coverage on modified code, all tests green
+
 ---
 
 ### GATE 2 CHECKPOINT
@@ -306,8 +377,10 @@ The channel capabilities are already available via `getChannelCapabilities(chann
 - No kick loop, no response spam, no platform timeout
 - Model uses `final_answer` to exit cleanly after completing work
 - `toolBehaviorSection` and `toolsSection` emit correctly in prompt (verify via logs)
-- No 413 errors on long responses (truncation safety net active)
+- Long responses split into chunks (no 413 errors, no content loss)
 - `final_answer` text appears in chat (emitted via `onTextChunk`)
+- Truncated `final_answer` retries automatically (model gets second chance)
+- No doubled refusal text or streamed noise in final output
 **Also resolves**: Bug 5 (response spam) and Bug 6 (platform timeout).
 **Proceed to Gate 3 only after user confirms.**
 

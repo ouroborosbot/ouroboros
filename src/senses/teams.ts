@@ -226,6 +226,9 @@ export function createTeamsCallbacks(
         safeEmit(text)
       }
     },
+    onClearText: () => {
+      textBuffer = ""
+    },
     onToolStart: (name: string, args: Record<string, string>) => {
       stopPhraseRotation()
       if (buffered) flushTextBuffer()
