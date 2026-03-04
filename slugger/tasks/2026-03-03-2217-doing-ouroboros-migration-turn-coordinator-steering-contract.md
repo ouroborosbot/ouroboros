@@ -61,7 +61,7 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 **Output**: `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-steering-contract/unit-0-baseline.md`
 **Acceptance**: Baseline inventory covers runtime/test callsites, safe injection boundary map, and explicit contract cases (ordering, carry-forward, no-dedupe scope).
 
-### ⬜ Unit 1a: Turn Coordinator & Cap Removal — Tests
+### ✅ Unit 1a: Turn Coordinator & Cap Removal — Tests
 **What**: Write failing tests for the refactor contract:
 - shared coordinator serializes same key and permits parallel different keys
 - Teams path no longer emits cap-reject overload message or checks in-flight cap gate
@@ -123,3 +123,4 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 - 2026-03-04 12:21 Removed follow-up dedupe/idempotency from doing scope to match locked no-scope-expansion direction.
 - 2026-03-04 13:17 Renamed task slug from `turn-coordinator-locking-refactor` to `turn-coordinator-steering-contract` to match current scope.
 - 2026-03-04 13:26 Unit 0 complete: baseline inventory captured runtime/config/test callsites and safe model-call steering boundaries.
+- 2026-03-04 13:30 Unit 1a complete: added failing contract tests for shared turn coordinator, cap removal behavior, and config field removal; captured red run artifact.
