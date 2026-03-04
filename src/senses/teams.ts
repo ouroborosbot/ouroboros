@@ -119,6 +119,7 @@ export function createTeamsCallbacks(
   // subsequent content through sendMessage.
   deadlineTimer = setTimeout(() => {
     deadlineTimer = null
+    /* v8 ignore next -- defensive: markStopped always calls cancelDeadline @preserve */
     if (stopped) return
     deadlineFired = true
     safeEmit("one moment \u2014 still working on this")
