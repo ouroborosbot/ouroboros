@@ -241,3 +241,4 @@ The current kick system is a blunt instrument -- pattern matching on response te
 - 2026-03-03 20:09 Created (3 bugs)
 - 2026-03-03 20:15 Rewrote with 6 bugs after second test findings and code investigation
 - 2026-03-03 20:25 Updated with session-file-confirmed root causes, corrected Bug 5 (kick loop not platform retries), resolved all open questions, specified exact patterns to remove
+- 2026-03-03 20:26 Added Copilot Chat vs 1:1 Teams activity shape investigation note to Bug 1
