@@ -1,6 +1,7 @@
 # Planning: Context Kernel Post-Testing Fixes
 
-**Status**: NEEDS_REVIEW
+**Status**: CONVERTED
+**Doing**: ./2026-03-03-2008-doing-context-kernel-fixes.md
 **Created**: 2026-03-03 20:09
 
 ## Goal
@@ -88,6 +89,8 @@ function safeSend(text: string): void {
 ```
 Small change to `safeSend` only. No changes to call sites (`onToolEnd`, `onKick`, `onError`, `flushTextBuffer`). No changes to `safeEmit` or `safeUpdate` (they use the streaming protocol which already handles ordering).
 
+Note: if any send in the chain fails, `markStopped()` halts all subsequent sends. This is correct behavior (if the connection is dead, stop trying), but tests must verify this — a failed send should prevent further sends from executing.
+
 **Gate 1 checkpoint:** User tests on Copilot Chat. Expects: messages arrive in correct order (tool results, kicks, and final response in proper sequence), displayName populated (or confirmed that Copilot Chat doesn't provide `activity.from.name`, in which case the conversation-ID fallback is correct behavior).
 
 ---
@@ -168,6 +171,7 @@ This is prompt tuning. The code structure of `contextSection()` doesn't change -
 - [ ] Friend record has real display name when AAD name is available
 - [ ] Conversation-ID fallback works when AAD fields are absent
 - [ ] `safeSend` serialized via promise chain -- concurrent `ctx.send()` calls no longer race
+- [ ] Failed send in chain halts subsequent sends (via `markStopped()`) -- verified by test
 - [ ] User confirms on Copilot Chat: messages arrive in correct order, displayName populated or fallback confirmed
 
 ### Gate 2: Kick Escape Hatch + Self-Trigger
@@ -317,3 +321,5 @@ This is prompt tuning. The code structure of `contextSection()` doesn't change -
 - 2026-03-03 21:19 Bug 4 reframed: patterns are intentionally aggressive, stay as-is. Root cause is missing tool_choice forcing after kick. Three small changes total. Removed all pattern removal references and kickCount >= 2 logic.
 - 2026-03-03 21:42 Bug 4 simplified: check `lastKickReason` (truthy) not `=== "narration"`. After ANY kick, force tool_choice. Even simpler condition.
 - 2026-03-03 21:49 Bug 3 simplified: prompt tuning of ~4 lines in contextSection(), not five separate changes. Reframed as single rewrite task.
+- 2026-03-03 Added note: failed send in promise chain must halt subsequent sends via markStopped(). Added completion criterion. Approved.
+- 2026-03-03 22:00 Converted to doing doc
