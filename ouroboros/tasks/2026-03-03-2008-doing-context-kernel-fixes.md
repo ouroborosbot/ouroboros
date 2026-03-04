@@ -37,8 +37,8 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 ### Gate 2 Follow-up: tool_choice + final_answer Hardening
 - [x] `toolChoiceRequired` defaults to `true` in core.ts (still overridable via options)
 - [x] `tool_choice` and `activeTools` setting restored to conditional on `toolChoiceRequired` (but now defaults on)
-- [ ] `toolBehaviorSection()` prompt rewritten: decision-tree framing, anti-no-op pattern
-- [ ] `toolsSection()` correctly includes `finalAnswerTool` when `toolChoiceRequired` defaults on
+- [x] `toolBehaviorSection()` prompt rewritten: decision-tree framing, anti-no-op pattern
+- [x] `toolsSection()` correctly includes `finalAnswerTool` when `toolChoiceRequired` defaults on
 - [ ] `finalAnswerTool` description reframed as primary response mechanism
 - [ ] `final_answer` text emitted via `callbacks.onTextChunk` -- test coverage verified
 - [ ] Response size constraint visible in prompt; truncation safety net in place
@@ -229,7 +229,7 @@ Also test `toolsSection()` (Issue E):
 **Output**: Modified `src/mind/prompt.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 6c: Issue B + E -- Coverage & Refactor
+### ✅ Unit 6c: Issue B + E -- Coverage & Refactor
 **What**: Verify 100% coverage on `toolBehaviorSection()` and `toolsSection()`. Both default-on and explicit-false paths must be covered.
 **Output**: Coverage report showing full branch coverage
 **Acceptance**: 100% coverage on new/modified code, tests still green
