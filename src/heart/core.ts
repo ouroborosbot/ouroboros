@@ -364,6 +364,8 @@ export async function runAgent(
           } catch {
             answer = result.content;
           }
+          // Emit the answer through the callback pipeline so channels receive it
+          if (answer) callbacks.onTextChunk(answer);
           // Push clean assistant message with extracted answer (no tool_calls)
           messages.push({ role: "assistant", content: answer } as OpenAI.ChatCompletionAssistantMessageParam);
           done = true;
