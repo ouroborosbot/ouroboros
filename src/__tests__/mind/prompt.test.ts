@@ -328,7 +328,7 @@ describe("buildSystem", () => {
     expect(result).not.toContain("final_answer")
   })
 
-  it("does NOT include tool behavior section when options is undefined", async () => {
+  it("includes tool behavior section when options is undefined (defaults on)", async () => {
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
@@ -336,7 +336,68 @@ describe("buildSystem", () => {
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli")
-    expect(result).not.toContain("## tool behavior")
+    expect(result).toContain("## tool behavior")
+  })
+
+  it("tool behavior section contains decision-tree framing", async () => {
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = await buildSystem("cli", { toolChoiceRequired: true })
+    // Decision tree: mentions calling tools for info and final_answer for responding
+    expect(result).toMatch(/need.*information.*call a tool/i)
+    expect(result).toMatch(/ready to respond.*call.*final_answer/i)
+  })
+
+  it("tool behavior section contains anti-no-op pattern", async () => {
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = await buildSystem("cli", { toolChoiceRequired: true })
+    // Anti-pattern: warns against calling get_current_time or no-ops before final_answer
+    expect(result).toContain("get_current_time")
+    expect(result).toMatch(/do not call.*no-op|do NOT call.*no-op/i)
+  })
+
+  it("tool behavior section clarifies final_answer is a tool call", async () => {
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = await buildSystem("cli", { toolChoiceRequired: true })
+    // Clarification: final_answer IS a tool call satisfying the requirement
+    expect(result).toMatch(/final_answer.*tool call.*satisfies|final_answer.*is a tool call/i)
+  })
+
+  it("toolsSection includes final_answer in tool list when options undefined (defaults on)", async () => {
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = await buildSystem("cli")
+    // The tools section should list final_answer when defaults on
+    expect(result).toContain("- final_answer:")
+  })
+
+  it("toolsSection does NOT include final_answer when toolChoiceRequired is false", async () => {
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = await buildSystem("cli", { toolChoiceRequired: false })
+    expect(result).not.toContain("- final_answer:")
   })
 
   it("includes flags section when disableStreaming is true and channel is teams", async () => {
