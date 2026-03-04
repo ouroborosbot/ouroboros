@@ -1,6 +1,6 @@
 # Planning: GitHub Issue Tool
 
-**Status**: drafting
+**Status**: NEEDS_REVIEW
 **Created**: 2026-03-04 00:32
 
 ## Goal
@@ -43,15 +43,18 @@ Allow agents using the ouroboros harness to open GitHub issues on the repo, enab
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [ ] Should the tool auto-detect the repo from the current working directory (via `gh` default behavior), or should it accept an optional `repo` parameter for explicit targeting?
-- [ ] Should labels be a free-form string (comma-separated) or should we validate against existing repo labels?
-- [ ] Should the tool name be `open_github_issue`, `gh_create_issue`, or something else? Need to be consistent with existing naming patterns (`gh_cli`, `git_commit`, etc.).
+- [x] ~~Should the tool auto-detect the repo from the current working directory (via `gh` default behavior), or should it accept an optional `repo` parameter for explicit targeting?~~ Resolved: target the ouroboros-agent-harness repo specifically. Derive from the repo's own git remote rather than relying on cwd.
+- [x] ~~Should labels be a free-form string (comma-separated) or should we validate against existing repo labels?~~ Resolved: free-form comma-separated string, passed directly to `gh --label`.
+- [x] ~~Should the tool name be `open_github_issue`, `gh_create_issue`, or something else?~~ Resolved: `open_github_issue`.
 
 ## Decisions Made
 - Uses `gh issue create` rather than the GitHub REST API directly, since `gh` CLI auth is already configured and the existing `gh_cli` tool proves the pattern works
 - Base tool (not integration tool) because it relies on local `gh` CLI, same as `gh_cli`
 - Blocked on remote channels for the same reason `gh_cli` is blocked (local CLI dependency)
 - `confirmationRequired: true` because creating issues is a write operation that affects the shared repo
+- Repo targeting: derive the repo owner/name from the git remote (e.g. `git remote get-url origin`) at handler invocation time, rather than hardcoding or relying on cwd. This keeps the tool portable if the repo is cloned under a different name or fork.
+- Labels: free-form comma-separated string passed directly to `gh --label` flags. No validation against repo labels.
+- Tool name: `open_github_issue`
 
 ## Context / References
 - Tool definition pattern: `src/repertoire/tools-base.ts` (see `gh_cli` at line ~135 for closest analog)
@@ -60,10 +63,12 @@ Allow agents using the ouroboros harness to open GitHub issues on the repo, enab
 - Remote safety tests: `src/__tests__/repertoire/tools-remote-safety.test.ts`
 - `Integration` type already includes `"github"` in `src/mind/friends/types.ts` (line 16) but no tools use it yet
 - `ChannelCapabilities` for CLI has empty `availableIntegrations` (line 9 in `src/mind/friends/channel.ts`)
-- `gh issue create` CLI: accepts `--title`, `--body`, `--label` flags
+- `gh issue create` CLI: accepts `--title`, `--body`, `--label`, `--repo` flags
+- Repo remote derivation: `git remote get-url origin` returns e.g. `https://github.com/owner/repo.git` or `git@github.com:owner/repo.git`; parse to extract `owner/repo`
 
 ## Notes
 The agent already has a `gh_cli` tool that can run arbitrary `gh` commands. The value of a dedicated `open_github_issue` tool is: (1) it's discoverable -- the agent sees it in its tool list and knows it can open issues without guessing, (2) it's safer -- constrained to issue creation rather than arbitrary `gh` commands, (3) it produces structured output rather than raw CLI text, and (4) it can have `confirmationRequired` specifically for issue creation without blocking all `gh` usage.
 
 ## Progress Log
 - 2026-03-04 00:32 Created
+- (pending) Resolved open questions: repo targeting (derive from git remote), labels (free-form CSV), tool name (open_github_issue)
