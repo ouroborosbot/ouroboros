@@ -1,6 +1,6 @@
 # Planning: Context Kernel Post-Testing Fixes
 
-**Status**: drafting
+**Status**: NEEDS_REVIEW
 **Created**: 2026-03-03 20:09
 
 ## Goal
