@@ -230,52 +230,52 @@ Sessions currently live at `~/.agentconfigs/{agentName}/sessions/{channel}/{sess
 - Migration of existing sessions to new path structure — old sessions are orphaned, delete manually.
 
 ## Completion Criteria
-- [ ] Teams handler extracts AAD fields from activity and populates `TeamsMessageContext`
-- [ ] Context resolver guard (`teamsContext?.aadObjectId`) succeeds when AAD identity is present
-- [ ] Resolved context is included in the system prompt for both Teams and CLI channels
-- [ ] System prompt includes name-quality instruction (first person, model-judged — no code heuristics)
-- [ ] System prompt includes memory ephemerality instruction (first person) when friend context is present
-- [ ] `FriendIdentity` + `FriendMemory` merged into single `FriendRecord` type (with `toolPreferences`, `notes`, and `displayName` fields)
-- [ ] `ResolvedContext` uses `friend: FriendRecord` instead of separate `identity` + `memory` fields
-- [ ] `ContextStore` replaced by `FriendStore` with domain-specific methods (`get`, `put`, `delete`, `findByExternalId`)
-- [ ] `FileFriendStore` splits reads/writes across agent knowledge and PII bridge backends
-- [ ] Agent knowledge stored at `{agentRoot}/friends/{uuid}.json` (id, displayName, toolPreferences, notes, createdAt, updatedAt)
-- [ ] PII bridge stored at `~/.agentconfigs/{agentName}/friends/{uuid}.json` (id, externalIds, tenantMemberships)
-- [ ] `resolveIdentity()` never overwrites `displayName` on existing records
-- [ ] `resolveMemory()` eliminated or reduced (memory is part of the merged record)
-- [ ] Friend record re-read from disk each turn (no in-memory mutation of context)
-- [ ] `save_friend_note` redesigned with `type` parameter (`name`, `tool_preference`, `note`)
-- [ ] `save_friend_note` conflict behavior: returns existing value and asks model to merge when overwriting without `override: true`
-- [ ] `save_friend_note` `name` type updates `record.displayName`
-- [ ] `save_friend_note` writes to disk only — no in-memory mutation
-- [ ] `ToolContext` type updated (`memoryStore` → `friendStore`)
-- [ ] `ContextResolver` renamed to `FriendResolver` (file: `resolver.ts` → `resolver.ts`, class rename)
-- [ ] `FriendResolver` works with `FriendStore` and merged `FriendRecord`
-- [ ] First-encounter creation flow: `findByExternalId()` returns null → creates new `FriendRecord` with system-provided name, empty notes/preferences → returns newly created record
-- [ ] System prompt includes new-friend behavior instruction (first person) when `notes` and `toolPreferences` are both empty
-- [ ] `AuthorityChecker` removed: interface, `checker?` field on `ResolvedContext`, resolver logic, prompt rendering, and tests
-- [ ] `getToolsForChannel()` accepts `toolPreferences` and injects matching preferences into tool `function.description` (in `tools` API param, not system prompt)
-- [ ] `toolPreferences` entries appear in tool descriptions only (not system prompt)
-- [ ] `notes` entries appear in system prompt only (not tool descriptions)
-- [ ] `save_friend_note` tool description includes first-person `override` guidance (replace/correct = override, new/check = omit)
-- [ ] System prompt includes working-memory trust instruction (conversation is source of truth, notes are journal for future me)
-- [ ] System prompt includes stale notes awareness instruction (check related notes when learning something that might invalidate them)
-- [ ] CLI external ID uses `username@hostname` format with provider `"local"`
-- [ ] System prompt includes priority guidance (friend's request first, social niceties second) when friend context is present
-- [ ] Missing `aadObjectId` handled gracefully: falls back to `teams-conversation` provider with conversation ID as external ID
-- [ ] No empty `externalIds` arrays — resolver always has an external ID to search for
-- [ ] `FileFriendStore` auto-creates directories on construction (`mkdirSync recursive`)
-- [ ] `sessionPath()` auto-creates parent directories before returning path
-- [ ] `save_friend_note` validates required parameters and returns first-person error messages on failure
-- [ ] `src/mind/context/` renamed to `src/mind/friends/`, all import paths updated
-- [ ] Session path restructured: `~/.agentconfigs/{agentName}/sessions/{friendUuid}/{channel}/{sessionId}.json`
-- [ ] `sessionPath()` accepts friend ID, callers pass it from resolved context
-- [ ] CLI session path uses friend UUID from CLI identity resolution
-- [ ] No migration of old sessions, no backwards compatibility
-- [ ] Top-level README.md documents the friend storage split and session path structure
-- [ ] 100% test coverage on all new and modified code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] Teams handler extracts AAD fields from activity and populates `TeamsMessageContext`
+- [x] Context resolver guard (`teamsContext?.aadObjectId`) succeeds when AAD identity is present
+- [x] Resolved context is included in the system prompt for both Teams and CLI channels
+- [x] System prompt includes name-quality instruction (first person, model-judged — no code heuristics)
+- [x] System prompt includes memory ephemerality instruction (first person) when friend context is present
+- [x] `FriendIdentity` + `FriendMemory` merged into single `FriendRecord` type (with `toolPreferences`, `notes`, and `displayName` fields)
+- [x] `ResolvedContext` uses `friend: FriendRecord` instead of separate `identity` + `memory` fields
+- [x] `ContextStore` replaced by `FriendStore` with domain-specific methods (`get`, `put`, `delete`, `findByExternalId`)
+- [x] `FileFriendStore` splits reads/writes across agent knowledge and PII bridge backends
+- [x] Agent knowledge stored at `{agentRoot}/friends/{uuid}.json` (id, displayName, toolPreferences, notes, createdAt, updatedAt)
+- [x] PII bridge stored at `~/.agentconfigs/{agentName}/friends/{uuid}.json` (id, externalIds, tenantMemberships)
+- [x] `resolveIdentity()` never overwrites `displayName` on existing records
+- [x] `resolveMemory()` eliminated or reduced (memory is part of the merged record)
+- [x] Friend record re-read from disk each turn (no in-memory mutation of context)
+- [x] `save_friend_note` redesigned with `type` parameter (`name`, `tool_preference`, `note`)
+- [x] `save_friend_note` conflict behavior: returns existing value and asks model to merge when overwriting without `override: true`
+- [x] `save_friend_note` `name` type updates `record.displayName`
+- [x] `save_friend_note` writes to disk only — no in-memory mutation
+- [x] `ToolContext` type updated (`memoryStore` → `friendStore`)
+- [x] `ContextResolver` renamed to `FriendResolver` (file: `resolver.ts` → `resolver.ts`, class rename)
+- [x] `FriendResolver` works with `FriendStore` and merged `FriendRecord`
+- [x] First-encounter creation flow: `findByExternalId()` returns null → creates new `FriendRecord` with system-provided name, empty notes/preferences → returns newly created record
+- [x] System prompt includes new-friend behavior instruction (first person) when `notes` and `toolPreferences` are both empty
+- [x] `AuthorityChecker` removed: interface, `checker?` field on `ResolvedContext`, resolver logic, prompt rendering, and tests
+- [x] `getToolsForChannel()` accepts `toolPreferences` and injects matching preferences into tool `function.description` (in `tools` API param, not system prompt)
+- [x] `toolPreferences` entries appear in tool descriptions only (not system prompt)
+- [x] `notes` entries appear in system prompt only (not tool descriptions)
+- [x] `save_friend_note` tool description includes first-person `override` guidance (replace/correct = override, new/check = omit)
+- [x] System prompt includes working-memory trust instruction (conversation is source of truth, notes are journal for future me)
+- [x] System prompt includes stale notes awareness instruction (check related notes when learning something that might invalidate them)
+- [x] CLI external ID uses `username@hostname` format with provider `"local"`
+- [x] System prompt includes priority guidance (friend's request first, social niceties second) when friend context is present
+- [x] Missing `aadObjectId` handled gracefully: falls back to `teams-conversation` provider with conversation ID as external ID
+- [x] No empty `externalIds` arrays — resolver always has an external ID to search for
+- [x] `FileFriendStore` auto-creates directories on construction (`mkdirSync recursive`)
+- [x] `sessionPath()` auto-creates parent directories before returning path
+- [x] `save_friend_note` validates required parameters and returns first-person error messages on failure
+- [x] `src/mind/context/` renamed to `src/mind/friends/`, all import paths updated
+- [x] Session path restructured: `~/.agentconfigs/{agentName}/sessions/{friendUuid}/{channel}/{sessionId}.json`
+- [x] `sessionPath()` accepts friend ID, callers pass it from resolved context
+- [x] CLI session path uses friend UUID from CLI identity resolution
+- [x] No migration of old sessions, no backwards compatibility
+- [x] Top-level README.md documents the friend storage split and session path structure
+- [x] 100% test coverage on all new and modified code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
