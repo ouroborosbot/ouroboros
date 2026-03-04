@@ -18,17 +18,20 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - Add Anthropic provider integration as a final step with setup-token auth profile support (OpenClaw-compatible flow: `claude setup-token` then token paste).
 - Add OpenAI Codex provider integration as a final step with OAuth subscription auth profile support (OpenClaw-compatible `openai-codex` flow).
 - Update config and agent/provider resolution paths so provider selection is explicit and per-agent.
-- Keep `providers` and `teams` blocks in per-agent `config.json` (secrets/config file).
-- Move `context` block from `config.json` into each agent's `agent.json` alongside `phrases` and other agent-level runtime settings.
+- Keep `providers` and `teams` blocks in per-agent `secrets.json` (secrets/config file).
+- Move `context` block from `secrets.json` into each agent's `agent.json` alongside `phrases` and other agent-level runtime settings.
 - Treat agent manifest path as explicit contract: `<repo>/<agent>/agent.json` (for example `/Users/arimendelow/Projects/ouroboros-agent-harness/slugger/agent.json`).
 - Reorganize local machine directories so secrets live in `~/.agentsecrets/<agent>/`, while runtime/session/log/PII/test artifacts live in `~/.agentstate/<agent>/` or `~/.agentstate/test-runs/<repo_slug>/`.
+- Treat secrets path as explicit contract: `agent.json.configPath = ~/.agentsecrets/<agent>/secrets.json`.
 - Include one-time migration handling so existing `~/.agentconfigs` data on other machines is migrated safely with explicit operator-visible guidance.
 - Add one-time migration behavior for pulled branches on other machines:
-  - move legacy `~/.agentconfigs/<agent>/config.json` to `~/.agentsecrets/<agent>/config.json` (providers/teams retained),
+  - move legacy `~/.agentconfigs/<agent>/config.json` to `~/.agentsecrets/<agent>/secrets.json` (providers/teams retained),
   - move legacy runtime directories (`sessions`, `logs`, `friends`, test-run artifacts) into `~/.agentstate/...`,
   - run explicit migration once and then require new paths only (no runtime fallback path support).
 - Add a repo migration runbook at `cross-agent-docs/agent-storage-migration-playbook.md` for other agents/Claude to follow after pulling changes.
-- Migration delivery is docs-only: no migration script. The runbook must include explicit move instructions, rationale, verification steps, and instruction to delete the migration playbook after successful completion on the target machine.
+- Migration delivery is docs-only: no migration script. The runbook must include explicit move instructions, rationale, and verification steps. Cleanup/removal of the playbook is decided by the other machine once migration is confirmed complete there.
+- Lock provider identifiers for this task to: `azure`, `minimax`, `anthropic`, `openai-codex`.
+- Model handling in this task is explicit but minimal: keep one configured model per provider in `secrets.json` (existing Azure/MiniMax parity + new Anthropic/OpenAI Codex fields); no additional model-selection feature work.
 - Add/adjust tests to maintain 100% coverage on all new code and preserve existing behavior contracts.
 
 ### Out of Scope
@@ -45,12 +48,15 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [ ] OpenAI Codex provider is integrated behind the same provider interface with OAuth auth profile support.
 - [ ] Provider selection is per-agent and config-driven (no global singleton lock-in).
 - [ ] Secrets/state boundary is enforced (`~/.agentsecrets` for secrets only; runtime/session/log/PII/test artifacts moved to `~/.agentstate`).
-- [ ] `config.json` retains `providers` + `teams`; `context` is loaded from `agent.json`.
+- [ ] `secrets.json` retains `providers` + `teams`; `context` is loaded from `agent.json`.
+- [ ] `agent.json.configPath` resolves to `~/.agentsecrets/<agent>/secrets.json`.
 - [ ] Missing/expired provider credentials fail fast with explicit re-auth guidance; no silent fallback.
 - [ ] A migration runbook exists in-repo for cross-machine post-pull reorganization of legacy `~/.agentconfigs` data.
 - [ ] Legacy `~/.agentconfigs` data migrates via explicit one-time migration (no runtime back-compat branches in normal execution code), with no data loss and clear operator messages.
 - [ ] Migration executes before provider abstraction refactor work so implementation targets final storage/config contracts.
-- [ ] Migration runbook is docs-only (no script) and includes post-migration instruction to delete the migration file after completion on the target machine.
+- [ ] Migration runbook is docs-only (no script) and includes explicit move/verify instructions for the other machine.
+- [ ] Provider IDs are explicitly locked and implemented as `azure`, `minimax`, `anthropic`, `openai-codex`.
+- [ ] Model fields are explicitly supported for each in-scope provider via `secrets.json` without introducing additional model-selection features.
 - [ ] All relevant docs are updated for the new provider/config/storage contracts (including `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, and `cross-agent-docs/agent-storage-migration-playbook.md`).
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
@@ -65,7 +71,8 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 
 ## Open Questions
 - [x] OpenAI API-key provider now or deferred: deferred to a follow-up task.
-- [x] Config/auth-profile/state boundary: keep `providers` + `teams` in `config.json`; move `context` to `agent.json`; split local storage into `~/.agentsecrets` (secrets) and `~/.agentstate` (runtime/session/log/PII/test artifacts).
+- [x] Config/auth-profile/state boundary: keep `providers` + `teams` in `secrets.json`; move `context` to `agent.json`; split local storage into `~/.agentsecrets` (secrets) and `~/.agentstate` (runtime/session/log/PII/test artifacts).
+- [x] Provider/model contract detail level: lock provider IDs and keep minimal per-provider model config support in `secrets.json` with no extra model-feature scope.
 - [x] Usage accounting changes in this task: deferred.
 
 ## Decisions Made
@@ -74,10 +81,12 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - Anthropic setup-token auth flow is explicitly in-scope and modeled after existing OpenClaw behavior.
 - OpenAI subscription path is explicitly in-scope via OpenAI Codex OAuth (`openai-codex`) flow.
 - Follow repo configuration policy: no environment variables.
-- `config.json` keeps `providers` and `teams` blocks; `context` moves into `agent.json`.
+- `secrets.json` keeps `providers` and `teams` blocks; `context` moves into `agent.json`.
 - `agent.json` location is explicit and fixed per agent: `<repo>/<agent>/agent.json`.
+- `agent.json.configPath` points to `~/.agentsecrets/<agent>/secrets.json`.
 - Migration support for other machines is mandatory: legacy `~/.agentconfigs` must be handled with a documented, agent-executable runbook.
-- Migration must be safe and deterministic on other machines: no destructive deletes during first migration; prefer move-with-fallback or copy-then-verify semantics.
+- Provider IDs in scope are fixed: `azure`, `minimax`, `anthropic`, `openai-codex`.
+- Model support in scope is minimal: per-provider configured model fields in `secrets.json`, no additional model orchestration work.
 - Runtime code must stay lean: no long-lived back-compat reads/writes for legacy `~/.agentconfigs` paths after migration.
 - Migration is manual-doc guided (Claude executes instructions from markdown); no dedicated migration script will be added.
 - Missing/expired credentials must hard-fail with explicit operator/user guidance; no silent fallback behavior.
@@ -108,3 +117,4 @@ Keep scope disciplined: runtime provider abstraction + provider integrations onl
 - 2026-03-04 15:01 Added completion criterion requiring all relevant repo docs to be updated for new config/storage/provider contracts
 - 2026-03-04 15:08 Reordered work so migration happens first; constrained migration delivery to markdown instructions only (no script), including post-completion deletion of the migration playbook on target machine
 - 2026-03-04 15:10 Made `agent.json` path explicit in plan (`<repo>/<agent>/agent.json`) to remove migration ambiguity
+- 2026-03-04 15:15 Renamed config target to `secrets.json`, locked `agent.json.configPath`, and clarified minimal provider/model contract (`azure|minimax|anthropic|openai-codex`)
