@@ -30,4 +30,22 @@ describe("nerves rename contract", () => {
     expect(gateScript).not.toContain('target: "observability-audit"')
     expect(gateScript).not.toContain("observability_coverage:")
   })
+
+  it("does not expose synthetic runtime-hardening gate wiring in CI contracts", () => {
+    const pkg = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8")) as {
+      scripts: Record<string, string>
+    }
+    const gateScript = readFileSync(
+      join(process.cwd(), "scripts", "run-coverage-gate.cjs"),
+      "utf8",
+    )
+
+    expect(pkg.scripts["audit:runtime-hardening"]).toBeUndefined()
+    expect(pkg.scripts["validate:runtime-hardening:load"]).toBeUndefined()
+    expect(gateScript).not.toContain("runtime-hardening-load-validation")
+    expect(gateScript).not.toContain("runtime-hardening-summary.json")
+    expect(gateScript).not.toContain('"audit:runtime-hardening"')
+    expect(gateScript).not.toContain("runtime_hardening:")
+    expect(gateScript).not.toContain('target: "runtime-hardening-audit"')
+  })
 })
