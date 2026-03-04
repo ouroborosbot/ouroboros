@@ -25,7 +25,7 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 - [ ] Task planning/doing/audit artifacts are retained for future auditing.
 - [ ] A self-audit explicitly states what I got wrong and how each issue is corrected.
 - [ ] Validation criteria are concrete and testable (including untouched-file guarantees).
-- [ ] 100% test coverage on all new code
+- [x] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
 
@@ -72,7 +72,7 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 - `./2026-03-03-2036-doing-ouroboros-migration-single-replica-hardening-cleanup/unit-1b-build-run.txt`
 **Acceptance**: Unit 1a tests pass; removed targets are absent; runtime behavior files remain unchanged in intent; full tests/build pass without warnings.
 
-### ⬜ Unit 1c: Cleanup Coverage & Refactor
+### ✅ Unit 1c: Cleanup Coverage & Refactor
 **What**: Run coverage gate after cleanup removals, backfill any coverage gaps introduced by cleanup-only changes, and refactor tests/code for clarity without changing behavior.
 **Output**:
 - `./2026-03-03-2036-doing-ouroboros-migration-single-replica-hardening-cleanup/unit-1c-coverage-run.txt`
@@ -120,3 +120,4 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 - 2026-03-03 21:55 Unit 0 complete: baseline inventory locked at 50/50 `main..HEAD` paths with explicit keep/remove dispositions and no `TBD` entries (`unit-0-inventory.md`).
 - 2026-03-03 21:57 Unit 1a complete: added synthetic gate removal contract assertions in `src/__tests__/nerves/rename-contract.test.ts`; captured intentional red run in `unit-1a-red-run.txt`.
 - 2026-03-03 21:59 Unit 1b complete: removed synthetic runtime-hardening stack and CI wiring (`package.json`, `scripts/run-coverage-gate.cjs`, runtime-hardening module/tests, load-validation script) and captured green runs in `unit-1b-test-run.txt` + `unit-1b-build-run.txt`.
+- 2026-03-03 22:00 Unit 1c complete: coverage gate (`npm run test:coverage`) and build are green with 100% coverage; artifacts saved in `unit-1c-coverage-run.txt` + `unit-1c-build-run.txt`.
