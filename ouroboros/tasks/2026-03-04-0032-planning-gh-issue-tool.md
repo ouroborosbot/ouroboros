@@ -1,36 +1,49 @@
-# Planning: GitHub Issue Tool
+# Planning: GitHub Integration Tool (github_create_issue)
 
 **Status**: approved
 **Created**: 2026-03-04 00:32
 
 ## Goal
-Allow agents using the ouroboros harness to open GitHub issues on the repo, enabling them to create backlog items, report bugs, and suggest improvements when they identify work that should be tracked.
+Allow agents using the ouroboros harness to create GitHub issues via the GitHub REST API using per-user OAuth, following the same integration pattern as ADO and Graph tools. Issues are opened as the authenticated human user, not the bot identity.
 
 ## Scope
 
 ### In Scope
-- New `open_github_issue` tool definition in the repertoire layer
-- Tool accepts title, body, and optional labels
-- Tool uses `gh issue create` under the hood (leveraging the existing `gh` CLI already available in the base toolset)
-- Available on CLI channel (base tool, no integration/OAuth required since `gh` auth is already configured locally)
-- Tool returns the created issue URL and number on success
+- New `github-client.ts` API client module (like `graph-client.ts` / `ado-client.ts`)
+- New `tools-github.ts` tool definitions module (like `tools-teams.ts`)
+- `github_create_issue` tool: accepts `owner`, `repo`, `title`, `body`, and optional `labels` parameters
+- Tool uses GitHub REST API (`POST /repos/{owner}/{repo}/issues`) with per-user OAuth token
+- Available on Teams channel only (integration tool requiring OAuth; NOT a base tool)
+- `integration: "github"` on the tool definition
 - `confirmationRequired: true` since creating issues is a mutation
-- Add to `summarizeArgs` for consistent logging
-- Add to `REMOTE_BLOCKED_LOCAL_TOOLS` (relies on local `gh` CLI, same as `gh_cli`)
-- Full test coverage for the new tool
+- `ToolContext` updated to include optional `githubToken`
+- `OAuthConfig` updated to include `githubConnectionName`
+- Channel capabilities updated: add `"github"` to Teams' `availableIntegrations`
+- Teams token handling updated: fetch `githubToken` from Bot Service, handle `AUTH_REQUIRED:github`
+- Tool registration in `tools.ts`: import `githubToolDefinitions`, add to `allDefinitions`, add `summarizeGithubArgs`
+- `summarizeArgs` in `tools.ts` delegates to `summarizeGithubArgs` for github tools
+- Full test coverage for all new code
+- Update existing tests that enumerate tools (tool name lists, integration counts)
 
 ### Out of Scope
-- GitHub OAuth integration for the Teams channel (would require a new OAuth connection; `gh` CLI is local-only)
-- Editing, closing, or commenting on existing issues
-- Issue templates or project board assignment
-- Listing/searching existing issues (agents can already do this via `gh_cli`)
-- Milestone or assignee assignment (keep first version simple)
+- Editing, closing, or commenting on existing issues (future tools can reuse the client + OAuth)
+- Listing/searching GitHub issues (future tool)
+- GitHub webhook integration
+- Issue templates, project board assignment, milestones, assignees
+- CLI channel support (no local `gh` CLI fallback -- this is an integration-only tool)
+- Multiple GitHub tools beyond `github_create_issue` (but architecture supports future expansion)
 
 ## Completion Criteria
-- [ ] `open_github_issue` tool is defined in `tools-base.ts` with handler
-- [ ] Tool is blocked in remote (Teams) channel via `REMOTE_BLOCKED_LOCAL_TOOLS`
-- [ ] `summarizeArgs` in `tools.ts` handles the new tool name
-- [ ] `confirmationRequired` is set to `true`
+- [ ] `github-client.ts` exists with `githubRequest()` function following `graph-client.ts` pattern
+- [ ] `tools-github.ts` exists with `github_create_issue` tool definition following `tools-teams.ts` pattern
+- [ ] `ToolContext` in `tools-base.ts` includes `githubToken?: string`
+- [ ] `OAuthConfig` in `config.ts` includes `githubConnectionName: string`
+- [ ] Teams `availableIntegrations` includes `"github"` in `channel.ts`
+- [ ] `teams.ts` fetches `githubToken` and passes it to `ToolContext`, handles `AUTH_REQUIRED:github`
+- [ ] `tools.ts` imports and registers github tool definitions in `allDefinitions`
+- [ ] `summarizeArgs` handles `github_create_issue`
+- [ ] All existing tool enumeration tests updated for new tool
+- [ ] Remote safety tests confirm github tools appear in Teams channel (integration tool, not blocked)
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -43,34 +56,42 @@ Allow agents using the ouroboros harness to open GitHub issues on the repo, enab
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [x] ~~Should the tool auto-detect the repo from the current working directory (via `gh` default behavior), or should it accept an optional `repo` parameter for explicit targeting?~~ Resolved: target the ouroboros-agent-harness repo specifically. Derive from the repo's own git remote rather than relying on cwd.
-- [x] ~~Should labels be a free-form string (comma-separated) or should we validate against existing repo labels?~~ Resolved: free-form comma-separated string, passed directly to `gh --label`.
-- [x] ~~Should the tool name be `open_github_issue`, `gh_create_issue`, or something else?~~ Resolved: `open_github_issue`.
+- (none -- all resolved)
 
 ## Decisions Made
-- Uses `gh issue create` rather than the GitHub REST API directly, since `gh` CLI auth is already configured and the existing `gh_cli` tool proves the pattern works
-- Base tool (not integration tool) because it relies on local `gh` CLI, same as `gh_cli`
-- Blocked on remote channels for the same reason `gh_cli` is blocked (local CLI dependency)
-- `confirmationRequired: true` because creating issues is a write operation that affects the shared repo
-- Repo targeting: derive the repo owner/name from the git remote (e.g. `git remote get-url origin`) at handler invocation time, rather than hardcoding or relying on cwd. This keeps the tool portable if the repo is cloned under a different name or fork.
-- Labels: free-form comma-separated string passed directly to `gh --label` flags. No validation against repo labels.
-- Tool name: `open_github_issue`
+- **Tool name**: `github_create_issue` -- follows the pattern of other integration tools (`ado_create_epic`, `ado_create_issue`, `graph_query`, etc.) and is specific enough while leaving room for future `github_*` tools
+- **Auth**: Per-user OAuth via Teams Bot Service, same pattern as ADO/Graph. NOT `gh` CLI
+- **Identity**: Issues opened as the human user who authorized via OAuth
+- **Repo targeting**: `owner` and `repo` accepted as explicit parameters (since it's a proper GitHub API tool, not a local CLI tool)
+- **Architecture**: Separate `github-client.ts` + `tools-github.ts` modules, mirroring `graph-client.ts` + `tools-teams.ts` and `ado-client.ts` + `ado-semantic.ts` patterns
+- **Integration type**: `"github"` already exists in the `Integration` union type (`src/mind/friends/types.ts` line 16); no type change needed
+- **Channel availability**: Teams only (integration tool). CLI channel has no OAuth; users can use `gh_cli` base tool for local GitHub operations
+- **Config**: New `githubConnectionName` field in `OAuthConfig` with empty string default (same pattern as `graphConnectionName` and `adoConnectionName`)
+- **Labels**: Comma-separated string parameter, split and sent as array in the API request body
+- `confirmationRequired: true` because creating issues is a write operation
 
 ## Context / References
-- Tool definition pattern: `src/repertoire/tools-base.ts` (see `gh_cli` at line ~135 for closest analog)
-- Tool registration: `src/repertoire/tools.ts` (allDefinitions, REMOTE_BLOCKED_LOCAL_TOOLS, summarizeArgs)
-- Existing test pattern: `src/__tests__/repertoire/tools.test.ts`
+- `Integration` type already includes `"github"`: `src/mind/friends/types.ts` line 16
+- Graph client pattern: `src/repertoire/graph-client.ts` -- `graphRequest()` with token, method, path, body, nerves events, error handling via `handleApiError`
+- ADO client pattern: `src/repertoire/ado-client.ts` -- `adoRequest()` with same pattern
+- Teams tool definitions: `src/repertoire/tools-teams.ts` -- tool definitions with `integration` field, `AUTH_REQUIRED:*` pattern, `summarizeTeamsArgs`
+- ADO semantic tools: `src/repertoire/ado-semantic.ts` -- more complex tool definitions following same pattern
+- Tool registration: `src/repertoire/tools.ts` -- `allDefinitions`, `getToolsForChannel`, `summarizeArgs`, `isConfirmationRequired`
+- ToolContext: `src/repertoire/tools-base.ts` -- `graphToken`, `adoToken`, `signin`
+- Channel capabilities: `src/mind/friends/channel.ts` -- Teams has `availableIntegrations: ["ado", "graph"]`, needs `"github"` added
+- OAuth config: `src/config.ts` -- `OAuthConfig` interface with `graphConnectionName`, `adoConnectionName`
+- Teams token fetching: `src/senses/teams.ts` -- `api.users.token.get()` pattern, `AUTH_REQUIRED` handling after agent loop
+- API error handling: `src/heart/api-error.ts` -- `handleApiError()` shared utility
+- Tests: `src/__tests__/repertoire/tools.test.ts` (tool enumeration at lines ~500, ~517, ~549, ~631, ~677, ~706, ~1602; summarizeArgs tests)
 - Remote safety tests: `src/__tests__/repertoire/tools-remote-safety.test.ts`
-- `Integration` type already includes `"github"` in `src/mind/friends/types.ts` (line 16) but no tools use it yet
-- `ChannelCapabilities` for CLI has empty `availableIntegrations` (line 9 in `src/mind/friends/channel.ts`)
-- `gh issue create` CLI: accepts `--title`, `--body`, `--label`, `--repo` flags
-- Repo remote derivation: `git remote get-url origin` returns e.g. `https://github.com/owner/repo.git` or `git@github.com:owner/repo.git`; parse to extract `owner/repo`
+- GitHub REST API: `POST /repos/{owner}/{repo}/issues` -- accepts `{ title, body, labels }` JSON body
 
 ## Notes
-The agent already has a `gh_cli` tool that can run arbitrary `gh` commands. The value of a dedicated `open_github_issue` tool is: (1) it's discoverable -- the agent sees it in its tool list and knows it can open issues without guessing, (2) it's safer -- constrained to issue creation rather than arbitrary `gh` commands, (3) it produces structured output rather than raw CLI text, and (4) it can have `confirmationRequired` specifically for issue creation without blocking all `gh` usage.
+The `Integration` type already includes `"github"` but no tools use it yet. This is the first GitHub integration tool. The architecture (separate client + tool module) is designed so future GitHub tools (list issues, search, comment, etc.) can be added to `tools-github.ts` and reuse `github-client.ts` without architectural changes.
 
 ## Progress Log
-- 2026-03-04 00:32 Created
-- 2026-03-04 00:36 Resolved open questions: repo targeting (derive from git remote), labels (free-form CSV), tool name (open_github_issue)
-- 2026-03-04 00:36 Approved
-- 2026-03-04 00:38 Converted to doing doc (4 passes complete)
+- 2026-03-04 00:32 Created (original plan: base tool using gh CLI)
+- 2026-03-04 00:36 Resolved open questions: repo targeting, labels, tool name
+- 2026-03-04 00:36 Approved (original plan)
+- 2026-03-04 00:38 Converted to doing doc (original plan, 4 passes)
+- [pending] Rewrote planning doc: changed from base tool (gh CLI) to integration tool (GitHub API + OAuth)
