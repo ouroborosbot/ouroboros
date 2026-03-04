@@ -34,6 +34,16 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [x] New test verifying kick message does not trigger `hasToolIntent()`
 - [ ] User confirms on Copilot Chat: no kick loop, no response spam, no timeout
 
+### Gate 2 Follow-up: tool_choice + final_answer Hardening
+- [ ] `toolChoiceRequired` defaults to `true` in core.ts (still overridable via options)
+- [ ] `tool_choice` and `activeTools` setting restored to conditional on `toolChoiceRequired` (but now defaults on)
+- [ ] `toolBehaviorSection()` prompt rewritten: decision-tree framing, anti-no-op pattern
+- [ ] `toolsSection()` correctly includes `finalAnswerTool` when `toolChoiceRequired` defaults on
+- [ ] `finalAnswerTool` description reframed as primary response mechanism
+- [ ] `final_answer` text emitted via `callbacks.onTextChunk` -- test coverage verified
+- [ ] Response size constraint visible in prompt; truncation safety net in place
+- [ ] User confirms on Teams: model uses final_answer cleanly, no 413 errors, prompt sections emit correctly
+
 ### Gate 3: Friend Context Instructions
 - [ ] Friend context instructions at prompt.ts:178-194 rewritten to be directive with displayName interpolation and aggressive saving
 - [ ] User confirms on both surfaces: bot helps first, introduces along the way, proactively calls `save_friend_note` when learning anything about the user without being asked
@@ -160,10 +170,135 @@ Note: KICK_MESSAGES is not exported. The test should import `detectKick` and use
 
 ---
 
+### GATE 2 FOLLOW-UP: tool_choice + final_answer Hardening
+
+These units address issues discovered during Gate 2 live testing. The core problem: `tool_choice: required` and `finalAnswerTool` were hardcoded unconditionally in core.ts, bypassing the `toolChoiceRequired` option. Meanwhile, Teams never passed `toolChoiceRequired`, so prompt sections (`toolBehaviorSection`, `toolsSection`) that check this flag never emitted -- the model was forced to call tools but never told about `final_answer` in the prompt.
+
+**Strategy**: Make `toolChoiceRequired` default to `true` (not hardcode it away). This restores the conditional checks everywhere while making them default-on. Teams gets the prompt sections automatically. CLI can still override.
+
+### ⬜ Unit 5a: Issue A (toolChoiceRequired default) -- Tests
+**What**: Write failing tests in `src/__tests__/heart/core.test.ts` verifying:
+1. When `runAgent` is called WITHOUT `toolChoiceRequired` in options, `tool_choice: "required"` is still set (because it defaults to true)
+2. When `runAgent` is called with `toolChoiceRequired: false`, `tool_choice` is NOT set
+3. When called without `toolChoiceRequired`, `activeTools` includes `finalAnswerTool`
+4. When called with `toolChoiceRequired: false`, `activeTools` does NOT include `finalAnswerTool`
+
+Tests should cover both Azure (Responses API) and non-Azure (Chat Completions) paths.
+**Output**: New test cases in `src/__tests__/heart/core.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because `tool_choice` is currently hardcoded unconditionally (ignores option)
+
+### ⬜ Unit 5b: Issue A (toolChoiceRequired default) -- Implementation
+**What**: Three changes in `src/heart/core.ts`:
+1. Default `toolChoiceRequired` to `true`: near top of `runAgent`, add `const toolChoiceRequired = options?.toolChoiceRequired ?? true;`
+2. Restore conditional `activeTools`: change line 262 from `const activeTools = [...baseTools, finalAnswerTool]` to `const activeTools = toolChoiceRequired ? [...baseTools, finalAnswerTool] : baseTools`
+3. Restore conditional `tool_choice`: change lines 289 and 304 from unconditional `azureParams.tool_choice = "required"` / `createParams.tool_choice = "required"` to conditional `if (toolChoiceRequired || lastKickReason)` (preserving the kick override from Unit 3b)
+
+Update the comment at lines 259-261 to reflect "defaults to true, overridable via options".
+**Output**: Modified `src/heart/core.ts`
+**Acceptance**: All tests PASS (green), no warnings. The Unit 3a/3b kick tests still pass (kick override preserved).
+
+### ⬜ Unit 5c: Issue A (toolChoiceRequired default) -- Coverage & Refactor
+**What**: Verify 100% coverage on modified `runAgent` logic. Both `toolChoiceRequired: true` (default) and `toolChoiceRequired: false` branches must be covered for activeTools and tool_choice setting. Kick override path must also be covered.
+**Output**: Coverage report showing full branch coverage
+**Acceptance**: 100% coverage on new/modified code, all tests green, no warnings
+
+### ⬜ Unit 6a: Issue B (toolBehaviorSection prompt) -- Tests
+**What**: Write failing tests in `src/__tests__/mind/prompt.test.ts` verifying:
+1. `toolBehaviorSection()` emits content when called with NO options (defaults on)
+2. `toolBehaviorSection()` emits content when called with `{ toolChoiceRequired: true }`
+3. `toolBehaviorSection()` returns empty string when called with `{ toolChoiceRequired: false }`
+4. The emitted content contains decision-tree framing: mentions calling tools for info and `final_answer` for responding
+5. The emitted content contains anti-no-op pattern: warns against calling `get_current_time` or other no-ops before `final_answer`
+6. The emitted content clarifies that `final_answer` IS a tool call satisfying the requirement
+
+Also test `toolsSection()` (Issue E):
+7. `toolsSection()` includes `final_answer` in tool list when called with no options (defaults on)
+8. `toolsSection()` does NOT include `final_answer` when called with `{ toolChoiceRequired: false }`
+**Output**: New test cases in `src/__tests__/mind/prompt.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because current `toolBehaviorSection` returns empty string when no options passed, and prompt text doesn't contain the new framing
+
+### ⬜ Unit 6b: Issue B + E (toolBehaviorSection + toolsSection) -- Implementation
+**What**: Two changes in `src/mind/prompt.ts`:
+1. `toolBehaviorSection()` at line 136: change guard from `if (!options?.toolChoiceRequired)` to `if (!(options?.toolChoiceRequired ?? true))` so it defaults on. Rewrite the prompt text:
+   - Decision tree: "need more information? call a tool. ready to respond to the user? call `final_answer`."
+   - Anti-pattern: "do NOT call `get_current_time` or other no-op tools just before `final_answer`. if you are done, call `final_answer` directly."
+   - Clarification: "`final_answer` is a tool call -- it satisfies the tool_choice requirement."
+   - Keep existing rule: `final_answer` must be the ONLY tool call in that turn.
+2. `toolsSection()` at line 97: change from `options?.toolChoiceRequired ? [...channelTools, finalAnswerTool] : channelTools` to `(options?.toolChoiceRequired ?? true) ? [...channelTools, finalAnswerTool] : channelTools` so it defaults on.
+**Output**: Modified `src/mind/prompt.ts`
+**Acceptance**: All tests PASS (green), no warnings
+
+### ⬜ Unit 6c: Issue B + E -- Coverage & Refactor
+**What**: Verify 100% coverage on `toolBehaviorSection()` and `toolsSection()`. Both default-on and explicit-false paths must be covered.
+**Output**: Coverage report showing full branch coverage
+**Acceptance**: 100% coverage on new/modified code, tests still green
+
+### ⬜ Unit 7a: Issue C (finalAnswerTool description) -- Tests
+**What**: Write a failing test in `src/__tests__/repertoire/tools.test.ts` (or the appropriate test file for tools-base.ts) verifying:
+1. `finalAnswerTool.function.description` frames it as the primary response mechanism (contains "respond to the user" or similar), NOT as an alternative ("instead of calling another tool")
+**Output**: New test case
+**Acceptance**: Test exists and FAILS (red) because current description says "instead of calling another tool"
+
+### ⬜ Unit 7b: Issue C (finalAnswerTool description) -- Implementation
+**What**: In `src/repertoire/tools-base.ts` at line 359-360, change the description from:
+`"give your final text response. use this when you want to reply with text instead of calling another tool."`
+to something like:
+`"respond to the user with your message. call this tool when you are ready to deliver your response."`
+**Output**: Modified `src/repertoire/tools-base.ts`
+**Acceptance**: All tests PASS (green), no warnings
+
+### ⬜ Unit 7c: Issue C -- Coverage & Refactor
+**What**: Verify the `finalAnswerTool` export is covered. This is a static definition so coverage is inherent, but verify no regressions in tools.test.ts.
+**Output**: Coverage report
+**Acceptance**: 100% coverage, all tests green
+
+### ⬜ Unit 8a: Issue D (final_answer onTextChunk emission) -- Test Coverage Verification
+**What**: Verify existing test coverage for the `final_answer` -> `callbacks.onTextChunk` path in `src/heart/core.ts` (lines 357-377). This was implemented in commits 43762ec and d7c184b. Check:
+1. Test exists verifying `onTextChunk` is called with the parsed answer text when `final_answer` is the sole tool call
+2. Test covers the JSON parse fallback (when `result.toolCalls[0].arguments` is malformed, falls back to `result.content`)
+3. Test covers the `answer` being falsy (no `onTextChunk` call)
+4. Test covers mixed-call rejection (final_answer combined with other tools is rejected)
+
+If any coverage gaps exist, write additional tests.
+**Output**: Coverage report or new tests if gaps found
+**Acceptance**: 100% coverage on the final_answer interception block (lines 357-377), all tests green
+
+### ⬜ Unit 9a: Issue F (response size / 413 error) -- Tests
+**What**: Write tests verifying:
+1. The system prompt for Teams channel includes `max 4000 chars` (already present via `channelCapabilities.maxMessageLength` in `contextSection`)
+2. The `toolBehaviorSection` or `final_answer` description reminds the model of message length constraints (optional -- verify if the existing channel traits line is sufficient)
+3. A truncation safety net: if `final_answer` text exceeds the channel's `maxMessageLength`, it is truncated before emission via `onTextChunk`. Test in core.ts or the callback layer.
+
+Focus: the truncation test should verify that when `final_answer` returns text longer than `maxMessageLength`, the emitted text is truncated to fit.
+**Output**: New test cases
+**Acceptance**: Tests exist. Truncation test FAILS (red) because no truncation logic exists yet.
+
+### ⬜ Unit 9b: Issue F (response size / 413 error) -- Implementation
+**What**: Add truncation safety net in `src/heart/core.ts` at the `final_answer` interception block (around line 368). After parsing the answer text:
+1. Get `maxMessageLength` from channel capabilities (pass channel caps into scope or look up from channel parameter)
+2. If `answer.length > maxMessageLength` and `maxMessageLength !== Infinity`, truncate to `maxMessageLength - 20` chars and append `\n\n[truncated]`
+3. Then emit via `callbacks.onTextChunk(answer)`
+
+The channel capabilities are already available via `getChannelCapabilities(channel)` import. The `channel` parameter is already in scope in `runAgent`.
+**Output**: Modified `src/heart/core.ts`
+**Acceptance**: All tests PASS (green), no warnings
+
+### ⬜ Unit 9c: Issue F -- Coverage & Refactor
+**What**: Verify 100% coverage on the truncation logic. Cover: no truncation needed (under limit), truncation triggered (over limit), Infinity maxMessageLength (no truncation), no channel (no truncation).
+**Output**: Coverage report
+**Acceptance**: 100% coverage on new/modified code, all tests green
+
+---
+
 ### GATE 2 CHECKPOINT
-**Manual test**: User deploys and tests on Copilot Chat with a tool-using request (e.g., "show me my backlog").
-**Expected**: No kick loop, no response spam, no platform timeout. Model uses `final_answer` to exit cleanly after completing work.
-**Also resolves**: Bug 5 (response spam -- consequence of kick loop + out-of-order) and Bug 6 (platform timeout -- consequence of kick loop).
+**Manual test**: User deploys and tests on Teams (Copilot Chat and/or standard 1:1) with tool-using and conversational requests.
+**Expected**:
+- No kick loop, no response spam, no platform timeout
+- Model uses `final_answer` to exit cleanly after completing work
+- `toolBehaviorSection` and `toolsSection` emit correctly in prompt (verify via logs)
+- No 413 errors on long responses (truncation safety net active)
+- `final_answer` text appears in chat (emitted via `onTextChunk`)
+**Also resolves**: Bug 5 (response spam) and Bug 6 (platform timeout).
 **Proceed to Gate 3 only after user confirms.**
 
 ---
