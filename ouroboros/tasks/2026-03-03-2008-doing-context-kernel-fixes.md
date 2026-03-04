@@ -490,12 +490,12 @@ Also verify the removal propagates:
 **`src/senses/teams.ts`**:
 1. Remove `disableStreaming` from `TeamsCallbackOptions` interface (line 74)
 2. Remove `const buffered = options?.disableStreaming === true` (line 100)
-3. `onReasoningChunk`: remove `if (!buffered)` guard -- always skip per-token `safeUpdate` (chunked streaming will handle reasoning display via the flush timer, similar to how buffered mode worked)
+3. `onReasoningChunk`: remove `if (!buffered)` guard -- never call per-token `safeUpdate` for reasoning (the phrase rotation timer and tool status updates provide sufficient keep-alive; reasoning text is internal, not user-facing content)
 4. `onTextChunk`: remove `if (buffered)` branch -- always accumulate in `textBuffer` (never `safeEmit` per-token)
 5. `onToolStart`: remove `if (buffered)` -- always call `flushTextBuffer()` before tool status
 6. `onToolEnd`: remove `if (buffered)` branch -- always use `safeUpdate` (not `safeEmit`)
 7. `onKick`: remove `if (buffered)` branch -- always use `safeUpdate` (not `safeEmit`)
-8. `onError`: remove `else if (buffered)` branch -- terminal errors use `safeSend`, transient use `safeUpdate`
+8. `onError`: remove `else if (buffered)` branch -- terminal errors always use `safeSend` (not `safeEmit`, which would inject error text into accumulated content), transient always use `safeUpdate`
 9. `handleTeamsMessage`: remove `disableStreaming` parameter, remove `agentOptions.disableStreaming` setting
 10. `startTeamsApp`: remove `--disable-streaming` argv check, remove `getTeamsChannelConfig().disableStreaming` check, remove `disableStreaming` from `withConversationLock` call, update startup log message
 11. Update the module-level comment block (lines 83-93) to describe the unified chunked streaming approach
@@ -552,12 +552,10 @@ Also verify the removal propagates:
 3. Add `startFlushTimer()`: if `flushTimer` is null, start `setInterval(() => flushTextBuffer(), FLUSH_INTERVAL_MS)`. Idempotent -- calling when timer already running is a no-op.
 4. Add `stopFlushTimer()`: clear `flushTimer` interval if set, set to null. Idempotent.
 5. In `onTextChunk`: after accumulating `textBuffer += text`, call `startFlushTimer()` to ensure periodic flushing is active.
-6. In `markStopped()`: call `stopFlushTimer()` (alongside existing `stopPhraseRotation()` and `cancelDeadline()` cleanup).
-7. In controller abort handler: call `stopFlushTimer()` (alongside existing `cancelDeadline()`).
+6. In `markStopped()`: call `stopFlushTimer()` (alongside existing `stopPhraseRotation()` cleanup).
+7. In controller abort handler: call `stopFlushTimer()`.
 8. In `flush()`: call `stopFlushTimer()` before flushing remaining buffer. This prevents the periodic timer from firing after the turn ends.
 9. `flushTextBuffer()` is already implemented and handles first-flush-to-emit vs subsequent-to-send logic. No changes needed to it.
-10. Remove the `STREAM_DEADLINE_MS` constant and `deadlineFired`/`deadlineTimer` state (already reverted in Unit 17a, but verify).
-11. Remove `cancelDeadline()` function and its calls (already reverted in Unit 17a, but verify).
 
 The phrase rotation timer (1.5s interval for `safeUpdate`) continues to run during reasoning phases, keeping the stream alive with status updates. Once `onTextChunk` starts, the flush timer takes over for content delivery. Both timers can coexist -- phrase rotation updates status, flush timer delivers content.
 
