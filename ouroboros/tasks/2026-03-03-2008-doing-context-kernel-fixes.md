@@ -219,3 +219,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-03 22:00 Pass 4 -- Quality (all 14 units have acceptance criteria, no TBD, all emojis present, proposed kick message verified against all 40 TOOL_INTENT_PATTERNS -- no matches)
 - 2026-03-03 22:06 Unit 1a complete: 2 tests for AAD extraction in startTeamsApp handler -- 1 fails (red) because teamsContext lacks AAD fields, 1 passes (fallback already works)
 - 2026-03-03 22:07 Unit 1b complete: 3 lines added to teamsContext construction -- aadObjectId, tenantId, displayName from activity. 153 tests pass, build clean
+- 2026-03-03 22:07 Unit 1c complete: teams.ts coverage 100% (stmts/branches/funcs/lines). Both AAD-present and AAD-absent paths covered. No refactoring needed
