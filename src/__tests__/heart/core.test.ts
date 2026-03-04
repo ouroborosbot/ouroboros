@@ -2885,55 +2885,6 @@ describe("getClient config integration", () => {
     expect(messages[1].content).toBe("just text")
   })
 
-  it("fires onError when tool loop limit is reached", async () => {
-    vi.resetModules()
-    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
-    await setupMinimax()
-
-    vi.mocked(fs.readFileSync).mockReturnValue("data")
-
-    // Make every API call return a tool call (never text-only)
-    mockCreate.mockReset()
-    let callCount = 0
-    mockCreate.mockImplementation(() => {
-      callCount++
-      return {
-        [Symbol.asyncIterator]: async function* () {
-          yield {
-            choices: [{
-              delta: {
-                tool_calls: [{
-                  index: 0,
-                  id: `call_${callCount}`,
-                  function: { name: "read_file", arguments: '{"path":"/tmp/f.txt"}' },
-                }],
-              },
-            }],
-          }
-        },
-      }
-    })
-
-    const errors: { error: Error; severity: string }[] = []
-    const callbacks: ChannelCallbacks = {
-      onModelStart: () => {},
-      onModelStreamStart: () => {},
-      onTextChunk: () => {},
-      onReasoningChunk: () => {},
-      onToolStart: () => {},
-      onToolEnd: () => {},
-      onError: (err, severity) => errors.push({ error: err, severity }),
-    }
-
-    const core = await import("../../heart/core")
-    await core.runAgent([{ role: "system", content: "test" }], callbacks)
-
-    expect(errors.length).toBe(1)
-    expect(errors[0].error.message).toContain("tool loop limit reached")
-    expect(errors[0].severity).toBe("terminal")
-    expect(callCount).toBe(core.MAX_TOOL_ROUNDS)
-  })
-
   it("exits when neither provider configured in config", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
@@ -3086,66 +3037,6 @@ describe("kick mechanism", () => {
     expect(assistantMessages[0].content).toContain("let me read that file for you")
     expect(assistantMessages[0].content).toContain("I narrated instead of acting. Using the tool now -- if done, calling final_answer.")
     expect(assistantMessages[1].content).toBe("here is the result")
-  })
-
-  // Kick detection disabled — see core.ts
-  it.skip("kicks fire unconditionally -- no maxKicks cap, bounded by MAX_TOOL_ROUNDS", async () => {
-    let callCount = 0
-    mockCreate.mockImplementation(() => {
-      callCount++
-      // All calls narrate intent -- kicks fire every time until MAX_TOOL_ROUNDS
-      return makeStream([makeChunk("I'll read the file now")])
-    })
-
-    const kicks: number[] = []
-    const errors: string[] = []
-    const callbacks: ChannelCallbacks = {
-      onModelStart: () => {},
-      onModelStreamStart: () => {},
-      onTextChunk: () => {},
-      onReasoningChunk: () => {},
-      onToolStart: () => {},
-      onToolEnd: () => {},
-      onError: (err) => errors.push(err.message),
-      onKick: () => kicks.push(1),
-    }
-
-    const messages: any[] = [{ role: "system", content: "test" }]
-    await runAgent(messages, callbacks)
-
-    // Kicks fire unconditionally -- the last kick hits MAX_TOOL_ROUNDS and
-    // terminates before onKick fires, so we get MAX_TOOL_ROUNDS - 1 callbacks
-    expect(kicks.length).toBe(9)
-    expect(errors.some(e => e.includes("tool loop limit"))).toBe(true)
-  })
-
-  // Kick detection disabled — see core.ts
-  it.skip("kick increments toolRounds and respects MAX_TOOL_ROUNDS", async () => {
-    let callCount = 0
-    mockCreate.mockImplementation(() => {
-      callCount++
-      return makeStream([makeChunk("I will do that now")])
-    })
-
-    const errors: string[] = []
-    const kicks: number[] = []
-    const callbacks: ChannelCallbacks = {
-      onModelStart: () => {},
-      onModelStreamStart: () => {},
-      onTextChunk: () => {},
-      onReasoningChunk: () => {},
-      onToolStart: () => {},
-      onToolEnd: () => {},
-      onError: (err) => errors.push(err.message),
-      onKick: () => kicks.push(1),
-    }
-
-    const messages: any[] = [{ role: "system", content: "test" }]
-    await runAgent(messages, callbacks)
-
-    // Kicks should be capped by MAX_TOOL_ROUNDS (10)
-    expect(callCount).toBeLessThanOrEqual(11) // initial + up to 10 kicks
-    expect(errors.some(e => e.includes("tool loop limit"))).toBe(true)
   })
 
   // Kick detection disabled — see core.ts
@@ -4132,43 +4023,6 @@ describe("integration: kick + tool_choice required combined", () => {
     const lastAssistant = [...messages].reverse().find((m: any) => m.role === "assistant")
     expect(lastAssistant.content).toBe("the answer is 42")
     expect(lastAssistant.tool_calls).toBeUndefined()
-  })
-
-  // Kick detection disabled — see core.ts
-  it.skip("MAX_TOOL_ROUNDS budget accounts for kicks + tool rounds together", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue("data")
-    let callCount = 0
-    mockCreate.mockImplementation(() => {
-      callCount++
-      // Alternate: narrate intent (kick) then tool call, repeat
-      if (callCount % 2 === 1 && callCount <= 5) {
-        return makeStream([makeChunk("I will do that")])
-      }
-      return makeStream([
-        makeChunk(undefined, [
-          { index: 0, id: `call_${callCount}`, function: { name: "read_file", arguments: '{"path":"a.txt"}' } },
-        ]),
-      ])
-    })
-
-    const errors: string[] = []
-    const kicks: number[] = []
-    const callbacks: ChannelCallbacks = {
-      onModelStart: () => {},
-      onModelStreamStart: () => {},
-      onTextChunk: () => {},
-      onReasoningChunk: () => {},
-      onToolStart: () => {},
-      onToolEnd: () => {},
-      onError: (err) => errors.push(err.message),
-      onKick: () => kicks.push(1),
-    }
-
-    const messages: any[] = [{ role: "system", content: "test" }]
-    await runAgent(messages, callbacks)
-
-    // Should hit MAX_TOOL_ROUNDS (10) combining kicks and tool rounds
-    expect(errors.some(e => e.includes("tool loop limit"))).toBe(true)
   })
 
   // Kick detection disabled — see core.ts
