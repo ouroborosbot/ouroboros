@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest"
 import { createNdjsonFileSink } from "../../nerves"
 
 describe("observability/sinks", () => {
-  it("appends ndjson events without truncating", async () => {
+  it("appends ndjson events without truncating", () => {
     const dir = mkdtempSync(join(tmpdir(), "ouro-observability-"))
     const filePath = join(dir, "events.ndjson")
 
@@ -31,17 +31,7 @@ describe("observability/sinks", () => {
       meta: { turn: 1 },
     })
 
-    let lines: string[] = []
-    for (let i = 0; i < 20; i++) {
-      try {
-        lines = readFileSync(filePath, "utf8").trim().split("\n")
-        if (lines.length === 2) break
-      } catch {
-        // File write is asynchronous; retry briefly.
-      }
-      await new Promise((resolve) => setTimeout(resolve, 5))
-    }
-
+    const lines = readFileSync(filePath, "utf8").trim().split("\n")
     expect(lines).toHaveLength(2)
     expect(JSON.parse(lines[0] as string).event).toBe("turn.start")
     expect(JSON.parse(lines[1] as string).event).toBe("turn.end")
