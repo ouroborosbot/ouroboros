@@ -783,6 +783,100 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     vi.restoreAllMocks()
   })
 
+  it("same-conversation follow-up during active turn is steered without starting a second turn", async () => {
+    vi.resetModules()
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+
+    let releaseFirst: (() => void) | undefined
+    const firstTurn = new Promise<void>((resolve) => { releaseFirst = resolve })
+    let drainedFollowUps: Array<{ text: string }> = []
+    const runAgentFn = vi.fn()
+      .mockImplementationOnce(async (_messages: any, _callbacks: any, _channel: any, _signal: any, options: any) => {
+        await firstTurn
+        drainedFollowUps = options?.drainSteeringFollowUps?.() ?? []
+        return { usage: undefined }
+      })
+      .mockResolvedValue({ usage: undefined })
+
+    vi.doMock("../../heart/core", () => ({
+      runAgent: runAgentFn,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      postTurn: vi.fn(),
+    }))
+
+    vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const stream1 = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const stream2 = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const api = {
+      users: {
+        token: {
+          get: vi.fn().mockResolvedValue({ token: undefined }),
+        },
+      },
+    }
+
+    const firstMessage = capturedHandler!({
+      stream: stream1,
+      activity: { text: "first", conversation: { id: "conv-steer" }, from: { id: "user-1" }, channelId: "msteams" },
+      api,
+      signin: vi.fn(),
+      send: vi.fn(),
+    })
+
+    for (let i = 0; i < 20 && runAgentFn.mock.calls.length === 0; i++) {
+      await new Promise((r) => setTimeout(r, 1))
+    }
+    expect(runAgentFn).toHaveBeenCalledTimes(1)
+
+    await capturedHandler!({
+      stream: stream2,
+      activity: { text: "follow-up", conversation: { id: "conv-steer" }, from: { id: "user-1" }, channelId: "msteams" },
+      api,
+      signin: vi.fn(),
+      send: vi.fn(),
+    })
+
+    // Follow-up should be buffered for steering and not open a second turn.
+    expect(runAgentFn).toHaveBeenCalledTimes(1)
+    expect(stream2.emit).not.toHaveBeenCalled()
+
+    releaseFirst?.()
+    await firstMessage
+    expect(runAgentFn).toHaveBeenCalledTimes(1)
+    expect(drainedFollowUps.map((m) => m.text)).toEqual(["follow-up"])
+
+    vi.restoreAllMocks()
+  })
+
   it("message handler fetches tokens and passes teamsContext to handleTeamsMessage", async () => {
     vi.resetModules()
     // no env vars to clear
@@ -2022,7 +2116,7 @@ describe("Teams adapter - session persistence", () => {
     expect(order[1]).toBe("start-2")
   })
 
-  it("enforces global in-flight conversation cap with deterministic overload response", async () => {
+  it("does not hard-reject concurrent conversations while one turn is in-flight", async () => {
     vi.resetModules()
     let releaseFirst: (() => void) | undefined
     const firstTurn = new Promise<void>((resolve) => { releaseFirst = resolve })
@@ -2049,10 +2143,10 @@ describe("Teams adapter - session persistence", () => {
     expect(runAgentFn).toHaveBeenCalledTimes(1)
 
     await teams.handleTeamsMessage("second", stream2 as any, "conv-2")
-    const overloadText = stream2.emit.mock.calls.map((c: any[]) => String(c[0] ?? "")).join("\n")
-    expect(overloadText).toContain("single-replica preview")
-    expect(overloadText).toContain("retry")
-    expect(runAgentFn).toHaveBeenCalledTimes(1)
+    const emitted = stream2.emit.mock.calls.map((c: any[]) => String(c[0] ?? "")).join("\n")
+    expect(emitted).not.toContain("single-replica preview")
+    expect(emitted).not.toContain("maximum concurrent conversations")
+    expect(runAgentFn).toHaveBeenCalledTimes(2)
 
     releaseFirst?.()
     await firstMessage
