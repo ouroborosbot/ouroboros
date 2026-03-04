@@ -234,7 +234,7 @@ Also test `toolsSection()` (Issue E):
 **Output**: Coverage report showing full branch coverage
 **Acceptance**: 100% coverage on new/modified code, tests still green
 
-### ⬜ Unit 7a: Issue C (finalAnswerTool description) -- Tests
+### ✅ Unit 7a: Issue C (finalAnswerTool description) -- Tests
 **What**: Write a failing test in `src/__tests__/repertoire/tools.test.ts` (or the appropriate test file for tools-base.ts) verifying:
 1. `finalAnswerTool.function.description` frames it as the primary response mechanism (contains "respond to the user" or similar), NOT as an alternative ("instead of calling another tool")
 **Output**: New test case
