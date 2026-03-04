@@ -70,7 +70,7 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 
 ### GATE 1: Identity + Out-of-Order Messages
 
-### ⬜ Unit 1a: Bug 1 (AAD extraction) -- Tests
+### ✅ Unit 1a: Bug 1 (AAD extraction) -- Tests
 **What**: Write failing tests for `teamsContext` AAD field population. Tests should verify that when `activity.from.aadObjectId`, `activity.conversation.tenantId`, and `activity.from.name` are present, they are copied into the `teamsContext` object. Also test the fallback case where these fields are absent (conversation-ID fallback still works).
 **Output**: New test cases in `src/__tests__/senses/teams.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `teamsContext` doesn't populate AAD fields yet
