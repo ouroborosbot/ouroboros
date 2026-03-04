@@ -99,18 +99,6 @@ export { hasToolIntent } from "./kicks";
 
 export const MAX_TOOL_ROUNDS = 10;
 
-function upsertSystemPrompt(
-  messages: OpenAI.ChatCompletionMessageParam[],
-  systemText: string,
-): void {
-  const systemMessage: OpenAI.ChatCompletionSystemMessageParam = { role: "system", content: systemText };
-  if (messages[0]?.role === "system") {
-    messages[0] = systemMessage;
-  } else {
-    messages.unshift(systemMessage);
-  }
-}
-
 // Remove orphan tool_calls from the last assistant message and any
 // trailing tool-result messages that lack a matching tool_call.
 // This keeps the conversation valid after an abort or tool-loop limit.
@@ -197,36 +185,14 @@ export async function runAgent(
 
   if (friendStore && friendId) {
     const freshFriend = await friendStore.get(friendId);
-    if (freshFriend) {
-      currentContext = { ...currentContext!, friend: freshFriend };
+    if (freshFriend && currentContext) {
+      currentContext = { ...currentContext, friend: freshFriend };
     }
   }
 
-  // Refresh system prompt at start of each turn when channel is provided.
-  // If refresh fails, keep existing system prompt (or inject a minimal safe fallback)
-  // so turn execution remains consistent and non-fatal.
+  // Refresh system prompt at start of each turn when channel is provided
   if (channel) {
-    try {
-      const refreshed = await buildSystem(channel, options, currentContext);
-      upsertSystemPrompt(messages, refreshed);
-    } catch (error) {
-      const hadExistingSystemPrompt = messages[0]?.role === "system" && typeof messages[0].content === "string";
-      const existingSystemText = hadExistingSystemPrompt ? (messages[0].content as string) : undefined;
-      const fallback = existingSystemText ?? "You are a helpful assistant.";
-      upsertSystemPrompt(messages, fallback);
-      emitNervesEvent({
-        level: "warn",
-        event: "mind.step_error",
-        trace_id: traceId,
-        component: "mind",
-        message: "buildSystem refresh failed; using fallback prompt",
-        meta: {
-          channel,
-          reason: error instanceof Error ? error.message : String(error),
-          used_existing_prompt: hadExistingSystemPrompt,
-        },
-      });
-    }
+    messages[0] = { role: "system", content: await buildSystem(channel, options, currentContext) };
   }
 
   let kickCount = 0;

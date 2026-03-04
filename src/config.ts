@@ -38,7 +38,6 @@ export interface TeamsChannelConfig {
   skipConfirmation: boolean
   disableStreaming: boolean
   port: number
-  maxConcurrentConversations: number
 }
 
 export interface IntegrationsConfig {
@@ -89,7 +88,6 @@ const DEFAULT_CONFIG: OuroborosConfig = {
     skipConfirmation: true,
     disableStreaming: false,
     port: 3978,
-    maxConcurrentConversations: 10,
   },
   integrations: {
     perplexityApiKey: "",
