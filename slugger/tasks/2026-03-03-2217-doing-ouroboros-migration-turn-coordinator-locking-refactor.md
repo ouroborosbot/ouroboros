@@ -13,16 +13,18 @@
 - **direct**: Execute units sequentially in current session (default)
 
 ## Objective
-Remove Teams hard reject-on-cap behavior and replace silent same-conversation waiting with explicit steering feedback, using a channel-agnostic turn coordinator for turn ownership.
+Remove Teams hard reject-on-cap behavior and replace silent same-conversation waiting with model-visible steering behavior, using a channel-agnostic turn coordinator for turn ownership.
 
 ## Completion Criteria
 - [ ] Teams no longer hard-rejects messages based on a static concurrent-turn cap.
 - [ ] `teamsChannel.maxConcurrentConversations` is fully removed from config schema/defaults/accessors and call sites.
 - [ ] A shared turn coordinator exists and is used by Teams for per-conversation serialization.
-- [ ] Same-conversation mid-turn follow-up messages receive immediate steering feedback (no silent queue UX).
+- [ ] Same-conversation follow-up messages during active turns are all preserved and injected into the active turn between model calls.
+- [ ] Steering path introduces no adapter-authored plain-text acknowledgement messages to users.
+- [ ] Model receives all follow-up user messages for steering (none dropped).
 - [ ] Single active-turn ownership per conversation is preserved; different conversations remain parallelizable.
 - [ ] Existing confirmation flow remains deadlock-safe with the coordinator in place.
-- [ ] Tests are updated to cover coordinator contract, steering feedback behavior, and removed cap behavior.
+- [ ] Tests are updated to cover coordinator contract, steering injection contract, and removed cap behavior.
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -51,25 +53,26 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
 ### ⬜ Unit 0: Setup/Research
-**What**: Lock baseline callsites and contracts for migration from Teams-local lock/cap to shared turn coordinator + steering-feedback path; enumerate references to `withConversationLock`, `_inFlightTeamsTurns`, `maxConcurrentConversations`, and current same-conversation message handling points.
+**What**: Lock baseline callsites and contracts for migration from Teams-local lock/cap to shared turn coordinator + steering injection path; enumerate references to `withConversationLock`, `_inFlightTeamsTurns`, `maxConcurrentConversations`, and current same-conversation follow-up handling points.
 **Output**: `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-locking-refactor/unit-0-baseline.md`
-**Acceptance**: Baseline inventory covers all active callsites and identifies exact tests/contracts to update for coordinator and steering behavior.
+**Acceptance**: Baseline inventory covers all active callsites and identifies exact tests/contracts to update for coordinator and preserve-all steering behavior.
 
 ### ⬜ Unit 1a: Turn Coordinator & Cap Removal — Tests
 **What**: Write failing tests for the refactor contract:
 - shared coordinator serializes same key and permits parallel different keys
 - Teams path no longer emits cap-reject overload message or checks in-flight cap gate
-- Teams path emits deterministic immediate steering feedback for same-conversation mid-turn follow-up
+- Teams path preserves all same-conversation mid-turn follow-up messages and injects them between model calls
+- Teams path does not emit adapter-authored plain-text steering acknowledgements
 - `teamsChannel.maxConcurrentConversations` removed from config/types/defaults/tests
 **Output**: `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-locking-refactor/unit-1a-red-run.txt`
 **Acceptance**: New/updated tests fail on current behavior before implementation.
 
 ### ⬜ Unit 1b: Turn Coordinator & Cap Removal — Implementation
-**What**: Implement shared turn coordinator, migrate Teams to use it, add steering-feedback handling for same-conversation mid-turn follow-ups, and remove cap-gate/config field and related runtime code/tests.
+**What**: Implement shared turn coordinator, migrate Teams to use it, add preserve-all steering injection handling for same-conversation mid-turn follow-ups, and remove cap-gate/config field and related runtime code/tests.
 **Output**:
 - `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-locking-refactor/unit-1b-test-run.txt`
 - `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-locking-refactor/unit-1b-build-run.txt`
-**Acceptance**: Unit 1a tests pass; Teams turn handling uses coordinator ownership semantics, emits steering feedback for mid-turn follow-ups, avoids hard cap rejection, and removes `maxConcurrentConversations`.
+**Acceptance**: Unit 1a tests pass; Teams turn handling uses coordinator ownership semantics, preserves+injects all follow-up messages for model visibility, emits no adapter-authored steering plain text, avoids hard cap rejection, and removes `maxConcurrentConversations`.
 
 ### ⬜ Unit 1c: Turn Coordinator & Cap Removal — Coverage & Refactor
 **What**: Run coverage gate, backfill any uncovered branches introduced by coordinator/cap-removal changes, and refactor for clarity.
@@ -79,7 +82,7 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 **Acceptance**: 100% coverage on changed code, tests green, build green, no warnings.
 
 ### ⬜ Unit 2a: Confirmation + Steering Safety Regression Validation
-**What**: Validate confirmation flow remains deadlock-safe after coordinator migration and steering path (pre-lock confirmation resolution, same-conversation ownership, and steering follow-up behavior).
+**What**: Validate confirmation flow remains deadlock-safe after coordinator migration and steering path (pre-lock confirmation resolution, same-conversation ownership, and preserve-all follow-up steering injection behavior).
 **Output**: `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-locking-refactor/unit-2a-test-run.txt`
 **Acceptance**: Confirmation and steering-related Teams tests pass with coordinator path active and no deadlock regressions.
 
