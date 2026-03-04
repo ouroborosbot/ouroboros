@@ -11,6 +11,7 @@ import { loadSession, deleteSession, postTurn } from "../mind/context"
 import type { UsageData } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand, getToolChoiceRequired } from "../repertoire/commands"
 import { getAgentName, getAgentRoot } from "../identity"
+import { createTraceId } from "../nerves"
 import { FileFriendStore } from "../mind/friends/store-file"
 import { FriendResolver } from "../mind/friends/resolver"
 import type { ToolContext } from "../repertoire/tools"
@@ -435,10 +436,15 @@ export async function main() {
       addHistory(history, input)
 
       currentAbort = new AbortController()
+      const traceId = createTraceId()
       ctrl.suppress(() => currentAbort!.abort())
       let result: { usage?: UsageData } | undefined
       try {
-        result = await runAgent(messages, cliCallbacks, "cli", currentAbort.signal, { toolChoiceRequired: getToolChoiceRequired(), toolContext: cliToolContext })
+        result = await runAgent(messages, cliCallbacks, "cli", currentAbort.signal, {
+          toolChoiceRequired: getToolChoiceRequired(),
+          toolContext: cliToolContext,
+          traceId,
+        })
       } catch {
         // AbortError — silently return to prompt
       }

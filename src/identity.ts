@@ -1,5 +1,6 @@
 import * as fs from "fs"
 import * as path from "path"
+import { emitNervesEvent } from "./nerves/runtime"
 
 export interface AgentConfig {
   name: string
@@ -20,7 +21,15 @@ let _cachedAgentConfig: AgentConfig | null = null
  * Throws if --agent is missing or has no value.
  */
 export function getAgentName(): string {
-  if (_cachedAgentName) return _cachedAgentName
+  if (_cachedAgentName) {
+    emitNervesEvent({
+      event: "identity.resolve",
+      component: "config/identity",
+      message: "resolved agent name from cache",
+      meta: { source: "cache" },
+    })
+    return _cachedAgentName
+  }
 
   const idx = process.argv.indexOf("--agent")
   if (idx === -1 || idx + 1 >= process.argv.length) {
@@ -30,6 +39,12 @@ export function getAgentName(): string {
   }
 
   _cachedAgentName = process.argv[idx + 1]
+  emitNervesEvent({
+    event: "identity.resolve",
+    component: "config/identity",
+    message: "resolved agent name from argv",
+    meta: { source: "argv" },
+  })
   return _cachedAgentName
 }
 
@@ -55,7 +70,15 @@ export function getAgentRoot(): string {
  * Throws descriptive error if file is missing or contains invalid JSON.
  */
 export function loadAgentConfig(): AgentConfig {
-  if (_cachedAgentConfig) return _cachedAgentConfig
+  if (_cachedAgentConfig) {
+    emitNervesEvent({
+      event: "identity.resolve",
+      component: "config/identity",
+      message: "loaded agent config from cache",
+      meta: { source: "cache" },
+    })
+    return _cachedAgentConfig
+  }
 
   const agentRoot = getAgentRoot()
   const configFile = path.join(agentRoot, "agent.json")
@@ -63,7 +86,17 @@ export function loadAgentConfig(): AgentConfig {
   let raw: string
   try {
     raw = fs.readFileSync(configFile, "utf-8")
-  } catch {
+  } catch (error) {
+    emitNervesEvent({
+      level: "error",
+      event: "config_identity.error",
+      component: "config/identity",
+      message: "failed reading agent.json",
+      meta: {
+        path: configFile,
+        reason: error instanceof Error ? error.message : String(error),
+      },
+    })
     throw new Error(
       `Cannot read agent.json at ${configFile}. Does the agent directory exist?`
     )
@@ -72,7 +105,17 @@ export function loadAgentConfig(): AgentConfig {
   let parsed: Record<string, unknown>
   try {
     parsed = JSON.parse(raw) as Record<string, unknown>
-  } catch {
+  } catch (error) {
+    emitNervesEvent({
+      level: "error",
+      event: "config_identity.error",
+      component: "config/identity",
+      message: "invalid agent.json syntax",
+      meta: {
+        path: configFile,
+        reason: error instanceof Error ? error.message : String(error),
+      },
+    })
     throw new Error(
       `Invalid JSON in agent.json at ${configFile}. Check syntax.`
     )
@@ -98,10 +141,23 @@ export function loadAgentConfig(): AgentConfig {
     }
     parsed.phrases = filled
     console.warn("agent.json is missing phrases, added placeholders")
+    emitNervesEvent({
+      level: "warn",
+      event: "config_identity.error",
+      component: "config/identity",
+      message: "agent config missing phrase pools; placeholders applied",
+      meta: { path: configFile },
+    })
     fs.writeFileSync(configFile, JSON.stringify(parsed, null, 2) + "\n", "utf-8")
   }
 
   _cachedAgentConfig = parsed as unknown as AgentConfig
+  emitNervesEvent({
+    event: "identity.resolve",
+    component: "config/identity",
+    message: "loaded agent config from disk",
+    meta: { source: "disk" },
+  })
   return _cachedAgentConfig
 }
 

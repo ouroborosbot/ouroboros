@@ -73,6 +73,11 @@ describe("execTool", () => {
     expect(fs.readFileSync).toHaveBeenCalledWith("/tmp/test.txt", "utf-8")
   })
 
+  it("rethrows non-Error values from handlers", async () => {
+    vi.mocked(fs.readFileSync).mockImplementation(() => { throw "boom" })
+    await expect(execTool("read_file", { path: "/tmp/test.txt" })).rejects.toBe("boom")
+  })
+
   // ── write_file ──
   it("write_file writes content and returns ok", async () => {
     vi.mocked(fs.writeFileSync).mockReturnValue(undefined)
@@ -623,9 +628,17 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
     }
     const result = getToolsForChannel(teamsCaps)
     const names = result.map((t: any) => t.function.name)
-    // Should have all base tools
-    expect(names).toContain("read_file")
-    expect(names).toContain("shell")
+    const blockedLocalTools = new Set(["read_file", "write_file", "shell", "git_commit", "gh_cli"])
+    const remoteBaseCount = tools.filter((t: any) => !blockedLocalTools.has(t.function.name)).length
+    // Teams channel should exclude blocked local tools
+    expect(names).not.toContain("read_file")
+    expect(names).not.toContain("write_file")
+    expect(names).not.toContain("shell")
+    expect(names).not.toContain("git_commit")
+    expect(names).not.toContain("gh_cli")
+    // But still include safe base tools
+    expect(names).toContain("list_directory")
+    expect(names).toContain("get_current_time")
     // Should have graph tools
     expect(names).toContain("graph_query")
     expect(names).toContain("graph_mutate")
@@ -644,8 +657,8 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
     expect(names).toContain("ado_restructure_backlog")
     expect(names).toContain("ado_validate_structure")
     expect(names).toContain("ado_preview_changes")
-    // base tools + 8 teams tools + 11 semantic ado tools
-    expect(result.length).toBe(tools.length + 19)
+    // remote-safe base tools + 8 teams tools + 11 semantic ado tools
+    expect(result.length).toBe(remoteBaseCount + 19)
   })
 
   it("returns base + graph-only tools when only graph integration", async () => {
@@ -661,6 +674,8 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
     }
     const result = getToolsForChannel(caps)
     const names = result.map((t: any) => t.function.name)
+    const blockedLocalTools = new Set(["read_file", "write_file", "shell", "git_commit", "gh_cli"])
+    const remoteBaseCount = tools.filter((t: any) => !blockedLocalTools.has(t.function.name)).length
     // Should have graph tools
     expect(names).toContain("graph_query")
     expect(names).toContain("graph_mutate")
@@ -671,8 +686,8 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
     expect(names).not.toContain("ado_mutate")
     expect(names).not.toContain("ado_work_items")
     expect(names).not.toContain("ado_docs")
-    // base tools + 4 graph tools
-    expect(result.length).toBe(tools.length + 4)
+    // remote-safe base tools + 4 graph tools
+    expect(result.length).toBe(remoteBaseCount + 4)
   })
 
   it("returns base + ado-only tools when only ado integration", async () => {
@@ -688,6 +703,8 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
     }
     const result = getToolsForChannel(caps)
     const names = result.map((t: any) => t.function.name)
+    const blockedLocalTools = new Set(["read_file", "write_file", "shell", "git_commit", "gh_cli"])
+    const remoteBaseCount = tools.filter((t: any) => !blockedLocalTools.has(t.function.name)).length
     // Should have ado tools
     expect(names).toContain("ado_query")
     expect(names).toContain("ado_mutate")
@@ -700,8 +717,8 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
     expect(names).not.toContain("graph_docs")
     // Should have semantic ado tools
     expect(names).toContain("ado_backlog_list")
-    // base tools + 4 ado tools + 11 semantic ado tools
-    expect(result.length).toBe(tools.length + 15)
+    // remote-safe base tools + 4 ado tools + 11 semantic ado tools
+    expect(result.length).toBe(remoteBaseCount + 15)
   })
 })
 
@@ -756,9 +773,9 @@ describe("getToolsForChannel with toolPreferences", () => {
       expect(tool.function.description).toContain("my friend prefers iteration paths like Team\\Sprint1")
     }
 
-    // Base tools should NOT have the preference
-    const readFile = result.find((t: any) => t.function.name === "read_file")
-    expect(readFile!.function.description).not.toContain("my friend prefers")
+    // Base tools should NOT have the preference (use web_search -- read_file is blocked for remote channels)
+    const webSearch = result.find((t: any) => t.function.name === "web_search")
+    expect(webSearch!.function.description).not.toContain("my friend prefers")
 
     // Graph tools should NOT have the preference
     const graphQuery = result.find((t: any) => t.function.name === "graph_query")
@@ -922,9 +939,9 @@ describe("ToolContext shape", () => {
         },
       },
     }
-    // Should work fine -- context is optional and doesn't affect base tools
+    // Teams context should deny local file operations
     const result = await execTool("read_file", { path: "/tmp/test.txt" }, ctx)
-    expect(result).toBe("file content")
+    expect(result).toContain("I can't do that from here")
   })
 
   it("ToolContext does NOT have adoOrganizations field", async () => {
@@ -1582,12 +1599,16 @@ describe("getToolsForChannel includes docs tools", () => {
     }
     const teamsTools = getToolsForChannel(teamsCaps)
     const names = teamsTools.map((t: any) => t.function.name)
+    const blockedLocalTools = new Set(["read_file", "write_file", "shell", "git_commit", "gh_cli"])
+    const remoteBaseCount = tools.filter((t: any) => !blockedLocalTools.has(t.function.name)).length
     expect(names).toContain("graph_docs")
     expect(names).toContain("ado_docs")
     // Should have semantic ado tools
     expect(names).toContain("ado_backlog_list")
-    // base tools + 8 teams tools (4 generic + 2 aliases + 2 docs) + 11 semantic ado tools
-    expect(teamsTools.length).toBe(tools.length + 19)
+    expect(names).not.toContain("read_file")
+    expect(names).not.toContain("shell")
+    // remote-safe base tools + 8 teams tools (4 generic + 2 aliases + 2 docs) + 11 semantic ado tools
+    expect(teamsTools.length).toBe(remoteBaseCount + 19)
   })
 
   it("cli channel does NOT include graph_docs or ado_docs", async () => {

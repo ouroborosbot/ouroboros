@@ -110,3 +110,21 @@ describe("phrases - getPhrases from agent.json", () => {
     expect("FOLLOWUP_PHRASES" in mod).toBe(false)
   })
 })
+
+describe("phrases observability contract", () => {
+  it("emits repertoire.load_end when loading phrase pools", async () => {
+    vi.resetModules()
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({
+      emitNervesEvent,
+    }))
+
+    const { getPhrases } = await import("../../wardrobe/phrases")
+    getPhrases()
+
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+      event: "repertoire.load_end",
+      component: "repertoire",
+    }))
+  })
+})

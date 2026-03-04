@@ -7,6 +7,7 @@ import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName } from "../identity";
 import type { ResolvedContext } from "./friends/types";
 import { getChannelCapabilities } from "./friends/channel";
+import { emitNervesEvent } from "../nerves/runtime";
 
 // Lazy-loaded psyche text cache
 let _psycheCache: { soul: string; identity: string; lore: string; friends: string } | null = null;
@@ -206,7 +207,14 @@ export function contextSection(context?: ResolvedContext): string {
 }
 
 export async function buildSystem(channel: Channel = "cli", options?: BuildSystemOptions, context?: ResolvedContext): Promise<string> {
-  return [
+  emitNervesEvent({
+    event: "mind.step_start",
+    component: "mind",
+    message: "buildSystem started",
+    meta: { channel, has_context: Boolean(context), tool_choice_required: Boolean(options?.toolChoiceRequired) },
+  });
+
+  const system = [
     soulSection(),
     identitySection(),
     loreSection(),
@@ -222,4 +230,13 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
   ]
     .filter(Boolean)
     .join("\n\n");
+
+  emitNervesEvent({
+    event: "mind.step_end",
+    component: "mind",
+    message: "buildSystem completed",
+    meta: { channel },
+  });
+
+  return system;
 }
