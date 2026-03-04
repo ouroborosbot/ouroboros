@@ -1,6 +1,6 @@
 # Doing: GitHub Issue Tool
 
-**Status**: drafting
+**Status**: READY_FOR_EXECUTION
 **Execution Mode**: direct
 **Created**: 2026-03-04 00:37
 **Planning**: ./2026-03-04-0032-planning-gh-issue-tool.md
@@ -43,9 +43,9 @@ Allow agents using the ouroboros harness to open GitHub issues on the repo, enab
 ## Work Units
 
 ### Legend
-- Not started · In progress · Done · Blocked
+[N] Not started · [P] In progress · [D] Done · [B] Blocked
 
-### Unit 1a: Tool definition -- Tests
+### [N] Unit 1a: Tool definition -- Tests
 **What**: Write tests for the `open_github_issue` tool definition in `tools-base.ts`. Tests should verify:
 - The tool is registered in `baseToolDefinitions` with name `open_github_issue`
 - The tool schema has `title` (required), `body` (required), and `labels` (optional) parameters
@@ -60,7 +60,7 @@ Allow agents using the ouroboros harness to open GitHub issues on the repo, enab
 **Output**: Failing tests in `src/__tests__/repertoire/tools.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `open_github_issue` tool does not exist yet
 
-### Unit 1b: Tool definition -- Implementation
+### [N] Unit 1b: Tool definition -- Implementation
 **What**: Add the `open_github_issue` tool definition to `baseToolDefinitions` in `src/repertoire/tools-base.ts`. The handler should:
 1. Run `git remote get-url origin` via `execSync` to get the repo URL
 2. Parse `owner/repo` from the URL (handle both `https://github.com/owner/repo.git` and `git@github.com:owner/repo.git` formats)
@@ -72,7 +72,7 @@ Allow agents using the ouroboros harness to open GitHub issues on the repo, enab
 **Output**: Working `open_github_issue` tool in `src/repertoire/tools-base.ts`
 **Acceptance**: All Unit 1a tests PASS (green), no warnings
 
-### Unit 1c: Tool definition -- Coverage & Refactor
+### [N] Unit 1c: Tool definition -- Coverage & Refactor
 **What**: Verify 100% branch coverage on the new tool handler. Ensure all paths are covered:
 - HTTPS remote URL parsing
 - SSH remote URL parsing
@@ -84,7 +84,7 @@ Refactor if needed (e.g. extract repo URL parsing into a named function for clar
 **Output**: 100% coverage confirmed, clean code
 **Acceptance**: `npm test` passes, coverage report shows 100% on new lines, no warnings
 
-### Unit 2a: Tool registration -- Tests
+### [N] Unit 2a: Tool registration -- Tests
 **What**: Write tests verifying the tool is properly integrated in the registration layer:
 - `open_github_issue` appears in the `REMOTE_BLOCKED_LOCAL_TOOLS` set (blocked on Teams channel)
 - `summarizeArgs("open_github_issue", { title: "..." })` returns the title (truncated to 40 chars)
@@ -96,19 +96,19 @@ Refactor if needed (e.g. extract repo URL parsing into a named function for clar
 **Output**: Failing tests
 **Acceptance**: Tests exist and FAIL (red) because registration changes not yet made
 
-### Unit 2b: Tool registration -- Implementation
+### [N] Unit 2b: Tool registration -- Implementation
 **What**: Update `src/repertoire/tools.ts`:
 1. Add `"open_github_issue"` to the `REMOTE_BLOCKED_LOCAL_TOOLS` set
 2. Add a `summarizeArgs` case for `"open_github_issue"` that returns `args.title?.slice(0, 40) || ""`
 **Output**: Updated `src/repertoire/tools.ts`
 **Acceptance**: All Unit 2a tests PASS (green), plus all existing tests still pass
 
-### Unit 2c: Tool registration -- Coverage & Refactor
+### [N] Unit 2c: Tool registration -- Coverage & Refactor
 **What**: Verify coverage on the new `summarizeArgs` branch and `REMOTE_BLOCKED_LOCAL_TOOLS` addition. Confirm no regressions.
 **Output**: 100% coverage, all tests green
 **Acceptance**: `npm test` passes, no warnings, no coverage gaps
 
-### Unit 3: Update existing tests that enumerate tools
+### [N] Unit 3: Update existing tests that enumerate tools
 **What**: Several existing tests enumerate the full set of base tools or blocked tools and may need updating:
 - Test "base tool definitions include expected tool names" (line ~500): add `expect(names).toContain("open_github_issue")`
 - Tests that check Teams channel tool lists to NOT contain blocked tools: add `expect(names).not.toContain("open_github_issue")`
@@ -130,3 +130,4 @@ Refactor if needed (e.g. extract repo URL parsing into a named function for clar
 - 2026-03-04 00:37 Created from planning doc (Pass 1 -- First Draft)
 - 2026-03-04 00:37 Pass 2 -- Granularity: units are atomic, no changes needed
 - 2026-03-04 00:37 Pass 3 -- Validation: all file paths, function names, patterns verified against codebase. 4 blockedLocalTools sets in tests need updating (lines 631, 677, 706, 1602). No doc changes needed.
+- 2026-03-04 00:38 Pass 4 -- Quality: added status markers to all unit headers, no TBDs, all acceptance criteria testable, coverage requirements present.
