@@ -357,7 +357,7 @@ export const finalAnswerTool: OpenAI.ChatCompletionTool = {
   function: {
     name: "final_answer",
     description:
-      "give your final text response. use this when you want to reply with text instead of calling another tool.",
+      "respond to the user with your message. call this tool when you are ready to deliver your response.",
     parameters: {
       type: "object",
       properties: { answer: { type: "string" } },
