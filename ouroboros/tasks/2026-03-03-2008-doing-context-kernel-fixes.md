@@ -27,10 +27,10 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [ ] User confirms on Copilot Chat: messages arrive in correct order, displayName populated or fallback confirmed
 
 ### Gate 2: Kick Escape Hatch + Self-Trigger
-- [ ] `tool_choice = "required"` set when `lastKickReason` is truthy at core.ts:288 and core.ts:303
+- [x] `tool_choice = "required"` set when `lastKickReason` is truthy at core.ts:288 and core.ts:303
 - [ ] Kick message rewritten to not self-trigger `hasToolIntent()` -- verified by unit test
 - [ ] All existing kick patterns and test expectations unchanged
-- [ ] New tests for `tool_choice` forcing after any kick
+- [x] New tests for `tool_choice` forcing after any kick
 - [ ] New test verifying kick message does not trigger `hasToolIntent()`
 - [ ] User confirms on Copilot Chat: no kick loop, no response spam, no timeout
 
@@ -134,7 +134,7 @@ Add `sendChain` variable before `safeSend` definition. No changes to call sites 
 **Output**: New test cases in `src/__tests__/heart/core.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `tool_choice` is only set when `options.toolChoiceRequired` is true, not when `lastKickReason` is truthy
 
-### ⬜ Unit 3b: Bug 4 (tool_choice forcing) -- Implementation
+### ✅ Unit 3b: Bug 4 (tool_choice forcing) -- Implementation
 **What**: Two one-line changes in `src/heart/core.ts`:
 1. Line 288 (Azure path): change `if (options?.toolChoiceRequired)` to `if (options?.toolChoiceRequired || lastKickReason)`
 2. Line 303 (non-Azure path): change `if (options?.toolChoiceRequired)` to `if (options?.toolChoiceRequired || lastKickReason)`
