@@ -95,3 +95,4 @@ The `Integration` type already includes `"github"` but no tools use it yet. This
 - 2026-03-04 00:36 Approved (original plan)
 - 2026-03-04 00:38 Converted to doing doc (original plan, 4 passes)
 - 2026-03-04 09:29 Rewrote planning doc: changed from base tool (gh CLI) to integration tool (GitHub API + OAuth)
+- 2026-03-04 09:33 Converted to doing doc (4 passes complete)
