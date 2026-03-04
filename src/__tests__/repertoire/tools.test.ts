@@ -569,9 +569,9 @@ describe("finalAnswerTool", () => {
     const { finalAnswerTool } = await import("../../repertoire/tools")
     expect(finalAnswerTool.type).toBe("function")
     expect(finalAnswerTool.function.name).toBe("final_answer")
-    expect(finalAnswerTool.function.description).toBe(
-      "give your final text response. use this when you want to reply with text instead of calling another tool."
-    )
+    // Description should frame as primary response mechanism, not alternative
+    expect(finalAnswerTool.function.description).toMatch(/respond to the user/i)
+    expect(finalAnswerTool.function.description).not.toContain("instead of calling another tool")
     expect(finalAnswerTool.function.parameters).toEqual({
       type: "object",
       properties: { answer: { type: "string" } },
