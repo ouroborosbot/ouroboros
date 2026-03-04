@@ -146,3 +146,4 @@ Self-audit (what I got wrong in the recent hardening PR work):
 - 2026-03-03 20:41 Captured cleanup principles from user, locked scope boundaries, and added explicit self-audit of mistakes to correct.
 - 2026-03-03 20:56 Renamed branch and planning task slug/title to single-replica-hardening-cleanup for clearer traceability to migration topic #18 cleanup.
 - 2026-03-03 21:03 Locked cleanup boundary with explicit keep/remove sets: preserve runtime hardening + all task files, remove synthetic runtime-hardening gate scaffolding and mandatory CI wiring.
+- 2026-03-03 21:37 Added explicit per-file inventory (keep/remove/move) and implementation verification expectations to eliminate planning ambiguity before doing conversion.
