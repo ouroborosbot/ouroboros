@@ -1,0 +1,39 @@
+# Unit 2b Task Audit Manifest
+
+## Source Pattern
+- git ls-files 'slugger/tasks/2026-03-03-1430*'
+
+## Tracked Files
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening.md
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/final-audit.md
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-0-runtime-baseline.md
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-1a-red-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-1b-build-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-1b-test-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-1c-build-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-1c-coverage-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-2a-red-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-2b-build-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-2b-test-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-2c-build-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-2c-coverage-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-3a-red-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-3b-build-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-3b-test-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-3c-build-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-3c-coverage-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-4a-red-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-4b-build-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-4b-gate-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-4b-load-validation.md
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-4b-test-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-4c-build-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-4c-coverage-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-4c-hardening-run.txt
+slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/unit-4c-test-run.txt
+slugger/tasks/2026-03-03-1430-planning-ouroboros-migration-single-replica-runtime-hardening.md
+
+## Validation
+- tracked_file_count: 28
+- missing_file_count: 0
+- status: pass

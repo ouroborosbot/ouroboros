@@ -1,0 +1,15 @@
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+ ❯ src/__tests__/nerves/runtime-hardening-gate.test.ts (2 tests | 2 failed) 7ms
+     × fails with typed artifact action when load-validation artifact is missing 5ms
+     × reports split SLO failures with typed required actions 1ms
+ ❯ src/__tests__/nerves/runtime-hardening-ci-contract.test.ts (2 tests | 2 failed) 9ms
+     × declares runtime-hardening audit command in package scripts 3ms
+     × coverage gate script includes runtime hardening status and summary artifact 6ms
+
+ Test Files  2 failed (2)
+      Tests  4 failed (4)
+   Start at  15:09:00
+   Duration  307ms (transform 36ms, setup 48ms, import 15ms, tests 16ms, environment 0ms)
+

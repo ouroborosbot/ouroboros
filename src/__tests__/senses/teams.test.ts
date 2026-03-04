@@ -1691,6 +1691,7 @@ describe("Teams adapter - session persistence", () => {
     trimMessagesFn?: any
     parseSlashCommandFn?: any
     dispatchFn?: any
+    teamsChannelConfig?: any
   } = {}) {
     const {
       runAgentFn = vi.fn().mockResolvedValue({ usage: undefined }),
@@ -1701,6 +1702,7 @@ describe("Teams adapter - session persistence", () => {
       trimMessagesFn = ((msgs: any) => [...msgs]),
       parseSlashCommandFn = (() => null),
       dispatchFn = (() => ({ handled: false })),
+      teamsChannelConfig = { skipConfirmation: false, disableStreaming: false, port: 3978, maxConcurrentConversations: 10 },
     } = overrides
 
     vi.doMock("../../heart/core", () => ({
@@ -1713,7 +1715,7 @@ describe("Teams adapter - session persistence", () => {
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
-      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue(teamsChannelConfig),
     }))
     vi.doMock("../../mind/prompt", () => ({
       buildSystem: vi.fn().mockResolvedValue("system prompt"),
@@ -2018,6 +2020,42 @@ describe("Teams adapter - session persistence", () => {
     // Both start before either ends (parallel)
     expect(order[0]).toBe("start-1")
     expect(order[1]).toBe("start-2")
+  })
+
+  it("enforces global in-flight conversation cap with deterministic overload response", async () => {
+    vi.resetModules()
+    let releaseFirst: (() => void) | undefined
+    const firstTurn = new Promise<void>((resolve) => { releaseFirst = resolve })
+    const runAgentFn = vi.fn()
+      .mockImplementationOnce(async () => {
+        await firstTurn
+        return { usage: undefined }
+      })
+      .mockResolvedValue({ usage: undefined })
+
+    mockTeamsDeps({
+      runAgentFn,
+      teamsChannelConfig: { skipConfirmation: false, disableStreaming: false, port: 3978, maxConcurrentConversations: 1 },
+    })
+    const teams = await import("../../senses/teams")
+
+    const stream1 = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const stream2 = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const firstMessage = teams.handleTeamsMessage("first", stream1 as any, "conv-1")
+    for (let i = 0; i < 20 && runAgentFn.mock.calls.length === 0; i++) {
+      await new Promise((r) => setTimeout(r, 1))
+    }
+    expect(runAgentFn).toHaveBeenCalledTimes(1)
+
+    await teams.handleTeamsMessage("second", stream2 as any, "conv-2")
+    const overloadText = stream2.emit.mock.calls.map((c: any[]) => String(c[0] ?? "")).join("\n")
+    expect(overloadText).toContain("single-replica preview")
+    expect(overloadText).toContain("retry")
+    expect(runAgentFn).toHaveBeenCalledTimes(1)
+
+    releaseFirst?.()
+    await firstMessage
   })
 
   it("handleTeamsMessage passes toolContext to runAgent when provided via TeamsMessageContext", async () => {
