@@ -3910,8 +3910,8 @@ describe("tool_choice required and final_answer", () => {
     expect(toolResults[0].content).toBe("(delivered)")
   })
 
-  it("truncates final_answer text exceeding channel maxMessageLength (teams)", async () => {
-    const longText = "x".repeat(5000) // Teams max is 4000
+  it("emits full final_answer text even when exceeding channel maxMessageLength (splitting is adapter's job)", async () => {
+    const longText = "x".repeat(5000) // Teams max is 4000 but core never truncates
     mockCreate.mockReturnValue(
       makeStream([
         makeChunk(undefined, [
@@ -3935,9 +3935,7 @@ describe("tool_choice required and final_answer", () => {
     await runAgent(messages, callbacks, "teams", undefined, { toolChoiceRequired: true })
 
     expect(textChunks).toHaveLength(1)
-    // Should be truncated to maxMessageLength - 20 + "\n\n[truncated]"
-    expect(textChunks[0].length).toBeLessThan(5000)
-    expect(textChunks[0]).toContain("[truncated]")
+    expect(textChunks[0]).toBe(longText) // full text, no truncation
   })
 
   it("does NOT truncate final_answer text within channel maxMessageLength", async () => {
@@ -3993,7 +3991,6 @@ describe("tool_choice required and final_answer", () => {
     await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
 
     expect(textChunks).toEqual([longText])
-    expect(textChunks[0]).not.toContain("[truncated]")
   })
 })
 

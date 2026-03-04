@@ -581,6 +581,62 @@ describe("Teams adapter - stripMentions", () => {
   })
 })
 
+describe("Teams adapter - splitMessage", () => {
+  let splitMessage: (text: string, maxLen: number) => string[]
+
+  beforeEach(async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    splitMessage = teams.splitMessage
+  })
+
+  it("returns single chunk when text fits within limit", () => {
+    expect(splitMessage("hello", 100)).toEqual(["hello"])
+  })
+
+  it("splits at paragraph boundary (\\n\\n)", () => {
+    const text = "first paragraph\n\nsecond paragraph"
+    const chunks = splitMessage(text, 20)
+    expect(chunks).toEqual(["first paragraph", "second paragraph"])
+  })
+
+  it("splits at line boundary when no paragraph break", () => {
+    const text = "line one\nline two"
+    const chunks = splitMessage(text, 12)
+    expect(chunks).toEqual(["line one", "line two"])
+  })
+
+  it("splits at word boundary when no line break", () => {
+    const text = "hello world foo"
+    const chunks = splitMessage(text, 12)
+    expect(chunks).toEqual(["hello world", "foo"])
+  })
+
+  it("hard-cuts when no boundary found", () => {
+    const text = "x".repeat(10)
+    const chunks = splitMessage(text, 4)
+    expect(chunks.join("")).toBe(text)
+    expect(chunks.every(c => c.length <= 4)).toBe(true)
+  })
+
+  it("preserves all content across multiple chunks", () => {
+    const text = "a".repeat(3000) + "\n\n" + "b".repeat(3000) + "\n\n" + "c".repeat(3000)
+    const chunks = splitMessage(text, 4000)
+    // All content preserved (ignoring stripped newlines between chunks)
+    expect(chunks.length).toBeGreaterThan(1)
+    const reassembled = chunks.join("\n\n")
+    expect(reassembled).toContain("a".repeat(3000))
+    expect(reassembled).toContain("b".repeat(3000))
+    expect(reassembled).toContain("c".repeat(3000))
+  })
+
+  it("never returns empty strings", () => {
+    const text = "a".repeat(100)
+    const chunks = splitMessage(text, 10)
+    expect(chunks.every(c => c.length > 0)).toBe(true)
+  })
+})
+
 describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
   afterEach(() => {
     // Config is loaded from config.json only, no env vars to clear
@@ -2703,6 +2759,61 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     await callbacks.flush()
     expect(mockStream.emit).not.toHaveBeenCalled()
     expect(sendMessage).not.toHaveBeenCalled()
+  })
+
+  it("flush() splits long text: first chunk to emit, rest to sendMessage", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    // Generate text that exceeds 4000 chars (Teams MAX_MESSAGE_LENGTH)
+    const longText = "a".repeat(3000) + "\n\n" + "b".repeat(3000)
+    callbacks.onTextChunk(longText)
+    await callbacks.flush()
+    // First chunk to emit, second to sendMessage
+    expect(mockStream.emit).toHaveBeenCalledTimes(1)
+    expect(mockStream.emit).toHaveBeenCalledWith("a".repeat(3000))
+    expect(sendMessage).toHaveBeenCalledTimes(1)
+    expect(sendMessage).toHaveBeenCalledWith("b".repeat(3000))
+  })
+
+  it("flush() splits long text after prior content: all chunks to sendMessage", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    // First flush sets streamHasContent
+    callbacks.onTextChunk("first")
+    await callbacks.flush()
+    mockStream.emit.mockClear()
+    sendMessage.mockClear()
+    // Second flush with long text
+    const longText = "x".repeat(3000) + "\n\n" + "y".repeat(3000)
+    callbacks.onTextChunk(longText)
+    await callbacks.flush()
+    expect(mockStream.emit).not.toHaveBeenCalled()
+    expect(sendMessage).toHaveBeenCalledTimes(2)
+    expect(sendMessage).toHaveBeenNthCalledWith(1, "x".repeat(3000))
+    expect(sendMessage).toHaveBeenNthCalledWith(2, "y".repeat(3000))
+  })
+
+  it("flushTextBuffer splits long text: first chunk to emit, rest to safeSend", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    // Accumulate long text
+    const longText = "a".repeat(3000) + "\n\n" + "b".repeat(3000)
+    callbacks.onTextChunk(longText)
+    // onToolStart triggers flushTextBuffer
+    callbacks.onToolStart("test_tool", { arg: "val" })
+    // First chunk to emit
+    expect(mockStream.emit).toHaveBeenCalledTimes(1)
+    expect(mockStream.emit).toHaveBeenCalledWith("a".repeat(3000))
+    // safeSend fires asynchronously via promise chain — wait a tick
+    await new Promise(r => setTimeout(r, 10))
+    expect(sendMessage).toHaveBeenCalledTimes(1)
+    expect(sendMessage).toHaveBeenCalledWith("b".repeat(3000))
   })
 
   it("when disableStreaming is false, onTextChunk emits directly (no buffering)", async () => {
