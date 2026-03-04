@@ -3551,14 +3551,23 @@ describe("tool_choice required and final_answer", () => {
     expect(deliveredMsg.content).toBe("(delivered)")
   })
 
-  it("final_answer with empty answer arg: uses empty string", async () => {
-    mockCreate.mockReturnValue(
-      makeStream([
+  it("final_answer with empty object arg: retries (no answer field)", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          makeChunk(undefined, [
+            { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{}' } },
+          ]),
+        ])
+      }
+      return makeStream([
         makeChunk(undefined, [
-          { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{}' } },
+          { index: 0, id: "call_2", function: { name: "final_answer", arguments: '{"answer":"got it"}' } },
         ]),
       ])
-    )
+    })
 
     const textChunks: string[] = []
     const callbacks: ChannelCallbacks = {
@@ -3574,16 +3583,14 @@ describe("tool_choice required and final_answer", () => {
     const messages: any[] = [{ role: "system", content: "test" }]
     await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
 
-    const assistantMsg = messages.find((m: any) => m.role === "assistant")
-    expect(assistantMsg).toBeDefined()
-    // Full msg is kept with tool_calls; answer is undefined (no answer field, no content)
-    // so onTextChunk is NOT called (answer is falsy)
-    expect(assistantMsg.tool_calls).toBeDefined()
-    expect(textChunks).toEqual([])
-    // Synthetic tool response is still pushed
-    const toolResults = messages.filter((m: any) => m.role === "tool")
-    expect(toolResults).toHaveLength(1)
-    expect(toolResults[0].content).toBe("(delivered)")
+    // {} has no answer field, so first attempt retries
+    expect(callCount).toBe(2)
+    // Error tool result for first attempt
+    const toolMsgs = messages.filter((m: any) => m.role === "tool")
+    expect(toolMsgs[0].tool_call_id).toBe("call_1")
+    expect(toolMsgs[0].content).toContain("incomplete or malformed")
+    // Successful answer from second attempt
+    expect(textChunks).toEqual(["got it"])
   })
 
   it("final_answer is never passed to execTool (intercepted before execution)", async () => {
@@ -3677,74 +3684,23 @@ describe("tool_choice required and final_answer", () => {
     // config cleanup handled by resetConfigCache in beforeEach
   })
 
-  it("final_answer with invalid JSON arguments: does not re-emit already-streamed content", async () => {
-    mockCreate.mockReturnValue(
-      makeStream([
-        makeChunk("some content", [
-          { index: 0, id: "call_1", function: { name: "final_answer", arguments: "not valid json{" } },
-        ]),
-      ])
-    )
-
-    const textChunks: string[] = []
-    const callbacks: ChannelCallbacks = {
-      onModelStart: () => {},
-      onModelStreamStart: () => {},
-      onTextChunk: (text) => textChunks.push(text),
-      onReasoningChunk: () => {},
-      onToolStart: () => {},
-      onToolEnd: () => {},
-      onError: () => {},
-    }
-
-    const messages: any[] = [{ role: "system", content: "test" }]
-    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
-
-    const assistantMsg = messages.find((m: any) => m.role === "assistant")
-    expect(assistantMsg).toBeDefined()
-    expect(assistantMsg.content).toBe("some content")
-    // Content was emitted during streaming; NOT re-emitted (would double it)
-    expect(textChunks).toEqual(["some content"])
-  })
-
-  it("final_answer with valid JSON but no answer field: does not re-emit already-streamed content", async () => {
-    mockCreate.mockReturnValue(
-      makeStream([
-        makeChunk("fallback content", [
-          { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"text":"hello"}' } },
-        ]),
-      ])
-    )
-
-    const textChunks: string[] = []
-    const callbacks: ChannelCallbacks = {
-      onModelStart: () => {},
-      onModelStreamStart: () => {},
-      onTextChunk: (text) => textChunks.push(text),
-      onReasoningChunk: () => {},
-      onToolStart: () => {},
-      onToolEnd: () => {},
-      onError: () => {},
-    }
-
-    const messages: any[] = [{ role: "system", content: "test" }]
-    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
-
-    const assistantMsg = messages.find((m: any) => m.role === "assistant")
-    expect(assistantMsg).toBeDefined()
-    expect(assistantMsg.content).toBe("fallback content")
-    // Content was emitted during streaming; NOT re-emitted (would double it)
-    expect(textChunks).toEqual(["fallback content"])
-  })
-
-  it("final_answer with invalid JSON and no content: falls back to undefined (no onTextChunk)", async () => {
-    mockCreate.mockReturnValue(
-      makeStream([
+  it("final_answer with invalid JSON arguments: retries (does not re-emit already-streamed content)", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          makeChunk("some content", [
+            { index: 0, id: "call_1", function: { name: "final_answer", arguments: "not valid json{" } },
+          ]),
+        ])
+      }
+      return makeStream([
         makeChunk(undefined, [
-          { index: 0, id: "call_1", function: { name: "final_answer", arguments: "bad json" } },
+          { index: 0, id: "call_2", function: { name: "final_answer", arguments: '{"answer":"valid now"}' } },
         ]),
       ])
-    )
+    })
 
     const textChunks: string[] = []
     const callbacks: ChannelCallbacks = {
@@ -3755,31 +3711,82 @@ describe("tool_choice required and final_answer", () => {
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: () => {},
+      onClearText: () => { textChunks.length = 0 },
     }
 
     const messages: any[] = [{ role: "system", content: "test" }]
     await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
 
-    const assistantMsg = messages.find((m: any) => m.role === "assistant")
-    expect(assistantMsg).toBeDefined()
-    // Full msg kept with tool_calls; answer falls back to result.content which is undefined
-    // so onTextChunk is NOT called (answer is falsy)
-    expect(assistantMsg.tool_calls).toBeDefined()
-    expect(textChunks).toEqual([])
-    // Synthetic tool response is still pushed
-    const toolResults = messages.filter((m: any) => m.role === "tool")
-    expect(toolResults).toHaveLength(1)
-    expect(toolResults[0].content).toBe("(delivered)")
+    // Invalid JSON triggers retry
+    expect(callCount).toBe(2)
+    // Error tool result for first attempt
+    const toolMsgs = messages.filter((m: any) => m.role === "tool")
+    expect(toolMsgs[0].tool_call_id).toBe("call_1")
+    expect(toolMsgs[0].content).toContain("incomplete or malformed")
+    // Only the valid answer from retry should be emitted (noise was cleared)
+    expect(textChunks).toEqual(["valid now"])
   })
 
-  it("final_answer with valid JSON, no answer field, and no content: falls back to undefined (no onTextChunk)", async () => {
-    mockCreate.mockReturnValue(
-      makeStream([
+  it("final_answer with valid JSON but no answer field: retries (does not re-emit already-streamed content)", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          makeChunk("fallback content", [
+            { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"text":"hello"}' } },
+          ]),
+        ])
+      }
+      return makeStream([
         makeChunk(undefined, [
-          { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"text":"hello"}' } },
+          { index: 0, id: "call_2", function: { name: "final_answer", arguments: '{"answer":"proper answer"}' } },
         ]),
       ])
-    )
+    })
+
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onClearText: () => { textChunks.length = 0 },
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    // No answer field triggers retry
+    expect(callCount).toBe(2)
+    // Error tool result for first attempt
+    const toolMsgs = messages.filter((m: any) => m.role === "tool")
+    expect(toolMsgs[0].tool_call_id).toBe("call_1")
+    expect(toolMsgs[0].content).toContain("incomplete or malformed")
+    // Only the valid answer from retry (noise was cleared by onClearText)
+    expect(textChunks).toEqual(["proper answer"])
+  })
+
+  it("final_answer with invalid JSON and no content: retries (pushes error tool result)", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          makeChunk(undefined, [
+            { index: 0, id: "call_1", function: { name: "final_answer", arguments: "bad json" } },
+          ]),
+        ])
+      }
+      return makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_2", function: { name: "final_answer", arguments: '{"answer":"recovered"}' } },
+        ]),
+      ])
+    })
 
     const textChunks: string[] = []
     const callbacks: ChannelCallbacks = {
@@ -3795,16 +3802,56 @@ describe("tool_choice required and final_answer", () => {
     const messages: any[] = [{ role: "system", content: "test" }]
     await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
 
-    const assistantMsg = messages.find((m: any) => m.role === "assistant")
-    expect(assistantMsg).toBeDefined()
-    // Full msg kept with tool_calls; parsed.answer is undefined, result.content is undefined
-    // so onTextChunk is NOT called (answer is falsy)
-    expect(assistantMsg.tool_calls).toBeDefined()
-    expect(textChunks).toEqual([])
-    // Synthetic tool response is still pushed
-    const toolResults = messages.filter((m: any) => m.role === "tool")
-    expect(toolResults).toHaveLength(1)
-    expect(toolResults[0].content).toBe("(delivered)")
+    // Invalid JSON triggers retry
+    expect(callCount).toBe(2)
+    // Error tool result for first attempt
+    const toolMsgs = messages.filter((m: any) => m.role === "tool")
+    expect(toolMsgs[0].tool_call_id).toBe("call_1")
+    expect(toolMsgs[0].content).toContain("incomplete or malformed")
+    // Recovered answer from retry
+    expect(textChunks).toEqual(["recovered"])
+  })
+
+  it("final_answer with valid JSON, no answer field, and no content: retries", async () => {
+    let callCount = 0
+    mockCreate.mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return makeStream([
+          makeChunk(undefined, [
+            { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"text":"hello"}' } },
+          ]),
+        ])
+      }
+      return makeStream([
+        makeChunk(undefined, [
+          { index: 0, id: "call_2", function: { name: "final_answer", arguments: '{"answer":"proper"}' } },
+        ]),
+      ])
+    })
+
+    const textChunks: string[] = []
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    // No answer field triggers retry
+    expect(callCount).toBe(2)
+    // Error tool result for first attempt
+    const toolMsgs = messages.filter((m: any) => m.role === "tool")
+    expect(toolMsgs[0].tool_call_id).toBe("call_1")
+    expect(toolMsgs[0].content).toContain("incomplete or malformed")
+    // Proper answer from retry
+    expect(textChunks).toEqual(["proper"])
   })
 
   it("calls onClearText before emitting valid final_answer when content was streamed", async () => {
