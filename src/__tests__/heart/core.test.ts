@@ -3786,7 +3786,7 @@ describe("tool_choice required and final_answer", () => {
     // config cleanup handled by resetConfigCache in beforeEach
   })
 
-  it("final_answer with invalid JSON arguments: falls back to result.content", async () => {
+  it("final_answer with invalid JSON arguments: does not re-emit already-streamed content", async () => {
     mockCreate.mockReturnValue(
       makeStream([
         makeChunk("some content", [
@@ -3795,10 +3795,11 @@ describe("tool_choice required and final_answer", () => {
       ])
     )
 
+    const textChunks: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
-      onTextChunk: () => {},
+      onTextChunk: (text) => textChunks.push(text),
       onReasoningChunk: () => {},
       onToolStart: () => {},
       onToolEnd: () => {},
@@ -3811,9 +3812,11 @@ describe("tool_choice required and final_answer", () => {
     const assistantMsg = messages.find((m: any) => m.role === "assistant")
     expect(assistantMsg).toBeDefined()
     expect(assistantMsg.content).toBe("some content")
+    // Content was emitted during streaming; NOT re-emitted (would double it)
+    expect(textChunks).toEqual(["some content"])
   })
 
-  it("final_answer with valid JSON but no answer field: falls back to result.content", async () => {
+  it("final_answer with valid JSON but no answer field: does not re-emit already-streamed content", async () => {
     mockCreate.mockReturnValue(
       makeStream([
         makeChunk("fallback content", [
@@ -3822,10 +3825,11 @@ describe("tool_choice required and final_answer", () => {
       ])
     )
 
+    const textChunks: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
-      onTextChunk: () => {},
+      onTextChunk: (text) => textChunks.push(text),
       onReasoningChunk: () => {},
       onToolStart: () => {},
       onToolEnd: () => {},
@@ -3838,6 +3842,8 @@ describe("tool_choice required and final_answer", () => {
     const assistantMsg = messages.find((m: any) => m.role === "assistant")
     expect(assistantMsg).toBeDefined()
     expect(assistantMsg.content).toBe("fallback content")
+    // Content was emitted during streaming; NOT re-emitted (would double it)
+    expect(textChunks).toEqual(["fallback content"])
   })
 
   it("final_answer with invalid JSON and no content: falls back to undefined (no onTextChunk)", async () => {
@@ -3908,6 +3914,37 @@ describe("tool_choice required and final_answer", () => {
     const toolResults = messages.filter((m: any) => m.role === "tool")
     expect(toolResults).toHaveLength(1)
     expect(toolResults[0].content).toBe("(delivered)")
+  })
+
+  it("calls onClearText before emitting valid final_answer when content was streamed", async () => {
+    // Model returns both content (refusal noise) and final_answer (real response)
+    mockCreate.mockReturnValue(
+      makeStream([
+        makeChunk("I'm sorry, but I cannot assist with that request.", [
+          { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"answer":"Here is the real answer"}' } },
+        ]),
+      ])
+    )
+
+    const textChunks: string[] = []
+    let clearCalled = false
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: (text) => textChunks.push(text),
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onClearText: () => { clearCalled = true; textChunks.length = 0 },
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
+
+    expect(clearCalled).toBe(true)
+    // Only the final_answer text is emitted after clear, NOT the refusal
+    expect(textChunks).toEqual(["Here is the real answer"])
   })
 
   it("emits full final_answer text even when exceeding channel maxMessageLength (splitting is adapter's job)", async () => {

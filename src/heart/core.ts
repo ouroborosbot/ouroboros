@@ -85,6 +85,9 @@ export interface ChannelCallbacks {
   onError(error: Error, severity: "transient" | "terminal"): void;
   onKick?(): void;
   onConfirmAction?(name: string, args: Record<string, string>): Promise<"confirmed" | "denied">;
+  // Clear any buffered text accumulated during streaming. Called before emitting
+  // the final_answer so streamed noise (e.g. refusal text) is discarded.
+  onClearText?(): void;
 }
 
 export interface RunAgentOptions {
@@ -359,16 +362,23 @@ export async function runAgent(
         // Check for final_answer sole call: intercept before tool execution
         const isSoleFinalAnswer = result.toolCalls.length === 1 && result.toolCalls[0].name === "final_answer";
         if (isSoleFinalAnswer) {
-          let answer: string;
+          let answer: string | undefined;
           try {
             const parsed = JSON.parse(result.toolCalls[0].arguments);
-            answer = parsed.answer ?? result.content;
+            answer = parsed.answer;
           } catch {
-            answer = result.content;
+            // JSON parsing failed (e.g. truncated output). Don't fall back to
+            // result.content — it was already emitted via onTextChunk during
+            // streaming and re-emitting would double it.
           }
           // Emit the answer through the callback pipeline so channels receive it.
           // Never truncate — channel adapters handle splitting long messages.
-          if (answer) callbacks.onTextChunk(answer);
+          // Clear any streamed content first (e.g. refusal noise) since the
+          // final_answer supersedes it.
+          if (answer) {
+            callbacks.onClearText?.();
+            callbacks.onTextChunk(answer);
+          }
           // Keep the full assistant message (with tool_calls) for debuggability,
           // plus a synthetic tool response so the conversation stays valid on resume.
           messages.push(msg);
