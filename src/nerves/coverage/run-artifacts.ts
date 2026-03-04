@@ -12,7 +12,7 @@ export interface TestRunInfo {
 }
 
 export function getTestRunsRoot(repoSlug: string = REPO_SLUG): string {
-  return join(homedir(), ".agentconfigs", "test-runs", repoSlug)
+  return join(homedir(), ".agentstate", "test-runs", repoSlug)
 }
 
 export function createRunId(now: Date = new Date()): string {

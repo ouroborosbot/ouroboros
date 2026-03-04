@@ -5,6 +5,11 @@ import { emitNervesEvent } from "./nerves/runtime"
 export interface AgentConfig {
   name: string
   configPath: string
+  context?: {
+    maxTokens?: number
+    contextMargin?: number
+    maxToolOutputChars?: number
+  }
   phrases: {
     thinking: string[]
     tool: string[]
@@ -149,6 +154,39 @@ export function loadAgentConfig(): AgentConfig {
       meta: { path: configFile },
     })
     fs.writeFileSync(configFile, JSON.stringify(parsed, null, 2) + "\n", "utf-8")
+  }
+
+  const rawConfigPath = parsed.configPath
+  if (typeof rawConfigPath !== "string" || rawConfigPath.trim().length === 0) {
+    emitNervesEvent({
+      level: "error",
+      event: "config_identity.error",
+      component: "config/identity",
+      message: "agent config missing configPath",
+      meta: { path: configFile },
+    })
+    throw new Error(
+      `agent.json at ${configFile} must include configPath.`,
+    )
+  }
+
+  if (
+    rawConfigPath.startsWith("~/.agentconfigs/") ||
+    rawConfigPath.includes("/.agentconfigs/")
+  ) {
+    emitNervesEvent({
+      level: "error",
+      event: "config_identity.error",
+      component: "config/identity",
+      message: "legacy configPath is not supported",
+      meta: {
+        path: configFile,
+        configPath: rawConfigPath,
+      },
+    })
+    throw new Error(
+      `Legacy configPath '${rawConfigPath}' is not supported. Use ~/.agentsecrets/<agent>/secrets.json.`,
+    )
   }
 
   _cachedAgentConfig = parsed as unknown as AgentConfig

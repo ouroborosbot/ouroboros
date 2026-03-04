@@ -1,6 +1,11 @@
 {
   "name": "ouroboros",
-  "configPath": "~/.agentconfigs/ouroboros/config.json",
+  "configPath": "~/.agentsecrets/ouroboros/secrets.json",
+  "context": {
+    "maxTokens": 80000,
+    "contextMargin": 20,
+    "maxToolOutputChars": 20000
+  },
   "phrases": {
     "thinking": [
       "chewing on that",

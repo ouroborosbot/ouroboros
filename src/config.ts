@@ -95,9 +95,18 @@ const DEFAULT_CONFIG: OuroborosConfig = {
 }
 
 let _cachedConfig: OuroborosConfig | null = null
+let _testContextOverride: ContextConfig | null = null
 
 function resolveConfigPath(): string {
   const raw = loadAgentConfig().configPath
+  if (
+    raw.startsWith("~/.agentconfigs/") ||
+    raw.includes("/.agentconfigs/")
+  ) {
+    throw new Error(
+      `Legacy configPath '${raw}' is not supported. Use ~/.agentsecrets/<agent>/secrets.json.`,
+    )
+  }
   if (raw.startsWith("~")) {
     return path.join(os.homedir(), raw.slice(1))
   }
@@ -172,6 +181,7 @@ export function loadConfig(): OuroborosConfig {
 
 export function resetConfigCache(): void {
   _cachedConfig = null
+  _testContextOverride = null
 }
 
 export type DeepPartial<T> = {
@@ -180,6 +190,14 @@ export type DeepPartial<T> = {
 
 export function setTestConfig(partial: DeepPartial<OuroborosConfig>): void {
   loadConfig() // ensure _cachedConfig exists
+  const contextPatch = partial.context as Partial<ContextConfig> | undefined
+  if (contextPatch) {
+    const base = _testContextOverride ?? DEFAULT_CONFIG.context
+    _testContextOverride = deepMerge(
+      base as unknown as Record<string, unknown>,
+      contextPatch as unknown as Record<string, unknown>,
+    ) as unknown as ContextConfig
+  }
   _cachedConfig = deepMerge(
     _cachedConfig as unknown as Record<string, unknown>,
     partial as unknown as Record<string, unknown>,
@@ -202,8 +220,23 @@ export function getTeamsConfig(): TeamsConfig {
 }
 
 export function getContextConfig(): ContextConfig {
-  const config = loadConfig()
-  return { ...config.context }
+  if (_testContextOverride) {
+    return { ..._testContextOverride }
+  }
+  const defaults = DEFAULT_CONFIG.context
+  const agentContext = loadAgentConfig().context
+  if (!agentContext || typeof agentContext !== "object") {
+    return { ...defaults }
+  }
+  return {
+    maxTokens: typeof agentContext.maxTokens === "number" ? agentContext.maxTokens : defaults.maxTokens,
+    contextMargin: typeof agentContext.contextMargin === "number"
+      ? agentContext.contextMargin
+      : defaults.contextMargin,
+    maxToolOutputChars: typeof agentContext.maxToolOutputChars === "number"
+      ? agentContext.maxToolOutputChars
+      : defaults.maxToolOutputChars,
+  }
 }
 
 export function getOAuthConfig(): OAuthConfig {
@@ -223,7 +256,7 @@ export function getIntegrationsConfig(): IntegrationsConfig {
 }
 
 export function getLogsDir(): string {
-  return path.join(os.homedir(), ".agentconfigs", getAgentName(), "logs")
+  return path.join(os.homedir(), ".agentstate", getAgentName(), "logs")
 }
 
 
@@ -232,7 +265,7 @@ function sanitizeKey(key: string): string {
 }
 
 export function sessionPath(friendId: string, channel: string, key: string): string {
-  const dir = path.join(os.homedir(), ".agentconfigs", getAgentName(), "sessions", friendId, channel)
+  const dir = path.join(os.homedir(), ".agentstate", getAgentName(), "sessions", friendId, channel)
   fs.mkdirSync(dir, { recursive: true })
   return path.join(dir, sanitizeKey(key) + ".json")
 }

@@ -22,7 +22,7 @@ vi.mock("../../repertoire/skills", () => ({
 vi.mock("../../identity", () => ({
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
-    configPath: "~/.agentconfigs/testagent/config.json",
+    configPath: "~/.agentsecrets/testagent/secrets.json",
   })),
   getAgentName: vi.fn(() => "testagent"),
   getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
@@ -60,7 +60,7 @@ function setupReadFileSync() {
     if (p.endsWith("IDENTITY.md")) return MOCK_IDENTITY
     if (p.endsWith("LORE.md")) return MOCK_LORE
     if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
-    if (p.endsWith("config.json")) return JSON.stringify({})
+    if (p.endsWith("secrets.json")) return JSON.stringify({})
     return ""
   })
 }
@@ -271,7 +271,7 @@ describe("buildSystem", () => {
       if (p.endsWith("IDENTITY.md")) return MOCK_IDENTITY
       if (p.endsWith("LORE.md")) return MOCK_LORE
       if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
-      if (p.endsWith("config.json")) return JSON.stringify({})
+      if (p.endsWith("secrets.json")) return JSON.stringify({})
       return ""
     })
     const { setTestConfig, resetConfigCache } = await import("../../config")
@@ -290,7 +290,7 @@ describe("buildSystem", () => {
       if (p.endsWith("IDENTITY.md")) return "custom identity content"
       if (p.endsWith("LORE.md")) return MOCK_LORE
       if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
-      if (p.endsWith("config.json")) return JSON.stringify({})
+      if (p.endsWith("secrets.json")) return JSON.stringify({})
       return ""
     })
     const { setTestConfig, resetConfigCache } = await import("../../config")
@@ -463,7 +463,7 @@ describe("psyche loading", () => {
   it("handles missing psyche files gracefully (empty string, no crash)", async () => {
     vi.mocked(fs.readFileSync).mockImplementation((filePath: any, _encoding?: any) => {
       const p = String(filePath)
-      if (p.endsWith("config.json")) return JSON.stringify({})
+      if (p.endsWith("secrets.json")) return JSON.stringify({})
       throw new Error("ENOENT: no such file or directory")
     })
     const { setTestConfig, resetConfigCache } = await import("../../config")
