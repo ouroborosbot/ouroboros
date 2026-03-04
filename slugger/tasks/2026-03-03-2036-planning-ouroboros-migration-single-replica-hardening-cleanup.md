@@ -31,6 +31,7 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 - [ ] Cleanup principles are locked: remove non-value changes and relocate misplaced changes.
 - [ ] Scope boundary is locked: only task-owned runtime/deployment-hardening changes are touched.
 - [ ] A file-by-file cleanup inventory exists with disposition per item: keep/remove/move.
+- [ ] Cleanup inventory explicitly resolves every task-owned changed path with no `TBD` entries.
 - [ ] Runtime behavior hardening changes are retained and validated.
 - [ ] Synthetic runtime-hardening gate stack is removed from runtime tree and mandatory CI coverage gate flow.
 - [ ] Task planning/doing/audit artifacts are retained for future auditing.
@@ -86,6 +87,53 @@ Cleanup boundary (current lock):
   runtime-hardening CI wiring in `scripts/run-coverage-gate.cjs` and `package.json`.
 - **Keep** task docs and artifacts under:
   `slugger/tasks/2026-03-03-1430-*`.
+
+File-by-file cleanup inventory (locked baseline, no ambiguity):
+- **Keep (runtime behavior + tests)**
+  - `src/config.ts`
+  - `src/heart/core.ts`
+  - `src/nerves/index.ts`
+  - `src/repertoire/tools.ts`
+  - `src/senses/teams.ts`
+  - `src/__tests__/heart/core.test.ts`
+  - `src/__tests__/nerves/non-blocking-sinks.test.ts`
+  - `src/__tests__/nerves/sinks.test.ts`
+  - `src/__tests__/repertoire/tools-remote-safety.test.ts`
+  - `src/__tests__/repertoire/tools.test.ts`
+  - `src/__tests__/senses/teams.test.ts`
+- **Remove (synthetic gate stack + synthetic gate tests/wiring)**
+  - `src/nerves/runtime-hardening/cli-main.ts`
+  - `src/nerves/runtime-hardening/cli.ts`
+  - `src/nerves/runtime-hardening/gate.ts`
+  - `src/__tests__/nerves/runtime-hardening-ci-contract.test.ts`
+  - `src/__tests__/nerves/runtime-hardening-cli-main.test.ts`
+  - `src/__tests__/nerves/runtime-hardening-cli.test.ts`
+  - `src/__tests__/nerves/runtime-hardening-gate.test.ts`
+  - `scripts/run-runtime-hardening-load-validation.cjs`
+  - Runtime-hardening wiring in `scripts/run-coverage-gate.cjs`
+  - Runtime-hardening npm scripts in `package.json`:
+    - `audit:runtime-hardening`
+    - `validate:runtime-hardening:load`
+- **Move**
+  - None currently approved; synthetic gate stack is removal target, not relocation target, for this pass.
+- **Always keep for audit**
+  - `slugger/tasks/2026-03-03-1430-planning-ouroboros-migration-single-replica-runtime-hardening.md`
+  - `slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening.md`
+  - `slugger/tasks/2026-03-03-1430-doing-ouroboros-migration-single-replica-runtime-hardening/*`
+
+Execution verification expectations for cleanup implementation:
+- Runtime behavior retained:
+  - remote local-tool blocking behavior still enforced
+  - teams max-concurrency guardrail still enforced
+  - prompt-refresh fallback behavior still enforced
+  - non-blocking sink behavior still enforced
+- Synthetic gate removed:
+  - no `src/nerves/runtime-hardening/*` module remains
+  - no runtime-hardening synthetic artifact generation in mandatory coverage gate flow
+- Repo quality:
+  - full tests pass
+  - build passes
+  - no warnings
 
 Self-audit (what I got wrong in the recent hardening PR work):
 - I introduced synthetic runtime/SLO scaffolding as if it were high-confidence value before validating that it was useful now.
