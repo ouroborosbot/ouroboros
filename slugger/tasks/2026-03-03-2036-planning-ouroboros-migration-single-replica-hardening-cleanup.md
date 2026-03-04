@@ -1,4 +1,4 @@
-# Planning: Runtime Cleanup Pass
+# Planning: Ouroboros Migration — Single-Replica Hardening Cleanup
 
 **Status**: NEEDS_REVIEW
 **Created**: 2026-03-03 20:36
@@ -57,7 +57,7 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 - Do not touch changes outside the runtime/deployment-hardening task footprint.
 
 ## Context / References
-- `/Users/arimendelow/Projects/ouroboros-agent-harness` current branch: `slugger/runtime-cleanup-pass`
+- `/Users/arimendelow/Projects/ouroboros-agent-harness` current branch: `slugger/single-replica-hardening-cleanup`
 - Recent history checked: `e613c72`, `c880a06`, `a43d583` and prior task completion commits on `main`
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/AGENTS.md`
 
