@@ -1,7 +1,7 @@
 # Planning: Context Kernel Post-Testing Fixes
 
 **Status**: drafting
-**Created**: [pending git timestamp]
+**Created**: 2026-03-03 20:09
 
 ## Goal
 Fix three bugs discovered during live testing of the context kernel on Microsoft 365 Copilot Chat (nostream mode): AAD displayName never extracted from Teams activity, tool-result and kick messages leaking as separate bot messages to the user in buffered mode, and new-friend behavior not triggering (no introduction, no save_friend_note call).
@@ -113,4 +113,4 @@ The friend record the user showed (`displayName: "Unknown"`) confirms Bug 1 -- t
 Bug 3 may partially resolve itself once Bug 1 is fixed -- the model might behave differently when it sees a real name vs "Unknown". However, the prompt instruction still needs strengthening regardless, because even with a real name, the model should still introduce itself and use `save_friend_note` on first encounter.
 
 ## Progress Log
-- [pending git timestamp] Created
+- 2026-03-03 20:09 Created
