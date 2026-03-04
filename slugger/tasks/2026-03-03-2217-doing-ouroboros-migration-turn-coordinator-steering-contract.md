@@ -74,7 +74,7 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 **Output**: `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-steering-contract/unit-1a-red-run.txt`
 **Acceptance**: New/updated tests fail on current behavior before implementation.
 
-### ⬜ Unit 1b: Turn Coordinator & Cap Removal — Implementation
+### ✅ Unit 1b: Turn Coordinator & Cap Removal — Implementation
 **What**: Implement shared turn coordinator, migrate Teams to use it, add preserve-all steering injection handling for same-conversation mid-turn follow-ups, and remove cap-gate/config field and related runtime code/tests. Implement steering buffer entry shape `{ conversationId, text, receivedAt }`.
 **Output**:
 - `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-steering-contract/unit-1b-test-run.txt`
@@ -124,3 +124,4 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 - 2026-03-04 13:17 Renamed task slug from `turn-coordinator-locking-refactor` to `turn-coordinator-steering-contract` to match current scope.
 - 2026-03-04 13:26 Unit 0 complete: baseline inventory captured runtime/config/test callsites and safe model-call steering boundaries.
 - 2026-03-04 13:30 Unit 1a complete: added failing contract tests for shared turn coordinator, cap removal behavior, and config field removal; captured red run artifact.
+- 2026-03-04 13:33 Unit 1b complete: implemented shared turn coordinator, removed Teams hard cap/config field, and wired boundary-based steering drain into `runAgent`.
