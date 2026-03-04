@@ -379,6 +379,48 @@ describe("getContextConfig", () => {
     expect(ctx.contextMargin).toBe(20)
   })
 
+  it("falls back per-field defaults when agent.json context has invalid types", async () => {
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      context: {
+        maxTokens: "bad",
+        contextMargin: 12,
+        maxToolOutputChars: null,
+      },
+    } as any)
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { getContextConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const ctx = getContextConfig()
+
+    expect(ctx.maxTokens).toBe(80000)
+    expect(ctx.contextMargin).toBe(12)
+    expect(ctx.maxToolOutputChars).toBe(20000)
+  })
+
+  it("falls back contextMargin to default when agent.json contextMargin is not numeric", async () => {
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      context: {
+        maxTokens: 91000,
+        contextMargin: "bad",
+        maxToolOutputChars: 15000,
+      },
+    } as any)
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { getContextConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const ctx = getContextConfig()
+
+    expect(ctx.maxTokens).toBe(91000)
+    expect(ctx.contextMargin).toBe(20)
+    expect(ctx.maxToolOutputChars).toBe(15000)
+  })
+
 })
 
 describe("sessionPath", () => {
