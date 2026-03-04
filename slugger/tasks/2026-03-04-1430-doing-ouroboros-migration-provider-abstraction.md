@@ -26,8 +26,9 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [ ] `agent.json.configPath` resolves to `~/.agentsecrets/<agent>/secrets.json`.
 - [ ] Missing/expired provider credentials fail fast with explicit re-auth guidance; no silent fallback.
 - [ ] A migration runbook exists in-repo for cross-machine post-pull reorganization of legacy `~/.agentconfigs` data.
-- [ ] Legacy `~/.agentconfigs` data migrates via explicit one-time migration (no runtime back-compat branches in normal execution code), with no data loss and clear operator messages.
-- [ ] Migration executes before provider abstraction refactor work so implementation targets final storage/config contracts.
+- [ ] Legacy `~/.agentconfigs` migration is fully documented as a one-time manual operation for other machines (no runtime back-compat branches in normal execution code), with no data loss and clear operator guidance.
+- [ ] Storage/config refactor executes before provider abstraction refactor work so implementation targets final storage/config contracts.
+- [ ] Actual cross-machine data migration is out-of-band from this task's code execution and handled via the migration runbook instructions.
 - [ ] Migration runbook is docs-only (no script) and includes explicit move/verify instructions for the other machine.
 - [ ] Provider IDs are explicitly locked and implemented as `azure`, `minimax`, `anthropic`, `openai-codex`.
 - [ ] Model fields are explicitly supported for each in-scope provider via `secrets.json` without introducing additional model-selection features.
@@ -64,17 +65,17 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Baseline notes file in artifacts directory with command outputs and touched-file map for `src/config.ts`, `src/identity.ts`, `src/heart/core.ts`, `src/heart/streaming.ts`, `src/mind/prompt.ts`, `src/senses/{cli,teams}.ts`, and related `src/__tests__/**`.
 **Acceptance**: Baseline artifact exists and identifies all files to change for migration, provider abstraction, and provider integrations.
 
-### ⬜ Unit 1a: Storage/config migration docs and contracts — Tests
+### ⬜ Unit 1a: Storage/config refactor contracts + migration runbook docs — Tests
 **What**: Add/adjust tests in `src/__tests__/identity.test.ts`, `src/__tests__/config.test.ts`, and path-dependent suites to define required contracts (`agent.json`, `secrets.json`, `.agentstate`) including fail-fast cases for missing/invalid contracts.
 **Output**: Failing contract tests for `agent.json.configPath -> ~/.agentsecrets/<agent>/secrets.json`, context loading from `agent.json`, and runtime/session/log/test-run paths under `~/.agentstate`.
 **Acceptance**: New/updated tests exist and fail red against current behavior.
 
-### ⬜ Unit 1b: Storage/config migration docs and contracts — Implementation
+### ⬜ Unit 1b: Storage/config refactor contracts + migration runbook docs — Implementation
 **What**: Implement path contract changes in `src/config.ts`, `src/identity.ts`, `src/senses/{cli,teams}.ts`, and nerves test-run path modules; add `cross-agent-docs/agent-storage-migration-playbook.md` with explicit one-time migration instructions.
 **Output**: Runtime/config loader updates, state-path updates, and migration runbook markdown.
 **Acceptance**: Contract tests pass green; no runtime fallback to legacy `.agentconfigs` paths.
 
-### ⬜ Unit 1c: Storage/config migration docs and contracts — Coverage & Refactor
+### ⬜ Unit 1c: Storage/config refactor contracts + migration runbook docs — Coverage & Refactor
 **What**: Refactor for clarity and verify branch/error-path coverage on migration/config contract code.
 **Output**: Refactored config-loading code and coverage report artifact for migration/config paths.
 **Acceptance**: 100% coverage on new migration/config code and tests remain green.
@@ -173,3 +174,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 15:30 Granularity pass: added missing unit outputs and split docs/final verification into atomic units
 - 2026-03-04 15:35 Validation pass: aligned units to actual repository files and current legacy path usage (`.agentconfigs`) to be migrated
 - 2026-03-04 15:38 Quality pass: confirmed unit headers/acceptance completeness and set status to READY_FOR_EXECUTION
+- 2026-03-04 15:32 Clarified scope wording: this task does storage/config refactor first; legacy data migration itself is manual out-of-band via runbook
