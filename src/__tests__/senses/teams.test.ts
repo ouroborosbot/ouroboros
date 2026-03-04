@@ -1796,7 +1796,7 @@ describe("Teams adapter - session persistence", () => {
       trimMessagesFn = ((msgs: any) => [...msgs]),
       parseSlashCommandFn = (() => null),
       dispatchFn = (() => ({ handled: false })),
-      teamsChannelConfig = { skipConfirmation: false, disableStreaming: false, port: 3978, maxConcurrentConversations: 10 },
+      teamsChannelConfig = { skipConfirmation: false, disableStreaming: false, port: 3978 },
     } = overrides
 
     vi.doMock("../../heart/core", () => ({
@@ -2129,7 +2129,7 @@ describe("Teams adapter - session persistence", () => {
 
     mockTeamsDeps({
       runAgentFn,
-      teamsChannelConfig: { skipConfirmation: false, disableStreaming: false, port: 3978, maxConcurrentConversations: 1 },
+      teamsChannelConfig: { skipConfirmation: false, disableStreaming: false, port: 3978 },
     })
     const teams = await import("../../senses/teams")
 
