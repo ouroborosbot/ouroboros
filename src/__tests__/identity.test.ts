@@ -223,6 +223,39 @@ describe("loadAgentConfig", () => {
     expect(() => loadAgentConfig()).toThrow(/agent\.json/)
   })
 
+  it("throws when agent.json is missing configPath", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      name: "ouroboros",
+      phrases: {
+        thinking: ["thinking"],
+        tool: ["tool"],
+        followup: ["followup"],
+      },
+    }))
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/must include configPath/)
+  })
+
+  it("throws when agent.json configPath is blank", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      name: "ouroboros",
+      configPath: "   ",
+      phrases: {
+        thinking: ["thinking"],
+        tool: ["tool"],
+        followup: ["followup"],
+      },
+    }))
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/must include configPath/)
+  })
+
   it("throws when agent.json configPath still points at legacy .agentconfigs location", async () => {
     process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
