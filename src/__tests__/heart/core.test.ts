@@ -3088,7 +3088,7 @@ describe("kick mechanism", () => {
     const assistantMessages = messages.filter((m: any) => m.role === "assistant")
     expect(assistantMessages).toHaveLength(2)
     expect(assistantMessages[0].content).toContain("let me read that file for you")
-    expect(assistantMessages[0].content).toContain("I narrated instead of acting. Calling the tool now -- if I've already finished, I can use final_answer.")
+    expect(assistantMessages[0].content).toContain("I narrated instead of acting. Using the tool now -- if done, calling final_answer.")
     expect(assistantMessages[1].content).toBe("here is the result")
   })
 
@@ -3177,7 +3177,7 @@ describe("kick mechanism", () => {
 
     // The self-correction assistant message should contain original narration + kick message
     const assistantMessages = messages.filter((m: any) => m.role === "assistant")
-    expect(assistantMessages.some((m: any) => m.content?.includes("let me check that") && m.content?.includes("I narrated instead of acting. Calling the tool now -- if I've already finished, I can use final_answer."))).toBe(true)
+    expect(assistantMessages.some((m: any) => m.content?.includes("let me check that") && m.content?.includes("I narrated instead of acting. Using the tool now -- if done, calling final_answer."))).toBe(true)
   })
 
   it("onKick callback receives no arguments", async () => {
@@ -3265,7 +3265,7 @@ describe("kick mechanism", () => {
     const assistantMessages = messages.filter((m: any) => m.role === "assistant")
     expect(assistantMessages).toHaveLength(2)
     expect(assistantMessages[0].content).toContain("I'm going to")
-    expect(assistantMessages[0].content).toContain("I narrated instead of acting. Calling the tool now -- if I've already finished, I can use final_answer.")
+    expect(assistantMessages[0].content).toContain("I narrated instead of acting. Using the tool now -- if done, calling final_answer.")
     expect(assistantMessages[1].content).toBe("the file says hello")
   })
 
@@ -3324,7 +3324,7 @@ describe("kick mechanism", () => {
     const assistantMessages = messages.filter((m: any) => m.role === "assistant")
     expect(assistantMessages).toHaveLength(2)
     expect(assistantMessages[0].content).toContain("let me read that file")
-    expect(assistantMessages[0].content).toContain("I narrated instead of acting. Calling the tool now -- if I've already finished, I can use final_answer.")
+    expect(assistantMessages[0].content).toContain("I narrated instead of acting. Using the tool now -- if done, calling final_answer.")
     expect(assistantMessages[1].content).toBe("here is the answer")
 
     // config cleanup handled by resetConfigCache in beforeEach
