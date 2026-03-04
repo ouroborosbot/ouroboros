@@ -20,6 +20,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - Update config and agent/provider resolution paths so provider selection is explicit and per-agent.
 - Keep `providers` and `teams` blocks in per-agent `config.json` (secrets/config file).
 - Move `context` block from `config.json` into each agent's `agent.json` alongside `phrases` and other agent-level runtime settings.
+- Treat agent manifest path as explicit contract: `<repo>/<agent>/agent.json` (for example `/Users/arimendelow/Projects/ouroboros-agent-harness/slugger/agent.json`).
 - Reorganize local machine directories so secrets live in `~/.agentsecrets/<agent>/`, while runtime/session/log/PII/test artifacts live in `~/.agentstate/<agent>/` or `~/.agentstate/test-runs/<repo_slug>/`.
 - Include one-time migration handling so existing `~/.agentconfigs` data on other machines is migrated safely with explicit operator-visible guidance.
 - Add one-time migration behavior for pulled branches on other machines:
@@ -74,6 +75,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - OpenAI subscription path is explicitly in-scope via OpenAI Codex OAuth (`openai-codex`) flow.
 - Follow repo configuration policy: no environment variables.
 - `config.json` keeps `providers` and `teams` blocks; `context` moves into `agent.json`.
+- `agent.json` location is explicit and fixed per agent: `<repo>/<agent>/agent.json`.
 - Migration support for other machines is mandatory: legacy `~/.agentconfigs` must be handled with a documented, agent-executable runbook.
 - Migration must be safe and deterministic on other machines: no destructive deletes during first migration; prefer move-with-fallback or copy-then-verify semantics.
 - Runtime code must stay lean: no long-lived back-compat reads/writes for legacy `~/.agentconfigs` paths after migration.
@@ -105,3 +107,4 @@ Keep scope disciplined: runtime provider abstraction + provider integrations onl
 - 2026-03-04 14:56 Re-scoped migration to one-time only; removed runtime back-compat expectation for legacy `~/.agentconfigs` paths
 - 2026-03-04 15:01 Added completion criterion requiring all relevant repo docs to be updated for new config/storage/provider contracts
 - 2026-03-04 15:08 Reordered work so migration happens first; constrained migration delivery to markdown instructions only (no script), including post-completion deletion of the migration playbook on target machine
+- 2026-03-04 15:13 Made `agent.json` path explicit in plan (`<repo>/<agent>/agent.json`) to remove migration ambiguity
