@@ -88,7 +88,7 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 - `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-steering-contract/unit-1c-build-run.txt`
 **Acceptance**: 100% coverage on changed code, tests green, build green, no warnings.
 
-### ⬜ Unit 2a: Steering Safety Regression Validation
+### ✅ Unit 2a: Steering Safety Regression Validation
 **What**: Validate steering path safety after coordinator migration (same-conversation ownership, preserve-all follow-up injection behavior, no-dedupe contract, boundary-only injection, and carry-forward behavior).
 **Output**: `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-steering-contract/unit-2a-test-run.txt`
 **Acceptance**: Steering-related Teams tests pass with coordinator path active and no ordering or boundary regressions.
@@ -126,3 +126,4 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 - 2026-03-04 13:30 Unit 1a complete: added failing contract tests for shared turn coordinator, cap removal behavior, and config field removal; captured red run artifact.
 - 2026-03-04 13:33 Unit 1b complete: implemented shared turn coordinator, removed Teams hard cap/config field, and wired boundary-based steering drain into `runAgent`.
 - 2026-03-04 13:38 Unit 1c complete: closed coverage gaps for steering injection and coordinator edge cases; `npm run test:coverage` and build now pass.
+- 2026-03-04 13:39 Unit 2a complete: steering-focused regression suite passed across coordinator, core boundary injection, and Teams channel behavior.
