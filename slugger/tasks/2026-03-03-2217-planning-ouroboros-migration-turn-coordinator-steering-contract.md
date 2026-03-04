@@ -1,6 +1,6 @@
 # Planning: Ouroboros Migration - Turn Coordinator Steering Contract
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-03-03 22:17
 
 ## Goal
@@ -31,21 +31,21 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 - Changes to unrelated CLI rendering or prompt/tool behavior.
 
 ## Completion Criteria
-- [ ] Teams no longer hard-rejects messages based on a static concurrent-turn cap.
-- [ ] `teamsChannel.maxConcurrentConversations` is fully removed from config schema/defaults/accessors and call sites.
-- [ ] A shared turn coordinator exists and is used by Teams for per-conversation serialization.
-- [ ] Same-conversation follow-up messages during active turns are all preserved and injected into the active turn between model calls.
-- [ ] No steering follow-up dedupe/idempotency layer is introduced in this task.
-- [ ] Steering follow-ups are injected as ordered discrete user messages (not dropped, reordered, or collapsed with lost boundaries).
-- [ ] Steering injection occurs only at model-call boundaries; no in-flight model-call mutation occurs.
-- [ ] Buffered follow-ups that miss a boundary are carried into the next turn for the same conversation.
-- [ ] Steering path introduces no adapter-authored plain-text acknowledgement messages to users.
-- [ ] Model receives all follow-up user messages for steering (none dropped).
-- [ ] Single active-turn ownership per conversation is preserved; different conversations remain parallelizable.
-- [ ] Tests are updated to cover coordinator contract, steering injection contract, and removed cap behavior.
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] Teams no longer hard-rejects messages based on a static concurrent-turn cap.
+- [x] `teamsChannel.maxConcurrentConversations` is fully removed from config schema/defaults/accessors and call sites.
+- [x] A shared turn coordinator exists and is used by Teams for per-conversation serialization.
+- [x] Same-conversation follow-up messages during active turns are all preserved and injected into the active turn between model calls.
+- [x] No steering follow-up dedupe/idempotency layer is introduced in this task.
+- [x] Steering follow-ups are injected as ordered discrete user messages (not dropped, reordered, or collapsed with lost boundaries).
+- [x] Steering injection occurs only at model-call boundaries; no in-flight model-call mutation occurs.
+- [x] Buffered follow-ups that miss a boundary are carried into the next turn for the same conversation.
+- [x] Steering path introduces no adapter-authored plain-text acknowledgement messages to users.
+- [x] Model receives all follow-up user messages for steering (none dropped).
+- [x] Single active-turn ownership per conversation is preserved; different conversations remain parallelizable.
+- [x] Tests are updated to cover coordinator contract, steering injection contract, and removed cap behavior.
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -97,3 +97,4 @@ Default proposal:
 - 2026-03-04 11:53 Historical (superseded at 12:21): generalized dedupe contract to channel message identity (Teams mapping as adapter detail) and locked no steering-specific buffer cap.
 - 2026-03-04 12:21 Removed follow-up dedupe/idempotency from plan scope; preserve-all steering now forwards follow-ups as received.
 - 2026-03-04 13:17 Renamed task slug from `turn-coordinator-locking-refactor` to `turn-coordinator-steering-contract` to match current scope.
+- 2026-03-04 13:40 Synced planning completion criteria to verified implementation evidence and final audit artifacts.
