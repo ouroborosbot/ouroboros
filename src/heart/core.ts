@@ -354,31 +354,47 @@ export async function runAgent(
         // Check for final_answer sole call: intercept before tool execution
         const isSoleFinalAnswer = result.toolCalls.length === 1 && result.toolCalls[0].name === "final_answer";
         if (isSoleFinalAnswer) {
+          // Extract answer from the tool call arguments.
+          // Supports: {"answer":"text"}, "text" (JSON string), retry on failure.
           let answer: string | undefined;
           try {
             const parsed = JSON.parse(result.toolCalls[0].arguments);
-            answer = parsed.answer;
+            if (typeof parsed === "string") {
+              answer = parsed;
+            } else if (parsed.answer != null) {
+              answer = parsed.answer;
+            }
+            // else: valid JSON but no answer field — answer stays undefined (retry)
           } catch {
-            // JSON parsing failed (e.g. truncated output). Don't fall back to
-            // result.content — it was already emitted via onTextChunk during
-            // streaming and re-emitting would double it.
+            // JSON parsing failed (e.g. truncated output) — answer stays undefined (retry)
           }
-          // Emit the answer through the callback pipeline so channels receive it.
-          // Never truncate — channel adapters handle splitting long messages.
-          // Clear any streamed content first (e.g. refusal noise) since the
-          // final_answer supersedes it.
-          if (answer) {
-            callbacks.onClearText?.();
+
+          // Clear any streamed noise (e.g. refusal text) before emitting or retrying.
+          callbacks.onClearText?.();
+
+          if (answer != null) {
+            // Emit the answer through the callback pipeline so channels receive it.
+            // Never truncate — channel adapters handle splitting long messages.
             callbacks.onTextChunk(answer);
+            // Keep the full assistant message (with tool_calls) for debuggability,
+            // plus a synthetic tool response so the conversation stays valid on resume.
+            messages.push(msg);
+            messages.push({ role: "tool", tool_call_id: result.toolCalls[0].id, content: "(delivered)" });
+            if (azureInput) {
+              azureInput.push({ type: "function_call_output" as const, call_id: result.toolCalls[0].id, output: "(delivered)" });
+            }
+            done = true;
+          } else {
+            // Answer is undefined — the model's final_answer was incomplete or
+            // malformed. Push the assistant msg + error tool result and let the
+            // model try again.
+            const retryError = "your final_answer was incomplete or malformed. call final_answer again with your complete response.";
+            messages.push(msg);
+            messages.push({ role: "tool", tool_call_id: result.toolCalls[0].id, content: retryError });
+            if (azureInput) {
+              azureInput.push({ type: "function_call_output" as const, call_id: result.toolCalls[0].id, output: retryError });
+            }
           }
-          // Keep the full assistant message (with tool_calls) for debuggability,
-          // plus a synthetic tool response so the conversation stays valid on resume.
-          messages.push(msg);
-          messages.push({ role: "tool", tool_call_id: result.toolCalls[0].id, content: "(delivered)" });
-          if (azureInput) {
-            azureInput.push({ type: "function_call_output" as const, call_id: result.toolCalls[0].id, output: "(delivered)" });
-          }
-          done = true;
           continue;
         }
 
