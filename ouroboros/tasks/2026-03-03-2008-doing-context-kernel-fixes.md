@@ -218,7 +218,7 @@ Also test `toolsSection()` (Issue E):
 **Output**: New test cases in `src/__tests__/mind/prompt.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because current `toolBehaviorSection` returns empty string when no options passed, and prompt text doesn't contain the new framing
 
-### ⬜ Unit 6b: Issue B + E (toolBehaviorSection + toolsSection) -- Implementation
+### ✅ Unit 6b: Issue B + E (toolBehaviorSection + toolsSection) -- Implementation
 **What**: Two changes in `src/mind/prompt.ts`:
 1. `toolBehaviorSection()` at line 136: change guard from `if (!options?.toolChoiceRequired)` to `if (!(options?.toolChoiceRequired ?? true))` so it defaults on. Rewrite the prompt text:
    - Decision tree: "need more information? call a tool. ready to respond to the user? call `final_answer`."
