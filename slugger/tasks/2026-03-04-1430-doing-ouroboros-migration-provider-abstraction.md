@@ -66,6 +66,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 
 ### ⬜ Unit 1a: Storage/config migration docs and contracts — Tests
 **What**: Add/adjust tests that define required path and config contracts (`agent.json`, `secrets.json`, `.agentstate`) including failure cases for missing contracts.
+**Output**: Failing contract test cases for config path resolution, context loading location, and legacy-path rejection behavior.
 **Acceptance**: New/updated tests exist and fail red against current behavior.
 
 ### ⬜ Unit 1b: Storage/config migration docs and contracts — Implementation
@@ -75,10 +76,12 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 
 ### ⬜ Unit 1c: Storage/config migration docs and contracts — Coverage & Refactor
 **What**: Refactor for clarity and verify branch/error-path coverage on migration/config contract code.
+**Output**: Refactored config-loading code and coverage report artifact for migration/config paths.
 **Acceptance**: 100% coverage on new migration/config code and tests remain green.
 
 ### ⬜ Unit 2a: Provider abstraction registry — Tests
 **What**: Add failing tests defining provider interface/registry behavior and per-agent provider resolution without singleton coupling.
+**Output**: Failing abstraction/registry tests for per-agent provider lookup and engine integration contracts.
 **Acceptance**: Tests fail red and prove engine no longer depends on hardcoded provider branching.
 
 ### ⬜ Unit 2b: Provider abstraction registry — Implementation
@@ -88,10 +91,12 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 
 ### ⬜ Unit 2c: Provider abstraction registry — Coverage & Refactor
 **What**: Refactor registry/selection code and cover all decision/error branches.
+**Output**: Refactored registry code and coverage artifact for provider selection and error branches.
 **Acceptance**: 100% coverage on new abstraction code with full related tests green.
 
 ### ⬜ Unit 3a: Provider-owned streaming/input behavior — Tests
 **What**: Add failing tests that lock streaming/input behavior in provider implementations instead of engine-level provider branches.
+**Output**: Failing tests proving provider-owned streaming/input behavior contracts.
 **Acceptance**: Tests fail red against old flow.
 
 ### ⬜ Unit 3b: Provider-owned streaming/input behavior — Implementation
@@ -101,10 +106,12 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 
 ### ⬜ Unit 3c: Provider-owned streaming/input behavior — Coverage & Refactor
 **What**: Refactor provider-side streaming code and ensure all branches/error paths are covered.
+**Output**: Refactored provider streaming/input code and branch coverage artifact.
 **Acceptance**: 100% coverage on new provider-side streaming code and tests green.
 
 ### ⬜ Unit 4a: Anthropic setup-token integration — Tests
 **What**: Add failing tests for Anthropic provider behavior, setup-token profile loading, and explicit auth-failure messaging.
+**Output**: Failing Anthropic provider/auth tests for success and fail-fast error paths.
 **Acceptance**: Anthropic tests fail red before implementation.
 
 ### ⬜ Unit 4b: Anthropic setup-token integration — Implementation
@@ -114,10 +121,12 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 
 ### ⬜ Unit 4c: Anthropic setup-token integration — Coverage & Refactor
 **What**: Refactor Anthropic provider code and cover all auth and response branches.
+**Output**: Refactored Anthropic provider code and coverage artifact for auth/stream branches.
 **Acceptance**: 100% coverage on new Anthropic integration code and tests green.
 
 ### ⬜ Unit 5a: OpenAI Codex OAuth integration — Tests
 **What**: Add failing tests for `openai-codex` provider behavior, OAuth profile loading, and explicit auth-failure messaging.
+**Output**: Failing OpenAI Codex provider/auth tests for success and fail-fast error paths.
 **Acceptance**: OpenAI Codex tests fail red before implementation.
 
 ### ⬜ Unit 5b: OpenAI Codex OAuth integration — Implementation
@@ -127,17 +136,28 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 
 ### ⬜ Unit 5c: OpenAI Codex OAuth integration — Coverage & Refactor
 **What**: Refactor OpenAI Codex provider code and cover all auth and response branches.
+**Output**: Refactored OpenAI Codex provider code and coverage artifact for auth/response branches.
 **Acceptance**: 100% coverage on new OpenAI Codex integration code and tests green.
 
-### ⬜ Unit 6: Docs and contract alignment
-**What**: Update `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, and related provider/config docs to reflect new contracts and migration policy.
-**Output**: Documentation updates aligned to implemented behavior.
-**Acceptance**: Documentation reflects final runtime behavior and migration instructions without contradictions.
+### ⬜ Unit 6a: Migration runbook and storage-contract docs
+**What**: Finalize `cross-agent-docs/agent-storage-migration-playbook.md` and document one-time migration expectations and cleanup policy.
+**Output**: Migration runbook updates and supporting docs aligned to new storage boundaries.
+**Acceptance**: Runbook has explicit move/verify/cleanup steps and matches implemented storage paths.
 
-### ⬜ Unit 7: Final verification and closure
+### ⬜ Unit 6b: Provider/config contract docs
+**What**: Update `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, and related provider/config docs to reflect provider IDs, auth profile flows, and fail-fast behavior.
+**Output**: Documentation updates aligned to implemented provider/config behavior.
+**Acceptance**: Documentation reflects final runtime provider behavior and config contracts without contradictions.
+
+### ⬜ Unit 7a: Full-suite and coverage verification
 **What**: Run full test suite, coverage checks, and static checks; assemble execution evidence in artifacts.
-**Output**: Final verification log and summary artifact.
+**Output**: Full verification log and coverage artifacts in task artifacts directory.
 **Acceptance**: All tests pass, no warnings, new-code coverage is 100%, and completion criteria are all satisfied.
+
+### ⬜ Unit 7b: Completion checklist and closeout
+**What**: Validate completion criteria checkboxes against evidence and prepare merge-ready summary.
+**Output**: Updated doing checklist and closeout summary artifact referencing evidence locations.
+**Acceptance**: Every completion checkbox has direct evidence and task is ready for work-doer execution/closure flow.
 
 ## Execution
 - **TDD strictly enforced**: tests → red → implement → green → refactor
@@ -150,3 +170,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 
 ## Progress Log
 - 2026-03-04 15:27 Created from planning doc
+- 2026-03-04 15:30 Granularity pass: added missing unit outputs and split docs/final verification into atomic units
