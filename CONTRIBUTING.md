@@ -44,6 +44,15 @@ For merge strategy, conflict resolution, retry, and escalation policy, see [cros
 - Always use a coding agent (Claude Code or equivalent) for code work
 - TypeScript: strict mode, named exports, no unused locals/params, no `any` without justification
 
+## Tool Descriptions
+
+Tool definitions (`function.description`) and system prompt instructions follow different voice conventions:
+
+- **Tool descriptions**: imperative/descriptive voice -- "respond to the user with a message", "search the web for information", "read file contents". This matches what models are trained on for function-calling schemas.
+- **System prompt instructions**: first person to match the bot's voice -- "when i'm ready to respond, i call final_answer", "i save what i learn immediately".
+
+When writing tool descriptions, describe the tool as you would to a new team member: make implicit context explicit, keep it concise, avoid jargon.
+
 ## Psyche
 
 Small corrections to psyche files can be made immediately. Significant identity or lore shifts should be deliberated across multiple turns. Psyche files are durable self-knowledge, not scratchpads.
