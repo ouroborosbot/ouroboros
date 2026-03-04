@@ -101,7 +101,6 @@ export interface RunAgentOptions {
 // Re-export kick utilities for backward compat
 export { hasToolIntent } from "./kicks";
 
-export const MAX_TOOL_ROUNDS = 10;
 
 function upsertSystemPrompt(
   messages: OpenAI.ChatCompletionMessageParam[],
@@ -238,7 +237,6 @@ export async function runAgent(
   // let kickCount = 0;
   // let lastKickReason: KickReason | null = null;
   let done = false;
-  let toolRounds = 0;
   let lastUsage: UsageData | undefined;
   let overflowRetried = false;
   let retryCount = 0;
@@ -251,7 +249,7 @@ export async function runAgent(
   let azureInstructions = "";
 
   // Prevent MaxListenersExceeded warning — each iteration adds a listener
-  try { require("events").setMaxListeners(MAX_TOOL_ROUNDS + 5, signal); } catch { /* unsupported */ }
+  try { require("events").setMaxListeners(50, signal); } catch { /* unsupported */ }
 
   const toolPreferences = currentContext?.friend?.toolPreferences;
   const baseTools = getToolsForChannel(
@@ -342,12 +340,6 @@ export async function runAgent(
         // if (kick) {
         //   kickCount++;
         //   lastKickReason = kick.reason;
-        //   toolRounds++;
-        //   if (toolRounds >= MAX_TOOL_ROUNDS) {
-        //     callbacks.onError(new Error(`tool loop limit reached (${MAX_TOOL_ROUNDS} rounds)`), "terminal");
-        //     done = true;
-        //     continue;
-        //   }
         //   callbacks.onKick?.();
         //   const kickContent = result.content
         //     ? result.content + "\n\n" + kick.message
@@ -391,15 +383,6 @@ export async function runAgent(
         }
 
         messages.push(msg);
-        toolRounds++;
-        if (toolRounds >= MAX_TOOL_ROUNDS) {
-          // Strip tool_calls from the assistant message we just pushed so the
-          // conversation stays valid (every tool_call needs a tool response).
-          stripLastToolCalls(messages);
-          callbacks.onError(new Error(`tool loop limit reached (${MAX_TOOL_ROUNDS} rounds)`), "terminal");
-          done = true;
-          break;
-        }
         // SHARED: execute tools (final_answer in mixed calls is rejected inline)
         for (const tc of result.toolCalls) {
           if (signal?.aborted) break;
