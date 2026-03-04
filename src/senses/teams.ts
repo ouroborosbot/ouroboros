@@ -113,13 +113,27 @@ export function createTeamsCallbacks(
   }
 
   // Safely send a separate message via sendMessage (buffered mode only).
-  // Catches errors and respects the stopped flag.
+  // Serialized via promise chain -- concurrent calls execute sequentially.
+  // If any send fails, the chain halts via markStopped().
+  let sendChain = Promise.resolve()
+  let sendChainBusy = false
   function safeSend(text: string): void {
     if (stopped || !sendMessage) return
-    try {
-      catchAsync(sendMessage(text))
-    } catch {
-      markStopped()
+    if (!sendChainBusy) {
+      // Chain is idle -- start the send synchronously and mark busy
+      sendChainBusy = true
+      try {
+        sendChain = sendMessage(text).catch(() => markStopped()).finally(() => { sendChainBusy = false })
+      } catch {
+        sendChainBusy = false
+        markStopped()
+      }
+    } else {
+      // Chain is busy -- queue onto the existing chain
+      sendChain = sendChain.then(() => {
+        if (stopped) return
+        return sendMessage(text)
+      }).catch(() => markStopped())
     }
   }
 
