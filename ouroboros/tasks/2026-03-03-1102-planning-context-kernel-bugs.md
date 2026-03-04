@@ -228,6 +228,7 @@ Sessions currently live at `~/.agentconfigs/{agentName}/sessions/{channel}/{sess
 - Persisting the `tools` array in session files for debugging/recall (deferred — see Notes)
 - Migration of existing data in `~/.agentconfigs/context/` — only one dev machine, no production users. Delete old directory manually.
 - Migration of existing sessions to new path structure — old sessions are orphaned, delete manually.
+- Graceful handling of unrecognized API errors (deferred). Currently, API errors that aren't context overflow or transient network errors emit a terminal error and exit the loop. The harness philosophy is "code for the model to use" — unrecognized errors should ideally be fed back to the model so it can adapt, rather than silently killing the turn. Requires thought on which errors are recoverable vs truly fatal.
 
 ## Completion Criteria
 - [x] Teams handler extracts AAD fields from activity and populates `TeamsMessageContext`
