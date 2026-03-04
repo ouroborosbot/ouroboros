@@ -27,15 +27,15 @@ Key facts:
 - Bug 1 (AAD extraction): code bug is the same on all configurations. Whether `activity.from.aadObjectId` is populated may differ per surface -- Gate 1 testing will confirm.
 - Bug 2 (out-of-order messages): requires BOTH Copilot Chat surface AND buffered mode (nostream). Root cause: `safeSend` is fire-and-forget -- `catchAsync` (teams.ts:86-90) attaches `.catch()` but never awaits, so multiple `ctx.send()` HTTP requests race. Standard Teams serializes incoming bot messages server-side; Copilot Chat does not. Streaming is unaffected because `safeEmit`/`safeUpdate` go through the Teams SDK streaming protocol which handles ordering internally.
 - Bug 3 (cold first encounter): surface-agnostic. Confirmed on both surfaces.
-- Bug 4 (kick false positives): the pattern matching runs in `core.ts` (surface-agnostic), but the visible symptoms (kick messages appearing as separate messages) are specific to Copilot + buffered via Bug 2.
+- Bug 4 (kick loop): the kick patterns are intentionally broad (they give the model another chance to call tools). The bug is that the `final_answer` escape hatch is never forced via `tool_choice`, so a model that has genuinely finished can't cleanly exit. Plus the kick message self-triggers via "I can" matching `/\bi can\b/i`. Visible symptoms (kick messages as separate messages) are specific to Copilot + buffered via Bug 2.
 
 ### Gated Fix Structure
 
 **Gate 1: Bug 1 (AAD extraction) + Bug 2 (out-of-order messages)**
 Bug 1 is the most fundamental fix -- the bot must know who the user is. Bug 2 fix: serialize `safeSend` via promise chain so concurrent `ctx.send()` calls don't race. User tests after.
 
-**Gate 2: Bug 4 (kick false positives + broken escape hatch)**
-Eliminates the kick loop cascade: prune overbroad patterns AND fix the `final_answer` escape hatch. Also resolves Bug 5 (response spam) and Bug 6 (platform timeout). User tests after.
+**Gate 2: Bug 4 (kick escape hatch + self-trigger)**
+Force `tool_choice = "required"` after narration kick (same as CLI forcing pattern) and fix kick message self-trigger. Three small changes. Patterns stay as-is. Also resolves Bug 5 (response spam) and Bug 6 (platform timeout). User tests after.
 
 **Gate 3: Bug 3 (new-friend prompts + proactive saving)**
 Prompt tuning: directive new-friend instruction and aggressive ephemerality instruction. User tests on both surfaces after.
@@ -92,41 +92,38 @@ Small change to `safeSend` only. No changes to call sites (`onToolEnd`, `onKick`
 
 ---
 
-#### GATE 2: Kick False Positives
+#### GATE 2: Kick Escape Hatch + Self-Trigger
 
-**Bug 4: Kick loop from overbroad narration detection + toothless escape hatch**
+**Bug 4: Kick loop from missing `tool_choice` forcing + self-triggering kick message**
 
-Two distinct root causes create the spiral:
+**The kick patterns are intentionally broad and correct.** The kick mechanism gives the model another chance to call tools. If the model says "I'll show your backlog" without calling a tool, the kick forces it to reconsider and actually call the tool. Without the kick, that narration would be the final response and the user never gets their backlog. The patterns are intentionally aggressive to overcorrect. All patterns stay as-is.
 
-**(a) Overbroad patterns:** The model's legitimate final answer "I'll default to grid/table format when showing your ADO backlog from now on" triggers `/\bi'll\b/i` in `TOOL_INTENT_PATTERNS`. A perfectly good response gets kicked.
+**Root cause:** After a narration kick, `final_answer` is added to the tool list (`core.ts:259-261`, condition: `lastKickReason === "narration"`) but `tool_choice` is NOT set to `"required"`. The conditions at `core.ts:288` (Azure) and `core.ts:303` (non-Azure) only check `options?.toolChoiceRequired`, not `lastKickReason`. So the model can respond with text-only, which gets kicked again, creating the loop.
 
-**(b) `final_answer` escape hatch is toothless:** Verified code paths:
-- `core.ts:259-261`: when `lastKickReason === "narration"`, `final_answer` IS injected into `activeTools`. The model sees it on the next iteration. VERIFIED.
-- `core.ts:288` (Azure path): `tool_choice = "required"` is only set when `options?.toolChoiceRequired` is true. This is NOT set after kicks. VERIFIED.
-- `core.ts:303` (non-Azure path): same -- `tool_choice` only set for `options.toolChoiceRequired`. VERIFIED.
-- `core.ts:346`: after a kick, `azureInput = null` forces a rebuild from messages. The model sees the full conversation including the kick-appended text. VERIFIED.
+In CLI before `final_answer` existed, the model WAS forced to call a tool after a kick (it would call `get_current_time` as a no-op). Same forcing is needed here.
 
-Result: `final_answer` is in the tool list, the kick message tells the model to use it, but `tool_choice` does not force it. The model responds with apologetic text instead of calling the tool. The screenshot shows the actual spiral:
-- Kick 1: "I'll default to grid/table format..." -- kicked (`/\bi'll\b/i`)
-- Model responds with text: "And I'll stop doing that stray internal note as well. Grid by default from here on out." -- kicked again
-- Model responds with text: "Right. That internal leak is on me. Won't happen again. Preference saved. Grid by default." -- kicked again
-- Each apology contains intent language ("I'll stop", "Won't happen") that triggers more kicks. The model never calls `final_answer`.
+The screenshot shows the spiral:
+- Kick 1: "I'll default to grid/table format..." -- kicked (model narrated, `final_answer` added to tools but not forced)
+- Model responds with text: "And I'll stop doing that stray internal note as well." -- kicked again (still not forced to call a tool)
+- Model responds with text: "Right. That internal leak is on me. Won't happen again." -- kicked again (continues until MAX_TOOL_ROUNDS)
 
-The pattern matching is in `core.ts` (surface-agnostic) -- it fires regardless of surface. The visible symptoms (kick messages as separate persistent messages) are specific to Copilot + buffered via Bug 2. On standard Teams in buffered mode the kicks still waste API round trips but don't show as separate messages.
+**Additional issue: kick message self-triggers.** The narration kick message at `kicks.ts:29`:
+```
+I narrated instead of acting. Calling the tool now -- if I've already finished, I can use final_answer.
+```
+Contains "I can" which matches `/\bi can\b/i` in `TOOL_INTENT_PATTERNS`. The kick message itself guarantees the next text response will also be kicked.
 
-**Fix (a): Prune overbroad patterns.** Six patterns to remove (match normal conversational English):
-- `/\bi'll\b/i` -- "I'll show your backlog"
-- `/\bi will\b/i` -- same
-- `/\bi can\b/i` -- "I can help with that"; also self-triggers in kick message
-- `/\bi should\b/i` -- "I should mention"
-- `/\bi'm \w+ing\b/i` -- matches "I'm glad", "I'm happy", "I'm sorry"
-- `/\bi am \w+ing\b/i` -- same
+The pattern matching is in `core.ts` (surface-agnostic). The visible symptoms (kick messages as separate persistent messages) are specific to Copilot + buffered via Bug 2.
 
-**Fix (b): Force `final_answer` after consecutive kicks.** After `kickCount >= 2`, set `tool_choice = { type: "function", function: { name: "final_answer" } }` at `core.ts:288` (Azure) and `core.ts:303` (non-Azure). Small change -- add a condition alongside the existing `options?.toolChoiceRequired` check. Repeated kicks make zero sense -- the system must recover, not spiral.
+**Three changes:**
 
-Also rewrite the kick message: must not match any remaining pattern AND must clearly direct the model to call `final_answer`. Verify with unit test.
+1. **`core.ts:288`** (Azure path): change `if (options?.toolChoiceRequired)` to `if (options?.toolChoiceRequired || lastKickReason === "narration")`. One condition added.
 
-Update existing tests: `kicks.test.ts:25` expects "I can help with that" -> true. Must be updated. Add regression tests with conversational responses that must NOT trigger kicks. Add tests for forced `tool_choice` after consecutive kicks.
+2. **`core.ts:303`** (non-Azure path): same change. One condition added.
+
+3. **`kicks.ts:29`**: rewrite kick message to not contain "I can" or any phrase matching `TOOL_INTENT_PATTERNS`. Example: "I narrated instead of acting. Using the tool now -- if done, calling final_answer."
+
+**No pattern changes.** All existing `TOOL_INTENT_PATTERNS` stay as-is. All existing kick test expectations stay as-is. Add new tests for: `tool_choice = "required"` when `lastKickReason === "narration"`, and kick message not self-triggering `hasToolIntent()`.
 
 **Bug 5: Response spam** -- consequence of Bug 4 (kick loop) + Bug 2 (out-of-order messages on Copilot). Resolves when both are fixed.
 
@@ -175,7 +172,7 @@ Five changes:
 
 ### Out of Scope
 - Streaming mode changes (Bug 2 is `safeSend` serialization only; streaming uses SDK protocol which handles ordering)
-- Comprehensive kick system redesign (fix immediate false positives + escape hatch; broader context-aware redesign deferred)
+- Kick pattern changes (patterns are intentionally broad; broader context-aware redesign deferred)
 - Changes to `save_friend_note` tool behavior (tool works correctly)
 - Changes to `FriendResolver` or `FriendStore` (work correctly given correct inputs)
 - Message deduplication via `activity.id` (deferred hardening)
@@ -189,13 +186,12 @@ Five changes:
 - [ ] `safeSend` serialized via promise chain -- concurrent `ctx.send()` calls no longer race
 - [ ] User confirms on Copilot Chat: messages arrive in correct order, displayName populated or fallback confirmed
 
-### Gate 2: Kick False Positives + Escape Hatch
-- [ ] 6 overbroad patterns removed from `TOOL_INTENT_PATTERNS`
-- [ ] Kick message does not self-trigger `hasToolIntent()` -- verified by unit test
-- [ ] Conversational responses do not trigger kicks -- verified by regression tests
-- [ ] Existing test expectations updated
-- [ ] After N consecutive kicks, `tool_choice` forces `final_answer` -- verified by unit test
-- [ ] Kick message rewritten to explicitly direct model to call `final_answer`
+### Gate 2: Kick Escape Hatch + Self-Trigger
+- [ ] `tool_choice = "required"` set when `lastKickReason === "narration"` at core.ts:288 and core.ts:303
+- [ ] Kick message rewritten to not self-trigger `hasToolIntent()` -- verified by unit test
+- [ ] All existing kick patterns and test expectations unchanged
+- [ ] New tests for `tool_choice` forcing after narration kick
+- [ ] New test verifying kick message does not trigger `hasToolIntent()`
 - [ ] User confirms on Copilot Chat: no kick loop, no response spam, no timeout
 
 ### Gate 3: New-Friend Prompts + Proactive Saving
@@ -223,14 +219,14 @@ Five changes:
 - [x] Bug 2: Which fix approach? **Serialize `safeSend` via promise chain.** Root cause is fire-and-forget concurrent sends, not wrong function choice. No changes to call sites needed.
 - [x] Bug 3: Priority vs warmth balance? **Help first, introduce along the way, save what you learn.**
 - [x] Bug 3: displayName interpolation? **Yes.** With "Unknown" special case.
-- [x] Bug 4: Pattern pruning scope? **Remove 6 patterns** that match conversational English. Keep narration-specific patterns.
+- [x] Bug 4: Pattern pruning scope? **No pattern removals.** Patterns are intentionally broad -- they give the model another chance to call tools. The bug is the toothless escape hatch, not the patterns.
 - [x] Bug 5: Platform retries or kick loop? **Kick loop.** Session file confirms. Dedup deferred.
 - [ ] Bug 1: Does Copilot Chat surface populate `activity.from.aadObjectId`? Gate 1 testing will confirm. Fix is the same regardless.
 
 ## Decisions Made
 - Bug 1 is the top priority. The bot must know who the user is. Three-line fix with optional chaining handles both surfaces.
 - Bug 2 requires both Copilot Chat surface AND buffered mode. Root cause: `safeSend` is fire-and-forget (`catchAsync` attaches `.catch()` but never awaits). Multiple `ctx.send()` HTTP requests race. Standard Teams serializes server-side; Copilot Chat does not. Fix: serialize `safeSend` via promise chain. Small change to `safeSend` only, no call-site changes needed.
-- Bug 4 has two verified root causes: (a) 6 overbroad patterns match normal English, (b) `final_answer` escape hatch is toothless -- tool is injected into `activeTools` (core.ts:259-261) but `tool_choice` is never forced after kicks (core.ts:288/303 only check `options.toolChoiceRequired`). Fix both: prune patterns AND set `tool_choice` to force `final_answer` after `kickCount >= 2`.
+- Bug 4: kick patterns are intentionally broad and stay as-is. Root cause: `final_answer` is injected into `activeTools` (core.ts:259) but `tool_choice` is not set to `"required"` (core.ts:288/303 only check `options.toolChoiceRequired`, not `lastKickReason`). Fix: add `|| lastKickReason === "narration"` to both conditions. Plus kick message self-triggers via "I can" -- rewrite to avoid. Three small changes total.
 - Bug 4 pattern matching is surface-agnostic (core.ts). Visible symptoms are specific to Copilot + buffered via Bug 2.
 - Bug 3 confirmed on both surfaces. Two issues: new-friend instruction is aspirational not directive, and ephemerality instruction uses "something important" which lets model skip saving. Fix both: directive new-friend behavior + aggressive save-anything bar.
 - Bug 5 = Bug 4 + Bug 2. Bug 6 = Bug 4. Both resolve automatically.
@@ -259,21 +255,12 @@ Five changes:
 - Line 184: ephemerality instruction -- rewrite from "something important" to aggressive save-anything bar
 - Line 193-194: new-friend instruction -- rewrite from aspirational to directive
 
-**Bug 4a -- `src/heart/kicks.ts`:**
-- Line 36: remove `/\bi'll\b/i`
-- Line 37: remove `/\bi will\b/i`
-- Line 47: remove `/\bi'm \w+ing\b/i`
-- Line 48: remove `/\bi am \w+ing\b/i`
-- Line 52: remove `/\bi should\b/i`
-- Line 53: remove `/\bi can\b/i`
-- Line 29: rewrite kick message -- must not contain "I can" (self-trigger), must explicitly direct model to call `final_answer`
-
-**Bug 4b -- `src/heart/core.ts`:**
-- Line 288 (Azure path): after `kickCount >= 2`, set `tool_choice = { type: "function", function: { name: "final_answer" } }`
-- Line 303 (non-Azure path): same
-- Line 259-261: `final_answer` injected into `activeTools` when `lastKickReason === "narration"` (existing, works correctly)
-- Line 328-348: kick detection loop (existing, `kickCount` already tracked at line 331)
-- Line 346: `azureInput = null` forces rebuild from messages after kick (existing, works correctly)
+**Bug 4 -- three changes:**
+1. `src/heart/core.ts:288` (Azure path): change `if (options?.toolChoiceRequired)` to `if (options?.toolChoiceRequired || lastKickReason === "narration")`. One condition added.
+2. `src/heart/core.ts:303` (non-Azure path): same change. One condition added.
+3. `src/heart/kicks.ts:29`: rewrite kick message to not contain "I can" or any phrase matching `TOOL_INTENT_PATTERNS`. Example: "I narrated instead of acting. Using the tool now -- if done, calling final_answer."
+- All patterns in `TOOL_INTENT_PATTERNS` (lines 33-120) stay as-is -- no removals
+- `core.ts:259-261`: `final_answer` already injected into `activeTools` when `lastKickReason === "narration"` (existing, works correctly)
 
 ### Supporting References
 
@@ -288,7 +275,7 @@ Five changes:
 - `src/mind/prompt.ts:144-206` -- contextSection function
 - `src/heart/kicks.ts:33-120` -- full TOOL_INTENT_PATTERNS array
 - `src/heart/core.ts:100` -- MAX_TOOL_ROUNDS = 10
-- `src/__tests__/heart/kicks.test.ts:25` -- false-positive test expectation ("I can help with that" -> true, must update)
+- `src/__tests__/heart/kicks.test.ts` -- existing kick tests (all expectations stay as-is; add new tests for forced final_answer and kick message self-trigger)
 - `src/__tests__/senses/teams.test.ts` -- existing Teams tests
 - `src/__tests__/mind/prompt.test.ts` -- existing prompt tests
 - `src/wardrobe/format.ts` -- formatToolResult, formatKick, formatError
@@ -299,8 +286,8 @@ Five changes:
 
 **Theme 1: "Defined but never wired"**
 - Bug 1: `TeamsMessageContext` interface defines `aadObjectId`, `tenantId`, `displayName` (teams.ts:303-305) but line 492 never sets them from the activity
-- Bug 4b: `final_answer` injected into tool list (core.ts:259) but `tool_choice` never forces it (core.ts:288/303 only check `toolChoiceRequired`)
-- Pattern: escape hatches and data paths exist architecturally but aren't connected at the call site
+- Bug 4: `final_answer` injected into tool list (core.ts:259) but `tool_choice` not set to `"required"` (core.ts:288/303 only check `toolChoiceRequired`, not `lastKickReason`). Plus kick message (kicks.ts:29) contains "I can" which self-triggers `/\bi can\b/i`
+- Pattern: escape hatches and data paths exist architecturally but the conditions aren't wired at the call site
 
 **Theme 2: "Fire-and-forget sends race on Copilot"**
 - Bug 2: `safeSend` (teams.ts:117-124) calls `sendMessage` via `catchAsync` which attaches `.catch()` but never awaits. Multiple `ctx.send()` HTTP POSTs fire concurrently and arrive in arbitrary order.
@@ -314,19 +301,17 @@ Five changes:
 - prompt.ts:194: "i should learn their name and how they like to work" -- aspirational, not directive
 - kicks.ts:29: "Calling the tool now -- if I've already finished, I can use final_answer" -- suggests but doesn't compel
 
-**Theme 4: "Patterns that match normal English"**
-- kicks.ts:36: `/\bi'll\b/i` -- "I'll show your backlog"
-- kicks.ts:37: `/\bi will\b/i` -- "I will default to grid"
-- kicks.ts:47: `/\bi'm \w+ing\b/i` -- "I'm glad", "I'm happy", "I'm sorry"
-- kicks.ts:48: `/\bi am \w+ing\b/i` -- same
-- kicks.ts:52: `/\bi should\b/i` -- "I should mention"
-- kicks.ts:53: `/\bi can\b/i` -- "I can help" AND self-triggers from kick message itself (line 29: "I can use final_answer")
+**Theme 4: "Intentionally aggressive patterns need a working exit"**
+- Kick patterns are broad by design -- they give the model another chance to call tools instead of narrating
+- The problem is not that kicks fire too often, but that the model has no forced exit once it has genuinely finished
+- In CLI before `final_answer`, the model was forced to call a tool (used `get_current_time` as no-op). Same forcing needed here.
+- Self-trigger in kick message (kicks.ts:29: "I can use final_answer" matches `/\bi can\b/i`) makes the loop worse
 
 ### Quick Reference
 
-**Patterns to remove (6):** `/\bi'll\b/i`, `/\bi will\b/i`, `/\bi can\b/i`, `/\bi should\b/i`, `/\bi'm \w+ing\b/i`, `/\bi am \w+ing\b/i`
+**Kick patterns:** ALL stay as-is. No removals.
 
-**Patterns to keep:** `/\blet me\b/i`, `/\bi need to\b/i`, `/\bi'm going to\b/i`, `/\bgoing to\b/i`, all obligation/plural/temporal/sequential/gerund/movement/self-narration patterns, `/\bcontinues\b/i`, `/^continuing\b/im`, `/^next up\b/i`
+**Kick message self-trigger:** kicks.ts:29 contains "I can" matching `/\bi can\b/i`. Rewrite to avoid.
 
 **Deferred: Message deduplication via activity.id** -- hardening measure for future task.
 
