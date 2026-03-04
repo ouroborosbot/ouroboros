@@ -366,8 +366,13 @@ export async function runAgent(
           }
           // Emit the answer through the callback pipeline so channels receive it
           if (answer) callbacks.onTextChunk(answer);
-          // Push clean assistant message with extracted answer (no tool_calls)
-          messages.push({ role: "assistant", content: answer } as OpenAI.ChatCompletionAssistantMessageParam);
+          // Keep the full assistant message (with tool_calls) for debuggability,
+          // plus a synthetic tool response so the conversation stays valid on resume.
+          messages.push(msg);
+          messages.push({ role: "tool", tool_call_id: result.toolCalls[0].id, content: "(delivered)" });
+          if (azureInput) {
+            azureInput.push({ type: "function_call_output" as const, call_id: result.toolCalls[0].id, output: "(delivered)" });
+          }
           done = true;
           continue;
         }

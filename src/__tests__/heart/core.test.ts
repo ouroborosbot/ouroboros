@@ -3501,10 +3501,11 @@ describe("tool_choice required and final_answer", () => {
     )
 
     const toolStarts: string[] = []
+    const textChunks: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
-      onTextChunk: () => {},
+      onTextChunk: (text) => textChunks.push(text),
       onReasoningChunk: () => {},
       onToolStart: (name) => toolStarts.push(name),
       onToolEnd: () => {},
@@ -3516,11 +3517,18 @@ describe("tool_choice required and final_answer", () => {
 
     // Should NOT have called any tools through onToolStart (final_answer is intercepted)
     expect(toolStarts).toEqual([])
-    // The assistant message should have the extracted answer content, not tool_calls
+    // The full assistant message is kept (with tool_calls) for debuggability
     const assistantMsg = messages.find((m: any) => m.role === "assistant")
     expect(assistantMsg).toBeDefined()
-    expect(assistantMsg.content).toBe("the final response")
-    expect(assistantMsg.tool_calls).toBeUndefined()
+    expect(assistantMsg.tool_calls).toBeDefined()
+    expect(assistantMsg.tool_calls[0].function.name).toBe("final_answer")
+    // Answer is emitted through onTextChunk callback
+    expect(textChunks).toEqual(["the final response"])
+    // A synthetic tool response keeps the conversation valid
+    const toolResults = messages.filter((m: any) => m.role === "tool")
+    expect(toolResults).toHaveLength(1)
+    expect(toolResults[0].tool_call_id).toBe("call_1")
+    expect(toolResults[0].content).toBe("(delivered)")
     // Only 1 API call (no loop continuation)
     expect(mockCreate).toHaveBeenCalledTimes(1)
   })
@@ -3548,10 +3556,11 @@ describe("tool_choice required and final_answer", () => {
     })
 
     const toolStarts: string[] = []
+    const textChunks: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
-      onTextChunk: () => {},
+      onTextChunk: (text) => textChunks.push(text),
       onReasoningChunk: () => {},
       onToolStart: (name) => toolStarts.push(name),
       onToolEnd: () => {},
@@ -3565,15 +3574,21 @@ describe("tool_choice required and final_answer", () => {
     expect(toolStarts).toEqual(["read_file"])
     // Should have 2 API calls (mixed -> sole final_answer)
     expect(callCount).toBe(2)
-    // The final assistant message should have the extracted answer
+    // The final assistant message keeps tool_calls (full msg); answer emitted via onTextChunk
     const lastAssistant = [...messages].reverse().find((m: any) => m.role === "assistant")
-    expect(lastAssistant.content).toBe("the real answer")
+    expect(lastAssistant.tool_calls).toBeDefined()
+    expect(lastAssistant.tool_calls[0].function.name).toBe("final_answer")
+    expect(textChunks).toEqual(["the real answer"])
     // There should be a rejection tool result for the mixed final_answer
     const toolResults = messages.filter((m: any) => m.role === "tool")
     const rejectionMsg = toolResults.find((m: any) => m.tool_call_id === "call_2")
     expect(rejectionMsg).toBeDefined()
     expect(rejectionMsg.content).toContain("rejected")
     expect(rejectionMsg.content).toContain("final_answer must be the only tool call")
+    // There should also be a synthetic "(delivered)" tool result for the sole final_answer
+    const deliveredMsg = toolResults.find((m: any) => m.tool_call_id === "call_3")
+    expect(deliveredMsg).toBeDefined()
+    expect(deliveredMsg.content).toBe("(delivered)")
   })
 
   it("final_answer with empty answer arg: uses empty string", async () => {
@@ -3585,10 +3600,11 @@ describe("tool_choice required and final_answer", () => {
       ])
     )
 
+    const textChunks: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
-      onTextChunk: () => {},
+      onTextChunk: (text) => textChunks.push(text),
       onReasoningChunk: () => {},
       onToolStart: () => {},
       onToolEnd: () => {},
@@ -3600,8 +3616,14 @@ describe("tool_choice required and final_answer", () => {
 
     const assistantMsg = messages.find((m: any) => m.role === "assistant")
     expect(assistantMsg).toBeDefined()
-    // Should use empty string or result.content as fallback
-    expect(typeof assistantMsg.content).toBe("string")
+    // Full msg is kept with tool_calls; answer is undefined (no answer field, no content)
+    // so onTextChunk is NOT called (answer is falsy)
+    expect(assistantMsg.tool_calls).toBeDefined()
+    expect(textChunks).toEqual([])
+    // Synthetic tool response is still pushed
+    const toolResults = messages.filter((m: any) => m.role === "tool")
+    expect(toolResults).toHaveLength(1)
+    expect(toolResults[0].content).toBe("(delivered)")
   })
 
   it("final_answer is never passed to execTool (intercepted before execution)", async () => {
@@ -3628,11 +3650,13 @@ describe("tool_choice required and final_answer", () => {
     const messages: any[] = [{ role: "system", content: "test" }]
     await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
 
-    // No tools should have been started (final_answer is intercepted)
+    // No tools should have been started via onToolStart (final_answer is intercepted)
     expect(toolStarts).toHaveLength(0)
-    // No tool result messages in history
+    // There IS a synthetic tool result "(delivered)" but no execTool-produced results
     const toolResults = messages.filter((m: any) => m.role === "tool")
-    expect(toolResults).toHaveLength(0)
+    expect(toolResults).toHaveLength(1)
+    expect(toolResults[0].tool_call_id).toBe("call_1")
+    expect(toolResults[0].content).toBe("(delivered)")
   })
 
   it("Azure: mixed final_answer rejection pushes to azureInput", async () => {
@@ -3668,10 +3692,11 @@ describe("tool_choice required and final_answer", () => {
 
     const core = await import("../../heart/core")
     const toolStarts: string[] = []
+    const textChunks: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
-      onTextChunk: () => {},
+      onTextChunk: (text) => textChunks.push(text),
       onReasoningChunk: () => {},
       onToolStart: (name) => toolStarts.push(name),
       onToolEnd: () => {},
@@ -3683,9 +3708,11 @@ describe("tool_choice required and final_answer", () => {
 
     expect(callCount).toBe(2)
     expect(toolStarts).toEqual(["read_file"])
-    // Final assistant message should have the extracted answer
+    // Final assistant message keeps tool_calls; answer emitted via onTextChunk
     const lastAssistant = [...messages].reverse().find((m: any) => m.role === "assistant")
-    expect(lastAssistant.content).toBe("the real answer")
+    expect(lastAssistant.tool_calls).toBeDefined()
+    expect(lastAssistant.tool_calls[0].function.name).toBe("final_answer")
+    expect(textChunks).toEqual(["the real answer"])
 
     // config cleanup handled by resetConfigCache in beforeEach
   })
@@ -3744,7 +3771,7 @@ describe("tool_choice required and final_answer", () => {
     expect(assistantMsg.content).toBe("fallback content")
   })
 
-  it("final_answer with invalid JSON and no content: falls back to empty string", async () => {
+  it("final_answer with invalid JSON and no content: falls back to undefined (no onTextChunk)", async () => {
     mockCreate.mockReturnValue(
       makeStream([
         makeChunk(undefined, [
@@ -3753,10 +3780,11 @@ describe("tool_choice required and final_answer", () => {
       ])
     )
 
+    const textChunks: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
-      onTextChunk: () => {},
+      onTextChunk: (text) => textChunks.push(text),
       onReasoningChunk: () => {},
       onToolStart: () => {},
       onToolEnd: () => {},
@@ -3768,10 +3796,17 @@ describe("tool_choice required and final_answer", () => {
 
     const assistantMsg = messages.find((m: any) => m.role === "assistant")
     expect(assistantMsg).toBeDefined()
-    expect(assistantMsg.content).toBe("")
+    // Full msg kept with tool_calls; answer falls back to result.content which is undefined
+    // so onTextChunk is NOT called (answer is falsy)
+    expect(assistantMsg.tool_calls).toBeDefined()
+    expect(textChunks).toEqual([])
+    // Synthetic tool response is still pushed
+    const toolResults = messages.filter((m: any) => m.role === "tool")
+    expect(toolResults).toHaveLength(1)
+    expect(toolResults[0].content).toBe("(delivered)")
   })
 
-  it("final_answer with valid JSON, no answer field, and no content: falls back to empty string", async () => {
+  it("final_answer with valid JSON, no answer field, and no content: falls back to undefined (no onTextChunk)", async () => {
     mockCreate.mockReturnValue(
       makeStream([
         makeChunk(undefined, [
@@ -3780,10 +3815,11 @@ describe("tool_choice required and final_answer", () => {
       ])
     )
 
+    const textChunks: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
-      onTextChunk: () => {},
+      onTextChunk: (text) => textChunks.push(text),
       onReasoningChunk: () => {},
       onToolStart: () => {},
       onToolEnd: () => {},
@@ -3795,7 +3831,14 @@ describe("tool_choice required and final_answer", () => {
 
     const assistantMsg = messages.find((m: any) => m.role === "assistant")
     expect(assistantMsg).toBeDefined()
-    expect(assistantMsg.content).toBe("")
+    // Full msg kept with tool_calls; parsed.answer is undefined, result.content is undefined
+    // so onTextChunk is NOT called (answer is falsy)
+    expect(assistantMsg.tool_calls).toBeDefined()
+    expect(textChunks).toEqual([])
+    // Synthetic tool response is still pushed
+    const toolResults = messages.filter((m: any) => m.role === "tool")
+    expect(toolResults).toHaveLength(1)
+    expect(toolResults[0].content).toBe("(delivered)")
   })
 })
 
@@ -4064,10 +4107,11 @@ describe("integration: kick + tool_choice required combined", () => {
       ])
     )
 
+    const textChunks: string[] = []
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
       onModelStreamStart: () => {},
-      onTextChunk: () => {},
+      onTextChunk: (text) => textChunks.push(text),
       onReasoningChunk: () => {},
       onToolStart: () => {},
       onToolEnd: () => {},
@@ -4077,9 +4121,16 @@ describe("integration: kick + tool_choice required combined", () => {
     const messages: any[] = [{ role: "system", content: "test" }]
     await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
 
+    // Full msg is kept with tool_calls; answer emitted through onTextChunk
     const assistantMsg = messages.find((m: any) => m.role === "assistant")
-    expect(assistantMsg.content).toBe(longText)
-    expect(assistantMsg.content.length).toBe(100000)
+    expect(assistantMsg.tool_calls).toBeDefined()
+    expect(textChunks).toHaveLength(1)
+    expect(textChunks[0]).toBe(longText)
+    expect(textChunks[0].length).toBe(100000)
+    // Synthetic tool response present
+    const toolResults = messages.filter((m: any) => m.role === "tool")
+    expect(toolResults).toHaveLength(1)
+    expect(toolResults[0].content).toBe("(delivered)")
   })
 
   // Kick detection disabled — see core.ts
