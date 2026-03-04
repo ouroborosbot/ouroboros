@@ -72,3 +72,4 @@ Self-audit (what I got wrong in the recent hardening PR work):
 
 ## Progress Log
 - 2026-03-03 20:36 Created
+- 2026-03-03 20:41 Captured cleanup principles from user, locked scope boundaries, and added explicit self-audit of mistakes to correct.
