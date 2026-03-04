@@ -1,0 +1,14 @@
+
+> ouroboros-agent-harness@1.0.0 validate:runtime-hardening:load
+> node scripts/run-runtime-hardening-load-validation.cjs
+
+runtime hardening load validation artifact: /Users/arimendelow/.agentconfigs/test-runs/ouroboros-agent-harness/2026-03-03T23-16-56-441Z/runtime-hardening-load-validation.json
+
+> ouroboros-agent-harness@1.0.0 audit:runtime-hardening
+> npm run build && node dist/nerves/runtime-hardening/cli-main.js
+
+
+> ouroboros-agent-harness@1.0.0 build
+> tsc
+
+runtime hardening audit: pass (/Users/arimendelow/.agentconfigs/test-runs/ouroboros-agent-harness/2026-03-03T23-16-56-441Z/runtime-hardening-summary.json)

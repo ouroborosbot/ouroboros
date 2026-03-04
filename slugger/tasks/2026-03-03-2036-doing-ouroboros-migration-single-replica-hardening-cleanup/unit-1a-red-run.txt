@@ -1,0 +1,39 @@
+
+> ouroboros-agent-harness@1.0.0 test
+> vitest run src/__tests__/nerves/rename-contract.test.ts
+
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+ ❯ src/__tests__/nerves/rename-contract.test.ts (3 tests | 1 failed) 5ms
+     ✓ uses audit:nerves script and nerves dist coverage CLI entry 1ms
+     ✓ uses nerves naming in coverage gate script 1ms
+     × does not expose synthetic runtime-hardening gate wiring in CI contracts 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/nerves/rename-contract.test.ts > nerves rename contract > does not expose synthetic runtime-hardening gate wiring in CI contracts
+AssertionError: expected 'npm run build && node dist/nerves/run…' to be undefined
+
+- Expected: 
+undefined
+
++ Received: 
+"npm run build && node dist/nerves/runtime-hardening/cli-main.js"
+
+ ❯ src/__tests__/nerves/rename-contract.test.ts:43:52
+     41|     )
+     42| 
+     43|     expect(pkg.scripts["audit:runtime-hardening"]).toBeUndefined()
+       |                                                    ^
+     44|     expect(pkg.scripts["validate:runtime-hardening:load"]).toBeUndefin…
+     45|     expect(gateScript).not.toContain("runtime-hardening-load-validatio…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  21:56:55
+   Duration  199ms (transform 40ms, setup 47ms, import 8ms, tests 5ms, environment 0ms)
+
