@@ -1,4 +1,4 @@
-# Planning: Ouroboros Migration - Turn Coordinator Locking Refactor
+# Planning: Ouroboros Migration - Turn Coordinator Steering Contract
 
 **Status**: NEEDS_REVIEW
 **Created**: 2026-03-03 22:17
@@ -96,3 +96,4 @@ Default proposal:
 - 2026-03-04 11:39 Historical (superseded at 12:21): locked detailed steering injection contract including dedupe by `activity.id`, ordered discrete injection, boundary-only injection, carry-forward semantics, and confirmation out of scope.
 - 2026-03-04 11:53 Historical (superseded at 12:21): generalized dedupe contract to channel message identity (Teams mapping as adapter detail) and locked no steering-specific buffer cap.
 - 2026-03-04 12:21 Removed follow-up dedupe/idempotency from plan scope; preserve-all steering now forwards follow-ups as received.
+- 2026-03-04 13:17 Renamed task slug from `turn-coordinator-locking-refactor` to `turn-coordinator-steering-contract` to match current scope.
