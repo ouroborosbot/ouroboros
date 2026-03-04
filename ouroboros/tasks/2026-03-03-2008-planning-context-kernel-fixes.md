@@ -227,3 +227,4 @@ Three changes:
 - 2026-03-03 20:35 Bug 3 confirmed on both surfaces
 - 2026-03-03 20:40 Correction pass: Bug 1 elevated to top priority, Bug 2 is Copilot-surface-specific (not buffered-mode), corrected test results table, tightened throughout
 - 2026-03-03 20:43 Renamed Bug 2 from "phantom messages" to "out-of-order messages" -- messages are real, rendering out of order on Copilot surface
+- 2026-03-03 20:45 Set status to NEEDS_REVIEW
