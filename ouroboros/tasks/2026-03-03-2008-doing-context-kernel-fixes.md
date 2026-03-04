@@ -203,7 +203,7 @@ Update the comment at lines 259-261 to reflect "defaults to true, overridable vi
 **Output**: Coverage report showing full branch coverage
 **Acceptance**: 100% coverage on new/modified code, all tests green, no warnings
 
-### ⬜ Unit 6a: Issue B (toolBehaviorSection prompt) -- Tests
+### ✅ Unit 6a: Issue B (toolBehaviorSection prompt) -- Tests
 **What**: Write failing tests in `src/__tests__/mind/prompt.test.ts` verifying:
 1. `toolBehaviorSection()` emits content when called with NO options (defaults on)
 2. `toolBehaviorSection()` emits content when called with `{ toolChoiceRequired: true }`
