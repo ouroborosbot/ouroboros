@@ -35,6 +35,7 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 - [ ] `teamsChannel.maxConcurrentConversations` is fully removed from config schema/defaults/accessors and call sites.
 - [ ] A shared turn coordinator exists and is used by Teams for per-conversation serialization.
 - [ ] Same-conversation follow-up messages during active turns are all preserved and injected into the active turn between model calls.
+- [ ] No steering follow-up dedupe/idempotency layer is introduced in this task.
 - [ ] Steering follow-ups are injected as ordered discrete user messages (not dropped, reordered, or collapsed with lost boundaries).
 - [ ] Steering injection occurs only at model-call boundaries; no in-flight model-call mutation occurs.
 - [ ] Buffered follow-ups that miss a boundary are carried into the next turn for the same conversation.
