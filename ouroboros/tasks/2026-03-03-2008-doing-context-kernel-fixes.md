@@ -464,3 +464,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-04 11:18 Unit 10a complete: "Tool Descriptions" section added to CONTRIBUTING.md -- imperative voice for schemas, first person for system prompts
 - 2026-03-04 13:51 Unit 14a complete: removed toolRounds, MAX_TOOL_ROUNDS, and loop limit block from core.ts. Removed 1 active + 3 skipped tests. setMaxListeners now uses fixed 50. 1281 tests pass, build clean
 - 2026-03-04 13:53 Unit 14b complete: 5 failing tests for final_answer extraction -- JSON string, truncated JSON retry, wrong-shape retry, retry-then-succeed, noise clearing on both attempts. All 5 fail, 143 existing pass
+- 2026-03-04 13:57 Unit 14c complete: rewrite isSoleFinalAnswer extraction -- JSON string support, retry on truncated/wrong-shape JSON, onClearText on both attempts. Updated 5 existing tests for retry behavior. 1286 tests pass, build clean
