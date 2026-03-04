@@ -41,6 +41,14 @@ Task docs go in `<agent>/tasks/` with naming scheme `YYYY-MM-DD-HHMM-{planning|d
 - If configuration is needed, prefer explicit CLI arguments, committed config files, or in-repo defaults.
 - If a proposal would normally use env vars, stop and present a non-env-var alternative instead.
 
+### Runtime vs Validation Boundary (Required)
+
+- Treat `src/` as runtime behavior only. Do not place synthetic policy/gate scaffolding in runtime modules.
+- CI-required checks must verify real runtime correctness (tests/build/contracts), not synthetic latency/SLO placeholders.
+- Synthetic performance artifacts (for shape/schema prototyping) must not be mandatory merge gates.
+- If latency/reliability checks are needed before production telemetry exists, keep them in `scripts/` as optional/manual development diagnostics.
+- Performance measurement must not depend on logging sinks; measure from request/response lifecycle events directly.
+
 ### Git Discipline
 
 - When a logical unit of work is complete and committable, commit immediately.
