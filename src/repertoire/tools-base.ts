@@ -188,7 +188,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       type: "function",
       function: {
         name: "get_current_time",
-        description: "get the current date and time",
+        description: "get the current date and time in America/Los_Angeles (Pacific Time)",
         parameters: { type: "object", properties: {} },
       },
     },
