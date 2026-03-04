@@ -255,8 +255,9 @@ export async function runAgent(
 
   while (!done) {
     // Compute activeTools per-iteration: include final_answer when
-    // toolChoiceRequired is set OR after a narration kick (false-positive escape hatch)
-    const activeTools = (options?.toolChoiceRequired || lastKickReason === "narration")
+    // toolChoiceRequired is set OR after any kick (escape hatch so the
+    // model can cleanly exit instead of calling no-op tools)
+    const activeTools = (options?.toolChoiceRequired || lastKickReason)
       ? [...baseTools, finalAnswerTool]
       : baseTools;
     // Yield so pending I/O (stdin Ctrl-C) can be processed between iterations

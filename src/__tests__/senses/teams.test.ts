@@ -2499,13 +2499,14 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     expect(mockStream.emit).toHaveBeenCalledWith("accumulated text")
   })
 
-  it("onKick calls sendMessage when disableStreaming is true", async () => {
+  it("onKick calls stream.update (not sendMessage) when disableStreaming is true", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
     callbacks.onKick!()
-    expect(sendMessage).toHaveBeenCalledWith("\u21BB kick")
+    expect(mockStream.update).toHaveBeenCalledWith("\u21BB kick")
+    expect(sendMessage).not.toHaveBeenCalled()
   })
 
   it("onKick after abort does NOT call sendMessage when disableStreaming is true", async () => {
@@ -2525,7 +2526,8 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockImplementation(() => { throw new Error("sync failure") })
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
-    callbacks.onToolEnd("read_file", "test.txt", true)
+    // Trigger safeSend via terminal onError (onToolEnd/onKick now use safeUpdate)
+    callbacks.onError(new Error("boom"), "terminal")
     expect(controller.signal.aborted).toBe(true)
   })
 
@@ -2546,23 +2548,24 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
-  it("onToolEnd success calls sendMessage with formatted result when disableStreaming is true", async () => {
+  it("onToolEnd success calls stream.update with formatted result when disableStreaming is true", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
     callbacks.onToolEnd("read_file", "test.txt", true)
-    expect(sendMessage).toHaveBeenCalledWith("\u2713 read_file (test.txt)")
-    expect(mockStream.emit).not.toHaveBeenCalled()
+    expect(mockStream.update).toHaveBeenCalledWith("\u2713 read_file (test.txt)")
+    expect(sendMessage).not.toHaveBeenCalled()
   })
 
-  it("onToolEnd failure calls sendMessage with formatted error when disableStreaming is true", async () => {
+  it("onToolEnd failure calls stream.update with formatted error when disableStreaming is true", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
     callbacks.onToolEnd("read_file", "missing.txt", false)
-    expect(sendMessage).toHaveBeenCalledWith("\u2717 read_file: missing.txt")
+    expect(mockStream.update).toHaveBeenCalledWith("\u2717 read_file: missing.txt")
+    expect(sendMessage).not.toHaveBeenCalled()
   })
 
   it("onToolEnd after abort does NOT call sendMessage when disableStreaming is true", async () => {
@@ -2789,9 +2792,9 @@ describe("Teams adapter - safeSend serialization (Bug 2)", () => {
 
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
 
-    // Trigger two safeSend calls (via onToolEnd which calls safeSend in buffered mode)
-    callbacks.onToolEnd("tool_a", "result_a", true)
-    callbacks.onToolEnd("tool_b", "result_b", true)
+    // Trigger two safeSend calls via terminal onError (onToolEnd/onKick now use safeUpdate)
+    callbacks.onError(new Error("err1"), "terminal")
+    callbacks.onError(new Error("err2"), "terminal")
 
     // With serialization, send2 should NOT start until send1 completes.
     // With fire-and-forget, both start immediately.
@@ -2828,16 +2831,14 @@ describe("Teams adapter - safeSend serialization (Bug 2)", () => {
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
 
     // First send will reject (triggers markStopped via chain .catch)
-    callbacks.onToolEnd("tool_a", "result_a", true)
+    callbacks.onError(new Error("err1"), "terminal")
     // Second send should be suppressed because stopped=true after chain failure
-    callbacks.onToolEnd("tool_b", "result_b", true)
+    callbacks.onError(new Error("err2"), "terminal")
 
     // Wait for the rejection to propagate through the chain
     await new Promise(r => setTimeout(r, 50))
 
     // With serialized chain: first send rejects -> markStopped() -> second send never fires.
-    // With fire-and-forget: both sends fire immediately and the rejection is caught asynchronously,
-    // so sendMessage would be called twice.
     expect(sendMessage).toHaveBeenCalledTimes(1)
     expect(controller.signal.aborted).toBe(true)
   })
@@ -2856,9 +2857,9 @@ describe("Teams adapter - safeSend serialization (Bug 2)", () => {
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
 
     // First send starts synchronously (chain idle)
-    callbacks.onToolEnd("tool_a", "result_a", true)
+    callbacks.onError(new Error("err1"), "terminal")
     // Second send chains (chain busy)
-    callbacks.onToolEnd("tool_b", "result_b", true)
+    callbacks.onError(new Error("err2"), "terminal")
 
     expect(sendMessage).toHaveBeenCalledTimes(1) // only first started so far
 
@@ -3829,8 +3830,9 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
 
     await teams.handleTeamsMessage("show file", mockStream as any, "conv-send-1", undefined, true, sendMessage)
 
-    // onToolEnd should have used sendMessage (buffered mode)
-    expect(sendMessage).toHaveBeenCalledWith("\u2713 read_file (package.json)")
+    // onToolEnd now uses safeUpdate (stream.update) not safeSend in buffered mode
+    expect(mockStream.update).toHaveBeenCalledWith("\u2713 read_file (package.json)")
+    expect(sendMessage).not.toHaveBeenCalledWith("\u2713 read_file (package.json)")
   })
 
   it("handleTeamsMessage awaits flush() (which is now async)", async () => {
@@ -3917,9 +3919,8 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
       send: mockSend,
     })
 
-    // The message handler should have passed a sendMessage function that wraps ctx.send
-    // In buffered mode, onKick should have called sendMessage which wraps ctx.send
-    expect(mockSend).toHaveBeenCalled()
+    // In buffered mode, onKick now uses safeUpdate (stream.update) not safeSend (ctx.send)
+    expect(mockStream.update).toHaveBeenCalledWith("\u21BB kick")
 
     vi.restoreAllMocks()
   })

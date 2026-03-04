@@ -4461,9 +4461,10 @@ describe("final_answer injection after narration kick", () => {
     await runAgent(messages, callbacks)
 
     expect(callCount).toBe(2)
-    // After empty kick: final_answer should NOT be injected
+    // After any kick (including empty): final_answer IS injected so the
+    // model can cleanly exit instead of calling no-op tools
     const secondToolNames = toolsPerCall[1].map((t: any) => t.function.name)
-    expect(secondToolNames).not.toContain("final_answer")
+    expect(secondToolNames).toContain("final_answer")
   })
 
   it("model calls final_answer after narration kick -- terminates cleanly", async () => {
