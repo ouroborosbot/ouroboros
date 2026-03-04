@@ -104,4 +104,4 @@ Keep scope disciplined: runtime provider abstraction + provider integrations onl
 - 2026-03-04 14:55 Added explicit first-run migration semantics for legacy `~/.agentconfigs` on other machines and fixed runbook location for Claude pickup
 - 2026-03-04 14:56 Re-scoped migration to one-time only; removed runtime back-compat expectation for legacy `~/.agentconfigs` paths
 - 2026-03-04 15:01 Added completion criterion requiring all relevant repo docs to be updated for new config/storage/provider contracts
-- 2026-03-04 15:03 Reordered work so migration happens first; constrained migration delivery to markdown instructions only (no script), including post-completion deletion of the migration playbook on target machine
+- 2026-03-04 15:08 Reordered work so migration happens first; constrained migration delivery to markdown instructions only (no script), including post-completion deletion of the migration playbook on target machine
