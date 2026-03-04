@@ -4204,6 +4204,165 @@ describe("integration: kick + tool_choice required combined", () => {
   })
 })
 
+describe("tool_choice forcing after kick (Bug 4)", () => {
+  let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal, options?: { toolChoiceRequired?: boolean }) => Promise<{ usage?: any }>
+
+  function makeStream(chunks: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const chunk of chunks) {
+          yield chunk
+        }
+      },
+    }
+  }
+
+  function makeChunk(content?: string, toolCalls?: any[]) {
+    const delta: any = {}
+    if (content !== undefined) delta.content = content
+    if (toolCalls !== undefined) delta.tool_calls = toolCalls
+    return { choices: [{ delta }] }
+  }
+
+  function makeResponsesStream(events: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const event of events) {
+          yield event
+        }
+      },
+    }
+  }
+
+  beforeEach(async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
+    mockCreate.mockReset()
+    mockResponsesCreate.mockReset()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+
+    const core = await import("../../heart/core")
+    runAgent = core.runAgent
+  })
+
+  it("MiniMax: sets tool_choice=required on the call AFTER a narration kick (no toolChoiceRequired option)", async () => {
+    const paramsPerCall: any[] = []
+    let callCount = 0
+    mockCreate.mockImplementation((params: any) => {
+      callCount++
+      paramsPerCall.push({ ...params })
+      if (callCount === 1) {
+        // Narration: triggers kick
+        return makeStream([makeChunk("let me read that file")])
+      }
+      // After kick: respond normally
+      return makeStream([makeChunk("here is the result")])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    // No toolChoiceRequired option -- tool_choice should still be set after kick
+    await runAgent(messages, callbacks)
+
+    expect(callCount).toBe(2)
+    // First call: no tool_choice (no kick yet, no toolChoiceRequired)
+    expect(paramsPerCall[0].tool_choice).toBeUndefined()
+    // Second call (after narration kick): tool_choice = "required"
+    expect(paramsPerCall[1].tool_choice).toBe("required")
+  })
+
+  it("Azure: sets tool_choice=required on the call AFTER a narration kick (no toolChoiceRequired option)", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
+
+    const textItem = { type: "message", id: "msg1", role: "assistant", content: [{ type: "output_text", text: "let me check that for you" }] }
+
+    const paramsPerCall: any[] = []
+    let callCount = 0
+    mockResponsesCreate.mockImplementation((params: any) => {
+      callCount++
+      paramsPerCall.push({ ...params })
+      if (callCount === 1) {
+        return makeResponsesStream([
+          { type: "response.output_text.delta", delta: "let me check that for you" },
+          { type: "response.output_item.done", item: textItem },
+        ])
+      }
+      return makeResponsesStream([
+        { type: "response.output_text.delta", delta: "here is the answer" },
+      ])
+    })
+
+    const core = await import("../../heart/core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await core.runAgent(messages, callbacks)
+
+    expect(callCount).toBe(2)
+    // First call: no tool_choice
+    expect(paramsPerCall[0].tool_choice).toBeUndefined()
+    // Second call (after narration kick): tool_choice = "required"
+    expect(paramsPerCall[1].tool_choice).toBe("required")
+  })
+
+  it("MiniMax: sets tool_choice=required after an empty kick (any kick, not just narration)", async () => {
+    const paramsPerCall: any[] = []
+    let callCount = 0
+    mockCreate.mockImplementation((params: any) => {
+      callCount++
+      paramsPerCall.push({ ...params })
+      if (callCount === 1) {
+        // Empty response: triggers empty kick
+        return makeStream([{ choices: [{ delta: {} }] }])
+      }
+      // After kick: respond normally
+      return makeStream([makeChunk("here is the result")])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+      onKick: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks)
+
+    expect(callCount).toBe(2)
+    // First call: no tool_choice
+    expect(paramsPerCall[0].tool_choice).toBeUndefined()
+    // Second call (after empty kick): tool_choice = "required"
+    expect(paramsPerCall[1].tool_choice).toBe("required")
+  })
+})
+
 describe("final_answer injection after narration kick", () => {
   let runAgent: (messages: any[], callbacks: ChannelCallbacks, channel?: string, signal?: AbortSignal, options?: { toolChoiceRequired?: boolean }) => Promise<{ usage?: any }>
 
