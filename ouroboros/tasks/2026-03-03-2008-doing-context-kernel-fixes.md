@@ -49,7 +49,10 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [x] Robust final_answer extraction: `parsed.answer` and quoted JSON string both work
 - [x] Truncated JSON and wrong-shape JSON trigger retry (model gets another chance)
 - [x] Retry does not count against toolRounds (error recovery, not a tool round -- toolRounds removed entirely)
-- [ ] User confirms on Teams: model uses final_answer cleanly, no 413 errors, prompt sections emit correctly
+- [x] Preemptive message splitting removed — full message sent, split only on error recovery
+- [x] Dead-stream fallback — flush() routes through sendMessage when stream is stopped
+- [ ] Async delivery pattern for 15s platform timeout — deadline timer emits acknowledgment, real content via sendMessage
+- [ ] User confirms on Teams: model uses final_answer cleanly, no 413 errors, no "Sorry something went wrong", prompt sections emit correctly
 
 ### Gate 3: Friend Context Instructions
 - [ ] Friend context instructions at prompt.ts:178-194 rewritten to be directive with displayName interpolation and aggressive saving
@@ -382,6 +385,47 @@ Changes:
 **Output**: Modified `src/senses/teams.ts`, `src/__tests__/senses/teams.test.ts`
 **Acceptance**: Full text sent without preemptive splitting. Error recovery splits on failure. All tests pass, 100% coverage.
 
+### ⬜ Unit 16a: Async delivery for platform 15s timeout -- tests
+**What**: The Copilot platform enforces a hard 15-second timeout for the initial `stream.emit()`. `stream.update()` (thinking phrases) does NOT satisfy this — the platform wants actual content. When the agent takes >15s, the stream dies and shows "Sorry, something went wrong." MS docs recommend: send an initial response within 15s, deliver real content as a follow-up message via `sendActivity`/`ctx.send`.
+
+Write failing tests in `src/__tests__/senses/teams.test.ts` verifying:
+1. **Buffered mode, fast response (<12s)**: content delivered via `safeEmit` on stream, no deadline fires, no `sendMessage` used for content
+2. **Buffered mode, slow response (>12s)**: deadline fires, brief acknowledgment emitted on stream via `safeEmit`, `flush()` delivers real content via `sendMessage` (not stream)
+3. **Streaming mode, fast first token (<12s)**: first `safeEmit` cancels the deadline timer, normal streaming continues
+4. **Streaming mode, slow first token (>12s)**: deadline fires, acknowledgment emitted on stream, subsequent text still streams normally
+5. **Timer cleanup**: timer is cleared when controller aborts (no leaked timers)
+
+Use `vi.useFakeTimers()` to control the 12s deadline.
+**Output**: New test cases in `src/__tests__/senses/teams.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because no deadline timer exists yet
+
+### ⬜ Unit 16b: Async delivery for platform 15s timeout -- implementation
+**What**: Implement the deadline timer in `createTeamsCallbacks` (`src/senses/teams.ts`):
+
+1. Add constant `STREAM_DEADLINE_MS = 12_000` (12s, with 3s safety margin before 15s platform timeout)
+2. Add state: `let deadlineFired = false`, `let deadlineTimer: NodeJS.Timeout | null = null`
+3. Start the deadline timer in the constructor scope. When it fires:
+   - Call `safeEmit("one moment — still working on this")` (satisfies the 15s platform requirement)
+   - Set `deadlineFired = true`
+   - Timer self-clears (`deadlineTimer = null`)
+4. In `safeEmit`: on first real call (before deadline fires), cancel the deadline timer. Use a flag or check `deadlineTimer` to avoid cancelling after it already fired.
+5. In `flush()`:
+   - If `deadlineFired && sendMessage`: route content through `sendMessage` (with split-on-error recovery). The stream already has the acknowledgment.
+   - If `!deadlineFired && !stopped`: route through `safeEmit` as normal (fast path)
+   - If `stopped && sendMessage`: route through `sendMessage` (existing dead-stream fallback)
+6. In `flushTextBuffer()`: same check — if `deadlineFired`, route through `safeSend` instead of `safeEmit`
+7. Cleanup: clear `deadlineTimer` in `markStopped()` and when controller signal fires abort
+
+Both streaming and buffered modes get the timer. In streaming mode, the first `onTextChunk` → `safeEmit` cancels it early. In buffered mode, `onTextChunk` accumulates in textBuffer (no `safeEmit`), so the timer fires if generation takes >12s.
+
+**Output**: Modified `src/senses/teams.ts`
+**Acceptance**: All tests PASS (green), no warnings
+
+### ⬜ Unit 16c: Async delivery -- coverage & refactor
+**What**: Verify 100% coverage on the deadline timer logic. All paths covered: fast path (timer cancelled), slow path (timer fires, sendMessage delivery), abort cleanup, streaming mode cancellation.
+**Output**: Coverage report
+**Acceptance**: 100% coverage on new/modified code, all tests green
+
 ---
 
 ### GATE 2 CHECKPOINT
@@ -390,10 +434,13 @@ Changes:
 - No kick loop, no response spam, no platform timeout
 - Model uses `final_answer` to exit cleanly after completing work
 - `toolBehaviorSection` and `toolsSection` emit correctly in prompt (verify via logs)
-- Long responses split into chunks (no 413 errors, no content loss)
+- No 413 errors, no content loss (full messages sent, split only on error recovery)
 - `final_answer` text appears in chat (emitted via `onTextChunk`)
 - Truncated `final_answer` retries automatically (model gets second chance)
 - No doubled refusal text or streamed noise in final output
+- No "Sorry, something went wrong" for long-running responses (async delivery pattern handles >15s platform timeout)
+- Fast responses (<12s) delivered on the stream as "Ouroboros"
+- Slow responses (>12s) show brief acknowledgment on stream, real content follows via sendMessage
 **Also resolves**: Bug 5 (response spam) and Bug 6 (platform timeout).
 **Proceed to Gate 3 only after user confirms.**
 
