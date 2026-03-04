@@ -4,19 +4,23 @@
 **Created**: 2026-03-03 20:09
 
 ## Goal
-Fix six bugs discovered during live testing of the context kernel on Microsoft 365 Copilot Chat (buffered/nostream mode). All bugs are specific to the buffered code path and/or the Copilot Chat surface -- standard 1:1 Teams bot chat works correctly. Two bugs are critical (kick loop, response spam). Four are serious (AAD extraction, phantom messages, new-friend prompts, platform timeout). Fixes are structured in three gated groups with manual user testing between each.
+Fix six bugs discovered during live testing of the context kernel on Microsoft 365 Copilot Chat. Two are critical (kick loop, response spam). Four are serious (AAD extraction, phantom messages, new-friend prompts, platform timeout). Some bugs are surface-agnostic (kick detection runs in core.ts), some are buffered-mode-specific (phantom messages via safeSend), and one (AAD extraction) may depend on how the Copilot Chat surface populates the activity object. Fixes are structured in three gated groups with manual user testing between each.
 
 **DO NOT include time estimates (hours/days) -- planning should focus on scope and criteria, not duration.**
 
 ## Scope
 
-### Key Finding: Standard Teams Works, Copilot Chat Does Not
+### Standard Teams Test: Limited Signal
 
-The user tested the same bot through standard 1:1 Teams chat and it worked perfectly: clean response ("hello. what are we sorting today?"), no kick loop, no phantom messages, no displayName issues. All six bugs are specific to:
-- **Buffered/nostream mode** (`disableStreaming=true`), which is the code path used when running through Copilot Chat or devtunnel scenarios where streaming is disabled
-- **The Copilot Chat surface** (Custom Engine Agent), which may populate the `activity` object differently than standard 1:1 Teams bot chat
+The user tested the same bot through standard 1:1 Teams chat with a simple greeting ("hi pal") and got a clean response ("hello. what are we sorting today?"). This confirms the basic greeting flow works, but it does NOT prove the bugs are surface-specific. The greeting involved no tool calls and no narration-style response, so it would not trigger Bug 4 (kick detection) on any surface.
 
-This means the streaming code path is healthy. All fixes target the buffered code path and its interactions.
+Per-bug surface/mode specificity:
+- **Bug 1 (AAD extraction):** Unknown whether surface matters. The `teamsContext` never extracts AAD fields regardless of surface -- the code bug is the same. Whether `activity.from.aadObjectId` is populated may differ between Copilot Chat and standard Teams, but the fix (extract whatever is available) is identical.
+- **Bug 2 (phantom messages):** Buffered-mode-specific. `safeSend` only sends separate messages in buffered mode. Streaming mode emits inline via `safeEmit`.
+- **Bug 3 (new-friend prompts):** Surface-agnostic. Prompt instructions are the same for all channels.
+- **Bug 4 (kick loop):** Surface-agnostic. `detectKick()` runs in `core.ts` and does not know which surface the message came from. The same kick loop would occur on standard Teams if the user asked for a backlog and the model responded with "I'll show you...". In streaming mode the duplicate output is less visible (inline text gets overwritten), but the wasted API round trips still happen.
+- **Bug 5 (response spam):** Consequence of Bug 4 + Bug 2. The duplication happens in any mode (kick loop), but the separate-message visibility is buffered-mode-specific.
+- **Bug 6 (platform timeout):** Consequence of Bug 4. The extra API round trips happen in any mode.
 
 ### Gated Fix Structure
 
@@ -48,7 +52,7 @@ Confirmed by PII bridge file: `provider: "teams-conversation"` with conversation
 
 Fix: add `aadObjectId: activity.from?.aadObjectId`, `tenantId: activity.conversation?.tenantId`, and `displayName: activity.from?.name` to the `teamsContext` object at line 492-506. The fields are already destructured from `ctx` at line 458 (`const { stream, activity, api, signin } = ctx`). Three-line fix.
 
-**Surface-specific activity shape note:** Standard 1:1 Teams bot chat works correctly, which suggests `activity.from.aadObjectId` and `activity.from.name` may be populated differently on the Copilot Chat surface. The three-line fix is still correct (it extracts whatever is available via optional chaining), and the existing conversation-ID fallback at line 344-345 handles the case where `aadObjectId` is absent. Test coverage must verify both paths: AAD fields present (standard Teams) and AAD fields absent (Copilot Chat fallback to conversation ID).
+**Surface-specific activity shape note:** It is unknown whether `activity.from.aadObjectId` and `activity.from.name` are populated differently on the Copilot Chat surface vs standard 1:1 Teams. The standard Teams test used a simple greeting (no tool calls) and created a separate friend record, so it doesn't tell us about AAD field population on that surface. The three-line fix is correct regardless (it extracts whatever is available via optional chaining), and the existing conversation-ID fallback at line 344-345 handles the case where `aadObjectId` is absent. Test coverage must verify both paths: AAD fields present and AAD fields absent (fallback to conversation-ID provider). Gate 1 user testing will reveal what each surface provides.
 
 **Bug 2: Phantom tool-result and kick messages in buffered (nostream) mode**
 
@@ -59,7 +63,7 @@ In `createTeamsCallbacks` (`src/senses/teams.ts:59-252`), when `disableStreaming
 
 In streaming mode, these are inline in the stream (via `safeEmit`) and get replaced by subsequent content. In buffered mode, `safeSend` calls `sendMessage` (which is `ctx.send()` at line 508) -- this creates a new persistent message activity in the Teams conversation. Each call produces a separate visible message.
 
-This bug only manifests in buffered mode. Standard Teams uses streaming mode, which is why the user saw clean output there.
+This bug only manifests in buffered mode (`disableStreaming=true`). In streaming mode, tool results, kicks, and errors are emitted inline via `safeEmit` and don't create separate persistent messages.
 
 Fix: in buffered mode, tool results, kicks, and terminal errors should use `safeUpdate` (transient status updates that show briefly during processing but don't persist) instead of `safeSend` (permanent separate messages). This matches the pattern already used by `onToolStart` (line 188: `safeUpdate(...)`) and transient errors (line 213: `safeUpdate(msg)`).
 
@@ -161,7 +165,7 @@ This is a prompt tuning issue, not a code bug. Three changes needed:
 ---
 
 ### Out of Scope
-- Streaming mode changes (streaming mode works correctly -- confirmed by standard 1:1 Teams test)
+- Streaming mode changes (Bug 2's safeSend issue is buffered-mode-specific; streaming mode emits inline)
 - Comprehensive rethink of the kick/narration detection system (deferred -- fix the immediate false positives and self-trigger; a broader redesign considering conversation context can come later)
 - Changes to `save_friend_note` tool behavior (tool works correctly, model just isn't calling it due to prompt issues)
 - Changes to the `FriendResolver` or `FriendStore` (these work correctly given correct inputs)
@@ -215,7 +219,7 @@ This is a prompt tuning issue, not a code bug. Three changes needed:
 - [x] Bug 3: Should displayName be interpolated in the name quality instruction? **Resolved: yes.** Include actual displayName, with special handling for "Unknown".
 - [x] Bug 4 Part B: How aggressively should we prune `TOOL_INTENT_PATTERNS`? **Resolved: remove the most aggressive false-positive patterns.** Remove `/\bi'll\b/i`, `/\bi can\b/i`, `/\bi should\b/i`, `/\bi will\b/i`, `/\bi'm \w+ing\b/i`, `/\bi am \w+ing\b/i`. Keep patterns that are clearly narration-specific.
 - [x] Bug 5: Is this platform retries or kick loop? **Resolved: kick loop.** Session file confirms 4 identical assistant messages with kick-appended text in one session. Dedup deferred.
-- [x] Bug 1: Do both surfaces (Copilot Chat and standard Teams) populate AAD fields? **Resolved: standard Teams works, Copilot Chat may not.** The three-line fix extracts whatever is available. Existing conversation-ID fallback handles the absent case. Gate 1 user testing will confirm whether Copilot Chat provides `activity.from.name`.
+- [ ] Bug 1: Do both surfaces (Copilot Chat and standard Teams) populate AAD fields the same way? **Unknown.** The standard Teams test used a simple greeting and created a separate session -- it doesn't tell us about AAD field population. The three-line fix extracts whatever is available regardless. Gate 1 user testing on Copilot Chat will reveal whether `activity.from.aadObjectId` and `activity.from.name` are populated on that surface.
 
 ## Decisions Made
 - Bug 1 root cause confirmed by PII bridge file: `provider: "teams-conversation"` proves `aadObjectId` was missing. `teamsContext` at teams.ts:492 never sets the three AAD fields. Three-line fix with optional chaining handles both surfaces.
@@ -223,7 +227,7 @@ This is a prompt tuning issue, not a code bug. Three changes needed:
 - Bug 4 root cause confirmed by session file: 4 consecutive identical assistant messages with kick-appended text. Overbroad patterns in `TOOL_INTENT_PATTERNS` match legitimate conversational responses. Kick message self-triggers via `/\bi can\b/i`. Fix: remove 6 false-positive patterns, rewrite kick message, add regression tests.
 - Bug 5 is a direct consequence of Bug 4 + Bug 2. Resolves when both are fixed.
 - Bug 6 is a direct consequence of Bug 4. Resolves when Bug 4 is fixed.
-- Standard 1:1 Teams bot confirmed working: streaming mode is healthy, buffered-mode bugs are the problem.
+- Standard 1:1 Teams test (simple greeting) confirmed basic flow works but does not prove bugs are surface-specific. Bug 4 (kick detection) is surface-agnostic and runs in core.ts. Bug 2 (phantom messages) is buffered-mode-specific.
 - Gated fix structure: Gate 1 (Bug 1 + 2), Gate 2 (Bug 4), Gate 3 (Bug 3). User tests on Copilot Chat between each gate.
 - Existing test at kicks.test.ts:25 ("I can help with that" -> true) must be updated to reflect the new pattern list.
 
@@ -257,7 +261,7 @@ This is a prompt tuning issue, not a code bug. Three changes needed:
 - Previous planning: `ouroboros/tasks/2026-03-03-1102-planning-context-kernel-bugs.md`
 
 ## Notes
-**Standard Teams test confirms streaming path is healthy.** The user sent "hi pal" through standard 1:1 Teams bot chat and got a clean response: "hello. what are we sorting today?" -- no kick loop, no phantom messages, no displayName issues. This narrows all bugs to the buffered code path and/or Copilot Chat surface differences.
+**Standard Teams test: limited signal.** The user sent "hi pal" through standard 1:1 Teams bot chat and got a clean response: "hello. what are we sorting today?". This confirms the basic greeting flow works, but does not narrow the bugs to a specific surface or mode. The greeting had no tool calls and no narration-style response, so it would not trigger kick detection on any surface. Bug 4 (kicks) is surface-agnostic (core.ts). Bug 2 (phantom messages) is buffered-mode-specific. Bug 1 (AAD extraction) is unknown -- the code bug exists regardless of surface.
 
 **Patterns to remove from TOOL_INTENT_PATTERNS (6 patterns):**
 - `/\bi'll\b/i` (line 36) -- "I'll show your backlog" is conversational, not narration
@@ -289,4 +293,5 @@ The current kick system is a blunt instrument -- pattern matching on response te
 - 2026-03-03 20:15 Rewrote with 6 bugs after second test findings and code investigation
 - 2026-03-03 20:25 Updated with session-file-confirmed root causes, corrected Bug 5 (kick loop not platform retries), resolved all open questions, specified exact patterns to remove
 - 2026-03-03 20:26 Added Copilot Chat vs 1:1 Teams activity shape investigation note to Bug 1
-- 2026-03-03 20:31 Restructured with gated fix groups, added standard-Teams-works finding, scoped all bugs to buffered mode / Copilot Chat surface
+- 2026-03-03 20:31 Restructured with gated fix groups, added standard-Teams-works finding
+- [pending timestamp] Corrected scoping: Bug 4 is surface-agnostic (core.ts), Bug 2 is buffered-mode-specific, Bug 1 unknown. Standard Teams test was simple greeting -- doesn't prove surface specificity
