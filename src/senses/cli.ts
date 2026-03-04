@@ -337,7 +337,7 @@ export async function main() {
 
   // Resolve context kernel (identity + channel) for CLI
   const agentKnowledgePath = path.join(getAgentRoot(), "friends")
-  const piiBridgePath = path.join(os.homedir(), ".agentconfigs", getAgentName(), "friends")
+  const piiBridgePath = path.join(os.homedir(), ".agentstate", getAgentName(), "friends")
   const friendStore = new FileFriendStore(agentKnowledgePath, piiBridgePath)
   const username = os.userInfo().username
   const hostname = os.hostname()

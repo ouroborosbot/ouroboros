@@ -1,0 +1,72 @@
+
+> ouroboros-agent-harness@1.0.0 test
+> vitest run src/__tests__/config.test.ts src/__tests__/identity.test.ts src/__tests__/nerves/coverage-run-artifacts.test.ts
+
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+{"ts":"2026-03-04T23:52:44.250Z","level":"info","event":"config.load","trace_id":"7587a9ea-6f63-49f2-86db-bc2307b34768","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":false}}
+{"ts":"2026-03-04T23:52:44.253Z","level":"info","event":"config.load","trace_id":"6f783604-22bc-4fd7-a236-9b68454fd504","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T23:52:44.255Z","level":"warn","event":"config_identity.error","trace_id":"a96a2439-21cf-458b-b0e0-8827632dc485","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"ENOENT"}}
+{"ts":"2026-03-04T23:52:44.255Z","level":"info","event":"config.load","trace_id":"f4112fad-b662-4803-b922-1acc3083b186","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T23:52:44.255Z","level":"warn","event":"config_identity.error","trace_id":"1bde754f-055f-4b6f-8355-6d092b4399b6","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"Unexpected token 'o', \"not json {{{\" is not valid JSON"}}
+{"ts":"2026-03-04T23:52:44.255Z","level":"info","event":"config.load","trace_id":"a4a91b34-e37e-4fd1-aa39-5f9cb09364e5","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T23:52:44.256Z","level":"warn","event":"config_identity.error","trace_id":"bfe5312c-371f-46ec-adac-d2a0a61c72d9","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"read-failure"}}
+{"ts":"2026-03-04T23:52:44.256Z","level":"info","event":"config.load","trace_id":"b4daecf3-ea9a-4f9f-906b-f4c2b600ce63","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T23:52:44.256Z","level":"info","event":"config.load","trace_id":"3105660b-5b9a-4067-a75b-b93aebaf05a8","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":false}}
+{"ts":"2026-03-04T23:52:44.257Z","level":"info","event":"config.load","trace_id":"56245bd3-1623-4aaf-922f-2ed664c002e9","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":false}}
+{"ts":"2026-03-04T23:52:44.257Z","level":"info","event":"config.load","trace_id":"33bbd5a3-9275-472b-a601-0a4f3992a90d","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T23:52:44.258Z","level":"info","event":"config.load","trace_id":"4a06e580-b946-4a19-aa82-7be5061d170c","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T23:52:44.258Z","level":"info","event":"config.load","trace_id":"c38bd6aa-834b-46af-b6f7-4f35484a6c7f","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":false}}
+{"ts":"2026-03-04T23:52:44.258Z","level":"info","event":"config.load","trace_id":"88fb9b52-75e7-4d58-9b81-4ba4b2b9cc63","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-04T23:52:44.258Z","level":"info","event":"config.load","trace_id":"c63b164d-e58e-4342-b4dd-9c3676dd3467","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":false}}
+{"ts":"2026-03-04T23:52:44.258Z","level":"info","event":"config.load","trace_id":"d4eedf44-1a5b-494b-8d66-7f1672965227","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":false}}
+ ✓ src/__tests__/config.test.ts (41 tests) 31ms
+{"ts":"2026-03-04T23:52:44.435Z","level":"info","event":"identity.resolve","trace_id":"0d8c42f3-0885-4ae1-bdf9-16dc43db635b","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:52:44.438Z","level":"info","event":"identity.resolve","trace_id":"e4f8a023-e705-480d-9642-aae39dedbe42","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:52:44.440Z","level":"info","event":"identity.resolve","trace_id":"b5049608-7944-4614-9071-33104f6053ae","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:52:44.440Z","level":"info","event":"identity.resolve","trace_id":"3df61ada-2916-4c59-8082-7e8c31afcf59","component":"config/identity","message":"resolved agent name from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-04T23:52:44.442Z","level":"info","event":"identity.resolve","trace_id":"6d950f71-b93f-49db-a590-84c0177b97f5","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:52:44.442Z","level":"info","event":"identity.resolve","trace_id":"4350b759-4b7b-4dad-be34-9f537fc6fdf2","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:52:44.443Z","level":"info","event":"identity.resolve","trace_id":"aeb45d78-bca6-4a90-bb0e-12981f9d5c61","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:52:44.443Z","level":"info","event":"identity.resolve","trace_id":"b52fbfcc-1216-40a1-a780-55b722d3b479","component":"config/identity","message":"loaded agent config from disk","meta":{"source":"disk"}}
+{"ts":"2026-03-04T23:52:44.443Z","level":"info","event":"identity.resolve","trace_id":"7ba96e93-2805-4f74-9641-353b29a33304","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:52:44.444Z","level":"warn","event":"config_identity.error","trace_id":"253836e0-3d30-4f17-b775-468de947f136","component":"config/identity","message":"agent config missing phrase pools; placeholders applied","meta":{"path":"/Users/arimendelow/Projects/ouroboros-agent-harness/ouroboros/agent.json"}}
+{"ts":"2026-03-04T23:52:44.444Z","level":"info","event":"identity.resolve","trace_id":"d1d9af13-252e-499e-bd51-1fce2da57646","component":"config/identity","message":"loaded agent config from disk","meta":{"source":"disk"}}
+stderr | src/__tests__/identity.test.ts > loadAgentConfig > auto-fills placeholder phrases when agent.json has no phrases field
+agent.json is missing phrases, added placeholders
+
+{"ts":"2026-03-04T23:52:44.445Z","level":"info","event":"identity.resolve","trace_id":"da67b65d-9098-4b69-aa86-b55f51f4c70e","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:52:44.445Z","level":"warn","event":"config_identity.error","trace_id":"765dea59-805b-4334-9e97-2cc2b7b33cdd","component":"config/identity","message":"agent config missing phrase pools; placeholders applied","meta":{"path":"/Users/arimendelow/Projects/ouroboros-agent-harness/ouroboros/agent.json"}}
+{"ts":"2026-03-04T23:52:44.445Z","level":"info","event":"identity.resolve","trace_id":"f5caa8a3-352c-42a1-b729-bb5f747efd91","component":"config/identity","message":"loaded agent config from disk","meta":{"source":"disk"}}
+{"ts":"2026-03-04T23:52:44.446Z","level":"info","event":"identity.resolve","trace_id":"59259991-1712-4293-a3d6-844dcc67b164","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:52:44.446Z","level":"info","event":"identity.resolve","trace_id":"c6c5593f-b60e-4e6b-a908-1bf2fd158f28","component":"config/identity","message":"loaded agent config from disk","meta":{"source":"disk"}}
+{"ts":"2026-03-04T23:52:44.446Z","level":"info","event":"identity.resolve","trace_id":"7ccbf087-2102-4c5b-88bb-54daf10db57a","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:52:44.446Z","level":"error","event":"config_identity.error","trace_id":"6ae679ee-d6b3-48d9-b164-10e752679e77","component":"config/identity","message":"failed reading agent.json","meta":{"path":"/Users/arimendelow/Projects/ouroboros-agent-harness/nonexistent/agent.json","reason":"ENOENT"}}
+{"ts":"2026-03-04T23:52:44.447Z","level":"info","event":"identity.resolve","trace_id":"3721a1f1-609a-4a11-b87c-3588ee7f9aee","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:52:44.447Z","level":"error","event":"config_identity.error","trace_id":"cf58c774-96eb-41ae-93ea-b4f98537a00d","component":"config/identity","message":"invalid agent.json syntax","meta":{"path":"/Users/arimendelow/Projects/ouroboros-agent-harness/ouroboros/agent.json","reason":"Unexpected token 'o', \"not valid json {{{\" is not valid JSON"}}
+{"ts":"2026-03-04T23:52:44.447Z","level":"info","event":"identity.resolve","trace_id":"77d52ab4-5f7f-49cf-b849-5ecc14c6e14e","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:52:44.447Z","level":"error","event":"config_identity.error","trace_id":"92b98327-ff48-4d7d-8f2f-d52e9c68046f","component":"config/identity","message":"legacy configPath is not supported","meta":{"path":"/Users/arimendelow/Projects/ouroboros-agent-harness/ouroboros/agent.json","configPath":"~/.agentconfigs/ouroboros/config.json"}}
+{"ts":"2026-03-04T23:52:44.447Z","level":"info","event":"identity.resolve","trace_id":"29a80e5e-ccb7-4be9-875b-f5ac9977a200","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:52:44.447Z","level":"error","event":"config_identity.error","trace_id":"253e48b7-73d6-45aa-86a1-8d4918c35ea9","component":"config/identity","message":"failed reading agent.json","meta":{"path":"/Users/arimendelow/Projects/ouroboros-agent-harness/ouroboros/agent.json","reason":"read-failure"}}
+{"ts":"2026-03-04T23:52:44.448Z","level":"info","event":"identity.resolve","trace_id":"a69b8e34-acdd-4d3d-87d1-850872e00e31","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:52:44.448Z","level":"error","event":"config_identity.error","trace_id":"b4ba962a-30eb-4244-b003-5198d4a9425c","component":"config/identity","message":"invalid agent.json syntax","meta":{"path":"/Users/arimendelow/Projects/ouroboros-agent-harness/ouroboros/agent.json","reason":"parse-failure"}}
+{"ts":"2026-03-04T23:52:44.448Z","level":"info","event":"identity.resolve","trace_id":"fc3e9aa4-e734-4da5-a98c-e5e4e7265769","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:52:44.448Z","level":"warn","event":"config_identity.error","trace_id":"ef5feb05-7188-465d-a1bc-e5121eef4566","component":"config/identity","message":"agent config missing phrase pools; placeholders applied","meta":{"path":"/Users/arimendelow/Projects/ouroboros-agent-harness/ouroboros/agent.json"}}
+{"ts":"2026-03-04T23:52:44.448Z","level":"info","event":"identity.resolve","trace_id":"8669f91d-3d4b-4c7c-b8d9-857406a01c13","component":"config/identity","message":"loaded agent config from disk","meta":{"source":"disk"}}
+{"ts":"2026-03-04T23:52:44.448Z","level":"info","event":"identity.resolve","trace_id":"3f41f7a9-fcff-4b9e-8bb8-fb37bbd6c23b","component":"config/identity","message":"loaded agent config from cache","meta":{"source":"cache"}}
+stderr | src/__tests__/identity.test.ts > loadAgentConfig > caches the config after first load
+agent.json is missing phrases, added placeholders
+
+stderr | src/__tests__/identity.test.ts > resetIdentity > clears cached agent config so it can be re-loaded
+agent.json is missing phrases, added placeholders
+agent.json is missing phrases, added placeholders
+
+ ✓ src/__tests__/identity.test.ts (22 tests) 20ms
+ ✓ src/__tests__/nerves/coverage-run-artifacts.test.ts (4 tests) 7ms
+
+ Test Files  3 passed (3)
+      Tests  67 passed (67)
+   Start at  15:52:44
+   Duration  602ms (transform 107ms, setup 67ms, import 85ms, tests 58ms, environment 0ms)
+

@@ -2,7 +2,7 @@
 // Separated from cli.ts so the CLI adapter is pure library code with clean
 // 100% test coverage -- entrypoints can't be covered by vitest since
 // require.main !== module in the test runner.
-// All config comes from the config.json path specified in agent.json.
+// All config comes from the secrets.json path specified in agent.json.
 
 // Fail fast if --agent is missing (before any src/ code tries getAgentName())
 if (!process.argv.includes("--agent")) {

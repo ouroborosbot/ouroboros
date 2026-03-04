@@ -287,7 +287,7 @@ let _friendStore: InstanceType<typeof FileFriendStore> | null = null
 function getFriendStore(): InstanceType<typeof FileFriendStore> {
   if (!_friendStore) {
     const agentKnowledgePath = path.join(getAgentRoot(), "friends")
-    const piiBridgePath = path.join(os.homedir(), ".agentconfigs", getAgentName(), "friends")
+    const piiBridgePath = path.join(os.homedir(), ".agentstate", getAgentName(), "friends")
     _friendStore = new FileFriendStore(agentKnowledgePath, piiBridgePath)
   }
   return _friendStore
