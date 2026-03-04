@@ -3454,8 +3454,10 @@ describe("tool_choice required and final_answer", () => {
     expect(toolNames).toContain("final_answer")
   })
 
-  it("ALWAYS includes final_answer tool even when toolChoiceRequired is false/undefined", async () => {
-    mockCreate.mockReturnValue(makeStream([makeChunk("hello")]))
+  it("defaults: includes final_answer tool when toolChoiceRequired is not passed (defaults true)", async () => {
+    mockCreate.mockReturnValue(makeStream([makeChunk(undefined, [
+      { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"answer":"done"}' } },
+    ])]))
 
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
@@ -3473,8 +3475,10 @@ describe("tool_choice required and final_answer", () => {
     expect(toolNames).toContain("final_answer")
   })
 
-  it("ALWAYS passes tool_choice: required even when toolChoiceRequired is not set", async () => {
-    mockCreate.mockReturnValue(makeStream([makeChunk("hello")]))
+  it("defaults: passes tool_choice: required when toolChoiceRequired is not set (defaults true)", async () => {
+    mockCreate.mockReturnValue(makeStream([makeChunk(undefined, [
+      { index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"answer":"done"}' } },
+    ])]))
 
     const callbacks: ChannelCallbacks = {
       onModelStart: () => {},
@@ -3489,6 +3493,71 @@ describe("tool_choice required and final_answer", () => {
     await runAgent([{ role: "system", content: "test" }], callbacks)
     const params = mockCreate.mock.calls[0][0]
     expect(params.tool_choice).toBe("required")
+  })
+
+  it("opt-out: does NOT include final_answer tool when toolChoiceRequired is false", async () => {
+    mockCreate.mockReturnValue(makeStream([makeChunk("hello")]))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks, undefined, undefined, { toolChoiceRequired: false })
+    const params = mockCreate.mock.calls[0][0]
+    const toolNames = params.tools.map((t: any) => t.function.name)
+    expect(toolNames).not.toContain("final_answer")
+  })
+
+  it("opt-out: does NOT set tool_choice when toolChoiceRequired is false", async () => {
+    mockCreate.mockReturnValue(makeStream([makeChunk("hello")]))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await runAgent([{ role: "system", content: "test" }], callbacks, undefined, undefined, { toolChoiceRequired: false })
+    const params = mockCreate.mock.calls[0][0]
+    expect(params.tool_choice).toBeUndefined()
+  })
+
+  it("opt-out Azure: does NOT set tool_choice when toolChoiceRequired is false", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
+
+    mockResponsesCreate.mockReturnValue(makeResponsesStream([
+      { type: "response.output_item.added", item: { type: "message", role: "assistant" } },
+      { type: "response.content_part.delta", delta: { type: "text", text: "hello" } },
+      { type: "response.output_item.done", item: { type: "message", role: "assistant", content: [{ type: "output_text", text: "hello" }] } },
+      { type: "response.completed", response: { usage: { input_tokens: 10, output_tokens: 5 } } },
+    ]))
+
+    const core = await import("../../heart/core")
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await core.runAgent([{ role: "system", content: "test" }], callbacks, undefined, undefined, { toolChoiceRequired: false })
+    const params = mockResponsesCreate.mock.calls[0][0]
+    expect(params.tool_choice).toBeUndefined()
   })
 
   it("final_answer sole call: extracts answer text and terminates loop", async () => {
