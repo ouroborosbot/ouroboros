@@ -722,6 +722,154 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
   })
 })
 
+describe("getToolsForChannel with toolPreferences", () => {
+  const teamsCaps = {
+    channel: "teams" as const,
+    availableIntegrations: ["ado" as const, "graph" as const],
+    supportsMarkdown: true,
+    supportsStreaming: false,
+    supportsRichCards: true,
+    maxMessageLength: 4000,
+  }
+  const cliCaps = {
+    channel: "cli" as const,
+    availableIntegrations: [] as const,
+    supportsMarkdown: false,
+    supportsStreaming: true,
+    supportsRichCards: false,
+    maxMessageLength: Infinity,
+  }
+
+  it("returns descriptions unchanged when no preferences provided", async () => {
+    vi.resetModules()
+    const { getToolsForChannel } = await import("../../repertoire/tools")
+    const withoutPrefs = getToolsForChannel(teamsCaps)
+    const withEmptyPrefs = getToolsForChannel(teamsCaps, {})
+    const withUndefined = getToolsForChannel(teamsCaps, undefined)
+
+    // All three should return identical descriptions
+    const descsWithout = withoutPrefs.map((t: any) => t.function.description)
+    const descsEmpty = withEmptyPrefs.map((t: any) => t.function.description)
+    const descsUndefined = withUndefined.map((t: any) => t.function.description)
+    expect(descsEmpty).toEqual(descsWithout)
+    expect(descsUndefined).toEqual(descsWithout)
+  })
+
+  it("appends ado preference to all tools with integration: 'ado'", async () => {
+    vi.resetModules()
+    const { getToolsForChannel } = await import("../../repertoire/tools")
+    const prefs = { ado: "my friend prefers iteration paths like Team\\Sprint1" }
+    const result = getToolsForChannel(teamsCaps, prefs)
+
+    // Find ado tools -- they should all have the preference appended
+    const adoTools = result.filter((t: any) =>
+      ["ado_query", "ado_mutate", "ado_work_items", "ado_docs",
+       "ado_backlog_list", "ado_create_epic", "ado_create_issue",
+       "ado_move_items", "ado_restructure_backlog", "ado_validate_structure",
+       "ado_preview_changes"].includes(t.function.name),
+    )
+    expect(adoTools.length).toBeGreaterThan(0)
+    for (const tool of adoTools) {
+      expect(tool.function.description).toContain("my friend prefers iteration paths like Team\\Sprint1")
+    }
+
+    // Base tools should NOT have the preference (use web_search -- read_file is blocked for remote channels)
+    const webSearch = result.find((t: any) => t.function.name === "web_search")
+    expect(webSearch!.function.description).not.toContain("my friend prefers")
+
+    // Graph tools should NOT have the preference
+    const graphQuery = result.find((t: any) => t.function.name === "graph_query")
+    expect(graphQuery!.function.description).not.toContain("my friend prefers")
+  })
+
+  it("appends graph preference to all tools with integration: 'graph'", async () => {
+    vi.resetModules()
+    const { getToolsForChannel } = await import("../../repertoire/tools")
+    const prefs = { graph: "always include manager field in profile queries" }
+    const result = getToolsForChannel(teamsCaps, prefs)
+
+    // Graph tools should have the preference appended
+    const graphTools = result.filter((t: any) =>
+      ["graph_query", "graph_mutate", "graph_profile", "graph_docs"].includes(t.function.name),
+    )
+    expect(graphTools.length).toBeGreaterThan(0)
+    for (const tool of graphTools) {
+      expect(tool.function.description).toContain("always include manager field in profile queries")
+    }
+
+    // ADO tools should NOT have the preference
+    const adoQuery = result.find((t: any) => t.function.name === "ado_query")
+    expect(adoQuery!.function.description).not.toContain("always include manager")
+  })
+
+  it("ignores unknown preference keys that don't match any integration", async () => {
+    vi.resetModules()
+    const { getToolsForChannel } = await import("../../repertoire/tools")
+    const withoutPrefs = getToolsForChannel(teamsCaps)
+    const withUnknownPrefs = getToolsForChannel(teamsCaps, { nonexistent: "some pref" })
+
+    // Descriptions should be identical -- unknown key has no effect
+    const descsWithout = withoutPrefs.map((t: any) => t.function.description)
+    const descsWith = withUnknownPrefs.map((t: any) => t.function.description)
+    expect(descsWith).toEqual(descsWithout)
+  })
+
+  it("applies multiple preferences independently", async () => {
+    vi.resetModules()
+    const { getToolsForChannel } = await import("../../repertoire/tools")
+    const prefs = {
+      ado: "use area path Team\\Backend",
+      graph: "prefer displayName over mail",
+    }
+    const result = getToolsForChannel(teamsCaps, prefs)
+
+    // ADO tools get ado pref but not graph pref
+    const adoQuery = result.find((t: any) => t.function.name === "ado_query")
+    expect(adoQuery!.function.description).toContain("use area path Team\\Backend")
+    expect(adoQuery!.function.description).not.toContain("prefer displayName over mail")
+
+    // Graph tools get graph pref but not ado pref
+    const graphQuery = result.find((t: any) => t.function.name === "graph_query")
+    expect(graphQuery!.function.description).toContain("prefer displayName over mail")
+    expect(graphQuery!.function.description).not.toContain("use area path Team\\Backend")
+  })
+
+  it("does not mutate original tool descriptions (rebuilt each call)", async () => {
+    vi.resetModules()
+    const { getToolsForChannel } = await import("../../repertoire/tools")
+
+    // First call with preferences
+    const prefs = { ado: "my special preference" }
+    const firstCall = getToolsForChannel(teamsCaps, prefs)
+    const adoToolFirst = firstCall.find((t: any) => t.function.name === "ado_query")
+    expect(adoToolFirst!.function.description).toContain("my special preference")
+
+    // Second call WITHOUT preferences
+    const secondCall = getToolsForChannel(teamsCaps)
+    const adoToolSecond = secondCall.find((t: any) => t.function.name === "ado_query")
+    expect(adoToolSecond!.function.description).not.toContain("my special preference")
+
+    // Third call with DIFFERENT preferences
+    const thirdCall = getToolsForChannel(teamsCaps, { ado: "different pref" })
+    const adoToolThird = thirdCall.find((t: any) => t.function.name === "ado_query")
+    expect(adoToolThird!.function.description).toContain("different pref")
+    expect(adoToolThird!.function.description).not.toContain("my special preference")
+  })
+
+  it("does not inject preferences for CLI channel (no integration tools)", async () => {
+    vi.resetModules()
+    const { getToolsForChannel } = await import("../../repertoire/tools")
+    const prefs = { ado: "some ado preference", graph: "some graph preference" }
+    const result = getToolsForChannel(cliCaps, prefs)
+
+    // CLI has no integration tools, so no descriptions should be modified
+    for (const tool of result) {
+      expect(tool.function.description).not.toContain("some ado preference")
+      expect(tool.function.description).not.toContain("some graph preference")
+    }
+  })
+})
+
 describe("isConfirmationRequired", () => {
   it("returns true for graph_mutate", async () => {
     vi.resetModules()
@@ -1293,8 +1441,8 @@ describe("execTool for generic ADO tools", () => {
   })
 })
 
-describe("ado_mutate authority checks (Unit 2C)", () => {
-  it("ado_mutate proceeds when canWrite() returns true", async () => {
+describe("ado_mutate without authority checks (authority removed)", () => {
+  it("ado_mutate proceeds with valid context", async () => {
     vi.resetModules()
     const { adoRequest } = await import("../../repertoire/ado-client")
     vi.mocked(adoRequest).mockResolvedValue('{"id": 789}')
@@ -1304,13 +1452,8 @@ describe("ado_mutate authority checks (Unit 2C)", () => {
       adoToken: "test-token",
       signin: vi.fn(),
       context: {
-        identity: { id: "id", displayName: "test", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        friend: { id: "id", displayName: "test", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "", updatedAt: "", schemaVersion: 1 },
         channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
-        checker: {
-          canRead: vi.fn().mockReturnValue(true),
-          canWrite: vi.fn().mockResolvedValue(true),
-          record403: vi.fn(),
-        },
       },
     }
 
@@ -1319,33 +1462,7 @@ describe("ado_mutate authority checks (Unit 2C)", () => {
     expect(adoRequest).toHaveBeenCalled()
   })
 
-  it("ado_mutate returns structured denial when canWrite() returns false", async () => {
-    vi.resetModules()
-    const { adoRequest } = await import("../../repertoire/ado-client")
-    vi.mocked(adoRequest).mockClear()
-
-    const { execTool } = await import("../../repertoire/tools")
-    const ctx = {
-      adoToken: "test-token",
-      signin: vi.fn(),
-      context: {
-        identity: { id: "id", displayName: "test", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
-        channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
-        checker: {
-          canRead: vi.fn().mockReturnValue(true),
-          canWrite: vi.fn().mockResolvedValue(false),
-          record403: vi.fn(),
-        },
-      },
-    }
-
-    const result = await execTool("ado_mutate", { method: "POST", organization: "myorg", path: "/_apis/wit/workitems/$Task" }, ctx)
-    expect(result).toContain("AUTHORITY_DENIED")
-    // Should NOT call adoRequest
-    expect(adoRequest).not.toHaveBeenCalled()
-  })
-
-  it("ado_mutate proceeds when no context/checker is available (backward-compatible)", async () => {
+  it("ado_mutate proceeds when no context is available", async () => {
     vi.resetModules()
     const { adoRequest } = await import("../../repertoire/ado-client")
     vi.mocked(adoRequest).mockResolvedValue('{"id": 111}')
@@ -1354,88 +1471,11 @@ describe("ado_mutate authority checks (Unit 2C)", () => {
     const ctx = {
       adoToken: "test-token",
       signin: vi.fn(),
-      // No context or checker
     }
 
     const result = await execTool("ado_mutate", { method: "PATCH", organization: "myorg", path: "/_apis/wit/workitems/1" }, ctx)
     expect(result).toBe('{"id": 111}')
     expect(adoRequest).toHaveBeenCalled()
-  })
-
-  it("ado_query calls record403() on PERMISSION_DENIED response", async () => {
-    vi.resetModules()
-    const { adoRequest } = await import("../../repertoire/ado-client")
-    vi.mocked(adoRequest).mockResolvedValue("PERMISSION_DENIED: You don't have access to this ADO resource.")
-
-    const { execTool } = await import("../../repertoire/tools")
-    const record403 = vi.fn()
-    const ctx = {
-      adoToken: "test-token",
-      signin: vi.fn(),
-      context: {
-        identity: { id: "id", displayName: "test", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
-        channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
-        checker: {
-          canRead: vi.fn().mockReturnValue(true),
-          canWrite: vi.fn().mockResolvedValue(true),
-          record403,
-        },
-      },
-    }
-
-    const result = await execTool("ado_query", { organization: "myorg", path: "/_apis/projects" }, ctx)
-    expect(result).toContain("PERMISSION_DENIED")
-    expect(record403).toHaveBeenCalledWith("ado", "myorg", expect.any(String))
-  })
-
-  it("ado_mutate calls record403() on PERMISSION_DENIED response", async () => {
-    vi.resetModules()
-    const { adoRequest } = await import("../../repertoire/ado-client")
-    vi.mocked(adoRequest).mockResolvedValue("PERMISSION_DENIED: You don't have access to this ADO resource.")
-
-    const { execTool } = await import("../../repertoire/tools")
-    const record403 = vi.fn()
-    const ctx = {
-      adoToken: "test-token",
-      signin: vi.fn(),
-      context: {
-        identity: { id: "id", displayName: "test", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
-        channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
-        checker: {
-          canRead: vi.fn().mockReturnValue(true),
-          canWrite: vi.fn().mockResolvedValue(true),
-          record403,
-        },
-      },
-    }
-
-    const result = await execTool("ado_mutate", { method: "POST", organization: "myorg", path: "/_apis/wit/workitems/$Task" }, ctx)
-    expect(result).toContain("PERMISSION_DENIED")
-    expect(record403).toHaveBeenCalledWith("ado", "myorg", expect.any(String))
-  })
-
-  it("structured denial message includes what was denied and suggested alternative", async () => {
-    vi.resetModules()
-
-    const { execTool } = await import("../../repertoire/tools")
-    const ctx = {
-      adoToken: "test-token",
-      signin: vi.fn(),
-      context: {
-        identity: { id: "id", displayName: "test", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
-        channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
-        checker: {
-          canRead: vi.fn().mockReturnValue(true),
-          canWrite: vi.fn().mockResolvedValue(false),
-          record403: vi.fn(),
-        },
-      },
-    }
-
-    const result = await execTool("ado_mutate", { method: "DELETE", organization: "myorg", path: "/_apis/wit/workitems/99" }, ctx)
-    expect(result).toContain("AUTHORITY_DENIED")
-    expect(result).toContain("myorg")
-    expect(result).toContain("DELETE")
   })
 })
 
@@ -1614,12 +1654,12 @@ describe("summarizeArgs for docs tools", () => {
     expect(summarizeArgs("ado_docs", {})).toBe("")
   })
 
-  it("returns key=value summary for save_friend_note", () => {
-    expect(summarizeArgs("save_friend_note", { key: "ado", value: "flat backlog" })).toBe("ado")
+  it("returns type+key summary for save_friend_note", () => {
+    expect(summarizeArgs("save_friend_note", { type: "tool_preference", key: "ado", content: "flat backlog" })).toBe("ado")
   })
 
-  it("returns empty string for save_friend_note with no key", () => {
-    expect(summarizeArgs("save_friend_note", { value: "flat backlog" })).toBe("")
+  it("returns type for save_friend_note name type (no key)", () => {
+    expect(summarizeArgs("save_friend_note", { type: "name", content: "Jordan" })).toBe("")
   })
 
   it("returns org + project for ado_backlog_list", () => {
@@ -1632,6 +1672,41 @@ describe("summarizeArgs for docs tools", () => {
 })
 
 describe("save_friend_note tool", () => {
+  // Helper: create a mock FriendRecord
+  function makeFriend(overrides: Record<string, any> = {}) {
+    return {
+      id: "uuid-1",
+      displayName: "Jordan",
+      externalIds: [{ provider: "aad", externalId: "aad-1", linkedAt: "2026-01-01" }],
+      tenantMemberships: ["t1"],
+      toolPreferences: {},
+      notes: {},
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      schemaVersion: 1,
+      ...overrides,
+    }
+  }
+
+  // Helper: create a mock ToolContext with friendStore
+  function makeCtx(overrides: Record<string, any> = {}) {
+    const friend = overrides.friend ?? makeFriend(overrides.friendOverrides)
+    const friendStore = overrides.friendStore ?? {
+      get: vi.fn().mockResolvedValue(friend),
+      put: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn(),
+      findByExternalId: vi.fn(),
+    }
+    return {
+      signin: vi.fn(),
+      context: {
+        friend,
+        channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
+      },
+      friendStore,
+    }
+  }
+
   it("is registered as a base tool definition (no integration)", async () => {
     vi.resetModules()
     const { baseToolDefinitions } = await import("../../repertoire/tools-base")
@@ -1640,108 +1715,240 @@ describe("save_friend_note tool", () => {
     expect(def!.integration).toBeUndefined()
   })
 
-  it("creates new FriendMemory when none exists", async () => {
+  it("tool description includes first-person override guidance", async () => {
     vi.resetModules()
-    const { execTool } = await import("../../repertoire/tools")
-    const memoryStore = {
-      get: vi.fn().mockResolvedValue(null),
-      put: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn(),
-      find: vi.fn(),
-    }
-    const ctx = {
-      signin: vi.fn(),
-      context: {
-        identity: { id: "uuid-1", displayName: "Jordan", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
-        channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
-        memory: null,
-      },
-      memoryStore,
-    }
-    const result = await execTool("save_friend_note", { key: "ado", value: "flat backlog view" }, ctx)
-    expect(result).toContain("saved")
-    expect(memoryStore.put).toHaveBeenCalledWith("uuid-1", {
-      id: "uuid-1",
-      toolPreferences: { ado: "flat backlog view" },
-      schemaVersion: 1,
-    })
+    const { baseToolDefinitions } = await import("../../repertoire/tools-base")
+    const def = baseToolDefinitions.find(d => d.tool.function.name === "save_friend_note")!
+    expect(def.tool.function.description).toContain("override")
   })
 
-  it("updates existing FriendMemory preference", async () => {
+  // -- Validation tests --
+
+  it("returns first-person error when content is missing", async () => {
     vi.resetModules()
     const { execTool } = await import("../../repertoire/tools")
-    const existingMemory = {
-      id: "uuid-1",
-      toolPreferences: { ado: "old preference", general: "keep this" },
-      schemaVersion: 1,
-    }
-    const memoryStore = {
-      get: vi.fn().mockResolvedValue(existingMemory),
-      put: vi.fn().mockResolvedValue(undefined),
-      delete: vi.fn(),
-      find: vi.fn(),
-    }
-    const ctx = {
-      signin: vi.fn(),
-      context: {
-        identity: { id: "uuid-1", displayName: "Jordan", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
-        channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
-        memory: existingMemory,
-      },
-      memoryStore,
-    }
-    const result = await execTool("save_friend_note", { key: "ado", value: "flat backlog view" }, ctx)
-    expect(result).toContain("saved")
-    expect(memoryStore.put).toHaveBeenCalledWith("uuid-1", {
-      id: "uuid-1",
-      toolPreferences: { ado: "flat backlog view", general: "keep this" },
-      schemaVersion: 1,
-    })
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "note", key: "role" }, ctx)
+    expect(result).toMatch(/content/i)
+    expect(result).toMatch(/i need|required/i)
+  })
+
+  it("returns first-person error when key is missing for tool_preference type", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "tool_preference", content: "flat backlog" }, ctx)
+    expect(result).toMatch(/key/i)
+    expect(result).toMatch(/i need|required/i)
+  })
+
+  it("returns first-person error when key is missing for note type", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "note", content: "engineering manager" }, ctx)
+    expect(result).toMatch(/key/i)
+    expect(result).toMatch(/i need|required/i)
+  })
+
+  it("returns first-person error when type is invalid", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "invalid", key: "k", content: "v" }, ctx)
+    expect(result).toMatch(/type/i)
   })
 
   it("returns error when no context is available", async () => {
     vi.resetModules()
     const { execTool } = await import("../../repertoire/tools")
     const ctx = { signin: vi.fn() }
-    const result = await execTool("save_friend_note", { key: "ado", value: "test" }, ctx)
+    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "eng" }, ctx)
     expect(result).toContain("no friend context")
   })
 
-  it("returns error when no memoryStore is available", async () => {
+  it("returns error when no friendStore is available", async () => {
     vi.resetModules()
     const { execTool } = await import("../../repertoire/tools")
     const ctx = {
       signin: vi.fn(),
       context: {
-        identity: { id: "uuid-1", displayName: "Jordan", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
+        friend: makeFriend(),
         channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
-        memory: null,
       },
     }
-    const result = await execTool("save_friend_note", { key: "ado", value: "test" }, ctx)
+    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "eng" }, ctx)
     expect(result).toContain("not available")
   })
 
-  it("handles write failure gracefully (D16)", async () => {
+  // -- type: "name" tests --
+
+  it("type 'name' updates displayName and notes['name']", async () => {
     vi.resetModules()
     const { execTool } = await import("../../repertoire/tools")
-    const memoryStore = {
-      get: vi.fn().mockResolvedValue(null),
-      put: vi.fn().mockRejectedValue(new Error("disk full")),
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "name", content: "Jordan Lee" }, ctx)
+    expect(result).toContain("saved")
+    expect(ctx.friendStore.put).toHaveBeenCalledWith(
+      "uuid-1",
+      expect.objectContaining({
+        displayName: "Jordan Lee",
+        notes: { name: "Jordan Lee" },
+      }),
+    )
+  })
+
+  it("type 'name' does not require key parameter", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "name", content: "Alex" }, ctx)
+    expect(result).toContain("saved")
+  })
+
+  // -- type: "tool_preference" tests --
+
+  it("type 'tool_preference' saves new preference", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "tool_preference", key: "ado", content: "flat backlog view" }, ctx)
+    expect(result).toContain("saved")
+    expect(ctx.friendStore.put).toHaveBeenCalledWith(
+      "uuid-1",
+      expect.objectContaining({
+        toolPreferences: { ado: "flat backlog view" },
+      }),
+    )
+  })
+
+  it("type 'tool_preference' with existing value and no override returns conflict", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx({ friendOverrides: { toolPreferences: { ado: "old preference" } } })
+    const result = await execTool("save_friend_note", { type: "tool_preference", key: "ado", content: "new preference" }, ctx)
+    // Should NOT have written to disk
+    expect(ctx.friendStore.put).not.toHaveBeenCalled()
+    // Should return existing value and merge instruction
+    expect(result).toContain("old preference")
+    expect(result).toMatch(/override|merge/i)
+  })
+
+  it("type 'tool_preference' with existing value and override=true overwrites", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx({ friendOverrides: { toolPreferences: { ado: "old preference" } } })
+    const result = await execTool("save_friend_note", { type: "tool_preference", key: "ado", content: "new preference", override: "true" }, ctx)
+    expect(result).toContain("saved")
+    expect(ctx.friendStore.put).toHaveBeenCalledWith(
+      "uuid-1",
+      expect.objectContaining({
+        toolPreferences: { ado: "new preference" },
+      }),
+    )
+  })
+
+  // -- type: "note" tests --
+
+  it("type 'note' saves new note", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "engineering manager" }, ctx)
+    expect(result).toContain("saved")
+    expect(ctx.friendStore.put).toHaveBeenCalledWith(
+      "uuid-1",
+      expect.objectContaining({
+        notes: { role: "engineering manager" },
+      }),
+    )
+  })
+
+  it("type 'note' with existing value and no override returns conflict", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx({ friendOverrides: { notes: { role: "old role" } } })
+    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "new role" }, ctx)
+    expect(ctx.friendStore.put).not.toHaveBeenCalled()
+    expect(result).toContain("old role")
+    expect(result).toMatch(/override|merge/i)
+  })
+
+  it("type 'note' with existing value and override=true overwrites", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx({ friendOverrides: { notes: { role: "old role" } } })
+    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "new role", override: "true" }, ctx)
+    expect(result).toContain("saved")
+    expect(ctx.friendStore.put).toHaveBeenCalledWith(
+      "uuid-1",
+      expect.objectContaining({
+        notes: { role: "new role" },
+      }),
+    )
+  })
+
+  // -- Disk write / no in-memory mutation tests --
+
+  it("writes to disk via friendStore.put, reads fresh record via friendStore.get", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const friend = makeFriend()
+    const friendStore = {
+      get: vi.fn().mockResolvedValue(friend),
+      put: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn(),
-      find: vi.fn(),
+      findByExternalId: vi.fn(),
     }
     const ctx = {
       signin: vi.fn(),
-      context: {
-        identity: { id: "uuid-1", displayName: "Jordan", externalIds: [], tenantMemberships: [], createdAt: "", updatedAt: "", schemaVersion: 1 },
-        channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity },
-        memory: null,
-      },
-      memoryStore,
+      context: { friend, channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity } },
+      friendStore,
     }
-    const result = await execTool("save_friend_note", { key: "ado", value: "test" }, ctx)
+    await execTool("save_friend_note", { type: "note", key: "role", content: "manager" }, ctx)
+    // Should have called get first to read fresh record
+    expect(friendStore.get).toHaveBeenCalledWith("uuid-1")
+    // Should have called put to write
+    expect(friendStore.put).toHaveBeenCalled()
+  })
+
+  it("handles write failure gracefully", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const friendStore = {
+      get: vi.fn().mockResolvedValue(makeFriend()),
+      put: vi.fn().mockRejectedValue(new Error("disk full")),
+      delete: vi.fn(),
+      findByExternalId: vi.fn(),
+    }
+    const ctx = {
+      signin: vi.fn(),
+      context: { friend: makeFriend(), channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity } },
+      friendStore,
+    }
+    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "test" }, ctx)
     expect(result).toContain("error")
     expect(result).toContain("disk full")
+  })
+
+  it("returns error when friend has no id", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const friendNoId = makeFriend({ id: "" })
+    const ctx = {
+      signin: vi.fn(),
+      context: { friend: friendNoId, channel: { channel: "cli" as const, availableIntegrations: [] as any[], supportsMarkdown: false, supportsStreaming: true, supportsRichCards: false, maxMessageLength: Infinity } },
+      friendStore: { get: vi.fn(), put: vi.fn(), delete: vi.fn(), findByExternalId: vi.fn() },
+    }
+    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "test" }, ctx)
+    expect(result).toContain("no friend identity")
+  })
+
+  it("returns error when friendStore.get returns null", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx({ friendStore: { get: vi.fn().mockResolvedValue(null), put: vi.fn(), delete: vi.fn(), findByExternalId: vi.fn() } })
+    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "test" }, ctx)
+    expect(result).toContain("can't find")
   })
 })

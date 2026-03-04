@@ -24,25 +24,11 @@ function makeCtx(overrides?: any) {
     adoToken: "test-token",
     signin: vi.fn(),
     context: {
-      identity: { id: "uuid-1", displayName: "Jordan", externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01" }], tenantMemberships: ["t1"], createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
+      friend: { id: "uuid-1", displayName: "Jordan", externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01" }], tenantMemberships: ["t1"], toolPreferences: {}, notes: {}, createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
       channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
-      memory: null,
     },
     ...overrides,
   }
-}
-
-function makeCtxWithChecker(canWriteResult = true) {
-  return makeCtx({
-    context: {
-      ...makeCtx().context,
-      checker: {
-        canRead: vi.fn().mockReturnValue(true),
-        canWrite: vi.fn().mockResolvedValue(canWriteResult),
-        record403: vi.fn(),
-      },
-    },
-  })
 }
 
 describe("ado_backlog_list tool", () => {
@@ -305,7 +291,7 @@ describe("ado_create_epic tool", () => {
     vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 200, fields: { "System.Title": "New Epic" } }))
 
     const def = findTool("ado_create_epic")!
-    const result = await def.handler({ title: "New Epic", areaPath: "Platform\\Team A" }, makeCtxWithChecker())
+    const result = await def.handler({ title: "New Epic", areaPath: "Platform\\Team A" }, makeCtx())
     expect(result).toContain("200")
     // Verify the PATCH body sent to ADO
     const call = vi.mocked(adoRequest).mock.calls[0]
@@ -321,21 +307,12 @@ describe("ado_create_epic tool", () => {
     vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 201 }))
 
     const def = findTool("ado_create_epic")!
-    await def.handler({ title: "Epic", iterationPath: "Sprint 3" }, makeCtxWithChecker())
+    await def.handler({ title: "Epic", iterationPath: "Sprint 3" }, makeCtx())
     const call = vi.mocked(adoRequest).mock.calls[0]
     const body = JSON.parse(call[4]!)
     expect(body).toEqual(expect.arrayContaining([
       expect.objectContaining({ path: "/fields/System.IterationPath", value: "Sprint 3" }),
     ]))
-  })
-
-  it("checks canWrite before executing", async () => {
-    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
-    const ctx = makeCtxWithChecker(false)
-    const def = findTool("ado_create_epic")!
-    const result = await def.handler({ title: "Denied Epic" }, ctx)
-    expect(result).toContain("AUTHORITY_DENIED")
-    expect(adoRequest).not.toHaveBeenCalled()
   })
 
   it("returns error when no ADO token", async () => {
@@ -365,7 +342,7 @@ describe("ado_create_issue tool", () => {
       description: "Description here",
       areaPath: "Platform\\Team A",
       parentId: "100",
-    }, makeCtxWithChecker())
+    }, makeCtx())
     expect(result).toContain("300")
     const call = vi.mocked(adoRequest).mock.calls[0]
     const body = JSON.parse(call[4]!)
@@ -375,13 +352,6 @@ describe("ado_create_issue tool", () => {
     ]))
   })
 
-  it("checks canWrite before executing", async () => {
-    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
-    const ctx = makeCtxWithChecker(false)
-    const def = findTool("ado_create_issue")!
-    const result = await def.handler({ title: "Denied" }, ctx)
-    expect(result).toContain("AUTHORITY_DENIED")
-  })
 })
 
 describe("ado_move_items tool", () => {
@@ -405,17 +375,9 @@ describe("ado_move_items tool", () => {
     const result = await def.handler({
       workItemIds: "101,102",
       newParentId: "200",
-    }, makeCtxWithChecker())
+    }, makeCtx())
     const parsed = JSON.parse(result)
     expect(parsed.moved).toHaveLength(2)
-  })
-
-  it("checks canWrite before executing", async () => {
-    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
-    const ctx = makeCtxWithChecker(false)
-    const def = findTool("ado_move_items")!
-    const result = await def.handler({ workItemIds: "101", newParentId: "200" }, ctx)
-    expect(result).toContain("AUTHORITY_DENIED")
   })
 
   it("handles partial failure", async () => {
@@ -424,7 +386,7 @@ describe("ado_move_items tool", () => {
     vi.mocked(adoRequest).mockResolvedValueOnce("PERMISSION_DENIED: 403")
 
     const def = findTool("ado_move_items")!
-    const result = await def.handler({ workItemIds: "101,102", newParentId: "200" }, makeCtxWithChecker())
+    const result = await def.handler({ workItemIds: "101,102", newParentId: "200" }, makeCtx())
     const parsed = JSON.parse(result)
     expect(parsed.moved.length + parsed.errors.length).toBe(2)
   })
@@ -434,7 +396,7 @@ describe("ado_move_items tool", () => {
     vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ error: "unexpected" }))
 
     const def = findTool("ado_move_items")!
-    const result = await def.handler({ workItemIds: "101", newParentId: "200" }, makeCtxWithChecker())
+    const result = await def.handler({ workItemIds: "101", newParentId: "200" }, makeCtx())
     const parsed = JSON.parse(result)
     expect(parsed.errors).toHaveLength(1)
   })
@@ -723,7 +685,7 @@ describe("ado_batch_update tool", () => {
         { type: "update", workItemId: 101, fields: { "System.State": "Active" } },
         { type: "create", workItemType: "Task", fields: { "System.Title": "New Task" } },
       ]),
-    }, makeCtxWithChecker())
+    }, makeCtx())
     const parsed = JSON.parse(result)
     expect(parsed.results).toHaveLength(2)
     expect(parsed.results.every((r: any) => r.success)).toBe(true)
@@ -740,7 +702,7 @@ describe("ado_batch_update tool", () => {
         { type: "update", workItemId: 101, fields: { "System.State": "Active" } },
         { type: "update", workItemId: 102, fields: { "System.State": "Closed" } },
       ]),
-    }, makeCtxWithChecker())
+    }, makeCtx())
     const parsed = JSON.parse(result)
     expect(parsed.results).toHaveLength(2)
     expect(parsed.results[0].success).toBe(true)
@@ -753,7 +715,7 @@ describe("ado_batch_update tool", () => {
     const def = findTool("ado_batch_update")!
     const result = await def.handler({
       operations: JSON.stringify([]),
-    }, makeCtxWithChecker())
+    }, makeCtx())
     const parsed = JSON.parse(result)
     expect(parsed.results).toHaveLength(0)
   })
@@ -767,26 +729,16 @@ describe("ado_batch_update tool", () => {
       operations: JSON.stringify([
         { type: "create", workItemType: "Bug", fields: { "System.Title": "Bug report" } },
       ]),
-    }, makeCtxWithChecker())
+    }, makeCtx())
     const parsed = JSON.parse(result)
     expect(parsed.results).toHaveLength(1)
     expect(parsed.results[0].success).toBe(true)
   })
 
-  it("checks authority before executing", async () => {
-    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
-    const ctx = makeCtxWithChecker(false)
-    const def = findTool("ado_batch_update")!
-    const result = await def.handler({
-      operations: JSON.stringify([{ type: "update", workItemId: 101, fields: {} }]),
-    }, ctx)
-    expect(result).toContain("AUTHORITY_DENIED")
-  })
-
   it("returns error for invalid JSON operations", async () => {
     vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
     const def = findTool("ado_batch_update")!
-    const result = await def.handler({ operations: "not json" }, makeCtxWithChecker())
+    const result = await def.handler({ operations: "not json" }, makeCtx())
     expect(result).toContain("error")
   })
 
@@ -805,7 +757,7 @@ describe("ado_batch_update tool", () => {
       operations: JSON.stringify([
         { type: "reparent", workItemId: 101, newParentId: 200 },
       ]),
-    }, makeCtxWithChecker())
+    }, makeCtx())
     const parsed = JSON.parse(result)
     expect(parsed.results[0].success).toBe(true)
   })
@@ -818,7 +770,7 @@ describe("ado_batch_update tool", () => {
       operations: JSON.stringify([
         { type: "delete", workItemId: 101 },
       ]),
-    }, makeCtxWithChecker())
+    }, makeCtx())
     const parsed = JSON.parse(result)
     expect(parsed.results[0].success).toBe(false)
     expect(parsed.results[0].error).toContain("Unknown operation type")
@@ -833,7 +785,7 @@ describe("ado_batch_update tool", () => {
       operations: JSON.stringify([
         { type: "update", workItemId: 101, fields: { "System.State": "Active" } },
       ]),
-    }, makeCtxWithChecker())
+    }, makeCtx())
     const parsed = JSON.parse(result)
     expect(parsed.results[0].success).toBe(false)
   })
@@ -847,7 +799,7 @@ describe("ado_batch_update tool", () => {
       operations: JSON.stringify([
         { type: "create", workItemType: "Task", fields: { "System.Title": "Test" } },
       ]),
-    }, makeCtxWithChecker())
+    }, makeCtx())
     const parsed = JSON.parse(result)
     expect(parsed.results[0].success).toBe(false)
     expect(parsed.results[0].error).toContain("network failure")
@@ -862,7 +814,7 @@ describe("ado_batch_update tool", () => {
       operations: JSON.stringify([
         { type: "update", workItemId: 101, fields: { "System.State": "Active" } },
       ]),
-    }, makeCtxWithChecker())
+    }, makeCtx())
     const parsed = JSON.parse(result)
     expect(parsed.results[0].success).toBe(false)
     expect(parsed.results[0].error).toContain("string error")
@@ -889,19 +841,9 @@ describe("ado_restructure_backlog tool", () => {
         { workItemId: 101, newParentId: 200 },
         { workItemId: 102, newParentId: 200 },
       ]),
-    }, makeCtxWithChecker())
+    }, makeCtx())
     const parsed = JSON.parse(result)
     expect(parsed.results).toHaveLength(2)
-  })
-
-  it("checks canWrite before executing", async () => {
-    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
-    const ctx = makeCtxWithChecker(false)
-    const def = findTool("ado_restructure_backlog")!
-    const result = await def.handler({
-      operations: JSON.stringify([{ workItemId: 101, newParentId: 200 }]),
-    }, ctx)
-    expect(result).toContain("AUTHORITY_DENIED")
   })
 
   it("handles partial failures and continues", async () => {
@@ -915,7 +857,7 @@ describe("ado_restructure_backlog tool", () => {
         { workItemId: 101, newParentId: 200 },
         { workItemId: 102, newParentId: 200 },
       ]),
-    }, makeCtxWithChecker())
+    }, makeCtx())
     const parsed = JSON.parse(result)
     expect(parsed.results).toHaveLength(2)
     // At least one success and one failure
@@ -926,7 +868,7 @@ describe("ado_restructure_backlog tool", () => {
   it("returns error for invalid JSON operations", async () => {
     vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
     const def = findTool("ado_restructure_backlog")!
-    const result = await def.handler({ operations: "not valid json" }, makeCtxWithChecker())
+    const result = await def.handler({ operations: "not valid json" }, makeCtx())
     expect(result).toContain("error")
     expect(result).toContain("valid JSON")
   })
@@ -938,21 +880,21 @@ describe("ado_restructure_backlog tool", () => {
     const def = findTool("ado_restructure_backlog")!
     const result = await def.handler({
       operations: JSON.stringify([{ workItemId: 101, newParentId: 200 }]),
-    }, makeCtxWithChecker())
+    }, makeCtx())
     const parsed = JSON.parse(result)
     expect(parsed.results[0].success).toBe(false)
   })
 })
 
-describe("authority-aware planning", () => {
+describe("batch operations without authority checks", () => {
   beforeEach(() => { vi.resetAllMocks() })
 
-  it("ado_batch_update: full authority -- plan proceeds, all operations execute", async () => {
+  it("ado_batch_update: all operations execute (authority removed)", async () => {
     vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
     vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 101 }))
     vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 102 }))
 
-    const ctx = makeCtxWithChecker(true)
+    const ctx = makeCtx()
     const def = findTool("ado_batch_update")!
     const result = await def.handler({
       operations: JSON.stringify([
@@ -963,29 +905,14 @@ describe("authority-aware planning", () => {
     const parsed = JSON.parse(result)
     expect(parsed.results).toHaveLength(2)
     expect(parsed.results.every((r: any) => r.success)).toBe(true)
-    expect(parsed.deniedOperations).toBeUndefined()
   })
 
-  it("ado_batch_update: no authority -- returns denial with all operations listed", async () => {
+  it("ado_restructure_backlog: all operations execute (authority removed)", async () => {
     vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
-
-    const ctx = makeCtxWithChecker(false)
-    const def = findTool("ado_batch_update")!
-    const result = await def.handler({
-      operations: JSON.stringify([
-        { type: "create", workItemType: "Task", fields: { "System.Title": "Task A" } },
-      ]),
-    }, ctx)
-    expect(result).toContain("AUTHORITY_DENIED")
-  })
-
-  it("ado_restructure_backlog: partial authority -- denied operations skipped with explanation", async () => {
-    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
-    // First reparent succeeds
     vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 101 }))
     vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 102 }))
 
-    const ctx = makeCtxWithChecker(true)
+    const ctx = makeCtx()
     const def = findTool("ado_restructure_backlog")!
     const result = await def.handler({
       operations: JSON.stringify([
@@ -995,50 +922,6 @@ describe("authority-aware planning", () => {
     }, ctx)
     const parsed = JSON.parse(result)
     expect(parsed.results).toHaveLength(2)
-  })
-
-  it("ado_batch_update: authority check failure proceeds optimistically (D16)", async () => {
-    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
-    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 101 }))
-
-    // Authority checker that throws on canWrite
-    const ctx = makeCtx({
-      context: {
-        ...makeCtx().context,
-        checker: {
-          canRead: vi.fn().mockReturnValue(true),
-          canWrite: vi.fn().mockRejectedValue(new Error("probe failed")),
-          record403: vi.fn(),
-        },
-      },
-    })
-    const def = findTool("ado_batch_update")!
-    const result = await def.handler({
-      operations: JSON.stringify([
-        { type: "create", workItemType: "Task", fields: { "System.Title": "Test" } },
-      ]),
-    }, ctx)
-    // Should proceed optimistically despite probe failure
-    const parsed = JSON.parse(result)
-    expect(parsed.results).toHaveLength(1)
-    expect(parsed.results[0].success).toBe(true)
-  })
-
-  it("ado_batch_update: without checker (CLI) -- proceeds without authority check", async () => {
-    vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
-    vi.mocked(adoRequest).mockResolvedValueOnce(JSON.stringify({ id: 101 }))
-
-    // makeCtx() has no checker by default
-    const ctx = makeCtx()
-    const def = findTool("ado_batch_update")!
-    const result = await def.handler({
-      operations: JSON.stringify([
-        { type: "create", workItemType: "Task", fields: { "System.Title": "Test" } },
-      ]),
-    }, ctx)
-    const parsed = JSON.parse(result)
-    expect(parsed.results).toHaveLength(1)
-    expect(parsed.results[0].success).toBe(true)
   })
 })
 

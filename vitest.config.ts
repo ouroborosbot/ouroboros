@@ -13,8 +13,8 @@ export default defineConfig({
       exclude: [
         "src/__tests__/**",
         "src/*-entry.ts",
-        "src/mind/context/store.ts",
-        "src/observability/coverage/cli-main.ts",
+        "src/mind/friends/store.ts",
+        "src/nerves/coverage/cli-main.ts",
       ],
       thresholds: {
         lines: 100,

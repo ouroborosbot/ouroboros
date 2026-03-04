@@ -2,7 +2,7 @@ import OpenAI, { AzureOpenAI } from "openai";
 import { getAzureConfig, getMinimaxConfig, getContextConfig } from "../config";
 import { execTool, summarizeArgs, finalAnswerTool, getToolsForChannel, isConfirmationRequired } from "../repertoire/tools";
 import type { ToolContext } from "../repertoire/tools";
-import { getChannelCapabilities } from "../mind/context/channel";
+import { getChannelCapabilities } from "../mind/friends/channel";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
 import type { AssistantMessageWithReasoning, ResponseItem } from "./streaming";
 import { detectKick } from "./kicks";
@@ -190,12 +190,24 @@ export async function runAgent(
     meta: { channel: channel ?? "unknown", provider },
   });
 
+  // Per-turn friend refresh: re-read friend record from disk for fresh context
+  const friendStore = options?.toolContext?.friendStore;
+  const friendId = options?.toolContext?.context?.friend?.id;
+  let currentContext = options?.toolContext?.context;
+
+  if (friendStore && friendId) {
+    const freshFriend = await friendStore.get(friendId);
+    if (freshFriend) {
+      currentContext = { ...currentContext!, friend: freshFriend };
+    }
+  }
+
   // Refresh system prompt at start of each turn when channel is provided.
   // If refresh fails, keep existing system prompt (or inject a minimal safe fallback)
   // so turn execution remains consistent and non-fatal.
   if (channel) {
     try {
-      const refreshed = await buildSystem(channel, options);
+      const refreshed = await buildSystem(channel, options, currentContext);
       upsertSystemPrompt(messages, refreshed);
     } catch (error) {
       const hadExistingSystemPrompt = messages[0]?.role === "system" && typeof messages[0].content === "string";
@@ -235,7 +247,11 @@ export async function runAgent(
   // Prevent MaxListenersExceeded warning — each iteration adds a listener
   try { require("events").setMaxListeners(MAX_TOOL_ROUNDS + 5, signal); } catch { /* unsupported */ }
 
-  const baseTools = getToolsForChannel(channel ? getChannelCapabilities(channel) : undefined);
+  const toolPreferences = currentContext?.friend?.toolPreferences;
+  const baseTools = getToolsForChannel(
+    channel ? getChannelCapabilities(channel) : undefined,
+    toolPreferences && Object.keys(toolPreferences).length > 0 ? toolPreferences : undefined,
+  );
 
   while (!done) {
     // Compute activeTools per-iteration: include final_answer when

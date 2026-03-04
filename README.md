@@ -25,15 +25,12 @@ ouroboros/                        # repo root
     mind/                         # prompt, context, memory
       prompt.ts                   # system prompt assembly from psyche + context kernel
       context.ts                  # sliding context window, session I/O
-      context/                    # context kernel (identity, channel, authority, memory)
-        types.ts                  # FriendIdentity, FriendMemory, ChannelCapabilities, etc.
-        store.ts                  # ContextStore interface (generic CRUD)
-        store-file.ts             # FileContextStore -- filesystem adapter with migration
-        identity.ts               # identity resolution (find-or-create by external ID)
+      friends/                    # friend storage and identity resolution
+        types.ts                  # FriendRecord, ChannelCapabilities, ResolvedContext
+        store.ts                  # FriendStore interface (domain-specific CRUD)
+        store-file.ts             # FileFriendStore -- two-backend split (agent knowledge + PII bridge)
         channel.ts                # channel capabilities (CLI vs Teams)
-        authority.ts              # AuthorityChecker, Security Namespaces pre-flight checks
-        memory.ts                 # FriendMemory with model-managed toolPreferences
-        resolver.ts               # ContextResolver -- wires identity + channel + authority
+        resolver.ts               # FriendResolver -- find-or-create friend by external ID
     repertoire/                   # tools, skills, commands, API clients
       tools-base.ts               # 12 base tools (read_file, shell, claude, save_friend_note, etc.)
       tools-teams.ts              # 8 Teams integration tools (graph, ado)
@@ -51,7 +48,7 @@ ouroboros/                        # repo root
     wardrobe/                     # formatting and presentation
       format.ts                   # shared formatters (tool results, kicks, errors)
       phrases.ts                  # loading phrases (thinking, tool, followup)
-    __tests__/                    # 1198 tests, 100% coverage
+    __tests__/                    # 1184 tests, 100% coverage
   ouroboros/                      # agent directory for "ouroboros"
     agent.json                    # name, configPath, custom phrases
     psyche/                       # personality files loaded into system prompt
@@ -127,7 +124,7 @@ The system prompt is built by `mind/prompt.ts` via `buildSystem()`. It concatena
 9. Tools list: all tools available in your channel
 10. Skills list: names of loadable skills
 11. Tool behavior section (if tool_choice is required)
-12. Friend context (if context kernel resolved): identity, channel traits, authority status, friend preferences
+12. Friend context (if resolved): friend identity, channel traits, behavioral instructions (ephemerality, name quality, priority guidance, working-memory trust, stale notes awareness, new-friend behavior), friend notes
 
 Missing psyche files produce empty strings, not crashes. You can write your own psyche from scratch -- just create the four `.md` files in your directory.
 
@@ -156,15 +153,19 @@ Plus 2 optional:
 
 **Context management** (`mind/context.ts`): this is the tail-eating at the heart of the ouroboros metaphor. Conversations are persisted to JSON files on disk. After each turn, the sliding window checks token count against budget (configurable, default 80,000 tokens). When over budget, oldest messages are trimmed -- never the system prompt -- until back under with a 20% margin. The agent consumes its own history to keep moving forward. Identity survives through psyche files and session persistence, not through unbounded context.
 
-**Context kernel** (`mind/context/`): the agent's awareness of who it's talking to and what it can do. Resolved once per conversation turn, the context kernel provides:
+**Friend system** (`mind/friends/`): the agent's awareness of who it's talking to. People who talk to the agent are "friends", not "users". Resolved once per conversation turn, re-read from disk each turn (no in-memory mutation).
 
-- **Identity** (`context/identity.ts`): `FriendIdentity` -- find-or-create by external ID (AAD, local). People who talk to the agent are "friends", not "users". Identities are cross-referenced across providers via `externalIds[]` and persist to disk via `FileContextStore`.
-- **Channel** (`context/channel.ts`): `ChannelCapabilities` -- what the current channel supports (markdown, streaming, rich cards, max message length, available integrations). CLI and Teams have different capability profiles.
-- **Authority** (`context/authority.ts`): `AuthorityChecker` -- pre-flight permission checks for write operations. Uses ADO Security Namespaces API. Optimistic reads, pre-flight writes. Probe failures proceed optimistically (D16 error handling).
-- **Memory** (`context/memory.ts`): `FriendMemory` with model-managed `toolPreferences` (`Record<string, string>`). The model decides what to store -- no typed schemas. Saved via `save_friend_note` tool.
-- **Resolver** (`context/resolver.ts`): `ContextResolver` wires identity + channel + authority + memory into a `ResolvedContext` injected into the system prompt and tool context.
+- **FriendRecord** (`friends/types.ts`): the single merged type for a person the agent knows. Contains `displayName`, `externalIds[]` (cross-provider identity links), `toolPreferences` (keyed by integration name), `notes` (general friend knowledge), `tenantMemberships`, timestamps, and schema version.
+- **FriendStore** (`friends/store.ts`): domain-specific persistence interface (`get`, `put`, `delete`, `findByExternalId`).
+- **FileFriendStore** (`friends/store-file.ts`): two-backend storage split by PII boundary:
+  - **Agent knowledge** (`{agentRoot}/friends/{uuid}.json`): id, displayName, toolPreferences, notes, timestamps, schemaVersion. Committed to the repo -- no PII.
+  - **PII bridge** (`~/.agentconfigs/{agentName}/friends/{uuid}.json`): id, externalIds, tenantMemberships, schemaVersion. Local-only -- contains PII.
+  - `get()` merges both backends. `put()` splits and writes both. `findByExternalId()` scans PII bridge, then merges with agent knowledge.
+- **Channel** (`friends/channel.ts`): `ChannelCapabilities` -- what the current channel supports (markdown, streaming, rich cards, max message length, available integrations).
+- **FriendResolver** (`friends/resolver.ts`): find-or-create by external ID. First encounter creates a new FriendRecord with system-provided name and empty notes/preferences. Returning friends are found via `findByExternalId()`. DisplayName is never overwritten on existing records.
+- **Session paths**: `~/.agentconfigs/{agentName}/sessions/{friendUuid}/{channel}/{sessionId}.json`. Each friend gets their own session directory.
 
-Design principles: don't persist what you can re-derive; conversation IS the cache; the model manages memory freeform.
+Design principles: don't persist what you can re-derive; conversation IS the cache; the model manages memory freeform via `save_friend_note`; toolPreferences go to tool descriptions (not system prompt); notes go to system prompt (not tool descriptions).
 
 **Tools**: 12 base tools available in all channels (read_file, write_file, shell, list_directory, git_commit, gh_cli, list_skills, load_skill, get_current_time, claude, web_search, save_friend_note). Teams gets 8 integration tools (graph_query, graph_mutate, ado_query, ado_mutate, graph_profile, ado_work_items, graph_docs, ado_docs) plus 11 semantic ADO tools (ado_backlog_list, ado_create_epic, ado_create_issue, ado_move_items, ado_restructure_backlog, ado_validate_structure, ado_preview_changes, ado_batch_update, ado_detect_orphans, ado_detect_cycles, ado_validate_parent_type_rules). Tools are registered in a unified `ToolDefinition[]` registry with per-tool `integration` and `confirmationRequired` flags. Channel-aware routing (`getToolsForChannel()`) filters tools by the channel's `availableIntegrations`.
 

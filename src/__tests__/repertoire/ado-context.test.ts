@@ -8,7 +8,7 @@ vi.mock("../../repertoire/ado-client", () => ({
 import { discoverOrganizations, discoverProjects } from "../../repertoire/ado-client"
 
 import { resolveAdoContext } from "../../repertoire/ado-context"
-import type { ResolvedContext } from "../../mind/context/types"
+import type { ResolvedContext } from "../../mind/friends/types"
 
 function makeTeamsContext(overrides?: Partial<ResolvedContext>): ResolvedContext {
   return {

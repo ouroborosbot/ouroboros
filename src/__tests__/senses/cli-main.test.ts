@@ -22,11 +22,13 @@ const mocks = vi.hoisted(() => ({
   getToolChoiceRequired: vi.fn().mockReturnValue(false),
   createInterface: vi.fn(),
   resolveContext: vi.fn().mockResolvedValue({
-    identity: {
+    friend: {
       id: "mock-uuid",
       displayName: "testuser",
       externalIds: [{ provider: "local", externalId: "testuser", linkedAt: "2026-01-01" }],
       tenantMemberships: [],
+      toolPreferences: {},
+      notes: {},
       createdAt: "2026-01-01",
       updatedAt: "2026-01-01",
       schemaVersion: 1,
@@ -78,6 +80,7 @@ vi.mock("../../repertoire/commands", () => ({
 }))
 vi.mock("../../identity", () => ({
   getAgentName: vi.fn(() => "testagent"),
+  getAgentRoot: vi.fn(() => "/mock/agent/root"),
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
     configPath: "~/.agentconfigs/testagent/config.json",
@@ -88,22 +91,20 @@ vi.mock("../../identity", () => ({
     },
   })),
 }))
-vi.mock("../../mind/context/store-file", () => {
-  const MockFileContextStore = vi.fn(function (this: any) {
-    this.identity = {
-      get: vi.fn(),
-      put: vi.fn(),
-      delete: vi.fn(),
-      find: vi.fn(),
-    }
+vi.mock("../../mind/friends/store-file", () => {
+  const MockFileFriendStore = vi.fn(function (this: any) {
+    this.get = vi.fn()
+    this.put = vi.fn()
+    this.delete = vi.fn()
+    this.findByExternalId = vi.fn()
   })
-  return { FileContextStore: MockFileContextStore }
+  return { FileFriendStore: MockFileFriendStore }
 })
-vi.mock("../../mind/context/resolver", () => {
-  const MockContextResolver = vi.fn(function (this: any) {
+vi.mock("../../mind/friends/resolver", () => {
+  const MockFriendResolver = vi.fn(function (this: any) {
     this.resolve = (...a: any[]) => mocks.resolveContext(...a)
   })
-  return { ContextResolver: MockContextResolver }
+  return { FriendResolver: MockFriendResolver }
 })
 vi.mock("os", async () => {
   const actual = await vi.importActual<typeof import("os")>("os")
@@ -819,12 +820,51 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
     expect(options).toBeDefined()
     expect(options.toolContext).toBeDefined()
     expect(options.toolContext.context).toBeDefined()
-    // Should have identity from OS username (mocked as "testuser")
-    expect(options.toolContext.context.identity).toBeDefined()
-    expect(options.toolContext.context.identity.displayName).toBe("testuser")
+    // Should have friend from OS username (mocked as "testuser")
+    expect(options.toolContext.context.friend).toBeDefined()
+    expect(options.toolContext.context.friend.displayName).toBe("testuser")
     // Should have CLI channel capabilities
     expect(options.toolContext.context.channel).toBeDefined()
     expect(options.toolContext.context.channel.channel).toBe("cli")
     expect(options.toolContext.context.channel.availableIntegrations).toEqual([])
+  })
+
+  it("buildSystem is called with resolved context as third argument", async () => {
+    setupBasic({ inputSequence: ["hello", "/exit"] })
+    mocks.loadSession.mockReturnValue(null) // force new session -> calls buildSystem
+
+    await main()
+
+    expect(mocks.buildSystem).toHaveBeenCalledWith(
+      "cli",
+      undefined,
+      expect.objectContaining({
+        friend: expect.objectContaining({ displayName: "testuser" }),
+        channel: expect.objectContaining({ channel: "cli" }),
+      }),
+    )
+  })
+
+  it("toolContext.friendStore is set from the FileFriendStore", async () => {
+    setupBasic({ inputSequence: ["hello", "/exit"] })
+    const runAgentCalls: any[][] = []
+    mocks.runAgent.mockImplementation(async (...args: any[]) => {
+      runAgentCalls.push(args)
+      return { usage: undefined }
+    })
+
+    await main()
+
+    const options = runAgentCalls[0][4]
+    expect(options.toolContext.friendStore).toBeDefined()
+  })
+
+  it("session path uses friend UUID from resolved context", async () => {
+    setupBasic({ inputSequence: ["hello", "/exit"] })
+
+    await main()
+
+    // sessionPath should be called with the friend UUID ("mock-uuid"), not "default"
+    expect(mocks.sessionPath).toHaveBeenCalledWith("mock-uuid", "cli", "session")
   })
 })

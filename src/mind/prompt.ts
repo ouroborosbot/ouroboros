@@ -5,8 +5,8 @@ import { getAzureConfig } from "../config";
 import { finalAnswerTool, getToolsForChannel } from "../repertoire/tools";
 import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName } from "../identity";
-import type { ResolvedContext } from "./context/types";
-import { getChannelCapabilities } from "./context/channel";
+import type { ResolvedContext } from "./friends/types";
+import { getChannelCapabilities } from "./friends/channel";
 import { emitNervesEvent } from "../nerves/runtime";
 
 // Lazy-loaded psyche text cache
@@ -146,12 +146,12 @@ export function contextSection(context?: ResolvedContext): string {
 
   const lines: string[] = ["## friend context"]
 
-  // Identity
-  const identity = context.identity
-  const emailId = identity.externalIds.find(e => e.provider === "aad")
+  const friendOrIdentity = context.friend
+  if (!friendOrIdentity) return ""
+  const emailId = friendOrIdentity.externalIds.find(e => e.provider === "aad")
   const idDisplay = emailId
-    ? `${identity.displayName} (${emailId.externalId})`
-    : identity.displayName
+    ? `${friendOrIdentity.displayName} (${emailId.externalId})`
+    : friendOrIdentity.displayName
   lines.push(`friend: ${idDisplay}`)
 
   // Channel
@@ -165,20 +165,40 @@ export function contextSection(context?: ResolvedContext): string {
   /* v8 ignore next -- empty-traits branch unreachable: streaming/no-streaming always adds a trait @preserve */
   lines.push(`channel: ${ch.channel}${traits.length ? ` (${traits.join(", ")})` : ""}`)
 
-  // Authority
-  if (context.checker && ch.availableIntegrations.length > 0) {
-    lines.push("")
-    lines.push("## authority")
-    lines.push(`integrations: ${ch.availableIntegrations.join(", ")}`)
-    lines.push("write operations are pre-flight checked -- mutations may be denied if insufficient permissions")
+  // Friend record and state detection (friend is guaranteed non-null here -- checked above)
+  const friend = context.friend!
+  const notes = friend.notes
+  const prefs = friend.toolPreferences
+  const hasNotes = Object.keys(notes).length > 0
+  const hasPrefs = Object.keys(prefs).length > 0
+  const isNewFriend = !hasNotes && !hasPrefs
+
+  // Priority guidance
+  lines.push("")
+  lines.push("my friend's request comes first. i help with what they need before social niceties.")
+
+  // Name quality instruction
+  lines.push("i prefer to use whatever name my friend prefers. if i learn a preferred name, i save it with save_friend_note.")
+
+  // Memory ephemerality instruction
+  lines.push("my conversation memory is ephemeral -- it resets between sessions. to remember something important about my friend, i use save_friend_note to write it to disk for future me.")
+
+  // Working-memory trust instruction
+  lines.push("the conversation is my source of truth. my notes are a journal for future me -- they may be stale or incomplete.")
+
+  // Stale notes awareness instruction
+  lines.push("when i learn something that might invalidate an existing note, i check related notes and update or override any that are stale.")
+
+  // New-friend behavior
+  if (isNewFriend) {
+    lines.push("this is a new friend -- i have no notes or preferences saved yet. i should learn their name and how they like to work, and save what i learn.")
   }
 
-  // Friend preferences (from FriendMemory)
-  const prefs = context.memory?.toolPreferences
-  if (prefs && Object.keys(prefs).length > 0) {
+  // Friend notes (from FriendRecord -- rendered in system prompt, NOT toolPreferences)
+  if (hasNotes) {
     lines.push("")
-    lines.push("## friend preferences")
-    for (const [key, value] of Object.entries(prefs)) {
+    lines.push("## what i know about this friend")
+    for (const [key, value] of Object.entries(notes)) {
       lines.push(`- ${key}: ${value}`)
     }
   }
