@@ -77,7 +77,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Runtime/config loader updates, state-path updates, and migration runbook markdown.
 **Acceptance**: Contract tests pass green; no runtime fallback to legacy `.agentconfigs` paths.
 
-### ⬜ Unit 1c: Storage/config refactor contracts + migration runbook docs — Coverage & Refactor
+### ✅ Unit 1c: Storage/config refactor contracts + migration runbook docs — Coverage & Refactor
 **What**: Refactor for clarity and verify branch/error-path coverage on migration/config contract code.
 **Output**: Refactored config-loading code and coverage report artifact for migration/config paths.
 **Acceptance**: 100% coverage on new migration/config code and tests remain green.
@@ -191,3 +191,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 15:44 Unit 0 complete: captured branch baseline, scripts, and touched-file map in `unit-0-baseline.md`
 - 2026-03-04 15:47 Unit 1a complete: added failing contract tests for `.agentsecrets`/`.agentstate` paths and `agent.json` context sourcing (`unit-1a-red-run.txt`)
 - 2026-03-04 15:53 Unit 1b complete: implemented secrets/state path contracts, moved context sourcing to `agent.json`, and added migration runbook (`unit-1b-*.txt`)
+- 2026-03-04 15:56 Unit 1c complete: achieved green coverage gate + nerves audit after branch-coverage hardening (`unit-1c-*.txt`)
