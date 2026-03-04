@@ -4152,8 +4152,9 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
     await teams.handleTeamsMessage("msg1", mockStream as any, "conv-1", teamsContext)
     await teams.handleTeamsMessage("msg2", mockStream as any, "conv-2", teamsContext)
 
-    // FileFriendStore should be created only once (singleton), not per-request
-    expect(FileFriendStore).toHaveBeenCalledTimes(1)
+    // FileFriendStore is created per request (not a singleton) so mkdirSync
+    // re-runs if directories are deleted while the process is alive.
+    expect(FileFriendStore).toHaveBeenCalledTimes(2)
   })
 
   it("buildSystem is called with resolved context as third argument", async () => {
