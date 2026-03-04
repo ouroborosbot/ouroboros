@@ -37,8 +37,8 @@ Bug 1 is the most fundamental fix -- the bot must know who the user is. Bug 2 fi
 **Gate 2: Bug 4 (kick escape hatch + self-trigger)**
 Force `tool_choice = "required"` after any kick (add `|| lastKickReason` to two conditions) and fix kick message self-trigger. Three small changes. Patterns stay as-is. Also resolves Bug 5 (response spam) and Bug 6 (platform timeout). User tests after.
 
-**Gate 3: Bug 3 (new-friend prompts + proactive saving)**
-Prompt tuning: directive new-friend instruction and aggressive ephemerality instruction. User tests on both surfaces after.
+**Gate 3: Bug 3 (friend context instructions)**
+Prompt tuning: rewrite ~4 lines in `contextSection()` to be directive with displayName interpolation and aggressive saving. User tests on both surfaces after.
 
 ### In Scope
 
@@ -135,38 +135,22 @@ The pattern matching is in `core.ts` (surface-agnostic). The visible symptoms (k
 
 #### GATE 3: New-Friend Prompts
 
-**Bug 3: Cold first encounter + no proactive saving -- confirmed on both surfaces**
+**Bug 3: Passive friend context instructions -- confirmed on both surfaces**
 
-Two related symptoms:
-
-**(a) Cold first encounter:** Bot doesn't introduce itself or learn the user's name.
+The friend context instructions in `contextSection()` (`prompt.ts:178-194`) are aspirational, not directive. The model treats them as optional. Observed on both surfaces:
 - Copilot Chat: user sent "hi, can you show me my backlog?" -- bot showed backlog, no introduction, didn't learn name, didn't call `save_friend_note`
 - Standard Teams: user sent "hi pal" -- bot responded "hello. what are we sorting today?" -- cold, transactional, no warmth
+- Neither surface: bot proactively saves preferences when it learns them (e.g., "always show this in a grid" should trigger `save_friend_note` without being asked)
 
-**(b) No proactive preference saving:** Bot doesn't call `save_friend_note` on its own when it learns something about the user. For example, if the user says "always show this in a grid," the bot should immediately save that as a tool preference without needing to be told "save that." The bot only saves when explicitly prompted. Principle: better to save too much than too little.
+**Fix: rewrite ~4 lines of prompt text in `contextSection()` at `prompt.ts:178, 181, 184, 193-194`.** The rewritten instructions should:
+- Interpolate displayName with "Unknown" handling ("i don't know this friend's name yet -- i ask what they'd like to be called")
+- Push aggressive saving of anything learned -- name, preferences, display format, role, projects, working style. Better to save too much than too little. Bar is "would future me want to know this?" not "is this important enough?"
+- Be directive, not aspirational -- "i save it immediately with save_friend_note" not "i should learn"
+- Clarify that priority guidance means "help first AND get to know them" not "help only"
 
-Surface-agnostic. Two prompt instructions are too passive:
+This is prompt tuning. The code structure of `contextSection()` doesn't change -- just the instruction strings.
 
-1. New-friend instruction at `prompt.ts:193-194`:
-```
-this is a new friend -- i have no notes or preferences saved yet. i should learn their name and how they like to work, and save what i learn.
-```
-"i should learn" is aspirational, not directive. The model treats it as optional. The priority guidance ("my friend's request comes first") compounds this -- the model reads it as "only the request matters."
-
-2. Ephemerality instruction at `prompt.ts:184`:
-```
-my conversation memory is ephemeral -- it resets between sessions. to remember something important about my friend, i use save_friend_note to write it to disk for future me.
-```
-"something important" lets the model decide what matters -- and it decides almost nothing is. The bar needs to be: "would future me want to know this?" and the answer should almost always be yes.
-
-Five changes:
-1. Aspirational to directive (new-friend): "after addressing their request, i introduce myself briefly and ask what they prefer to be called. i save what i learn with save_friend_note."
-2. Interpolate displayName: "the name i have for this friend is {displayName}." When "Unknown": "i don't know this friend's name yet -- i ask what they'd like to be called and save it."
-3. Clarify priority vs warmth: "help first, then get to know them" not "help only."
-4. Aggressive ephemerality instruction: "when i learn ANYTHING about my friend -- name, preferences, how they like things displayed, their role, projects, working style -- i save it immediately with save_friend_note. better to save too much than too little. if the session ends, anything i didn't save is gone forever."
-5. Covers both explicit preferences ("show me grids", "always use tables") and implicit ones (they seem to prefer concise responses, they work on a specific project, etc.). The bar is "would future me want to know this?" not "is this important enough?"
-
-**Gate 3 checkpoint:** User tests on both Copilot Chat and standard Teams with fresh friend records. Expects: bot helps first, introduces itself along the way, asks what they prefer to be called, proactively calls `save_friend_note` when learning anything about the user (name, preferences, working style) without needing to be asked.
+**Gate 3 checkpoint:** User tests on both Copilot Chat and standard Teams with fresh friend records. Expects: bot helps first, introduces itself along the way, proactively calls `save_friend_note` when learning anything about the user without being asked.
 
 ---
 
@@ -194,12 +178,8 @@ Five changes:
 - [ ] New test verifying kick message does not trigger `hasToolIntent()`
 - [ ] User confirms on Copilot Chat: no kick loop, no response spam, no timeout
 
-### Gate 3: New-Friend Prompts + Proactive Saving
-- [ ] New-friend instruction is directive, not aspirational
-- [ ] Name quality instruction interpolates displayName with "Unknown" handling
-- [ ] Priority guidance clarified: help first, then get to know them
-- [ ] Ephemerality instruction rewritten: aggressive save-anything bar, not "something important"
-- [ ] Covers explicit preferences ("show me grids") and implicit ones (working style, projects)
+### Gate 3: Friend Context Instructions
+- [ ] Friend context instructions at prompt.ts:178-194 rewritten to be directive with displayName interpolation and aggressive saving
 - [ ] User confirms on both surfaces: bot helps first, introduces along the way, proactively calls `save_friend_note` when learning anything about the user without being asked
 
 ### All Gates
@@ -228,7 +208,7 @@ Five changes:
 - Bug 2 requires both Copilot Chat surface AND buffered mode. Root cause: `safeSend` is fire-and-forget (`catchAsync` attaches `.catch()` but never awaits). Multiple `ctx.send()` HTTP requests race. Standard Teams serializes server-side; Copilot Chat does not. Fix: serialize `safeSend` via promise chain. Small change to `safeSend` only, no call-site changes needed.
 - Bug 4: kick patterns are intentionally broad and stay as-is. Root cause: after any kick, `tool_choice` is not set to `"required"` (core.ts:288/303 only check `options.toolChoiceRequired`). Fix: add `|| lastKickReason` to both conditions. Plus kick message self-triggers via "I can" -- rewrite to avoid. Three small changes total.
 - Bug 4 pattern matching is surface-agnostic (core.ts). Visible symptoms are specific to Copilot + buffered via Bug 2.
-- Bug 3 confirmed on both surfaces. Two issues: new-friend instruction is aspirational not directive, and ephemerality instruction uses "something important" which lets model skip saving. Fix both: directive new-friend behavior + aggressive save-anything bar.
+- Bug 3 confirmed on both surfaces. Friend context instructions at prompt.ts:178-194 are aspirational not directive. Fix: rewrite ~4 lines of prompt text to be directive with displayName interpolation and aggressive saving.
 - Bug 5 = Bug 4 + Bug 2. Bug 6 = Bug 4. Both resolve automatically.
 - Gated structure: Gate 1 (Bug 1 + 2), Gate 2 (Bug 4), Gate 3 (Bug 3). User tests between gates.
 
@@ -249,11 +229,10 @@ Five changes:
 - No changes to call sites (`onToolEnd` line 194-195, `onKick` line 203-204, `onError` line 209+, `flushTextBuffer` line 128+)
 - `catchAsync` (line 86-90) is the root cause -- attaches `.catch()` but never awaits
 
-**Bug 3 -- `src/mind/prompt.ts`:**
-- Line 178: priority guidance -- rewrite to clarify "help first, then get to know them"
-- Line 181: name quality instruction -- rewrite with displayName interpolation
-- Line 184: ephemerality instruction -- rewrite from "something important" to aggressive save-anything bar
-- Line 193-194: new-friend instruction -- rewrite from aspirational to directive
+**Bug 3 -- `src/mind/prompt.ts:178-194` (prompt tuning):**
+- Rewrite ~4 lines of friend context instructions in `contextSection()` to be directive with displayName interpolation and aggressive saving
+- Lines: 178 (priority guidance), 181 (name quality), 184 (ephemerality), 193-194 (new-friend instruction)
+- Code structure of `contextSection()` doesn't change -- just the instruction strings
 
 **Bug 4 -- three changes:**
 1. `src/heart/core.ts:288` (Azure path): change `if (options?.toolChoiceRequired)` to `if (options?.toolChoiceRequired || lastKickReason)`. One condition added.
