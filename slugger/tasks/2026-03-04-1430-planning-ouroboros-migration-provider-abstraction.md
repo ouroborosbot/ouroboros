@@ -11,7 +11,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 ## Scope
 
 ### In Scope
-- Run storage/config migration first so refactor work targets final paths/contracts from the start.
+- Run storage/config refactor first so provider abstraction work targets final paths/contracts from the start.
 - Replace `src/heart/core.ts` provider singleton selection (`getClient/getProvider/getModel`) with provider interface + registry.
 - Keep Azure and MiniMax runtime behavior parity during the refactor.
 - Move provider-specific streaming/input state handling out of the engine loop into provider implementations.
@@ -23,11 +23,11 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - Treat agent manifest path as explicit contract: `<repo>/<agent>/agent.json` (for example `/Users/arimendelow/Projects/ouroboros-agent-harness/slugger/agent.json`).
 - Reorganize local machine directories so secrets live in `~/.agentsecrets/<agent>/`, while runtime/session/log/PII/test artifacts live in `~/.agentstate/<agent>/` or `~/.agentstate/test-runs/<repo_slug>/`.
 - Treat secrets path as explicit contract: `agent.json.configPath = ~/.agentsecrets/<agent>/secrets.json`.
-- Include one-time migration handling so existing `~/.agentconfigs` data on other machines is migrated safely with explicit operator-visible guidance.
-- Add one-time migration behavior for pulled branches on other machines:
+- Include one-time migration guidance so existing `~/.agentconfigs` data on other machines can be migrated safely with explicit operator-visible instructions.
+- Define one-time migration instructions for pulled branches on other machines:
   - move legacy `~/.agentconfigs/<agent>/config.json` to `~/.agentsecrets/<agent>/secrets.json` (providers/teams retained),
   - move legacy runtime directories (`sessions`, `logs`, `friends`, test-run artifacts) into `~/.agentstate/...`,
-  - run explicit migration once and then require new paths only (no runtime fallback path support).
+  - run explicit manual migration once and then require new paths only (no runtime fallback path support).
 - Add a repo migration runbook at `cross-agent-docs/agent-storage-migration-playbook.md` for other agents/Claude to follow after pulling changes.
 - Migration delivery is docs-only: no migration script. The runbook must include explicit move instructions, rationale, and verification steps. Cleanup/removal of the playbook is decided by the other machine once migration is confirmed complete there.
 - Lock provider identifiers for this task to: `azure`, `minimax`, `anthropic`, `openai-codex`.
@@ -52,8 +52,9 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [ ] `agent.json.configPath` resolves to `~/.agentsecrets/<agent>/secrets.json`.
 - [ ] Missing/expired provider credentials fail fast with explicit re-auth guidance; no silent fallback.
 - [ ] A migration runbook exists in-repo for cross-machine post-pull reorganization of legacy `~/.agentconfigs` data.
-- [ ] Legacy `~/.agentconfigs` data migrates via explicit one-time migration (no runtime back-compat branches in normal execution code), with no data loss and clear operator messages.
-- [ ] Migration executes before provider abstraction refactor work so implementation targets final storage/config contracts.
+- [ ] Legacy `~/.agentconfigs` migration is fully documented as a one-time manual operation for other machines (no runtime back-compat branches in normal execution code), with no data loss and clear operator guidance.
+- [ ] Storage/config refactor executes before provider abstraction refactor work so implementation targets final storage/config contracts.
+- [ ] Actual cross-machine data migration is out-of-band from this task's code execution and handled via the migration runbook instructions.
 - [ ] Migration runbook is docs-only (no script) and includes explicit move/verify instructions for the other machine.
 - [ ] Provider IDs are explicitly locked and implemented as `azure`, `minimax`, `anthropic`, `openai-codex`.
 - [ ] Model fields are explicitly supported for each in-scope provider via `secrets.json` without introducing additional model-selection features.
@@ -119,3 +120,4 @@ Keep scope disciplined: runtime provider abstraction + provider integrations onl
 - 2026-03-04 15:10 Made `agent.json` path explicit in plan (`<repo>/<agent>/agent.json`) to remove migration ambiguity
 - 2026-03-04 15:16 Renamed config target to `secrets.json`, locked `agent.json.configPath`, and clarified minimal provider/model contract (`azure|minimax|anthropic|openai-codex`)
 - 2026-03-04 15:25 User approved planning doc for conversion to doing
+- 2026-03-04 15:32 Clarified that this task performs storage/config refactor before provider abstraction; legacy data migration itself is manual out-of-band via runbook
