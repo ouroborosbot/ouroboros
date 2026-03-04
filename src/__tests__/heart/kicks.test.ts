@@ -177,7 +177,7 @@ describe("detectKick", () => {
 
   it("returns narration kick for content with intent phrases", () => {
     const kick = detectKick("let me read that file for you")
-    expect(kick).toEqual({ reason: "narration", message: "I narrated instead of acting. Calling the tool now -- if I've already finished, I can use final_answer." })
+    expect(kick).toEqual({ reason: "narration", message: "I narrated instead of acting. Using the tool now -- if done, calling final_answer." })
   })
 
   it("returns tool_required kick when toolChoiceRequired is true and content has no intent", () => {
