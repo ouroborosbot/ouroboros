@@ -39,7 +39,7 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [x] `tool_choice` and `activeTools` setting restored to conditional on `toolChoiceRequired` (but now defaults on)
 - [x] `toolBehaviorSection()` prompt rewritten: decision-tree framing, anti-no-op pattern
 - [x] `toolsSection()` correctly includes `finalAnswerTool` when `toolChoiceRequired` defaults on
-- [ ] `finalAnswerTool` description reframed as primary response mechanism
+- [x] `finalAnswerTool` description reframed as primary response mechanism
 - [ ] `final_answer` text emitted via `callbacks.onTextChunk` -- test coverage verified
 - [ ] Response size constraint visible in prompt; truncation safety net in place
 - [ ] Tool description voice standard codified in CONTRIBUTING.md
@@ -248,7 +248,7 @@ to something like:
 **Output**: Modified `src/repertoire/tools-base.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 7c: Issue C -- Coverage & Refactor
+### ✅ Unit 7c: Issue C -- Coverage & Refactor
 **What**: Verify the `finalAnswerTool` export is covered. This is a static definition so coverage is inherent, but verify no regressions in tools.test.ts.
 **Output**: Coverage report
 **Acceptance**: 100% coverage, all tests green
