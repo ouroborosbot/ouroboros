@@ -42,6 +42,7 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [ ] `finalAnswerTool` description reframed as primary response mechanism
 - [ ] `final_answer` text emitted via `callbacks.onTextChunk` -- test coverage verified
 - [ ] Response size constraint visible in prompt; truncation safety net in place
+- [ ] Tool description voice standard codified in CONTRIBUTING.md
 - [ ] User confirms on Teams: model uses final_answer cleanly, no 413 errors, prompt sections emit correctly
 
 ### Gate 3: Friend Context Instructions
@@ -288,6 +289,15 @@ The channel capabilities are already available via `getChannelCapabilities(chann
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new/modified code, all tests green
 
+### ⬜ Unit 10a: Codify tool description voice standard in docs
+**What**: Add a "Tool Descriptions" section to CONTRIBUTING.md (the project's code style/conventions doc). The section should codify:
+- Tool descriptions use imperative/descriptive voice ("respond to the user with a message", "search the web for information") -- this is what models are trained on
+- System prompt instructions about tools use first person to match the bot's voice ("when i'm ready to respond, i call final_answer")
+- Reference Anthropic's guidance: describe tools as you would to a new team member, make implicit context explicit
+- Brief, 5-10 lines max
+**Output**: Updated `CONTRIBUTING.md`
+**Acceptance**: The convention is documented, consistent with existing doc style
+
 ---
 
 ### GATE 2 CHECKPOINT
@@ -364,3 +374,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-03 22:39 Unit 3d complete: Rewrote narration kick message from "...I can use final_answer" to "...if done, calling final_answer". 0 pattern matches verified. All 158 core + 107 kicks tests pass, build clean
 - 2026-03-03 22:40 Unit 3e complete: core.ts and kicks.ts both 100% coverage (stmts/branches/funcs/lines). All 342 heart tests pass across 4 files. No refactoring needed. Build clean
 - 2026-03-04 10:53 Added Gate 2 follow-up units (5a-9c) for Issues A-F: toolChoiceRequired default, toolBehaviorSection prompt, finalAnswerTool description, onTextChunk coverage, response truncation
+- 2026-03-04 10:58 Added Unit 10a: codify tool description voice standard in CONTRIBUTING.md; updated completion criteria
