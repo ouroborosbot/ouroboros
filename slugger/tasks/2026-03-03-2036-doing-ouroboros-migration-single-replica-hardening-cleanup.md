@@ -21,7 +21,7 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 - [x] A file-by-file cleanup inventory exists with disposition per item: keep/remove/move.
 - [x] Cleanup inventory explicitly resolves every task-owned changed path with no `TBD` entries.
 - [ ] Runtime behavior hardening changes are retained and validated.
-- [ ] Synthetic runtime-hardening gate stack is removed from runtime tree and mandatory CI coverage gate flow.
+- [x] Synthetic runtime-hardening gate stack is removed from runtime tree and mandatory CI coverage gate flow.
 - [ ] Task planning/doing/audit artifacts are retained for future auditing.
 - [ ] A self-audit explicitly states what I got wrong and how each issue is corrected.
 - [ ] Validation criteria are concrete and testable (including untouched-file guarantees).
@@ -65,7 +65,7 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 **Output**: Red run artifact `./2026-03-03-2036-doing-ouroboros-migration-single-replica-hardening-cleanup/unit-1a-red-run.txt`.
 **Acceptance**: New cleanup contract tests fail against current branch state before implementation.
 
-### ⬜ Unit 1b: Synthetic Gate Removal — Implementation (Green)
+### ✅ Unit 1b: Synthetic Gate Removal — Implementation (Green)
 **What**: Remove synthetic runtime-hardening gate stack and mandatory CI wiring while preserving approved runtime behavior hardening.
 **Output**: Updated codebase with synthetic gate stack removed; green run artifacts:
 - `./2026-03-03-2036-doing-ouroboros-migration-single-replica-hardening-cleanup/unit-1b-test-run.txt`
@@ -119,3 +119,4 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 - 2026-03-03 21:52 Pass 4 complete: quality scan verified checklist/testability/emoji requirements and set status to READY_FOR_EXECUTION.
 - 2026-03-03 21:55 Unit 0 complete: baseline inventory locked at 50/50 `main..HEAD` paths with explicit keep/remove dispositions and no `TBD` entries (`unit-0-inventory.md`).
 - 2026-03-03 21:57 Unit 1a complete: added synthetic gate removal contract assertions in `src/__tests__/nerves/rename-contract.test.ts`; captured intentional red run in `unit-1a-red-run.txt`.
+- 2026-03-03 21:59 Unit 1b complete: removed synthetic runtime-hardening stack and CI wiring (`package.json`, `scripts/run-coverage-gate.cjs`, runtime-hardening module/tests, load-validation script) and captured green runs in `unit-1b-test-run.txt` + `unit-1b-build-run.txt`.
