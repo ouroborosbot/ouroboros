@@ -2752,6 +2752,97 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
   })
 })
 
+describe("Teams adapter - safeSend serialization (Bug 2)", () => {
+  let mockStream: { emit: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> }
+  let controller: AbortController
+
+  beforeEach(() => {
+    mockStream = {
+      emit: vi.fn(),
+      update: vi.fn(),
+      close: vi.fn(),
+    }
+    controller = new AbortController()
+  })
+
+  it("concurrent safeSend calls execute sends sequentially (not concurrently)", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+
+    // Track the execution order: each sendMessage records when it starts and
+    // resolves only after we explicitly resolve its deferred.
+    const order: string[] = []
+    let resolve1!: () => void
+    let resolve2!: () => void
+    const promise1 = new Promise<void>(r => { resolve1 = r })
+    const promise2 = new Promise<void>(r => { resolve2 = r })
+
+    const sendMessage = vi.fn()
+      .mockImplementationOnce(() => {
+        order.push("send1-start")
+        return promise1.then(() => { order.push("send1-end") })
+      })
+      .mockImplementationOnce(() => {
+        order.push("send2-start")
+        return promise2.then(() => { order.push("send2-end") })
+      })
+
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+
+    // Trigger two safeSend calls (via onToolEnd which calls safeSend in buffered mode)
+    callbacks.onToolEnd("tool_a", "result_a", true)
+    callbacks.onToolEnd("tool_b", "result_b", true)
+
+    // With serialization, send2 should NOT start until send1 completes.
+    // With fire-and-forget, both start immediately.
+    expect(order).toContain("send1-start")
+
+    // If serialized, send2-start should NOT be in order yet (send1 hasn't completed)
+    expect(order).not.toContain("send2-start")
+
+    // Complete the first send
+    resolve1()
+    await promise1
+    // Allow microtasks to flush so the chain continuation runs
+    await new Promise(r => setTimeout(r, 0))
+
+    // Now send2 should have started (chain continuation)
+    expect(order).toContain("send2-start")
+
+    // Complete the second send
+    resolve2()
+    await promise2
+    await new Promise(r => setTimeout(r, 0))
+
+    expect(order).toEqual(["send1-start", "send1-end", "send2-start", "send2-end"])
+  })
+
+  it("failed send in chain halts subsequent sends via markStopped()", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+
+    const sendMessage = vi.fn()
+      .mockRejectedValueOnce(new Error("network failure"))
+      .mockResolvedValueOnce(undefined)
+
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+
+    // First send will reject (triggers markStopped via chain .catch)
+    callbacks.onToolEnd("tool_a", "result_a", true)
+    // Second send should be suppressed because stopped=true after chain failure
+    callbacks.onToolEnd("tool_b", "result_b", true)
+
+    // Wait for the rejection to propagate through the chain
+    await new Promise(r => setTimeout(r, 50))
+
+    // With serialized chain: first send rejects -> markStopped() -> second send never fires.
+    // With fire-and-forget: both sends fire immediately and the rejection is caught asynchronously,
+    // so sendMessage would be called twice.
+    expect(sendMessage).toHaveBeenCalledTimes(1)
+    expect(controller.signal.aborted).toBe(true)
+  })
+})
+
 describe("Teams adapter - handleTeamsMessage with disableStreaming", () => {
   beforeEach(() => {
     // no env vars to clear
