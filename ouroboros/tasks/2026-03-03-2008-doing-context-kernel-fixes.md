@@ -51,7 +51,7 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [x] Retry does not count against toolRounds (error recovery, not a tool round -- toolRounds removed entirely)
 - [x] Preemptive message splitting removed — full message sent, split only on error recovery
 - [x] Dead-stream fallback — flush() routes through sendMessage when stream is stopped
-- [ ] Async delivery pattern for 15s platform timeout — deadline timer emits acknowledgment, real content via sendMessage
+- [x] Async delivery pattern for 15s platform timeout — deadline timer emits acknowledgment, real content via sendMessage
 - [ ] User confirms on Teams: model uses final_answer cleanly, no 413 errors, no "Sorry something went wrong", prompt sections emit correctly
 
 ### Gate 3: Friend Context Instructions
@@ -421,7 +421,7 @@ Both streaming and buffered modes get the timer. In streaming mode, the first `o
 **Output**: Modified `src/senses/teams.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 16c: Async delivery -- coverage & refactor
+### ✅ Unit 16c: Async delivery -- coverage & refactor
 **What**: Verify 100% coverage on the deadline timer logic. All paths covered: fast path (timer cancelled), slow path (timer fires, sendMessage delivery), abort cleanup, streaming mode cancellation.
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new/modified code, all tests green
