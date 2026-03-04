@@ -248,3 +248,4 @@ Five changes:
 - 2026-03-03 20:43 Renamed Bug 2 from "phantom messages" to "out-of-order messages" -- messages are real, rendering out of order on Copilot surface
 - 2026-03-03 20:45 Set status to NEEDS_REVIEW
 - 2026-03-03 20:50 Bug 2 scoping: requires Copilot Chat + buffered mode intersection (Copilot + streaming confirmed working, standard + buffered confirmed working)
+- 2026-03-03 20:51 Bug 3 expanded: added proactive saving (bot doesn't call save_friend_note on its own), aggressive ephemerality instruction ("save anything" not "something important"), 5 changes now instead of 3
