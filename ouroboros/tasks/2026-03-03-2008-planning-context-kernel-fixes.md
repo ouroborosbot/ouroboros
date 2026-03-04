@@ -32,7 +32,7 @@ Key facts:
 ### Gated Fix Structure
 
 **Gate 1: Bug 1 (AAD extraction) + Bug 2 (out-of-order messages)**
-Bug 1 is the most fundamental fix -- the bot must know who the user is. Bug 2 is a mechanical three-line change. User tests after.
+Bug 1 is the most fundamental fix -- the bot must know who the user is. Bug 2 fix approach needs Gate 1 testing to determine (safeSend was intentional design; fix must work around Copilot platform behavior). User tests after.
 
 **Gate 2: Bug 4 (kick false positives + broken escape hatch)**
 Eliminates the kick loop cascade: prune overbroad patterns AND fix the `final_answer` escape hatch. Also resolves Bug 5 (response spam) and Bug 6 (platform timeout). User tests after.
@@ -70,11 +70,23 @@ In `createTeamsCallbacks` (`src/senses/teams.ts:59-252`), when `disableStreaming
 - `onKick` (line 203-204) calls `safeSend(msg)` -- sends kick notification as separate bot message
 - `onError` terminal branch (line 215-216) calls `safeSend(msg)` -- sends error as separate bot message
 
-`safeSend` calls `sendMessage` (which is `ctx.send()` at line 508). On the Copilot Chat surface in buffered mode, each `ctx.send()` creates a separate persistent message that renders out of order -- tool results and kick notifications appear above the user's message or in the wrong sequence, and the actual response gets duplicated below. These are real messages showing up in the wrong place, not invisible artifacts.
+`safeSend` calls `sendMessage` (which is `ctx.send()` at line 508). On the Copilot Chat surface in buffered mode, each `ctx.send()` creates a separate persistent message that renders out of order -- tool results and kick notifications appear above the user's message or in the wrong sequence, and the actual response gets duplicated below.
 
-Fix: change `safeSend(msg)` to `safeUpdate(msg)` for all three callbacks in the buffered branch. `safeUpdate` shows transient status text that doesn't persist as a separate message. This matches the pattern already used by `onToolStart` (line 188) and transient errors (line 213).
+**Important: `safeSend` was intentional design, not an accident.** The code comments at `teams.ts:52-58` document the dual-mode rendering: streaming mode emits inline via `safeEmit`, buffered mode sends separate messages via `sendMessage`. The disable-streaming planning doc (2026-02-27-1637) confirms this was deliberate. The ordering issue is a Copilot Chat platform behavior with `ctx.send()`, not a code bug per se -- our fix needs to work around the platform.
 
-**Gate 1 checkpoint:** User tests on Copilot Chat. Expects: no out-of-order messages (tool results and kicks should not appear as separate messages), displayName populated (or confirmed that Copilot Chat doesn't provide `activity.from.name`, in which case the conversation-ID fallback is correct behavior).
+**The three functions:**
+- `safeEmit(text)` = `stream.emit(text)` -- appends to the stream response (primary output, persistent)
+- `safeUpdate(text)` = `stream.update(text)` -- transient status update (shows briefly, disappears like "thinking...")
+- `safeSend(text)` = `ctx.send(text)` -- sends a completely separate bot message (persistent)
+
+**Fix options (needs Gate 1 testing to determine best approach):**
+- **Option A (mixed):** `safeUpdate` for kicks and errors (transient is fine for these), but accumulate tool results into the text buffer so they appear inline in the final response (like streaming mode does with `safeEmit`)
+- **Option B (simple):** `safeUpdate` for everything -- simplest change, but tool results become transient (flash and disappear), which is different UX from streaming where they're inline and persistent
+- **Option C (accept less detail):** `safeUpdate` for everything and accept that buffered mode on Copilot Chat shows less mid-turn detail than streaming
+
+We don't know how `stream.update()` behaves on the Copilot Chat surface specifically. It works on standard Teams (status phrases show correctly) but Copilot might handle it differently. Gate 1 testing will determine which option to implement.
+
+**Gate 1 checkpoint:** User tests on Copilot Chat. Expects: no out-of-order messages, displayName populated (or confirmed that Copilot Chat doesn't provide `activity.from.name`, in which case the conversation-ID fallback is correct behavior). Bug 2 fix approach finalized based on how `safeUpdate` and buffer accumulation behave on Copilot surface.
 
 ---
 
@@ -172,8 +184,8 @@ Five changes:
 - [ ] `teamsContext` populates `aadObjectId`, `tenantId`, and `displayName` from `activity`
 - [ ] Friend record has real display name when AAD name is available
 - [ ] Conversation-ID fallback works when AAD fields are absent
-- [ ] `onToolEnd`, `onKick`, and terminal `onError` use `safeUpdate` in buffered mode
-- [ ] User confirms on Copilot Chat: tool results and kicks do not appear as separate out-of-order messages, displayName populated or fallback confirmed
+- [ ] Out-of-order messages eliminated in buffered mode on Copilot Chat (fix approach determined by Gate 1 testing -- options: safeUpdate for kicks/errors + buffer accumulation for tool results, or safeUpdate for all)
+- [ ] User confirms on Copilot Chat: no out-of-order messages, displayName populated or fallback confirmed, Bug 2 fix approach validated
 
 ### Gate 2: Kick False Positives + Escape Hatch
 - [ ] 6 overbroad patterns removed from `TOOL_INTENT_PATTERNS`
@@ -205,7 +217,8 @@ Five changes:
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [x] Bug 2: Terminal errors too? **Yes.** safeSend to safeUpdate for all three: onToolEnd, onKick, terminal onError.
+- [x] Bug 2: Terminal errors too? **Yes.** All three callbacks (onToolEnd, onKick, terminal onError) need fixing.
+- [ ] Bug 2: Which fix approach? `safeSend` was intentional design (teams.ts:52-58). Options: (A) safeUpdate for kicks/errors + buffer accumulation for tool results, (B) safeUpdate for all, (C) safeUpdate for all and accept less detail. Gate 1 testing will determine -- need to verify how `stream.update()` behaves on Copilot Chat surface.
 - [x] Bug 3: Priority vs warmth balance? **Help first, introduce along the way, save what you learn.**
 - [x] Bug 3: displayName interpolation? **Yes.** With "Unknown" special case.
 - [x] Bug 4: Pattern pruning scope? **Remove 6 patterns** that match conversational English. Keep narration-specific patterns.
@@ -214,7 +227,7 @@ Five changes:
 
 ## Decisions Made
 - Bug 1 is the top priority. The bot must know who the user is. Three-line fix with optional chaining handles both surfaces.
-- Bug 2 requires both Copilot Chat surface AND buffered mode. Copilot + streaming delivers in correct order. Standard Teams + buffered works clean. Fix: safeSend to safeUpdate in buffered branch.
+- Bug 2 requires both Copilot Chat surface AND buffered mode. Copilot + streaming delivers in correct order. Standard Teams + buffered works clean. `safeSend` was intentional design (teams.ts:52-58 comments, disable-streaming planning doc). Fix must work around Copilot platform behavior -- approach to be determined by Gate 1 testing (options: safeUpdate for kicks/errors + buffer accumulation for tool results, or safeUpdate for all).
 - Bug 4 has two verified root causes: (a) 6 overbroad patterns match normal English, (b) `final_answer` escape hatch is toothless -- tool is injected into `activeTools` (core.ts:259-261) but `tool_choice` is never forced after kicks (core.ts:288/303 only check `options.toolChoiceRequired`). Fix both: prune patterns AND set `tool_choice` to force `final_answer` after `kickCount >= 2`.
 - Bug 4 pattern matching is surface-agnostic (core.ts). Visible symptoms are specific to Copilot + buffered via Bug 2.
 - Bug 3 confirmed on both surfaces. Two issues: new-friend instruction is aspirational not directive, and ephemerality instruction uses "something important" which lets model skip saving. Fix both: directive new-friend behavior + aggressive save-anything bar.
@@ -232,10 +245,12 @@ Five changes:
 - `activity` is available at line 458: `const { stream, activity, api, signin } = ctx`
 
 **Bug 2 -- `src/senses/teams.ts` buffered branch in `createTeamsCallbacks`:**
-- Line 194-195: `onToolEnd` -- change `safeSend(msg)` to `safeUpdate(msg)`
-- Line 203-204: `onKick` -- change `safeSend(msg)` to `safeUpdate(msg)`
-- Line 209+: `onError` terminal -- change `safeSend(msg)` to `safeUpdate(msg)`
-- Reference pattern: `onToolStart` (line 188) already uses `safeUpdate`
+- Line 52-58: code comments documenting intentional dual-mode design (safeSend was deliberate)
+- Line 194-195: `onToolEnd` -- currently `safeSend(msg)` (fix approach TBD by Gate 1 testing)
+- Line 203-204: `onKick` -- currently `safeSend(msg)` (likely change to `safeUpdate` -- kicks are transient)
+- Line 209+: `onError` terminal -- currently `safeSend(msg)` (likely change to `safeUpdate` -- errors are transient)
+- Line 188: `onToolStart` already uses `safeUpdate` (reference pattern for transient status)
+- Options: (A) safeUpdate for kicks/errors + accumulate tool results into text buffer, (B) safeUpdate for all, (C) safeUpdate for all and accept less detail
 
 **Bug 3 -- `src/mind/prompt.ts`:**
 - Line 178: priority guidance -- rewrite to clarify "help first, then get to know them"
@@ -261,11 +276,13 @@ Five changes:
 
 ### Supporting References
 
+- `src/senses/teams.ts:52-58` -- code comments documenting intentional dual-mode design (Bug 2 context)
 - `src/senses/teams.ts:298-305` -- TeamsMessageContext interface (declares aadObjectId?, tenantId?, displayName?)
 - `src/senses/teams.ts:344-350` -- resolver AAD fallback logic
-- `src/senses/teams.ts:104-113` -- safeUpdate implementation (Bug 2 fix pattern)
-- `src/senses/teams.ts:117-124` -- safeSend implementation (Bug 2 current behavior)
+- `src/senses/teams.ts:104-113` -- safeUpdate implementation (`stream.update()` -- transient status)
+- `src/senses/teams.ts:117-124` -- safeSend implementation (`ctx.send()` -- separate persistent message)
 - `src/senses/teams.ts:508` -- ctxSend = ctx.send()
+- `ouroboros/tasks/2026-02-27-1637-planning-disable-streaming.md` -- disable-streaming planning doc (confirms safeSend was deliberate design)
 - `src/mind/prompt.ts:144-206` -- contextSection function
 - `src/heart/kicks.ts:33-120` -- full TOOL_INTENT_PATTERNS array
 - `src/heart/core.ts:100` -- MAX_TOOL_ROUNDS = 10
@@ -287,6 +304,7 @@ Five changes:
 - Bug 2: `onToolEnd` (teams.ts:194-195) and `onKick` (teams.ts:203-204) use `safeSend(msg)` in buffered mode -- creates separate new messages. Streaming uses `safeEmit("\n\n" + msg + "\n\n")` which appends inline.
 - `onError` terminal case (teams.ts:209+) also uses `safeSend` in buffered mode
 - Streaming is self-healing (everything in one stream). Buffered creates discrete messages that Copilot Chat renders out of order.
+- NOTE: `safeSend` was intentional design (teams.ts:52-58), not an accident. Fix must work around Copilot platform behavior, not just swap function calls.
 
 **Theme 3: "Aspirational instructions the model ignores"**
 - prompt.ts:181: "i prefer to use whatever name my friend prefers" -- vague, no action
