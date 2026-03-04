@@ -117,3 +117,4 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 - 2026-03-04 10:51 Pass 4 complete: quality checks passed (emoji headers present, no TBDs, criteria testable) and status set to READY_FOR_EXECUTION.
 - 2026-03-04 10:54 Updated doing scope to include explicit steering follow-up behavior and related regression coverage.
 - 2026-03-04 11:19 Updated doing contract to preserve+inject all steering follow-ups and prohibit adapter-authored steering plain-text acknowledgements.
+- 2026-03-04 11:39 Expanded doing contract details: dedupe by `activity.id`, ordered discrete injection, boundary-only injection, carry-forward semantics, and confirmation explicitly out of scope.
