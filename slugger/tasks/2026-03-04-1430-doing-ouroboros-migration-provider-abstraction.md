@@ -67,7 +67,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Baseline notes file in artifacts directory with command outputs and touched-file map for `src/config.ts`, `src/identity.ts`, `src/heart/core.ts`, `src/heart/streaming.ts`, `src/mind/prompt.ts`, `src/senses/{cli,teams}.ts`, and related `src/__tests__/**`.
 **Acceptance**: Baseline artifact exists and identifies all files to change for migration, provider abstraction, and provider integrations.
 
-### ⬜ Unit 1a: Storage/config refactor contracts + migration runbook docs — Tests
+### ✅ Unit 1a: Storage/config refactor contracts + migration runbook docs — Tests
 **What**: Add/adjust tests in `src/__tests__/identity.test.ts`, `src/__tests__/config.test.ts`, and path-dependent suites to define required contracts (`agent.json`, `secrets.json`, `.agentstate`) including fail-fast cases for missing/invalid contracts.
 **Output**: Failing contract tests for `agent.json.configPath -> ~/.agentsecrets/<agent>/secrets.json`, context loading from `agent.json`, and runtime/session/log/test-run paths under `~/.agentstate`.
 **Acceptance**: New/updated tests exist and fail red against current behavior.
@@ -189,3 +189,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 15:35 Added manual validation gates for live Anthropic setup-token and OpenAI Codex OAuth verification with required artifacts
 - 2026-03-04 15:38 Quality pass: confirmed unit headers/acceptance completeness and set status to READY_FOR_EXECUTION
 - 2026-03-04 15:44 Unit 0 complete: captured branch baseline, scripts, and touched-file map in `unit-0-baseline.md`
+- 2026-03-04 15:47 Unit 1a complete: added failing contract tests for `.agentsecrets`/`.agentstate` paths and `agent.json` context sourcing (`unit-1a-red-run.txt`)
