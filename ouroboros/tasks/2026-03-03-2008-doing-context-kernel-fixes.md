@@ -387,3 +387,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-04 11:14 Unit 8a complete: core.ts 100% coverage. final_answer interception block fully covered by 7 existing tests: parsed answer, JSON fallback, empty args, invalid JSON, no content, mixed-call rejection. No gaps
 - 2026-03-04 11:15 Unit 9a complete: 3 tests for truncation safety net -- 1 fails (over limit needs truncation), 2 pass (under limit and Infinity). 142 existing tests still pass
 - 2026-03-04 11:16 Unit 9b complete: truncation in final_answer block -- getChannelCapabilities(channel).maxMessageLength, slice + "[truncated]". 143 tests pass, build clean
+- 2026-03-04 11:17 Unit 9c complete: core.ts 100% coverage. All 1271 tests pass across 45 files. No refactoring needed
