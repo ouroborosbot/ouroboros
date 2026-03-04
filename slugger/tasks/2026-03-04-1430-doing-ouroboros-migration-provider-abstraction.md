@@ -23,15 +23,15 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [ ] Anthropic setup-token flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
 - [ ] OpenAI Codex OAuth flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
 - [ ] Provider selection is per-agent and config-driven (no global singleton lock-in).
-- [ ] Secrets/state boundary is enforced (`~/.agentsecrets` for secrets only; runtime/session/log/PII/test artifacts moved to `~/.agentstate`).
-- [ ] `secrets.json` retains `providers` + `teams`; `context` is loaded from `agent.json`.
-- [ ] `agent.json.configPath` resolves to `~/.agentsecrets/<agent>/secrets.json`.
+- [x] Secrets/state boundary is enforced (`~/.agentsecrets` for secrets only; runtime/session/log/PII/test artifacts moved to `~/.agentstate`).
+- [x] `secrets.json` retains `providers` + `teams`; `context` is loaded from `agent.json`.
+- [x] `agent.json.configPath` resolves to `~/.agentsecrets/<agent>/secrets.json`.
 - [ ] Missing/expired provider credentials fail fast with explicit re-auth guidance; no silent fallback.
-- [ ] A migration runbook exists in-repo for cross-machine post-pull reorganization of legacy `~/.agentconfigs` data.
-- [ ] Legacy `~/.agentconfigs` migration is fully documented as a one-time manual operation for other machines (no runtime back-compat branches in normal execution code), with no data loss and clear operator guidance.
-- [ ] Storage/config refactor executes before provider abstraction refactor work so implementation targets final storage/config contracts.
-- [ ] Actual cross-machine data migration is out-of-band from this task's code execution and handled via the migration runbook instructions.
-- [ ] Migration runbook is docs-only (no script) and includes explicit move/verify instructions for the other machine.
+- [x] A migration runbook exists in-repo for cross-machine post-pull reorganization of legacy `~/.agentconfigs` data.
+- [x] Legacy `~/.agentconfigs` migration is fully documented as a one-time manual operation for other machines (no runtime back-compat branches in normal execution code), with no data loss and clear operator guidance.
+- [x] Storage/config refactor executes before provider abstraction refactor work so implementation targets final storage/config contracts.
+- [x] Actual cross-machine data migration is out-of-band from this task's code execution and handled via the migration runbook instructions.
+- [x] Migration runbook is docs-only (no script) and includes explicit move/verify instructions for the other machine.
 - [ ] Provider IDs are explicitly locked and implemented as `azure`, `minimax`, `anthropic`, `openai-codex`.
 - [ ] Model fields are explicitly supported for each in-scope provider via `secrets.json` without introducing additional model-selection features.
 - [ ] All relevant docs are updated for the new provider/config/storage contracts (including `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, and `cross-agent-docs/agent-storage-migration-playbook.md`).
@@ -72,7 +72,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Failing contract tests for `agent.json.configPath -> ~/.agentsecrets/<agent>/secrets.json`, context loading from `agent.json`, and runtime/session/log/test-run paths under `~/.agentstate`.
 **Acceptance**: New/updated tests exist and fail red against current behavior.
 
-### ⬜ Unit 1b: Storage/config refactor contracts + migration runbook docs — Implementation
+### ✅ Unit 1b: Storage/config refactor contracts + migration runbook docs — Implementation
 **What**: Implement path contract changes in `src/config.ts`, `src/identity.ts`, `src/senses/{cli,teams}.ts`, and nerves test-run path modules; add `cross-agent-docs/agent-storage-migration-playbook.md` with explicit one-time migration instructions.
 **Output**: Runtime/config loader updates, state-path updates, and migration runbook markdown.
 **Acceptance**: Contract tests pass green; no runtime fallback to legacy `.agentconfigs` paths.
@@ -190,3 +190,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 15:38 Quality pass: confirmed unit headers/acceptance completeness and set status to READY_FOR_EXECUTION
 - 2026-03-04 15:44 Unit 0 complete: captured branch baseline, scripts, and touched-file map in `unit-0-baseline.md`
 - 2026-03-04 15:47 Unit 1a complete: added failing contract tests for `.agentsecrets`/`.agentstate` paths and `agent.json` context sourcing (`unit-1a-red-run.txt`)
+- 2026-03-04 15:53 Unit 1b complete: implemented secrets/state path contracts, moved context sourcing to `agent.json`, and added migration runbook (`unit-1b-*.txt`)
