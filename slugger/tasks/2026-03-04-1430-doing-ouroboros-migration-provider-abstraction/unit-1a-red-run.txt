@@ -1,0 +1,325 @@
+
+> ouroboros-agent-harness@1.0.0 test
+> vitest run src/__tests__/config.test.ts src/__tests__/identity.test.ts src/__tests__/nerves/coverage-run-artifacts.test.ts
+
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+{"ts":"2026-03-04T23:47:26.726Z","level":"info","event":"config.load","trace_id":"71e2a192-2e01-43cb-a149-6d01ee82fbad","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":false}}
+{"ts":"2026-03-04T23:47:26.729Z","level":"info","event":"config.load","trace_id":"f88d34fe-4370-44cc-9718-715fd1c9937e","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T23:47:26.731Z","level":"warn","event":"config_identity.error","trace_id":"c6432f6f-8ec0-40b7-888e-59337970513b","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"\"undefined\" is not valid JSON"}}
+{"ts":"2026-03-04T23:47:26.731Z","level":"info","event":"config.load","trace_id":"900a7860-4be7-4c72-9534-a309b5ac2f2b","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T23:47:26.735Z","level":"warn","event":"config_identity.error","trace_id":"d55be46b-b3ce-4086-829d-e11d0f55f4d1","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"ENOENT"}}
+{"ts":"2026-03-04T23:47:26.735Z","level":"info","event":"config.load","trace_id":"2712a9ed-e97c-4c82-9c34-abe2f84839b9","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T23:47:26.736Z","level":"warn","event":"config_identity.error","trace_id":"a1635b8f-f4f3-488f-bfec-28023d55ed5d","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"Unexpected token 'o', \"not json {{{\" is not valid JSON"}}
+{"ts":"2026-03-04T23:47:26.736Z","level":"info","event":"config.load","trace_id":"134dd8ba-d3b9-4b4a-8d9d-f082bb1cb4b3","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T23:47:26.736Z","level":"warn","event":"config_identity.error","trace_id":"b88853e9-15be-4782-a309-2f09793a3782","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"read-failure"}}
+{"ts":"2026-03-04T23:47:26.737Z","level":"info","event":"config.load","trace_id":"363eb95f-2e29-4d07-a886-7b1d93a83819","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T23:47:26.737Z","level":"info","event":"config.load","trace_id":"98e649e3-337a-4e4f-bccb-e0b00e135f0f","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":false}}
+{"ts":"2026-03-04T23:47:26.737Z","level":"info","event":"config.load","trace_id":"4e9991e5-40a4-47e9-b638-a46b1c7eb699","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":false}}
+{"ts":"2026-03-04T23:47:26.738Z","level":"info","event":"config.load","trace_id":"8f1e42a1-33c2-4f5e-b603-f8f9b22918d8","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T23:47:26.739Z","level":"info","event":"config.load","trace_id":"938a1199-01de-4eed-922a-556066221c9f","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T23:47:26.739Z","level":"info","event":"config.load","trace_id":"bfe35c9d-bbe8-4b7c-9919-6882edb0b398","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":false}}
+{"ts":"2026-03-04T23:47:26.739Z","level":"info","event":"config.load","trace_id":"006de381-015b-4142-af5b-e0b12339aa4f","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-04T23:47:26.740Z","level":"info","event":"config.load","trace_id":"cec2ec52-f977-4d13-a17f-fde7fdb14b86","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":false}}
+{"ts":"2026-03-04T23:47:26.740Z","level":"info","event":"config.load","trace_id":"0c4e08cf-e4b2-414c-b7e4-e691d54d62bc","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":false}}
+ ❯ src/__tests__/config.test.ts (41 tests | 8 failed) 38ms
+     ✓ reads config from path specified in agent.json configPath 13ms
+     ✓ auto-creates config directory when loading 1ms
+     × throws when agent.json configPath does not use .agentsecrets/<agent>/secrets.json 5ms
+     ✓ returns defaults when file is missing (ENOENT) 1ms
+     ✓ returns defaults when file contains invalid JSON 1ms
+     ✓ returns defaults when config read throws a non-Error value 1ms
+     ✓ merges partial config with defaults 0ms
+     ✓ does not use OUROBOROS_CONFIG_PATH env var 1ms
+     ✓ resolves configPath with ~ to homedir 1ms
+     ✓ uses absolute configPath as-is 0ms
+     ✓ caches config after first load 0ms
+     ✓ re-reads from disk after resetConfigCache() 0ms
+     ✓ emits config.load observability event when loading config 2ms
+     ✓ returns azure config from config.json 0ms
+     ✓ uses default apiVersion when not specified 0ms
+     ✓ returns minimax config from config.json 0ms
+     ✓ returns teams config from config.json 0ms
+     × returns context config from agent.json 1ms
+     ✓ returns defaults when not configured 0ms
+     × returns correct path with friendId, channel, and key (3-arg signature) 1ms
+     × returns correct path for teams channel with friendId 1ms
+     × sanitizes key by replacing slashes and colons with underscores 1ms
+     × auto-creates parent directories 1ms
+     × returns logs directory using agent name from identity module 0ms
+     × returns NDJSON log path and sanitizes key 0ms
+     ✓ returns default connection names 0ms
+     ✓ respects config.json values 0ms
+     ✓ getAdoConfig no longer exists (removed in Unit 1Hb) 0ms
+     ✓ returns default teamsChannel config when not specified 0ms
+     ✓ returns teamsChannel config from config.json 0ms
+     ✓ returns a shallow copy (not the same reference) 0ms
+     ✓ merges partial teamsChannel config with defaults 0ms
+     ✓ returns default integrations config when not specified 0ms
+     ✓ returns integrations config from config.json 0ms
+     ✓ returns a shallow copy (not the same reference) 0ms
+     ✓ deep-merges partial config into cached config 0ms
+     ✓ overrides specific fields while leaving others untouched 0ms
+     ✓ works with resetConfigCache to restore defaults 0ms
+     ✓ handles empty partial (no-op) 0ms
+     ✓ can set nested config sections (teamsChannel, integrations) 0ms
+     ✓ can overwrite then reset then overwrite again 0ms
+{"ts":"2026-03-04T23:47:26.909Z","level":"info","event":"identity.resolve","trace_id":"dbfcaacb-9987-4ae1-9e6f-23026f7a2ce1","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:47:26.912Z","level":"info","event":"identity.resolve","trace_id":"d06148ac-f39b-44bb-ac4a-3af12ef9678c","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:47:26.915Z","level":"info","event":"identity.resolve","trace_id":"b1a84124-288e-4458-b207-eb4a6259dbda","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:47:26.915Z","level":"info","event":"identity.resolve","trace_id":"7a86d9cd-8b49-4e6b-a8cb-df557b560f58","component":"config/identity","message":"resolved agent name from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-04T23:47:26.917Z","level":"info","event":"identity.resolve","trace_id":"b0c74ed6-ca2f-4557-98da-bbe521d42735","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:47:26.917Z","level":"info","event":"identity.resolve","trace_id":"0d06d186-04ed-40ec-82bc-0c7a5576ca9c","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:47:26.918Z","level":"info","event":"identity.resolve","trace_id":"04a5017c-2a7a-4b4b-9b77-a59ba8a43f69","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:47:26.918Z","level":"info","event":"identity.resolve","trace_id":"8a5537c0-9d60-4567-9cf2-7cbbeefa24f1","component":"config/identity","message":"loaded agent config from disk","meta":{"source":"disk"}}
+{"ts":"2026-03-04T23:47:26.918Z","level":"info","event":"identity.resolve","trace_id":"ab5c20be-922d-438a-b22c-d34ab89a5c82","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:47:26.919Z","level":"warn","event":"config_identity.error","trace_id":"43754c6c-b188-457a-ad05-c0e1f29b7511","component":"config/identity","message":"agent config missing phrase pools; placeholders applied","meta":{"path":"/Users/arimendelow/Projects/ouroboros-agent-harness/ouroboros/agent.json"}}
+{"ts":"2026-03-04T23:47:26.919Z","level":"info","event":"identity.resolve","trace_id":"faa29b08-4ac7-45d2-b8ca-cf7aae3fc6cc","component":"config/identity","message":"loaded agent config from disk","meta":{"source":"disk"}}
+stderr | src/__tests__/identity.test.ts > loadAgentConfig > auto-fills placeholder phrases when agent.json has no phrases field
+agent.json is missing phrases, added placeholders
+
+{"ts":"2026-03-04T23:47:26.920Z","level":"info","event":"identity.resolve","trace_id":"a1a3e3cb-90b1-4e47-9dac-194c7ca7184d","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:47:26.920Z","level":"warn","event":"config_identity.error","trace_id":"ab49d495-b544-4f9c-8d10-fd081c08a970","component":"config/identity","message":"agent config missing phrase pools; placeholders applied","meta":{"path":"/Users/arimendelow/Projects/ouroboros-agent-harness/ouroboros/agent.json"}}
+{"ts":"2026-03-04T23:47:26.920Z","level":"info","event":"identity.resolve","trace_id":"f8a063f6-e478-47d3-9b86-0469879e3d35","component":"config/identity","message":"loaded agent config from disk","meta":{"source":"disk"}}
+{"ts":"2026-03-04T23:47:26.921Z","level":"info","event":"identity.resolve","trace_id":"e1fcdc0f-4922-43d0-b7ae-73fa37974fe2","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:47:26.921Z","level":"info","event":"identity.resolve","trace_id":"7a37e409-15d8-4557-b515-c56cb014763d","component":"config/identity","message":"loaded agent config from disk","meta":{"source":"disk"}}
+{"ts":"2026-03-04T23:47:26.921Z","level":"info","event":"identity.resolve","trace_id":"ddbf752c-1a8d-456d-b64d-e3f23175ead6","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:47:26.921Z","level":"error","event":"config_identity.error","trace_id":"cb1fb000-df0e-4a01-91dd-5ee8946e3650","component":"config/identity","message":"failed reading agent.json","meta":{"path":"/Users/arimendelow/Projects/ouroboros-agent-harness/nonexistent/agent.json","reason":"ENOENT"}}
+{"ts":"2026-03-04T23:47:26.922Z","level":"info","event":"identity.resolve","trace_id":"bee6cae5-eed5-41e9-adf2-9e35d1e78299","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:47:26.922Z","level":"error","event":"config_identity.error","trace_id":"4de8cfbd-6db5-496f-8771-be3aecf0c5fe","component":"config/identity","message":"invalid agent.json syntax","meta":{"path":"/Users/arimendelow/Projects/ouroboros-agent-harness/ouroboros/agent.json","reason":"Unexpected token 'o', \"not valid json {{{\" is not valid JSON"}}
+{"ts":"2026-03-04T23:47:26.922Z","level":"info","event":"identity.resolve","trace_id":"ae3d943c-f1f9-43dd-80b4-cee209219ef7","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:47:26.922Z","level":"info","event":"identity.resolve","trace_id":"9f49acbf-a04b-4040-addd-9a8d5b8bec5c","component":"config/identity","message":"loaded agent config from disk","meta":{"source":"disk"}}
+{"ts":"2026-03-04T23:47:26.925Z","level":"info","event":"identity.resolve","trace_id":"fc3ebbb3-37dc-4619-a236-582b2fca1145","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:47:26.926Z","level":"error","event":"config_identity.error","trace_id":"2ab93cf1-bcf6-4d2f-9aa0-3158ef5bf265","component":"config/identity","message":"failed reading agent.json","meta":{"path":"/Users/arimendelow/Projects/ouroboros-agent-harness/ouroboros/agent.json","reason":"read-failure"}}
+{"ts":"2026-03-04T23:47:26.926Z","level":"info","event":"identity.resolve","trace_id":"0ecd0240-fb6b-47c7-8437-73af7f13d796","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:47:26.926Z","level":"error","event":"config_identity.error","trace_id":"330af0e7-b7dc-4fa8-bdbd-b4a62a7ff92b","component":"config/identity","message":"invalid agent.json syntax","meta":{"path":"/Users/arimendelow/Projects/ouroboros-agent-harness/ouroboros/agent.json","reason":"parse-failure"}}
+{"ts":"2026-03-04T23:47:26.926Z","level":"info","event":"identity.resolve","trace_id":"99d7e779-d4a6-4f57-b31e-773dadaa7294","component":"config/identity","message":"resolved agent name from argv","meta":{"source":"argv"}}
+{"ts":"2026-03-04T23:47:26.926Z","level":"warn","event":"config_identity.error","trace_id":"4f9d6506-1c3e-4fd1-9322-5800a3b95e6e","component":"config/identity","message":"agent config missing phrase pools; placeholders applied","meta":{"path":"/Users/arimendelow/Projects/ouroboros-agent-harness/ouroboros/agent.json"}}
+{"ts":"2026-03-04T23:47:26.926Z","level":"info","event":"identity.resolve","trace_id":"39a4aa68-6bdf-455d-86ab-f7dc4885a989","component":"config/identity","message":"loaded agent config from disk","meta":{"source":"disk"}}
+{"ts":"2026-03-04T23:47:26.926Z","level":"info","event":"identity.resolve","trace_id":"2d94be2b-9197-46bb-b420-2cb05ecda41d","component":"config/identity","message":"loaded agent config from cache","meta":{"source":"cache"}}
+stderr | src/__tests__/identity.test.ts > loadAgentConfig > caches the config after first load
+agent.json is missing phrases, added placeholders
+
+stderr | src/__tests__/identity.test.ts > resetIdentity > clears cached agent config so it can be re-loaded
+agent.json is missing phrases, added placeholders
+agent.json is missing phrases, added placeholders
+
+ ❯ src/__tests__/identity.test.ts (22 tests | 1 failed) 24ms
+     ✓ parses --agent <name> from process.argv 4ms
+     ✓ parses --agent <name> when other args are present 1ms
+     ✓ throws when --agent is missing from process.argv 1ms
+     ✓ throws when --agent is present but no value follows 1ms
+     ✓ caches the agent name after first parse 1ms
+     ✓ resolves repo root from src/ directory (dev via tsx) 0ms
+     ✓ returns a directory that exists 0ms
+     ✓ returns path.join(repoRoot, agentName) 0ms
+     ✓ uses a different name for a different agent 1ms
+     ✓ reads and parses agent.json from agent root 1ms
+     ✓ auto-fills placeholder phrases when agent.json has no phrases field 1ms
+     ✓ warns and writes placeholders when agent.json is missing phrases 1ms
+     ✓ does NOT warn or write when agent.json already has phrases 0ms
+     ✓ throws descriptive error when agent.json is missing 0ms
+     ✓ throws descriptive error when agent.json has invalid JSON 0ms
+     × throws when agent.json configPath still points at legacy .agentconfigs location 3ms
+     ✓ handles non-Error read failures when loading agent.json 1ms
+     ✓ handles non-Error parse failures when loading agent.json 0ms
+     ✓ caches the config after first load 1ms
+     ✓ emits identity.resolve observability event when loading agent config 1ms
+     ✓ clears cached agent name so it can be re-parsed 0ms
+     ✓ clears cached agent config so it can be re-loaded 1ms
+ ❯ src/__tests__/nerves/coverage-run-artifacts.test.ts (4 tests | 1 failed) 10ms
+     × builds test-run paths and deterministic run IDs 5ms
+     ✓ writes, reads, and clears active/latest run metadata 3ms
+     ✓ returns null when persisted metadata is malformed 1ms
+     ✓ returns null for structurally invalid metadata and tolerates clearing when absent 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/config.test.ts > loadConfig > throws when agent.json configPath does not use .agentsecrets/<agent>/secrets.json
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ src/__tests__/config.test.ts:86:32
+     84|     const { loadConfig, resetConfigCache } = await import("../config")
+     85|     resetConfigCache()
+     86|     expect(() => loadConfig()).toThrow(/\.agentsecrets.*secrets\.json/)
+       |                                ^
+     87|   })
+     88| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/10]⎯
+
+ FAIL  src/__tests__/config.test.ts > getContextConfig > returns context config from agent.json
+AssertionError: expected 1 to be 100000 // Object.is equality
+
+- Expected
++ Received
+
+- 100000
++ 1
+
+ ❯ src/__tests__/config.test.ts:366:27
+    364|     const ctx = getContextConfig()
+    365| 
+    366|     expect(ctx.maxTokens).toBe(100000)
+       |                           ^
+    367|     expect(ctx.contextMargin).toBe(25)
+    368|     expect(ctx.maxToolOutputChars).toBe(12345)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/10]⎯
+
+ FAIL  src/__tests__/config.test.ts > sessionPath > returns correct path with friendId, channel, and key (3-arg signature)
+AssertionError: expected '/Users/arimendelow/.agentconfigs/test…' to be '/Users/arimendelow/.agentstate/testag…' // Object.is equality
+
+Expected: "/Users/arimendelow/.agentstate/testagent/sessions/uuid-abc-123/cli/session.json"
+Received: "/Users/arimendelow/.agentconfigs/testagent/sessions/uuid-abc-123/cli/session.json"
+
+ ❯ src/__tests__/config.test.ts:396:15
+    394|     const p = sessionPath("uuid-abc-123", "cli", "session")
+    395| 
+    396|     expect(p).toBe(path.join(os.homedir(), ".agentstate", "testagent",…
+       |               ^
+    397|   })
+    398| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/10]⎯
+
+ FAIL  src/__tests__/config.test.ts > sessionPath > returns correct path for teams channel with friendId
+AssertionError: expected '/Users/arimendelow/.agentconfigs/test…' to be '/Users/arimendelow/.agentstate/testag…' // Object.is equality
+
+Expected: "/Users/arimendelow/.agentstate/testagent/sessions/uuid-xyz-456/teams/conv-123.json"
+Received: "/Users/arimendelow/.agentconfigs/testagent/sessions/uuid-xyz-456/teams/conv-123.json"
+
+ ❯ src/__tests__/config.test.ts:405:15
+    403|     const p = sessionPath("uuid-xyz-456", "teams", "conv-123")
+    404| 
+    405|     expect(p).toBe(path.join(os.homedir(), ".agentstate", "testagent",…
+       |               ^
+    406|   })
+    407| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/10]⎯
+
+ FAIL  src/__tests__/config.test.ts > sessionPath > sanitizes key by replacing slashes and colons with underscores
+AssertionError: expected '/Users/arimendelow/.agentconfigs/test…' to be '/Users/arimendelow/.agentstate/testag…' // Object.is equality
+
+Expected: "/Users/arimendelow/.agentstate/testagent/sessions/uuid-1/teams/a]conv_id_123.json"
+Received: "/Users/arimendelow/.agentconfigs/testagent/sessions/uuid-1/teams/a]conv_id_123.json"
+
+ ❯ src/__tests__/config.test.ts:414:15
+    412|     const p = sessionPath("uuid-1", "teams", "a]conv/id:123")
+    413| 
+    414|     expect(p).toBe(path.join(os.homedir(), ".agentstate", "testagent",…
+       |               ^
+    415|   })
+    416| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/10]⎯
+
+ FAIL  src/__tests__/config.test.ts > sessionPath > auto-creates parent directories
+AssertionError: expected "vi.fn()" to be called with arguments: [ …(2) ]
+
+Received: 
+
+  1st vi.fn() call:
+
+  [
+-   "/Users/arimendelow/.agentstate/testagent/sessions/uuid-1/cli",
++   "/Users/arimendelow/.agentconfigs/testagent/sessions/uuid-1/cli",
+    {
+      "recursive": true,
+    },
+  ]
+
+
+Number of calls: 1
+
+ ❯ src/__tests__/config.test.ts:423:26
+    421|     sessionPath("uuid-1", "cli", "session")
+    422| 
+    423|     expect(fs.mkdirSync).toHaveBeenCalledWith(
+       |                          ^
+    424|       path.join(os.homedir(), ".agentstate", "testagent", "sessions", …
+    425|       { recursive: true },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/10]⎯
+
+ FAIL  src/__tests__/config.test.ts > logPath > returns logs directory using agent name from identity module
+AssertionError: expected '/Users/arimendelow/.agentconfigs/test…' to be '/Users/arimendelow/.agentstate/testag…' // Object.is equality
+
+Expected: "/Users/arimendelow/.agentstate/testagent/logs"
+Received: "/Users/arimendelow/.agentconfigs/testagent/logs"
+
+ ❯ src/__tests__/config.test.ts:441:17
+    439|     const dir = getLogsDir()
+    440| 
+    441|     expect(dir).toBe(path.join(os.homedir(), ".agentstate", "testagent…
+       |                 ^
+    442|   })
+    443| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/10]⎯
+
+ FAIL  src/__tests__/config.test.ts > logPath > returns NDJSON log path and sanitizes key
+AssertionError: expected '/Users/arimendelow/.agentconfigs/test…' to be '/Users/arimendelow/.agentstate/testag…' // Object.is equality
+
+Expected: "/Users/arimendelow/.agentstate/testagent/logs/teams/a]conv_id_123.ndjson"
+Received: "/Users/arimendelow/.agentconfigs/testagent/logs/teams/a]conv_id_123.ndjson"
+
+ ❯ src/__tests__/config.test.ts:450:15
+    448|     const p = logPath("teams", "a]conv/id:123")
+    449| 
+    450|     expect(p).toBe(path.join(os.homedir(), ".agentstate", "testagent",…
+       |               ^
+    451|   })
+    452| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/10]⎯
+
+ FAIL  src/__tests__/identity.test.ts > loadAgentConfig > throws when agent.json configPath still points at legacy .agentconfigs location
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ src/__tests__/identity.test.ts:240:37
+    238|     const { loadAgentConfig, resetIdentity } = await import("../identi…
+    239|     resetIdentity()
+    240|     expect(() => loadAgentConfig()).toThrow(/\.agentsecrets.*secrets\.…
+       |                                     ^
+    241|   })
+    242| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/10]⎯
+
+ FAIL  src/__tests__/nerves/coverage-run-artifacts.test.ts > observability/coverage run artifacts > builds test-run paths and deterministic run IDs
+AssertionError: expected '/Users/arimendelow/.agentconfigs/test…' to contain '/.agentstate/test-runs/ouro-run-artif…'
+
+Expected: "/.agentstate/test-runs/ouro-run-artifacts-1772668047073"
+Received: "/Users/arimendelow/.agentconfigs/test-runs/ouro-run-artifacts-1772668047073"
+
+ ❯ src/__tests__/nerves/coverage-run-artifacts.test.ts:42:39
+     40| 
+     41|     expect(readLatestRun(repoSlug)).toBeNull()
+     42|     expect(getTestRunsRoot(repoSlug)).toContain(`/.agentstate/test-run…
+       |                                       ^
+     43|     expect(info.run_dir).toContain(`/.agentstate/test-runs/${repoSlug}…
+     44|     expect(createRunId(new Date("2026-03-02T18:00:00.000Z"))).toBe("20…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/10]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  10 failed | 57 passed (67)
+   Start at  15:47:26
+   Duration  601ms (transform 106ms, setup 65ms, import 85ms, tests 72ms, environment 0ms)
+

@@ -14,7 +14,7 @@ vi.mock("fs", () => ({
 vi.mock("../identity", () => ({
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
-    configPath: "~/.agentconfigs/testagent/config.json",
+    configPath: "~/.agentsecrets/testagent/secrets.json",
   })),
   getAgentName: vi.fn(() => "testagent"),
 }))
@@ -27,7 +27,7 @@ beforeEach(() => {
   vi.mocked(fs.mkdirSync).mockReset()
   vi.mocked(identity.loadAgentConfig).mockReturnValue({
     name: "testagent",
-    configPath: "~/.agentconfigs/testagent/config.json",
+    configPath: "~/.agentsecrets/testagent/secrets.json",
   })
   vi.mocked(identity.getAgentName).mockReturnValue("testagent")
 })
@@ -60,7 +60,7 @@ describe("loadConfig", () => {
     expect(config.providers.azure.apiKey).toBe("az-key")
     expect(config.providers.azure.endpoint).toBe("https://example.openai.azure.com")
     // Should resolve ~ to homedir and use configPath from agent.json
-    const expectedPath = path.join(os.homedir(), ".agentconfigs", "testagent", "config.json")
+    const expectedPath = path.join(os.homedir(), ".agentsecrets", "testagent", "secrets.json")
     expect(fs.readFileSync).toHaveBeenCalledWith(expectedPath, "utf-8")
   })
 
@@ -71,8 +71,19 @@ describe("loadConfig", () => {
     resetConfigCache()
     loadConfig()
 
-    const expectedDir = path.join(os.homedir(), ".agentconfigs", "testagent")
+    const expectedDir = path.join(os.homedir(), ".agentsecrets", "testagent")
     expect(fs.mkdirSync).toHaveBeenCalledWith(expectedDir, { recursive: true })
+  })
+
+  it("throws when agent.json configPath does not use .agentsecrets/<agent>/secrets.json", async () => {
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentconfigs/testagent/config.json",
+    })
+
+    const { loadConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    expect(() => loadConfig()).toThrow(/\.agentsecrets.*secrets\.json/)
   })
 
   it("returns defaults when file is missing (ENOENT)", async () => {
@@ -146,7 +157,7 @@ describe("loadConfig", () => {
     loadConfig()
 
     // Should NOT use the env var -- should use agent.json configPath
-    const expectedPath = path.join(os.homedir(), ".agentconfigs", "testagent", "config.json")
+    const expectedPath = path.join(os.homedir(), ".agentsecrets", "testagent", "secrets.json")
     expect(fs.readFileSync).toHaveBeenCalledWith(expectedPath, "utf-8")
     expect(fs.readFileSync).not.toHaveBeenCalledWith("/tmp/should-not-be-used.json", "utf-8")
 
@@ -328,11 +339,22 @@ describe("getContextConfig", () => {
     vi.resetModules()
   })
 
-  it("returns context config from config.json", async () => {
-    const configData = {
+  it("returns context config from agent.json", async () => {
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
       context: {
         maxTokens: 100000,
         contextMargin: 25,
+        maxToolOutputChars: 12345,
+      },
+    } as any)
+
+    const configData = {
+      context: {
+        maxTokens: 1,
+        contextMargin: 2,
+        maxToolOutputChars: 3,
       },
     }
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(configData))
@@ -343,6 +365,7 @@ describe("getContextConfig", () => {
 
     expect(ctx.maxTokens).toBe(100000)
     expect(ctx.contextMargin).toBe(25)
+    expect(ctx.maxToolOutputChars).toBe(12345)
   })
 
   it("returns defaults when not configured", async () => {
@@ -370,7 +393,7 @@ describe("sessionPath", () => {
     const { sessionPath } = await import("../config")
     const p = sessionPath("uuid-abc-123", "cli", "session")
 
-    expect(p).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "sessions", "uuid-abc-123", "cli", "session.json"))
+    expect(p).toBe(path.join(os.homedir(), ".agentstate", "testagent", "sessions", "uuid-abc-123", "cli", "session.json"))
   })
 
   it("returns correct path for teams channel with friendId", async () => {
@@ -379,7 +402,7 @@ describe("sessionPath", () => {
     const { sessionPath } = await import("../config")
     const p = sessionPath("uuid-xyz-456", "teams", "conv-123")
 
-    expect(p).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "sessions", "uuid-xyz-456", "teams", "conv-123.json"))
+    expect(p).toBe(path.join(os.homedir(), ".agentstate", "testagent", "sessions", "uuid-xyz-456", "teams", "conv-123.json"))
   })
 
   it("sanitizes key by replacing slashes and colons with underscores", async () => {
@@ -388,7 +411,7 @@ describe("sessionPath", () => {
     const { sessionPath } = await import("../config")
     const p = sessionPath("uuid-1", "teams", "a]conv/id:123")
 
-    expect(p).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "sessions", "uuid-1", "teams", "a]conv_id_123.json"))
+    expect(p).toBe(path.join(os.homedir(), ".agentstate", "testagent", "sessions", "uuid-1", "teams", "a]conv_id_123.json"))
   })
 
   it("auto-creates parent directories", async () => {
@@ -398,7 +421,7 @@ describe("sessionPath", () => {
     sessionPath("uuid-1", "cli", "session")
 
     expect(fs.mkdirSync).toHaveBeenCalledWith(
-      path.join(os.homedir(), ".agentconfigs", "testagent", "sessions", "uuid-1", "cli"),
+      path.join(os.homedir(), ".agentstate", "testagent", "sessions", "uuid-1", "cli"),
       { recursive: true },
     )
   })
@@ -415,7 +438,7 @@ describe("logPath", () => {
     const { getLogsDir } = await import("../config")
     const dir = getLogsDir()
 
-    expect(dir).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "logs"))
+    expect(dir).toBe(path.join(os.homedir(), ".agentstate", "testagent", "logs"))
   })
 
   it("returns NDJSON log path and sanitizes key", async () => {
@@ -424,7 +447,7 @@ describe("logPath", () => {
     const { logPath } = await import("../config")
     const p = logPath("teams", "a]conv/id:123")
 
-    expect(p).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "logs", "teams", "a]conv_id_123.ndjson"))
+    expect(p).toBe(path.join(os.homedir(), ".agentstate", "testagent", "logs", "teams", "a]conv_id_123.ndjson"))
   })
 })
 
