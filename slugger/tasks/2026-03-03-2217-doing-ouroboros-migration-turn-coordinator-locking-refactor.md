@@ -20,10 +20,11 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 - [ ] `teamsChannel.maxConcurrentConversations` is fully removed from config schema/defaults/accessors and call sites.
 - [ ] A shared turn coordinator exists and is used by Teams for per-conversation serialization.
 - [ ] Same-conversation follow-up messages during active turns are all preserved and injected into the active turn between model calls.
-- [ ] Steering follow-up capture is deduped by activity identity so retry-delivered duplicates are not injected multiple times.
+- [ ] Steering follow-up capture is deduped by channel message identity when available so retry-delivered duplicates are not injected multiple times.
 - [ ] Steering follow-ups are injected as ordered discrete user messages (not dropped, reordered, or collapsed with lost boundaries).
 - [ ] Steering injection occurs only at model-call boundaries; no in-flight model-call mutation occurs.
 - [ ] Buffered follow-ups that miss a boundary are carried into the next turn for the same conversation.
+- [ ] No steering-specific buffer cap is introduced; steering follow-ups use existing context/window and trimming behavior.
 - [ ] Steering path introduces no adapter-authored plain-text acknowledgement messages to users.
 - [ ] Model receives all follow-up user messages for steering (none dropped).
 - [ ] Single active-turn ownership per conversation is preserved; different conversations remain parallelizable.
@@ -65,7 +66,7 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 - shared coordinator serializes same key and permits parallel different keys
 - Teams path no longer emits cap-reject overload message or checks in-flight cap gate
 - Teams path preserves all same-conversation mid-turn follow-up messages and injects them between model calls
-- Teams path dedupes follow-ups by activity identity and does not inject duplicates on retry
+- Coordinator dedupes follow-ups by channel message identity when available and does not inject duplicates on retry
 - Teams path preserves message boundaries/order when injecting follow-ups (discrete user messages in chronological order)
 - Teams path carries buffered follow-ups into next turn when no boundary consumed them in the active turn
 - Teams path does not emit adapter-authored plain-text steering acknowledgements
@@ -74,11 +75,11 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 **Acceptance**: New/updated tests fail on current behavior before implementation.
 
 ### ⬜ Unit 1b: Turn Coordinator & Cap Removal — Implementation
-**What**: Implement shared turn coordinator, migrate Teams to use it, add preserve-all steering injection handling for same-conversation mid-turn follow-ups, and remove cap-gate/config field and related runtime code/tests. Implement steering buffer entry shape `{ activityId, conversationId, text, receivedAt }` and dedupe semantics keyed by `activityId`.
+**What**: Implement shared turn coordinator, migrate Teams to use it, add preserve-all steering injection handling for same-conversation mid-turn follow-ups, and remove cap-gate/config field and related runtime code/tests. Implement steering buffer entry shape `{ messageId?, conversationId, text, receivedAt }` where `messageId` is channel-provided identity when available, with dedupe keyed by `messageId` when present.
 **Output**:
 - `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-locking-refactor/unit-1b-test-run.txt`
 - `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-locking-refactor/unit-1b-build-run.txt`
-**Acceptance**: Unit 1a tests pass; Teams turn handling uses coordinator ownership semantics, dedupes by `activityId`, preserves+injects all follow-up messages for model visibility with ordered discrete boundaries, uses boundary-only injection with carry-forward, emits no adapter-authored steering plain text, avoids hard cap rejection, and removes `maxConcurrentConversations`.
+**Acceptance**: Unit 1a tests pass; Teams turn handling uses coordinator ownership semantics, dedupes by channel message identity when available, preserves+injects all follow-up messages for model visibility with ordered discrete boundaries, uses boundary-only injection with carry-forward, adds no steering-specific buffer cap, emits no adapter-authored steering plain text, avoids hard cap rejection, and removes `maxConcurrentConversations`.
 
 ### ⬜ Unit 1c: Turn Coordinator & Cap Removal — Coverage & Refactor
 **What**: Run coverage gate, backfill any uncovered branches introduced by coordinator/cap-removal changes, and refactor for clarity.
