@@ -39,6 +39,12 @@ export function stripMentions(text: string): string {
 // Not used preemptively — the harness tries to send the full message first.
 const RECOVERY_CHUNK_SIZE = 4000
 
+// Deadline for first stream.emit() call. The Copilot platform enforces a hard
+// 15s timeout — if no content is emitted within 15s, the stream dies with
+// "Sorry, something went wrong." We emit a brief acknowledgment at 12s (3s
+// safety margin) and route real content through sendMessage as a follow-up.
+export const STREAM_DEADLINE_MS = 12_000
+
 // Split text into chunks that fit within maxLen, breaking at paragraph
 // boundaries (\n\n), then line boundaries (\n), then word boundaries.
 // Never loses content — all text is preserved across chunks.
@@ -100,12 +106,34 @@ export function createTeamsCallbacks(
   let streamHasContent = false // tracks whether primary output has received content
   let phraseTimer: NodeJS.Timeout | null = null
   let lastPhrase = ""
+  let deadlineFired = false // true when the 12s deadline timer fires
+  let deadlineTimer: NodeJS.Timeout | null = null
+
+  // Cancel the deadline timer (called on first safeEmit or when cleaning up).
+  function cancelDeadline(): void {
+    if (deadlineTimer) { clearTimeout(deadlineTimer); deadlineTimer = null }
+  }
+
+  // Start the deadline timer. If no content is emitted within STREAM_DEADLINE_MS,
+  // emit a brief acknowledgment to satisfy the platform's 15s timeout and route
+  // subsequent content through sendMessage.
+  deadlineTimer = setTimeout(() => {
+    deadlineTimer = null
+    /* v8 ignore next -- defensive: markStopped always calls cancelDeadline @preserve */
+    if (stopped) return
+    deadlineFired = true
+    safeEmit("one moment \u2014 still working on this")
+  }, STREAM_DEADLINE_MS)
+
+  // Clean up deadline timer if the controller aborts before it fires.
+  controller.signal.addEventListener("abort", () => cancelDeadline(), { once: true })
 
   // Mark stream as broken and abort the agent loop.
   function markStopped(): void {
     if (stopped) return
     stopped = true
     stopPhraseRotation()
+    cancelDeadline()
     controller.abort()
   }
 
@@ -120,8 +148,10 @@ export function createTeamsCallbacks(
 
   // Safely emit a text delta to the stream.
   // On error (e.g. 403 from Teams stop button), abort the controller.
+  // Cancels the deadline timer on first call (content reached the stream in time).
   function safeEmit(text: string): void {
     if (stopped) return
+    cancelDeadline()
     try {
       catchAsync(stream.emit(text))
       streamHasContent = true
@@ -168,13 +198,15 @@ export function createTeamsCallbacks(
 
   // Flush accumulated text buffer. First flush goes to safeEmit (primary
   // output gets real content). Subsequent flushes go to safeSend.
+  // When deadline has fired, stream already has the acknowledgment — route
+  // content through safeSend instead.
   // No preemptive splitting — sends full text. Error recovery happens in flush().
   function flushTextBuffer(): void {
     if (!textBuffer) return
-    if (!streamHasContent) {
-      safeEmit(textBuffer)
-    } else {
+    if (deadlineFired || streamHasContent) {
       safeSend(textBuffer)
+    } else {
+      safeEmit(textBuffer)
     }
     textBuffer = ""
   }
@@ -286,13 +318,14 @@ export function createTeamsCallbacks(
         }
       : undefined,
     flush: async () => {
+      cancelDeadline()
       if (textBuffer) {
         const text = textBuffer
         textBuffer = ""
-        if (!streamHasContent && !stopped) {
+        if (!streamHasContent && !stopped && !deadlineFired) {
           safeEmit(text)
         } else if (sendMessage) {
-          // Stream already has content, is dead, or safeEmit isn't viable.
+          // Stream already has content, deadline fired, or stream is dead.
           // Send as a separate message; split on failure as recovery.
           try {
             await sendMessage(text)
