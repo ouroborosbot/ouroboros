@@ -29,7 +29,7 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 ### Gate 2: Kick Escape Hatch + Self-Trigger
 - [x] `tool_choice = "required"` set when `lastKickReason` is truthy at core.ts:288 and core.ts:303
 - [x] Kick message rewritten to not self-trigger `hasToolIntent()` -- verified by unit test
-- [ ] All existing kick patterns and test expectations unchanged
+- [x] All existing kick patterns and test expectations unchanged
 - [x] New tests for `tool_choice` forcing after any kick
 - [x] New test verifying kick message does not trigger `hasToolIntent()`
 - [ ] User confirms on Copilot Chat: no kick loop, no response spam, no timeout
@@ -153,7 +153,7 @@ Note: KICK_MESSAGES is not exported. The test should import `detectKick` and use
 **Output**: Modified `src/heart/kicks.ts`
 **Acceptance**: All tests PASS (green), no warnings. The self-trigger test now passes.
 
-### ⬜ Unit 3e: Bug 4 -- Coverage & Refactor
+### ✅ Unit 3e: Bug 4 -- Coverage & Refactor
 **What**: Verify 100% coverage on changes in `core.ts` (tool_choice conditions) and `kicks.ts` (rewritten message). All existing kick tests must still pass with no changes to their expectations.
 **Output**: Coverage report showing full branch coverage
 **Acceptance**: 100% coverage on new/modified code, all tests green, no warnings
