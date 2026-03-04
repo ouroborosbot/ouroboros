@@ -1,0 +1,53 @@
+
+> ouroboros-agent-harness@1.0.0 test
+> vitest run src/__tests__/repertoire/tools-remote-safety.test.ts
+
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+{"ts":"2026-03-03T22:48:56.027Z","level":"info","event":"tool.start","trace_id":"f5524717-9029-429c-ac23-a5aa2794e6dd","component":"tools","message":"tool execution started","meta":{"name":"shell"}}
+{"ts":"2026-03-03T22:48:56.033Z","level":"info","event":"tool.end","trace_id":"3f0f509f-431e-44ac-98b5-4390d9aa03af","component":"tools","message":"tool execution finished","meta":{"name":"shell","success":true}}
+ ❯ src/__tests__/repertoire/tools-remote-safety.test.ts (2 tests | 2 failed) 14ms
+     × does not expose local cli/file/git/gh tools to remote channel tool lists 4ms
+     × returns explanatory denial messaging when remote context attempts local shell execution 9ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/repertoire/tools-remote-safety.test.ts > remote channel tool safety > does not expose local cli/file/git/gh tools to remote channel tool lists
+AssertionError: expected [ 'read_file', 'write_file', …(29) ] to not include 'shell'
+ ❯ src/__tests__/repertoire/tools-remote-safety.test.ts:11:23
+      9|     const names = tools.map((t) => t.function.name)
+     10| 
+     11|     expect(names).not.toContain("shell")
+       |                       ^
+     12|     expect(names).not.toContain("read_file")
+     13|     expect(names).not.toContain("write_file")
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/__tests__/repertoire/tools-remote-safety.test.ts > remote channel tool safety > returns explanatory denial messaging when remote context attempts local shell execution
+AssertionError: expected 'hello\n' to contain 'can\'t do that from here'
+
+- Expected
++ Received
+
+- can't do that from here
++ hello
++
+
+ ❯ src/__tests__/repertoire/tools-remote-safety.test.ts:38:34
+     36|     const result = await execTool("shell", { command: "echo hello" }, …
+     37| 
+     38|     expect(result.toLowerCase()).toContain("can't do that from here")
+       |                                  ^
+     39|     expect(result.toLowerCase()).toContain("talking to multiple people…
+     40|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  14:48:55
+   Duration  299ms (transform 119ms, setup 46ms, import 103ms, tests 14ms, environment 0ms)
+
