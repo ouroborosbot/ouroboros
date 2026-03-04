@@ -91,7 +91,7 @@ displayName: activity.from?.name,
 **Output**: Coverage report showing full branch coverage
 **Acceptance**: 100% coverage on new/modified code, tests still green
 
-### ⬜ Unit 2a: Bug 2 (safeSend serialization) -- Tests
+### ✅ Unit 2a: Bug 2 (safeSend serialization) -- Tests
 **What**: Write failing tests for `safeSend` promise chain serialization. Tests should verify:
 1. Concurrent `safeSend` calls execute sends sequentially (not concurrently)
 2. A failed send in the chain halts subsequent sends via `markStopped()`
