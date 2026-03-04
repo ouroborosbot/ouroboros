@@ -177,7 +177,7 @@ These units address issues discovered during Gate 2 live testing. The core probl
 
 **Strategy**: Make `toolChoiceRequired` default to `true` (not hardcode it away). This restores the conditional checks everywhere while making them default-on. Teams gets the prompt sections automatically. CLI can still override.
 
-### ⬜ Unit 5a: Issue A (toolChoiceRequired default) -- Tests
+### ✅ Unit 5a: Issue A (toolChoiceRequired default) -- Tests
 **What**: Write failing tests in `src/__tests__/heart/core.test.ts` verifying:
 1. When `runAgent` is called WITHOUT `toolChoiceRequired` in options, `tool_choice: "required"` is still set (because it defaults to true)
 2. When `runAgent` is called with `toolChoiceRequired: false`, `tool_choice` is NOT set
