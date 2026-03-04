@@ -142,7 +142,7 @@ Add `sendChain` variable before `safeSend` definition. No changes to call sites 
 **Output**: Modified `src/heart/core.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 3c: Bug 4 (kick message self-trigger) -- Tests
+### ✅ Unit 3c: Bug 4 (kick message self-trigger) -- Tests
 **What**: Write a test in `src/__tests__/heart/kicks.test.ts` that verifies the narration kick message does NOT trigger `hasToolIntent()`. Currently it will PASS (the message contains "I can" which matches `/\bi can\b/i`), so the test should assert `hasToolIntent(KICK_MESSAGES.narration) === false`, and it will FAIL because the current message self-triggers.
 Note: KICK_MESSAGES is not exported. The test should import `detectKick` and use a narration-kicked response to extract the message, or test `hasToolIntent` with the known kick message text directly.
 **Output**: New test case in `src/__tests__/heart/kicks.test.ts`
