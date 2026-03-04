@@ -206,7 +206,9 @@ export function createTeamsCallbacks(
       stopPhraseRotation()
       const msg = formatToolResult(name, summary, success)
       if (buffered) {
-        safeSend(msg)
+        // Show as transient stream status (not a separate message) to avoid
+        // cross-channel ordering issues on Copilot Chat
+        safeUpdate(msg)
       } else {
         safeEmit("\n\n" + msg + "\n\n")
       }
@@ -215,7 +217,7 @@ export function createTeamsCallbacks(
       stopPhraseRotation()
       const msg = formatKick()
       if (buffered) {
-        safeSend(msg)
+        safeUpdate(msg)
       } else {
         safeEmit("\n\n" + msg + "\n\n")
       }
