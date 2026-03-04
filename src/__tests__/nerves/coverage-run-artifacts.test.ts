@@ -39,8 +39,8 @@ describe("observability/coverage run artifacts", () => {
     slugsToCleanup.add(repoSlug)
 
     expect(readLatestRun(repoSlug)).toBeNull()
-    expect(getTestRunsRoot(repoSlug)).toContain(`/test-runs/${repoSlug}`)
-    expect(info.run_dir).toContain(`/test-runs/${repoSlug}/${info.run_id}`)
+    expect(getTestRunsRoot(repoSlug)).toContain(`/.agentstate/test-runs/${repoSlug}`)
+    expect(info.run_dir).toContain(`/.agentstate/test-runs/${repoSlug}/${info.run_id}`)
     expect(createRunId(new Date("2026-03-02T18:00:00.000Z"))).toBe("2026-03-02T18-00-00-000Z")
   })
 

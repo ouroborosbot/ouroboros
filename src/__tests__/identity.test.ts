@@ -223,6 +223,23 @@ describe("loadAgentConfig", () => {
     expect(() => loadAgentConfig()).toThrow(/agent\.json/)
   })
 
+  it("throws when agent.json configPath still points at legacy .agentconfigs location", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      name: "ouroboros",
+      configPath: "~/.agentconfigs/ouroboros/config.json",
+      phrases: {
+        thinking: ["thinking"],
+        tool: ["tool"],
+        followup: ["followup"],
+      },
+    }))
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/\.agentsecrets.*secrets\.json/)
+  })
+
   it("handles non-Error read failures when loading agent.json", async () => {
     process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
     vi.mocked(fs.readFileSync).mockImplementation(() => {
