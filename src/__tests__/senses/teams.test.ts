@@ -2874,6 +2874,21 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     expect(controller.signal.aborted).toBe(true)
   })
 
+  it("flush() falls back to sendMessage when stream is dead (stopped)", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    callbacks.onTextChunk("important content")
+    // Kill the stream (e.g. platform error during generation)
+    mockStream.update.mockImplementation(() => { throw new Error("403 Forbidden") })
+    callbacks.onModelStart() // triggers safeUpdate → markStopped
+    // Stream is now dead. flush() should fall back to sendMessage instead of safeEmit.
+    await callbacks.flush()
+    expect(mockStream.emit).not.toHaveBeenCalledWith("important content")
+    expect(sendMessage).toHaveBeenCalledWith("important content")
+  })
+
   it("stop-streaming (403) via update still aborts when disableStreaming is true", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")

@@ -289,9 +289,11 @@ export function createTeamsCallbacks(
       if (textBuffer) {
         const text = textBuffer
         textBuffer = ""
-        if (!streamHasContent) {
+        if (!streamHasContent && !stopped) {
           safeEmit(text)
         } else if (sendMessage) {
+          // Stream already has content, is dead, or safeEmit isn't viable.
+          // Send as a separate message; split on failure as recovery.
           try {
             await sendMessage(text)
           } catch {
