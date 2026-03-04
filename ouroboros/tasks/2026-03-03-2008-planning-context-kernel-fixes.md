@@ -10,14 +10,16 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 
 ## Scope
 
-### Standard Teams Test: Limited Signal
+### Standard Teams Test: Confirms Bug 3 Is Surface-Agnostic
 
-The user tested the same bot through standard 1:1 Teams chat with a simple greeting ("hi pal") and got a clean response ("hello. what are we sorting today?"). This confirms the basic greeting flow works, but it does NOT prove the bugs are surface-specific. The greeting involved no tool calls and no narration-style response, so it would not trigger Bug 4 (kick detection) on any surface.
+The user tested the same bot through standard 1:1 Teams chat with a greeting ("hi pal"). The bot responded: "hello. what are we sorting today?" -- cold, transactional, no warmth, no self-introduction, no attempt to learn the user's name, no `save_friend_note` call. This is the same new-friend behavior failure observed on Copilot Chat (Bug 3), confirming it is surface-agnostic.
+
+The test did NOT exercise tool calls or narration-style responses, so it provides no signal on Bug 4 (kicks) or Bug 2 (phantom messages) for standard Teams.
 
 Per-bug surface/mode specificity:
 - **Bug 1 (AAD extraction):** Unknown whether surface matters. The `teamsContext` never extracts AAD fields regardless of surface -- the code bug is the same. Whether `activity.from.aadObjectId` is populated may differ between Copilot Chat and standard Teams, but the fix (extract whatever is available) is identical.
 - **Bug 2 (phantom messages):** Buffered-mode-specific. `safeSend` only sends separate messages in buffered mode. Streaming mode emits inline via `safeEmit`.
-- **Bug 3 (new-friend prompts):** Surface-agnostic. Prompt instructions are the same for all channels.
+- **Bug 3 (new-friend prompts):** **Surface-agnostic -- confirmed on both Copilot Chat and standard Teams.** The system prompt instructions are too weak to produce new-friend behavior on either surface.
 - **Bug 4 (kick loop):** Surface-agnostic. `detectKick()` runs in `core.ts` and does not know which surface the message came from. The same kick loop would occur on standard Teams if the user asked for a backlog and the model responded with "I'll show you...". In streaming mode the duplicate output is less visible (inline text gets overwritten), but the wasted API round trips still happen.
 - **Bug 5 (response spam):** Consequence of Bug 4 + Bug 2. The duplication happens in any mode (kick loop), but the separate-message visibility is buffered-mode-specific.
 - **Bug 6 (platform timeout):** Consequence of Bug 4. The extra API round trips happen in any mode.
@@ -150,17 +152,28 @@ Fix: resolves automatically when Bug 4 is fixed. No dedicated fix needed.
 
 **Bug 3: New-friend behavior not triggering -- prompt instruction insufficient**
 
-The new-friend instruction at `src/mind/prompt.ts:193-194` exists and is correctly conditional on `isNewFriend`. However, during live testing, the model did not exhibit new-friend behavior: no warm introduction, no attempt to learn the user's name, no `save_friend_note` call. The priority guidance ("my friend's request comes first") likely dominated.
+The new-friend instruction at `src/mind/prompt.ts:193-194` exists and is correctly conditional on `isNewFriend`. However, during live testing, the model did not exhibit new-friend behavior on EITHER surface:
+- **Copilot Chat:** user sent "hi, can you show me my backlog?" -- bot showed the backlog but made no introduction, didn't ask for the user's name, didn't call `save_friend_note`
+- **Standard 1:1 Teams:** user sent "hi pal" -- bot responded "hello. what are we sorting today?" -- cold, transactional, no warmth, no self-introduction, no attempt to learn the user's name
+
+This confirms Bug 3 is surface-agnostic. The system prompt instructions are too weak to produce new-friend behavior regardless of channel.
+
+The current instruction:
+```
+this is a new friend -- i have no notes or preferences saved yet. i should learn their name and how they like to work, and save what i learn.
+```
+
+The problem: "i should learn" is aspirational, not directive. The model treats it as a nice-to-have and goes straight to task-completion mode. The priority guidance ("my friend's request comes first") compounds this -- the model interprets "request first" as "only the request matters."
 
 This is a prompt tuning issue, not a code bug. Three changes needed:
 
-1. Strengthen the new-friend instruction: more explicit about what to do. Help first, but briefly introduce yourself along the way, ask what they prefer to be called, and save what you learn with `save_friend_note`.
+1. Strengthen the new-friend instruction from aspirational to directive. Not "i should learn their name" but "after addressing their request, i introduce myself briefly and ask what they prefer to be called. i save what i learn with save_friend_note." The instruction must make the introduction a concrete action, not a vague aspiration.
 
-2. Name quality instruction (line 181) should interpolate the actual `displayName`: "the name i have for this friend is {displayName}." When displayName is "Unknown", the instruction should explicitly say to ask for their name.
+2. Name quality instruction (line 181) should interpolate the actual `displayName`: "the name i have for this friend is {displayName}." When displayName is "Unknown", the instruction should explicitly say: "i don't know this friend's name yet -- i ask what they'd like to be called and save it with save_friend_note."
 
-3. The current instruction is a vague "i should learn..." -- needs to be an action directive: "after helping, i ask what they prefer to be called and save it."
+3. Clarify the relationship between priority guidance and new-friend behavior. The priority instruction should NOT suppress introductions entirely -- it should mean "help first, then get to know them" not "help only, skip everything else."
 
-**Gate 3 checkpoint:** User tests on Copilot Chat with a fresh friend record. Expects: bot helps first, introduces itself along the way, asks what the friend prefers to be called, and calls `save_friend_note` to save what it learns.
+**Gate 3 checkpoint:** User tests on both Copilot Chat and standard Teams with fresh friend records. Expects: bot helps first, introduces itself along the way, asks what the friend prefers to be called, and calls `save_friend_note` to save what it learns.
 
 ---
 
@@ -261,7 +274,7 @@ This is a prompt tuning issue, not a code bug. Three changes needed:
 - Previous planning: `ouroboros/tasks/2026-03-03-1102-planning-context-kernel-bugs.md`
 
 ## Notes
-**Standard Teams test: limited signal.** The user sent "hi pal" through standard 1:1 Teams bot chat and got a clean response: "hello. what are we sorting today?". This confirms the basic greeting flow works, but does not narrow the bugs to a specific surface or mode. The greeting had no tool calls and no narration-style response, so it would not trigger kick detection on any surface. Bug 4 (kicks) is surface-agnostic (core.ts). Bug 2 (phantom messages) is buffered-mode-specific. Bug 1 (AAD extraction) is unknown -- the code bug exists regardless of surface.
+**Standard Teams test confirmed Bug 3 on both surfaces.** The user sent "hi pal" through standard 1:1 Teams bot chat. The bot responded "hello. what are we sorting today?" -- cold and transactional with no new-friend behavior. This is the same failure mode observed on Copilot Chat, confirming Bug 3 is surface-agnostic. The test had no tool calls, so it provides no signal on Bug 4 (kicks) or Bug 2 (phantom messages).
 
 **Patterns to remove from TOOL_INTENT_PATTERNS (6 patterns):**
 - `/\bi'll\b/i` (line 36) -- "I'll show your backlog" is conversational, not narration
@@ -294,4 +307,5 @@ The current kick system is a blunt instrument -- pattern matching on response te
 - 2026-03-03 20:25 Updated with session-file-confirmed root causes, corrected Bug 5 (kick loop not platform retries), resolved all open questions, specified exact patterns to remove
 - 2026-03-03 20:26 Added Copilot Chat vs 1:1 Teams activity shape investigation note to Bug 1
 - 2026-03-03 20:31 Restructured with gated fix groups, added standard-Teams-works finding
-- 2026-03-03 20:34 Corrected scoping: Bug 4 is surface-agnostic (core.ts), Bug 2 is buffered-mode-specific, Bug 1 unknown. Standard Teams test was simple greeting -- doesn't prove surface specificity
+- 2026-03-03 20:34 Corrected scoping: Bug 4 is surface-agnostic (core.ts), Bug 2 is buffered-mode-specific, Bug 1 unknown
+- [pending timestamp] Standard Teams test confirms Bug 3 on both surfaces: bot is cold and transactional, no new-friend behavior. Strengthened Bug 3 analysis -- instruction is aspirational not directive
