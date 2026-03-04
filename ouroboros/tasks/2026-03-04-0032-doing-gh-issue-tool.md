@@ -226,4 +226,5 @@ Note: These tests may need to be integration-style or verify behavior through mo
 
 ## Progress Log
 - 2026-03-04 09:29 Created from planning doc (Pass 1 -- First Draft)
-- [pending] Pass 2 -- Granularity: all units atomic, testable, single-session; all have What/Output/Acceptance. No changes needed.
+- 2026-03-04 09:31 Pass 2 -- Granularity: all units atomic, testable, single-session; all have What/Output/Acceptance. No changes needed.
+- [pending] Pass 3 -- Validation: all file paths, types, patterns verified against codebase. Integration type "github" exists in types.ts. handleApiError, emitNervesEvent patterns confirmed. Token fetch/AUTH_REQUIRED patterns in teams.ts verified (lines 421-422, 493-503). blockedLocalTools at 4 test locations confirmed (631, 677, 706, 1602). No doc changes needed.
