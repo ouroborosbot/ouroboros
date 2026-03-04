@@ -41,6 +41,12 @@ Task docs go in `<agent>/tasks/` with naming scheme `YYYY-MM-DD-HHMM-{planning|d
 - Do not expand scope unilaterally. If a possible improvement is not explicitly requested, keep it out of the task.
 - If extra hardening/optimization ideas arise, record them as optional follow-up proposals and stop for user approval before adding them to planning or doing docs.
 
+### Debt Discipline (Required)
+
+- Do not introduce intentional debt (temporary shims, deprecated references, transitional test hooks) unless the user explicitly approves it first.
+- Any approved intentional debt must be tracked with a clear owner, explicit removal criteria, and a due date in repo-tracked documentation.
+- Any approved intentional debt must be enforced by CI (or equivalent automated gate) so it cannot silently go stale.
+
 ### Configuration Policy (Required)
 
 - Do not introduce or require environment variables for this project.
