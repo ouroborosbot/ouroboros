@@ -58,7 +58,10 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 **Acceptance**: Every changed path in task-owned scope is accounted for with no `TBD` entries; keep/remove rules match approved planning doc.
 
 ### ⬜ Unit 1a: Synthetic Gate Removal Contract — Tests (Red)
-**What**: Add failing tests that assert synthetic runtime-hardening gate wiring must be absent from final state (no runtime-hardening CLI/gate module contract, no runtime-hardening scripts in `package.json`, no runtime-hardening branch in mandatory coverage gate script).
+**What**: Add failing tests that assert synthetic runtime-hardening gate wiring must be absent from final state:
+- no runtime-hardening scripts in `package.json`
+- no runtime-hardening branch/summary/action wiring in mandatory coverage gate script
+- no runtime-hardening CLI module contract entrypoints expected for CI
 **Output**: Red run artifact `./2026-03-03-2036-doing-ouroboros-migration-single-replica-hardening-cleanup/unit-1a-red-run.txt`.
 **Acceptance**: New cleanup contract tests fail against current branch state before implementation.
 
@@ -67,7 +70,7 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 **Output**: Updated codebase with synthetic gate stack removed; green run artifacts:
 - `./2026-03-03-2036-doing-ouroboros-migration-single-replica-hardening-cleanup/unit-1b-test-run.txt`
 - `./2026-03-03-2036-doing-ouroboros-migration-single-replica-hardening-cleanup/unit-1b-build-run.txt`
-**Acceptance**: Unit 1a tests pass; removed targets are absent; runtime behavior files remain and full tests/build pass without warnings.
+**Acceptance**: Unit 1a tests pass; removed targets are absent; runtime behavior files remain unchanged in intent; full tests/build pass without warnings.
 
 ### ⬜ Unit 1c: Cleanup Coverage & Refactor
 **What**: Run coverage gate after cleanup removals, backfill any coverage gaps introduced by cleanup-only changes, and refactor tests/code for clarity without changing behavior.
@@ -77,7 +80,11 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 **Acceptance**: 100% coverage on changed code, tests green, build green, no warnings.
 
 ### ⬜ Unit 2a: Runtime Hardening Retention Verification
-**What**: Verify retained runtime hardening behaviors still hold after synthetic stack removal (remote local-tool blocking, teams concurrency cap, prompt refresh fallback, non-blocking sinks) via targeted test runs and evidence capture.
+**What**: Verify retained runtime hardening behaviors still hold after synthetic stack removal via targeted tests and evidence capture:
+- remote local-tool blocking behavior
+- teams concurrency cap behavior
+- prompt refresh fallback behavior
+- non-blocking sink behavior
 **Output**: `./2026-03-03-2036-doing-ouroboros-migration-single-replica-hardening-cleanup/unit-2a-runtime-retention.txt`.
 **Acceptance**: Targeted runtime behavior tests all pass and map explicitly to retained keep-list files.
 
@@ -107,3 +114,4 @@ Clean up the recent runtime/deployment-hardening work by removing changes that a
 ## Progress Log
 - 2026-03-03 21:50 Created from planning doc.
 - 2026-03-03 21:51 Pass 1 complete: created first draft doing doc with explicit unit boundaries and artifacts contract.
+- 2026-03-03 21:52 Pass 2 complete: granularity pass tightened unit acceptance details and split synthetic-removal assertions into explicit atomic checks.
