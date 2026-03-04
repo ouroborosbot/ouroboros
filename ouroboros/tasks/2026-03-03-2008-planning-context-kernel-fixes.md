@@ -23,6 +23,14 @@ Confirmed by PII bridge file: `provider: "teams-conversation"` with conversation
 
 Fix: add `aadObjectId: activity.from?.aadObjectId`, `tenantId: activity.conversation?.tenantId`, and `displayName: activity.from?.name` to the `teamsContext` object at line 492-506. The fields are already destructured from `ctx` at line 458 (`const { stream, activity, api, signin } = ctx`). Three-line fix.
 
+**Bug 1 investigation note: Copilot Chat vs 1:1 Teams bot activity shape.**
+The user is testing on Microsoft 365 Copilot Chat (Custom Engine Agent), which is a different surface from standard 1:1 Teams bot chat. Both use the same Teams SDK and Azure resources, but the `activity` object may have different properties populated depending on which surface the message comes from. Specifically:
+- `activity.from.aadObjectId` and `activity.from.name` may be present in one surface but not the other
+- `activity.conversation.tenantId` may differ as well
+- The user is about to test through standard 1:1 Teams to compare the activity shape
+- If the activity shape differs between surfaces, we may need surface-specific extraction logic or more robust fallback handling beyond the current conversation-ID fallback
+- The three-line fix is still correct (it extracts whatever is available), but the test coverage must verify both surfaces: one where AAD fields are present and one where they are absent (falling back to conversation-ID provider)
+
 **Bug 2: Phantom tool-result and kick messages in buffered (nostream) mode**
 
 In `createTeamsCallbacks` (`src/senses/teams.ts:59-252`), when `disableStreaming=true` (buffered mode):
