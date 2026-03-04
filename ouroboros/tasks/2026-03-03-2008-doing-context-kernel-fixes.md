@@ -42,7 +42,7 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [x] `finalAnswerTool` description reframed as primary response mechanism
 - [x] `final_answer` text emitted via `callbacks.onTextChunk` -- test coverage verified
 - [x] Response size constraint visible in prompt; truncation safety net in place
-- [ ] Tool description voice standard codified in CONTRIBUTING.md
+- [x] Tool description voice standard codified in CONTRIBUTING.md
 - [ ] User confirms on Teams: model uses final_answer cleanly, no 413 errors, prompt sections emit correctly
 
 ### Gate 3: Friend Context Instructions
@@ -289,7 +289,7 @@ The channel capabilities are already available via `getChannelCapabilities(chann
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new/modified code, all tests green
 
-### ⬜ Unit 10a: Codify tool description voice standard in docs
+### ✅ Unit 10a: Codify tool description voice standard in docs
 **What**: Add a "Tool Descriptions" section to CONTRIBUTING.md (the project's code style/conventions doc). The section should codify:
 - Tool descriptions use imperative/descriptive voice ("respond to the user with a message", "search the web for information") -- this is what models are trained on
 - System prompt instructions about tools use first person to match the bot's voice ("when i'm ready to respond, i call final_answer")
