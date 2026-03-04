@@ -223,10 +223,6 @@ export function getIntegrationsConfig(): IntegrationsConfig {
   return { ...config.integrations }
 }
 
-export function getSessionDir(): string {
-  return path.join(os.homedir(), ".agentconfigs", getAgentName(), "sessions")
-}
-
 export function getLogsDir(): string {
   return path.join(os.homedir(), ".agentconfigs", getAgentName(), "logs")
 }
