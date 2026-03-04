@@ -225,3 +225,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-03 22:13 Unit 2c complete: teams.ts coverage 100%. Added chained-rejection test for line 136. All 1277 tests pass across 45 files, build clean
 - 2026-03-03 22:35 Unit 3a complete: 3 failing tests for tool_choice forcing after kick -- MiniMax narration, Azure narration, MiniMax empty. All fail because core.ts only checks options.toolChoiceRequired, not lastKickReason
 - 2026-03-03 22:36 Unit 3b complete: 2 one-line changes in core.ts -- added || lastKickReason to both tool_choice conditions. All 158 core tests pass, build clean
+- 2026-03-03 22:37 Unit 3c complete: 1 failing test verifying narration kick message does not self-trigger hasToolIntent(). Fails because message contains "I can" matching /\bi can\b/i
