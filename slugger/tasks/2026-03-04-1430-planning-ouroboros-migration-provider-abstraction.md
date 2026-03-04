@@ -17,8 +17,11 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - Add Anthropic provider integration as a final step with setup-token auth profile support (OpenClaw-compatible flow: `claude setup-token` then token paste).
 - Add OpenAI Codex provider integration as a final step with OAuth subscription auth profile support (OpenClaw-compatible `openai-codex` flow).
 - Update config and agent/provider resolution paths so provider selection is explicit and per-agent.
-- Keep non-secret agent settings in repo-tracked per-agent config (agent-local files under repo), move secrets to `~/.agentsecrets/<agent>/`, and move runtime state (sessions, logs, PII bridge files, test-run artifacts) to `~/.agentstate/<agent>/` or `~/.agentstate/test-runs/<repo_slug>/`.
-- Include migration/back-compat handling so existing `~/.agentconfigs` data is moved or read-forward safely.
+- Keep `providers` and `teams` blocks in per-agent `config.json` (secrets/config file).
+- Move `context` block from `config.json` into each agent's `agent.json` alongside `phrases` and other agent-level runtime settings.
+- Reorganize local machine directories so secrets live in `~/.agentsecrets/<agent>/`, while runtime/session/log/PII/test artifacts live in `~/.agentstate/<agent>/` or `~/.agentstate/test-runs/<repo_slug>/`.
+- Include migration/back-compat handling so existing `~/.agentconfigs` data on other machines is migrated safely with explicit operator-visible guidance.
+- Add a repo migration runbook for other agents/Claude to follow after pulling changes.
 - Add/adjust tests to maintain 100% coverage on all new code and preserve existing behavior contracts.
 
 ### Out of Scope
@@ -35,7 +38,9 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [ ] OpenAI Codex provider is integrated behind the same provider interface with OAuth auth profile support.
 - [ ] Provider selection is per-agent and config-driven (no global singleton lock-in).
 - [ ] Secrets/state boundary is enforced (`~/.agentsecrets` for secrets only; runtime/session/log/PII/test artifacts moved to `~/.agentstate`).
+- [ ] `config.json` retains `providers` + `teams`; `context` is loaded from `agent.json`.
 - [ ] Missing/expired provider credentials fail fast with explicit re-auth guidance; no silent fallback.
+- [ ] A migration runbook exists in-repo for cross-machine post-pull reorganization of legacy `~/.agentconfigs` data.
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -49,7 +54,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 
 ## Open Questions
 - [x] OpenAI API-key provider now or deferred: deferred to a follow-up task.
-- [x] Config/auth-profile/state boundary: repo-tracked agent config for non-secrets, `~/.agentsecrets/<agent>/` for secrets, `~/.agentstate/...` for runtime/session/log/PII/test artifacts.
+- [x] Config/auth-profile/state boundary: keep `providers` + `teams` in `config.json`; move `context` to `agent.json`; split local storage into `~/.agentsecrets` (secrets) and `~/.agentstate` (runtime/session/log/PII/test artifacts).
 - [x] Usage accounting changes in this task: deferred.
 
 ## Decisions Made
@@ -58,6 +63,8 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - Anthropic setup-token auth flow is explicitly in-scope and modeled after existing OpenClaw behavior.
 - OpenAI subscription path is explicitly in-scope via OpenAI Codex OAuth (`openai-codex`) flow.
 - Follow repo configuration policy: no environment variables.
+- `config.json` keeps `providers` and `teams` blocks; `context` moves into `agent.json`.
+- Migration support for other machines is mandatory: legacy `~/.agentconfigs` must be handled with a documented, agent-executable runbook.
 - Missing/expired credentials must hard-fail with explicit operator/user guidance; no silent fallback behavior.
 
 ## Context / References
@@ -71,6 +78,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - `/Users/arimendelow/Projects/openclaw/src/commands/auth-choice.apply.openai.ts`
 - `/Users/arimendelow/Projects/openclaw/src/agents/model-forward-compat.ts`
 - `/Users/arimendelow/Projects/openclaw/README.md`
+- `/Users/arimendelow/Projects/ouroboros-agent-harness/README.md`
 
 ## Notes
 Keep scope disciplined: runtime provider abstraction + provider integrations only, no additional architecture expansion.
@@ -79,3 +87,4 @@ Keep scope disciplined: runtime provider abstraction + provider integrations onl
 - 2026-03-04 14:30 Created
 - 2026-03-04 14:37 Updated scope to OpenClaw-compatible Anthropic setup-token + OpenAI Codex OAuth flows; set status to NEEDS_REVIEW
 - 2026-03-04 14:46 Incorporated user decisions: defer OpenAI API-key, enforce no-silent-fallback auth failures, and split secrets/state paths (`.agentsecrets` + `.agentstate`)
+- 2026-03-04 14:51 Locked config layout decisions (`providers` + `teams` stay in config.json; `context` moves to agent.json) and added explicit cross-machine migration runbook requirement
