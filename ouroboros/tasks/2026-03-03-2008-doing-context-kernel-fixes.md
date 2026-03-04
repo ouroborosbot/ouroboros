@@ -221,3 +221,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-03 22:07 Unit 1b complete: 3 lines added to teamsContext construction -- aadObjectId, tenantId, displayName from activity. 153 tests pass, build clean
 - 2026-03-03 22:07 Unit 1c complete: teams.ts coverage 100% (stmts/branches/funcs/lines). Both AAD-present and AAD-absent paths covered. No refactoring needed
 - 2026-03-03 22:09 Unit 2a complete: 2 failing tests for safeSend serialization -- concurrent sends not sequential (fire-and-forget), chain failure does not halt subsequent sends
+- 2026-03-03 22:12 Unit 2b complete: safeSend serialized via promise chain with idle/busy tracking -- synchronous first call (preserves existing tests), chained when busy. 155 tests pass, build clean
