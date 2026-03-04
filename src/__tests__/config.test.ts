@@ -483,10 +483,11 @@ describe("getTeamsChannelConfig", () => {
     resetConfigCache()
     const tc = getTeamsChannelConfig()
 
-    expect(tc.skipConfirmation).toBe(true)
-    expect(tc.disableStreaming).toBe(false)
-    expect(tc.port).toBe(3978)
-    expect((tc as any).maxConcurrentConversations).toBeUndefined()
+    expect(tc).toEqual({
+      skipConfirmation: true,
+      disableStreaming: false,
+      port: 3978,
+    })
   })
 
   it("returns teamsChannel config from config.json", async () => {
@@ -495,7 +496,6 @@ describe("getTeamsChannelConfig", () => {
         skipConfirmation: true,
         disableStreaming: true,
         port: 4000,
-        maxConcurrentConversations: 1,
       },
     }
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(configData))
@@ -504,10 +504,11 @@ describe("getTeamsChannelConfig", () => {
     resetConfigCache()
     const tc = getTeamsChannelConfig()
 
-    expect(tc.skipConfirmation).toBe(true)
-    expect(tc.disableStreaming).toBe(true)
-    expect(tc.port).toBe(4000)
-    expect((tc as any).maxConcurrentConversations).toBeUndefined()
+    expect(tc).toEqual({
+      skipConfirmation: true,
+      disableStreaming: true,
+      port: 4000,
+    })
   })
 
   it("returns a shallow copy (not the same reference)", async () => {
