@@ -17,6 +17,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - Move provider-specific streaming/input state handling out of the engine loop into provider implementations.
 - Add Anthropic provider integration as a final step with setup-token auth profile support (OpenClaw-compatible flow: `claude setup-token` then token paste).
 - Add OpenAI Codex provider integration as a final step with OAuth subscription auth profile support (OpenClaw-compatible `openai-codex` flow).
+- Define mandatory manual validation gates for Anthropic setup-token and OpenAI Codex OAuth using real auth profiles, with operator-readable evidence artifacts.
 - Update config and agent/provider resolution paths so provider selection is explicit and per-agent.
 - Keep `providers` and `teams` blocks in per-agent `secrets.json` (secrets/config file).
 - Move `context` block from `secrets.json` into each agent's `agent.json` alongside `phrases` and other agent-level runtime settings.
@@ -46,6 +47,8 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [ ] Azure and MiniMax behavior is preserved with passing regression tests.
 - [ ] Anthropic provider is integrated behind the same provider interface with setup-token auth profile support.
 - [ ] OpenAI Codex provider is integrated behind the same provider interface with OAuth auth profile support.
+- [ ] Anthropic setup-token flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
+- [ ] OpenAI Codex OAuth flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
 - [ ] Provider selection is per-agent and config-driven (no global singleton lock-in).
 - [ ] Secrets/state boundary is enforced (`~/.agentsecrets` for secrets only; runtime/session/log/PII/test artifacts moved to `~/.agentstate`).
 - [ ] `secrets.json` retains `providers` + `teams`; `context` is loaded from `agent.json`.
@@ -91,6 +94,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - Runtime code must stay lean: no long-lived back-compat reads/writes for legacy `~/.agentconfigs` paths after migration.
 - Migration is manual-doc guided (Claude executes instructions from markdown); no dedicated migration script will be added.
 - Missing/expired credentials must hard-fail with explicit operator/user guidance; no silent fallback behavior.
+- Anthropic setup-token and OpenAI Codex OAuth require explicit manual end-to-end validation gates before task completion is accepted.
 
 ## Context / References
 - `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration/provider-abstraction.md`
@@ -121,3 +125,4 @@ Keep scope disciplined: runtime provider abstraction + provider integrations onl
 - 2026-03-04 15:16 Renamed config target to `secrets.json`, locked `agent.json.configPath`, and clarified minimal provider/model contract (`azure|minimax|anthropic|openai-codex`)
 - 2026-03-04 15:25 User approved planning doc for conversion to doing
 - 2026-03-04 15:32 Clarified that this task performs storage/config refactor before provider abstraction; legacy data migration itself is manual out-of-band via runbook
+- 2026-03-04 15:35 Added mandatory manual validation gates for Anthropic setup-token and OpenAI Codex OAuth with artifact evidence requirements

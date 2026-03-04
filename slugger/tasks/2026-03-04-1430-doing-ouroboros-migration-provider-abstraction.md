@@ -20,6 +20,8 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [ ] Azure and MiniMax behavior is preserved with passing regression tests.
 - [ ] Anthropic provider is integrated behind the same provider interface with setup-token auth profile support.
 - [ ] OpenAI Codex provider is integrated behind the same provider interface with OAuth auth profile support.
+- [ ] Anthropic setup-token flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
+- [ ] OpenAI Codex OAuth flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
 - [ ] Provider selection is per-agent and config-driven (no global singleton lock-in).
 - [ ] Secrets/state boundary is enforced (`~/.agentsecrets` for secrets only; runtime/session/log/PII/test artifacts moved to `~/.agentstate`).
 - [ ] `secrets.json` retains `providers` + `teams`; `context` is loaded from `agent.json`.
@@ -125,6 +127,11 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Refactored Anthropic provider code and coverage artifact for auth/stream branches.
 **Acceptance**: 100% coverage on new Anthropic integration code and tests green.
 
+### ⬜ Unit 4d: Anthropic setup-token integration — Manual validation gate
+**What**: Execute a real end-to-end Anthropic turn using the setup-token profile path (no mocks) and capture sanitized evidence.
+**Output**: Artifact log with timestamp, provider id, model, command/entrypoint used, and outcome.
+**Acceptance**: Live Anthropic run succeeds via setup-token auth; failure mode includes explicit re-auth guidance; evidence artifact is present.
+
 ### ⬜ Unit 5a: OpenAI Codex OAuth integration — Tests
 **What**: Add failing tests for `openai-codex` provider behavior, OAuth profile loading contract, and explicit auth-failure messaging in provider/config test suites.
 **Output**: Failing OpenAI Codex provider/auth tests for success and fail-fast error paths.
@@ -140,6 +147,11 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Refactored OpenAI Codex provider code and coverage artifact for auth/response branches.
 **Acceptance**: 100% coverage on new OpenAI Codex integration code and tests green.
 
+### ⬜ Unit 5d: OpenAI Codex OAuth integration — Manual validation gate
+**What**: Execute a real end-to-end OpenAI Codex turn using OAuth profile auth (no mocks) and capture sanitized evidence.
+**Output**: Artifact log with timestamp, provider id, model, command/entrypoint used, and outcome.
+**Acceptance**: Live OpenAI Codex run succeeds via OAuth auth; failure mode includes explicit re-auth guidance; evidence artifact is present.
+
 ### ⬜ Unit 6a: Migration runbook and storage-contract docs
 **What**: Finalize `cross-agent-docs/agent-storage-migration-playbook.md` with explicit `~/.agentconfigs` -> `~/.agentsecrets`/`~/.agentstate` moves, validation steps, and post-migration cleanup notes for the other machine.
 **Output**: Migration runbook updates and supporting docs aligned to new storage boundaries.
@@ -153,7 +165,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 ### ⬜ Unit 7a: Full-suite and coverage verification
 **What**: Run full test suite, coverage checks, and static checks; assemble execution evidence in artifacts.
 **Output**: Full verification log and coverage artifacts in task artifacts directory.
-**Acceptance**: All tests pass, no warnings, new-code coverage is 100%, and completion criteria are all satisfied.
+**Acceptance**: All tests pass, no warnings, new-code coverage is 100%, manual Anthropic/OpenAI auth validation artifacts are present, and completion criteria are all satisfied.
 
 ### ⬜ Unit 7b: Completion checklist and closeout
 **What**: Validate completion criteria checkboxes against evidence and prepare merge-ready summary.
@@ -172,6 +184,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 ## Progress Log
 - 2026-03-04 15:26 Created from planning doc
 - 2026-03-04 15:30 Granularity pass: added missing unit outputs and split docs/final verification into atomic units
-- 2026-03-04 15:35 Validation pass: aligned units to actual repository files and current legacy path usage (`.agentconfigs`) to be migrated
-- 2026-03-04 15:38 Quality pass: confirmed unit headers/acceptance completeness and set status to READY_FOR_EXECUTION
 - 2026-03-04 15:32 Clarified scope wording: this task does storage/config refactor first; legacy data migration itself is manual out-of-band via runbook
+- 2026-03-04 15:35 Validation pass: aligned units to actual repository files and current legacy path usage (`.agentconfigs`) to be migrated
+- 2026-03-04 15:35 Added manual validation gates for live Anthropic setup-token and OpenAI Codex OAuth verification with required artifacts
+- 2026-03-04 15:38 Quality pass: confirmed unit headers/acceptance completeness and set status to READY_FOR_EXECUTION
