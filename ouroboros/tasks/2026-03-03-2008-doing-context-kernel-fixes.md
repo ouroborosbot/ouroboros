@@ -188,7 +188,7 @@ Tests should cover both Azure (Responses API) and non-Azure (Chat Completions) p
 **Output**: New test cases in `src/__tests__/heart/core.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `tool_choice` is currently hardcoded unconditionally (ignores option)
 
-### ⬜ Unit 5b: Issue A (toolChoiceRequired default) -- Implementation
+### ✅ Unit 5b: Issue A (toolChoiceRequired default) -- Implementation
 **What**: Three changes in `src/heart/core.ts`:
 1. Default `toolChoiceRequired` to `true`: near top of `runAgent`, add `const toolChoiceRequired = options?.toolChoiceRequired ?? true;`
 2. Restore conditional `activeTools`: change line 262 from `const activeTools = [...baseTools, finalAnswerTool]` to `const activeTools = toolChoiceRequired ? [...baseTools, finalAnswerTool] : baseTools`
