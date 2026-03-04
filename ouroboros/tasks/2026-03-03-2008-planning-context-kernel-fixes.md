@@ -80,27 +80,25 @@ Fix: change `safeSend(msg)` to `safeUpdate(msg)` for all three callbacks in the 
 
 #### GATE 2: Kick False Positives
 
-**Bug 4: Kick loop from overbroad narration detection + broken escape hatch**
+**Bug 4: Kick loop from overbroad narration detection + toothless escape hatch**
 
 Two distinct root causes create the spiral:
 
-**(a) Overbroad patterns (existing analysis):** The model's legitimate response "I'll default to grid/table format when showing your ADO backlog from now on" triggers `/\bi'll\b/i` in `TOOL_INTENT_PATTERNS`. This first kick may itself be a false positive -- a perfectly good final answer gets rejected.
+**(a) Overbroad patterns:** The model's legitimate final answer "I'll default to grid/table format when showing your ADO backlog from now on" triggers `/\bi'll\b/i` in `TOOL_INTENT_PATTERNS`. A perfectly good response gets kicked.
 
-**(b) `final_answer` escape hatch doesn't work (NEW):** After the first kick, `core.ts:259-261` injects `final_answer` into the tool list. But there is no `tool_choice` forcing -- the model is free to respond with text instead of calling the tool. And it does. The screenshot shows:
+**(b) `final_answer` escape hatch is toothless:** Verified code paths:
+- `core.ts:259-261`: when `lastKickReason === "narration"`, `final_answer` IS injected into `activeTools`. The model sees it on the next iteration. VERIFIED.
+- `core.ts:288` (Azure path): `tool_choice = "required"` is only set when `options?.toolChoiceRequired` is true. This is NOT set after kicks. VERIFIED.
+- `core.ts:303` (non-Azure path): same -- `tool_choice` only set for `options.toolChoiceRequired`. VERIFIED.
+- `core.ts:346`: after a kick, `azureInput = null` forces a rebuild from messages. The model sees the full conversation including the kick-appended text. VERIFIED.
+
+Result: `final_answer` is in the tool list, the kick message tells the model to use it, but `tool_choice` does not force it. The model responds with apologetic text instead of calling the tool. The screenshot shows the actual spiral:
 - Kick 1: "I'll default to grid/table format..." -- kicked (`/\bi'll\b/i`)
 - Model responds with text: "And I'll stop doing that stray internal note as well. Grid by default from here on out." -- kicked again
 - Model responds with text: "Right. That internal leak is on me. Won't happen again. Preference saved. Grid by default." -- kicked again
-- Each apology/explanation contains intent language ("I'll stop", "Won't happen") that triggers more kicks
+- Each apology contains intent language ("I'll stop", "Won't happen") that triggers more kicks. The model never calls `final_answer`.
 
-The model never calls `final_answer`. It keeps apologizing in text, and each apology matches the overbroad patterns. The `final_answer` tool is available but the model doesn't use it because: (1) the kick message says "if I've already finished, I can use final_answer" which is too soft, and (2) there's no `tool_choice` constraint forcing tool use.
-
-Key code paths:
-- `core.ts:259-261` -- `final_answer` injected into `activeTools` when `lastKickReason === "narration"`
-- `core.ts:288` -- `tool_choice = "required"` only set when `options.toolChoiceRequired`, NOT after kicks
-- `core.ts:303` -- same for non-Azure path
-- `core.ts:328-348` -- kick detection loop: `detectKick` fires, `toolRounds++`, kick message appended, `continue`
-
-The pattern matching is in `core.ts` (surface-agnostic) -- it would fire on standard Teams too if the model said "I'll show you...". The visible symptoms (kick messages as separate persistent messages) are specific to Copilot + buffered via Bug 2. On standard Teams in buffered mode the kicks would still waste API round trips but wouldn't show as separate messages.
+The pattern matching is in `core.ts` (surface-agnostic) -- it fires regardless of surface. The visible symptoms (kick messages as separate persistent messages) are specific to Copilot + buffered via Bug 2. On standard Teams in buffered mode the kicks still waste API round trips but don't show as separate messages.
 
 **Fix (a): Prune overbroad patterns.** Six patterns to remove (match normal conversational English):
 - `/\bi'll\b/i` -- "I'll show your backlog"
@@ -110,9 +108,9 @@ The pattern matching is in `core.ts` (surface-agnostic) -- it would fire on stan
 - `/\bi'm \w+ing\b/i` -- matches "I'm glad", "I'm happy", "I'm sorry"
 - `/\bi am \w+ing\b/i` -- same
 
-**Fix (b): Make escape hatch reliable.** After N consecutive kicks (e.g., 2), force `tool_choice: { type: "function", function: { name: "final_answer" } }` so the model MUST call `final_answer` instead of responding with more text. Also rewrite the kick message to be more explicit about using the tool. Even if the first kick was legitimate, repeated kicks make zero sense -- the system must recover, not spiral.
+**Fix (b): Force `final_answer` after consecutive kicks.** After `kickCount >= 2`, set `tool_choice = { type: "function", function: { name: "final_answer" } }` at `core.ts:288` (Azure) and `core.ts:303` (non-Azure). Small change -- add a condition alongside the existing `options?.toolChoiceRequired` check. Repeated kicks make zero sense -- the system must recover, not spiral.
 
-Kick message rewrite: must not match any remaining pattern AND must clearly direct the model to call `final_answer`. Verify with unit test.
+Also rewrite the kick message: must not match any remaining pattern AND must clearly direct the model to call `final_answer`. Verify with unit test.
 
 Update existing tests: `kicks.test.ts:25` expects "I can help with that" -> true. Must be updated. Add regression tests with conversational responses that must NOT trigger kicks. Add tests for forced `tool_choice` after consecutive kicks.
 
@@ -217,7 +215,7 @@ Five changes:
 ## Decisions Made
 - Bug 1 is the top priority. The bot must know who the user is. Three-line fix with optional chaining handles both surfaces.
 - Bug 2 requires both Copilot Chat surface AND buffered mode. Copilot + streaming delivers in correct order. Standard Teams + buffered works clean. Fix: safeSend to safeUpdate in buffered branch.
-- Bug 4 has two root causes: (a) overbroad patterns match normal English, (b) `final_answer` escape hatch is available but not forced -- model responds with apologetic text instead of calling the tool. Fix both: prune 6 patterns AND force `tool_choice` after N consecutive kicks. Repeated kicks make zero sense -- the system must recover, not spiral.
+- Bug 4 has two verified root causes: (a) 6 overbroad patterns match normal English, (b) `final_answer` escape hatch is toothless -- tool is injected into `activeTools` (core.ts:259-261) but `tool_choice` is never forced after kicks (core.ts:288/303 only check `options.toolChoiceRequired`). Fix both: prune patterns AND set `tool_choice` to force `final_answer` after `kickCount >= 2`.
 - Bug 4 pattern matching is surface-agnostic (core.ts). Visible symptoms are specific to Copilot + buffered via Bug 2.
 - Bug 3 confirmed on both surfaces. Two issues: new-friend instruction is aspirational not directive, and ephemerality instruction uses "something important" which lets model skip saving. Fix both: directive new-friend behavior + aggressive save-anything bar.
 - Bug 5 = Bug 4 + Bug 2. Bug 6 = Bug 4. Both resolve automatically.
