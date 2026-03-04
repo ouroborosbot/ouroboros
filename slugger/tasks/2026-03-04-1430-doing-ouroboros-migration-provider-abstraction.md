@@ -2,7 +2,7 @@
 
 **Status**: drafting
 **Execution Mode**: pending
-**Created**: 2026-03-04 15:27
+**Created**: 2026-03-04 15:26
 **Planning**: ./2026-03-04-1430-planning-ouroboros-migration-provider-abstraction.md
 **Artifacts**: ./2026-03-04-1430-doing-ouroboros-migration-provider-abstraction/
 
@@ -61,17 +61,17 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 
 ### ⬜ Unit 0: Baseline and file map
 **What**: Capture current branch baseline for provider/config/loading code paths and current tests before edits.
-**Output**: Baseline notes file in artifacts directory with command outputs and touched-file map.
+**Output**: Baseline notes file in artifacts directory with command outputs and touched-file map for `src/config.ts`, `src/identity.ts`, `src/heart/core.ts`, `src/heart/streaming.ts`, `src/mind/prompt.ts`, `src/senses/{cli,teams}.ts`, and related `src/__tests__/**`.
 **Acceptance**: Baseline artifact exists and identifies all files to change for migration, provider abstraction, and provider integrations.
 
 ### ⬜ Unit 1a: Storage/config migration docs and contracts — Tests
-**What**: Add/adjust tests that define required path and config contracts (`agent.json`, `secrets.json`, `.agentstate`) including failure cases for missing contracts.
-**Output**: Failing contract test cases for config path resolution, context loading location, and legacy-path rejection behavior.
+**What**: Add/adjust tests in `src/__tests__/identity.test.ts`, `src/__tests__/config.test.ts`, and path-dependent suites to define required contracts (`agent.json`, `secrets.json`, `.agentstate`) including fail-fast cases for missing/invalid contracts.
+**Output**: Failing contract tests for `agent.json.configPath -> ~/.agentsecrets/<agent>/secrets.json`, context loading from `agent.json`, and runtime/session/log/test-run paths under `~/.agentstate`.
 **Acceptance**: New/updated tests exist and fail red against current behavior.
 
 ### ⬜ Unit 1b: Storage/config migration docs and contracts — Implementation
-**What**: Implement path contract changes and config-loading updates; add `cross-agent-docs/agent-storage-migration-playbook.md` with explicit one-time migration instructions.
-**Output**: Runtime/config loader updates plus migration runbook markdown.
+**What**: Implement path contract changes in `src/config.ts`, `src/identity.ts`, `src/senses/{cli,teams}.ts`, and nerves test-run path modules; add `cross-agent-docs/agent-storage-migration-playbook.md` with explicit one-time migration instructions.
+**Output**: Runtime/config loader updates, state-path updates, and migration runbook markdown.
 **Acceptance**: Contract tests pass green; no runtime fallback to legacy `.agentconfigs` paths.
 
 ### ⬜ Unit 1c: Storage/config migration docs and contracts — Coverage & Refactor
@@ -80,12 +80,12 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Acceptance**: 100% coverage on new migration/config code and tests remain green.
 
 ### ⬜ Unit 2a: Provider abstraction registry — Tests
-**What**: Add failing tests defining provider interface/registry behavior and per-agent provider resolution without singleton coupling.
+**What**: Add failing tests in `src/__tests__/heart/core.test.ts` and `src/__tests__/mind/prompt.test.ts` defining provider interface/registry behavior and per-agent provider resolution without singleton coupling.
 **Output**: Failing abstraction/registry tests for per-agent provider lookup and engine integration contracts.
 **Acceptance**: Tests fail red and prove engine no longer depends on hardcoded provider branching.
 
 ### ⬜ Unit 2b: Provider abstraction registry — Implementation
-**What**: Implement provider abstraction + registry and rewire request path to use per-agent provider selection.
+**What**: Implement provider abstraction + registry, rewire `src/heart/core.ts` request path to use provider interface selection, and update prompt provider reporting in `src/mind/prompt.ts` to consume abstraction output.
 **Output**: Provider interface, registry wiring, engine integration changes.
 **Acceptance**: Provider abstraction tests pass green and Azure/MiniMax regression tests remain passing.
 
@@ -95,12 +95,12 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Acceptance**: 100% coverage on new abstraction code with full related tests green.
 
 ### ⬜ Unit 3a: Provider-owned streaming/input behavior — Tests
-**What**: Add failing tests that lock streaming/input behavior in provider implementations instead of engine-level provider branches.
+**What**: Add failing tests around `src/heart/core.ts`/`src/heart/streaming.ts` to lock provider-owned streaming/input behavior instead of engine-level provider branches.
 **Output**: Failing tests proving provider-owned streaming/input behavior contracts.
 **Acceptance**: Tests fail red against old flow.
 
 ### ⬜ Unit 3b: Provider-owned streaming/input behavior — Implementation
-**What**: Move provider-specific streaming/input state handling into provider implementations.
+**What**: Move provider-specific streaming/input state handling (including current Azure-specific input accumulation) into provider implementations behind the registry abstraction.
 **Output**: Provider implementation updates and simplified engine flow.
 **Acceptance**: Streaming behavior tests pass green and parity holds for Azure/MiniMax.
 
@@ -110,7 +110,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Acceptance**: 100% coverage on new provider-side streaming code and tests green.
 
 ### ⬜ Unit 4a: Anthropic setup-token integration — Tests
-**What**: Add failing tests for Anthropic provider behavior, setup-token profile loading, and explicit auth-failure messaging.
+**What**: Add failing tests for Anthropic provider behavior, setup-token profile loading contract, and explicit auth-failure messaging in the same heart/config test suites used by provider selection.
 **Output**: Failing Anthropic provider/auth tests for success and fail-fast error paths.
 **Acceptance**: Anthropic tests fail red before implementation.
 
@@ -125,7 +125,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Acceptance**: 100% coverage on new Anthropic integration code and tests green.
 
 ### ⬜ Unit 5a: OpenAI Codex OAuth integration — Tests
-**What**: Add failing tests for `openai-codex` provider behavior, OAuth profile loading, and explicit auth-failure messaging.
+**What**: Add failing tests for `openai-codex` provider behavior, OAuth profile loading contract, and explicit auth-failure messaging in provider/config test suites.
 **Output**: Failing OpenAI Codex provider/auth tests for success and fail-fast error paths.
 **Acceptance**: OpenAI Codex tests fail red before implementation.
 
@@ -140,12 +140,12 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Acceptance**: 100% coverage on new OpenAI Codex integration code and tests green.
 
 ### ⬜ Unit 6a: Migration runbook and storage-contract docs
-**What**: Finalize `cross-agent-docs/agent-storage-migration-playbook.md` and document one-time migration expectations and cleanup policy.
+**What**: Finalize `cross-agent-docs/agent-storage-migration-playbook.md` with explicit `~/.agentconfigs` -> `~/.agentsecrets`/`~/.agentstate` moves, validation steps, and post-migration cleanup notes for the other machine.
 **Output**: Migration runbook updates and supporting docs aligned to new storage boundaries.
 **Acceptance**: Runbook has explicit move/verify/cleanup steps and matches implemented storage paths.
 
 ### ⬜ Unit 6b: Provider/config contract docs
-**What**: Update `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, and related provider/config docs to reflect provider IDs, auth profile flows, and fail-fast behavior.
+**What**: Update `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, `slugger/agent.json`, and related provider/config docs to reflect provider IDs, auth profile flows, and fail-fast behavior.
 **Output**: Documentation updates aligned to implemented provider/config behavior.
 **Acceptance**: Documentation reflects final runtime provider behavior and config contracts without contradictions.
 
@@ -171,3 +171,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 ## Progress Log
 - 2026-03-04 15:27 Created from planning doc
 - 2026-03-04 15:30 Granularity pass: added missing unit outputs and split docs/final verification into atomic units
+- 2026-03-04 15:35 Validation pass: aligned units to actual repository files and current legacy path usage (`.agentconfigs`) to be migrated
