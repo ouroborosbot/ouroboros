@@ -349,3 +349,4 @@ Five changes:
 - 2026-03-03 20:56 Bug 4 tightened: all code paths verified with line numbers (core.ts:259-261, 288, 303, 346), removed speculative language, concrete fix location identified
 - 2026-03-03 21:02 Added cross-cutting themes (4 themes for work-doer context) and restructured Context/References into fix-site references per bug + supporting references
 - 2026-03-03 21:09 Bug 2 corrected: safeSend was intentional design (teams.ts:52-58 comments), not an accident. Removed "3-line fix" claim. Added 3 fix options (A/B/C), marked as needing Gate 1 testing. Added open question for fix approach.
+- 2026-03-03 21:12 Bug 2 root cause found: safeSend is fire-and-forget (catchAsync attaches .catch() but never awaits). Multiple ctx.send() race. Fix: serialize via promise chain. Removed options A/B/C, resolved open question.
