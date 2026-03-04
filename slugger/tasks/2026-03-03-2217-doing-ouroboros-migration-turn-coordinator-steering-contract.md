@@ -56,7 +56,7 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Setup/Research
+### ✅ Unit 0: Setup/Research
 **What**: Lock baseline callsites and contracts for migration from Teams-local lock/cap to shared turn coordinator + steering injection path; enumerate references to `withConversationLock`, `_inFlightTeamsTurns`, `maxConcurrentConversations`, and current same-conversation follow-up handling points. Identify exact model-call boundaries in `heart/core.ts` that are safe steering injection points.
 **Output**: `./2026-03-03-2217-doing-ouroboros-migration-turn-coordinator-steering-contract/unit-0-baseline.md`
 **Acceptance**: Baseline inventory covers runtime/test callsites, safe injection boundary map, and explicit contract cases (ordering, carry-forward, no-dedupe scope).
@@ -122,3 +122,4 @@ Remove Teams hard reject-on-cap behavior and replace silent same-conversation wa
 - 2026-03-04 11:53 Historical (superseded at 12:21): generalized doing dedupe contract to channel message identity and locked no steering-specific buffer cap (existing context trimming/window applies).
 - 2026-03-04 12:21 Removed follow-up dedupe/idempotency from doing scope to match locked no-scope-expansion direction.
 - 2026-03-04 13:17 Renamed task slug from `turn-coordinator-locking-refactor` to `turn-coordinator-steering-contract` to match current scope.
+- 2026-03-04 13:26 Unit 0 complete: baseline inventory captured runtime/config/test callsites and safe model-call steering boundaries.
