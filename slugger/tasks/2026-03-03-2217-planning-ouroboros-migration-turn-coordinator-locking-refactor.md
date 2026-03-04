@@ -11,10 +11,11 @@ Remove Teams hard reject-on-cap behavior and preserve ordered per-conversation e
 ## Scope
 
 ### In Scope
-- Remove the global hard reject path in Teams that denies turns when `maxConcurrentConversations` is reached.
+- Remove the global hard reject path in Teams that denies turns based on in-flight cap checks.
 - Introduce a channel-agnostic turn coordinator module that serializes turns by conversation/session key.
 - Move current per-conversation lock behavior out of `src/senses/teams.ts` into the shared coordinator.
 - Update Teams integration to use the shared coordinator and preserve current same-conversation ordering guarantees.
+- Remove `teamsChannel.maxConcurrentConversations` entirely from config/types/defaults/tests and runtime code paths.
 - Update tests to validate lock behavior through the new coordinator and verify hard reject behavior is removed.
 
 ### Out of Scope
@@ -24,6 +25,7 @@ Remove Teams hard reject-on-cap behavior and preserve ordered per-conversation e
 
 ## Completion Criteria
 - [ ] Teams no longer hard-rejects messages based on a static concurrent-turn cap.
+- [ ] `teamsChannel.maxConcurrentConversations` is fully removed from config schema/defaults/accessors and call sites.
 - [ ] A shared turn coordinator exists and is used by Teams for per-conversation serialization.
 - [ ] Same-conversation turns remain serialized; different-conversation turns remain parallelizable.
 - [ ] Existing confirmation flow remains deadlock-safe with the coordinator in place.
@@ -40,17 +42,18 @@ Remove Teams hard reject-on-cap behavior and preserve ordered per-conversation e
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [ ] Should `teamsChannel.maxConcurrentConversations` be removed from config in this task or left temporarily as deprecated/no-op for compatibility?
+- None.
 
 ## Decisions Made
 - Remove app-level hard reject-on-cap behavior from runtime request handling.
+- Remove `teamsChannel.maxConcurrentConversations` entirely (no deprecated/no-op compatibility field).
 - Keep serialization constraints (the correctness part) and make them channel-agnostic via a shared turn coordinator.
 - Treat load-balancing/replica-scale solutions as infrastructure concerns outside this code task.
 
 ## Context / References
 - `src/senses/teams.ts` (`withConversationLock`, in-flight cap gate in `handleTeamsMessage`)
 - `src/__tests__/senses/teams.test.ts` (serialization and cap tests)
-- `src/config.ts` (`teamsChannel.maxConcurrentConversations`)
+- `src/config.ts` and `src/__tests__/config.test.ts` (teams channel config schema/defaults)
 - Prior completed cleanup task docs:
   - `slugger/tasks/2026-03-03-2036-planning-ouroboros-migration-single-replica-hardening-cleanup.md`
   - `slugger/tasks/2026-03-03-2036-doing-ouroboros-migration-single-replica-hardening-cleanup.md`
