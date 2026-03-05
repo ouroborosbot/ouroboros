@@ -3903,7 +3903,7 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.3-codex",
+          model: "gpt-5.2",
           oauthAccessToken: "oauth-test-token",
         },
       },
@@ -3916,7 +3916,7 @@ describe("openai-codex oauth provider contract", () => {
     try {
       const core = await import("../../heart/core")
       expect(core.getProvider()).toBe("openai-codex")
-      expect(core.getModel()).toBe("gpt-5.3-codex")
+      expect(core.getModel()).toBe("gpt-5.2")
       expect(mockExit).not.toHaveBeenCalled()
     } finally {
       mockExit.mockRestore()
@@ -3929,7 +3929,7 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.3-codex",
+          model: "gpt-5.2",
           oauthAccessToken: "",
         },
       },
@@ -3958,7 +3958,7 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.3-codex",
+          model: "gpt-5.2",
           oauthAccessToken: "oauth-test-token",
         },
       },
@@ -3995,7 +3995,7 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.3-codex",
+          model: "gpt-5.2",
           oauthAccessToken: "oauth-test-token",
         },
       },
@@ -4030,7 +4030,7 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.3-codex",
+          model: "gpt-5.2",
           oauthAccessToken: " \n\t ",
         },
       },
@@ -4058,7 +4058,7 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.3-codex",
+          model: "gpt-5.2",
           oauthAccessToken: "oauth-test-token",
         },
       },
@@ -4133,7 +4133,7 @@ describe("openai-codex oauth provider contract", () => {
     expect(second.content).toBe("done")
     expect(mockResponsesCreate).toHaveBeenCalledTimes(2)
     expect(mockResponsesCreate.mock.calls[0][0]).toEqual(expect.objectContaining({
-      model: "gpt-5.3-codex",
+      model: "gpt-5.2",
       tool_choice: "required",
       metadata: { trace_id: "trace-openai-codex" },
     }))
@@ -4145,7 +4145,7 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.3-codex",
+          model: "gpt-5.2",
           oauthAccessToken: "oauth-test-token",
         },
       },
@@ -4180,7 +4180,7 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.3-codex",
+          model: "gpt-5.2",
           oauthAccessToken: "oauth-test-token",
         },
       },

@@ -134,7 +134,7 @@ const DEFAULT_SECRETS_TEMPLATE: Record<string, unknown> = {
       setupToken: "",
     },
     "openai-codex": {
-      model: "gpt-5.3-codex",
+      model: "gpt-5.2",
       oauthAccessToken: "",
     },
   },
