@@ -1,3 +1,5 @@
+/* eslint-disable no-console -- terminal UX: autonomous loop progress output */
+
 /**
  * Unit 6: Autonomous Loop — wires reflection into the sub-agent pipeline.
  *

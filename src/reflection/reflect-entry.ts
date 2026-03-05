@@ -1,3 +1,5 @@
+/* eslint-disable no-console -- terminal UX: CLI entry point for reflection */
+
 // Entry point for `npm run reflect` — runs a single reflection cycle.
 // Usage: node dist/reflection/reflect-entry.js --agent ouroboros [--dry-run]
 
