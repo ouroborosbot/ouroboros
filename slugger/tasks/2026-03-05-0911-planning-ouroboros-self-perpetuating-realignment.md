@@ -76,3 +76,4 @@ Current branch baseline is green (`npm test`: 50 files passed, 1474 tests total,
 
 ## Progress Log
 - 2026-03-05 09:12 Created
+- 2026-03-05 09:14 Narrowed task-file cleanup scope to initial self-perpetuating-run artifacts; preserve valid historical ouroboros tasks
