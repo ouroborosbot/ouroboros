@@ -1004,7 +1004,7 @@ Changes:
 **Output**: New test cases in `src/__tests__/repertoire/tools.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because the note handler currently stores `{ key: "name" }` as a regular note
 
-### ⬜ Unit 23b: "name" note -> displayName redirect -- Implementation
+### ✅ Unit 23b: "name" note -> displayName redirect -- Implementation
 **What**: Add a redirect check at the top of the `type === "note"` block in `src/repertoire/tools-base.ts` (before the existing conflict check):
 
 ```typescript
