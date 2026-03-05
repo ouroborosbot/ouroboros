@@ -289,7 +289,7 @@ describe("buildSystem", () => {
     setTestConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.3-codex",
+          model: "gpt-5.2",
           oauthAccessToken: "oauth-token-for-tests",
         },
       },
@@ -301,7 +301,7 @@ describe("buildSystem", () => {
       const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
       resetPsycheCache()
       const result = await buildSystem()
-      expect(result).toContain("openai codex (gpt-5.3-codex)")
+      expect(result).toContain("openai codex (gpt-5.2)")
     } finally {
       mockExit.mockRestore()
     }
