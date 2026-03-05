@@ -875,7 +875,7 @@ Tests to KEEP AS-IS (these currently pass and assert behavior we are keeping):
 **Output**: Modified `src/__tests__/mind/prompt.test.ts`, new `src/__tests__/mind/first-impressions.test.ts`, modified `src/__tests__/mind/friends/resolver.test.ts`
 **Acceptance**: New/rewritten tests FAIL (red) because: `first-impressions.ts` does not exist, priority guidance line still present, name quality line still present, `isNewFriend` still uses notes check, auto-name not implemented. Existing kept tests still PASS.
 
-### ⬜ Unit 21h: Prompt rewrite + first-impressions module + auto-name -- Implementation
+### ✅ Unit 21h: Prompt rewrite + first-impressions module + auto-name -- Implementation
 **What**: Three sets of changes implementing the refined instruction architecture.
 
 1. **Rewrite `contextSection()` in `src/mind/prompt.ts`**:
@@ -1021,3 +1021,4 @@ Tests to KEEP AS-IS (these currently pass and assert behavior we are keeping):
 - 2026-03-04 18:58 Unit 21e complete: accumulateFriendTokens helper in tokens.ts (early-return guards, ?? 0 fallback, updatedAt refresh). Wired into teams.ts after postTurn (guarded by toolContext?.context?.friend?.id) and cli.ts after postTurn. 1313 tests pass, build clean
 - 2026-03-04 18:59 Unit 21f complete: tokens.ts 100% coverage. teams.ts 98.63/98.64/95.91/99.22 -- uncovered lines 266, 594 are pre-existing (onClearText, ctxSend). Token accumulation call site at line 498 covered. No refactoring needed
 - 2026-03-04 19:03 Unit 21g complete: 8 failing tests across 3 files -- 6 prompt.test.ts (priority guidance absent, get-to-know absent, name quality absent x2, onboarding threshold, save-anything directive), 2 resolver.test.ts (auto-name Jordan, auto-name Unknown skipped), 1 first-impressions.test.ts file fails at import. 1310 other tests pass
+- 2026-03-04 19:05 Unit 21h complete: contextSection rewritten (removed priority guidance, name quality line, isNewFriend; added 4 always-on directives + getFirstImpressions call). Created first-impressions.ts (ONBOARDING_TOKEN_THRESHOLD=100K, isOnboarding, getFirstImpressions with displayName/Unknown variants). Auto-name in resolver.ts (notes: { name: displayName } when not "Unknown"). 1329 tests pass, build clean
