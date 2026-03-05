@@ -981,7 +981,7 @@ Changes:
 **Output**: Modified `src/mind/friends/types.ts`, `src/mind/friends/store-file.ts`, `src/mind/friends/resolver.ts`, `src/repertoire/tools-base.ts`, `src/mind/prompt.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 22c: Timestamped notes -- Coverage & Refactor
+### ✅ Unit 22c: Timestamped notes -- Coverage & Refactor
 **What**: Verify 100% coverage on all modified code paths:
 1. **types.ts**: type change only, no runtime code to cover
 2. **store-file.ts**: structured notes round-trip through put/get/merge
