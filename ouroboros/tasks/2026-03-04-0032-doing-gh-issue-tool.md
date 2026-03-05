@@ -51,7 +51,7 @@ Allow agents using the ouroboros harness to create GitHub issues via the GitHub 
 ### Legend
 ⬜ Not started . 🔄 In progress . ✅ Done . ❌ Blocked
 
-### ⬜Unit 0: Config + Type Updates
+### ✅Unit 0: Config + Type Updates
 **What**: Update `ToolContext` in `tools-base.ts` to add `githubToken?: string`. Update `OAuthConfig` in `config.ts` to add `githubConnectionName: string` with empty string default.
 **Output**: Updated `tools-base.ts` and `config.ts`
 **Acceptance**: Types compile, existing tests still pass. No functional change yet.
