@@ -1,6 +1,6 @@
 # Doing: Nerves Logging Policy Enforcement
 
-**Status**: drafting
+**Status**: READY_FOR_EXECUTION
 **Execution Mode**: direct
 **Created**: 2026-03-05 09:56
 **Planning**: ./2026-03-05-0953-planning-nerves-logging-policy.md
@@ -46,14 +46,14 @@ Enforce the console-to-nerves migration with an ESLint `no-console` rule so new 
 ## Work Units
 
 ### Legend
-Not started: not started | In progress: in progress | Done: done | Blocked: blocked
+⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
-### Unit 1: Install ESLint and create config
+### ⬜ Unit 1: Install ESLint and create config
 **What**: Install `eslint` and `typescript-eslint` as devDependencies. Create `eslint.config.js` (flat config) with `no-console: "error"` scoped to `src/**/*.ts`, explicitly excluding `src/__tests__/**` from the no-console rule. Add `"lint": "eslint src/"` script to `package.json`.
 **Output**: `eslint.config.js` created, `package.json` updated with eslint deps and lint script
 **Acceptance**: `npx eslint --print-config src/identity.ts` shows `no-console: "error"`; `npx eslint --print-config src/__tests__/somefile.ts` does NOT show `no-console: "error"` (or shows "off")
 
-### Unit 2: Annotate exception sites
+### ⬜ Unit 2: Annotate exception sites
 **What**: Add `// eslint-disable-next-line no-console -- <category>: <reason>` above each of the 8 legitimate console.* calls:
 - `src/cli-entry.ts:9` -- `// eslint-disable-next-line no-console -- pre-boot guard: --agent check before imports`
 - `src/teams-entry.ts:9` -- `// eslint-disable-next-line no-console -- pre-boot guard: --agent check before imports`
@@ -63,20 +63,20 @@ Not started: not started | In progress: in progress | Done: done | Blocked: bloc
 - `src/senses/cli.ts:474` -- `// eslint-disable-next-line no-console -- terminal UX: goodbye`
 - `src/nerves/coverage/cli.ts:34` -- `// eslint-disable-next-line no-console -- meta-tooling: audit error message`
 - `src/nerves/coverage/cli.ts:49` -- `// eslint-disable-next-line no-console -- meta-tooling: audit result message`
-**Output**: All 8 files updated with disable comments
+**Output**: 4 files updated with 8 disable comments total
 **Acceptance**: `npm run lint` passes with zero violations
 
-### Unit 3: Integrate lint into coverage gate
+### ⬜ Unit 3: Integrate lint into coverage gate
 **What**: Add `npm run lint` as a step in `scripts/run-coverage-gate.cjs`, running before vitest. If lint fails, the gate fails with a `type: "lint"` required action.
 **Output**: Updated `scripts/run-coverage-gate.cjs`
 **Acceptance**: `npm run test:coverage` runs lint as part of the gate; lint failure causes gate failure
 
-### Unit 4: Document logging policy
+### ⬜ Unit 4: Document logging policy
 **What**: Add "Logging Policy" section to `AGENTS.md` (after Git Discipline) covering: all runtime logging uses `emitNervesEvent()`, three exception categories, disable-line annotation format, new events must register in REQUIRED_EVENTS. Add brief mention in `CONTRIBUTING.md` under Code section.
 **Output**: Updated `AGENTS.md` and `CONTRIBUTING.md`
 **Acceptance**: Both files contain logging policy content; policy matches the three categories and annotation format
 
-### Unit 5: Final verification
+### ⬜ Unit 5: Final verification
 **What**: Run `npm run lint` and `npm test` to verify everything passes end-to-end. Run `npm run test:coverage` to verify the full gate (including lint integration).
 **Output**: Clean lint, passing tests, passing coverage gate
 **Acceptance**: All three commands exit 0 with no errors or warnings
