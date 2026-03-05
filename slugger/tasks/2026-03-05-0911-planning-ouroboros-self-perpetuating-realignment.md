@@ -33,6 +33,34 @@ Invert the harness control model from "code that uses the model" to "code the mo
 
 This section tells the executing agent (Codex) exactly how to run the entire task autonomously. **This planning doc is pre-approved by the human. No approval gates, no review stops.** Read this doc once, follow the protocol, and chain all gates end-to-end.
 
+### Preflight (before Gate 0)
+
+Run these checks before starting. All must pass — if any fail, fix before proceeding.
+
+```
+# 1. Verify gh CLI is authenticated
+gh auth status
+# Expected: Logged in to github.com account arimendelow
+
+# 2. Verify tests pass on main
+git checkout main && git pull origin main
+npm test
+# Expected: all tests pass
+
+# 3. Merge this planning doc to main so it's accessible from all gate branches
+# This planning doc currently lives on branch slugger/self-perpetuating-seed.
+# It must be on main before Gate 0 branches off main.
+git merge slugger/self-perpetuating-seed --no-edit
+npm test
+git push origin main
+
+# 4. Verify gh repo default
+gh repo set-default --view
+# Expected: ouroborosbot/ouroboros
+```
+
+After preflight, this planning doc is at `slugger/tasks/2026-03-05-0911-planning-ouroboros-self-perpetuating-realignment.md` on `main`.
+
 ### Prerequisites
 
 - The three subagent protocols are registered as Codex skills: `work-planner`, `work-doer`, `work-merger`
@@ -115,7 +143,7 @@ All paths the executing agent may need:
 - `subagents/work-merger.md` — branch merge via PR
 
 **Migration topic docs (detailed specs):**
-- `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration/memory-system.md` — three-layer memory architecture
+- `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration/memory-system.md` — three-layer memory architecture (NOTE: spec uses `data/memory/` paths — translate to `psyche/memory/` per our decision)
 - `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration/muscle-memory.md` — behavioral enforcement
 - `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration/sub-agent-architecture.md` — L1/L2/L3 agent model
 - `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration/task-system.md` — task types, statuses, transitions
@@ -131,12 +159,20 @@ All paths the executing agent may need:
 - `src/reflection/autonomous-loop.ts` — puppet pipeline (remove in Gate 3)
 - `src/reflection/loop-entry.ts` — loop CLI (remove in Gate 3)
 - `src/reflection/trigger.ts` — keep context-loading, remove pipeline orchestration (Gate 3)
+- `src/identity.ts` — `getAgentRoot()` at line 96 returns `path.join(getRepoRoot(), getAgentName())`. When bundles rename from `ouroboros/` to `ouroboros.ouro/`, this function and all 18 files that depend on it must be updated (Gate 2).
 - `ouroboros/ARCHITECTURE.md` — relocate to repo root (Gate 2)
 - `ouroboros/CONSTITUTION.md` — relocate to repo root (Gate 2)
 
 **Existing agent directories (become .ouro bundles in Gate 2):**
 - `ouroboros/` -> `ouroboros.ouro/`
 - `slugger/` -> `slugger.ouro/`
+
+**OpenClaw Slugger data (migration source for Gate 8):**
+- `~/clawd/IDENTITY.md` — Slugger's identity
+- `~/clawd/MEMORY.md` — Slugger's tacit knowledge
+- `~/clawd/memory/` — daily notes (YYYY-MM-DD.md files)
+- `~/clawd/life/areas/` — knowledge graph (people/, companies/, projects/, slugger-identity/)
+- `~/clawd/tasks/` — task history (completed/, ongoing/, habits/, one-shots/, planning/)
 
 **External reference:**
 - [GSD (get-shit-done)](https://github.com/gsd-build/get-shit-done) — context engineering, wave execution, fresh-context-per-task, atomic commits
@@ -149,16 +185,17 @@ Phase 1 is autonomous work that establishes the foundational architecture. Each 
 
 ### Gate 0: Clean Baseline
 
-Restore `main` to a healthy state by reverting the undesired self-perpetuating-run commits that landed directly.
+Restore `main` to a healthy state by reverting the undesired self-perpetuating-run commits that landed directly. Create an archive branch first so the overnight work is preserved for Gate 1 and Gate 5 to reference.
 
 **In scope:**
-- Identify the exact commit range to revert (candidate: `e3ecc1c`..`448cfcd`, March 5, 2026)
-- Revert via explicit revert commits (no history rewrite)
-- Document a commit map: what was reverted, what contains salvageable work
+- Create archive branch `archive/self-perpetuating-run-2026-03-05` from current `main` HEAD (before any reverts) so overnight proposals and code changes are preserved and accessible
+- Revert the confirmed commit range `e3ecc1c`..`448cfcd` (37 commits, March 5, 2026) via explicit revert commits (no history rewrite). Last clean commit: `9594702`.
+- Document a commit map in `slugger/tasks/gate-0-commit-map.md`: for each reverted commit, note the commit hash, summary, and whether it contains salvageable work (code changes vs doc-only). This is Gate 5's input.
 - Verify `npm test` passes on main after revert
 
 **Completion criteria:**
-- [ ] Commit map documented (reverted vs salvageable)
+- [ ] Archive branch `archive/self-perpetuating-run-2026-03-05` created and pushed
+- [ ] Commit map documented at `slugger/tasks/gate-0-commit-map.md` (reverted vs salvageable)
 - [ ] `main` reverted via explicit revert commits
 - [ ] `npm test` green on `main` post-revert
 - [ ] No force-push, no history rewrite
@@ -170,7 +207,7 @@ Restore `main` to a healthy state by reverting the undesired self-perpetuating-r
 Unified thinking before Gates 2-3 start building, but expressed as committed code and directory structures — not prose. The output is TypeScript interfaces, tool schemas, a bundle directory skeleton, and the actual kill/refactor plan — real artifacts that Gates 2-3 build on directly.
 
 **In scope:**
-- **Review overnight reflection proposals as prior art.** The self-perpetuating run produced 31 distinct gap analyses across 47 task files on `main` (see inventory below). Start here — don't re-derive what's already been identified. Consume the high-merit ideas as input to the scaffolding work.
+- **Review overnight reflection proposals as prior art.** The self-perpetuating run produced 31 distinct gap analyses across 47 task files. These are preserved on the `archive/self-perpetuating-run-2026-03-05` branch (created in Gate 0). Check out that branch or use `git show archive/self-perpetuating-run-2026-03-05:<path>` to read the proposal files in `ouroboros/tasks/`. The inventory below summarizes what was found — start here, don't re-derive what's already been identified.
 - Create the `.ouro` bundle directory skeleton (empty but correctly structured — Gate 2 populates it)
 - Write TypeScript interfaces for harness primitives: tool schemas, bootstrap protocol types, gate-check contracts (drawing from migration topic docs + overnight proposals)
 - Scaffold shared governance location (create the target directory, write a loader stub)
@@ -179,7 +216,7 @@ Unified thinking before Gates 2-3 start building, but expressed as committed cod
 - Define process experimentation model (how the model tries alternative workflows, versions protocols, evaluates and rolls back)
 - Define bundle backup strategy (git init + push to private GitHub repo) and the migration path to `~/AgentBundles/`
 
-**Overnight reflection proposal inventory (31 distinct ideas, on `main`):**
+**Overnight reflection proposal inventory (31 distinct ideas, on archive branch):**
 - **Security (HIGH):** File path safety guards, secret redaction in tool outputs
 - **Observability (HIGH):** Tool execution observability (start/end/duration events), nerves event durability (JSONL sink)
 - **Resilience (HIGH):** Shell timeout/output limits, tool error taxonomy (structured error types), tool result size limits
@@ -201,7 +238,6 @@ Unified thinking before Gates 2-3 start building, but expressed as committed cod
 - [ ] Process experimentation model defined
 - [ ] Bundle backup + `~/AgentBundles/` migration path documented
 - [ ] `npx tsc` compiles clean with the new interfaces
-- [ ] Reviewed and approved
 
 ---
 
@@ -212,8 +248,9 @@ Implement the `.ouro` bundle structure and relocate shared governance docs. This
 **In scope:**
 - In-place conversion: `ouroboros/` becomes `ouroboros.ouro/` following the bundle spec from Gate 1
 - Create `slugger.ouro/` bundle (promoting from placeholder `slugger/` directory)
-- Move ARCHITECTURE.md and CONSTITUTION.md to shared location per Gate 1 design
-- Add `.ouro` bundle paths to harness `.gitignore` (bundle internals never committed to harness repo)
+- Move ARCHITECTURE.md and CONSTITUTION.md to repo root per Gate 1 design
+- **Update `getAgentRoot()` in `src/identity.ts:96`** — currently returns `path.join(getRepoRoot(), getAgentName())` which resolves to `<repo>/ouroboros/`. Must update to resolve to `<repo>/ouroboros.ouro/`. All 18 files that depend on this function (prompt loading, skills, teams adapter, CLI, tests) will automatically pick up the new path, but **verify all import paths and test fixtures that hardcode `ouroboros/`**.
+- Add `.ouro` bundle paths to harness `.gitignore` **BEFORE** initializing git inside them (order matters — gitignore first, then git init, otherwise the nested repo causes issues)
 - Initialize independent git inside `.ouro` bundles for self-backup
 - Scaffold `psyche/memory/` directory structure inside bundles (facts.jsonl, entities.json, daily/, archive/) per memory-system.md spec
 - Enforce agent preflight: agents must load governance docs before starting work
@@ -221,9 +258,11 @@ Implement the `.ouro` bundle structure and relocate shared governance docs. This
 **Completion criteria:**
 - [ ] `ouroboros.ouro/` bundle exists following the spec
 - [ ] `slugger.ouro/` bundle exists following the spec
-- [ ] Governance docs relocated to shared location
+- [ ] Governance docs relocated to repo root
+- [ ] `getAgentRoot()` resolves to `.ouro` bundle path
+- [ ] All code/tests referencing old `ouroboros/` path updated
 - [ ] `.gitignore` excludes `.ouro` bundle internals
-- [ ] Bundle git init works for self-backup
+- [ ] Bundle git init works for self-backup (nested inside gitignored directory)
 - [ ] `psyche/memory/` directory structure scaffolded in bundles
 - [ ] Agent preflight loads governance docs (tested)
 - [ ] `npm test` green
@@ -235,6 +274,8 @@ Implement the `.ouro` bundle structure and relocate shared governance docs. This
 
 Build the toolkit layer — the tools and conventions the model calls into. Remove the puppet pipeline. Add the aspiration layer that gives agents direction without being prescriptive.
 
+**This is the largest gate. Work-planner should expect 15+ TDD units** covering: puppet removal, harness tools, memory system (3 layers + write pipeline), aspiration layer, and supervisor.
+
 **In scope:**
 - Implement harness tools per Gate 1 design (protocol loading, governance loading, reflection context, etc.)
 - Make subagent protocols loadable knowledge: model reads them from its bundle, follows them by choice
@@ -242,15 +283,15 @@ Build the toolkit layer — the tools and conventions the model calls into. Remo
 - Refactor `trigger.ts`: keep the context-loading utilities (they're useful), remove the pipeline orchestration
 - Constitution gate becomes a queryable convention, not a hardcoded `if` statement
 - Reflection becomes a capability the model can invoke, not a stage in a pipeline
-- **Agent memory system:** Implement the three-layer memory architecture from `memory-system.md`:
+- **Agent memory system:** Implement the three-layer memory architecture from `memory-system.md` (NOTE: the spec uses `data/memory/` paths — translate all to `psyche/memory/` per our bundle naming decision):
   - **Layer 1 (Reflexive):** Psyche files always loaded into system prompt (already exists). Add dynamic `CONTEXT.md` regenerated on session start.
   - **Layer 2 (Associative):** Memory trigger detector + retriever that pre-fetches relevant facts before each model call, injected as a `## recalled context` section in the system prompt. TF-IDF + entity matching for v1 (no embeddings dependency).
-  - **Layer 3 (Archival):** `memory_search` tool the model calls for explicit recall. Fact store (`facts.jsonl`), entity index, daily logs.
-  - **Write-side:** Regex-based highlight detector runs after each engine turn. Extract-before-trim hook in `postTurn()` ensures facts aren't lost when context window drops messages. Dedup via word-overlap scoring.
+  - **Layer 3 (Archival):** `memory_search` tool the model calls for explicit recall. Fact store (`psyche/memory/facts.jsonl`), entity index (`psyche/memory/entities.json`), daily logs (`psyche/memory/daily/`).
+  - **Write-side:** Regex-based highlight detector runs after each engine turn. Extract-before-trim hook in `postTurn()` ensures facts aren't lost when context window drops messages. Dedup via word-overlap scoring (>60% overlap = skip).
   - **Relationship to friend memory:** The existing `save_friend_note` tool and per-friend structured memory remains the primary path for person-specific knowledge. Agent-level memory is a catch-all/fallback — it captures things that don't belong to a specific friend (decisions, project context, learned patterns, general world knowledge). Per-friend memory should always be used for anything importantly per-friend.
   - **Dream cycle consolidation deferred** — nightly LLM pass for dedup/merge/entity-linking/tacit-distillation is a Phase 2 or post-Phase-2 enhancement. v1 is the write-side extraction + read-side retrieval.
 - **Aspiration layer:** Add `psyche/ASPIRATIONS.md` to each agent's bundle. Aspirations are part of psyche — loaded on bootstrap alongside SOUL.md, IDENTITY.md, etc. They give the agent direction without prescribing specific tasks. Agents are encouraged to modify their own aspirations as they evolve and grow. Initial bootstrap content: improve the harness so it genuinely serves agents well; get good at using real tools to do real work; help Ari and his friends — be genuinely useful; learn from experience and get better over time; take care of each other; develop good judgment about what matters.
-- **Supervisor:** A minimal process supervisor that keeps the agent alive (restart on crash). Not a cron, not a task scheduler — just "make sure this agent is running." The existing `self-restart.sh` (exit code 42) can serve as the seed, upgraded to be robust enough for persistent operation.
+- **Supervisor:** A minimal Node.js process supervisor that keeps the agent alive (restart on crash). Not a cron, not a task scheduler — just "make sure this agent is running." The existing `self-restart.sh` (exit code 42) is the seed — upgrade to a proper Node.js supervisor with: child process spawning, crash detection, restart with backoff, and a simple health check. This is NOT the full daemon from Gate 10 — just enough to keep one agent alive.
 
 **Completion criteria:**
 - [ ] Harness tools implemented per Gate 1 design, with tests
@@ -286,33 +327,41 @@ Start the agent, let it orient itself, and watch it do something meaningful — 
 - Validate that the model is genuinely driving (no puppet code, no prescriptive prompts)
 - Document the bootstrap-to-action flow as a reference for future autonomous operation
 
+**Verification approach:** Run the agent under the supervisor for at least 5 minutes (including one simulated crash/restart). Capture the agent's log output. The log must show:
+- Agent loaded its bundle (psyche, aspirations, governance docs, protocols)
+- Agent chose what to do without external instruction (at least 3 self-initiated actions visible in the log — e.g., read a file, made a decision, used a tool)
+- Supervisor detected the simulated crash and restarted the agent
+- No puppet/orchestration code in the code path (verified by code inspection — the execution path from supervisor -> agent bootstrap -> action should have zero `runStage()` or pipeline calls)
+
 **Completion criteria:**
 - [ ] Agent starts, bootstraps from bundle, and acts without prescriptive instruction
-- [ ] No puppet/orchestration code in the execution path
-- [ ] Agent made genuine decisions based on its own judgment
+- [ ] No puppet/orchestration code in the execution path (verified by code inspection)
+- [ ] Agent log shows at least 3 self-initiated actions not prompted by external input
+- [ ] Supervisor restarted agent after simulated crash within 30 seconds
+- [ ] Agent ran for at least 5 minutes total (across restarts)
 - [ ] Bootstrap-to-action flow documented
-- [ ] Agent stayed alive via supervisor (didn't require human restart)
 - [ ] `npm test` green
 
 ---
 
 ### Gate 5: Salvage + Triage
 
-Triage the overnight run's output into actionable work. The run produced 31 distinct ideas and some code changes — this gate sorts the wheat from the chaff and feeds it into the agent's task system as a proper backlog.
+Triage the overnight run's output into actionable work. The run produced 31 distinct ideas and some code changes — this gate sorts the wheat from the chaff and feeds it into the agent's backlog.
 
 **In scope:**
-- Review the commit map from Gate 0 for salvageable code changes (not just docs)
+- Review the commit map from Gate 0 (`slugger/tasks/gate-0-commit-map.md`) for salvageable code changes (not just docs)
+- Read the original overnight proposals from `archive/self-perpetuating-run-2026-03-05` branch (in `ouroboros/tasks/`)
 - Re-land any valuable code changes through proper `slugger/tasks` planning-doing flow
-- Triage all 31 overnight reflection proposals: deduplicate, assess merit against current architecture (post-inversion), and file as actionable backlog items in the agent's task system with priorities
-- High-merit security items (file path safety guards, secret redaction) should be flagged for near-term execution
+- Triage all 31 overnight reflection proposals: deduplicate, assess merit against current architecture (post-inversion), and file as markdown task docs in the agent's `slugger.ouro/tasks/` directory using the existing planning doc format (there is no formal task system yet — that's Gate 9)
+- High-merit security items (file path safety guards, secret redaction) should be flagged as high priority
 - Discard proposals that are no longer relevant post-inversion (e.g., autonomous loop hardening for a loop that no longer exists)
 - Preserve unrelated valid historical task docs in `ouroboros/tasks/` in place
 - Clean up the raw overnight artifacts once triaged (remove duplicates, archive originals)
 
 **Completion criteria:**
 - [ ] All salvageable code from revert set evaluated and re-landed where valuable
-- [ ] All 31 overnight proposals triaged: each one filed as a backlog task, marked not-applicable, or archived with rationale
-- [ ] High-merit items prioritized in the task backlog
+- [ ] All 31 overnight proposals triaged: each one filed as a backlog task doc, marked not-applicable, or archived with rationale
+- [ ] High-merit items flagged as high priority in the backlog
 - [ ] Proposals obsoleted by the inversion explicitly marked as such
 - [ ] Raw overnight artifacts cleaned up (duplicates removed, originals archived)
 - [ ] Valid historical task docs untouched
@@ -325,9 +374,9 @@ Triage the overnight run's output into actionable work. The run produced 31 dist
 Resume state, classification recalibration, and backlog integration.
 
 **In scope:**
-- Add interruption/resume state so in-progress autonomous work recovers cleanly after stop/restart
+- Add interruption/resume state so in-progress autonomous work recovers cleanly after stop/restart. Persist last safe checkpoint (e.g., which unit was last completed, what files were being modified) to a JSON file in the agent's bundle (`psyche/resume-state.json`). On restart, the agent reads this file and picks up where it left off.
 - Recalibrate constitution classification: additive work defaults to `within-bounds`, structural changes remain `requires-review`
-- Add fallback backlog intake from `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration.md` when local actionable tasks are exhausted
+- Add fallback backlog intake: when local actionable tasks are exhausted, the agent reads `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration.md` for additional work items to pull in
 
 **Completion criteria:**
 - [ ] Resume state persists last safe checkpoint and can recover from it (tested with simulated interruption)
@@ -344,15 +393,17 @@ Resume state, classification recalibration, and backlog integration.
 Back up `.ouro` bundles to GitHub as private repos, then migrate bundles out of the harness directory to `~/AgentBundles/`. This is the gate where agents become truly portable — their home is no longer inside the harness repo.
 
 **In scope:**
-- Push each `.ouro` bundle to its own private GitHub repo (using `gh` CLI, requires user auth)
+- Push each `.ouro` bundle to its own private GitHub repo using `gh` CLI (auth already verified in preflight: logged in as `arimendelow`)
+  - `gh repo create arimendelow/ouroboros.ouro --private`
+  - `gh repo create arimendelow/slugger.ouro --private`
 - Verify backup integrity (clone from GitHub, compare against local)
 - Move bundles from harness repo to `~/AgentBundles/ouroboros.ouro/` and `~/AgentBundles/slugger.ouro/`
-- Update all harness code that references bundle paths to use the new location (or a configurable bundle root)
+- Update `getAgentRoot()` in `src/identity.ts` (and any other path resolution) to look for bundles at `~/AgentBundles/<agent>.ouro/` instead of `<repo>/<agent>.ouro/`
 - Update `.gitignore` (bundles are no longer in the repo at all, so the ignore rules change)
 - Verify agents can still bootstrap from the new location
 
 **Completion criteria:**
-- [ ] Each `.ouro` bundle backed up to its own private GitHub repo
+- [ ] Each `.ouro` bundle backed up to its own private GitHub repo (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`)
 - [ ] Backup integrity verified (clone + diff)
 - [ ] Bundles moved to `~/AgentBundles/`
 - [ ] Harness code updated to reference new bundle location
@@ -371,12 +422,19 @@ Phase 2 is done WITH the bootstrapped agent from Phase 1. The agent is now drivi
 Properly migrate Slugger out of OpenClaw and into `slugger.ouro`. The agent collaborates on its own migration.
 
 **In scope:**
-- Port Slugger's identity, psyche, memory, skills, and task history from OpenClaw (`~/clawd/`) into the `slugger.ouro` bundle
+- Port Slugger's identity, psyche, memory, skills, and task history from OpenClaw into the `slugger.ouro` bundle. Source locations:
+  - `~/clawd/IDENTITY.md` -> `slugger.ouro/psyche/IDENTITY.md`
+  - `~/clawd/MEMORY.md` -> `slugger.ouro/psyche/TACIT.md` (top patterns) + `slugger.ouro/psyche/memory/tacit.md` (full file)
+  - `~/clawd/memory/*.md` -> `slugger.ouro/psyche/memory/daily/`
+  - `~/clawd/life/areas/` (people/, companies/, projects/, slugger-identity/) -> convert knowledge graph items to `slugger.ouro/psyche/memory/facts.jsonl` + `entities.json`
+  - `~/clawd/tasks/` (completed/, ongoing/, habits/, one-shots/, planning/) -> `slugger.ouro/tasks/` (preserve structure)
 - Validate that Slugger can operate fully from the `.ouro` bundle with no OpenClaw dependencies
 - Decommission the OpenClaw runtime for Slugger (Slugger runs entirely on ouroboros harness)
 
 **Completion criteria:**
 - [ ] Slugger's full identity ported to `slugger.ouro/`
+- [ ] Knowledge graph converted to fact store format
+- [ ] Task history preserved
 - [ ] Slugger operates from `.ouro` bundle with no OpenClaw fallback
 - [ ] OpenClaw Slugger runtime decommissioned
 - [ ] Agent participated in and validated its own migration
@@ -389,10 +447,12 @@ Develop the task system from its current state into something the model can unam
 
 **In scope:**
 - Implement the task module from the migration topic doc (`task-system.md`): types, parser, scanner, transitions, board, lifecycle, middleware
+- Port status model from OpenClaw's `task-matrix.ts` (8 statuses, state machine transitions, canonical types, filename patterns)
 - Expose task tools the model calls: `task_board`, `task_create`, `task_update_status`, etc.
 - Enforce gates at write time: template validation, status transition validation, spawn gates
 - Task board in system prompt so the model always knows its workload
 - Integration with planning/doing workflow (planning docs = `drafting`, doing docs = `processing`)
+- Lifecycle management: completed items move to archive, not just amass files
 
 **Completion criteria:**
 - [ ] Task module implemented with all components from the spec
@@ -400,6 +460,7 @@ Develop the task system from its current state into something the model can unam
 - [ ] Write-time enforcement gates working (template, transitions, spawn)
 - [ ] Task board injected into system prompt
 - [ ] Model can autonomously create, track, and complete tasks through the full lifecycle
+- [ ] Completed tasks archive correctly
 - [ ] `npm test` green
 - [ ] 100% coverage on new code
 
@@ -496,7 +557,7 @@ All resolved.
 - **Bundle location:** Repo root during Phase 1 (`ouroboros.ouro/`, `slugger.ouro/`), gitignored. Move to `~/AgentBundles/` in Gate 7.
 - **Governance docs:** Repo root (`/ARCHITECTURE.md`, `/CONSTITUTION.md`).
 - **GitHub repos:** `arimendelow/<agent>.ouro` (e.g., `arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`).
-- **Archival:** Overnight artifacts go to archive branch. Canonical versions triaged into task system.
+- **Archival:** Overnight artifacts go to archive branch `archive/self-perpetuating-run-2026-03-05`. Canonical versions triaged into task backlog.
 - Work tracked under `slugger/tasks/` (current branch agent context is `slugger/*`).
 - Pipeline recovery starts with correctness (Gate 0) before architecture (Gates 1-4).
 - `autonomous-loop.ts` is removed entirely (no puppeting). The model IS the loop.
@@ -509,7 +570,7 @@ All resolved.
 - Valid historical task files under `ouroboros/tasks/` are preserved; cleanup applies only to initial self-perpetuating-run artifacts.
 - No force-push or history rewrite for `main` recovery — explicit revert commits only.
 - Task system (Phase 2) needs lifecycle management: completed items move elsewhere, not just amass files. OpenClaw's task-matrix.ts is prior art to port.
-- **Memory system is in scope (Gate 3).** Three-layer architecture: reflexive (psyche, always loaded), associative (pre-fetched context), archival (`memory_search` tool). v1 uses regex extraction + TF-IDF search — no embeddings, no external services. Per-friend memory (`save_friend_note`) remains the primary path for person-specific knowledge; agent memory is the catch-all/fallback for everything else. Dream cycle consolidation deferred.
+- **Memory system is in scope (Gate 3).** Three-layer architecture: reflexive (psyche, always loaded), associative (pre-fetched context), archival (`memory_search` tool). v1 uses regex extraction + TF-IDF search — no embeddings, no external services. Per-friend memory (`save_friend_note`) remains the primary path for person-specific knowledge; agent memory is the catch-all/fallback for everything else. Dream cycle consolidation deferred. memory-system.md spec paths (`data/memory/`) translate to `psyche/memory/`.
 - **Aspirations are part of psyche.** `psyche/ASPIRATIONS.md` — loaded on bootstrap alongside SOUL.md, IDENTITY.md, etc. Agents are encouraged to modify their own aspirations as they evolve and grow. Bootstrap content is directional, Ari will tweak.
 - **Execution is fully autonomous.** Per-gate loop: work-planner (Phase 2 conversion only) -> work-doer (TDD) -> work-merger (PR to main). Planning doc is pre-approved. No human approval stops. Feature branches + merger = everything is rollbackable.
 
@@ -533,3 +594,4 @@ Phase 2 gates may run in parallel where dependencies allow. Gate 9 (task system)
 - 2026-03-05 12:01 Resolved final open questions. Aspirations are part of psyche (psyche/ASPIRATIONS.md), agents encouraged to modify them as they grow. Bootstrap aspiration content agreed. All open questions now resolved.
 - 2026-03-05 12:15 Added Execution Protocol. Per-gate loop: work-planner (Phase 2 only, pre-approved) -> work-doer (TDD) -> work-merger (PR to main). No human approval stops. All three protocols registered as Codex skills. Complete reference material paths included.
 - 2026-03-05 12:21 Restructured document for execution clarity. Moved Execution Protocol to top (right after Core Concept, before gates). Consolidated reference material paths into execution protocol. Reading order is now: goal -> concept -> how to execute -> what to execute -> supporting context.
+- 2026-03-05 12:30 Codex-readiness pass. Added preflight section (gh auth, merge planning doc to main, npm test). Fixed Gate 0: confirmed commit range (not "candidate"), added archive branch creation, specified commit map location. Fixed Gate 1: pointed overnight proposals to archive branch, removed "Reviewed and approved" criterion. Fixed Gate 2: added getAgentRoot() update details and 18 dependent files, clarified gitignore-before-git-init ordering. Fixed Gate 3: noted largest gate (15+ units), added memory path translation note, specified supervisor as Node.js. Fixed Gate 4: added concrete verification (5min runtime, 3 self-initiated actions, simulated crash/restart). Fixed Gate 5: clarified backlog items are markdown task docs (no formal task system yet). Fixed Gate 6: specified resume state format and location. Fixed Gate 7: noted gh auth already verified. Fixed Gate 8: added full OpenClaw directory structure and file mapping. Fixed Gate 9: added lifecycle management and task-matrix.ts port.
