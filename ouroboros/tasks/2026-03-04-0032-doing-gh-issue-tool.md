@@ -182,7 +182,7 @@ Note: These tests may need to be integration-style or verify behavior through mo
 **Output**: Failing tests
 **Acceptance**: Tests exist and FAIL (red)
 
-### ⬜Unit 5b: Teams Token Handling -- Implementation
+### ✅Unit 5b: Teams Token Handling -- Implementation
 **What**: Update `src/senses/teams.ts`:
 1. Add `githubToken?: string` to `TeamsMessageContext` interface
 2. In `handleTeamsMessage`: add `githubToken: teamsContext.githubToken` to the `toolContext` object
