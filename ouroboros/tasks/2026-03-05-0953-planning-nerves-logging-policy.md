@@ -131,4 +131,4 @@ Achieve 100% nerves observability coverage across all production source files: e
 ## Progress Log
 - 2026-03-05 09:54 Created
 - 2026-03-05 09:54 Resolved open questions, updated decisions, approved
-- TBD Scope expanded: bidirectional audit + full nerves coverage of all production files
+- 2026-03-05 10:05 Scope expanded: bidirectional audit + full nerves coverage of all production files
