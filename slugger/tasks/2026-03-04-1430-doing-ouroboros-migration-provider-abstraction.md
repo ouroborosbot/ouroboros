@@ -18,9 +18,9 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 ## Completion Criteria
 - [ ] Provider abstraction is in place and engine no longer branches on hardcoded provider names in the request path.
 - [ ] Azure and MiniMax behavior is preserved with passing regression tests.
-- [ ] Anthropic provider is integrated behind the same provider interface with setup-token auth profile support.
+- [x] Anthropic provider is integrated behind the same provider interface with setup-token auth profile support.
 - [ ] OpenAI Codex provider is integrated behind the same provider interface with OAuth auth profile support.
-- [ ] Anthropic setup-token flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
+- [x] Anthropic setup-token flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
 - [ ] OpenAI Codex OAuth flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
 - [ ] Provider selection is per-agent and config-driven (no global singleton lock-in).
 - [x] Provider-specific implementation logic is extracted from `src/heart/core.ts` into `src/heart/providers/*` modules before Unit 5 work, with behavior parity confirmed by tests.
@@ -176,7 +176,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Coverage artifacts `unit-4l-coverage.txt` and `unit-4l-coverage-summary.json`.
 **Acceptance**: New Anthropic hardening code is at 100% coverage, related tests remain green, and coverage artifacts are saved.
 
-### ⬜ Unit 4m: Anthropic setup-token integration — Manual validation gate
+### ✅ Unit 4m: Anthropic setup-token integration — Manual validation gate
 **What**: Execute a real end-to-end Anthropic turn using the setup-token profile path (no mocks), including a tool-calling prompt, and capture sanitized evidence.
 **Output**: Manual validation artifacts `unit-4m-manual-validation.txt`, `unit-4m-manual-validation.json`, and `unit-4m-manual-validation.stderr.txt`.
 **Acceptance**: Live Anthropic run succeeds via setup-token auth, tool calls execute with valid arguments, failure mode includes explicit re-auth guidance, and all manual artifacts are present.
@@ -264,3 +264,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 19:01 Unit 4j complete: added Anthropic streamed tool-argument red regression for malformed `content_block_start` + `input_json_delta` assembly (`unit-4j-red-run.txt`, `unit-4j-jest.json`, `unit-4j-red-run.exit`)
 - 2026-03-04 19:04 Unit 4k complete: implemented Anthropic streamed tool-argument reconstruction hardening with green targeted tests/build (`unit-4k-green-run.txt`, `unit-4k-jest.json`, `unit-4k-build.txt`)
 - 2026-03-04 19:07 Unit 4l complete: added edge-path Anthropic argument assembly coverage tests and reached 100% coverage/build on provider hardening code (`unit-4l-coverage.txt`, `unit-4l-coverage-summary.json`, `unit-4l-build.txt`)
+- 2026-03-04 19:20 Unit 4m complete: executed live Anthropic setup-token CLI validation, captured tool-call/session evidence, and captured fail-fast + runtime re-auth guidance evidence (`unit-4m-manual-validation.txt`, `unit-4m-manual-validation.json`, `unit-4m-manual-validation.stderr.txt`)
