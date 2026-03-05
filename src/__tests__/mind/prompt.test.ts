@@ -24,7 +24,6 @@ vi.mock("../../identity", () => {
   const DEFAULT_AGENT_CONTEXT = {
     maxTokens: 80000,
     contextMargin: 20,
-    maxToolOutputChars: 20000,
   }
   return {
     DEFAULT_AGENT_CONTEXT,
@@ -79,7 +78,6 @@ function setAgentProvider(provider: "azure" | "minimax" | "anthropic" | "openai-
   const DEFAULT_AGENT_CONTEXT = {
     maxTokens: 80000,
     contextMargin: 20,
-    maxToolOutputChars: 20000,
   }
   vi.mocked(identity.loadAgentConfig).mockReturnValue({
     name: "testagent",

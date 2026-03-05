@@ -39,7 +39,6 @@ vi.mock("../../identity", () => ({
   DEFAULT_AGENT_CONTEXT: {
     maxTokens: 80000,
     contextMargin: 20,
-    maxToolOutputChars: 20000,
   },
   getAgentName: vi.fn(() => "testagent"),
   getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
@@ -3998,7 +3997,6 @@ describe("anthropic setup-token provider contract", () => {
         model: "",
       }),
       getContextConfig: () => ({
-        maxToolOutputChars: 50000,
         maxTokens: 120000,
         contextMargin: 2000,
       }),
@@ -7078,44 +7076,6 @@ describe("confirmation system", () => {
     const toolMsg = messages.find((m: any) => m.role === "tool" && m.tool_call_id === "tc_mut")
     expect(toolMsg).toBeDefined()
     expect(toolMsg.content).not.toContain("cancelled")
-  })
-
-  it("truncates tool output exceeding maxToolOutputChars", async () => {
-    await setupConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } }, context: { maxToolOutputChars: 50 } })
-
-    const hugeOutput = "x".repeat(100)
-    vi.mocked(fs.readFileSync).mockReturnValue(hugeOutput)
-
-    let callCount = 0
-    mockCreate.mockImplementation(() => {
-      callCount++
-      if (callCount === 1) {
-        return makeStream([
-          makeChunk(undefined, [
-            { index: 0, id: "tc1", function: { name: "read_file", arguments: '{"path":"big.txt"}' } },
-          ]),
-        ])
-      }
-      return makeStream([makeChunk("done")])
-    })
-
-    const callbacks: ChannelCallbacks = {
-      onModelStart: () => {},
-      onModelStreamStart: () => {},
-      onTextChunk: () => {},
-      onReasoningChunk: () => {},
-      onToolStart: () => {},
-      onToolEnd: () => {},
-      onError: () => {},
-    }
-
-    const messages: any[] = [{ role: "system", content: "test" }]
-    await runAgent(messages, callbacks)
-
-    const toolMsg = messages.find((m: any) => m.role === "tool" && m.tool_call_id === "tc1")
-    expect(toolMsg).toBeDefined()
-    expect(toolMsg.content).toContain("output too large")
-    expect(toolMsg.content).toContain("100 chars")
   })
 
   it("re-reads friend record from disk each turn when friendStore is present", async () => {

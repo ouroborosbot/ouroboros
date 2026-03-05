@@ -127,7 +127,6 @@ describe("loadAgentConfig", () => {
       context: {
         maxTokens: 80000,
         contextMargin: 20,
-        maxToolOutputChars: 20000,
       },
       phrases: {
         thinking: ["working"],

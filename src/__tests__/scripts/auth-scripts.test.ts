@@ -46,7 +46,6 @@ function createAgentWorkspace(agent: string): { workspaceDir: string; homeDir: s
         context: {
           maxTokens: 80000,
           contextMargin: 20,
-          maxToolOutputChars: 20000,
         },
         phrases: {
           thinking: ["working"],

@@ -42,7 +42,6 @@ export interface OAuthConfig {
 export interface ContextConfig {
   maxTokens: number
   contextMargin: number
-  maxToolOutputChars: number
 }
 
 export interface TeamsChannelConfig {
@@ -321,9 +320,6 @@ export function getContextConfig(): ContextConfig {
     contextMargin: typeof agentContext.contextMargin === "number"
       ? agentContext.contextMargin
       : defaults.contextMargin,
-    maxToolOutputChars: typeof agentContext.maxToolOutputChars === "number"
-      ? agentContext.maxToolOutputChars
-      : defaults.maxToolOutputChars,
   }
 }
 
