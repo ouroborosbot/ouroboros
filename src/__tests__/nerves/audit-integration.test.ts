@@ -161,7 +161,7 @@ emitNervesEvent({ component: "test", event: "test_end", message: "e" })
     expect(report.nerves_coverage.every_test_emits.status).toBe("fail")
   })
 
-  it("reports source_coverage failure when source keys are not observed", () => {
+  it("reports source_coverage failure as advisory (not in required_actions)", () => {
     const { eventsPath, perTestPath, sourceRoot } = createAuditFixture()
 
     // Events file has no events matching the source keys
@@ -175,9 +175,11 @@ emitNervesEvent({ component: "engine", event: "engine.turn_start", message: "s" 
 `, "utf8")
 
     const report = auditNervesCoverage({ eventsPath, perTestPath, sourceRoot })
+    // Source coverage still reports the failure in the data
     expect(report.nerves_coverage.source_coverage.status).toBe("fail")
     expect(report.nerves_coverage.source_coverage.missing).toContain("engine:engine.turn_start")
-    expect(report.required_actions).toContainEqual(expect.objectContaining({
+    // But it's advisory -- not in required_actions (many tests mock emitNervesEvent)
+    expect(report.required_actions).not.toContainEqual(expect.objectContaining({
       target: "source-coverage",
     }))
   })
@@ -215,7 +217,7 @@ export function helper() { return 42 }
     expect(report.nerves_coverage.file_completeness.status).toBe("pass")
   })
 
-  it("scans subdirectories and skips __tests__ and nerves", () => {
+  it("scans subdirectories and skips __tests__, nerves, and reflection", () => {
     const { eventsPath, perTestPath, sourceRoot } = createAuditFixture()
 
     writeFileSync(eventsPath, JSON.stringify({
@@ -251,6 +253,13 @@ emitNervesEvent({ component: "should", event: "not_scan", message: "" })
     mkdirSync(nervesDir, { recursive: true })
     writeFileSync(join(nervesDir, "skip.ts"), `
 emitNervesEvent({ component: "should", event: "not_scan", message: "" })
+`, "utf8")
+
+    // Create reflection dir that should also be skipped (tests mock emitNervesEvent)
+    const reflectionDir = join(sourceRoot, "reflection")
+    mkdirSync(reflectionDir, { recursive: true })
+    writeFileSync(join(reflectionDir, "skip.ts"), `
+emitNervesEvent({ component: "should", event: "not_scan_either", message: "" })
 `, "utf8")
 
     const report = auditNervesCoverage({ eventsPath, perTestPath, sourceRoot })

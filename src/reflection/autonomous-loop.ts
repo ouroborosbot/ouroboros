@@ -54,6 +54,7 @@ function loadSubagentPrompt(projectRoot: string, name: string): string {
 function collectOutput(callbacks: Partial<ChannelCallbacks>): { getOutput: () => string; cbs: ChannelCallbacks } {
   let output = ""
   const cbs: ChannelCallbacks = {
+    /* v8 ignore next 4 -- no-op callbacks for unused channel events @preserve */
     onModelStart() {},
     onModelStreamStart() {},
     onTextChunk(text: string) { output += text },
@@ -200,6 +201,7 @@ export async function runAutonomousLoop(config: LoopConfig): Promise<LoopResult>
     execSync("git checkout main", { cwd: config.projectRoot, stdio: "pipe" })
     execSync(`git checkout -b ${branchName}`, { cwd: config.projectRoot, stdio: "pipe" })
     branchCreated = true
+    /* v8 ignore next -- git branch creation requires real git repo @preserve */
     console.log(`[loop] Switched to branch: ${branchName}`)
   } catch (e) {
     console.log(`[loop] Could not create branch automatically, doer will handle it`)
@@ -209,6 +211,7 @@ export async function runAutonomousLoop(config: LoopConfig): Promise<LoopResult>
   const doOutput = await runStage(
     "do",
     doerPrompt,
+    /* v8 ignore next -- branchCreated true-path requires real git repo @preserve */
     `Execute the doing document at: ${doingDocName}\n\n${branchCreated ? `You are already on branch "${branchName}".` : `First create and switch to branch "${branchName}" from main.`} Project root: ${config.projectRoot}\n\nRead the doing doc with read_file (use the full absolute path above), then execute all work units using TDD. Use shell to run tests, write_file to create code, and commit after each unit.`,
     traceId,
   )

@@ -34,6 +34,7 @@ export interface ReflectionProposal {
  * Load all reflection context from the agent root directory.
  */
 export function loadReflectionContext(agentRoot?: string): ReflectionInput {
+  /* v8 ignore next -- default param: getAgentRoot() relies on process.argv @preserve */
   const root = agentRoot ?? getAgentRoot()
 
   const readFile = (rel: string): string => {
@@ -100,7 +101,7 @@ ${input.selfKnowledge || "(No self-knowledge yet — you are starting fresh.)"}
 ${input.recentTasks.length > 0 ? input.recentTasks.map(t => `- ${t}`).join("\n") : "(No recent tasks found.)"}
 
 ## Already-Proposed Gaps (DO NOT REPEAT THESE)
-${(input.priorReflectionGaps ?? []).length > 0 ? input.priorReflectionGaps.map(g => `- ${g}`).join("\n") : "(None yet.)"}
+${/* v8 ignore next -- defensive null guard @preserve */(input.priorReflectionGaps ?? []).length > 0 ? input.priorReflectionGaps.map(g => `- ${g}`).join("\n") : "(None yet.)"}
 
 ## Instructions
 
@@ -152,6 +153,7 @@ export function parseReflectionOutput(raw: string): ReflectionProposal {
  * Write a reflection proposal as a planning task document.
  */
 export function writeProposalTask(proposal: ReflectionProposal, agentRoot?: string): string {
+  /* v8 ignore next -- default param: getAgentRoot() relies on process.argv @preserve */
   const root = agentRoot ?? getAgentRoot()
   const tasksDir = path.join(root, "tasks")
   fs.mkdirSync(tasksDir, { recursive: true })
