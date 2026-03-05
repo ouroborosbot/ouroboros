@@ -14,6 +14,7 @@ import { getAgentName, getAgentRoot } from "../identity"
 import { createTraceId } from "../nerves"
 import { FileFriendStore } from "../mind/friends/store-file"
 import { FriendResolver } from "../mind/friends/resolver"
+import { accumulateFriendTokens } from "../mind/friends/tokens"
 import type { ToolContext } from "../repertoire/tools"
 import { configureCliRuntimeLogger } from "./cli-logging"
 
@@ -463,6 +464,7 @@ export async function main() {
       process.stdout.write("\n\n")
 
       postTurn(messages, sessPath, result?.usage)
+      await accumulateFriendTokens(friendStore, resolvedContext.friend.id, result?.usage)
 
       if (closed) break
       process.stdout.write("\x1b[36m> \x1b[0m")

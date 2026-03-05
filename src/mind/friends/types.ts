@@ -36,11 +36,12 @@ export interface ExternalId {
 // Split across two storage backends by PII boundary.
 export interface FriendRecord {
   id: string                              // stable UUID
-  displayName: string
+  name: string
   externalIds: ExternalId[]               // PII
   tenantMemberships: string[]             // PII
   toolPreferences: Record<string, string> // keyed by integration name
-  notes: Record<string, string>           // general friend knowledge
+  notes: Record<string, { value: string, savedAt: string }> // general friend knowledge (timestamped)
+  totalTokens: number                     // cumulative token usage across all turns
   createdAt: string                       // ISO date
   updatedAt: string
   schemaVersion: number

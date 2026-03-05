@@ -36,6 +36,7 @@ export interface TeamsConfig {
 export interface OAuthConfig {
   graphConnectionName: string
   adoConnectionName: string
+  githubConnectionName: string
 }
 
 export interface ContextConfig {
@@ -46,7 +47,7 @@ export interface ContextConfig {
 
 export interface TeamsChannelConfig {
   skipConfirmation: boolean
-  disableStreaming: boolean
+  flushIntervalMs?: number
   port: number
 }
 
@@ -100,10 +101,10 @@ const DEFAULT_SECRETS_TEMPLATE: Omit<OuroborosConfig, "context"> = {
   oauth: {
     graphConnectionName: "graph",
     adoConnectionName: "ado",
+    githubConnectionName: "",
   },
   teamsChannel: {
     skipConfirmation: true,
-    disableStreaming: false,
     port: 3978,
   },
   integrations: {
@@ -333,8 +334,8 @@ export function getOAuthConfig(): OAuthConfig {
 
 export function getTeamsChannelConfig(): TeamsChannelConfig {
   const config = loadConfig()
-  const { skipConfirmation, disableStreaming, port } = config.teamsChannel
-  return { skipConfirmation, disableStreaming, port }
+  const { skipConfirmation, flushIntervalMs, port } = config.teamsChannel
+  return { skipConfirmation, flushIntervalMs, port }
 }
 
 export function getIntegrationsConfig(): IntegrationsConfig {

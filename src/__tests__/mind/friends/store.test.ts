@@ -5,11 +5,12 @@ import type { FriendRecord } from "../../../mind/friends/types"
 function makeFriend(overrides: Partial<FriendRecord> = {}): FriendRecord {
   return {
     id: "uuid-1",
-    displayName: "Jordan",
+    name: "Jordan",
     externalIds: [],
     tenantMemberships: [],
     toolPreferences: {},
     notes: {},
+    totalTokens: 0,
     createdAt: "2026-03-02T00:00:00.000Z",
     updatedAt: "2026-03-02T00:00:00.000Z",
     schemaVersion: 1,

@@ -3,6 +3,7 @@ import { tools, baseToolDefinitions } from "./tools-base";
 import type { ToolContext, ToolDefinition } from "./tools-base";
 import { teamsToolDefinitions, summarizeTeamsArgs } from "./tools-teams";
 import { adoSemanticToolDefinitions } from "./ado-semantic";
+import { githubToolDefinitions, summarizeGithubArgs } from "./tools-github";
 import type { ChannelCapabilities } from "../mind/friends/types";
 import { emitNervesEvent } from "../nerves/runtime";
 
@@ -12,7 +13,7 @@ export type { ToolContext, ToolHandler, ToolDefinition } from "./tools-base";
 export { teamsTools } from "./tools-teams";
 
 // All tool definitions in a single registry
-const allDefinitions: ToolDefinition[] = [...baseToolDefinitions, ...teamsToolDefinitions, ...adoSemanticToolDefinitions];
+const allDefinitions: ToolDefinition[] = [...baseToolDefinitions, ...teamsToolDefinitions, ...adoSemanticToolDefinitions, ...githubToolDefinitions];
 const REMOTE_BLOCKED_LOCAL_TOOLS = new Set(["shell", "read_file", "write_file", "git_commit", "gh_cli"]);
 
 function baseToolsForCapabilities(capabilities?: ChannelCapabilities): OpenAI.ChatCompletionTool[] {
@@ -46,7 +47,7 @@ export function getToolsForChannel(
     return baseTools;
   }
   const available = new Set(capabilities.availableIntegrations);
-  const integrationDefs = [...teamsToolDefinitions, ...adoSemanticToolDefinitions].filter(
+  const integrationDefs = [...teamsToolDefinitions, ...adoSemanticToolDefinitions, ...githubToolDefinitions].filter(
     (d) => d.integration && available.has(d.integration),
   );
 
@@ -156,6 +157,10 @@ export function summarizeArgs(name: string, args: Record<string, string>): strin
   // Check teams tools first
   const teamsSummary = summarizeTeamsArgs(name, args);
   if (teamsSummary !== undefined) return teamsSummary;
+
+  // Check github tools
+  const githubSummary = summarizeGithubArgs(name, args);
+  if (githubSummary !== undefined) return githubSummary;
 
   // Base tools
   if (name === "read_file" || name === "write_file") return summarizeKeyValues(args, ["path"]);

@@ -37,12 +37,25 @@ For the full testing policy (TDD flow, CI gate, mocking conventions, verificatio
 
 For merge strategy, conflict resolution, retry, and escalation policy, see [cross-agent-docs/sync-and-merge-conventions.md](cross-agent-docs/sync-and-merge-conventions.md).
 
+## P0: Never Lose User-Facing Content
+
+Any text generated for the end user MUST reach them. Truncation, silent drops, and size-limit failures are all content loss. When output exceeds a channel's message size limit, **split and send in chunks** — never truncate. This applies everywhere: final_answer delivery, tool result summaries, error messages. If content was meant for the user to see, they see all of it.
+
 ## Code
 
 - `src/` is shared harness infrastructure — test thoroughly, keep 100% coverage, no agent-specific logic
 - `{agent}/` is your directory — modify freely (`agent.json`, `psyche/`, `tasks/`, `skills/`, `manifest/`)
 - Always use a coding agent (Claude Code or equivalent) for code work
 - TypeScript: strict mode, named exports, no unused locals/params, no `any` without justification
+
+## Tool Descriptions
+
+Tool definitions (`function.description`) and system prompt instructions follow different voice conventions:
+
+- **Tool descriptions**: imperative/descriptive voice -- "respond to the user with a message", "search the web for information", "read file contents". This matches what models are trained on for function-calling schemas.
+- **System prompt instructions**: first person to match the bot's voice -- "when i'm ready to respond, i call final_answer", "i save what i learn immediately".
+
+When writing tool descriptions, describe the tool as you would to a new team member: make implicit context explicit, keep it concise, avoid jargon.
 
 ## Psyche
 
