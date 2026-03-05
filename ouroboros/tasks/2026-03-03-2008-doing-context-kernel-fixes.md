@@ -457,7 +457,7 @@ These units replace units 16a-16c (deadline timer) and the `--disable-streaming`
 - Works identically through devtunnel or in production
 - Eliminates dual-mode complexity (no more streaming vs buffered branching)
 
-### ⬜ Unit 17a: Revert deadline timer (units 16a-16c) -- git revert
+### ✅ Unit 17a: Revert deadline timer (units 16a-16c) -- git revert
 **What**: Revert the commits that implemented the deadline timer. The commits to revert are all commits after 406bffe on this branch (see `git log --oneline 406bffe..HEAD` -- skip doc-only commits, revert the code commits: `73ba07d`, `6c2b1af`, `e4bd591`, and the revert-of-revert `8763d81`). The goal is to return `src/senses/teams.ts` and `src/__tests__/senses/teams.test.ts` to their state at commit 406bffe (before deadline timer was added). Verify with `git diff 406bffe -- src/senses/teams.ts src/__tests__/senses/teams.test.ts` that the diff is empty after reverting. If git revert is messy (due to the revert-of-revert chain), use `git checkout 406bffe -- src/senses/teams.ts src/__tests__/senses/teams.test.ts` and commit.
 **Output**: Clean revert commit(s). `src/senses/teams.ts` and `src/__tests__/senses/teams.test.ts` match their 406bffe state.
 **Acceptance**: `git diff 406bffe -- src/senses/teams.ts src/__tests__/senses/teams.test.ts` shows no diff. All tests pass (the deadline timer tests are gone). Build clean.
@@ -475,11 +475,11 @@ These tests replace the "createTeamsCallbacks with disableStreaming" describe bl
 Also verify the removal propagates:
 6. `handleTeamsMessage` no longer accepts `disableStreaming` parameter
 7. `startTeamsApp` no longer reads `--disable-streaming` from `process.argv` or `getTeamsChannelConfig().disableStreaming`
-8. `TeamsCallbackOptions.disableStreaming` is removed from the interface
+8. `TeamsCallbackOptions.disableStreaming` is removed; `flushIntervalMs` is added (optional)
 9. `RunAgentOptions.disableStreaming` is removed
 10. `BuildSystemOptions.disableStreaming` is removed
 11. `flagsSection` is removed or returns empty (no longer needed)
-12. `TeamsChannelConfig.disableStreaming` is removed from config interface
+12. `TeamsChannelConfig.disableStreaming` replaced with `flushIntervalMs?: number`
 
 **Output**: Updated tests in `src/__tests__/senses/teams.test.ts`, `src/__tests__/heart/core.test.ts`, `src/__tests__/mind/prompt.test.ts`, `src/__tests__/config.test.ts`
 **Acceptance**: Tests exist and FAIL because the `buffered` flag and dual-mode branching still exist
@@ -509,8 +509,8 @@ Also verify the removal propagates:
 15. Remove `flagsSection` call from `buildSystem`
 
 **`src/config.ts`**:
-16. Remove `disableStreaming` from `TeamsChannelConfig` interface (line 39)
-17. Remove `disableStreaming: false` from `DEFAULT_CONFIG` (line 90)
+16. Replace `disableStreaming: boolean` with `flushIntervalMs?: number` in `TeamsChannelConfig` interface (line 39). Optional -- when absent, `DEFAULT_FLUSH_INTERVAL_MS` (1000) is used.
+17. Remove `disableStreaming: false` from `DEFAULT_CONFIG` (line 90). Do NOT add a `flushIntervalMs` default -- omitting it means the code default is used, and config.json only needs to specify it when tuning.
 
 **`package.json`**:
 18. Remove `teams:no-stream` script
@@ -547,20 +547,24 @@ Also verify the removal propagates:
 ### ⬜ Unit 19b: Chunked streaming (periodic flush timer) -- implementation
 **What**: Implement the periodic flush timer in `createTeamsCallbacks` (`src/senses/teams.ts`):
 
-1. Add constant `FLUSH_INTERVAL_MS = 1_500` (1.5s -- stays within 1 req/sec Teams throttle with margin, first flush well within 15s Copilot timeout). Export for testability.
-2. Add state: `let flushTimer: NodeJS.Timeout | null = null`
-3. Add `startFlushTimer()`: if `flushTimer` is null, start `setInterval(() => flushTextBuffer(), FLUSH_INTERVAL_MS)`. Idempotent -- calling when timer already running is a no-op.
-4. Add `stopFlushTimer()`: clear `flushTimer` interval if set, set to null. Idempotent.
-5. In `onTextChunk`: after accumulating `textBuffer += text`, call `startFlushTimer()` to ensure periodic flushing is active.
-6. In `markStopped()`: call `stopFlushTimer()` (alongside existing `stopPhraseRotation()` cleanup).
-7. In controller abort handler: call `stopFlushTimer()`.
-8. In `flush()`: call `stopFlushTimer()` before flushing remaining buffer. This prevents the periodic timer from firing after the turn ends.
-9. `flushTextBuffer()` is already implemented and handles first-flush-to-emit vs subsequent-to-send logic. No changes needed to it.
+1. Add constant `DEFAULT_FLUSH_INTERVAL_MS = 1_000` (1s -- at the Teams 1 req/sec throttle floor; tune up if 429s observed). Export for testability. Add a comment block above the constant documenting why chunked streaming exists and this specific value, with links:
+   - Teams streaming throttle (1 req/sec): https://learn.microsoft.com/en-us/microsoftteams/platform/bots/streaming-ux
+   - Copilot 15s platform timeout: https://learn.microsoft.com/en-us/answers/questions/2288017/m365-custom-engine-agents-timeout-message-after-15
+   - SDK debounces at 500ms internally, cumulative text re-sent each chunk — per-token streaming causes compounding latency
+2. Read the configured interval: `const flushInterval = options?.flushIntervalMs ?? DEFAULT_FLUSH_INTERVAL_MS`. Thread `flushIntervalMs` through `TeamsCallbackOptions` from `getTeamsChannelConfig().flushIntervalMs` in `handleTeamsMessage`. This makes the value tunable via `config.json` without code changes.
+3. Add state: `let flushTimer: NodeJS.Timeout | null = null`
+4. Add `startFlushTimer()`: if `flushTimer` is null, start `setInterval(() => flushTextBuffer(), flushInterval)`. Idempotent -- calling when timer already running is a no-op.
+5. Add `stopFlushTimer()`: clear `flushTimer` interval if set, set to null. Idempotent.
+6. In `onTextChunk`: after accumulating `textBuffer += text`, call `startFlushTimer()` to ensure periodic flushing is active.
+7. In `markStopped()`: call `stopFlushTimer()` (alongside existing `stopPhraseRotation()` cleanup).
+8. In controller abort handler: call `stopFlushTimer()`.
+9. In `flush()`: call `stopFlushTimer()` before flushing remaining buffer. This prevents the periodic timer from firing after the turn ends.
+10. `flushTextBuffer()` is already implemented and handles first-flush-to-emit vs subsequent-to-send logic. No changes needed to it.
 
 The phrase rotation timer (1.5s interval for `safeUpdate`) continues to run during reasoning phases, keeping the stream alive with status updates. Once `onTextChunk` starts, the flush timer takes over for content delivery. Both timers can coexist -- phrase rotation updates status, flush timer delivers content.
 
 **Output**: Modified `src/senses/teams.ts`
-**Acceptance**: All tests PASS (green), no warnings. Periodic flush timer starts on first text chunk, flushes every 1.5s, cleans up properly.
+**Acceptance**: All tests PASS (green), no warnings. Periodic flush timer starts on first text chunk, flushes at configured interval (default 1s), cleans up properly. Interval tunable via `config.json` `teamsChannel.flushIntervalMs`.
 
 ### ⬜ Unit 19c: Chunked streaming -- coverage & refactor
 **What**: Verify 100% coverage on the periodic flush timer logic. All paths covered:
@@ -589,8 +593,8 @@ The phrase rotation timer (1.5s interval for `safeUpdate`) continues to run duri
 - `final_answer` text appears in chat (emitted via `onTextChunk`)
 - Truncated `final_answer` retries automatically (model gets second chance)
 - No doubled refusal text or streamed noise in final output
-- Chunked streaming delivers content in periodic flushes (~1.5s intervals) -- not per-token, not all-at-once
-- First content arrives well within 15s Copilot platform timeout (first flush at ~1.5s after first token)
+- Chunked streaming delivers content in periodic flushes (default 1s, tunable via `config.json` `teamsChannel.flushIntervalMs`) -- not per-token, not all-at-once
+- First content arrives well within 15s Copilot platform timeout (first flush at ~1s after first token)
 - No "Sorry, something went wrong" -- periodic flushes keep the stream alive
 - HTTP roundtrips reduced from hundreds to ~10-15 per response (stays within 1 req/sec Teams throttle)
 - No `--disable-streaming` flag, no dual-mode branching -- single unified streaming approach
