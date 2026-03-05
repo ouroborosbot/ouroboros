@@ -186,4 +186,4 @@ Achieve 100% automatic nerves observability enforcement: replace the manual `REQ
 - 2026-03-05 09:54 Resolved open questions, updated decisions, approved
 - 2026-03-05 10:05 Scope expanded: bidirectional audit + full nerves coverage of all production files
 - 2026-03-05 10:09 Resolved all open questions: skip 3 pure-type/infra files, runtime-primary enforcement model, domain grouping
-- TBD Major scope change: replace REQUIRED_EVENTS with 4 automatic audit rules
+- 2026-03-05 10:29 Major scope change: replace REQUIRED_EVENTS with 4 automatic audit rules
