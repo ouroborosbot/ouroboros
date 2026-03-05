@@ -413,14 +413,14 @@ describe("summarizeArgs", () => {
     expect(summarizeArgs("web_search", {})).toBe("")
   })
 
-  it("returns truncated JSON for unknown tool", () => {
-    expect(summarizeArgs("unknown_tool", { key: "value" })).toBe('{"key":"value"}')
+  it("returns key=value summary for unknown tool", () => {
+    expect(summarizeArgs("unknown_tool", { key: "value" })).toBe("key=value")
   })
 
-  it("truncates long JSON for unknown tool to 30 chars", () => {
-    const longVal = "a".repeat(40)
+  it("truncates long values for unknown tool summaries", () => {
+    const longVal = "a".repeat(80)
     const result = summarizeArgs("unknown_tool", { key: longVal })
-    expect(result.length).toBe(30)
+    expect(result).toBe("key=" + "a".repeat(60) + "...")
   })
 })
 
