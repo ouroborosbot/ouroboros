@@ -1032,21 +1032,29 @@ This intercepts `key: "name"` before the existing/override logic runs, so it alw
 
 ---
 
-### GATE 3 CHECKPOINT
-**Manual test**: User tests on both Copilot Chat and standard Teams with fresh friend records (bomb existing friend data to reset).
-**Expected**:
-- Bot proactively calls `save_friend_note` when learning anything about the user without being asked
-- New friend records have `totalTokens: 0` and a `name` note auto-populated from displayName (when not "Unknown")
-- Onboarding instructions appear in the system prompt for new friends (totalTokens below 100K)
-- After sufficient conversation (totalTokens >= 100K threshold), onboarding instructions drop from the system prompt
-- Always-on instructions (memory ephemerality, working-memory trust, stale notes, save aggressively) appear at ALL token levels
-- Friend notes rendering ("what i know about this friend") always appears when notes exist, regardless of totalTokens
-- Priority guidance line is ABSENT from system prompt
-- Separate name quality line is ABSENT from system prompt
-- `totalTokens` increments after each turn (visible in friend JSON files on disk)
-- Notes display with date prefix in system prompt (e.g. `- role: [2026-03-05] software engineer`)
-- `save_friend_note` with key "name" updates displayName (not stored as a note) and returns descriptive message
-- Friend JSON files on disk show structured notes with `{ value, savedAt }` format
+### GATE 3 CHECKPOINT ✅ PASSED (2026-03-05)
+**Manual test**: User tested on Copilot Chat with fresh friend records.
+**Results**:
+- [x] Bot proactively calls `save_friend_note` when learning anything about the user without being asked
+- [x] New friend records have `totalTokens: 0` and a `name` note auto-populated from displayName (when not "Unknown")
+- [x] Onboarding instructions appear in the system prompt for new friends (totalTokens below 100K)
+- [x] Threshold drop logic unit-tested (100K output tokens too high to test organically)
+- [x] Always-on instructions (memory ephemerality, working-memory trust, stale notes, save aggressively) appear at ALL token levels
+- [x] Friend notes rendering ("what i know about this friend") always appears when notes exist, regardless of totalTokens
+- [x] Priority guidance line is ABSENT from system prompt
+- [x] Separate name quality line is ABSENT from system prompt
+- [x] `totalTokens` increments after each turn (output tokens only, not input)
+- [x] Notes display with date prefix in system prompt (e.g. `- role: [2026-03-05] software engineer`)
+- [x] `save_friend_note` with key "name" updates friend name (not stored as a note) and returns descriptive message
+- [x] Friend JSON files on disk show structured notes with `{ value, savedAt }` format
+- [x] Streaming works — chunked flush, no separate messages, async 413 recovery
+- [x] Bot personality landing well — diagnostic, structured, warm
+**Additional fixes during testing**:
+- Token accumulation changed to output_tokens only (input re-counts system prompt every turn)
+- Explicit "save before respond" instruction added (final_answer is sole tool call per turn)
+- Async 413 recovery in flush() via tryEmit() — awaits emit result, falls back to sendMessage
+- Richer onboarding questions (role, stress points, time sinks, collaborators, tools, communication style, outside work)
+- `displayName` renamed to `name` on FriendRecord across codebase
 
 ---
 
