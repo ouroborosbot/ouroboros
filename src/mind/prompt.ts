@@ -8,6 +8,7 @@ import { getAgentRoot, getAgentName } from "../identity";
 import type { ResolvedContext } from "./friends/types";
 import { getChannelCapabilities } from "./friends/channel";
 import { emitNervesEvent } from "../nerves/runtime";
+import { getFirstImpressions } from "./first-impressions";
 
 // Lazy-loaded psyche text cache
 let _psycheCache: { soul: string; identity: string; lore: string; friends: string } | null = null;
@@ -147,44 +148,27 @@ export function contextSection(context?: ResolvedContext): string {
   /* v8 ignore next -- empty-traits branch unreachable: streaming/no-streaming always adds a trait @preserve */
   lines.push(`channel: ${ch.channel}${traits.length ? ` (${traits.join(", ")})` : ""}`)
 
-  // Friend record and state detection (friend is guaranteed non-null here -- checked above)
+  // Friend record (guaranteed non-null here -- checked above)
   const friend = context.friend!
-  const notes = friend.notes
-  const prefs = friend.toolPreferences
-  const hasNotes = Object.keys(notes).length > 0
-  const hasPrefs = Object.keys(prefs).length > 0
-  const isNewFriend = !hasNotes && !hasPrefs
 
-  // Priority guidance
+  // Always-on directives (permanent in contextSection, never gated by token threshold)
   lines.push("")
-  lines.push("my friend's request comes first. i help with what they need, and i get to know them along the way.")
-
-  // Name quality instruction
-  lines.push("when i learn a name my friend prefers, i save it immediately with save_friend_note.")
-
-  // Memory ephemerality instruction
   lines.push("my conversation memory is ephemeral -- it resets between sessions. anything i learn about my friend, i save with save_friend_note so future me remembers.")
-
-  // Working-memory trust instruction
   lines.push("the conversation is my source of truth. my notes are a journal for future me -- they may be stale or incomplete.")
-
-  // Stale notes awareness instruction
   lines.push("when i learn something that might invalidate an existing note, i check related notes and update or override any that are stale.")
+  lines.push("i save ANYTHING i learn about my friend immediately with save_friend_note -- names, preferences, what they do, what they care about. when in doubt, save it.")
 
-  // New-friend behavior
-  if (isNewFriend) {
-    if (friend.displayName === "Unknown") {
-      lines.push("this is a new friend -- i don't know this friend's name yet. i ask what they'd like to be called. i save what i learn immediately with save_friend_note.")
-    } else {
-      lines.push(`this is a new friend (${friend.displayName}) -- i have no notes or preferences saved yet. i save what i learn immediately with save_friend_note.`)
-    }
+  // Onboarding instructions (only below token threshold -- drop once exceeded)
+  const impressions = getFirstImpressions(friend)
+  if (impressions) {
+    lines.push(impressions)
   }
 
   // Friend notes (from FriendRecord -- rendered in system prompt, NOT toolPreferences)
-  if (hasNotes) {
+  if (Object.keys(friend.notes).length > 0) {
     lines.push("")
     lines.push("## what i know about this friend")
-    for (const [key, value] of Object.entries(notes)) {
+    for (const [key, value] of Object.entries(friend.notes)) {
       lines.push(`- ${key}: ${value}`)
     }
   }

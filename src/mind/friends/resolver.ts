@@ -65,7 +65,7 @@ export class FriendResolver {
       externalIds: [externalId],
       tenantMemberships,
       toolPreferences: {},
-      notes: {},
+      notes: this.params.displayName !== "Unknown" ? { name: this.params.displayName } : {},
       totalTokens: 0,
       createdAt: now,
       updatedAt: now,
