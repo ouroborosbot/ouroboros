@@ -786,7 +786,7 @@ Use a mock `FriendStore` (vi.fn() for get/put/delete/findByExternalId).
 **Output**: New `src/__tests__/mind/friends/tokens.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `src/mind/friends/tokens.ts` does not exist yet
 
-### ⬜ Unit 21e: Token accumulation after each turn -- Implementation
+### ✅ Unit 21e: Token accumulation after each turn -- Implementation
 **What**: Create the accumulation helper and wire it into both adapters. The helper runs after `postTurn()` to avoid racing with session save.
 
 Changes:
@@ -1018,3 +1018,4 @@ Tests to KEEP AS-IS (these currently pass and assert behavior we are keeping):
 - 2026-03-04 18:55 Unit 21b complete: added totalTokens to FriendRecord (types.ts), AgentKnowledgeData + put/merge (store-file.ts), resolveOrCreate (resolver.ts). Updated 4 makeFriend helpers in test files. 1307 tests pass, build clean
 - 2026-03-04 18:56 Unit 21c complete: 100% coverage on store-file.ts, resolver.ts, types.ts (stmts/branches/funcs/lines). All totalTokens paths covered. No refactoring needed
 - 2026-03-04 18:57 Unit 21d complete: 6 failing tests for accumulateFriendTokens -- first turn (0 -> 1500), subsequent (3000 -> 5000), no-op undefined, no-op zero, record not found, legacy undefined totalTokens. All fail (tokens.ts doesn't exist)
+- 2026-03-04 18:58 Unit 21e complete: accumulateFriendTokens helper in tokens.ts (early-return guards, ?? 0 fallback, updatedAt refresh). Wired into teams.ts after postTurn (guarded by toolContext?.context?.friend?.id) and cli.ts after postTurn. 1313 tests pass, build clean
