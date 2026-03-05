@@ -1,11 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
+import * as nodeFs from "node:fs"
+import * as path from "path"
 import type { ChannelCallbacks } from "../../heart/core"
 
 vi.mock("../../identity", () => ({
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
-    configPath: "~/.agentconfigs/testagent/config.json",
+    configPath: "~/.agentsecrets/testagent/secrets.json",
+    provider: "minimax",
   })),
+  DEFAULT_AGENT_CONTEXT: {
+    maxTokens: 80000,
+    contextMargin: 20,
+    maxToolOutputChars: 20000,
+  },
   getAgentName: vi.fn(() => "testagent"),
   getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
   getRepoRoot: vi.fn(() => "/mock/repo"),
@@ -103,6 +111,16 @@ describe("toResponsesTools", () => {
 
     const result = toResponsesTools(ccTools)
     expect(result[0].parameters).toBeNull()
+  })
+})
+
+describe("provider module boundary contract", () => {
+  it("has dedicated provider runtime modules for azure/anthropic/minimax", () => {
+    const providerDir = path.resolve(__dirname, "..", "..", "heart", "providers")
+    expect(nodeFs.existsSync(providerDir)).toBe(true)
+    expect(nodeFs.existsSync(path.join(providerDir, "azure.ts"))).toBe(true)
+    expect(nodeFs.existsSync(path.join(providerDir, "anthropic.ts"))).toBe(true)
+    expect(nodeFs.existsSync(path.join(providerDir, "minimax.ts"))).toBe(true)
   })
 })
 
@@ -930,6 +948,23 @@ describe("streamResponsesApi", () => {
       output_tokens: 50,
       reasoning_tokens: 20,
       total_tokens: 150,
+    })
+  })
+
+  it("captures usage from response.done event", async () => {
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_text.delta", delta: "hello" },
+      { type: "response.done", response: {
+        usage: { input_tokens: 120, output_tokens: 40, output_tokens_details: { reasoning_tokens: 5 }, total_tokens: 160 },
+      }},
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(result.usage).toEqual({
+      input_tokens: 120,
+      output_tokens: 40,
+      reasoning_tokens: 5,
+      total_tokens: 160,
     })
   })
 

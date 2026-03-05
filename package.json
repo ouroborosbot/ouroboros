@@ -6,6 +6,8 @@
     "build": "tsc",
     "dev": "tsc && node dist/cli-entry.js --agent ouroboros",
     "dev:slugger": "tsc && node dist/cli-entry.js --agent slugger",
+    "auth:openai-codex": "node scripts/auth-openai-codex.cjs --agent ouroboros",
+    "auth:claude-setup-token": "node scripts/auth-claude-setup-token.cjs --agent ouroboros",
     "test": "vitest run",
     "test:coverage:vitest": "vitest run --coverage",
     "audit:nerves": "npm run build && node dist/nerves/coverage/cli-main.js",
@@ -14,6 +16,7 @@
     "manifest:package": "cd ouroboros/manifest && zip -r ../../manifest.zip manifest.json color.png outline.png"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "@microsoft/teams.apps": "^2.0.5",
     "@microsoft/teams.dev": "^2.0.5",
     "openai": "^4.78.0"

@@ -1,0 +1,28 @@
+
+> ouroboros-agent-harness@1.0.0 test
+> vitest run src/__tests__/heart/core.test.ts src/__tests__/mind/prompt.test.ts -t anthropic
+
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+{"ts":"2026-03-05T00:26:57.792Z","level":"warn","event":"config_identity.error","trace_id":"121a6f4a-aeda-478d-acc4-142890d5f00d","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"Unexpected end of JSON input"}}
+{"ts":"2026-03-05T00:26:57.794Z","level":"info","event":"config.load","trace_id":"1f0705dd-1422-40d9-87ed-0edc5a8898a5","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-05T00:26:57.924Z","level":"info","event":"config.load","trace_id":"632adaf0-0d6d-4d81-b69d-a5a725ec266e","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-05T00:26:57.924Z","level":"info","event":"config.load","trace_id":"0751c4f9-d517-440d-82ab-412b534a251d","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-05T00:26:57.926Z","level":"warn","event":"config_identity.error","trace_id":"729d322d-493b-418e-98c7-9a31f0116a66","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"Unexpected end of JSON input"}}
+{"ts":"2026-03-05T00:26:57.926Z","level":"info","event":"config.load","trace_id":"9157aa8a-3461-4131-8df3-44ecd6fe6dff","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-05T00:26:57.927Z","level":"info","event":"config.load","trace_id":"fff256e4-729d-478c-866a-18e0968c06a2","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-05T00:26:57.927Z","level":"info","event":"config.load","trace_id":"644a776d-bd5e-4212-89fe-66c66570bd4a","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+ ✓ src/__tests__/heart/core.test.ts (162 tests | 160 skipped) 154ms
+{"ts":"2026-03-05T00:26:58.115Z","level":"info","event":"config.load","trace_id":"e484b655-53d9-465f-9dd5-a62c4c2b5e90","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-05T00:26:58.142Z","level":"info","event":"mind.step_start","trace_id":"dd64e4ba-33d6-4eb3-9ab4-e33c995119b0","component":"mind","message":"buildSystem started","meta":{"channel":"cli","has_context":false,"tool_choice_required":false}}
+{"ts":"2026-03-05T00:26:58.142Z","level":"info","event":"config.load","trace_id":"ae88f526-94ce-4347-9d08-fecf5cb46a78","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-05T00:26:58.142Z","level":"info","event":"config.load","trace_id":"78401d42-0f89-42b7-8f71-b85d93842327","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-05T00:26:58.143Z","level":"info","event":"mind.step_end","trace_id":"b7553c26-8fe0-4aab-a169-c44f2ad831c6","component":"mind","message":"buildSystem completed","meta":{"channel":"cli"}}
+ ✓ src/__tests__/mind/prompt.test.ts (60 tests | 59 skipped) 35ms
+
+ Test Files  2 passed (2)
+      Tests  3 passed | 219 skipped (222)
+   Start at  16:26:57
+   Duration  752ms (transform 346ms, setup 58ms, import 235ms, tests 189ms, environment 0ms)
+

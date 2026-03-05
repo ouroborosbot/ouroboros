@@ -16,6 +16,7 @@ import { FileFriendStore } from "../mind/friends/store-file"
 import { FriendResolver } from "../mind/friends/resolver"
 import { accumulateFriendTokens } from "../mind/friends/tokens"
 import type { ToolContext } from "../repertoire/tools"
+import { configureCliRuntimeLogger } from "./cli-logging"
 
 // readline.Interface exposes undocumented mutable line/cursor for in-progress input
 type ReadlineInternals = readline.Interface & { line: string; cursor: number }
@@ -338,7 +339,7 @@ export async function main() {
 
   // Resolve context kernel (identity + channel) for CLI
   const agentKnowledgePath = path.join(getAgentRoot(), "friends")
-  const piiBridgePath = path.join(os.homedir(), ".agentconfigs", getAgentName(), "friends")
+  const piiBridgePath = path.join(os.homedir(), ".agentstate", getAgentName(), "friends")
   const friendStore = new FileFriendStore(agentKnowledgePath, piiBridgePath)
   const username = os.userInfo().username
   const hostname = os.hostname()
@@ -357,6 +358,7 @@ export async function main() {
   }
 
   const friendId = resolvedContext.friend.id
+  configureCliRuntimeLogger(friendId)
   const sessPath = sessionPath(friendId, "cli", "session")
 
   // Load existing session or start fresh

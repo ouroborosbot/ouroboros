@@ -4,7 +4,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 vi.mock("../../identity", () => ({
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
-    configPath: "~/.agentconfigs/testagent/config.json",
+    configPath: "~/.agentsecrets/testagent/secrets.json",
+    provider: "minimax",
     phrases: {
       thinking: ["working"],
       tool: ["running tool"],
@@ -67,7 +68,8 @@ describe("phrases - getPhrases from agent.json", () => {
   it("returns phrases directly from loadAgentConfig().phrases", async () => {
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
       name: "testagent",
-      configPath: "~/.agentconfigs/testagent/config.json",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
       phrases: {
         thinking: ["custom thinking"],
         tool: ["custom tool"],
@@ -87,7 +89,8 @@ describe("phrases - getPhrases from agent.json", () => {
     // loadAgentConfig now always returns phrases (auto-filled with placeholders if missing)
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
       name: "testagent",
-      configPath: "~/.agentconfigs/testagent/config.json",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
       phrases: {
         thinking: ["working"],
         tool: ["running tool"],
