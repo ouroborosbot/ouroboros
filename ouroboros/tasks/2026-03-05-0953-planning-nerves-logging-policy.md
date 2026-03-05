@@ -1,10 +1,10 @@
 # Planning: Nerves Logging Policy Enforcement
 
-**Status**: approved
+**Status**: NEEDS_REVIEW
 **Created**: 2026-03-05 09:54
 
 ## Goal
-Achieve 100% automatic nerves observability enforcement: replace the manual `REQUIRED_EVENTS` manifest with 4 automatic audit rules, enforce `no-console` via ESLint, add `emitNervesEvent` calls to every observable code path in production, and document the logging policy.
+Achieve 100% automatic nerves observability enforcement: replace the manual `REQUIRED_EVENTS` manifest with 5 automatic audit rules, enforce `no-console` via ESLint, add `emitNervesEvent` calls to every observable code path in production, and document the logging policy.
 
 ## Scope
 
@@ -21,14 +21,15 @@ Achieve 100% automatic nerves observability enforcement: replace the manual `REQ
   - Meta-tooling (2 sites): `src/nerves/coverage/cli.ts:34`, `src/nerves/coverage/cli.ts:49`
 - Integrate `npm run lint` into `scripts/run-coverage-gate.cjs` as a step before vitest
 
-**Phase B: Replace REQUIRED_EVENTS with 4 automatic audit rules**
+**Phase B: Replace REQUIRED_EVENTS with 5 automatic audit rules**
 - Remove `REQUIRED_EVENTS`, `getRequiredEventKeys()`, `getDeclaredLogpoints()` from `src/nerves/coverage/contract.ts`
 - Keep `REQUIRED_ENVELOPE_FIELDS`, `SENSITIVE_PATTERNS`, `eventKey()` in contract.ts (still needed)
-- Rewrite `src/nerves/coverage/audit.ts` to implement 4 automatic rules:
+- Rewrite `src/nerves/coverage/audit.ts` to implement 5 automatic rules:
   1. **Every test emits at least one nerves event** -- catches dead zones where tests exercise production code but no events are emitted. Requires per-test event tracking.
-  2. **Start/end pairing** -- every `*.start` event must have a corresponding `*.end` or `*.error` within the same test. Catches fire-and-forget gaps.
+  2. **Start/end pairing** -- every event ending in `_start` must have a corresponding event with the same prefix ending in `_end` or `_error` within the same test. Naming convention: `component.action_start` / `component.action_end` / `component.action_error` (e.g., `engine.turn_start` / `engine.turn_end` / `engine.error`). The audit matches on `_start` suffix and looks for `_end` or `_error` with the same prefix. Catches fire-and-forget gaps.
   3. **Error events include context** -- every error-level event must have non-empty `meta`. No "something failed" without the what and why.
-  4. **Source coverage** -- every `emitNervesEvent` call site in production source code was exercised during the test run. Static regex scan of `src/**/*.ts` (excluding tests and nerves infra) extracts `component:event` keys, cross-referenced against events captured during tests. No manual list needed.
+  4. **Source coverage** -- every `emitNervesEvent` call site in production source code was exercised during the test run. Static regex scan of `src/**/*.ts` (excluding tests and nerves infra) extracts `component:event` keys, cross-referenced against events captured during tests. No manual list needed. **Requires static string literals** -- all `emitNervesEvent` calls must use string literals (not template literals, not variables) for `event` and `component` fields so the scanner can extract them.
+  5. **File completeness** -- every production `.ts` file in `src/` (excluding `src/__tests__/` and pure type-only files) must contain at least one `emitNervesEvent` call. The static scanner discovers which files have calls; the audit flags any production file with zero calls. Prevents new production files from being added without nerves events. Exemption: files containing only `type`/`interface`/`enum` declarations with zero executable code (function/class/const) are exempt -- the scanner detects this automatically.
 - Keep existing checks: schema envelope validation, SENSITIVE_PATTERNS redaction check
 - Update `src/__tests__/nerves/global-capture.ts` to support per-test event tracking:
   - Currently captures events globally via `registerGlobalLogSink`
@@ -85,9 +86,11 @@ Achieve 100% automatic nerves observability enforcement: replace the manual `REQ
   - All runtime logging uses `emitNervesEvent()`, never raw `console.*`
   - Three categories of legitimate console exceptions (pre-boot guard, terminal UX, meta-tooling)
   - Each exception requires `// eslint-disable-next-line no-console -- <category>: <reason>`
-  - Automatic enforcement via 4 audit rules (no manual manifest)
-  - Start/end pairing convention for operations
+  - Automatic enforcement via 5 audit rules (no manual manifest)
+  - Start/end pairing naming convention: `component.action_start` / `component.action_end` / `component.action_error`
   - Error events must include context in meta
+  - Static string literals only: `event` and `component` fields in `emitNervesEvent` must be string literals (no template literals, no variables) so the static scanner can extract them
+  - File completeness: every production `.ts` file must have at least one `emitNervesEvent` call (pure type-only files exempt)
 - Add brief logging policy mention in CONTRIBUTING.md under the Code section
 
 ### Out of Scope
@@ -104,7 +107,8 @@ Achieve 100% automatic nerves observability enforcement: replace the manual `REQ
 - [ ] `npm run lint` passes cleanly (zero violations)
 - [ ] `npm run lint` integrated into `scripts/run-coverage-gate.cjs`
 - [ ] `REQUIRED_EVENTS` removed from contract.ts (manual manifest eliminated)
-- [ ] Nerves audit implements 4 automatic rules: every-test-emits, start/end-pairing, error-context, source-coverage
+- [ ] Nerves audit implements 5 automatic rules: every-test-emits, start/end-pairing, error-context, source-coverage, file-completeness
+- [ ] All `emitNervesEvent` calls use static string literals for `event` and `component` (no template literals, no variables)
 - [ ] Per-test event tracking implemented in global-capture.ts
 - [ ] Schema envelope validation and SENSITIVE_PATTERNS redaction check preserved
 - [ ] All 20 production files have nerves events (every file with executable code; only types.ts skipped)
@@ -116,7 +120,7 @@ Achieve 100% automatic nerves observability enforcement: replace the manual `REQ
 - [ ] No warnings
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
-- [ ] `npm run test:coverage` gate passes (lint + vitest 100% + nerves audit 4 rules all green)
+- [ ] `npm run test:coverage` gate passes (lint + vitest 100% + nerves audit 5 rules all green)
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -141,14 +145,16 @@ Achieve 100% automatic nerves observability enforcement: replace the manual `REQ
 - Integrate lint into `scripts/run-coverage-gate.cjs` so CI catches violations automatically
 - Only skip `types.ts` (zero executable code). All other production files need nerves events, including pure utilities.
 - Phase C work grouped by domain (heart, mind, repertoire, senses) for coherent event naming
-- REQUIRED_EVENTS manual manifest replaced by 4 automatic audit rules
+- REQUIRED_EVENTS manual manifest replaced by 5 automatic audit rules
 - Static regex scan used for Rule 4 (source coverage) -- automatic discovery, no manual registration
 - Primary enforcement is runtime observation -- tests emit events, audit verifies all call sites exercised
 - SENSITIVE_PATTERNS and schema envelope validation preserved
 - `emit-new-events.test.ts` to be deleted (artifact of old manual-manifest model)
 - Rule 1: ALL tests must emit at least one nerves event. No exemptions. If code runs, it emits.
 - Per-test event tracking via beforeEach/afterEach hooks with reset between tests
-- Rule 2 (start/end pairing): scoped within a single test
+- Rule 2 (start/end pairing): scoped within a single test. Naming convention: `_start` / `_end` / `_error` suffixes with shared prefix.
+- Rule 5 (file completeness): every production .ts file must have at least one emitNervesEvent call. Pure type-only files exempt (detected by absence of function/class/const declarations).
+- Static string literals only for `event` and `component` in emitNervesEvent calls -- no template literals, no variables. Enables reliable regex extraction.
 
 ## Context / References
 - Prior planning doc: `ouroboros/tasks/2026-03-04-2354-planning-nerves-console-migration.md` (completed)
@@ -165,6 +171,7 @@ Achieve 100% automatic nerves observability enforcement: replace the manual `REQ
 - 8 console exception sites confirmed at current line numbers
 - 20 production files without emitNervesEvent calls (only types.ts skipped -- zero executable code)
 - Existing naming convention: `{component}:{component_prefix}.{action}` (e.g., `engine:engine.turn_start`)
+- Start/end pairing naming: `component.action_start` / `component.action_end` / `component.action_error` -- audit matches on `_start` suffix, looks for `_end` or `_error` with same prefix
 
 **Blast radius of removing REQUIRED_EVENTS (6 files):**
 - `src/nerves/coverage/contract.ts` -- definition site
@@ -180,6 +187,9 @@ Achieve 100% automatic nerves observability enforcement: replace the manual `REQ
 - Rule 4 (source coverage) regex needs to extract `component` and `event` from `emitNervesEvent` calls. The pattern is consistent: `emitNervesEvent({ ... event: "foo", ... component: "bar" ... })`. Multi-line extraction needed since calls often span multiple lines.
 - The `emit-new-events.test.ts` file is a workaround for the old model -- under the new model, tests that exercise real production code will naturally emit the events.
 - Rule 1 "no exemptions" means even small utility files like `store.ts` (13 lines, factory function) and `cli-logging.ts` (11 lines, logger setup) need nerves events. This drives toward total observability -- every code path that runs is visible in the event stream.
+- Static string literals requirement for `event`/`component` enables the regex scanner to reliably extract keys. If a call uses a variable or template literal, the scanner cannot discover it, and Rule 4 (source coverage) will not track it. This is a hard policy -- code review should catch violations.
+- Rule 5 (file completeness) closes the gap where someone adds a new production file whose code gets exercised by existing tests that already emit events from other modules. Without Rule 5, Rule 1 (every test emits) would pass because the test emits events from some other module, but the new file itself has zero observability.
+- The file completeness exemption for pure type files uses a heuristic: if a file has no `function`, `class`, or `const` declarations (only `type`, `interface`, `enum`), it is exempt. This should be simple to implement with regex.
 
 ## Progress Log
 - 2026-03-05 09:54 Created
