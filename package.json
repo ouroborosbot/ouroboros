@@ -13,6 +13,7 @@
     "audit:nerves": "npm run build && node dist/nerves/coverage/cli-main.js",
     "test:coverage": "node scripts/run-coverage-gate.cjs",
     "teams": "tsc && node dist/teams-entry.js --agent ouroboros",
+    "lint": "eslint src/",
     "manifest:package": "cd ouroboros/manifest && zip -r ../../manifest.zip manifest.json color.png outline.png"
   },
   "dependencies": {
@@ -23,7 +24,9 @@
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.0.18",
+    "eslint": "^10.0.2",
     "typescript": "^5.7.0",
+    "typescript-eslint": "^8.56.1",
     "vitest": "^4.0.18"
   }
 }
