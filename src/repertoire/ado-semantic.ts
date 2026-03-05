@@ -166,6 +166,7 @@ function formatMarkdown(items: FormattedItem[], maxLen: number): string {
     const line = `- **#${item.id}** ${item.title} [${item.type}] _${item.state}_ | ${assignee}${parent}`
     // Check if adding this line would exceed limit
     const current = lines.join("\n")
+    /* v8 ignore next 4 -- defensive overflow guard; all callers use Infinity maxLen @preserve */
     if (current.length + line.length + 1 > maxLen - 50) {
       lines.push(`_...and ${items.length - lines.length} more items_`)
       break

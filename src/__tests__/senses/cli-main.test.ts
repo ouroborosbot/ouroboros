@@ -24,7 +24,7 @@ const mocks = vi.hoisted(() => ({
   resolveContext: vi.fn().mockResolvedValue({
     friend: {
       id: "mock-uuid",
-      displayName: "testuser",
+      name: "testuser",
       externalIds: [{ provider: "local", externalId: "testuser", linkedAt: "2026-01-01" }],
       tenantMemberships: [],
       toolPreferences: {},
@@ -822,7 +822,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
     expect(options.toolContext.context).toBeDefined()
     // Should have friend from OS username (mocked as "testuser")
     expect(options.toolContext.context.friend).toBeDefined()
-    expect(options.toolContext.context.friend.displayName).toBe("testuser")
+    expect(options.toolContext.context.friend.name).toBe("testuser")
     // Should have CLI channel capabilities
     expect(options.toolContext.context.channel).toBeDefined()
     expect(options.toolContext.context.channel.channel).toBe("cli")
@@ -839,7 +839,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
       "cli",
       undefined,
       expect.objectContaining({
-        friend: expect.objectContaining({ displayName: "testuser" }),
+        friend: expect.objectContaining({ name: "testuser" }),
         channel: expect.objectContaining({ channel: "cli" }),
       }),
     )

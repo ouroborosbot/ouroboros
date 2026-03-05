@@ -18,9 +18,9 @@ describe("getChannelCapabilities", () => {
     expect(caps.channel).toBe("teams")
     expect(caps.availableIntegrations).toEqual(["ado", "graph"])
     expect(caps.supportsMarkdown).toBe(true)
-    expect(caps.supportsStreaming).toBe(false)
+    expect(caps.supportsStreaming).toBe(true)
     expect(caps.supportsRichCards).toBe(true)
-    expect(caps.maxMessageLength).toBe(4000)
+    expect(caps.maxMessageLength).toBe(Infinity)
   })
 
   it("returns minimal default capabilities for unknown channel", () => {

@@ -188,7 +188,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       type: "function",
       function: {
         name: "get_current_time",
-        description: "get the current date and time",
+        description: "get the current date and time in America/Los_Angeles (Pacific Time)",
         parameters: { type: "object", properties: {} },
       },
     },
@@ -313,9 +313,9 @@ export const baseToolDefinitions: ToolDefinition[] = [
         const isOverride = a.override === "true";
 
         if (a.type === "name") {
-          const updated: FriendRecord = { ...record, displayName: a.content, notes: { ...record.notes, name: a.content }, updatedAt: new Date().toISOString() };
+          const updated: FriendRecord = { ...record, name: a.content, updatedAt: new Date().toISOString() };
           await ctx.friendStore.put(friendId, updated);
-          return `saved: displayName = ${a.content}`;
+          return `saved: name = ${a.content}`;
         }
 
         if (a.type === "tool_preference") {
@@ -329,11 +329,18 @@ export const baseToolDefinitions: ToolDefinition[] = [
         }
 
         // type === "note"
+        // Redirect "name" key to name field
+        if (a.key === "name") {
+          const updated: FriendRecord = { ...record, name: a.content, updatedAt: new Date().toISOString() };
+          await ctx.friendStore.put(friendId, updated);
+          return `updated friend's name to '${a.content}' (stored as name, not a note)`;
+        }
+
         const existing = record.notes[a.key];
         if (existing && !isOverride) {
-          return `i already have a note for '${a.key}': "${existing}". if you want to replace it, call again with override: true. or merge both values into content and override.`;
+          return `i already have a note for '${a.key}': "${existing.value}". if you want to replace it, call again with override: true. or merge both values into content and override.`;
         }
-        const updated: FriendRecord = { ...record, notes: { ...record.notes, [a.key]: a.content }, updatedAt: new Date().toISOString() };
+        const updated: FriendRecord = { ...record, notes: { ...record.notes, [a.key]: { value: a.content, savedAt: new Date().toISOString() } }, updatedAt: new Date().toISOString() };
         await ctx.friendStore.put(friendId, updated);
         return `saved: note ${a.key} = ${a.content}`;
       } catch (err) {
@@ -357,7 +364,7 @@ export const finalAnswerTool: OpenAI.ChatCompletionTool = {
   function: {
     name: "final_answer",
     description:
-      "give your final text response. use this when you want to reply with text instead of calling another tool.",
+      "respond to the user with your message. call this tool when you are ready to deliver your response.",
     parameters: {
       type: "object",
       properties: { answer: { type: "string" } },

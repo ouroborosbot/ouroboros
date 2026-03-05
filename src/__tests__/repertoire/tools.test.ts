@@ -569,9 +569,9 @@ describe("finalAnswerTool", () => {
     const { finalAnswerTool } = await import("../../repertoire/tools")
     expect(finalAnswerTool.type).toBe("function")
     expect(finalAnswerTool.function.name).toBe("final_answer")
-    expect(finalAnswerTool.function.description).toBe(
-      "give your final text response. use this when you want to reply with text instead of calling another tool."
-    )
+    // Description should frame as primary response mechanism, not alternative
+    expect(finalAnswerTool.function.description).toMatch(/respond to the user/i)
+    expect(finalAnswerTool.function.description).not.toContain("instead of calling another tool")
     expect(finalAnswerTool.function.parameters).toEqual({
       type: "object",
       properties: { answer: { type: "string" } },
@@ -622,9 +622,9 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
       channel: "teams" as const,
       availableIntegrations: ["ado" as const, "graph" as const],
       supportsMarkdown: true,
-      supportsStreaming: false,
+      supportsStreaming: true,
       supportsRichCards: true,
-      maxMessageLength: 4000,
+      maxMessageLength: Infinity,
     }
     const result = getToolsForChannel(teamsCaps)
     const names = result.map((t: any) => t.function.name)
@@ -668,9 +668,9 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
       channel: "teams" as const,
       availableIntegrations: ["graph" as const],
       supportsMarkdown: true,
-      supportsStreaming: false,
+      supportsStreaming: true,
       supportsRichCards: true,
-      maxMessageLength: 4000,
+      maxMessageLength: Infinity,
     }
     const result = getToolsForChannel(caps)
     const names = result.map((t: any) => t.function.name)
@@ -697,9 +697,9 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
       channel: "teams" as const,
       availableIntegrations: ["ado" as const],
       supportsMarkdown: true,
-      supportsStreaming: false,
+      supportsStreaming: true,
       supportsRichCards: true,
-      maxMessageLength: 4000,
+      maxMessageLength: Infinity,
     }
     const result = getToolsForChannel(caps)
     const names = result.map((t: any) => t.function.name)
@@ -727,9 +727,9 @@ describe("getToolsForChannel with toolPreferences", () => {
     channel: "teams" as const,
     availableIntegrations: ["ado" as const, "graph" as const],
     supportsMarkdown: true,
-    supportsStreaming: false,
+    supportsStreaming: true,
     supportsRichCards: true,
-    maxMessageLength: 4000,
+    maxMessageLength: Infinity,
   }
   const cliCaps = {
     channel: "cli" as const,
@@ -933,9 +933,9 @@ describe("ToolContext shape", () => {
           channel: "teams" as const,
           availableIntegrations: ["ado" as const, "graph" as const],
           supportsMarkdown: true,
-          supportsStreaming: false,
+          supportsStreaming: true,
           supportsRichCards: true,
-          maxMessageLength: 4000,
+          maxMessageLength: Infinity,
         },
       },
     }
@@ -1452,7 +1452,7 @@ describe("ado_mutate without authority checks (authority removed)", () => {
       adoToken: "test-token",
       signin: vi.fn(),
       context: {
-        friend: { id: "id", displayName: "test", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "", updatedAt: "", schemaVersion: 1 },
+        friend: { id: "id", name: "test", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "", updatedAt: "", schemaVersion: 1 },
         channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
       },
     }
@@ -1593,9 +1593,9 @@ describe("getToolsForChannel includes docs tools", () => {
       channel: "teams" as const,
       availableIntegrations: ["ado" as const, "graph" as const],
       supportsMarkdown: true,
-      supportsStreaming: false,
+      supportsStreaming: true,
       supportsRichCards: true,
-      maxMessageLength: 4000,
+      maxMessageLength: Infinity,
     }
     const teamsTools = getToolsForChannel(teamsCaps)
     const names = teamsTools.map((t: any) => t.function.name)
@@ -1676,11 +1676,12 @@ describe("save_friend_note tool", () => {
   function makeFriend(overrides: Record<string, any> = {}) {
     return {
       id: "uuid-1",
-      displayName: "Jordan",
+      name: "Jordan",
       externalIds: [{ provider: "aad", externalId: "aad-1", linkedAt: "2026-01-01" }],
       tenantMemberships: ["t1"],
       toolPreferences: {},
       notes: {},
+      totalTokens: 0,
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
       schemaVersion: 1,
@@ -1783,7 +1784,7 @@ describe("save_friend_note tool", () => {
 
   // -- type: "name" tests --
 
-  it("type 'name' updates displayName and notes['name']", async () => {
+  it("type 'name' updates name field (not a note)", async () => {
     vi.resetModules()
     const { execTool } = await import("../../repertoire/tools")
     const ctx = makeCtx()
@@ -1792,10 +1793,12 @@ describe("save_friend_note tool", () => {
     expect(ctx.friendStore.put).toHaveBeenCalledWith(
       "uuid-1",
       expect.objectContaining({
-        displayName: "Jordan Lee",
-        notes: { name: "Jordan Lee" },
+        name: "Jordan Lee",
       }),
     )
+    // notes should NOT contain "name" key -- name is stored on the record, not as a note
+    const putArg = ctx.friendStore.put.mock.calls[0][1]
+    expect(putArg.notes).not.toHaveProperty("name")
   })
 
   it("type 'name' does not require key parameter", async () => {
@@ -1850,7 +1853,7 @@ describe("save_friend_note tool", () => {
 
   // -- type: "note" tests --
 
-  it("type 'note' saves new note", async () => {
+  it("type 'note' saves new note with structured { value, savedAt }", async () => {
     vi.resetModules()
     const { execTool } = await import("../../repertoire/tools")
     const ctx = makeCtx()
@@ -1859,33 +1862,87 @@ describe("save_friend_note tool", () => {
     expect(ctx.friendStore.put).toHaveBeenCalledWith(
       "uuid-1",
       expect.objectContaining({
-        notes: { role: "engineering manager" },
+        notes: { role: { value: "engineering manager", savedAt: expect.stringMatching(/^\d{4}-/) } },
       }),
     )
   })
 
-  it("type 'note' with existing value and no override returns conflict", async () => {
+  it("type 'note' with existing structured value and no override returns conflict showing value", async () => {
     vi.resetModules()
     const { execTool } = await import("../../repertoire/tools")
-    const ctx = makeCtx({ friendOverrides: { notes: { role: "old role" } } })
+    const ctx = makeCtx({ friendOverrides: { notes: { role: { value: "old role", savedAt: "2026-01-01T00:00:00.000Z" } } } })
     const result = await execTool("save_friend_note", { type: "note", key: "role", content: "new role" }, ctx)
     expect(ctx.friendStore.put).not.toHaveBeenCalled()
     expect(result).toContain("old role")
+    expect(result).not.toContain("[object Object]")
     expect(result).toMatch(/override|merge/i)
   })
 
-  it("type 'note' with existing value and override=true overwrites", async () => {
+  it("type 'note' with existing value and override=true replaces with updated savedAt", async () => {
     vi.resetModules()
     const { execTool } = await import("../../repertoire/tools")
-    const ctx = makeCtx({ friendOverrides: { notes: { role: "old role" } } })
+    const ctx = makeCtx({ friendOverrides: { notes: { role: { value: "old role", savedAt: "2026-01-01T00:00:00.000Z" } } } })
     const result = await execTool("save_friend_note", { type: "note", key: "role", content: "new role", override: "true" }, ctx)
     expect(result).toContain("saved")
     expect(ctx.friendStore.put).toHaveBeenCalledWith(
       "uuid-1",
       expect.objectContaining({
-        notes: { role: "new role" },
+        notes: { role: { value: "new role", savedAt: expect.stringMatching(/^\d{4}-/) } },
       }),
     )
+  })
+
+  // -- type: "note" key: "name" -> name field redirect tests --
+
+  it("type 'note' key 'name' redirects to name field update (not a note)", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "note", key: "name", content: "Ari" }, ctx)
+    expect(ctx.friendStore.put).toHaveBeenCalledWith(
+      "uuid-1",
+      expect.objectContaining({
+        name: "Ari",
+      }),
+    )
+    // notes should NOT contain key "name"
+    const putArg = ctx.friendStore.put.mock.calls[0][1]
+    expect(putArg.notes).not.toHaveProperty("name")
+  })
+
+  it("type 'note' key 'name' returns descriptive redirect message", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "note", key: "name", content: "Ari" }, ctx)
+    // Should indicate it was stored as name, not a note
+    expect(result.toLowerCase()).toContain("name")
+    expect(result).toContain("Ari")
+    expect(result.toLowerCase()).toMatch(/name.*not a note|stored as.*name/)
+  })
+
+  it("type 'note' key 'name' with override=true still redirects to name field", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "note", key: "name", content: "Ari", override: "true" }, ctx)
+    expect(ctx.friendStore.put).toHaveBeenCalledWith(
+      "uuid-1",
+      expect.objectContaining({
+        name: "Ari",
+      }),
+    )
+  })
+
+  it("type 'note' key 'name' does NOT check for existing note conflict", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    // Give the friend an existing "name" note to verify it's bypassed
+    const ctx = makeCtx({ friendOverrides: { notes: { name: { value: "Old Name", savedAt: "2026-01-01T00:00:00.000Z" } } } })
+    const result = await execTool("save_friend_note", { type: "note", key: "name", content: "New Name" }, ctx)
+    // Should NOT return conflict message, should always update
+    expect(result).not.toContain("already have")
+    expect(ctx.friendStore.put).toHaveBeenCalled()
   })
 
   // -- Disk write / no in-memory mutation tests --
