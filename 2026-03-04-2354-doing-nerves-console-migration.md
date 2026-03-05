@@ -17,7 +17,7 @@ Eliminate all `console.log/warn/error` calls from production source files by con
 
 ## Completion Criteria
 - [ ] Zero `console.*` calls in `src/senses/teams.ts`, `src/heart/core.ts`, `src/mind/friends/resolver.ts`
-- [ ] The one `console.warn` in `src/identity.ts` is removed (nerves event already exists there)
+- [x] The one `console.warn` in `src/identity.ts` is removed (nerves event already exists there)
 - [ ] All new events registered in `REQUIRED_EVENTS` in `contract.ts`
 - [ ] `npm run test:coverage` passes (nerves audit gate green)
 - [ ] No sensitive data (tokens, secrets) in event meta (respect SENSITIVE_PATTERNS)
@@ -56,7 +56,7 @@ Eliminate all `console.log/warn/error` calls from production source files by con
 **Output**: Confirmation that existing tests cover this path.
 **Acceptance**: Existing identity tests pass and cover the missing-phrases branch.
 
-### ⬜ Unit 1b: identity.ts -- Implementation
+### ✅ Unit 1b: identity.ts -- Implementation
 **What**: Delete `console.warn("agent.json is missing phrases, added placeholders")` from line 169 of `src/identity.ts`.
 **Output**: `src/identity.ts` with zero console.* calls.
 **Acceptance**: `grep -c 'console\.' src/identity.ts` returns 0. Tests pass.
@@ -194,3 +194,4 @@ Test should FAIL initially because contract.ts hasn't been updated yet.
 - 2026-03-04 23:57 Created from planning doc
 - 2026-03-04 23:59 Completed 4 conversion passes (first draft, granularity, validation, quality)
 - 2026-03-05 00:01 Unit 0 complete: baseline 1440 tests pass, 14 console calls confirmed across 4 files
+- 2026-03-05 00:02 Unit 1a+1b complete: identity.ts console.warn removed, test updated to assert emitNervesEvent
