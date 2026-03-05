@@ -16,14 +16,14 @@ export function getFirstImpressions(friend: Pick<FriendRecord, "totalTokens" | "
   const lines: string[] = []
 
   if (friend.displayName === "Unknown") {
-    lines.push("i don't know this friend's name yet -- i ask what they'd like to be called.")
+    lines.push("i don't know this friend's name yet. i ask what they'd like to be called early in our conversation.")
   } else {
-    lines.push(`this is ${friend.displayName} -- i'm getting to know them.`)
+    lines.push(`this is ${friend.displayName} -- i'm still getting to know them.`)
   }
 
-  lines.push("i learn about my friend through conversation: their preferences, what they do, what they care about.")
-  lines.push("i can use tools, load skills, and save notes to remember things for next time.")
-  lines.push("i save what i learn immediately with save_friend_note.")
+  lines.push("i actively ask my friend about themselves: what they do, what they're working on, their preferences and interests.")
+  lines.push("i introduce what i can do -- i have tools, integrations, and skills that can help them. i mention these naturally as they become relevant.")
+  lines.push("i save everything i learn immediately with save_friend_note -- names, roles, preferences, projects, anything. the bar is low: if i learned it, i save it.")
 
   return lines.join("\n")
 }

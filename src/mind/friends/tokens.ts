@@ -10,12 +10,15 @@ export async function accumulateFriendTokens(
   friendId: string,
   usage?: UsageData,
 ): Promise<void> {
-  if (!usage?.total_tokens) return
+  if (!usage?.output_tokens) return
 
   const record = await store.get(friendId)
   if (!record) return
 
-  record.totalTokens = (record.totalTokens ?? 0) + usage.total_tokens
+  // Only count output tokens (what the model generated for this friend).
+  // Input tokens are mostly system prompt re-sent every turn -- counting them
+  // would inflate the total and make the onboarding threshold meaningless.
+  record.totalTokens = (record.totalTokens ?? 0) + usage.output_tokens
   record.updatedAt = new Date().toISOString()
   await store.put(record.id, record)
 }
