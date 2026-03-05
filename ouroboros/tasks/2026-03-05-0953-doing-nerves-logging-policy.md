@@ -92,17 +92,17 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 
 ## Phase B: Automatic Audit Rules
 
-### ⬜ Unit 4a: Per-test event tracking -- tests
+### ✅ Unit 4a: Per-test event tracking -- tests
 **What**: Write tests for the new per-test event tracking in global-capture.ts. Tests should verify: events are captured per-test with test name association, events are reset between tests (isolated), per-test data is written to a file the audit can consume.
 **Output**: Test file for per-test capture behavior
 **Acceptance**: Tests exist and FAIL (red) -- the per-test tracking does not exist yet
 
-### ⬜ Unit 4b: Per-test event tracking -- implementation
+### ✅ Unit 4b: Per-test event tracking -- implementation
 **What**: Update `src/__tests__/nerves/global-capture.ts` to add `beforeEach`/`afterEach` hooks that track current test name and associate events. Reset captured events between tests so each test's events are isolated. Write per-test data to `vitest-events-per-test.json` alongside the existing global ndjson file. `maxWorkers: 1` means no interleaving risk.
 **Output**: Updated global-capture.ts with per-test tracking
 **Acceptance**: Tests from 4a PASS (green). Existing tests still pass.
 
-### ⬜ Unit 4c: Per-test event tracking -- coverage & refactor
+### ✅ Unit 4c: Per-test event tracking -- coverage & refactor
 **What**: Verify 100% coverage on new per-test tracking code. Refactor if needed.
 **Output**: Coverage report showing 100% on new code
 **Acceptance**: 100% coverage on new code, tests still green
@@ -428,3 +428,4 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 - 2026-03-05 11:33 Unit 1 complete: ESLint v10 installed with no-console:error for src/**/*.ts, test files excluded, npm run lint script added
 - 2026-03-05 11:37 Unit 2 complete: 8 console exception sites annotated across 4 files, npm run lint passes clean
 - 2026-03-05 11:40 Unit 3 complete: lint step added to run-coverage-gate.cjs, runs before vitest, short-circuits on failure
+- 2026-03-05 11:40 Unit 4a/4b/4c complete: per-test event tracking in global-capture.ts with beforeEach hooks, Map-based event association, vitest-events-per-test.json output
