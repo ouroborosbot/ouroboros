@@ -3058,6 +3058,16 @@ describe("provider abstraction contract", () => {
     expect(source).not.toContain('if (provider === "azure")')
   })
 
+  it("delegates provider runtime construction to dedicated provider modules", () => {
+    const sourcePath = path.resolve(__dirname, "..", "..", "heart", "core.ts")
+    const source = nodeFs.readFileSync(sourcePath, "utf-8")
+    expect(source).toContain('from "./providers/azure"')
+    expect(source).toContain('from "./providers/anthropic"')
+    expect(source).toContain('from "./providers/minimax"')
+    expect(source).not.toContain("const runtimeFactories:")
+    expect(source).not.toContain("streamAnthropicMessages(")
+  })
+
   it("registry provider runtimes expose provider-owned turn execution hooks", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
