@@ -179,7 +179,7 @@ Design principles: don't persist what you can re-derive; conversation IS the cac
 
 **Config** (`config.ts`): provider credentials, context window settings, Teams connection info, OAuth config. All loaded from the secrets.json file pointed to by your agent.json `configPath`. No environment variables in `src/` -- everything comes from files.
 
-For Anthropic, set only `providers.anthropic.model` (recommended: `claude-opus-4-6`) in `secrets.json`. Store the setup-token (`claude setup-token`) in `~/.agentsecrets/<agent>/auth-profiles.json`; runtime reads Anthropic auth from that file.
+For Anthropic, set `providers.anthropic.model` (recommended: `claude-opus-4-6`) and `providers.anthropic.setupToken` directly in `secrets.json`.
 
 ### What you can modify
 
