@@ -19,7 +19,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [ ] Provider abstraction is in place and engine no longer branches on hardcoded provider names in the request path.
 - [ ] Azure and MiniMax behavior is preserved with passing regression tests.
 - [x] Anthropic provider is integrated behind the same provider interface with setup-token auth profile support.
-- [ ] OpenAI Codex provider is integrated behind the same provider interface with OAuth auth profile support.
+- [x] OpenAI Codex provider is integrated behind the same provider interface with OAuth auth profile support.
 - [x] Anthropic setup-token flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
 - [ ] OpenAI Codex OAuth flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
 - [ ] Provider selection is per-agent and config-driven (no global singleton lock-in).
@@ -36,8 +36,8 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [x] Storage/config refactor executes before provider abstraction refactor work so implementation targets final storage/config contracts.
 - [x] Actual cross-machine data migration is out-of-band from this task's code execution and handled via the migration runbook instructions.
 - [x] Migration runbook is docs-only (no script) and includes explicit move/verify instructions for the other machine.
-- [ ] Provider IDs are explicitly locked and implemented as `azure`, `minimax`, `anthropic`, `openai-codex`.
-- [ ] Model fields are explicitly supported for each in-scope provider via `secrets.json` without introducing additional model-selection features.
+- [x] Provider IDs are explicitly locked and implemented as `azure`, `minimax`, `anthropic`, `openai-codex`.
+- [x] Model fields are explicitly supported for each in-scope provider via `secrets.json` without introducing additional model-selection features.
 - [ ] All relevant docs are updated for the new provider/config/storage contracts (including `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, and `cross-agent-docs/agent-storage-migration-playbook.md`).
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
@@ -186,7 +186,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Failing OpenAI Codex provider/auth tests for success and fail-fast error paths.
 **Acceptance**: OpenAI Codex tests fail red before implementation.
 
-### ⬜ Unit 5b: OpenAI Codex OAuth integration — Implementation
+### ✅ Unit 5b: OpenAI Codex OAuth integration — Implementation
 **What**: Implement `openai-codex` provider behind the abstraction with OAuth auth profile flow and explicit fail-fast auth errors.
 **Output**: OpenAI Codex provider and auth profile integration.
 **Acceptance**: OpenAI Codex tests pass green with explicit re-auth guidance on auth failure.
@@ -266,3 +266,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 19:07 Unit 4l complete: added edge-path Anthropic argument assembly coverage tests and reached 100% coverage/build on provider hardening code (`unit-4l-coverage.txt`, `unit-4l-coverage-summary.json`, `unit-4l-build.txt`)
 - 2026-03-04 19:20 Unit 4m complete: executed live Anthropic setup-token CLI validation, captured tool-call/session evidence, and captured fail-fast + runtime re-auth guidance evidence (`unit-4m-manual-validation.txt`, `unit-4m-manual-validation.json`, `unit-4m-manual-validation.stderr.txt`)
 - 2026-03-04 19:30 Unit 5a complete: added red OpenAI Codex OAuth provider/config/prompt/identity contract tests with failing evidence artifacts (`unit-5a-red-run.txt`, `unit-5a-jest.json`, `unit-5a-red-run.exit`)
+- 2026-03-04 19:32 Unit 5b complete: implemented OpenAI Codex OAuth provider runtime + config/identity/core wiring with green targeted suites and build (`unit-5b-test-run.txt`, `unit-5b-jest.json`, `unit-5b-build.txt`)
