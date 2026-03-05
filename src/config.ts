@@ -22,6 +22,11 @@ export interface AnthropicProviderConfig {
   setupToken: string
 }
 
+export interface OpenAICodexProviderConfig {
+  model: string
+  oauthAccessToken: string
+}
+
 export interface TeamsConfig {
   clientId: string
   clientSecret: string
@@ -54,6 +59,7 @@ export interface OuroborosConfig {
     azure: AzureProviderConfig
     minimax: MinimaxProviderConfig
     anthropic: AnthropicProviderConfig
+    "openai-codex": OpenAICodexProviderConfig
   }
   teams: TeamsConfig
   oauth: OAuthConfig
@@ -78,6 +84,10 @@ const DEFAULT_CONFIG: OuroborosConfig = {
     anthropic: {
       model: "",
       setupToken: "",
+    },
+    "openai-codex": {
+      model: "",
+      oauthAccessToken: "",
     },
   },
   teams: {
@@ -119,6 +129,10 @@ const DEFAULT_SECRETS_TEMPLATE: Record<string, unknown> = {
     anthropic: {
       model: "claude-opus-4-6",
       setupToken: "",
+    },
+    "openai-codex": {
+      model: "gpt-5.3-codex",
+      oauthAccessToken: "",
     },
   },
 }
@@ -272,6 +286,11 @@ export function getMinimaxConfig(): MinimaxProviderConfig {
 export function getAnthropicConfig(): AnthropicProviderConfig {
   const config = loadConfig()
   return { ...config.providers.anthropic }
+}
+
+export function getOpenAICodexConfig(): OpenAICodexProviderConfig {
+  const config = loadConfig()
+  return { ...config.providers["openai-codex"] }
 }
 
 export function getTeamsConfig(): TeamsConfig {

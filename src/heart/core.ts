@@ -19,8 +19,9 @@ import type { Channel } from "../mind/prompt";
 import { createAnthropicProviderRuntime } from "./providers/anthropic";
 import { createAzureProviderRuntime } from "./providers/azure";
 import { createMinimaxProviderRuntime } from "./providers/minimax";
+import { createOpenAICodexProviderRuntime } from "./providers/openai-codex";
 
-export type ProviderId = "azure" | "anthropic" | "minimax";
+export type ProviderId = "azure" | "anthropic" | "minimax" | "openai-codex";
 
 export interface ProviderRuntime {
   id: ProviderId;
@@ -51,6 +52,7 @@ export function createProviderRegistry(): ProviderRegistry {
     azure: createAzureProviderRuntime,
     anthropic: createAnthropicProviderRuntime,
     minimax: createMinimaxProviderRuntime,
+    "openai-codex": createOpenAICodexProviderRuntime,
   };
 
   return {
@@ -95,6 +97,7 @@ export function getProviderDisplayLabel(): string {
     azure: () => `azure openai (${getAzureConfig().deployment || "default"}, model: ${model})`,
     anthropic: () => `anthropic (${model})`,
     minimax: () => `minimax (${model})`,
+    "openai-codex": () => `openai codex (${model})`,
   };
   return providerLabelBuilders[getProvider()]();
 }
