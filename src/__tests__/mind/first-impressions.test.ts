@@ -31,31 +31,31 @@ describe("first-impressions", () => {
   })
 
   describe("getFirstImpressions", () => {
-    it("returns non-empty string containing displayName when totalTokens: 0 and known name", () => {
-      const result = getFirstImpressions({ totalTokens: 0, displayName: "Jordan" })
+    it("returns non-empty string containing name when totalTokens: 0 and known name", () => {
+      const result = getFirstImpressions({ totalTokens: 0, name: "Jordan" })
       expect(result.length).toBeGreaterThan(0)
       expect(result).toContain("Jordan")
     })
 
-    it("mentions asking what they'd like to be called when displayName is 'Unknown'", () => {
-      const result = getFirstImpressions({ totalTokens: 0, displayName: "Unknown" })
+    it("mentions asking what they'd like to be called when name is 'Unknown'", () => {
+      const result = getFirstImpressions({ totalTokens: 0, name: "Unknown" })
       expect(result.length).toBeGreaterThan(0)
       expect(result.toLowerCase()).toMatch(/don't know.*name|do not know.*name/)
       expect(result.toLowerCase()).toMatch(/ask/)
     })
 
     it("returns empty string for totalTokens: 100_000 (at threshold)", () => {
-      const result = getFirstImpressions({ totalTokens: 100_000, displayName: "Jordan" })
+      const result = getFirstImpressions({ totalTokens: 100_000, name: "Jordan" })
       expect(result).toBe("")
     })
 
     it("returns empty string for totalTokens: 200_000 (above threshold)", () => {
-      const result = getFirstImpressions({ totalTokens: 200_000, displayName: "Jordan" })
+      const result = getFirstImpressions({ totalTokens: 200_000, name: "Jordan" })
       expect(result).toBe("")
     })
 
     it("actively asks about the friend and mentions agent capabilities", () => {
-      const result = getFirstImpressions({ totalTokens: 0, displayName: "Jordan" })
+      const result = getFirstImpressions({ totalTokens: 0, name: "Jordan" })
       // Should actively ask about the friend
       expect(result.toLowerCase()).toMatch(/ask.*about/)
       // Should mention agent capabilities

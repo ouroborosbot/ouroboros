@@ -25,7 +25,7 @@ vi.mock("../../mind/friends/store-file", () => ({
 vi.mock("../../mind/friends/resolver", () => ({
   FriendResolver: vi.fn(function (this: any) {
     this.resolve = vi.fn().mockResolvedValue({
-      friend: { id: "mock-uuid", displayName: "Test User", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
+      friend: { id: "mock-uuid", name: "Test User", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
       channel: { channel: "teams", availableIntegrations: ["graph", "ado"], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
     })
   }),
@@ -1394,7 +1394,7 @@ describe("Teams adapter - startTeamsApp AAD extraction (Bug 1)", () => {
     // Mock FriendResolver to capture constructor args
     const MockFriendResolver = vi.fn(function (this: any) {
       this.resolve = vi.fn().mockResolvedValue({
-        friend: { id: "mock-uuid", displayName: "Alice AAD", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
+        friend: { id: "mock-uuid", name: "Alice AAD", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
         channel: { channel: "teams", availableIntegrations: ["graph", "ado"], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
       })
     })
@@ -1475,7 +1475,7 @@ describe("Teams adapter - startTeamsApp AAD extraction (Bug 1)", () => {
     // Mock FriendResolver to capture constructor args
     const MockFriendResolver = vi.fn(function (this: any) {
       this.resolve = vi.fn().mockResolvedValue({
-        friend: { id: "mock-uuid", displayName: "Unknown", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
+        friend: { id: "mock-uuid", name: "Unknown", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
         channel: { channel: "teams", availableIntegrations: ["graph", "ado"], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
       })
     })
@@ -2013,7 +2013,7 @@ describe("Teams adapter - session persistence", () => {
     const mockResolve = vi.fn().mockResolvedValue({
       friend: {
         id: "mock-uuid",
-        displayName: "Test User",
+        name: "Test User",
         externalIds: [{ provider: "aad", externalId: "aad-user-123", tenantId: "tenant-abc", linkedAt: "2026-01-01" }],
         tenantMemberships: ["tenant-abc"],
         toolPreferences: {},
@@ -2418,7 +2418,7 @@ describe("Teams adapter - session persistence", () => {
     vi.doMock("../../mind/friends/resolver", () => ({
       FriendResolver: vi.fn(function (this: any) {
         this.resolve = vi.fn().mockResolvedValue({
-          friend: { id: "m", displayName: "U", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
+          friend: { id: "m", name: "U", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
           channel: { channel: "teams", availableIntegrations: ["graph", "ado"], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
         })
       }),
@@ -2950,7 +2950,7 @@ describe("Teams adapter - handleTeamsMessage unified chunked streaming", () => {
     const mockResolve = vi.fn().mockResolvedValue({
       friend: {
         id: "mock-uuid",
-        displayName: "Test User",
+        name: "Test User",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
@@ -3174,7 +3174,7 @@ describe("Teams adapter - confirmation callback", () => {
     const mockResolve = vi.fn().mockResolvedValue({
       friend: {
         id: "mock-uuid",
-        displayName: "Test User",
+        name: "Test User",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
@@ -3584,7 +3584,7 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
     const mockResolve = vi.fn().mockResolvedValue({
       friend: {
         id: "mock-uuid",
-        displayName: "Test User",
+        name: "Test User",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
@@ -3765,7 +3765,7 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
     const mockResolve = vi.fn().mockResolvedValue({
       friend: {
         id: "mock-uuid",
-        displayName: "Test User",
+        name: "Test User",
         externalIds: [{ provider: "aad", externalId: "aad-user-123", tenantId: "tenant-abc", linkedAt: "2026-01-01" }],
         tenantMemberships: ["tenant-abc"],
         toolPreferences: {},
@@ -3828,7 +3828,7 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
     expect(options).toBeDefined()
     expect(options.toolContext).toBeDefined()
     expect(options.toolContext.context).toBeDefined()
-    expect(options.toolContext.context.friend.displayName).toBe("Test User")
+    expect(options.toolContext.context.friend.name).toBe("Test User")
     expect(options.toolContext.context.channel.channel).toBe("teams")
     expect(options.toolContext.context.channel.availableIntegrations).toContain("graph")
   })
@@ -3977,7 +3977,7 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
       "teams",
       undefined,
       expect.objectContaining({
-        friend: expect.objectContaining({ displayName: "Test User" }),
+        friend: expect.objectContaining({ name: "Test User" }),
         channel: expect.objectContaining({ channel: "teams" }),
       }),
     )

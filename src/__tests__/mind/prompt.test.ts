@@ -582,7 +582,7 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [{ provider: "local" as const, externalId: "jordan", linkedAt: "2026-01-01T00:00:00.000Z" }],
         tenantMemberships: [],
         toolPreferences: {},
@@ -611,7 +611,7 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan Smith",
+        name: "Jordan Smith",
         externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01T00:00:00.000Z" }],
         tenantMemberships: ["t1"],
         toolPreferences: {},
@@ -638,7 +638,7 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
@@ -669,7 +669,7 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
@@ -698,11 +698,11 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
-        notes: { role: "engineering manager", project: "ouroboros" },
+        notes: { role: { value: "engineering manager", savedAt: "2026-01-01T00:00:00.000Z" }, project: { value: "ouroboros", savedAt: "2026-01-01T00:00:00.000Z" } },
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -717,8 +717,8 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    expect(result).toContain("role: engineering manager")
-    expect(result).toContain("project: ouroboros")
+    expect(result).toContain("role: [2026-01-01] engineering manager")
+    expect(result).toContain("project: [2026-01-01] ouroboros")
   })
 
   it("does not render notes section when notes is empty", async () => {
@@ -726,7 +726,7 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
@@ -753,7 +753,7 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: { ado: "use iteration paths" },
@@ -781,7 +781,7 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
@@ -810,11 +810,11 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01" }],
         tenantMemberships: ["t1"],
         toolPreferences: { ado: "use iteration paths" },
-        notes: { role: "engineer" },
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -839,11 +839,11 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
-        notes: { name: "Jordan" },
+        notes: { name: { value: "Jordan", savedAt: "2026-01-01T00:00:00.000Z" } },
         totalTokens: 200_000,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
@@ -870,7 +870,7 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
@@ -899,11 +899,11 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
-        notes: { role: "engineer" },
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
         totalTokens: 200_000,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
@@ -929,11 +929,11 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
-        notes: { role: "engineer" },
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
         totalTokens: 50_000,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
@@ -959,7 +959,7 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: { ado: "use area paths" },
@@ -988,11 +988,11 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: { ado: "use iteration paths like Team\\Sprint1", graph: "include manager" },
-        notes: { role: "engineer" },
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -1011,7 +1011,7 @@ describe("contextSection", () => {
     expect(result).not.toContain("use iteration paths")
     expect(result).not.toContain("include manager")
     // But notes SHOULD be in system prompt
-    expect(result).toContain("role: engineer")
+    expect(result).toContain("role: [2026-01-01] engineer")
   })
 
   it("does NOT include priority guidance (removed -- overfitting)", async () => {
@@ -1019,11 +1019,11 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
-        notes: { role: "engineer" },
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
         totalTokens: 200_000,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
@@ -1048,11 +1048,11 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
-        notes: { role: "engineer" },
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -1077,11 +1077,11 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
-        notes: { role: "engineer" },
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -1102,12 +1102,12 @@ describe("contextSection", () => {
 
   // --- Unit 4a tests: friend context instructions rewrite ---
 
-  it("onboarding text interpolates displayName when known (via first-impressions)", async () => {
+  it("onboarding text interpolates name when known (via first-impressions)", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
@@ -1127,16 +1127,16 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    // First-impressions content (included via isOnboarding) should contain the displayName
+    // First-impressions content (included via isOnboarding) should contain the name
     expect(result).toContain("Jordan")
   })
 
-  it("onboarding text mentions unknown name when displayName is 'Unknown' (via first-impressions)", async () => {
+  it("onboarding text mentions unknown name when name is 'Unknown' (via first-impressions)", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Unknown",
+        name: "Unknown",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
@@ -1166,7 +1166,7 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
@@ -1197,11 +1197,11 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
-        notes: { role: "engineer" },
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
         totalTokens: 200_000,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
@@ -1226,11 +1226,11 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
-        notes: { role: "engineer" },
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -1256,11 +1256,11 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
-        notes: { name: "Jordan" },
+        notes: { name: { value: "Jordan", savedAt: "2026-01-01T00:00:00.000Z" } },
         totalTokens: 200_000,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
@@ -1289,11 +1289,11 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
-        notes: { role: "engineer" },
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
         totalTokens: 200_000,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
@@ -1321,7 +1321,7 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
@@ -1343,8 +1343,8 @@ describe("contextSection", () => {
     const result = contextSection(ctx)
     // Notes should always render regardless of token count
     expect(result).toContain("what i know about this friend")
-    expect(result).toContain("role: engineer")
-    expect(result).toContain("project: ouroboros")
+    expect(result).toContain("role: [2026-01-01] engineer")
+    expect(result).toContain("project: [2026-01-01] ouroboros")
   })
 })
 
@@ -1363,7 +1363,7 @@ describe("buildSystem with context", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01T00:00:00.000Z" }],
         tenantMemberships: ["t1"],
         toolPreferences: {},
