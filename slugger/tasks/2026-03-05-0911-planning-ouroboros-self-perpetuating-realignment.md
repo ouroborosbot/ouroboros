@@ -340,6 +340,119 @@ Teach agents to use Claude Code and Codex (and whatever else works) to do real c
 
 ---
 
+---
+
+## Execution Protocol
+
+This section tells the executing agent (Codex) exactly how to run the entire task autonomously. **This planning doc is pre-approved by the human. No approval gates, no review stops.** Read this doc once, follow the protocol, and chain all gates end-to-end.
+
+### Prerequisites
+
+- The three subagent protocols are registered as Codex skills: `work-planner`, `work-doer`, `work-merger`
+- This planning doc is the single source of truth for all gates
+- All reference material paths are listed in Context / References below
+
+### Per-Gate Execution Loop
+
+For each gate (0 through 11), execute this cycle:
+
+**Step 1: Branch**
+```
+git checkout main && git pull origin main
+git checkout -b <agent>/gate-<N>-<slug>
+```
+Branch naming: `slugger/gate-0-clean-baseline`, `slugger/gate-1-architectural-scaffolding`, etc.
+
+**Step 2: Generate doing doc (work-planner Phase 2 only)**
+
+Invoke the `work-planner` skill. Because this planning doc is already approved, **skip Phase 1 (planning) entirely** — go straight to Phase 2 (conversion). The input is this gate's section from this planning doc.
+
+Tell work-planner:
+- Planning doc path: `slugger/tasks/2026-03-05-0911-planning-ouroboros-self-perpetuating-realignment.md`
+- Convert ONLY the current gate's section (Gate N) into a doing doc
+- The planning doc is pre-approved — no approval gate needed
+- Place the doing doc in `slugger/tasks/` following the naming convention
+- Execution mode: `direct`
+
+Work-planner will run its 4 conversion passes (first draft, granularity, validation, quality) and produce a doing doc with TDD units. The doing doc is ready for execution immediately — no approval gate.
+
+**Step 3: Execute doing doc (work-doer)**
+
+Invoke the `work-doer` skill. It reads the doing doc from Step 2 and executes all units sequentially with strict TDD:
+- Tests first (red), then implementation (green), then refactor
+- Commit and push after each unit
+- 100% coverage on new code
+- `npm test` green after every unit
+- `npx tsc` compiles clean after every implementation/refactor unit
+
+**Step 4: Merge to main (work-merger)**
+
+Invoke the `work-merger` skill. It:
+- Fetches latest `main`, merges, resolves any conflicts
+- Creates a PR via `gh`
+- Waits for CI
+- Merges to main
+- Cleans up the feature branch
+
+After work-merger completes, the gate's work is on `main`.
+
+**Step 5: Verify gate completion**
+
+After merge, verify the gate's completion criteria from this planning doc:
+- Run `npm test` on main — must be green
+- Check that all completion criteria checkboxes for this gate are satisfiable
+- If any criterion is not met, fix it on a hotfix branch and merge before proceeding
+
+**Step 6: Continue to next gate**
+
+Return to Step 1 for the next gate. The next gate's doing doc will be generated fresh against the current codebase (which now includes all prior gates' work).
+
+### Failure Handling
+
+- **Test failures during work-doer:** Work-doer spawns sub-agents to diagnose and fix. If genuinely blocked (unclear requirements, external dependency), it marks the unit blocked and stops.
+- **Merge conflicts during work-merger:** Work-merger resolves using doing doc context. If conflicts are genuinely ambiguous, it retries with exponential backoff.
+- **Gate completion criteria not met after merge:** Create a hotfix branch, fix the issue, merge via work-merger, then re-verify before proceeding.
+- **Never skip a gate.** If a gate is blocked, fix the blocker — don't move on with an incomplete gate.
+
+### Phase 2 Note
+
+Phase 2 gates (8-11) are designed to be done collaboratively with the bootstrapped agent. By Gate 8, the agent infrastructure from Phase 1 should be operational. The executing agent should leverage the running agents' capabilities where applicable — for example, Gate 8 (Slugger Migration) should involve Slugger in validating its own migration.
+
+### Reference Material Paths
+
+All paths the executing agent may need:
+
+**Subagent protocols (Codex skills):**
+- `subagents/work-planner.md` — planning → doing doc conversion
+- `subagents/work-doer.md` — TDD unit execution
+- `subagents/work-merger.md` — branch merge via PR
+
+**Migration topic docs (detailed specs for Phase 2):**
+- `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration/memory-system.md` — three-layer memory architecture
+- `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration/muscle-memory.md` — behavioral enforcement
+- `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration/sub-agent-architecture.md` — L1/L2/L3 agent model
+- `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration/task-system.md` — task types, statuses, transitions
+- `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration/coding-agent-orchestration.md` — session manager
+- `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration/daemon-gateway.md` — supervisor process
+- `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration/operational-lifecycle.md` — dream cycle, proactivity
+- `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration/provider-abstraction.md` — per-agent provider config
+
+**Prior art (direct port targets):**
+- `~/clawd/tmp/slugger-plugin-v2-patch-20260222-235020/src/infrastructure/task-matrix.ts` — OpenClaw task statuses, transitions, pipeline stages
+
+**Current harness files (kill/refactor targets):**
+- `src/reflection/autonomous-loop.ts` — puppet pipeline (remove in Gate 3)
+- `src/reflection/loop-entry.ts` — loop CLI (remove in Gate 3)
+- `src/reflection/trigger.ts` — keep context-loading, remove pipeline orchestration (Gate 3)
+- `ouroboros/ARCHITECTURE.md` — relocate to repo root (Gate 2)
+- `ouroboros/CONSTITUTION.md` — relocate to repo root (Gate 2)
+
+**Existing agent directories (become .ouro bundles in Gate 2):**
+- `ouroboros/` → `ouroboros.ouro/`
+- `slugger/` → `slugger.ouro/`
+
+---
+
 ### Out of Scope (This Task)
 - Voice system, calendar integration, or other channel expansions
 - New LLM provider feature work not required for the inversion or agent operation
@@ -436,3 +549,4 @@ Phase 2 gates may run in parallel where dependencies allow. Gate 9 (task system)
 - 2026-03-05 Resolved all open questions. Key decisions: agents are persistent aspirational beings (not cron-driven task executors); governance is agent-owned (founding fathers sign the constitution); GitHub repos named <agent>.ouro; Gate 3 gets aspiration layer + supervisor; Gate 4 reframed as agent orienting and acting on its own judgment. Added overnight proposal inventory to Gate 1 and proper triage process to Gate 5. Referenced OpenClaw task-matrix.ts as prior art for Phase 2.
 - 2026-03-05 Moved memory system from out-of-scope into Gate 3. Three-layer architecture (reflexive/associative/archival) per memory-system.md spec. v1: regex extraction + TF-IDF, no embeddings. Agent memory is catch-all/fallback; per-friend save_friend_note remains primary for person-specific knowledge. Dream cycle consolidation and OpenClaw data migration deferred.
 - 2026-03-05 Resolved final open questions. Aspirations are part of psyche (psyche/ASPIRATIONS.md), agents encouraged to modify them as they grow. Bootstrap aspiration content agreed. All open questions now resolved.
+- 2026-03-05 Added Execution Protocol. Per-gate loop: work-planner (Phase 2 only, pre-approved) → work-doer (TDD) → work-merger (PR to main). No human approval stops. All three protocols registered as Codex skills. Complete reference material paths included.
