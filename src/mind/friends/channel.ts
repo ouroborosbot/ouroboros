@@ -14,11 +14,11 @@ const CHANNEL_CAPABILITIES: Record<string, ChannelCapabilities> = {
   },
   teams: {
     channel: "teams",
-    availableIntegrations: ["ado", "graph"],
+    availableIntegrations: ["ado", "graph", "github"],
     supportsMarkdown: true,
-    supportsStreaming: false,
+    supportsStreaming: true,
     supportsRichCards: true,
-    maxMessageLength: 4000,
+    maxMessageLength: Infinity,
   },
 }
 

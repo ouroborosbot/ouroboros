@@ -8,9 +8,10 @@ import { execTool, summarizeArgs, finalAnswerTool, getToolsForChannel, isConfirm
 import type { ToolContext } from "../repertoire/tools";
 import { getChannelCapabilities } from "../mind/friends/channel";
 import type { AssistantMessageWithReasoning, ResponseItem } from "./streaming";
-import { detectKick } from "./kicks";
+// Kick detection preserved but disabled — see comment in agent loop below.
+// import { detectKick } from "./kicks";
+// import type { KickReason } from "./kicks";
 import { emitNervesEvent } from "../nerves/runtime";
-import type { KickReason } from "./kicks";
 import type { TurnResult } from "./streaming";
 import type { UsageData } from "../mind/context";
 import { trimMessages } from "../mind/context";
@@ -123,11 +124,13 @@ export interface ChannelCallbacks {
   onError(error: Error, severity: "transient" | "terminal"): void;
   onKick?(): void;
   onConfirmAction?(name: string, args: Record<string, string>): Promise<"confirmed" | "denied">;
+  // Clear any buffered text accumulated during streaming. Called before emitting
+  // the final_answer so streamed noise (e.g. refusal text) is discarded.
+  onClearText?(): void;
 }
 
 export interface RunAgentOptions {
   toolChoiceRequired?: boolean;
-  disableStreaming?: boolean;
   skipConfirmation?: boolean;
   toolContext?: ToolContext;
   traceId?: string;
@@ -137,7 +140,6 @@ export interface RunAgentOptions {
 // Re-export kick utilities for backward compat
 export { hasToolIntent } from "./kicks";
 
-export const MAX_TOOL_ROUNDS = 10;
 
 function upsertSystemPrompt(
   messages: OpenAI.ChatCompletionMessageParam[],
@@ -220,6 +222,7 @@ export async function runAgent(
   const providerRuntime = getProviderRuntime();
   const provider = providerRuntime.id;
   const { maxToolOutputChars } = getContextConfig();
+  const toolChoiceRequired = options?.toolChoiceRequired ?? true;
   const traceId = options?.traceId;
   emitNervesEvent({
     event: "engine.turn_start",
@@ -268,16 +271,16 @@ export async function runAgent(
     }
   }
 
-  let kickCount = 0;
+  // kickCount and lastKickReason preserved but unused while kick detection is disabled.
+  // let kickCount = 0;
+  // let lastKickReason: KickReason | null = null;
   let done = false;
-  let toolRounds = 0;
   let lastUsage: UsageData | undefined;
   let overflowRetried = false;
   let retryCount = 0;
-  let lastKickReason: KickReason | null = null;
 
   // Prevent MaxListenersExceeded warning — each iteration adds a listener
-  try { require("events").setMaxListeners(MAX_TOOL_ROUNDS + 5, signal); } catch { /* unsupported */ }
+  try { require("events").setMaxListeners(50, signal); } catch { /* unsupported */ }
 
   const toolPreferences = currentContext?.friend?.toolPreferences;
   const baseTools = getToolsForChannel(
@@ -289,11 +292,11 @@ export async function runAgent(
   providerRuntime.resetTurnState(messages);
 
   while (!done) {
-    // Compute activeTools per-iteration: include final_answer when
-    // toolChoiceRequired is set OR after a narration kick (false-positive escape hatch)
-    const activeTools = (options?.toolChoiceRequired || lastKickReason === "narration")
-      ? [...baseTools, finalAnswerTool]
-      : baseTools;
+    // When toolChoiceRequired is true (the default), include final_answer
+    // so the model can signal completion. With tool_choice: required, the
+    // model must call a tool every turn — final_answer is how it exits.
+    // Overridable via options.toolChoiceRequired = false (e.g. CLI).
+    const activeTools = toolChoiceRequired ? [...baseTools, finalAnswerTool] : baseTools;
     const steeringFollowUps = options?.drainSteeringFollowUps?.() ?? [];
     if (steeringFollowUps.length > 0) {
       for (const followUp of steeringFollowUps) {
@@ -313,7 +316,7 @@ export async function runAgent(
         callbacks,
         signal,
         traceId,
-        toolChoiceRequired: options?.toolChoiceRequired,
+        toolChoiceRequired,
       });
 
       // Track usage from the latest API call
@@ -338,54 +341,77 @@ export async function runAgent(
         (msg as AssistantMessageWithReasoning)._reasoning_items = reasoningItems;
       }
       if (!result.toolCalls.length) {
-        const kick = detectKick(result.content, options);
-        if (kick) {
-          kickCount++;
-          lastKickReason = kick.reason;
-          toolRounds++;
-          if (toolRounds >= MAX_TOOL_ROUNDS) {
-            callbacks.onError(new Error(`tool loop limit reached (${MAX_TOOL_ROUNDS} rounds)`), "terminal");
-            done = true;
-            continue;
-          }
-          callbacks.onKick?.();
-          // Preserve original content with self-correction appended
-          const kickContent = result.content
-            ? result.content + "\n\n" + kick.message
-            : kick.message;
-          messages.push({ role: "assistant", content: kickContent });
-          providerRuntime.resetTurnState(messages);
-          continue;
-        }
+        // Kick detection is disabled while tool_choice: required + final_answer
+        // is the primary loop control mechanism. The model should never reach
+        // this path (tool_choice: required forces a tool call), but if it does,
+        // accept the response as-is rather than risk false-positive kicks.
+        //
+        // Preserved for future use — re-enable by uncommenting:
+        // const kick = detectKick(result.content, options);
+        // if (kick) {
+        //   kickCount++;
+        //   lastKickReason = kick.reason;
+        //   callbacks.onKick?.();
+        //   const kickContent = result.content
+        //     ? result.content + "\n\n" + kick.message
+        //     : kick.message;
+        //   messages.push({ role: "assistant", content: kickContent });
+        //   providerRuntime.resetTurnState(messages);
+        //   continue;
+        // }
         messages.push(msg);
         done = true;
       } else {
         // Check for final_answer sole call: intercept before tool execution
         const isSoleFinalAnswer = result.toolCalls.length === 1 && result.toolCalls[0].name === "final_answer";
         if (isSoleFinalAnswer) {
-          let answer: string;
+          // Extract answer from the tool call arguments.
+          // Supports: {"answer":"text"}, "text" (JSON string), retry on failure.
+          let answer: string | undefined;
           try {
             const parsed = JSON.parse(result.toolCalls[0].arguments);
-            answer = parsed.answer ?? result.content;
+            if (typeof parsed === "string") {
+              answer = parsed;
+            } else if (parsed.answer != null) {
+              answer = parsed.answer;
+            }
+            // else: valid JSON but no answer field — answer stays undefined (retry)
           } catch {
-            answer = result.content;
+            // JSON parsing failed (e.g. truncated output) — answer stays undefined (retry)
           }
-          // Push clean assistant message with extracted answer (no tool_calls)
-          messages.push({ role: "assistant", content: answer } as OpenAI.ChatCompletionAssistantMessageParam);
-          done = true;
+
+          if (answer != null) {
+            if (result.finalAnswerStreamed) {
+              // The streaming layer already parsed and emitted the answer
+              // progressively via FinalAnswerParser. Skip clearing and
+              // re-emitting to avoid double-delivery.
+            } else {
+              // Clear any streamed noise (e.g. refusal text) before emitting.
+              callbacks.onClearText?.();
+              // Emit the answer through the callback pipeline so channels receive it.
+              // Never truncate -- channel adapters handle splitting long messages.
+              callbacks.onTextChunk(answer);
+            }
+            // Keep the full assistant message (with tool_calls) for debuggability,
+            // plus a synthetic tool response so the conversation stays valid on resume.
+            messages.push(msg);
+            messages.push({ role: "tool", tool_call_id: result.toolCalls[0].id, content: "(delivered)" });
+            providerRuntime.appendToolOutput(result.toolCalls[0].id, "(delivered)");
+            done = true;
+          } else {
+            // Answer is undefined -- the model's final_answer was incomplete or
+            // malformed. Clear any partial streamed text or noise, then push the
+            // assistant msg + error tool result and let the model try again.
+            callbacks.onClearText?.();
+            const retryError = "your final_answer was incomplete or malformed. call final_answer again with your complete response.";
+            messages.push(msg);
+            messages.push({ role: "tool", tool_call_id: result.toolCalls[0].id, content: retryError });
+            providerRuntime.appendToolOutput(result.toolCalls[0].id, retryError);
+          }
           continue;
         }
 
         messages.push(msg);
-        toolRounds++;
-        if (toolRounds >= MAX_TOOL_ROUNDS) {
-          // Strip tool_calls from the assistant message we just pushed so the
-          // conversation stays valid (every tool_call needs a tool response).
-          stripLastToolCalls(messages);
-          callbacks.onError(new Error(`tool loop limit reached (${MAX_TOOL_ROUNDS} rounds)`), "terminal");
-          done = true;
-          break;
-        }
         // SHARED: execute tools (final_answer in mixed calls is rejected inline)
         for (const tc of result.toolCalls) {
           if (signal?.aborted) break;

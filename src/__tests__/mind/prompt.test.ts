@@ -428,7 +428,7 @@ describe("buildSystem", () => {
     expect(result).not.toContain("final_answer")
   })
 
-  it("does NOT include tool behavior section when options is undefined", async () => {
+  it("includes tool behavior section when options is undefined (defaults on)", async () => {
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
@@ -436,51 +436,86 @@ describe("buildSystem", () => {
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli")
-    expect(result).not.toContain("## tool behavior")
+    expect(result).toContain("## tool behavior")
   })
 
-  it("includes flags section when disableStreaming is true and channel is teams", async () => {
+  it("tool behavior section contains decision-tree framing", async () => {
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = await buildSystem("teams", { disableStreaming: true })
-    expect(result).toContain("## my flags")
-    expect(result).toContain("streaming")
-    expect(result).toContain("disabled")
+    const result = await buildSystem("cli", { toolChoiceRequired: true })
+    // Decision tree: mentions calling tools for info and final_answer for responding
+    expect(result).toMatch(/need.*information.*call a tool/i)
+    expect(result).toMatch(/ready to respond.*call.*final_answer/i)
   })
 
-  it("does NOT include flags section when disableStreaming is true but channel is cli", async () => {
+  it("tool behavior section contains anti-no-op pattern", async () => {
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = await buildSystem("cli", { disableStreaming: true })
-    expect(result).not.toContain("## my flags")
+    const result = await buildSystem("cli", { toolChoiceRequired: true })
+    // Anti-pattern: warns against calling get_current_time or no-ops before final_answer
+    expect(result).toContain("get_current_time")
+    expect(result).toMatch(/do not call.*no-op|do NOT call.*no-op/i)
   })
 
-  it("does NOT include flags section when disableStreaming is false", async () => {
+  it("tool behavior section clarifies final_answer is a tool call", async () => {
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = await buildSystem("teams", { disableStreaming: false })
-    expect(result).not.toContain("## my flags")
+    const result = await buildSystem("cli", { toolChoiceRequired: true })
+    // Clarification: final_answer IS a tool call satisfying the requirement
+    expect(result).toMatch(/final_answer.*tool call.*satisfies|final_answer.*is a tool call/i)
   })
 
-  it("does NOT include flags section when disableStreaming is undefined", async () => {
+  it("toolsSection includes final_answer in tool list when options undefined (defaults on)", async () => {
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
+    const result = await buildSystem("cli")
+    // The tools section should list final_answer when defaults on
+    expect(result).toContain("- final_answer:")
+  })
+
+  it("toolsSection does NOT include final_answer when toolChoiceRequired is false", async () => {
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = await buildSystem("cli", { toolChoiceRequired: false })
+    expect(result).not.toContain("- final_answer:")
+  })
+
+  it("does not export flagsSection (removed)", async () => {
+    vi.resetModules()
+    setupReadFileSync()
+    const promptModule = await import("../../mind/prompt")
+    // flagsSection should no longer be exported
+    expect(promptModule).not.toHaveProperty("flagsSection")
+  })
+
+  it("BuildSystemOptions does not accept disableStreaming", async () => {
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    // buildSystem with no options should never produce "## my flags"
     const result = await buildSystem("teams")
     expect(result).not.toContain("## my flags")
   })
@@ -618,67 +653,13 @@ describe("psyche loading", () => {
   })
 })
 
-describe("flagsSection rationale", () => {
-  beforeEach(() => {
+describe("flagsSection removed", () => {
+  it("flagsSection is no longer exported from prompt module", async () => {
     vi.resetModules()
     setAgentProvider("minimax")
-  })
-
-  it("mentions devtunnel relay buffering (microsoft/dev-tunnels#518)", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { flagsSection, resetPsycheCache } = await import("../../mind/prompt")
-    resetPsycheCache()
-    const result = flagsSection("teams", { disableStreaming: true })
-    expect(result).toContain("devtunnel")
-    expect(result).toContain("dev-tunnels#518")
-  })
-
-  it("mentions 60-second hard timeout", async () => {
-    setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { flagsSection, resetPsycheCache } = await import("../../mind/prompt")
-    resetPsycheCache()
-    const result = flagsSection("teams", { disableStreaming: true })
-    expect(result).toContain("60")
-    expect(result.toLowerCase()).toContain("timeout")
-  })
-
-  it("mentions no HTTP/2 support on devtunnels", async () => {
-    setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { flagsSection, resetPsycheCache } = await import("../../mind/prompt")
-    resetPsycheCache()
-    const result = flagsSection("teams", { disableStreaming: true })
-    expect(result).toContain("HTTP/2")
-  })
-
-  it("mentions Teams throttles streaming updates to 1 req/sec", async () => {
-    setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { flagsSection, resetPsycheCache } = await import("../../mind/prompt")
-    resetPsycheCache()
-    const result = flagsSection("teams", { disableStreaming: true })
-    expect(result).toContain("1 req/sec")
-  })
-
-  it("mentions buffering avoids compounding latency", async () => {
-    setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { flagsSection, resetPsycheCache } = await import("../../mind/prompt")
-    resetPsycheCache()
-    const result = flagsSection("teams", { disableStreaming: true })
-    expect(result.toLowerCase()).toContain("latency")
+    const promptModule = await import("../../mind/prompt")
+    expect(promptModule).not.toHaveProperty("flagsSection")
   })
 })
 
@@ -713,7 +694,7 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [{ provider: "local" as const, externalId: "jordan", linkedAt: "2026-01-01T00:00:00.000Z" }],
         tenantMemberships: [],
         toolPreferences: {},
@@ -742,7 +723,7 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan Smith",
+        name: "Jordan Smith",
         externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01T00:00:00.000Z" }],
         tenantMemberships: ["t1"],
         toolPreferences: {},
@@ -755,9 +736,9 @@ describe("contextSection", () => {
         channel: "teams" as const,
         availableIntegrations: ["ado" as const, "graph" as const],
         supportsMarkdown: true,
-        supportsStreaming: false,
+        supportsStreaming: true,
         supportsRichCards: true,
-        maxMessageLength: 4000,
+        maxMessageLength: Infinity,
       },
     }
     const result = contextSection(ctx)
@@ -769,7 +750,7 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
@@ -782,16 +763,17 @@ describe("contextSection", () => {
         channel: "teams" as const,
         availableIntegrations: ["ado" as const, "graph" as const],
         supportsMarkdown: true,
-        supportsStreaming: false,
+        supportsStreaming: true,
         supportsRichCards: true,
-        maxMessageLength: 4000,
+        maxMessageLength: Infinity,
       },
     }
     const result = contextSection(ctx)
     expect(result).toContain("channel: teams")
     expect(result).toContain("markdown")
-    expect(result).toContain("no streaming")
-    expect(result).toContain("max 4000 chars")
+    expect(result).toContain("streaming")
+    expect(result).not.toContain("no streaming")
+    expect(result).not.toContain("max ")
   })
 
   it("renders CLI channel with streaming", async () => {
@@ -799,7 +781,7 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
@@ -823,16 +805,44 @@ describe("contextSection", () => {
     expect(result).not.toContain("no streaming")
   })
 
+  it("renders 'no streaming' trait when channel does not support streaming", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        name: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "cli" as const,
+        availableIntegrations: [] as any[],
+        supportsMarkdown: false,
+        supportsStreaming: false,
+        supportsRichCards: false,
+        maxMessageLength: Infinity,
+      },
+    }
+    const result = contextSection(ctx)
+    expect(result).toContain("no streaming")
+    expect(result).not.toContain(", streaming")
+  })
+
   it("renders notes section when friend has notes", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
-        notes: { role: "engineering manager", project: "ouroboros" },
+        notes: { role: { value: "engineering manager", savedAt: "2026-01-01T00:00:00.000Z" }, project: { value: "ouroboros", savedAt: "2026-01-01T00:00:00.000Z" } },
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -847,8 +857,8 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    expect(result).toContain("role: engineering manager")
-    expect(result).toContain("project: ouroboros")
+    expect(result).toContain("role: [2026-01-01] engineering manager")
+    expect(result).toContain("project: [2026-01-01] ouroboros")
   })
 
   it("does not render notes section when notes is empty", async () => {
@@ -856,7 +866,7 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
@@ -883,7 +893,7 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: { ado: "use iteration paths" },
@@ -911,7 +921,7 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
@@ -940,11 +950,11 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01" }],
         tenantMemberships: ["t1"],
         toolPreferences: { ado: "use iteration paths" },
-        notes: { role: "engineer" },
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -964,16 +974,17 @@ describe("contextSection", () => {
     expect(result).toContain("save_friend_note")
   })
 
-  it("includes name-quality instruction with displayName", async () => {
+  it("separate name quality line is absent but save directive still present", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
-        notes: { name: "Jordan" },
+        notes: { name: { value: "Jordan", savedAt: "2026-01-01T00:00:00.000Z" } },
+        totalTokens: 200_000,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -988,21 +999,23 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    // Should include instruction about name quality
-    expect(result).toContain("name")
-    expect(result.toLowerCase()).toContain("prefer")
+    // Separate "when i learn a name my friend prefers" line is absent
+    expect(result.toLowerCase()).not.toMatch(/when i learn a name my friend prefers/)
+    // But "save" still appears via the broader "save ANYTHING" directive
+    expect(result.toLowerCase()).toContain("save")
   })
 
-  it("includes new-friend instruction when notes and toolPreferences both empty", async () => {
+  it("onboarding text appears for friend with totalTokens: 0", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
         notes: {},
+        totalTokens: 0,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -1017,20 +1030,21 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    // Should include instruction about new friend
-    expect(result.toLowerCase()).toContain("new friend")
+    // Onboarding text should appear below threshold -- mentions learning about the friend
+    expect(result.toLowerCase()).toMatch(/learn|get to know/)
   })
 
-  it("does NOT include new-friend instruction when notes has entries", async () => {
+  it("onboarding text does NOT appear for friend with totalTokens: 200_000", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
-        notes: { role: "engineer" },
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
+        totalTokens: 200_000,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -1045,19 +1059,52 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    expect(result.toLowerCase()).not.toContain("new friend")
+    // Onboarding text should NOT appear above threshold
+    expect(result.toLowerCase()).not.toMatch(/new friend/)
+    expect(result.toLowerCase()).not.toMatch(/get to know/)
   })
 
-  it("does NOT include new-friend instruction when toolPreferences has entries", async () => {
+  it("onboarding text STILL appears when friend has notes but totalTokens below threshold", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
+        totalTokens: 50_000,
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // Notes presence is irrelevant -- onboarding is token-based
+    // 50K tokens is below 100K threshold, so onboarding text should appear
+    expect(result.toLowerCase()).toMatch(/learn|get to know/)
+  })
+
+  it("onboarding text STILL appears when friend has toolPreferences but totalTokens below threshold", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: { ado: "use area paths" },
         notes: {},
+        totalTokens: 50_000,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -1072,7 +1119,8 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    expect(result.toLowerCase()).not.toContain("new friend")
+    // Tool preferences are irrelevant -- onboarding is token-based
+    expect(result.toLowerCase()).toMatch(/learn|get to know/)
   })
 
   it("does NOT render toolPreferences in system prompt", async () => {
@@ -1080,11 +1128,11 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: { ado: "use iteration paths like Team\\Sprint1", graph: "include manager" },
-        notes: { role: "engineer" },
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -1103,19 +1151,20 @@ describe("contextSection", () => {
     expect(result).not.toContain("use iteration paths")
     expect(result).not.toContain("include manager")
     // But notes SHOULD be in system prompt
-    expect(result).toContain("role: engineer")
+    expect(result).toContain("role: [2026-01-01] engineer")
   })
 
-  it("includes priority guidance when friend context is present", async () => {
+  it("does NOT include priority guidance (removed -- overfitting)", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
-        notes: { role: "engineer" },
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
+        totalTokens: 200_000,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -1130,9 +1179,8 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    // Should include priority guidance -- friend's request first
-    expect(result.toLowerCase()).toContain("request")
-    expect(result.toLowerCase()).toContain("first")
+    // Priority guidance line "my friend's request comes first" is removed
+    expect(result.toLowerCase()).not.toContain("request comes first")
   })
 
   it("includes working-memory trust instruction", async () => {
@@ -1140,11 +1188,11 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
-        notes: { role: "engineer" },
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -1169,11 +1217,11 @@ describe("contextSection", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
-        notes: { role: "engineer" },
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -1190,6 +1238,253 @@ describe("contextSection", () => {
     const result = contextSection(ctx)
     // Should include instruction about checking for stale notes
     expect(result.toLowerCase()).toContain("stale")
+  })
+
+  // --- Unit 4a tests: friend context instructions rewrite ---
+
+  it("onboarding text interpolates name when known (via first-impressions)", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        name: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        totalTokens: 0,
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // First-impressions content (included via isOnboarding) should contain the name
+    expect(result).toContain("Jordan")
+  })
+
+  it("onboarding text mentions unknown name when name is 'Unknown' (via first-impressions)", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        name: "Unknown",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        totalTokens: 0,
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // First-impressions should mention asking what they'd like to be called
+    expect(result.toLowerCase()).toMatch(/don't know.*name|do not know.*name/)
+    expect(result.toLowerCase()).toMatch(/ask/)
+  })
+
+  it("onboarding text is directive with action verbs (via first-impressions)", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        name: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        totalTokens: 0,
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // First-impressions text should be directive, not aspirational
+    expect(result).not.toMatch(/should learn/)
+    // Should contain directive about saving
+    expect(result.toLowerCase()).toMatch(/save/)
+  })
+
+  it("does NOT include 'get to know' in contextSection for returning friends (moved to onboarding-only)", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        name: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
+        totalTokens: 200_000,
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // "get to know" is now onboarding-only, not always-on
+    expect(result.toLowerCase()).not.toMatch(/get to know/)
+  })
+
+  it("memory instruction lowers the bar -- saves anything learned, not just important things", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        name: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // Memory instruction should NOT say "something important" -- bar is too high
+    expect(result).not.toContain("something important")
+    // Should lower the bar to "anything i learn"
+    expect(result.toLowerCase()).toMatch(/anything i learn/)
+  })
+
+  it("separate name quality line is ABSENT -- folded into broader save directive", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        name: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: { name: { value: "Jordan", savedAt: "2026-01-01T00:00:00.000Z" } },
+        totalTokens: 200_000,
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "cli" as const,
+        availableIntegrations: [] as any[],
+        supportsMarkdown: false,
+        supportsStreaming: true,
+        supportsRichCards: false,
+        maxMessageLength: Infinity,
+      },
+    }
+    const result = contextSection(ctx)
+    // Separate "when i learn a name" line is removed -- folded into "save ANYTHING"
+    expect(result.toLowerCase()).not.toMatch(/when i learn a name/)
+    // But "save" still appears via the broader directive
+    expect(result.toLowerCase()).toContain("save")
+  })
+
+  // --- Part B: Token-threshold-based instruction tests ---
+
+  it("always-on directives present at high totalTokens (200K)", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        name: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } },
+        totalTokens: 200_000,
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // All 4 always-on directives should be present at any token level
+    expect(result.toLowerCase()).toContain("ephemeral")
+    expect(result.toLowerCase()).toContain("source of truth")
+    expect(result.toLowerCase()).toContain("stale")
+    expect(result.toLowerCase()).toContain("save anything")
+  })
+
+  it("friend notes rendering always present at high totalTokens", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        name: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" }, project: { value: "ouroboros", savedAt: "2026-01-01T00:00:00.000Z" } },
+        totalTokens: 200_000,
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // Notes should always render regardless of token count
+    expect(result).toContain("what i know about this friend")
+    expect(result).toContain("role: [2026-01-01] engineer")
+    expect(result).toContain("project: [2026-01-01] ouroboros")
   })
 })
 
@@ -1209,7 +1504,7 @@ describe("buildSystem with context", () => {
     const ctx = {
       friend: {
         id: "uuid-1",
-        displayName: "Jordan",
+        name: "Jordan",
         externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01T00:00:00.000Z" }],
         tenantMemberships: ["t1"],
         toolPreferences: {},
@@ -1222,9 +1517,9 @@ describe("buildSystem with context", () => {
         channel: "teams" as const,
         availableIntegrations: ["ado" as const, "graph" as const],
         supportsMarkdown: true,
-        supportsStreaming: false,
+        supportsStreaming: true,
         supportsRichCards: true,
-        maxMessageLength: 4000,
+        maxMessageLength: Infinity,
       },
     }
     const result = await buildSystem("teams", undefined, ctx)

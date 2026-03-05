@@ -1,6 +1,6 @@
-# OAuth Setup for Graph API and Azure DevOps API
+# OAuth Setup for Graph API, Azure DevOps API, and GitHub API
 
-This guide covers the manual Azure/Entra setup required for Ouroboros to call Microsoft Graph API and Azure DevOps API on behalf of users via OAuth SSO in Teams.
+This guide covers the manual Azure/Entra setup required for Ouroboros to call Microsoft Graph API, Azure DevOps API, and GitHub API on behalf of users via OAuth SSO in Teams.
 
 ## Prerequisites
 
@@ -99,6 +99,57 @@ You need **two** OAuth connection settings on the Azure Bot resource -- one for 
 
 > **Note**: The ADO scopes use the Azure DevOps resource ID (`499b84ac-1321-427f-aa17-267ca6975798`) rather than the `https://app.vso.com` audience. The `.default` scope requests all permissions configured on the app registration for that resource.
 
+### 2.3 GitHub Connection (`github`)
+
+Unlike Graph and ADO, GitHub uses its own OAuth provider (not AAD v2). You need a **GitHub OAuth App** first.
+
+#### 2.3.1 Create a GitHub OAuth App
+
+1. Go to **github.com** > **Settings** > **Developer settings** > **OAuth Apps** > **New OAuth App** (or create under an organization at `github.com/organizations/{org}/settings/applications`).
+2. Fill in:
+   - **Application name**: `Ouroboros for Copilot` (users see this on the consent screen)
+   - **Homepage URL**: your project URL (e.g., `https://ouroboros.bot`)
+   - **Authorization callback URL**: `https://token.botframework.com/.auth/web/redirect`
+3. Click **Register application**.
+4. Copy the **Client ID**.
+5. Click **Generate a new client secret** and copy it (shown only once).
+
+#### 2.3.2 Create the Bot Service Connection
+
+Via Azure Portal:
+1. Go to **Azure Bot** resource > **Configuration** > **OAuth Connection Settings** > **Add Setting**.
+2. Fill in:
+   - **Name**: `github` (must match `githubConnectionName` in config.json)
+   - **Service Provider**: GitHub
+   - **Client ID**: from the GitHub OAuth App
+   - **Client Secret**: from the GitHub OAuth App
+   - **Scopes**: `repo` (or `repo,read:org` if you need org access)
+
+Or via Azure CLI:
+```bash
+az bot authsetting create \
+  --name {bot-name} \
+  --resource-group {resource-group} \
+  --setting-name github \
+  --provider-scope-string "repo" \
+  --client-id "{github-client-id}" \
+  --client-secret "{github-client-secret}" \
+  --service "github"
+```
+
+#### 2.3.3 Update config.json
+
+Add the connection name to the `oauth` section:
+```json
+{
+  "oauth": {
+    "githubConnectionName": "github"
+  }
+}
+```
+
+> **Note**: The GitHub connection is independent of the AAD app registration. Users sign in to GitHub separately from Graph/ADO. The first time a user asks the bot to create a GitHub issue, they'll be prompted to authorize with their GitHub account.
+
 ## 3. Teams Manifest
 
 The manifest already includes `webApplicationInfo` (committed separately):
@@ -168,6 +219,9 @@ After completing the setup:
 4. Ask the bot: "Show my work items in {org}"
    - This triggers `ado_work_items`, which may prompt for ADO signin.
    - After signin, the bot should return your recent work items.
+5. Ask the bot: "Create an issue on {owner}/{repo} titled 'Test issue'"
+   - This triggers `github_create_issue`, which may prompt for GitHub signin.
+   - After signin, the bot should create the issue and return its URL.
 
 If signin fails, check:
 - OAuth connection names match between Azure Bot config and env vars

@@ -24,7 +24,7 @@ function makeCtx(overrides?: any) {
     adoToken: "test-token",
     signin: vi.fn(),
     context: {
-      friend: { id: "uuid-1", displayName: "Jordan", externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01" }], tenantMemberships: ["t1"], toolPreferences: {}, notes: {}, createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
+      friend: { id: "uuid-1", name: "Jordan", externalIds: [{ provider: "aad" as const, externalId: "jordan@contoso.com", tenantId: "t1", linkedAt: "2026-01-01" }], tenantMemberships: ["t1"], toolPreferences: {}, notes: {}, createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
       channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
     },
     ...overrides,
@@ -547,7 +547,7 @@ describe("channel-aware formatting", () => {
     return makeCtx({
       context: {
         ...makeCtx().context,
-        channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 4000 },
+        channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: Infinity },
       },
     })
   }
@@ -590,9 +590,8 @@ describe("channel-aware formatting", () => {
     expect(result).toContain("#100")
   })
 
-  it("ado_backlog_list: Teams response respects maxMessageLength", async () => {
+  it("ado_backlog_list: Teams response includes all items (no truncation with Infinity maxMessageLength)", async () => {
     vi.mocked(resolveAdoContext).mockResolvedValue({ ok: true, organization: "contoso", project: "Platform" })
-    // Create many items to exceed 4000 char limit
     const items = Array.from({ length: 50 }, (_, i) => ({
       id: i + 100,
       fields: {
@@ -611,8 +610,10 @@ describe("channel-aware formatting", () => {
     const ctx = makeTeamsCtx()
     const def = findTool("ado_backlog_list")!
     const result = await def.handler({}, ctx)
-    // Should be truncated to near maxMessageLength
-    expect(result.length).toBeLessThanOrEqual(4100) // Some tolerance
+    // All 50 items included — no maxMessageLength truncation
+    expect(result).toContain("#100")
+    expect(result).toContain("#149")
+    expect(result).not.toContain("...and")
   })
 
   it("ado_backlog_list: CLI has no truncation", async () => {

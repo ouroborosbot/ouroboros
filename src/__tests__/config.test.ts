@@ -139,7 +139,6 @@ describe("loadConfig", () => {
       },
       teamsChannel: {
         skipConfirmation: true,
-        disableStreaming: false,
         port: 3978,
       },
       integrations: {
@@ -683,18 +682,15 @@ describe("getTeamsChannelConfig", () => {
     resetConfigCache()
     const tc = getTeamsChannelConfig()
 
-    expect(tc).toEqual({
-      skipConfirmation: true,
-      disableStreaming: false,
-      port: 3978,
-    })
+    expect(tc.skipConfirmation).toBe(true)
+    expect(tc.port).toBe(3978)
   })
 
-  it("returns teamsChannel config from config.json", async () => {
+  it("returns teamsChannel config with flushIntervalMs from config.json", async () => {
     const configData = {
       teamsChannel: {
         skipConfirmation: true,
-        disableStreaming: true,
+        flushIntervalMs: 2000,
         port: 4000,
       },
     }
@@ -704,11 +700,9 @@ describe("getTeamsChannelConfig", () => {
     resetConfigCache()
     const tc = getTeamsChannelConfig()
 
-    expect(tc).toEqual({
-      skipConfirmation: true,
-      disableStreaming: true,
-      port: 4000,
-    })
+    expect(tc.skipConfirmation).toBe(true)
+    expect(tc.flushIntervalMs).toBe(2000)
+    expect(tc.port).toBe(4000)
   })
 
   it("returns a shallow copy (not the same reference)", async () => {
@@ -723,7 +717,7 @@ describe("getTeamsChannelConfig", () => {
     expect(tc1).not.toBe(tc2)
   })
 
-  it("merges partial teamsChannel config with defaults", async () => {
+  it("merges partial teamsChannel config with defaults (no disableStreaming)", async () => {
     const configData = {
       teamsChannel: {
         port: 5000,
@@ -736,7 +730,7 @@ describe("getTeamsChannelConfig", () => {
     const tc = getTeamsChannelConfig()
 
     expect(tc.skipConfirmation).toBe(true)
-    expect(tc.disableStreaming).toBe(false)
+    expect(tc).not.toHaveProperty("disableStreaming")
     expect(tc.port).toBe(5000)
   })
 })
@@ -865,7 +859,7 @@ describe("setTestConfig", () => {
     const tc = getTeamsChannelConfig()
     expect(tc.skipConfirmation).toBe(true)
     expect(tc.port).toBe(5000)
-    expect(tc.disableStreaming).toBe(false) // default preserved
+    expect(tc).not.toHaveProperty("disableStreaming") // removed
 
     const ic = getIntegrationsConfig()
     expect(ic.perplexityApiKey).toBe("pplx-test")
