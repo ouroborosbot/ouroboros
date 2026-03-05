@@ -131,7 +131,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Refactored Anthropic provider code and coverage artifact for auth/stream branches.
 **Acceptance**: 100% coverage on new Anthropic integration code and tests green.
 
-### ⬜ Unit 4d: Provider module extraction pre-Unit-5 pass — Tests
+### ✅ Unit 4d: Provider module extraction pre-Unit-5 pass — Tests
 **What**: Add failing tests in `src/__tests__/heart/core.test.ts` and `src/__tests__/heart/streaming.test.ts` that lock provider module boundaries so provider-specific runtime logic is owned in `src/heart/providers/{anthropic,azure,minimax}.ts` and no longer embedded in `src/heart/core.ts`.
 **Output**: Failing boundary tests plus artifact logs `unit-4d-red-run.txt` and `unit-4d-red-jest.json`.
 **Acceptance**: Tests fail red, logs are saved under the task artifacts directory, and failures identify provider-specific runtime logic still anchored in `src/heart/core.ts`.
@@ -255,3 +255,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 18:39 Pass 2 (Granularity) refined Units 4d-4m outputs/acceptance with explicit per-unit artifact files
 - 2026-03-04 18:40 Pass 3 (Validation) aligned Units 4d-4m to actual repository test/runtime files and explicit provider-module creation path
 - 2026-03-04 18:41 Pass 4 (Quality) confirmed completion criteria, coverage section, and unit emoji/status formatting with no additional content gaps
+- 2026-03-04 18:44 Unit 4d complete: added failing provider-module boundary tests in `core.test.ts`/`streaming.test.ts` with red artifacts (`unit-4d-red-run.txt`, `unit-4d-red-jest.json`, `unit-4d-red-run.exit`)
