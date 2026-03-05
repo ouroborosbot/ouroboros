@@ -6,18 +6,16 @@ export const githubToolDefinitions: ToolDefinition[] = [
     tool: {
       type: "function",
       function: {
-        name: "github_create_issue",
-        description: "Create a GitHub issue on a repository. Requires OAuth authorization.",
+        name: "file_ouroboros_bug",
+        description: "File a bug or feature request on the ouroboros harness repo. Requires GitHub OAuth authorization.",
         parameters: {
           type: "object",
           properties: {
-            owner: { type: "string", description: "Repository owner (user or organization)" },
-            repo: { type: "string", description: "Repository name" },
             title: { type: "string", description: "Issue title" },
             body: { type: "string", description: "Issue body/description (optional)" },
             labels: { type: "string", description: "Comma-separated label names (optional)" },
           },
-          required: ["owner", "repo", "title"],
+          required: ["title"],
         },
       },
     },
@@ -25,12 +23,14 @@ export const githubToolDefinitions: ToolDefinition[] = [
       if (!ctx?.githubToken) {
         return "AUTH_REQUIRED:github -- I need access to GitHub. Please sign in when prompted."
       }
+      const owner = "ouroborosbot"
+      const repo = "ouroboros"
       const payload: Record<string, unknown> = { title: args.title }
       if (args.body) payload.body = args.body
       if (args.labels) {
         payload.labels = args.labels.split(",").map((l) => l.trim())
       }
-      return githubRequest(ctx.githubToken, "POST", `/repos/${args.owner}/${args.repo}/issues`, JSON.stringify(payload))
+      return githubRequest(ctx.githubToken, "POST", `/repos/${owner}/${repo}/issues`, JSON.stringify(payload))
     },
     integration: "github",
     confirmationRequired: true,
@@ -38,6 +38,6 @@ export const githubToolDefinitions: ToolDefinition[] = [
 ]
 
 export function summarizeGithubArgs(name: string, args: Record<string, string>): string | undefined {
-  if (name === "github_create_issue") return args.title || ""
+  if (name === "file_ouroboros_bug") return args.title || ""
   return undefined
 }
