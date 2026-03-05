@@ -29,14 +29,15 @@ function createMockStore(existing?: FriendRecord | null): FriendStore {
 }
 
 describe("accumulateFriendTokens", () => {
-  it("adds usage.total_tokens to a record with totalTokens: 0", async () => {
+  it("adds only output_tokens to a record with totalTokens: 0", async () => {
     const friend = makeFriend({ totalTokens: 0 })
     const store = createMockStore(friend)
 
     await accumulateFriendTokens(store, "uuid-1", { input_tokens: 500, output_tokens: 800, reasoning_tokens: 200, total_tokens: 1500 })
 
     expect(store.get).toHaveBeenCalledWith("uuid-1")
-    expect(store.put).toHaveBeenCalledWith("uuid-1", expect.objectContaining({ totalTokens: 1500 }))
+    // Only output_tokens (800) counted -- not total_tokens (1500)
+    expect(store.put).toHaveBeenCalledWith("uuid-1", expect.objectContaining({ totalTokens: 800 }))
     // updatedAt should be refreshed
     const putCall = (store.put as ReturnType<typeof vi.fn>).mock.calls[0][1] as FriendRecord
     expect(putCall.updatedAt).not.toBe("2026-03-02T00:00:00.000Z")
@@ -48,7 +49,8 @@ describe("accumulateFriendTokens", () => {
 
     await accumulateFriendTokens(store, "uuid-1", { input_tokens: 1000, output_tokens: 800, reasoning_tokens: 200, total_tokens: 2000 })
 
-    expect(store.put).toHaveBeenCalledWith("uuid-1", expect.objectContaining({ totalTokens: 5000 }))
+    // 3000 existing + 800 output = 3800
+    expect(store.put).toHaveBeenCalledWith("uuid-1", expect.objectContaining({ totalTokens: 3800 }))
   })
 
   it("is a no-op when usage is undefined", async () => {
@@ -60,10 +62,10 @@ describe("accumulateFriendTokens", () => {
     expect(store.put).not.toHaveBeenCalled()
   })
 
-  it("is a no-op when usage.total_tokens is 0", async () => {
+  it("is a no-op when output_tokens is 0", async () => {
     const store = createMockStore(makeFriend())
 
-    await accumulateFriendTokens(store, "uuid-1", { input_tokens: 0, output_tokens: 0, reasoning_tokens: 0, total_tokens: 0 })
+    await accumulateFriendTokens(store, "uuid-1", { input_tokens: 500, output_tokens: 0, reasoning_tokens: 0, total_tokens: 500 })
 
     expect(store.get).not.toHaveBeenCalled()
     expect(store.put).not.toHaveBeenCalled()
@@ -86,6 +88,7 @@ describe("accumulateFriendTokens", () => {
 
     await accumulateFriendTokens(store, "uuid-1", { input_tokens: 500, output_tokens: 800, reasoning_tokens: 200, total_tokens: 1500 })
 
-    expect(store.put).toHaveBeenCalledWith("uuid-1", expect.objectContaining({ totalTokens: 1500 }))
+    // Only output_tokens (800) counted
+    expect(store.put).toHaveBeenCalledWith("uuid-1", expect.objectContaining({ totalTokens: 800 }))
   })
 })

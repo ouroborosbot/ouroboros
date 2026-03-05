@@ -54,12 +54,14 @@ describe("first-impressions", () => {
       expect(result).toBe("")
     })
 
-    it("encourages learning about the friend and mentions agent capabilities", () => {
+    it("actively asks about the friend and mentions agent capabilities", () => {
       const result = getFirstImpressions({ totalTokens: 0, displayName: "Jordan" })
-      // Should encourage learning about the friend
-      expect(result.toLowerCase()).toMatch(/learn|get to know/)
+      // Should actively ask about the friend
+      expect(result.toLowerCase()).toMatch(/ask.*about/)
       // Should mention agent capabilities
-      expect(result.toLowerCase()).toMatch(/tool|skill|save/)
+      expect(result.toLowerCase()).toMatch(/tool|integration|skill/)
+      // Should instruct to save everything learned
+      expect(result.toLowerCase()).toMatch(/save.*learn/)
     })
   })
 })
