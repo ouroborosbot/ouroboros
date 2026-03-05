@@ -543,6 +543,36 @@ export function startTeamsApp(): void {
     mode = "DevtoolsPlugin"
   }
 
+  // Override default OAuth verify-state handler.  The SDK's built-in handler
+  // uses a single defaultConnectionName, which breaks multi-connection setups
+  // (graph + ado + github).  The verifyState activity only carries a `state`
+  // code with no connectionName, so we try each configured connection until
+  // one succeeds.
+  const allConnectionNames = [
+    oauthConfig.graphConnectionName,
+    oauthConfig.adoConnectionName,
+    oauthConfig.githubConnectionName,
+  ].filter(Boolean)
+
+  app.on("signin.verify-state", async (ctx) => {
+    const { api, activity } = ctx
+    if (!activity.value?.state) return { status: 404 }
+    for (const cn of allConnectionNames) {
+      try {
+        await api.users.token.get({
+          channelId: activity.channelId,
+          userId: activity.from.id,
+          connectionName: cn,
+          code: activity.value.state,
+        })
+        console.log(`[teams] verify-state succeeded for connection "${cn}"`)
+        return { status: 200 }
+      } catch { /* try next */ }
+    }
+    console.warn("[teams] verify-state failed for all connections")
+    return { status: 412 }
+  })
+
   app.on("message", async (ctx) => {
     const { stream, activity, api, signin } = ctx
     const text = activity.text || ""

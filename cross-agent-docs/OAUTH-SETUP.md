@@ -148,7 +148,9 @@ Add the connection name to the `oauth` section:
 }
 ```
 
-> **Note**: The GitHub connection is independent of the AAD app registration. Users sign in to GitHub separately from Graph/ADO. The first time a user asks the bot to create a GitHub issue, they'll be prompted to authorize with their GitHub account.
+> **Note**: The GitHub connection is independent of the AAD app registration. Users sign in to GitHub separately from Graph/ADO. The first time a user asks the bot to file a bug, they'll be prompted to authorize with their GitHub account.
+
+> **Important**: The Teams SDK's built-in `signin/verifyState` handler only supports a single `defaultConnectionName` (set to the Graph connection). Third-party OAuth providers like GitHub use the `verifyState` flow (not `tokenExchange`), so the default handler fails with a 412 PreconditionFailed. Ouroboros overrides `signin.verify-state` in `senses/teams.ts` to try all configured connection names. If you add a new OAuth connection, add its connection name to the `allConnectionNames` array.
 
 ## 3. Teams Manifest
 
