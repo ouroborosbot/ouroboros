@@ -22,38 +22,44 @@ Achieve 100% nerves observability coverage across all production source files: e
 - Integrate `npm run lint` into `scripts/run-coverage-gate.cjs` as a step before vitest
 
 **Phase B: Bidirectional audit enforcement**
-- Enhance `src/nerves/coverage/audit.ts` to scan production source files for all `emitNervesEvent` calls, extract their `component:event` keys, and verify every key appears in `REQUIRED_EVENTS`
-- The audit already checks that every `REQUIRED_EVENTS` entry is observed during tests -- keep that
-- New check direction: source code emitNervesEvent calls --> must be registered in contract
-- If someone adds an emitNervesEvent call without registering it in REQUIRED_EVENTS, the audit fails
+- PRIMARY enforcement (already exists, keep): runtime observation -- tests run, events are captured, audit verifies every `REQUIRED_EVENTS` entry was observed. This is the gate.
+- SECONDARY enforcement (new): static regex scan of production source files for `emitNervesEvent` calls, extract `component:event` keys, verify every key appears in `REQUIRED_EVENTS` ("emitted but not declared" check)
+- The static scan also helps identify code paths that are missing nerves calls (advisory, not gate-blocking)
+- Enhance `src/nerves/coverage/audit.ts` to add the "emitted but not declared" check
+- If someone adds an `emitNervesEvent` call without registering it in `REQUIRED_EVENTS`, the audit fails
 
 **Phase C: Full nerves coverage of existing production code**
-- Audit all 21 production files that currently lack `emitNervesEvent` calls
+- Audit production files that currently lack `emitNervesEvent` calls
 - Add nerves events for observable code paths: error catches, state transitions, I/O operations, API calls, startup/shutdown, connection events
 - Register all new events in `REQUIRED_EVENTS` in `contract.ts`
 - Add test coverage so every new event is observed during test runs
-- Files needing nerves events (21 files, ~4000 lines):
-  - `src/heart/providers/anthropic.ts` (378 lines -- API calls, error handling, streaming)
-  - `src/heart/providers/azure.ts` (56 lines -- provider init)
-  - `src/heart/providers/minimax.ts` (41 lines -- provider init)
-  - `src/heart/providers/openai-codex.ts` (163 lines -- API calls, error handling)
-  - `src/heart/streaming.ts` (457 lines -- stream processing, errors)
-  - `src/heart/turn-coordinator.ts` (68 lines -- turn coordination)
-  - `src/heart/api-error.ts` (36 lines -- error classification)
-  - `src/mind/first-impressions.ts` (38 lines -- first impressions logic)
-  - `src/mind/friends/channel.ts` (36 lines -- channel resolution)
-  - `src/mind/friends/store-file.ts` (178 lines -- file I/O, error handling)
-  - `src/mind/friends/store.ts` (13 lines -- store interface/factory)
-  - `src/mind/friends/tokens.ts` (24 lines -- token processing)
-  - `src/mind/friends/types.ts` (66 lines -- type definitions, likely no events needed)
-  - `src/repertoire/ado-context.ts` (88 lines -- ADO context building)
-  - `src/repertoire/ado-semantic.ts` (950 lines -- ADO semantic operations, API calls, errors)
-  - `src/repertoire/ado-templates.ts` (193 lines -- template operations)
-  - `src/repertoire/tools-base.ts` (375 lines -- tool execution, errors)
-  - `src/repertoire/tools-github.ts` (43 lines -- GitHub tool definitions)
-  - `src/repertoire/tools-teams.ts` (306 lines -- Teams tool operations)
-  - `src/senses/cli-logging.ts` (11 lines -- logging setup)
-  - `src/senses/cli.ts` (476 lines -- CLI REPL, commands, session management)
+- Files needing nerves events (18 files, ~3900 lines):
+  - Heart domain:
+    - `src/heart/providers/anthropic.ts` (378 lines -- API calls, error handling, streaming)
+    - `src/heart/providers/azure.ts` (56 lines -- provider init)
+    - `src/heart/providers/minimax.ts` (41 lines -- provider init)
+    - `src/heart/providers/openai-codex.ts` (163 lines -- API calls, error handling)
+    - `src/heart/streaming.ts` (457 lines -- stream processing, errors)
+    - `src/heart/turn-coordinator.ts` (68 lines -- turn coordination)
+    - `src/heart/api-error.ts` (36 lines -- error classification)
+  - Mind domain:
+    - `src/mind/first-impressions.ts` (38 lines -- first impressions logic)
+    - `src/mind/friends/channel.ts` (36 lines -- channel resolution)
+    - `src/mind/friends/store-file.ts` (178 lines -- file I/O, error handling)
+    - `src/mind/friends/tokens.ts` (24 lines -- token processing)
+  - Repertoire domain:
+    - `src/repertoire/ado-context.ts` (88 lines -- ADO context building)
+    - `src/repertoire/ado-semantic.ts` (950 lines -- ADO semantic operations, API calls, errors)
+    - `src/repertoire/ado-templates.ts` (193 lines -- template operations)
+    - `src/repertoire/tools-base.ts` (375 lines -- tool execution, errors)
+    - `src/repertoire/tools-github.ts` (43 lines -- GitHub tool definitions)
+    - `src/repertoire/tools-teams.ts` (306 lines -- Teams tool operations)
+  - Senses domain:
+    - `src/senses/cli.ts` (476 lines -- CLI REPL, commands, session management)
+- Skipped files (no observable runtime behavior):
+  - `src/mind/friends/types.ts` -- pure type definitions
+  - `src/mind/friends/store.ts` -- pure interface
+  - `src/senses/cli-logging.ts` -- nerves infrastructure itself
 
 **Phase D: Documentation**
 - Add "Logging Policy" section to AGENTS.md covering:
@@ -70,15 +76,15 @@ Achieve 100% nerves observability coverage across all production source files: e
 - Adding ESLint rules beyond no-console (keep config minimal)
 - Creating a cross-agent-docs file for logging (keep it simple in AGENTS.md for now)
 - CI pipeline changes beyond the coverage gate integration
-- Pure type-definition files that have no runtime behavior (may be skipped with justification)
+- Pure type/interface files with no runtime behavior: `types.ts`, `store.ts` (interface only), `cli-logging.ts` (nerves infra)
 
 ## Completion Criteria
 - [ ] ESLint installed and configured with `no-console: "error"` for `src/**/*.ts` (excluding tests)
 - [ ] All 8 console exception sites annotated with correct category and reason
 - [ ] `npm run lint` passes cleanly (zero violations)
 - [ ] `npm run lint` integrated into `scripts/run-coverage-gate.cjs`
-- [ ] Nerves audit performs bidirectional contract verification (source calls <--> REQUIRED_EVENTS)
-- [ ] All 21 production files audited for nerves coverage gaps
+- [ ] Nerves audit performs bidirectional contract verification: runtime observation (REQUIRED_EVENTS all observed in tests) + static scan (emitNervesEvent calls all registered in REQUIRED_EVENTS)
+- [ ] All 18 production files audited for nerves coverage gaps (3 skipped: pure types/interfaces/infra)
 - [ ] Every observable code path in production has an `emitNervesEvent` call
 - [ ] All new events registered in `REQUIRED_EVENTS` in `contract.ts`
 - [ ] All new events observed during test runs (nerves audit passes)
@@ -98,10 +104,10 @@ Achieve 100% nerves observability coverage across all production source files: e
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [ ] For pure type/interface files like `src/mind/friends/types.ts` (66 lines of type definitions), should we skip nerves events since there is no runtime behavior? Proposed: yes, skip with documented justification.
-- [ ] For very small files with no I/O or error handling (e.g., `src/senses/cli-logging.ts` at 11 lines, `src/mind/friends/store.ts` at 13 lines), same question -- skip if no observable behavior?
-- [ ] Should the bidirectional audit scan use static regex extraction of emitNervesEvent calls, or AST parsing? Proposed: regex extraction (simpler, sufficient for the `emitNervesEvent({...component: "x", event: "y"...})` pattern).
-- [ ] For Phase C, should we tackle files grouped by domain (heart, mind, repertoire, senses) or by size/complexity? Proposed: group by domain for coherent event naming.
+- [x] Pure type/interface files (`types.ts`): Skip -- no runtime behavior, no observable paths.
+- [x] Tiny files: `store.ts` is pure interface -- skip. `cli-logging.ts` is nerves infrastructure itself (configures runtime logger) -- skip, no observable paths needing events.
+- [x] Bidirectional audit approach: Regex scan is a secondary helper for catching "emitted but not declared" gaps and finding code paths missing nerves calls. The PRIMARY enforcement is runtime observation -- tests run, events are captured, audit verifies all declared events were observed. Gate enforcement is through runtime, not static analysis.
+- [x] Phase C grouping: By domain (heart, mind, repertoire, senses) for coherent event naming.
 
 ## Decisions Made
 - Use ESLint flat config (`eslint.config.js`) since the project has no existing ESLint setup
@@ -110,6 +116,10 @@ Achieve 100% nerves observability coverage across all production source files: e
 - Three console exception categories: pre-boot guard, terminal UX, meta-tooling
 - Integrate lint into `scripts/run-coverage-gate.cjs` so CI catches violations automatically
 - Scope expanded from "enforce no-console" to "100% nerves observability" -- bidirectional audit + full coverage of all production files
+- Skip pure type/interface files: `types.ts`, `store.ts` (interface only) -- no runtime behavior
+- Skip `cli-logging.ts` -- nerves infrastructure itself, no observable paths needing events
+- Audit enforcement model: PRIMARY = runtime observation (tests emit events, audit verifies all REQUIRED_EVENTS observed). SECONDARY = static regex scan (catches "emitted but not declared" and helps find missing nerves call sites). Gate is runtime-based.
+- Phase C work grouped by domain (heart, mind, repertoire, senses) for coherent event naming
 
 ## Context / References
 - Prior planning doc: `ouroboros/tasks/2026-03-04-2354-planning-nerves-console-migration.md` (completed)
@@ -123,10 +133,10 @@ Achieve 100% nerves observability coverage across all production source files: e
 - Existing naming convention: `{component}:{component_prefix}.{action}` (e.g., `engine:engine.turn_start`, `channels:channel.message_sent`)
 
 ## Notes
-- This is a large scope expansion. Phase C alone covers 21 files with ~4000 lines of production code. Each file needs: audit for observable paths, add emitNervesEvent calls, register events, write tests for new events.
-- The bidirectional audit (Phase B) should be done before Phase C so it can catch registration gaps as we add events.
-- Files like `types.ts` that are pure type definitions with no runtime behavior can be skipped -- no observable code paths means no events to emit.
-- The `api-error.ts` file (36 lines) is a utility for error classification -- it may warrant a nerves event for error classification results, or it may be pure logic with no I/O. Needs inspection.
+- Phase C covers 18 files with ~3900 lines of production code. Each file needs: inspect for observable paths, add emitNervesEvent calls, register events, ensure tests emit each new event.
+- Phase B (bidirectional audit) should be done before Phase C so it catches registration gaps as we add events.
+- The `api-error.ts` file (36 lines) is a utility for error classification -- needs inspection during Phase C to determine if it has observable behavior worth emitting events for.
+- 3 files skipped: `types.ts` (pure types), `store.ts` (pure interface), `cli-logging.ts` (nerves infra itself).
 
 ## Progress Log
 - 2026-03-05 09:54 Created
