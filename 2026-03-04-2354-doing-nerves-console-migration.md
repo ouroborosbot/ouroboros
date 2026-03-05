@@ -89,7 +89,7 @@ Eliminate all `console.log/warn/error` calls from production source files by con
 **What**: Verify 100% coverage on the new emitNervesEvent calls. Refactor if needed.
 **Acceptance**: 100% coverage on new code, tests still green.
 
-### ⬜ Unit 4a: teams.ts -- Tests (verify-state + message received)
+### ✅ Unit 4a: teams.ts -- Tests (verify-state + message received)
 **What**: Write/update tests in `src/__tests__/senses/teams.test.ts` for the verify-state and message-received console calls. Replace `vi.spyOn(console, "log/warn")` assertions with `emitNervesEvent` mock assertions. New events:
 - `channel.verify_state` (info for success, warn for all-failed)
 - `channel.message_received` (info)
@@ -97,7 +97,7 @@ Tests should FAIL initially because teams.ts still uses console.*.
 **Output**: Failing tests for verify_state and message_received events.
 **Acceptance**: Tests exist, run, and FAIL (red).
 
-### ⬜ Unit 4b: teams.ts -- Implementation (verify-state + message received)
+### ✅ Unit 4b: teams.ts -- Implementation (verify-state + message received)
 **What**: In `src/senses/teams.ts`:
 1. Add `import { emitNervesEvent } from "../nerves/runtime"`
 2. Replace `console.log('[teams] verify-state succeeded...')` with emitNervesEvent (info, channel.verify_state)
@@ -106,7 +106,7 @@ Tests should FAIL initially because teams.ts still uses console.*.
 **Output**: 3 console.* calls replaced.
 **Acceptance**: Tests from 4a pass (green).
 
-### ⬜ Unit 4c: teams.ts -- Tests (token status + signin)
+### ✅ Unit 4c: teams.ts -- Tests (token status + signin)
 **What**: Write/update tests for token-status and signin console calls:
 - `channel.token_status` (info) -- replaces console.log for graph/ado/github token status
 - `channel.signin_result` (info) -- replaces console.log for signin success
@@ -115,7 +115,7 @@ Tests should FAIL initially.
 **Output**: Failing tests for token_status, signin_result, signin_error events.
 **Acceptance**: Tests exist, run, and FAIL (red).
 
-### ⬜ Unit 4d: teams.ts -- Implementation (token status + signin)
+### ✅ Unit 4d: teams.ts -- Implementation (token status + signin)
 **What**: Replace 3 console.* calls for token/signin:
 1. `console.log('[teams] tokens: graph=...')` -> emitNervesEvent (info, channel.token_status, meta: { graph: bool, ado: bool, github: bool })
 2. `console.log('[teams] signin(${cn}): ...')` -> emitNervesEvent (info, channel.signin_result)
@@ -123,7 +123,7 @@ Tests should FAIL initially.
 **Output**: 3 more console.* calls replaced.
 **Acceptance**: Tests from 4c pass (green).
 
-### ⬜ Unit 4e: teams.ts -- Tests (error handlers + startup)
+### ✅ Unit 4e: teams.ts -- Tests (error handlers + startup)
 **What**: Write/update tests for remaining console calls:
 - `channel.handler_error` (error) -- replaces console.error for handler errors
 - `channel.unhandled_rejection` (error) -- replaces console.error for unhandled rejections
@@ -133,7 +133,7 @@ Tests should FAIL initially.
 **Output**: Failing tests for handler_error, unhandled_rejection, app_error, app_started events.
 **Acceptance**: Tests exist, run, and FAIL (red).
 
-### ⬜ Unit 4f: teams.ts -- Implementation (error handlers + startup)
+### ✅ Unit 4f: teams.ts -- Implementation (error handlers + startup)
 **What**: Replace final 4 console.* calls:
 1. `console.error('[teams] handler error: ...')` -> emitNervesEvent (error, channel.handler_error)
 2. `console.error('[teams] unhandled rejection: ...')` -> emitNervesEvent (error, channel.unhandled_rejection)
@@ -142,7 +142,7 @@ Tests should FAIL initially.
 **Output**: `src/senses/teams.ts` with zero console.* calls.
 **Acceptance**: Tests from 4e pass (green). No console.* in file.
 
-### ⬜ Unit 4g: teams.ts -- Coverage & Refactor
+### ✅ Unit 4g: teams.ts -- Coverage & Refactor
 **What**: Verify 100% coverage on all new emitNervesEvent calls in teams.ts. Clean up any remaining console spy mocks in tests that are no longer needed.
 **Acceptance**: 100% coverage on new code, tests still green, no stale console spies.
 
@@ -197,3 +197,4 @@ Test should FAIL initially because contract.ts hasn't been updated yet.
 - 2026-03-05 00:02 Unit 1a+1b complete: identity.ts console.warn removed, test updated to assert emitNervesEvent
 - 2026-03-05 00:03 Unit 2a+2b+2c complete: resolver.ts console.error replaced, 100% coverage
 - 2026-03-05 00:10 Unit 3a+3b+3c complete: core.ts 2 console.error calls replaced, 17 related tests updated
+- 2026-03-05 00:19 Units 4a-4g complete: teams.ts 10 console calls replaced, 100% coverage
