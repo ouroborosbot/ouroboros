@@ -52,10 +52,10 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [x] Preemptive message splitting removed — full message sent, split only on error recovery
 - [x] Dead-stream fallback -- flush() routes through sendMessage when stream is stopped
 - [x] ~~Async delivery pattern for 15s platform timeout -- deadline timer emits acknowledgment, real content via sendMessage~~ (REVERTED: replaced by chunked streaming)
-- [ ] Deadline timer (units 16a-16c) reverted cleanly
-- [ ] `--disable-streaming` / buffered mode removed entirely (no `disableStreaming`, no `buffered` flag, no `teams:no-stream` script, no `flagsSection`)
-- [ ] Chunked streaming implemented -- periodic flush every ~1.5s via `flushTextBuffer()`
-- [ ] Single unified streaming mode (no dual-mode branching)
+- [x] Deadline timer (units 16a-16c) reverted cleanly
+- [x] `--disable-streaming` / buffered mode removed entirely (no `disableStreaming`, no `buffered` flag, no `teams:no-stream` script, no `flagsSection`)
+- [x] Chunked streaming implemented -- periodic flush every ~1s via `flushTextBuffer()`
+- [x] Single unified streaming mode (no dual-mode branching)
 - [ ] User confirms on Teams: model uses final_answer cleanly, no 413 errors, no "Sorry something went wrong", prompt sections emit correctly, responses arrive in periodic chunks (not per-token, not all-at-once)
 
 ### Gate 3: Friend Context Instructions
@@ -566,7 +566,7 @@ The phrase rotation timer (1.5s interval for `safeUpdate`) continues to run duri
 **Output**: Modified `src/senses/teams.ts`
 **Acceptance**: All tests PASS (green), no warnings. Periodic flush timer starts on first text chunk, flushes at configured interval (default 1s), cleans up properly. Interval tunable via `config.json` `teamsChannel.flushIntervalMs`.
 
-### ⬜ Unit 19c: Chunked streaming -- coverage & refactor
+### ✅ Unit 19c: Chunked streaming -- coverage & refactor
 **What**: Verify 100% coverage on the periodic flush timer logic. All paths covered:
 1. Timer start (first `onTextChunk` starts timer)
 2. Timer tick with accumulated text (flushes)
@@ -699,3 +699,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-04 16:34 Unit 18c complete: 100% coverage on all modified files (config.ts, core.ts, prompt.ts). teams.ts uncovered lines 222, 542 are pre-existing gaps (onClearText, ctxSend). Zero references to disableStreaming/buffered/--disable-streaming/teams:no-stream in source code. No refactoring needed
 - 2026-03-04 16:36 Unit 19a complete: 11 tests for periodic flush timer using vi.useFakeTimers(). 8 fail (red) -- no periodic timer exists yet. 3 pass vacuously (cleanup tests). Tests cover: timer fires at interval, multiple flushes, empty no-op, start on first text chunk, abort/flush/markStopped cleanup, first flush within 15s, reasoning phase isolation, end-of-turn flush, flushIntervalMs override
 - 2026-03-04 16:38 Unit 19b complete: periodic flush timer implemented -- DEFAULT_FLUSH_INTERVAL_MS=1000, startFlushTimer/stopFlushTimer helpers, onTextChunk starts timer, markStopped/flush/abort cleans up, flushIntervalMs threaded from config. 1274 tests pass, build clean
+- 2026-03-04 16:39 Unit 19c complete: 100% coverage on all new flush timer code (startFlushTimer, stopFlushTimer, abort listener, flushInterval, onTextChunk startFlushTimer call). Pre-existing uncovered lines 258, 580 (onClearText, ctxSend) unchanged. All 9 coverage criteria verified. No refactoring needed
