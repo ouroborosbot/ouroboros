@@ -4350,3 +4350,134 @@ describe("Teams adapter - periodic flush timer", () => {
     expect(mockStream.emit).toHaveBeenCalledWith("custom interval")
   })
 })
+
+describe("Teams adapter - GitHub token handling", () => {
+  function mockTeamsDepsGH(overrides: {
+    runAgentFn?: any
+    teamsChannelConfig?: any
+  } = {}) {
+    const {
+      runAgentFn = vi.fn().mockResolvedValue({ usage: undefined }),
+      teamsChannelConfig = { skipConfirmation: false, port: 3978 },
+    } = overrides
+
+    vi.doMock("../../heart/core", () => ({
+      runAgent: runAgentFn,
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue(teamsChannelConfig),
+    }))
+    vi.doMock("../../mind/prompt", () => ({
+      buildSystem: vi.fn().mockResolvedValue("system prompt"),
+      contextSection: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../mind/context", () => ({
+      loadSession: vi.fn().mockReturnValue(null),
+      saveSession: vi.fn(),
+      deleteSession: vi.fn(),
+      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
+      postTurn: vi.fn(),
+    }))
+    vi.doMock("../../repertoire/commands", () => ({
+      createCommandRegistry: vi.fn().mockReturnValue({
+        register: vi.fn(),
+        get: vi.fn(),
+        list: vi.fn().mockReturnValue([]),
+        dispatch: vi.fn().mockReturnValue({ handled: false }),
+      }),
+      registerDefaultCommands: vi.fn(),
+      parseSlashCommand: vi.fn().mockReturnValue(null),
+    }))
+    const MockFileFriendStore = vi.fn(function (this: any) {
+      this.get = vi.fn()
+      this.put = vi.fn()
+      this.delete = vi.fn()
+      this.findByExternalId = vi.fn()
+    })
+    vi.doMock("../../mind/friends/store-file", () => ({
+      FileFriendStore: MockFileFriendStore,
+    }))
+    vi.doMock("../../mind/friends/resolver", () => ({
+      FriendResolver: vi.fn(function (this: any) {
+        this.resolve = vi.fn().mockResolvedValue({
+          friend: { id: "mock-uuid", name: "Test", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "2026-01-01", updatedAt: "2026-01-01", schemaVersion: 1 },
+          channel: { channel: "teams", availableIntegrations: ["graph", "ado", "github"], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
+        })
+      }),
+    }))
+    vi.doMock("../../mind/friends/tokens", () => ({
+      accumulateFriendTokens: vi.fn(),
+    }))
+    vi.doMock("../../nerves", async () => {
+      const actual = await vi.importActual<typeof import("../../nerves")>("../../nerves")
+      return { ...actual, createTraceId: vi.fn().mockReturnValue("trace-gh") }
+    })
+    vi.doMock("../../heart/turn-coordinator", () => ({
+      createTurnCoordinator: vi.fn().mockReturnValue({
+        withTurnLock: vi.fn().mockImplementation((_key: string, fn: () => Promise<void>) => fn()),
+        tryBeginTurn: vi.fn().mockReturnValue(true),
+        endTurn: vi.fn(),
+        drainFollowUps: vi.fn().mockReturnValue([]),
+        enqueueFollowUp: vi.fn(),
+      }),
+    }))
+  }
+
+  it("handleTeamsMessage passes githubToken in ToolContext", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
+    mockTeamsDepsGH({ runAgentFn })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+
+    const teamsContext = {
+      graphToken: "g-token",
+      adoToken: "a-token",
+      githubToken: "gh-token-123",
+      signin: vi.fn(),
+    }
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-gh", teamsContext)
+    expect(runAgentFn).toHaveBeenCalled()
+
+    const options = runAgentFn.mock.calls[0][4]
+    expect(options.toolContext.githubToken).toBe("gh-token-123")
+  })
+
+  it("triggers signin for AUTH_REQUIRED:github after agent loop", async () => {
+    vi.resetModules()
+    const runAgentFn = vi.fn().mockImplementation(async (msgs: any[]) => {
+      msgs.push({ role: "assistant", content: "AUTH_REQUIRED:github" })
+      return { usage: undefined }
+    })
+    mockTeamsDepsGH({ runAgentFn })
+    const teams = await import("../../senses/teams")
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    const signinFn = vi.fn()
+
+    await teams.handleTeamsMessage("hello", mockStream as any, "conv-auth-gh", {
+      graphToken: undefined,
+      adoToken: undefined,
+      githubToken: undefined,
+      signin: signinFn,
+    })
+
+    expect(signinFn).toHaveBeenCalledWith("github")
+  })
+
+  it("TeamsMessageContext includes githubToken field", () => {
+    // Type-level test: verify the interface accepts githubToken
+    const ctx: import("../../senses/teams").TeamsMessageContext = {
+      graphToken: "g",
+      adoToken: "a",
+      githubToken: "gh",
+      signin: async () => undefined,
+    }
+    expect(ctx.githubToken).toBe("gh")
+  })
+})

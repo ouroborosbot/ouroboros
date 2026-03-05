@@ -29,6 +29,10 @@ vi.mock("../../repertoire/ado-client", () => ({
   discoverOrganizations: vi.fn(),
 }))
 
+vi.mock("../../repertoire/github-client", () => ({
+  githubRequest: vi.fn(),
+}))
+
 vi.mock("../../identity", () => ({
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
@@ -2007,5 +2011,99 @@ describe("save_friend_note tool", () => {
     const ctx = makeCtx({ friendStore: { get: vi.fn().mockResolvedValue(null), put: vi.fn(), delete: vi.fn(), findByExternalId: vi.fn() } })
     const result = await execTool("save_friend_note", { type: "note", key: "role", content: "test" }, ctx)
     expect(result).toContain("can't find")
+  })
+})
+
+describe("github tool registration", () => {
+  it("allDefinitions includes github_create_issue (via execTool)", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    // If github_create_issue is registered, calling it without a token returns AUTH_REQUIRED
+    const result = await execTool("github_create_issue", { owner: "o", repo: "r", title: "t" })
+    expect(result).toContain("AUTH_REQUIRED:github")
+  })
+
+  it("isConfirmationRequired returns true for github_create_issue", async () => {
+    vi.resetModules()
+    const { isConfirmationRequired } = await import("../../repertoire/tools")
+    expect(isConfirmationRequired("github_create_issue")).toBe(true)
+  })
+
+  it("summarizeArgs returns title for github_create_issue", async () => {
+    vi.resetModules()
+    const { summarizeArgs } = await import("../../repertoire/tools")
+    expect(summarizeArgs("github_create_issue", { title: "Fix bug" })).toBe("Fix bug")
+  })
+
+  it("summarizeArgs returns empty string for github_create_issue with no title", async () => {
+    vi.resetModules()
+    const { summarizeArgs } = await import("../../repertoire/tools")
+    expect(summarizeArgs("github_create_issue", {})).toBe("")
+  })
+
+  it("github_create_issue is NOT in REMOTE_BLOCKED_LOCAL_TOOLS", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    // If it were blocked, calling it in a remote context would return "can't do that from here"
+    const remoteContext = {
+      githubToken: "tok",
+      signin: async () => undefined,
+      context: {
+        identity: {
+          id: "friend-1",
+          displayName: "Test",
+          externalIds: [],
+          tenantMemberships: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          schemaVersion: 1,
+        },
+        channel: {
+          channel: "teams",
+          availableIntegrations: ["github"],
+          supportsMarkdown: true,
+          supportsStreaming: true,
+          supportsRichCards: true,
+          maxMessageLength: Infinity,
+        },
+        memory: null,
+      },
+    } as any
+    const { githubRequest } = await import("../../repertoire/github-client")
+    vi.mocked(githubRequest).mockResolvedValue('{"id":1}')
+    const result = await execTool("github_create_issue", { owner: "o", repo: "r", title: "t" }, remoteContext)
+    expect(result).not.toContain("can't do that from here")
+  })
+
+  it("getToolsForChannel with github integration returns github_create_issue", async () => {
+    vi.resetModules()
+    const { getToolsForChannel } = await import("../../repertoire/tools")
+    const teamsCaps = {
+      channel: "teams" as const,
+      availableIntegrations: ["ado" as const, "graph" as const, "github" as const],
+      supportsMarkdown: true,
+      supportsStreaming: true,
+      supportsRichCards: true,
+      maxMessageLength: Infinity,
+    }
+    const result = getToolsForChannel(teamsCaps)
+    const names = result.map((t: any) => t.function.name)
+    expect(names).toContain("github_create_issue")
+  })
+
+  it("getToolsForChannel with CLI caps does NOT return github_create_issue", async () => {
+    vi.resetModules()
+    const { getToolsForChannel } = await import("../../repertoire/tools")
+    const cliCaps = {
+      channel: "cli" as const,
+      availableIntegrations: [] as const,
+      supportsMarkdown: false,
+      supportsStreaming: true,
+      supportsRichCards: false,
+      maxMessageLength: Infinity,
+    }
+    const result = getToolsForChannel(cliCaps)
+    const names = result.map((t: any) => t.function.name)
+    expect(names).not.toContain("github_create_issue")
   })
 })

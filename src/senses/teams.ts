@@ -402,6 +402,7 @@ function getFriendStore(): InstanceType<typeof FileFriendStore> {
 export interface TeamsMessageContext {
   graphToken?: string
   adoToken?: string
+  githubToken?: string
   signin: (connectionName: string) => Promise<string | undefined>
   // AAD identity fields (extracted from bot activity)
   aadObjectId?: string
@@ -426,6 +427,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   const toolContext: ToolContext | undefined = teamsContext ? {
     graphToken: teamsContext.graphToken,
     adoToken: teamsContext.adoToken,
+    githubToken: teamsContext.githubToken,
     signin: teamsContext.signin,
     friendStore: store,
   } : undefined
@@ -497,6 +499,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
     const allContent = messages.map(m => typeof m.content === "string" ? m.content : "").join("\n")
     if (allContent.includes("AUTH_REQUIRED:graph")) await teamsContext.signin("graph")
     if (allContent.includes("AUTH_REQUIRED:ado")) await teamsContext.signin("ado")
+    if (allContent.includes("AUTH_REQUIRED:github")) await teamsContext.signin("github")
   }
 
   // Trim context and save session
@@ -578,6 +581,7 @@ export function startTeamsApp(): void {
       // Failures are silently caught -- the tool handler will request signin if needed.
       let graphToken: string | undefined
       let adoToken: string | undefined
+      let githubToken: string | undefined
       try {
         const graphRes = await api.users.token.get({ userId, connectionName: oauthConfig.graphConnectionName, channelId })
         graphToken = graphRes?.token
@@ -586,11 +590,16 @@ export function startTeamsApp(): void {
         const adoRes = await api.users.token.get({ userId, connectionName: oauthConfig.adoConnectionName, channelId })
         adoToken = adoRes?.token
       } catch { /* no token yet — tool handler will trigger signin */ }
-      console.log(`[teams] tokens: graph=${graphToken ? "yes" : "no"} ado=${adoToken ? "yes" : "no"}`)
+      try {
+        const githubRes = await api.users.token.get({ userId, connectionName: oauthConfig.githubConnectionName, channelId })
+        githubToken = githubRes?.token
+      } catch { /* no token yet — tool handler will trigger signin */ }
+      console.log(`[teams] tokens: graph=${graphToken ? "yes" : "no"} ado=${adoToken ? "yes" : "no"} github=${githubToken ? "yes" : "no"}`)
 
       const teamsContext: TeamsMessageContext = {
         graphToken,
         adoToken,
+        githubToken,
         signin: async (cn: string) => {
           try {
             const result = await signin({ connectionName: cn })

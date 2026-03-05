@@ -46,7 +46,7 @@ describe("FriendResolver", () => {
     expect(ctx.friend.name).toBe("Jordan")
     expect(ctx.friend.id).toBe("uuid-1")
     expect(ctx.channel.channel).toBe("teams")
-    expect(ctx.channel.availableIntegrations).toEqual(["ado", "graph"])
+    expect(ctx.channel.availableIntegrations).toEqual(["ado", "graph", "github"])
   })
 
   it("resolves CLI identity with local provider", async () => {

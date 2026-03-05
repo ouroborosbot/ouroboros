@@ -26,6 +26,7 @@ export interface TeamsConfig {
 export interface OAuthConfig {
   graphConnectionName: string
   adoConnectionName: string
+  githubConnectionName: string
 }
 
 export interface ContextConfig {
@@ -78,6 +79,7 @@ const DEFAULT_CONFIG: OuroborosConfig = {
   oauth: {
     graphConnectionName: "graph",
     adoConnectionName: "ado",
+    githubConnectionName: "",
   },
   context: {
     maxTokens: 80000,
