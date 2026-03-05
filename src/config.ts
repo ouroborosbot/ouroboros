@@ -17,6 +17,10 @@ export interface MinimaxProviderConfig {
   model: string
 }
 
+export interface AnthropicProviderConfig {
+  model: string
+}
+
 export interface TeamsConfig {
   clientId: string
   clientSecret: string
@@ -48,6 +52,7 @@ export interface OuroborosConfig {
   providers: {
     azure: AzureProviderConfig
     minimax: MinimaxProviderConfig
+    anthropic: AnthropicProviderConfig
   }
   teams: TeamsConfig
   oauth: OAuthConfig
@@ -67,6 +72,9 @@ const DEFAULT_CONFIG: OuroborosConfig = {
     },
     minimax: {
       apiKey: "",
+      model: "",
+    },
+    anthropic: {
       model: "",
     },
   },
@@ -212,6 +220,11 @@ export function getAzureConfig(): AzureProviderConfig {
 export function getMinimaxConfig(): MinimaxProviderConfig {
   const config = loadConfig()
   return { ...config.providers.minimax }
+}
+
+export function getAnthropicConfig(): AnthropicProviderConfig {
+  const config = loadConfig()
+  return { ...config.providers.anthropic }
 }
 
 export function getTeamsConfig(): TeamsConfig {

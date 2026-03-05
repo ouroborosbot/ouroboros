@@ -1,5 +1,10 @@
+import Anthropic from "@anthropic-ai/sdk";
+import { execSync } from "child_process";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import OpenAI, { AzureOpenAI } from "openai";
-import { getAzureConfig, getMinimaxConfig, getContextConfig } from "../config";
+import { getAnthropicConfig, getAzureConfig, getMinimaxConfig, getContextConfig } from "../config";
 import { execTool, summarizeArgs, finalAnswerTool, getToolsForChannel, isConfirmationRequired } from "../repertoire/tools";
 import type { ToolContext } from "../repertoire/tools";
 import { getChannelCapabilities } from "../mind/friends/channel";
@@ -14,12 +19,12 @@ import { trimMessages } from "../mind/context";
 import { buildSystem } from "../mind/prompt";
 import type { Channel } from "../mind/prompt";
 
-export type ProviderId = "azure" | "minimax";
+export type ProviderId = "azure" | "anthropic" | "minimax";
 
 interface ProviderRuntime {
   id: ProviderId;
   model: string;
-  client: OpenAI;
+  client: unknown;
   streamTurn(request: ProviderTurnRequest): Promise<TurnResult>;
   appendToolOutput(callId: string, output: string): void;
   resetTurnState(messages: OpenAI.ChatCompletionMessageParam[]): void;
@@ -39,6 +44,342 @@ interface ProviderRegistry {
 }
 
 let _providerRuntime: ProviderRuntime | null = null;
+
+const ANTHROPIC_SETUP_TOKEN_PREFIX = "sk-ant-oat01-";
+const ANTHROPIC_SETUP_TOKEN_MIN_LENGTH = 80;
+const ANTHROPIC_OAUTH_BETA_HEADER =
+  "claude-code-20250219,oauth-2025-04-20,fine-grained-tool-streaming-2025-05-14,interleaved-thinking-2025-05-14";
+
+interface AnthropicCredential {
+  token: string;
+  expiresAt: number;
+}
+
+function getAnthropicReauthGuidance(reason: string): string {
+  return `${reason} Run \`claude setup-token\` and retry.`;
+}
+
+function parseClaudeCliOauth(raw: unknown): AnthropicCredential | null {
+  if (!raw || typeof raw !== "object") return null;
+  const oauth = (raw as Record<string, unknown>).claudeAiOauth;
+  if (!oauth || typeof oauth !== "object") return null;
+
+  const accessToken = (oauth as Record<string, unknown>).accessToken;
+  const expiresAtRaw = (oauth as Record<string, unknown>).expiresAt;
+  if (typeof accessToken !== "string" || accessToken.trim().length === 0) return null;
+
+  let expiresAt: number;
+  if (typeof expiresAtRaw === "number") {
+    expiresAt = expiresAtRaw;
+  } else if (typeof expiresAtRaw === "string") {
+    const parsed = Date.parse(expiresAtRaw);
+    if (!Number.isFinite(parsed)) return null;
+    expiresAt = parsed;
+  } else {
+    return null;
+  }
+
+  if (!Number.isFinite(expiresAt) || expiresAt <= 0) return null;
+  return { token: accessToken.trim(), expiresAt };
+}
+
+function readAnthropicCredentialFromKeychain(): AnthropicCredential | null {
+  if (process.platform !== "darwin") return null;
+  try {
+    const raw = execSync(
+      'security find-generic-password -s "Claude Code-credentials" -w',
+      {
+        encoding: "utf8",
+        timeout: 5000,
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    ).trim();
+    return parseClaudeCliOauth(JSON.parse(raw) as Record<string, unknown>);
+  } catch {
+    return null;
+  }
+}
+
+function readAnthropicCredentialFromFile(): AnthropicCredential | null {
+  const credentialsPath = path.join(os.homedir(), ".claude", ".credentials.json");
+  try {
+    const raw = fs.readFileSync(credentialsPath, "utf-8");
+    return parseClaudeCliOauth(JSON.parse(raw) as Record<string, unknown>);
+  } catch {
+    return null;
+  }
+}
+
+function resolveAnthropicSetupTokenCredential(): AnthropicCredential {
+  const credential = readAnthropicCredentialFromKeychain() ?? readAnthropicCredentialFromFile();
+  if (!credential) {
+    throw new Error(
+      getAnthropicReauthGuidance(
+        "Anthropic model is configured but no Claude setup-token credential was found.",
+      ),
+    );
+  }
+  if (!credential.token.startsWith(ANTHROPIC_SETUP_TOKEN_PREFIX)) {
+    throw new Error(
+      getAnthropicReauthGuidance(
+        `Anthropic credential is not a setup-token (expected prefix ${ANTHROPIC_SETUP_TOKEN_PREFIX}).`,
+      ),
+    );
+  }
+  if (credential.token.length < ANTHROPIC_SETUP_TOKEN_MIN_LENGTH) {
+    throw new Error(
+      getAnthropicReauthGuidance("Anthropic setup-token looks too short."),
+    );
+  }
+  if (credential.expiresAt <= Date.now()) {
+    throw new Error(
+      getAnthropicReauthGuidance("Anthropic setup-token is expired."),
+    );
+  }
+  return credential;
+}
+
+function toAnthropicTextContent(content: OpenAI.ChatCompletionContentPart[] | string | null | undefined): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .filter((part): part is OpenAI.ChatCompletionContentPartText => part.type === "text")
+    .map((part) => part.text)
+    .join("\n");
+}
+
+function parseToolCallInput(argumentsJson: string): Record<string, unknown> {
+  if (!argumentsJson.trim()) return {};
+  try {
+    const parsed = JSON.parse(argumentsJson);
+    return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
+}
+
+function toAnthropicMessages(
+  messages: OpenAI.ChatCompletionMessageParam[],
+): { system?: string; messages: Array<Record<string, unknown>> } {
+  let system: string | undefined;
+  const converted: Array<Record<string, unknown>> = [];
+
+  for (const msg of messages) {
+    if (msg.role === "system") {
+      if (!system) {
+        const text = toAnthropicTextContent((msg as OpenAI.ChatCompletionSystemMessageParam).content);
+        system = text || undefined;
+      }
+      continue;
+    }
+
+    if (msg.role === "user") {
+      converted.push({
+        role: "user",
+        content: toAnthropicTextContent((msg as OpenAI.ChatCompletionUserMessageParam).content),
+      });
+      continue;
+    }
+
+    if (msg.role === "assistant") {
+      const assistant = msg as OpenAI.ChatCompletionAssistantMessageParam;
+      const blocks: Array<Record<string, unknown>> = [];
+      const text = toAnthropicTextContent(assistant.content);
+      if (text) {
+        blocks.push({ type: "text", text });
+      }
+      if (assistant.tool_calls) {
+        for (const toolCall of assistant.tool_calls) {
+          blocks.push({
+            type: "tool_use",
+            id: toolCall.id,
+            name: toolCall.function.name,
+            input: parseToolCallInput(toolCall.function.arguments),
+          });
+        }
+      }
+      if (blocks.length === 0) {
+        blocks.push({ type: "text", text: "" });
+      }
+      converted.push({ role: "assistant", content: blocks });
+      continue;
+    }
+
+    if (msg.role === "tool") {
+      const tool = msg as OpenAI.ChatCompletionToolMessageParam;
+      converted.push({
+        role: "user",
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: tool.tool_call_id,
+            content: toAnthropicTextContent(tool.content),
+          },
+        ],
+      });
+    }
+  }
+
+  return { system, messages: converted };
+}
+
+function toAnthropicTools(tools: OpenAI.ChatCompletionTool[]): Array<Record<string, unknown>> {
+  return tools.map((tool) => ({
+    name: tool.function.name,
+    description: tool.function.description ?? "",
+    input_schema: (tool.function.parameters as Record<string, unknown>) ?? { type: "object", properties: {} },
+  }));
+}
+
+function toAnthropicUsage(raw: Record<string, unknown>): UsageData {
+  const inputTokens = Number(raw.input_tokens ?? 0) || 0;
+  const cacheCreateTokens = Number(raw.cache_creation_input_tokens ?? 0) || 0;
+  const cacheReadTokens = Number(raw.cache_read_input_tokens ?? 0) || 0;
+  const outputTokens = Number(raw.output_tokens ?? 0) || 0;
+  const totalInputTokens = inputTokens + cacheCreateTokens + cacheReadTokens;
+  return {
+    input_tokens: totalInputTokens,
+    output_tokens: outputTokens,
+    reasoning_tokens: 0,
+    total_tokens: totalInputTokens + outputTokens,
+  };
+}
+
+function isAnthropicAuthFailure(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const status = (error as HttpError).status;
+  if (status === 401 || status === 403) return true;
+  const lower = error.message.toLowerCase();
+  return (
+    lower.includes("oauth authentication") ||
+    lower.includes("authentication failed") ||
+    lower.includes("unauthorized") ||
+    lower.includes("invalid api key")
+  );
+}
+
+function withAnthropicAuthGuidance(error: unknown): Error {
+  const base = error instanceof Error ? error.message : String(error);
+  if (isAnthropicAuthFailure(error)) {
+    return new Error(getAnthropicReauthGuidance(`Anthropic authentication failed (${base}).`));
+  }
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+async function streamAnthropicMessages(
+  client: Anthropic,
+  model: string,
+  request: ProviderTurnRequest,
+): Promise<TurnResult> {
+  const { system, messages } = toAnthropicMessages(request.messages);
+  const anthropicTools = toAnthropicTools(request.activeTools);
+
+  const params: Record<string, unknown> = {
+    model,
+    max_tokens: 4096,
+    messages,
+    stream: true,
+  };
+  if (system) params.system = system;
+  if (anthropicTools.length > 0) params.tools = anthropicTools;
+  if (request.toolChoiceRequired && anthropicTools.length > 0) {
+    params.tool_choice = { type: "any" };
+  }
+
+  let response: AsyncIterable<Record<string, unknown>>;
+  try {
+    response = await client.messages.create(
+      params as Anthropic.MessageCreateParamsStreaming,
+      request.signal ? { signal: request.signal } : {},
+    ) as AsyncIterable<Record<string, unknown>>;
+  } catch (error) {
+    throw withAnthropicAuthGuidance(error);
+  }
+
+  let content = "";
+  let streamStarted = false;
+  let usage: UsageData | undefined;
+  const toolCalls = new Map<number, { id: string; name: string; arguments: string }>();
+
+  try {
+    for await (const event of response) {
+      if (request.signal?.aborted) break;
+      const eventType = String(event.type ?? "");
+      if (eventType === "content_block_start") {
+        const block = event.content_block as Record<string, unknown> | undefined;
+        if (block?.type === "tool_use") {
+          const index = Number(event.index);
+          const rawInput = block.input;
+          const input = rawInput && typeof rawInput === "object"
+            ? JSON.stringify(rawInput)
+            : "";
+          toolCalls.set(index, {
+            id: String(block.id ?? ""),
+            name: String(block.name ?? ""),
+            arguments: input,
+          });
+        }
+        continue;
+      }
+
+      if (eventType === "content_block_delta") {
+        const delta = event.delta as Record<string, unknown> | undefined;
+        const deltaType = String(delta?.type ?? "");
+        if (deltaType === "text_delta") {
+          if (!streamStarted) {
+            request.callbacks.onModelStreamStart();
+            streamStarted = true;
+          }
+          const text = String(delta?.text ?? "");
+          content += text;
+          request.callbacks.onTextChunk(text);
+          continue;
+        }
+        if (deltaType === "thinking_delta") {
+          if (!streamStarted) {
+            request.callbacks.onModelStreamStart();
+            streamStarted = true;
+          }
+          request.callbacks.onReasoningChunk(String(delta?.thinking ?? ""));
+          continue;
+        }
+        if (deltaType === "input_json_delta") {
+          const index = Number(event.index);
+          const existing = toolCalls.get(index);
+          if (existing) {
+            existing.arguments += String(delta?.partial_json ?? "");
+          }
+          continue;
+        }
+      }
+
+      if (eventType === "content_block_stop") {
+        const index = Number(event.index);
+        const existing = toolCalls.get(index);
+        if (existing && existing.arguments.trim().length === 0) {
+          existing.arguments = "{}";
+        }
+        continue;
+      }
+
+      if (eventType === "message_delta") {
+        const rawUsage = event.usage;
+        if (rawUsage && typeof rawUsage === "object") {
+          usage = toAnthropicUsage(rawUsage as Record<string, unknown>);
+        }
+      }
+    }
+  } catch (error) {
+    throw withAnthropicAuthGuidance(error);
+  }
+
+  return {
+    content,
+    toolCalls: [...toolCalls.values()],
+    outputItems: [],
+    usage,
+  };
+}
 
 export function createProviderRegistry(): ProviderRegistry {
   const runtimes: Array<() => ProviderRuntime | null> = [
@@ -100,6 +441,35 @@ export function createProviderRegistry(): ProviderRegistry {
       };
     },
     () => {
+      const anthropicConfig = getAnthropicConfig();
+      if (!anthropicConfig.model) return null;
+
+      const credential = resolveAnthropicSetupTokenCredential();
+      const client = new Anthropic({
+        apiKey: credential.token,
+        timeout: 30000,
+        maxRetries: 0,
+        defaultHeaders: {
+          "anthropic-beta": ANTHROPIC_OAUTH_BETA_HEADER,
+        },
+      });
+
+      return {
+        id: "anthropic",
+        model: anthropicConfig.model,
+        client,
+        resetTurnState(_messages: OpenAI.ChatCompletionMessageParam[]): void {
+          // Anthropic request payload is derived from canonical messages each turn.
+        },
+        appendToolOutput(_callId: string, _output: string): void {
+          // Anthropic uses canonical messages for tool_result tracking.
+        },
+        streamTurn(request: ProviderTurnRequest): Promise<TurnResult> {
+          return streamAnthropicMessages(client, anthropicConfig.model, request);
+        },
+      };
+    },
+    () => {
       const minimaxConfig = getMinimaxConfig();
       if (!minimaxConfig.apiKey) return null;
       const client = new OpenAI({
@@ -145,10 +515,16 @@ export function createProviderRegistry(): ProviderRegistry {
 
 function getProviderRuntime(): ProviderRuntime {
   if (!_providerRuntime) {
-    _providerRuntime = createProviderRegistry().resolve();
+    try {
+      _providerRuntime = createProviderRegistry().resolve();
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+      throw new Error("unreachable");
+    }
     if (!_providerRuntime) {
       console.error(
-        "no provider configured. set azure or minimax credentials in secrets.json.",
+        "no provider configured. set azure, minimax, or anthropic credentials in secrets.json.",
       );
       process.exit(1);
       throw new Error("unreachable");
@@ -169,6 +545,7 @@ export function getProviderDisplayLabel(): string {
   const model = getModel();
   const providerLabelBuilders: Record<ProviderId, () => string> = {
     azure: () => `azure openai (${getAzureConfig().deployment || "default"}, model: ${model})`,
+    anthropic: () => `anthropic (${model})`,
     minimax: () => `minimax (${model})`,
   };
   return providerLabelBuilders[getProvider()]();
