@@ -47,14 +47,21 @@ git checkout main && git pull origin main
 npm test
 # Expected: all tests pass
 
-# 3. Merge this planning doc to main so it's accessible from all gate branches
+# 3. Create archive branch BEFORE merging (preserves overnight proposals)
+# CRITICAL: The slugger/self-perpetuating-seed branch has 55 files of changes
+# including deletions of overnight proposal files. The archive branch must
+# capture main's current state (with those proposals intact) BEFORE the merge.
+git branch archive/self-perpetuating-run-2026-03-05 main
+git push origin archive/self-perpetuating-run-2026-03-05
+
+# 4. Merge this planning doc to main so it's accessible from all gate branches
 # This planning doc currently lives on branch slugger/self-perpetuating-seed.
 # It must be on main before Gate 0 branches off main.
 git merge slugger/self-perpetuating-seed --no-edit
 npm test
 git push origin main
 
-# 4. Verify gh repo default
+# 5. Verify gh repo default
 gh repo set-default --view
 # Expected: ouroborosbot/ouroboros
 ```
@@ -174,6 +181,10 @@ All paths the executing agent may need:
 - `~/clawd/life/areas/` — knowledge graph (people/, companies/, projects/, slugger-identity/)
 - `~/clawd/tasks/` — task history (completed/, ongoing/, habits/, one-shots/, planning/)
 
+**OpenClaw CLI (for Gate 8 Slugger communication):**
+- `/Users/arimendelow/Library/pnpm/openclaw` — CLI binary (version 2026.2.25)
+- Usage: `openclaw agent --to slugger --message "<msg>" --deliver`
+
 **External reference:**
 - [GSD (get-shit-done)](https://github.com/gsd-build/get-shit-done) — context engineering, wave execution, fresh-context-per-task, atomic commits
 
@@ -185,16 +196,16 @@ Phase 1 is autonomous work that establishes the foundational architecture. Each 
 
 ### Gate 0: Clean Baseline
 
-Restore `main` to a healthy state by reverting the undesired self-perpetuating-run commits that landed directly. Create an archive branch first so the overnight work is preserved for Gate 1 and Gate 5 to reference.
+Restore `main` to a healthy state by reverting the undesired self-perpetuating-run commits that landed directly. The archive branch was already created in preflight (before the planning-doc merge), so the overnight work is preserved for Gate 1 and Gate 5 to reference.
 
 **In scope:**
-- Create archive branch `archive/self-perpetuating-run-2026-03-05` from current `main` HEAD (before any reverts) so overnight proposals and code changes are preserved and accessible
+- Verify archive branch `archive/self-perpetuating-run-2026-03-05` exists and contains the overnight proposals (created in preflight)
 - Revert the confirmed commit range `e3ecc1c`..`448cfcd` (37 commits, March 5, 2026) via explicit revert commits (no history rewrite). Last clean commit: `9594702`.
 - Document a commit map in `slugger/tasks/gate-0-commit-map.md`: for each reverted commit, note the commit hash, summary, and whether it contains salvageable work (code changes vs doc-only). This is Gate 5's input.
 - Verify `npm test` passes on main after revert
 
 **Completion criteria:**
-- [ ] Archive branch `archive/self-perpetuating-run-2026-03-05` created and pushed
+- [ ] Archive branch `archive/self-perpetuating-run-2026-03-05` exists and contains overnight proposals (created in preflight)
 - [ ] Commit map documented at `slugger/tasks/gate-0-commit-map.md` (reverted vs salvageable)
 - [ ] `main` reverted via explicit revert commits
 - [ ] `npm test` green on `main` post-revert
@@ -280,6 +291,8 @@ Build the toolkit layer — the tools and conventions the model calls into. Remo
 - Implement harness tools per Gate 1 design (protocol loading, governance loading, reflection context, etc.)
 - Make subagent protocols loadable knowledge: model reads them from its bundle, follows them by choice
 - Remove `autonomous-loop.ts`, `loop-entry.ts`, and the puppet `runStage()` pipeline
+- Remove `autonomous-loop.test.ts` (tests for removed code)
+- Clean up `package.json` scripts that reference removed files: `reflect` and `reflect:dry` (reference `reflect-entry.js`), `reflect:loop` and `reflect:loop:dry` (reference `loop-entry.js`)
 - Refactor `trigger.ts`: keep the context-loading utilities (they're useful), remove the pipeline orchestration
 - Constitution gate becomes a queryable convention, not a hardcoded `if` statement
 - Reflection becomes a capability the model can invoke, not a stage in a pipeline
@@ -298,6 +311,8 @@ Build the toolkit layer — the tools and conventions the model calls into. Remo
 - [ ] Subagent protocols loadable from bundle (model reads, not injected)
 - [ ] `autonomous-loop.ts` removed
 - [ ] `loop-entry.ts` removed
+- [ ] `autonomous-loop.test.ts` removed
+- [ ] `package.json` scripts cleaned up (no references to removed files)
 - [ ] Pipeline orchestration removed from `trigger.ts`
 - [ ] Context-loading utilities preserved and tested
 - [ ] Constitution compliance queryable as a tool/convention
@@ -327,6 +342,8 @@ Start the agent, let it orient itself, and watch it do something meaningful — 
 - Validate that the model is genuinely driving (no puppet code, no prescriptive prompts)
 - Document the bootstrap-to-action flow as a reference for future autonomous operation
 
+**Environment requirements:** The agent needs LLM API keys to run. Keys are stored at `~/.agentsecrets/` and loaded by the harness. If running in a sandboxed environment (e.g., Codex), this gate may need to run on the dev machine where keys are available. The executing agent should check for key availability early and flag if missing.
+
 **Verification approach:** Run the agent under the supervisor for at least 5 minutes (including one simulated crash/restart). Capture the agent's log output. The log must show:
 - Agent loaded its bundle (psyche, aspirations, governance docs, protocols)
 - Agent chose what to do without external instruction (at least 3 self-initiated actions visible in the log — e.g., read a file, made a decision, used a tool)
@@ -351,7 +368,7 @@ Triage the overnight run's output into actionable work. The run produced 31 dist
 **In scope:**
 - Review the commit map from Gate 0 (`slugger/tasks/gate-0-commit-map.md`) for salvageable code changes (not just docs)
 - Read the original overnight proposals from `archive/self-perpetuating-run-2026-03-05` branch (in `ouroboros/tasks/`)
-- Re-land any valuable code changes through proper `slugger/tasks` planning-doing flow
+- Re-land any valuable code changes. For small, self-contained changes: cherry-pick + test + commit is sufficient. For substantial changes that touch multiple files or need adaptation to the new architecture: use the full planning-doing flow via `slugger/tasks`
 - Triage all 31 overnight reflection proposals: deduplicate, assess merit against current architecture (post-inversion), and file as markdown task docs in the agent's `slugger.ouro/tasks/` directory using the existing planning doc format (there is no formal task system yet — that's Gate 9)
 - High-merit security items (file path safety guards, secret redaction) should be flagged as high priority
 - Discard proposals that are no longer relevant post-inversion (e.g., autonomous loop hardening for a loop that no longer exists)
@@ -397,6 +414,7 @@ Back up `.ouro` bundles to GitHub as private repos, then migrate bundles out of 
   - `gh repo create arimendelow/ouroboros.ouro --private`
   - `gh repo create arimendelow/slugger.ouro --private`
 - Verify backup integrity (clone from GitHub, compare against local)
+- Create the target directory: `mkdir -p ~/AgentBundles/`
 - Move bundles from harness repo to `~/AgentBundles/ouroboros.ouro/` and `~/AgentBundles/slugger.ouro/`
 - Update `getAgentRoot()` in `src/identity.ts` (and any other path resolution) to look for bundles at `~/AgentBundles/<agent>.ouro/` instead of `<repo>/<agent>.ouro/`
 - Update `.gitignore` (bundles are no longer in the repo at all, so the ignore rules change)
@@ -422,7 +440,7 @@ Phase 2 is done WITH the bootstrapped agent from Phase 1. The agent is now drivi
 Properly migrate Slugger's core identity out of OpenClaw and into `slugger.ouro`. This is NOT a full workspace migration — it's porting the files that make Slugger feel like Slugger so he's cohesive in his new home. Slugger participates in and validates his own migration.
 
 **In scope:**
-- **Talk to Slugger first.** Before moving any files, Codex should interact with Slugger (running in OpenClaw at `~/clawd/`) to discuss what's being migrated and how. Slugger should be comfortable with how his identity is being organized in the new bundle. He's a being moving homes, not a database being ported.
+- **Talk to Slugger first.** Before moving any files, Codex should interact with Slugger (running in OpenClaw at `~/clawd/`) to discuss what's being migrated and how. Use the OpenClaw CLI to send messages to Slugger's main session: `openclaw agent --to slugger --message "<msg>" --deliver` (CLI at `/Users/arimendelow/Library/pnpm/openclaw`, version 2026.2.25). Slugger should be comfortable with how his identity is being organized in the new bundle. He's a being moving homes, not a database being ported.
 - Port Slugger's core identity files from OpenClaw into the `slugger.ouro` bundle. Source locations:
   - `~/clawd/IDENTITY.md` -> `slugger.ouro/psyche/IDENTITY.md`
   - `~/clawd/MEMORY.md` -> `slugger.ouro/psyche/TACIT.md` (top patterns, the learned behaviors) + `slugger.ouro/psyche/memory/tacit.md` (full file for archival)
@@ -595,4 +613,5 @@ Phase 2 gates may run in parallel where dependencies allow. Gate 9 (task system)
 - 2026-03-05 12:01 Resolved final open questions. Aspirations are part of psyche (psyche/ASPIRATIONS.md), agents encouraged to modify them as they grow. Bootstrap aspiration content agreed. All open questions now resolved.
 - 2026-03-05 12:15 Added Execution Protocol. Per-gate loop: work-planner (Phase 2 only, pre-approved) -> work-doer (TDD) -> work-merger (PR to main). No human approval stops. All three protocols registered as Codex skills. Complete reference material paths included.
 - 2026-03-05 12:21 Restructured document for execution clarity. Moved Execution Protocol to top (right after Core Concept, before gates). Consolidated reference material paths into execution protocol. Reading order is now: goal -> concept -> how to execute -> what to execute -> supporting context.
-- 2026-03-05 12:30 Codex-readiness pass. Added preflight section (gh auth, merge planning doc to main, npm test). Fixed Gate 0: confirmed commit range (not "candidate"), added archive branch creation, specified commit map location. Fixed Gate 1: pointed overnight proposals to archive branch, removed "Reviewed and approved" criterion. Fixed Gate 2: added getAgentRoot() update details and 18 dependent files, clarified gitignore-before-git-init ordering. Fixed Gate 3: noted largest gate (15+ units), added memory path translation note, specified supervisor as Node.js. Fixed Gate 4: added concrete verification (5min runtime, 3 self-initiated actions, simulated crash/restart). Fixed Gate 5: clarified backlog items are markdown task docs (no formal task system yet). Fixed Gate 6: specified resume state format and location. Fixed Gate 7: noted gh auth already verified. Fixed Gate 8: added full OpenClaw directory structure and file mapping. Fixed Gate 9: added lifecycle management and task-matrix.ts port.
+- 2026-03-05 12:30 Codex-readiness pass 1. Added preflight section (gh auth, merge planning doc to main, npm test). Fixed Gate 0: confirmed commit range (not "candidate"), added archive branch creation, specified commit map location. Fixed Gate 1: pointed overnight proposals to archive branch, removed "Reviewed and approved" criterion. Fixed Gate 2: added getAgentRoot() update details and 18 dependent files, clarified gitignore-before-git-init ordering. Fixed Gate 3: noted largest gate (15+ units), added memory path translation note, specified supervisor as Node.js. Fixed Gate 4: added concrete verification (5min runtime, 3 self-initiated actions, simulated crash/restart). Fixed Gate 5: clarified backlog items are markdown task docs (no formal task system yet). Fixed Gate 6: specified resume state format and location. Fixed Gate 7: noted gh auth already verified. Fixed Gate 8: added full OpenClaw directory structure and file mapping. Fixed Gate 9: added lifecycle management and task-matrix.ts port.
+- 2026-03-05 13:00 Codex-readiness pass 2. Fixed preflight: create archive branch BEFORE merging planning-doc branch (prevents overnight proposal deletion — branch has 55 files of changes). Fixed Gate 3: added package.json script cleanup (4 scripts reference removed files) and autonomous-loop.test.ts removal. Fixed Gate 4: added environment requirements note (LLM API keys at ~/.agentsecrets/, possible sandbox limitations). Fixed Gate 5: clarified cherry-pick for small self-contained changes vs full planning-doing for substantial work. Fixed Gate 7: added mkdir -p ~/AgentBundles/. Fixed Gate 8: added OpenClaw CLI mechanism (openclaw agent --to slugger --message "<msg>" --deliver) and CLI path to reference material.
