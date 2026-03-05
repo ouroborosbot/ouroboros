@@ -805,7 +805,7 @@ Changes:
    - Friend with `totalTokens: THRESHOLD` -> onboarding instructions DO NOT appear
    - Friend with `totalTokens: THRESHOLD + 1000` -> onboarding instructions DO NOT appear
 3. **Onboarding content** (`src/__tests__/mind/prompt.test.ts`): the onboarding block includes memory instructions ("my conversation memory is ephemeral"), name-quality instruction, and working-memory trust instruction ONLY when below threshold. Above threshold, these instructions are absent.
-4. **Non-onboarding instructions persist** (`src/__tests__/mind/prompt.test.ts`): priority guidance ("my friend's request comes first"), stale-notes awareness instruction, and friend notes rendering are NOT gated by the threshold -- they always appear regardless of totalTokens.
+4. **Non-onboarding instructions persist** (`src/__tests__/mind/prompt.test.ts`): priority guidance ("my friend's request comes first") and friend notes rendering ("what i know about this friend") are NOT gated by the threshold -- they always appear regardless of totalTokens.
 
 **Output**: New test cases
 **Acceptance**: Tests exist and FAIL (red) because `isNewFriend` still uses notes-exist check and no threshold constant exists
@@ -816,22 +816,24 @@ Changes:
 1. **Auto-populate name in resolver** (`src/mind/friends/resolver.ts`): in `resolveOrCreate()`, when creating a new friend, if `this.params.displayName !== "Unknown"`, set `notes: { name: this.params.displayName }` instead of `notes: {}`.
 
 2. **Token-based onboarding in prompt** (`src/mind/prompt.ts`):
-   - Export a constant `ONBOARDING_TOKEN_THRESHOLD` (initial value TBD -- user to review, suggest 50000 as starting point based on ~5-10 conversations worth of tokens)
-   - Replace the `isNewFriend` calculation:
+   - Export a constant `ONBOARDING_TOKEN_THRESHOLD` (initial value TBD -- user to review in Unit 21j, suggest 50000 as starting point based on ~5-10 conversations worth of tokens)
+   - Replace the `isNewFriend` calculation at line 156:
      ```
      // OLD: const isNewFriend = !hasNotes && !hasPrefs
      // NEW:
      const isOnboarding = (friend.totalTokens ?? 0) < ONBOARDING_TOKEN_THRESHOLD
      ```
    - Gate the following instructions behind `isOnboarding` (they only appear below threshold):
-     - Name quality instruction ("when i learn a name...")
-     - Memory ephemerality instruction ("my conversation memory is ephemeral...")
-     - Working-memory trust instruction ("the conversation is my source of truth...")
-     - Stale notes awareness instruction ("when i learn something that might invalidate...")
-     - The new-friend block (displayName-specific text for Unknown vs known)
+     - Name quality instruction (line 163: "when i learn a name...")
+     - Memory ephemerality instruction (line 166: "my conversation memory is ephemeral...")
+     - Working-memory trust instruction (line 169: "the conversation is my source of truth...")
+     - Stale notes awareness instruction (line 172: "when i learn something that might invalidate...")
+     - The new-friend block (lines 175-180: displayName-specific text for Unknown vs known)
    - Keep these instructions OUTSIDE the gate (always appear):
-     - Priority guidance ("my friend's request comes first...")
-     - Friend notes rendering ("what i know about this friend")
+     - Priority guidance (line 160: "my friend's request comes first...")
+     - Friend notes rendering (lines 184-190: "what i know about this friend")
+
+   NOTE: The exact boundary between "onboarding" and "permanent" instructions is debatable. Memory ephemerality, working-memory trust, and stale notes awareness are operational instructions that could be useful for established friends too. Unit 21j is the discussion checkpoint where user decides the exact boundary. Initial implementation gates all five instruction blocks behind the threshold; user can promote any to permanent in 21j.
 
    The onboarding block drops from the system prompt once `totalTokens >= ONBOARDING_TOKEN_THRESHOLD`, reducing prompt size for established friends.
 
