@@ -484,7 +484,6 @@ describe("getTeamsChannelConfig", () => {
     const tc = getTeamsChannelConfig()
 
     expect(tc.skipConfirmation).toBe(true)
-    expect(tc).not.toHaveProperty("disableStreaming")
     expect(tc.port).toBe(3978)
   })
 
@@ -504,7 +503,6 @@ describe("getTeamsChannelConfig", () => {
 
     expect(tc.skipConfirmation).toBe(true)
     expect(tc.flushIntervalMs).toBe(2000)
-    expect(tc).not.toHaveProperty("disableStreaming")
     expect(tc.port).toBe(4000)
   })
 

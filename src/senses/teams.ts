@@ -11,10 +11,10 @@ import { sessionPath, getTeamsConfig, getTeamsChannelConfig } from "../config"
 import { loadSession, deleteSession, postTurn } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "../repertoire/commands"
 import { createTraceId } from "../nerves"
-import { emitNervesEvent } from "../nerves/runtime"
 import { FileFriendStore } from "../mind/friends/store-file"
 import { FriendResolver } from "../mind/friends/resolver"
 import { accumulateFriendTokens } from "../mind/friends/tokens"
+import { createTurnCoordinator } from "../heart/turn-coordinator"
 import { getAgentRoot, getAgentName } from "../identity"
 import * as os from "os"
 import * as path from "path"
@@ -377,15 +377,14 @@ export function resolvePendingConfirmation(convId: string, text: string): boolea
   return true
 }
 
-// Per-conversation lock to serialize messages for the same conversation
-const _convLocks = new Map<string, Promise<void>>()
-let _inFlightTeamsTurns = 0
+const _turnCoordinator = createTurnCoordinator()
+
+function teamsTurnKey(conversationId: string): string {
+  return `teams:${conversationId}`
+}
 
 export async function withConversationLock(convId: string, fn: () => Promise<void>): Promise<void> {
-  const prev = _convLocks.get(convId) || Promise.resolve()
-  const current = prev.then(fn, fn)
-  _convLocks.set(convId, current)
-  await current
+  await _turnCoordinator.withTurnLock(teamsTurnKey(convId), fn)
 }
 
 // Create a fresh friend store per request so mkdirSync re-runs if directories
@@ -409,21 +408,7 @@ export interface TeamsMessageContext {
 
 // Handle an incoming Teams message
 export async function handleTeamsMessage(text: string, stream: TeamsStream, conversationId: string, teamsContext?: TeamsMessageContext, sendMessage?: (text: string) => Promise<void>): Promise<void> {
-  const maxConcurrent = Math.max(1, getTeamsChannelConfig().maxConcurrentConversations || 10)
-  if (_inFlightTeamsTurns >= maxConcurrent) {
-    const message = "I can't do that from here right now because this single-replica preview is already handling its maximum concurrent conversations. Please retry in a moment."
-    emitNervesEvent({
-      level: "warn",
-      event: "channel.error",
-      component: "channels",
-      message: "teams concurrency cap reached",
-      meta: { channel: "teams", conversation_id: conversationId, max_concurrent: maxConcurrent },
-    })
-    stream.emit(message)
-    return
-  }
-  _inFlightTeamsTurns++
-  try {
+  const turnKey = teamsTurnKey(conversationId)
   // NOTE: Confirmation resolution is handled in the app.on("message") handler
   // BEFORE the conversation lock.  By the time we get here, any pending
   // confirmation has already been resolved and the reply consumed.
@@ -497,6 +482,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   agentOptions.traceId = traceId
   if (toolContext) agentOptions.toolContext = toolContext
   if (channelConfig.skipConfirmation) agentOptions.skipConfirmation = true
+  agentOptions.drainSteeringFollowUps = () => _turnCoordinator.drainFollowUps(turnKey).map((m) => ({ text: m.text }))
   const result = await runAgent(messages, callbacks, "teams", controller.signal, agentOptions)
 
   // Flush any remaining accumulated text at end of turn
@@ -518,9 +504,6 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
     await accumulateFriendTokens(store, toolContext.context.friend.id, result.usage)
   }
   // SDK auto-closes the stream after our handler returns (app.process.js)
-  } finally {
-    _inFlightTeamsTurns = Math.max(0, _inFlightTeamsTurns - 1)
-  }
 }
 
 // Start the Teams app in DevtoolsPlugin mode (local dev) or Bot Service mode (real Teams).
@@ -558,6 +541,7 @@ export function startTeamsApp(): void {
     const { stream, activity, api, signin } = ctx
     const text = activity.text || ""
     const convId = activity.conversation?.id || "unknown"
+    const turnKey = teamsTurnKey(convId)
     const userId = activity.from?.id || ""
     const channelId = activity.channelId || "msteams"
 
@@ -575,49 +559,62 @@ export function startTeamsApp(): void {
       return
     }
 
-    // Fetch tokens for both OAuth connections independently.
-    // Failures are silently caught -- the tool handler will request signin if needed.
-    let graphToken: string | undefined
-    let adoToken: string | undefined
-    try {
-      const graphRes = await api.users.token.get({ userId, connectionName: oauthConfig.graphConnectionName, channelId })
-      graphToken = graphRes?.token
-    } catch { /* no token yet — tool handler will trigger signin */ }
-    try {
-      const adoRes = await api.users.token.get({ userId, connectionName: oauthConfig.adoConnectionName, channelId })
-      adoToken = adoRes?.token
-    } catch { /* no token yet — tool handler will trigger signin */ }
-    console.log(`[teams] tokens: graph=${graphToken ? "yes" : "no"} ado=${adoToken ? "yes" : "no"}`)
-
-    const teamsContext: TeamsMessageContext = {
-      graphToken,
-      adoToken,
-      signin: async (cn: string) => {
-        try {
-          const result = await signin({ connectionName: cn })
-          console.log(`[teams] signin(${cn}): ${result ? "token received" : "no token"}`)
-          return result
-        } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : String(e)
-          console.error(`[teams] signin(${cn}) failed: ${msg.slice(0, 100)}`)
-          return undefined
-        }
-      },
-      aadObjectId: activity.from?.aadObjectId,
-      tenantId: activity.conversation?.tenantId,
-      displayName: activity.from?.name,
+    // If this conversation already has an active turn, steer follow-up input
+    // into that turn and avoid starting a second concurrent turn.
+    if (!_turnCoordinator.tryBeginTurn(turnKey)) {
+      _turnCoordinator.enqueueFollowUp(turnKey, {
+        conversationId: convId,
+        text,
+        receivedAt: Date.now(),
+      })
+      return
     }
 
-    const ctxSend = async (t: string) => {
-      // Use send with replyToId (not reply, which adds a blockquote).
-      // replyToId anchors the message after the user's message in Copilot Chat.
-      await ctx.send({ type: "message", text: t, replyToId: activity.id })
-    }
     try {
-      await withConversationLock(convId, () => handleTeamsMessage(text, stream, convId, teamsContext, ctxSend))
+      // Fetch tokens for both OAuth connections independently.
+      // Failures are silently caught -- the tool handler will request signin if needed.
+      let graphToken: string | undefined
+      let adoToken: string | undefined
+      try {
+        const graphRes = await api.users.token.get({ userId, connectionName: oauthConfig.graphConnectionName, channelId })
+        graphToken = graphRes?.token
+      } catch { /* no token yet — tool handler will trigger signin */ }
+      try {
+        const adoRes = await api.users.token.get({ userId, connectionName: oauthConfig.adoConnectionName, channelId })
+        adoToken = adoRes?.token
+      } catch { /* no token yet — tool handler will trigger signin */ }
+      console.log(`[teams] tokens: graph=${graphToken ? "yes" : "no"} ado=${adoToken ? "yes" : "no"}`)
+
+      const teamsContext: TeamsMessageContext = {
+        graphToken,
+        adoToken,
+        signin: async (cn: string) => {
+          try {
+            const result = await signin({ connectionName: cn })
+            console.log(`[teams] signin(${cn}): ${result ? "token received" : "no token"}`)
+            return result
+          } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : String(e)
+            console.error(`[teams] signin(${cn}) failed: ${msg.slice(0, 100)}`)
+            return undefined
+          }
+        },
+        aadObjectId: activity.from?.aadObjectId,
+        tenantId: activity.conversation?.tenantId,
+        displayName: activity.from?.name,
+      }
+
+      const ctxSend = async (t: string) => {
+        // Use send with replyToId (not reply, which adds a blockquote).
+        // replyToId anchors the message after the user's message in Copilot Chat.
+        await ctx.send({ type: "message", text: t, replyToId: activity.id })
+      }
+      await handleTeamsMessage(text, stream, convId, teamsContext, ctxSend)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       console.error(`[teams] handler error: ${msg.slice(0, 200)}`)
+    } finally {
+      _turnCoordinator.endTurn(turnKey)
     }
   })
 

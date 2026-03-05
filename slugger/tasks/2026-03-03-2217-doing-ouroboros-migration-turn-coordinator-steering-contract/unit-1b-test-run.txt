@@ -1,0 +1,45 @@
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+{"ts":"2026-03-04T21:33:44.774Z","level":"info","event":"repertoire.load_start","trace_id":"0cf302ab-ce40-45c4-8a99-0ec097f815fe","component":"repertoire","message":"loading phrase pools","meta":{}}
+{"ts":"2026-03-04T21:33:44.776Z","level":"info","event":"repertoire.load_end","trace_id":"3d1edf75-fa78-40f4-a8eb-3cc621e22910","component":"repertoire","message":"loaded phrase pools","meta":{"thinking_count":1,"tool_count":1,"followup_count":1}}
+{"ts":"2026-03-04T21:33:44.776Z","level":"info","event":"repertoire.load_start","trace_id":"fd5ad727-ac0d-4083-80f7-bf64ec2b3dec","component":"repertoire","message":"loading phrase pools","meta":{}}
+{"ts":"2026-03-04T21:33:44.777Z","level":"info","event":"repertoire.load_end","trace_id":"af08e6cc-ce97-44ce-ba54-fa7520149615","component":"repertoire","message":"loaded phrase pools","meta":{"thinking_count":1,"tool_count":1,"followup_count":1}}
+{"ts":"2026-03-04T21:33:44.791Z","level":"info","event":"repertoire.load_start","trace_id":"3db339a1-ab4b-4b0c-83c2-21394d26ecf4","component":"repertoire","message":"loading phrase pools","meta":{}}
+{"ts":"2026-03-04T21:33:44.791Z","level":"info","event":"repertoire.load_end","trace_id":"21837091-30bd-4752-ba44-43fc37c814f5","component":"repertoire","message":"loaded phrase pools","meta":{"thinking_count":1,"tool_count":1,"followup_count":1}}
+{"ts":"2026-03-04T21:33:44.805Z","level":"info","event":"repertoire.load_start","trace_id":"8e2665e8-ac57-47a5-8074-1f356bbf9d31","component":"repertoire","message":"loading phrase pools","meta":{}}
+{"ts":"2026-03-04T21:33:44.805Z","level":"info","event":"repertoire.load_end","trace_id":"e3db3f64-5881-4cec-be9c-fee2141124b1","component":"repertoire","message":"loaded phrase pools","meta":{"thinking_count":1,"tool_count":1,"followup_count":1}}
+{"ts":"2026-03-04T21:33:44.822Z","level":"info","event":"channel.message_sent","trace_id":"311eb526-0a44-49a7-8c90-4ecfd7958052","component":"channels","message":"formatted tool result for channel output","meta":{"kind":"tool_result","name":"read_file","success":true,"has_summary":true}}
+{"ts":"2026-03-04T21:33:44.824Z","level":"info","event":"channel.message_sent","trace_id":"37e5f8be-b5d7-4ad3-bf4b-163bf0605805","component":"channels","message":"formatted tool result for channel output","meta":{"kind":"tool_result","name":"get_current_time","success":true,"has_summary":false}}
+{"ts":"2026-03-04T21:33:44.826Z","level":"info","event":"channel.message_sent","trace_id":"a0f8b43f-1e27-428f-a1c1-0ea75494e73e","component":"channels","message":"formatted tool result for channel output","meta":{"kind":"tool_result","name":"read_file","success":false,"has_summary":true}}
+{"ts":"2026-03-04T21:33:44.828Z","level":"info","event":"channel.message_sent","trace_id":"84ba6ebe-f284-4737-af76-d5aa1541ba2e","component":"channels","message":"formatted tool result for channel output","meta":{"kind":"tool_result","name":"read_file","success":true,"has_summary":true}}
+{"ts":"2026-03-04T21:33:46.379Z","level":"info","event":"repertoire.load_start","trace_id":"80183f32-a041-41ff-912f-55568c2c31e8","component":"repertoire","message":"loading phrase pools","meta":{}}
+{"ts":"2026-03-04T21:33:46.379Z","level":"info","event":"repertoire.load_end","trace_id":"6cc51ae0-5c18-433a-8f80-f31097b673e9","component":"repertoire","message":"loaded phrase pools","meta":{"thinking_count":1,"tool_count":1,"followup_count":1}}
+{"ts":"2026-03-04T21:33:44.882Z","level":"info","event":"repertoire.load_start","trace_id":"c0be1451-2f2b-42b0-a392-ef8307e2b4fc","component":"repertoire","message":"loading phrase pools","meta":{}}
+{"ts":"2026-03-04T21:33:44.882Z","level":"info","event":"repertoire.load_end","trace_id":"b8195415-94ea-4b97-82ba-03a9171ef8b7","component":"repertoire","message":"loaded phrase pools","meta":{"thinking_count":1,"tool_count":1,"followup_count":1}}
+ ✓ src/__tests__/senses/teams.test.ts (151 tests) 911ms
+     ✓ exports createTeamsCallbacks  454ms
+ ✓ src/__tests__/heart/turn-coordinator.test.ts (5 tests) 38ms
+{"ts":"2026-03-04T21:33:45.566Z","level":"info","event":"config.load","trace_id":"04e3afe7-4b85-4734-b8c8-a991508dbbd2","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":false}}
+{"ts":"2026-03-04T21:33:45.569Z","level":"info","event":"config.load","trace_id":"d74b1b17-c957-4b58-a90c-61b65c74aa9b","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T21:33:45.570Z","level":"warn","event":"config_identity.error","trace_id":"a5905005-8f86-4f83-adf3-70a58cce78d0","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"ENOENT"}}
+{"ts":"2026-03-04T21:33:45.570Z","level":"info","event":"config.load","trace_id":"41c7fccb-68af-46dd-96db-917315fba417","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T21:33:45.571Z","level":"warn","event":"config_identity.error","trace_id":"2947ade7-570c-47a8-a491-b2cf9ff6c7b9","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"Unexpected token 'o', \"not json {{{\" is not valid JSON"}}
+{"ts":"2026-03-04T21:33:45.571Z","level":"info","event":"config.load","trace_id":"f507bad6-25f3-46fb-9224-c6c08406d2da","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T21:33:45.572Z","level":"warn","event":"config_identity.error","trace_id":"b40500c4-89eb-4cc3-ba97-99481a66d562","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"read-failure"}}
+{"ts":"2026-03-04T21:33:45.572Z","level":"info","event":"config.load","trace_id":"bfc9225f-da83-4f38-8115-a9c129c0d6ea","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T21:33:45.572Z","level":"info","event":"config.load","trace_id":"fa069a47-c8d7-4e76-9e6a-5bd976f3a388","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":false}}
+{"ts":"2026-03-04T21:33:45.573Z","level":"info","event":"config.load","trace_id":"5adce710-e6ca-4b91-83e8-5331afa15cb1","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":false}}
+{"ts":"2026-03-04T21:33:45.573Z","level":"info","event":"config.load","trace_id":"5dbc84a0-bd97-4bfa-b104-0038237634ad","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T21:33:45.574Z","level":"info","event":"config.load","trace_id":"3166a614-0192-4670-9b80-17d2c503d328","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-04T21:33:45.574Z","level":"info","event":"config.load","trace_id":"8d7b2573-3097-4675-becc-1dc4748db96d","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":false}}
+{"ts":"2026-03-04T21:33:45.574Z","level":"info","event":"config.load","trace_id":"5713c6fd-0035-4d16-abec-f03b58f2a4a9","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-04T21:33:45.575Z","level":"info","event":"config.load","trace_id":"fe4e1b9f-6adf-4cdb-9cb4-5ef7286f45b5","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":false}}
+{"ts":"2026-03-04T21:33:45.575Z","level":"info","event":"config.load","trace_id":"ac1220f7-4518-41a3-87dc-ca0ef33859a9","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":false}}
+ ✓ src/__tests__/config.test.ts (40 tests) 21ms
+
+ Test Files  3 passed (3)
+      Tests  196 passed (196)
+   Start at  13:33:43
+   Duration  1.62s (transform 319ms, setup 64ms, import 213ms, tests 971ms, environment 0ms)
+

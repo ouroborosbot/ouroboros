@@ -242,6 +242,33 @@ describe("runAgent", () => {
     expect(order[1]).toBe("api_call")
   })
 
+  it("injects steering follow-ups as ordered user messages before model calls", async () => {
+    const drained = vi.fn().mockReturnValue([
+      { text: "follow-up 1" },
+      { text: "follow-up 2" },
+    ])
+    mockCreate.mockReturnValue(makeStream([makeChunk("ok")]))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "system", content: "test" }]
+    await runAgent(messages, callbacks, undefined, undefined, {
+      drainSteeringFollowUps: drained,
+    } as any)
+
+    expect(drained).toHaveBeenCalledTimes(1)
+    const followUps = messages.filter((m: any) => m.role === "user").map((m: any) => m.content)
+    expect(followUps).toEqual(["follow-up 1", "follow-up 2"])
+  })
+
   it("propagates traceId option into model request metadata", async () => {
     mockCreate.mockReturnValue(
       makeStream([makeChunk("ok")])
