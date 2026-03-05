@@ -56,7 +56,7 @@ Allow agents using the ouroboros harness to create GitHub issues via the GitHub 
 **Output**: Updated `tools-base.ts` and `config.ts`
 **Acceptance**: Types compile, existing tests still pass. No functional change yet.
 
-### ⬜Unit 1a: GitHub API Client -- Tests
+### ✅Unit 1a: GitHub API Client -- Tests
 **What**: Write tests for `src/repertoire/github-client.ts` following the pattern of `src/__tests__/repertoire/graph-client.test.ts`. Tests should cover:
 - `githubRequest()` makes correct HTTP requests to `https://api.github.com` with Bearer token
 - GET request without body
