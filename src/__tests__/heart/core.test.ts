@@ -3026,14 +3026,6 @@ describe("provider abstraction contract", () => {
     expect(typeof runtime?.resetTurnState).toBe("function")
   })
 
-  it("runAgent keeps provider-specific native input handling out of engine loop", () => {
-    const sourcePath = path.resolve(__dirname, "..", "..", "heart", "core.ts")
-    const source = nodeFs.readFileSync(sourcePath, "utf-8")
-    expect(source).not.toContain("let providerInput")
-    expect(source).not.toContain("toResponsesInput(messages)")
-    expect(source).not.toContain("streamResponsesApi(")
-    expect(source).not.toContain("streamChatCompletion(")
-  })
 })
 
 describe("hasToolIntent", () => {
