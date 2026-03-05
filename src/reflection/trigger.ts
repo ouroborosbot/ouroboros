@@ -107,7 +107,7 @@ ${(input.priorReflectionGaps ?? []).length > 0 ? input.priorReflectionGaps.map(g
 1. Review your architecture and capability matrix. What is the biggest gap? **Do NOT propose any gap listed in "Already-Proposed Gaps" above — find a NEW one.**
 2. Check against the constitution — is this something you can address autonomously, or does it require human review?
    - Use "within-bounds" for: adding tests, adding validation, improving observability, adding documentation, small refactors, new utility functions, bug fixes, and anything that extends existing patterns without restructuring modules.
-   - Use "requires-review" ONLY for: restructuring core modules (heart, mind), changing provider interfaces, modifying the constitution itself, or removing existing functionality.
+   - Use "requires-review" ONLY for: restructuring core modules (heart, mind), changing existing provider interface contracts (not testing them), modifying the constitution itself, or removing existing functionality. Adding tests for existing provider code is ALWAYS within-bounds.
    - When in doubt about small/medium effort items that ADD code without changing existing interfaces, prefer "within-bounds".
 3. Propose ONE specific, concrete improvement task. Include:
    - **Gap**: What's missing or broken
