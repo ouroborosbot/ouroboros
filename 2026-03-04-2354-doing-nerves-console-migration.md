@@ -61,17 +61,17 @@ Eliminate all `console.log/warn/error` calls from production source files by con
 **Output**: `src/identity.ts` with zero console.* calls.
 **Acceptance**: `grep -c 'console\.' src/identity.ts` returns 0. Tests pass.
 
-### ⬜ Unit 2a: resolver.ts -- Tests
+### ✅ Unit 2a: resolver.ts -- Tests
 **What**: Write a test in `src/__tests__/mind/friends/resolver.test.ts` that verifies when `store.put()` throws, `emitNervesEvent` is called with `{ component: "friends", event: "friends.persist_error", level: "error" }`. The test must mock `../../nerves/runtime` to capture the call. The test should FAIL initially because resolver.ts still uses console.error.
 **Output**: Failing test for friends.persist_error event.
 **Acceptance**: Test exists, runs, and FAILS (red) because emitNervesEvent is not called yet.
 
-### ⬜ Unit 2b: resolver.ts -- Implementation
+### ✅ Unit 2b: resolver.ts -- Implementation
 **What**: In `src/mind/friends/resolver.ts`, replace `console.error("failed to persist friend record:", err)` with `emitNervesEvent({ level: "error", event: "friends.persist_error", component: "friends", message: "failed to persist friend record", meta: { reason: err instanceof Error ? err.message : String(err) } })`. Add import for `emitNervesEvent` from `../../nerves/runtime`.
 **Output**: `src/mind/friends/resolver.ts` with zero console.* calls.
 **Acceptance**: Test from 2a passes (green). No console.* in file.
 
-### ⬜ Unit 2c: resolver.ts -- Coverage & Refactor
+### ✅ Unit 2c: resolver.ts -- Coverage & Refactor
 **What**: Verify 100% coverage on the new emitNervesEvent call. Refactor if needed.
 **Acceptance**: 100% coverage on new code, tests still green.
 
@@ -195,3 +195,4 @@ Test should FAIL initially because contract.ts hasn't been updated yet.
 - 2026-03-04 23:59 Completed 4 conversion passes (first draft, granularity, validation, quality)
 - 2026-03-05 00:01 Unit 0 complete: baseline 1440 tests pass, 14 console calls confirmed across 4 files
 - 2026-03-05 00:02 Unit 1a+1b complete: identity.ts console.warn removed, test updated to assert emitNervesEvent
+- 2026-03-05 00:03 Unit 2a+2b+2c complete: resolver.ts console.error replaced, 100% coverage
