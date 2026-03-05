@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   runAgent: vi.fn().mockResolvedValue({ usage: undefined }),
   buildSystem: vi.fn().mockResolvedValue("system prompt"),
   sessionPath: vi.fn().mockReturnValue("/tmp/test-session.json"),
+  logPath: vi.fn().mockReturnValue("/tmp/testagent-cli-runtime.ndjson"),
   getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
   loadSession: vi.fn().mockReturnValue(null),
   saveSession: vi.fn(),
@@ -60,6 +61,7 @@ vi.mock("../../heart/core", () => ({
 }))
 vi.mock("../../config", () => ({
   sessionPath: (...a: any[]) => mocks.sessionPath(...a),
+  logPath: (...a: any[]) => mocks.logPath(...a),
   getContextConfig: (...a: any[]) => mocks.getContextConfig(...a),
 }))
 vi.mock("../../mind/prompt", () => ({
@@ -83,7 +85,8 @@ vi.mock("../../identity", () => ({
   getAgentRoot: vi.fn(() => "/mock/agent/root"),
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
-    configPath: "~/.agentconfigs/testagent/config.json",
+    configPath: "~/.agentsecrets/testagent/secrets.json",
+    provider: "minimax",
     phrases: {
       thinking: ["working"],
       tool: ["running tool"],
@@ -181,6 +184,7 @@ function resetMocks() {
   mocks.runAgent.mockReset().mockResolvedValue({ usage: undefined })
   mocks.buildSystem.mockReset().mockReturnValue("system prompt")
   mocks.sessionPath.mockReset().mockReturnValue("/tmp/test-session.json")
+  mocks.logPath.mockReset().mockReturnValue("/tmp/testagent-cli-runtime.ndjson")
   mocks.getContextConfig.mockReset().mockReturnValue({ maxTokens: 80000, contextMargin: 20 })
   mocks.loadSession.mockReset().mockReturnValue(null)
   mocks.saveSession.mockReset()

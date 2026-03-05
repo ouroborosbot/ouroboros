@@ -1,0 +1,3 @@
+{"total": {"lines":{"total":147,"covered":147,"skipped":0,"pct":100},"statements":{"total":157,"covered":157,"skipped":0,"pct":100},"functions":{"total":20,"covered":20,"skipped":0,"pct":100},"branches":{"total":153,"covered":153,"skipped":0,"pct":100},"branchesTrue":{"total":0,"covered":0,"skipped":0,"pct":"Unknown"}}
+,"/Users/arimendelow/Projects/ouroboros-agent-harness/src/heart/providers/anthropic.ts": {"lines":{"total":147,"covered":147,"skipped":0,"pct":100},"functions":{"total":20,"covered":20,"skipped":0,"pct":100},"statements":{"total":157,"covered":157,"skipped":0,"pct":100},"branches":{"total":153,"covered":153,"skipped":0,"pct":100}}
+}

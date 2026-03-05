@@ -116,11 +116,33 @@ describe("loadAgentConfig", () => {
     vi.resetModules()
   })
 
+  it("builds a full default agent template with all supported fields", async () => {
+    const { buildDefaultAgentTemplate } = await import("../identity")
+    const template = buildDefaultAgentTemplate("ouroboros")
+
+    expect(template).toEqual({
+      name: "ouroboros",
+      provider: "anthropic",
+      configPath: "~/.agentsecrets/ouroboros/secrets.json",
+      context: {
+        maxTokens: 80000,
+        contextMargin: 20,
+        maxToolOutputChars: 20000,
+      },
+      phrases: {
+        thinking: ["working"],
+        tool: ["running tool"],
+        followup: ["processing"],
+      },
+    })
+  })
+
   it("reads and parses agent.json from agent root", async () => {
     process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
     const agentJson = {
       name: "ouroboros",
-      configPath: "~/.agentconfigs/ouroboros/config.json",
+      configPath: "~/.agentsecrets/ouroboros/secrets.json",
+      provider: "minimax",
       phrases: {
         thinking: ["thinking hard"],
         tool: ["doing stuff"],
@@ -134,7 +156,7 @@ describe("loadAgentConfig", () => {
     const config = loadAgentConfig()
 
     expect(config.name).toBe("ouroboros")
-    expect(config.configPath).toBe("~/.agentconfigs/ouroboros/config.json")
+    expect(config.configPath).toBe("~/.agentsecrets/ouroboros/secrets.json")
     expect(config.phrases?.thinking).toEqual(["thinking hard"])
     expect(config.phrases?.tool).toEqual(["doing stuff"])
     expect(config.phrases?.followup).toEqual(["almost done"])
@@ -144,7 +166,8 @@ describe("loadAgentConfig", () => {
     process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
     const agentJson = {
       name: "ouroboros",
-      configPath: "~/.agentconfigs/ouroboros/config.json",
+      configPath: "~/.agentsecrets/ouroboros/secrets.json",
+    provider: "minimax",
     }
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(agentJson))
 
@@ -164,7 +187,8 @@ describe("loadAgentConfig", () => {
     process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
     const agentJson = {
       name: "ouroboros",
-      configPath: "~/.agentconfigs/ouroboros/config.json",
+      configPath: "~/.agentsecrets/ouroboros/secrets.json",
+    provider: "minimax",
     }
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(agentJson))
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
@@ -182,7 +206,8 @@ describe("loadAgentConfig", () => {
     process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
     const agentJson = {
       name: "ouroboros",
-      configPath: "~/.agentconfigs/ouroboros/config.json",
+      configPath: "~/.agentsecrets/ouroboros/secrets.json",
+      provider: "minimax",
       phrases: {
         thinking: ["thinking hard"],
         tool: ["doing stuff"],
@@ -223,6 +248,113 @@ describe("loadAgentConfig", () => {
     expect(() => loadAgentConfig()).toThrow(/agent\.json/)
   })
 
+  it("throws when agent.json is missing configPath", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      name: "ouroboros",
+      phrases: {
+        thinking: ["thinking"],
+        tool: ["tool"],
+        followup: ["followup"],
+      },
+    }))
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/must include configPath/)
+  })
+
+  it("throws when agent.json configPath is blank", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      name: "ouroboros",
+      configPath: "   ",
+      provider: "minimax",
+      phrases: {
+        thinking: ["thinking"],
+        tool: ["tool"],
+        followup: ["followup"],
+      },
+    }))
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/must include configPath/)
+  })
+
+  it("throws when agent.json configPath still points at legacy .agentconfigs location", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      name: "ouroboros",
+      configPath: "~/.agentconfigs/ouroboros/config.json",
+      provider: "minimax",
+      phrases: {
+        thinking: ["thinking"],
+        tool: ["tool"],
+        followup: ["followup"],
+      },
+    }))
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/\.agentsecrets.*secrets\.json/)
+  })
+
+  it("throws when agent.json is missing provider", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      name: "ouroboros",
+      configPath: "~/.agentsecrets/ouroboros/secrets.json",
+      phrases: {
+        thinking: ["thinking"],
+        tool: ["tool"],
+        followup: ["followup"],
+      },
+    }))
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/must include provider/)
+  })
+
+  it("throws when agent.json provider is invalid", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      name: "ouroboros",
+      configPath: "~/.agentsecrets/ouroboros/secrets.json",
+      provider: "unknown",
+      phrases: {
+        thinking: ["thinking"],
+        tool: ["tool"],
+        followup: ["followup"],
+      },
+    }))
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/must include provider/)
+    expect(() => loadAgentConfig()).toThrow(/openai-codex/)
+  })
+
+  it("accepts openai-codex as a valid provider", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      name: "ouroboros",
+      configPath: "~/.agentsecrets/ouroboros/secrets.json",
+      provider: "openai-codex",
+      phrases: {
+        thinking: ["thinking"],
+        tool: ["tool"],
+        followup: ["followup"],
+      },
+    }))
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    const config = loadAgentConfig()
+    expect(config.provider).toBe("openai-codex")
+  })
+
   it("handles non-Error read failures when loading agent.json", async () => {
     process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
     vi.mocked(fs.readFileSync).mockImplementation(() => {
@@ -251,7 +383,8 @@ describe("loadAgentConfig", () => {
     process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
     const agentJson = {
       name: "ouroboros",
-      configPath: "~/.agentconfigs/ouroboros/config.json",
+      configPath: "~/.agentsecrets/ouroboros/secrets.json",
+    provider: "minimax",
     }
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(agentJson))
 
@@ -268,7 +401,8 @@ describe("loadAgentConfig", () => {
     process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
     const agentJson = {
       name: "ouroboros",
-      configPath: "~/.agentconfigs/ouroboros/config.json",
+      configPath: "~/.agentsecrets/ouroboros/secrets.json",
+      provider: "minimax",
       phrases: {
         thinking: ["thinking"],
         tool: ["tool"],
@@ -314,7 +448,8 @@ describe("resetIdentity", () => {
     process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
       name: "ouroboros",
-      configPath: "~/.agentconfigs/ouroboros/config.json",
+      configPath: "~/.agentsecrets/ouroboros/secrets.json",
+    provider: "minimax",
     }))
 
     const { loadAgentConfig, resetIdentity } = await import("../identity")
@@ -325,9 +460,10 @@ describe("resetIdentity", () => {
     resetIdentity()
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
       name: "ouroboros",
-      configPath: "/new/path/config.json",
+      configPath: "/new/path/secrets.json",
+    provider: "minimax",
     }))
     const config = loadAgentConfig()
-    expect(config.configPath).toBe("/new/path/config.json")
+    expect(config.configPath).toBe("/new/path/secrets.json")
   })
 })

@@ -8,7 +8,7 @@ import { getDeclaredLogpoints } from "../../nerves/coverage/contract"
 const REPO_SLUG = "ouroboros-agent-harness"
 
 function readActiveRunDir(): string | null {
-  const activePath = join(homedir(), ".agentconfigs", "test-runs", REPO_SLUG, ".active-run.json")
+  const activePath = join(homedir(), ".agentstate", "test-runs", REPO_SLUG, ".active-run.json")
   if (!existsSync(activePath)) return null
   try {
     const parsed = JSON.parse(readFileSync(activePath, "utf8")) as { run_dir?: unknown }

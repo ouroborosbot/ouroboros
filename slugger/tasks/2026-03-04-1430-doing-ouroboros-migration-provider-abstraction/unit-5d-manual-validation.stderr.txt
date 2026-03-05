@@ -1,0 +1,10 @@
+# Unit 5d - captured failure-path stderr excerpt
+
+OpenAI Codex configuration error.
+OpenAI Codex OAuth access token is missing a chatgpt_account_id claim required for chatgpt.com/backend-api/codex.
+Fix:
+  1. Run `npm run auth:openai-codex -- --agent ouroboros`
+     (or run `codex login` and set the OAuth token manually)
+  2. Open ~/.agentsecrets/ouroboros/secrets.json
+  3. Confirm providers.openai-codex.oauthAccessToken is set
+  4. This provider uses chatgpt.com/backend-api/codex/responses (not api.openai.com/responses).

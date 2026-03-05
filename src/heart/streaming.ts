@@ -428,7 +428,8 @@ export async function streamResponsesApi(
         }
         break;
       }
-      case "response.completed": {
+      case "response.completed":
+      case "response.done": {
         const u = event.response?.usage as ResponseUsage | undefined;
         if (u) {
           usage = {

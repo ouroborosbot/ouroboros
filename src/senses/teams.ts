@@ -394,7 +394,7 @@ export async function withConversationLock(convId: string, fn: () => Promise<voi
 // are deleted while the process is alive.
 function getFriendStore(): InstanceType<typeof FileFriendStore> {
   const agentKnowledgePath = path.join(getAgentRoot(), "friends")
-  const piiBridgePath = path.join(os.homedir(), ".agentconfigs", getAgentName(), "friends")
+  const piiBridgePath = path.join(os.homedir(), ".agentstate", getAgentName(), "friends")
   return new FileFriendStore(agentKnowledgePath, piiBridgePath)
 }
 

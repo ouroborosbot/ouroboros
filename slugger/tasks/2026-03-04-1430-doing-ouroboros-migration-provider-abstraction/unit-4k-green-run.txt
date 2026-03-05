@@ -1,0 +1,34 @@
+
+> ouroboros-agent-harness@1.0.0 test
+> vitest run src/__tests__/heart/core.test.ts
+
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+{"ts":"2026-03-05T03:04:43.097Z","level":"warn","event":"config_identity.error","trace_id":"59fecd6f-8a4a-40f5-8758-d497b57851cb","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"Unexpected end of JSON input"}}
+{"ts":"2026-03-05T03:04:43.098Z","level":"info","event":"config.load","trace_id":"3d0467b7-e5c7-4981-ab10-67dd7541c194","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-05T03:04:43.100Z","level":"info","event":"config.load","trace_id":"98b7d622-02e6-4e52-a6d2-2ee3c54f3e61","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-05T03:04:43.100Z","level":"info","event":"engine.turn_start","trace_id":"15e9afdd-5d25-4dfb-81b0-7fa90f8622cb","component":"engine","message":"runAgent turn started","meta":{"channel":"unknown","provider":"minimax"}}
+{"ts":"2026-03-05T03:04:43.101Z","level":"info","event":"engine.turn_end","trace_id":"4209d4cf-2780-4846-b42e-49486fdf54cc","component":"engine","message":"runAgent turn completed","meta":{"done":true}}
+{"ts":"2026-03-05T03:04:43.102Z","level":"warn","event":"config_identity.error","trace_id":"9ba41ce8-de8c-4eba-8eb9-a6b4e7adfaac","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"Unexpected end of JSON input"}}
+{"ts":"2026-03-05T03:04:43.102Z","level":"info","event":"config.load","trace_id":"e6aeeaa8-7073-4919-af78-51f3497e3faf","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-05T03:04:43.103Z","level":"info","event":"config.load","trace_id":"858606f6-5922-410f-a828-7e218db6e2a5","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-05T03:04:43.103Z","level":"info","event":"engine.turn_start","trace_id":"c65207d7-f03c-42b2-8329-beef06d180b8","component":"engine","message":"runAgent turn started","meta":{"channel":"unknown","provider":"minimax"}}
+{"ts":"2026-03-05T03:04:43.104Z","level":"info","event":"engine.turn_end","trace_id":"f7bf8ef4-4504-49d6-868d-abd296ce2ce1","component":"engine","message":"runAgent turn completed","meta":{"done":true}}
+{"ts":"2026-03-05T03:04:43.105Z","level":"warn","event":"config_identity.error","trace_id":"255dcd44-f5d7-48d7-ad5a-066760eab2a6","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"Unexpected end of JSON input"}}
+{"ts":"2026-03-05T03:04:43.105Z","level":"info","event":"config.load","trace_id":"4877c30a-2525-45e8-896e-c6cb570d2c34","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-05T03:04:43.106Z","level":"info","event":"config.load","trace_id":"7c4f306d-c7ac-403d-b315-074548630b47","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+{"ts":"2026-03-05T03:04:43.106Z","level":"info","event":"engine.turn_start","trace_id":"trace-abc","component":"engine","message":"runAgent turn started","meta":{"channel":"unknown","provider":"minimax"}}
+{"ts":"2026-03-05T03:04:43.107Z","level":"info","event":"engine.turn_end","trace_id":"trace-abc","component":"engine","message":"runAgent turn completed","meta":{"done":true}}
+{"ts":"2026-03-05T03:04:43.107Z","level":"warn","event":"config_identity.error","trace_id":"32de1f02-9294-4315-8ea1-c602dd1d48e8","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"Unexpected end of JSON input"}}
+{"ts":"2026-03-05T03:04:43.107Z","level":"info","event":"config.load","trace_id":"a7a11157-2ec9-409d-8350-c24d0f0d5469","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-05T03:04:43.109Z","level":"warn","event":"config_identity.error","trace_id":"298f29bd-33bd-4b65-a9e3-d8ca678b427d","component":"config/identity","message":"config read failed; defaults applied","meta":{"phase":"loadConfig","reason":"Unexpected end of JSON input"}}
+{"ts":"2026-03-05T03:04:43.109Z","level":"info","event":"config.load","trace_id":"634fcbb2-2e83-4ebc-b4a3-d29126d7cb88","component":"config/identity","message":"config loaded from disk","meta":{"source":"disk","used_defaults_only":true}}
+{"ts":"2026-03-05T03:04:43.111Z","level":"info","event":"config.load","trace_id":"03b11a35-44d9-4759-b12f-87d18f9f150b","component":"config/identity","message":"config loaded from cache","meta":{"source":"cache"}}
+ ✓ src/__tests__/heart/core.test.ts (175 tests) 580ms
+
+ Test Files  1 passed (1)
+      Tests  175 passed (175)
+   Start at  19:04:42
+   Duration  969ms (transform 323ms, setup 45ms, import 213ms, tests 580ms, environment 0ms)
+

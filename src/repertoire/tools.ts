@@ -134,6 +134,25 @@ export async function execTool(name: string, args: Record<string, string>, ctx?:
   }
 }
 
+function summarizeKeyValues(args: Record<string, string>, keys: string[], maxValueLength = 60): string {
+  const parts: string[] = []
+  for (const key of keys) {
+    const raw = args[key]
+    if (raw === undefined || raw === null) continue
+    const compact = String(raw).replace(/\s+/g, " ").trim()
+    if (!compact) continue
+    const clipped = compact.length > maxValueLength ? compact.slice(0, maxValueLength) + "..." : compact
+    parts.push(`${key}=${clipped}`)
+  }
+  return parts.join(" ")
+}
+
+function summarizeUnknownArgs(args: Record<string, string>): string {
+  const keys = Object.keys(args)
+  if (keys.length === 0) return ""
+  return summarizeKeyValues(args, keys)
+}
+
 export function summarizeArgs(name: string, args: Record<string, string>): string {
   // Check teams tools first
   const teamsSummary = summarizeTeamsArgs(name, args);
@@ -144,18 +163,17 @@ export function summarizeArgs(name: string, args: Record<string, string>): strin
   if (githubSummary !== undefined) return githubSummary;
 
   // Base tools
-  if (name === "read_file" || name === "write_file") return args.path || "";
-  if (name === "shell") {
-    const cmd = args.command || "";
-    return cmd.length > 50 ? cmd.slice(0, 50) + "..." : cmd;
+  if (name === "read_file" || name === "write_file") return summarizeKeyValues(args, ["path"]);
+  if (name === "shell") return summarizeKeyValues(args, ["command"]);
+  if (name === "list_directory") return summarizeKeyValues(args, ["path"]);
+  if (name === "git_commit") return summarizeKeyValues(args, ["message"]);
+  if (name === "gh_cli") return summarizeKeyValues(args, ["command"]);
+  if (name === "load_skill") return summarizeKeyValues(args, ["name"]);
+  if (name === "claude") return summarizeKeyValues(args, ["prompt"]);
+  if (name === "web_search") return summarizeKeyValues(args, ["query"]);
+  if (name === "save_friend_note") {
+    return summarizeKeyValues(args, ["type", "key", "content"]);
   }
-  if (name === "list_directory") return args.path || "";
-  if (name === "git_commit") return args.message?.slice(0, 40) || "";
-  if (name === "gh_cli") return args.command?.slice(0, 40) || "";
-  if (name === "load_skill") return args.name || "";
-  if (name === "claude") return args.prompt?.slice(0, 40) || "";
-  if (name === "web_search") return args.query?.slice(0, 40) || "";
-  if (name === "save_friend_note") return args.key || "";
-  if (name === "ado_backlog_list") return `${args.organization || ""} ${args.project || ""}`.trim();
-  return JSON.stringify(args).slice(0, 30);
+  if (name === "ado_backlog_list") return summarizeKeyValues(args, ["organization", "project"]);
+  return summarizeUnknownArgs(args);
 }

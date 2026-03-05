@@ -14,9 +14,15 @@ vi.mock("fs", () => ({
 vi.mock("../identity", () => ({
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
-    configPath: "~/.agentconfigs/testagent/config.json",
+    configPath: "~/.agentsecrets/testagent/secrets.json",
+  provider: "minimax",
   })),
   getAgentName: vi.fn(() => "testagent"),
+  DEFAULT_AGENT_CONTEXT: {
+    maxTokens: 80000,
+    contextMargin: 20,
+    maxToolOutputChars: 20000,
+  },
 }))
 
 import * as fs from "fs"
@@ -25,9 +31,11 @@ import * as identity from "../identity"
 beforeEach(() => {
   vi.mocked(fs.readFileSync).mockReset()
   vi.mocked(fs.mkdirSync).mockReset()
+  vi.mocked(fs.writeFileSync).mockReset()
   vi.mocked(identity.loadAgentConfig).mockReturnValue({
     name: "testagent",
-    configPath: "~/.agentconfigs/testagent/config.json",
+    configPath: "~/.agentsecrets/testagent/secrets.json",
+  provider: "minimax",
   })
   vi.mocked(identity.getAgentName).mockReturnValue("testagent")
 })
@@ -60,7 +68,7 @@ describe("loadConfig", () => {
     expect(config.providers.azure.apiKey).toBe("az-key")
     expect(config.providers.azure.endpoint).toBe("https://example.openai.azure.com")
     // Should resolve ~ to homedir and use configPath from agent.json
-    const expectedPath = path.join(os.homedir(), ".agentconfigs", "testagent", "config.json")
+    const expectedPath = path.join(os.homedir(), ".agentsecrets", "testagent", "secrets.json")
     expect(fs.readFileSync).toHaveBeenCalledWith(expectedPath, "utf-8")
   })
 
@@ -71,8 +79,20 @@ describe("loadConfig", () => {
     resetConfigCache()
     loadConfig()
 
-    const expectedDir = path.join(os.homedir(), ".agentconfigs", "testagent")
+    const expectedDir = path.join(os.homedir(), ".agentsecrets", "testagent")
     expect(fs.mkdirSync).toHaveBeenCalledWith(expectedDir, { recursive: true })
+  })
+
+  it("throws when agent.json configPath does not use .agentsecrets/<agent>/secrets.json", async () => {
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentconfigs/testagent/config.json",
+    provider: "minimax",
+    })
+
+    const { loadConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    expect(() => loadConfig()).toThrow(/\.agentsecrets.*secrets\.json/)
   })
 
   it("returns defaults when file is missing (ENOENT)", async () => {
@@ -90,6 +110,101 @@ describe("loadConfig", () => {
     expect(config.providers.minimax.apiKey).toBe("")
     expect(config.context.maxTokens).toBe(80000)
     expect(config.context.contextMargin).toBe(20)
+
+    const expectedPath = path.join(os.homedir(), ".agentsecrets", "testagent", "secrets.json")
+    expect(fs.writeFileSync).toHaveBeenCalledTimes(1)
+    expect(fs.writeFileSync).toHaveBeenCalledWith(expectedPath, expect.any(String), "utf-8")
+    const written = vi.mocked(fs.writeFileSync).mock.calls[0]?.[1]
+    const parsed = JSON.parse(String(written)) as Record<string, unknown>
+    expect(parsed).toHaveProperty("providers")
+    expect(parsed).toMatchObject({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+          setupToken: "",
+        },
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: "",
+        },
+      },
+      teams: {
+        clientId: "",
+        clientSecret: "",
+        tenantId: "",
+      },
+      oauth: {
+        graphConnectionName: "graph",
+        adoConnectionName: "ado",
+      },
+      teamsChannel: {
+        skipConfirmation: true,
+        port: 3978,
+      },
+      integrations: {
+        perplexityApiKey: "",
+      },
+    })
+    expect(parsed).not.toHaveProperty("context")
+  })
+
+  it("continues with defaults when writing default secrets config fails after ENOENT", async () => {
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      const err: any = new Error("ENOENT")
+      err.code = "ENOENT"
+      throw err
+    })
+    vi.mocked(fs.writeFileSync).mockImplementation(() => {
+      throw new Error("disk full")
+    })
+
+    const { loadConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const config = loadConfig()
+
+    expect(fs.writeFileSync).toHaveBeenCalledTimes(1)
+    expect(config.providers.minimax.apiKey).toBe("")
+    expect(config.context.maxTokens).toBe(80000)
+  })
+
+  it("continues with defaults when writing default secrets config throws non-Error", async () => {
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      const err: any = new Error("ENOENT")
+      err.code = "ENOENT"
+      throw err
+    })
+    vi.mocked(fs.writeFileSync).mockImplementation(() => {
+      throw "disk-fail"
+    })
+
+    const { loadConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const config = loadConfig()
+
+    expect(fs.writeFileSync).toHaveBeenCalledTimes(1)
+    expect(config.providers.azure.apiKey).toBe("")
+    expect(config.context.maxTokens).toBe(80000)
+  })
+
+  it("ignores legacy context block from secrets.json", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        context: { maxTokens: 1, contextMargin: 1, maxToolOutputChars: 1 },
+        providers: {
+          minimax: { apiKey: "minimax-key", model: "MiniMax-M2.5" },
+        },
+      })
+    )
+
+    const { loadConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const config = loadConfig()
+
+    // context must come from agent.json defaults, not legacy secrets.json context
+    expect(config.context.maxTokens).toBe(80000)
+    expect(config.context.contextMargin).toBe(20)
+    expect(config.context.maxToolOutputChars).toBe(20000)
+    expect(config.providers.minimax.apiKey).toBe("minimax-key")
   })
 
   it("returns defaults when file contains invalid JSON", async () => {
@@ -139,14 +254,14 @@ describe("loadConfig", () => {
 
   it("does not use OUROBOROS_CONFIG_PATH env var", async () => {
     process.env.OUROBOROS_CONFIG_PATH = "/tmp/should-not-be-used.json"
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ context: { maxTokens: 50000 } }))
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ providers: { azure: { apiKey: "x" } } }))
 
     const { loadConfig, resetConfigCache } = await import("../config")
     resetConfigCache()
     loadConfig()
 
     // Should NOT use the env var -- should use agent.json configPath
-    const expectedPath = path.join(os.homedir(), ".agentconfigs", "testagent", "config.json")
+    const expectedPath = path.join(os.homedir(), ".agentsecrets", "testagent", "secrets.json")
     expect(fs.readFileSync).toHaveBeenCalledWith(expectedPath, "utf-8")
     expect(fs.readFileSync).not.toHaveBeenCalledWith("/tmp/should-not-be-used.json", "utf-8")
 
@@ -157,6 +272,7 @@ describe("loadConfig", () => {
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
       name: "myagent",
       configPath: "~/custom/path/config.json",
+    provider: "minimax",
     })
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
 
@@ -172,6 +288,7 @@ describe("loadConfig", () => {
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
       name: "myagent",
       configPath: "/absolute/path/config.json",
+    provider: "minimax",
     })
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
 
@@ -183,7 +300,7 @@ describe("loadConfig", () => {
   })
 
   it("caches config after first load", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ context: { maxTokens: 50000 } }))
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ providers: { minimax: { apiKey: "k1" } } }))
 
     const { loadConfig, resetConfigCache } = await import("../config")
     resetConfigCache()
@@ -195,18 +312,18 @@ describe("loadConfig", () => {
   })
 
   it("re-reads from disk after resetConfigCache()", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ context: { maxTokens: 50000 } }))
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ providers: { azure: { apiKey: "first" } } }))
 
     const { loadConfig, resetConfigCache } = await import("../config")
     resetConfigCache()
     const config1 = loadConfig()
 
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ context: { maxTokens: 60000 } }))
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ providers: { azure: { apiKey: "second" } } }))
     resetConfigCache()
     const config2 = loadConfig()
 
     expect(config1).not.toBe(config2)
-    expect(config2.context.maxTokens).toBe(60000)
+    expect(config2.providers.azure.apiKey).toBe("second")
     expect(fs.readFileSync).toHaveBeenCalledTimes(2)
   })
 
@@ -297,6 +414,31 @@ describe("getMinimaxConfig", () => {
 
 })
 
+describe("getOpenAICodexConfig", () => {
+  beforeEach(async () => {
+    vi.resetModules()
+  })
+
+  it("exports openai-codex config getter and returns oauth config from secrets.json", async () => {
+    const configData = {
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: "oauth-token-123",
+        },
+      },
+    }
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(configData))
+
+    const config = await import("../config")
+    expect(typeof (config as any).getOpenAICodexConfig).toBe("function")
+    const codex = (config as any).getOpenAICodexConfig()
+
+    expect(codex.model).toBe("gpt-5.2")
+    expect(codex.oauthAccessToken).toBe("oauth-token-123")
+  })
+})
+
 describe("getTeamsConfig", () => {
   beforeEach(async () => {
     vi.resetModules()
@@ -328,11 +470,23 @@ describe("getContextConfig", () => {
     vi.resetModules()
   })
 
-  it("returns context config from config.json", async () => {
-    const configData = {
+  it("returns context config from agent.json", async () => {
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
       context: {
         maxTokens: 100000,
         contextMargin: 25,
+        maxToolOutputChars: 12345,
+      },
+    } as any)
+
+    const configData = {
+      context: {
+        maxTokens: 1,
+        contextMargin: 2,
+        maxToolOutputChars: 3,
       },
     }
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(configData))
@@ -343,6 +497,7 @@ describe("getContextConfig", () => {
 
     expect(ctx.maxTokens).toBe(100000)
     expect(ctx.contextMargin).toBe(25)
+    expect(ctx.maxToolOutputChars).toBe(12345)
   })
 
   it("returns defaults when not configured", async () => {
@@ -354,6 +509,50 @@ describe("getContextConfig", () => {
 
     expect(ctx.maxTokens).toBe(80000)
     expect(ctx.contextMargin).toBe(20)
+  })
+
+  it("falls back per-field defaults when agent.json context has invalid types", async () => {
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
+      context: {
+        maxTokens: "bad",
+        contextMargin: 12,
+        maxToolOutputChars: null,
+      },
+    } as any)
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { getContextConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const ctx = getContextConfig()
+
+    expect(ctx.maxTokens).toBe(80000)
+    expect(ctx.contextMargin).toBe(12)
+    expect(ctx.maxToolOutputChars).toBe(20000)
+  })
+
+  it("falls back contextMargin to default when agent.json contextMargin is not numeric", async () => {
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
+      context: {
+        maxTokens: 91000,
+        contextMargin: "bad",
+        maxToolOutputChars: 15000,
+      },
+    } as any)
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { getContextConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const ctx = getContextConfig()
+
+    expect(ctx.maxTokens).toBe(91000)
+    expect(ctx.contextMargin).toBe(20)
+    expect(ctx.maxToolOutputChars).toBe(15000)
   })
 
 })
@@ -370,7 +569,7 @@ describe("sessionPath", () => {
     const { sessionPath } = await import("../config")
     const p = sessionPath("uuid-abc-123", "cli", "session")
 
-    expect(p).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "sessions", "uuid-abc-123", "cli", "session.json"))
+    expect(p).toBe(path.join(os.homedir(), ".agentstate", "testagent", "sessions", "uuid-abc-123", "cli", "session.json"))
   })
 
   it("returns correct path for teams channel with friendId", async () => {
@@ -379,7 +578,7 @@ describe("sessionPath", () => {
     const { sessionPath } = await import("../config")
     const p = sessionPath("uuid-xyz-456", "teams", "conv-123")
 
-    expect(p).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "sessions", "uuid-xyz-456", "teams", "conv-123.json"))
+    expect(p).toBe(path.join(os.homedir(), ".agentstate", "testagent", "sessions", "uuid-xyz-456", "teams", "conv-123.json"))
   })
 
   it("sanitizes key by replacing slashes and colons with underscores", async () => {
@@ -388,7 +587,7 @@ describe("sessionPath", () => {
     const { sessionPath } = await import("../config")
     const p = sessionPath("uuid-1", "teams", "a]conv/id:123")
 
-    expect(p).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "sessions", "uuid-1", "teams", "a]conv_id_123.json"))
+    expect(p).toBe(path.join(os.homedir(), ".agentstate", "testagent", "sessions", "uuid-1", "teams", "a]conv_id_123.json"))
   })
 
   it("auto-creates parent directories", async () => {
@@ -398,7 +597,7 @@ describe("sessionPath", () => {
     sessionPath("uuid-1", "cli", "session")
 
     expect(fs.mkdirSync).toHaveBeenCalledWith(
-      path.join(os.homedir(), ".agentconfigs", "testagent", "sessions", "uuid-1", "cli"),
+      path.join(os.homedir(), ".agentstate", "testagent", "sessions", "uuid-1", "cli"),
       { recursive: true },
     )
   })
@@ -415,7 +614,7 @@ describe("logPath", () => {
     const { getLogsDir } = await import("../config")
     const dir = getLogsDir()
 
-    expect(dir).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "logs"))
+    expect(dir).toBe(path.join(os.homedir(), ".agentstate", "testagent", "logs"))
   })
 
   it("returns NDJSON log path and sanitizes key", async () => {
@@ -424,7 +623,7 @@ describe("logPath", () => {
     const { logPath } = await import("../config")
     const p = logPath("teams", "a]conv/id:123")
 
-    expect(p).toBe(path.join(os.homedir(), ".agentconfigs", "testagent", "logs", "teams", "a]conv_id_123.ndjson"))
+    expect(p).toBe(path.join(os.homedir(), ".agentstate", "testagent", "logs", "teams", "a]conv_id_123.ndjson"))
   })
 })
 

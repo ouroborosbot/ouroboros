@@ -5,10 +5,42 @@ import { emitNervesEvent } from "./nerves/runtime"
 export interface AgentConfig {
   name: string
   configPath: string
+  provider: "azure" | "minimax" | "anthropic" | "openai-codex"
+  context?: {
+    maxTokens?: number
+    contextMargin?: number
+    maxToolOutputChars?: number
+  }
   phrases: {
     thinking: string[]
     tool: string[]
     followup: string[]
+  }
+}
+
+export const DEFAULT_AGENT_CONTEXT = {
+  maxTokens: 80000,
+  contextMargin: 20,
+  maxToolOutputChars: 20000,
+} as const
+
+export const DEFAULT_AGENT_PHRASES: AgentConfig["phrases"] = {
+  thinking: ["working"],
+  tool: ["running tool"],
+  followup: ["processing"],
+}
+
+export function buildDefaultAgentTemplate(agentName: string): AgentConfig {
+  return {
+    name: agentName,
+    provider: "anthropic",
+    configPath: `~/.agentsecrets/${agentName}/secrets.json`,
+    context: { ...DEFAULT_AGENT_CONTEXT },
+    phrases: {
+      thinking: [...DEFAULT_AGENT_PHRASES.thinking],
+      tool: [...DEFAULT_AGENT_PHRASES.tool],
+      followup: [...DEFAULT_AGENT_PHRASES.followup],
+    },
   }
 }
 
@@ -121,12 +153,6 @@ export function loadAgentConfig(): AgentConfig {
     )
   }
 
-  const PLACEHOLDER_PHRASES = {
-    thinking: ["working"],
-    tool: ["running tool"],
-    followup: ["processing"],
-  }
-
   const existingPhrases = parsed.phrases as Partial<AgentConfig["phrases"]> | undefined
   const needsFill = !existingPhrases ||
     !existingPhrases.thinking ||
@@ -135,9 +161,9 @@ export function loadAgentConfig(): AgentConfig {
 
   if (needsFill) {
     const filled = {
-      thinking: existingPhrases?.thinking ?? PLACEHOLDER_PHRASES.thinking,
-      tool: existingPhrases?.tool ?? PLACEHOLDER_PHRASES.tool,
-      followup: existingPhrases?.followup ?? PLACEHOLDER_PHRASES.followup,
+      thinking: existingPhrases?.thinking ?? DEFAULT_AGENT_PHRASES.thinking,
+      tool: existingPhrases?.tool ?? DEFAULT_AGENT_PHRASES.tool,
+      followup: existingPhrases?.followup ?? DEFAULT_AGENT_PHRASES.followup,
     }
     parsed.phrases = filled
     console.warn("agent.json is missing phrases, added placeholders")
@@ -149,6 +175,61 @@ export function loadAgentConfig(): AgentConfig {
       meta: { path: configFile },
     })
     fs.writeFileSync(configFile, JSON.stringify(parsed, null, 2) + "\n", "utf-8")
+  }
+
+  const rawConfigPath = parsed.configPath
+  if (typeof rawConfigPath !== "string" || rawConfigPath.trim().length === 0) {
+    emitNervesEvent({
+      level: "error",
+      event: "config_identity.error",
+      component: "config/identity",
+      message: "agent config missing configPath",
+      meta: { path: configFile },
+    })
+    throw new Error(
+      `agent.json at ${configFile} must include configPath.`,
+    )
+  }
+
+  if (
+    rawConfigPath.startsWith("~/.agentconfigs/") ||
+    rawConfigPath.includes("/.agentconfigs/")
+  ) {
+    emitNervesEvent({
+      level: "error",
+      event: "config_identity.error",
+      component: "config/identity",
+      message: "legacy configPath is not supported",
+      meta: {
+        path: configFile,
+        configPath: rawConfigPath,
+      },
+    })
+    throw new Error(
+      `Legacy configPath '${rawConfigPath}' is not supported. Use ~/.agentsecrets/<agent>/secrets.json.`,
+    )
+  }
+
+  const rawProvider = parsed.provider
+  if (
+    rawProvider !== "azure" &&
+    rawProvider !== "minimax" &&
+    rawProvider !== "anthropic" &&
+    rawProvider !== "openai-codex"
+  ) {
+    emitNervesEvent({
+      level: "error",
+      event: "config_identity.error",
+      component: "config/identity",
+      message: "agent config missing or invalid provider",
+      meta: {
+        path: configFile,
+        provider: rawProvider,
+      },
+    })
+    throw new Error(
+      `agent.json at ${configFile} must include provider: "azure", "minimax", "anthropic", or "openai-codex".`,
+    )
   }
 
   _cachedAgentConfig = parsed as unknown as AgentConfig
