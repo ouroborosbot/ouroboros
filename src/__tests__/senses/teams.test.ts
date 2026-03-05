@@ -86,63 +86,78 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     expect(() => callbacks.onModelStreamStart()).not.toThrow()
   })
 
-  // --- Delta emit tests (SDK handles accumulation) ---
+  // --- Chunked streaming: text is always accumulated, never emitted per-token ---
 
-  it("emits text delta directly to stream", async () => {
+  it("onTextChunk accumulates text in buffer (does not emit per-token)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     callbacks.onTextChunk("Hello")
-    expect(mockStream.emit).toHaveBeenCalledWith("Hello")
+    // Text should be buffered, NOT emitted per-token
+    expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
-  it("emits each chunk as a delta (not cumulative)", async () => {
+  it("onTextChunk accumulates multiple chunks (flushed later, not per-token)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
 
     callbacks.onTextChunk("Hello")
     callbacks.onTextChunk(" world")
 
-    expect(mockStream.emit).toHaveBeenCalledTimes(2)
-    expect(mockStream.emit).toHaveBeenNthCalledWith(1, "Hello")
-    expect(mockStream.emit).toHaveBeenNthCalledWith(2, " world")
+    // Nothing emitted yet -- text is buffered for periodic flush
+    expect(mockStream.emit).not.toHaveBeenCalled()
+    // Flush delivers accumulated text
+    await callbacks.flush()
+    expect(mockStream.emit).toHaveBeenCalledTimes(1)
+    expect(mockStream.emit).toHaveBeenCalledWith("Hello world")
   })
 
-  // --- Stop-streaming tests ---
+  // --- Stop-streaming tests (403 detected during flush, not per-token) ---
 
-  it("when emit throws (403), controller is aborted", async () => {
+  it("when emit throws (403) during flush, controller is aborted", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     mockStream.emit.mockImplementation(() => { throw new Error("403 Forbidden") })
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onTextChunk("data")
+    // onTextChunk accumulates -- 403 not triggered yet
+    expect(controller.signal.aborted).toBe(false)
+    // flush triggers emit which throws 403
+    await callbacks.flush()
     expect(controller.signal.aborted).toBe(true)
   })
 
-  it("after abort, subsequent onTextChunk calls do not emit", async () => {
+  it("after abort via flush, subsequent onTextChunk calls silently accumulate", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
-    mockStream.emit.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
-    callbacks.onTextChunk("first") // this throws and aborts
+    callbacks.onTextChunk("first")
+    mockStream.emit.mockImplementation(() => { throw new Error("403 Forbidden") })
+    await callbacks.flush() // triggers abort
     mockStream.emit.mockClear()
+    // Subsequent text is silently ignored (stopped=true)
     callbacks.onTextChunk("second")
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
-  it("onError after abort does not emit (graceful stop)", async () => {
+  it("onError after abort does not emit or send (graceful stop)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
-    mockStream.emit.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
 
-    callbacks.onTextChunk("data") // triggers abort
+    callbacks.onTextChunk("data")
+    mockStream.emit.mockImplementation(() => { throw new Error("403 Forbidden") })
+    await callbacks.flush() // triggers abort via emit
     mockStream.emit.mockClear()
+    sendMessage.mockClear()
     callbacks.onError(new Error("connection lost"), "terminal")
     expect(mockStream.emit).not.toHaveBeenCalled()
+    expect(sendMessage).not.toHaveBeenCalled()
   })
 
   // --- update() error handling ---
@@ -173,13 +188,15 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   // --- onReasoningChunk tests ---
 
-  it("onReasoningChunk sends reasoning text via update()", async () => {
+  it("onReasoningChunk accumulates reasoning without calling update (no per-token HTTP)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onReasoningChunk("analyzing code")
-    expect(mockStream.update).toHaveBeenCalledWith("analyzing code")
+    // Reasoning text is accumulated internally, NOT sent per-token via update
+    // (phrase rotation and tool status updates provide keep-alive during reasoning)
+    expect(mockStream.update).not.toHaveBeenCalled()
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
@@ -197,13 +214,17 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   // --- async (Promise-based) error handling ---
 
-  it("when emit returns a rejected Promise, controller is aborted", async () => {
+  it("when emit returns a rejected Promise during flush, controller is aborted", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     mockStream.emit.mockReturnValue(Promise.reject(new Error("403 Forbidden")))
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onTextChunk("data")
+    // onTextChunk accumulates, no emit yet
+    expect(controller.signal.aborted).toBe(false)
+    // flush triggers emit which returns rejected Promise
+    await callbacks.flush()
     // Let the microtask (Promise rejection handler) run
     await new Promise(r => setTimeout(r, 0))
     expect(controller.signal.aborted).toBe(true)
@@ -220,7 +241,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     expect(controller.signal.aborted).toBe(true)
   })
 
-  it("after async abort via emit, phrase rotation stops", async () => {
+  it("after async abort via flush emit, phrase rotation stops", async () => {
     vi.useFakeTimers()
     vi.resetModules()
     const teams = await import("../../senses/teams")
@@ -231,11 +252,12 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     callbacks.onModelStart()
     mockStream.update.mockClear()
 
-    // Emit triggers async abort
+    // Text accumulates, flush triggers emit which rejects
     callbacks.onTextChunk("data")
+    await callbacks.flush()
     await vi.advanceTimersByTimeAsync(0) // flush microtasks
 
-    // Phrase timer should have been cleared — advancing time should not produce updates
+    // Phrase timer should have been cleared -- advancing time should not produce updates
     mockStream.update.mockClear()
     vi.advanceTimersByTime(3000)
     expect(mockStream.update).not.toHaveBeenCalled()
@@ -243,64 +265,68 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     vi.useRealTimers()
   })
 
-  it("markStopped is idempotent — second async rejection does not abort twice", async () => {
+  it("markStopped is idempotent -- second async rejection does not abort twice", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
-    // Both emit and update return rejected Promises
-    mockStream.emit.mockReturnValue(Promise.reject(new Error("403")))
+    // update returns rejected Promise (used by onToolStart)
     mockStream.update.mockReturnValue(Promise.reject(new Error("403")))
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
-    callbacks.onTextChunk("data")       // first async rejection
-    callbacks.onToolStart("x", {})      // second async rejection (markStopped early-returns)
+    callbacks.onToolStart("x", {})      // first async rejection via update
+    callbacks.onToolStart("y", {})      // second async rejection (markStopped early-returns)
     await new Promise(r => setTimeout(r, 0))
     expect(controller.signal.aborted).toBe(true)
   })
 
-  it("onTextChunk calls stream.emit() directly (no think-tag processing)", async () => {
+  it("onTextChunk accumulates text (no per-token emit)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onTextChunk("hello")
-    expect(mockStream.emit).toHaveBeenCalledWith("hello")
+    // Text is buffered, not emitted per-token
+    expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
-  it("onReasoningChunk accumulates chunks into a single update()", async () => {
+  it("onReasoningChunk accumulates without calling update (no per-token HTTP)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onReasoningChunk("step 1")
     callbacks.onReasoningChunk(" step 2")
-    // Each chunk updates with the accumulated buffer
-    expect(mockStream.update).toHaveBeenCalledWith("step 1")
-    expect(mockStream.update).toHaveBeenCalledWith("step 1 step 2")
-    // Text emits only final answer, not reasoning
-    callbacks.onTextChunk("answer")
-    expect(mockStream.emit).toHaveBeenCalledTimes(1)
-    expect(mockStream.emit).toHaveBeenCalledWith("answer")
+    // Reasoning is accumulated internally but NOT sent per-token via update
+    expect(mockStream.update).not.toHaveBeenCalled()
+    expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
-  it("text without prior reasoning emits directly", async () => {
+  it("text without prior reasoning accumulates in buffer", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
 
     callbacks.onTextChunk("just text")
-    expect(mockStream.emit).toHaveBeenCalledTimes(1)
+    // Text accumulated, not emitted per-token
+    expect(mockStream.emit).not.toHaveBeenCalled()
+    // Flush delivers it
+    await callbacks.flush()
     expect(mockStream.emit).toHaveBeenCalledWith("just text")
   })
 
-  it("reasoning never leaks into emitted text across turns", async () => {
+  it("reasoning never leaks into emitted text", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
 
     callbacks.onReasoningChunk("old reasoning")
     callbacks.onModelStart()
     callbacks.onTextChunk("answer")
-    // Reasoning was shown via update(), never emitted
+    // Text is accumulated, not emitted yet
+    expect(mockStream.emit).not.toHaveBeenCalled()
+    await callbacks.flush()
+    // Only text is emitted, not reasoning
     expect(mockStream.emit).toHaveBeenCalledTimes(1)
     expect(mockStream.emit).toHaveBeenCalledWith("answer")
   })
@@ -315,83 +341,82 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     expect(mockStream.update).toHaveBeenCalledWith("running read_file (package.json)...")
   })
 
-  // --- Streaming-mode onToolEnd: inline via stream.emit (not update) ---
+  it("onToolStart always flushes accumulated textBuffer before showing tool status", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
+    callbacks.onTextChunk("accumulated text")
+    callbacks.onToolStart("read_file", { path: "test.txt" })
+    // First flush goes to stream.emit (primary output)
+    expect(mockStream.emit).toHaveBeenCalledWith("accumulated text")
+  })
 
-  it("onToolEnd success emits inline formatted result via stream.emit", async () => {
+  // --- Unified onToolEnd: always via stream.update (transient status) ---
+
+  it("onToolEnd success shows formatted result via stream.update (not emit)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     callbacks.onToolEnd("read_file", "package.json", true)
-    expect(mockStream.emit).toHaveBeenCalledWith("\n\n\u2713 read_file (package.json)\n\n")
+    expect(mockStream.update).toHaveBeenCalledWith("\u2713 read_file (package.json)")
+    expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
-  it("onToolEnd with empty summary emits inline formatted result", async () => {
+  it("onToolEnd with empty summary shows formatted result via stream.update", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     callbacks.onToolEnd("get_current_time", "", true)
-    expect(mockStream.emit).toHaveBeenCalledWith("\n\n\u2713 get_current_time\n\n")
+    expect(mockStream.update).toHaveBeenCalledWith("\u2713 get_current_time")
+    expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
-  it("onToolEnd failure emits inline formatted error via stream.emit", async () => {
+  it("onToolEnd failure shows formatted error via stream.update (not emit)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     callbacks.onToolEnd("read_file", "missing.txt", false)
-    expect(mockStream.emit).toHaveBeenCalledWith("\n\n\u2717 read_file: missing.txt\n\n")
+    expect(mockStream.update).toHaveBeenCalledWith("\u2717 read_file: missing.txt")
+    expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
-  it("onToolEnd after abort does NOT call stream.emit", async () => {
+  it("onToolEnd after abort does NOT call stream.update or stream.emit", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
-    mockStream.emit.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
+    mockStream.update.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
-    callbacks.onTextChunk("data") // triggers abort
+    callbacks.onToolStart("x", {}) // triggers abort via update
+    mockStream.update.mockClear()
     mockStream.emit.mockClear()
     callbacks.onToolEnd("read_file", "test.txt", true)
+    expect(mockStream.update).not.toHaveBeenCalled()
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
-  it("keeps Teams stream output channel-native and emits structured channel events", async () => {
-    vi.resetModules()
-    const emitNervesEvent = vi.fn()
-    vi.doMock("../../nerves/runtime", () => ({
-      emitNervesEvent,
-    }))
-    const teams = await import("../../senses/teams")
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+  // --- Unified onKick: always via stream.update (transient status) ---
 
-    callbacks.onToolEnd("read_file", "package.json", true)
-
-    expect(mockStream.emit).toHaveBeenCalledWith("\n\n\u2713 read_file (package.json)\n\n")
-    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
-      event: "channel.message_sent",
-      component: "channels",
-    }))
-  })
-
-  // --- Streaming-mode onKick: inline via stream.emit ---
-
-  it("onKick emits inline formatted kick via stream.emit", async () => {
+  it("onKick shows formatted kick via stream.update (not emit)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     callbacks.onKick!()
-    expect(mockStream.emit).toHaveBeenCalledWith("\n\n\u21BB kick\n\n")
-  })
-
-  it("onKick after abort does NOT call stream.emit", async () => {
-    vi.resetModules()
-    const teams = await import("../../senses/teams")
-    mockStream.emit.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
-    callbacks.onTextChunk("data") // triggers abort
-    mockStream.emit.mockClear()
-    callbacks.onKick!()
+    expect(mockStream.update).toHaveBeenCalledWith("\u21BB kick")
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
-  // --- Streaming-mode onError: severity branching ---
+  it("onKick after abort does NOT call stream.update", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    mockStream.update.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onToolStart("x", {}) // triggers abort via update
+    mockStream.update.mockClear()
+    callbacks.onKick!()
+    expect(mockStream.update).not.toHaveBeenCalled()
+  })
+
+  // --- Unified onError: terminal uses safeSend, transient uses safeUpdate ---
 
   it("onError transient calls stream.update (ephemeral)", async () => {
     vi.resetModules()
@@ -402,22 +427,27 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
-  it("onError terminal emits inline formatted error via stream.emit", async () => {
+  it("onError terminal uses safeSend (sendMessage), not safeEmit", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
     callbacks.onError(new Error("something broke"), "terminal")
-    expect(mockStream.emit).toHaveBeenCalledWith("\n\nError: something broke\n\n")
+    expect(sendMessage).toHaveBeenCalledWith("Error: something broke")
+    expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
-  it("onError terminal after abort does NOT emit", async () => {
+  it("onError terminal after abort does NOT send or emit", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
-    mockStream.emit.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
-    callbacks.onTextChunk("data") // triggers abort
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    mockStream.update.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
+    callbacks.onToolStart("x", {}) // triggers abort via update
+    sendMessage.mockClear()
     mockStream.emit.mockClear()
     callbacks.onError(new Error("connection lost"), "terminal")
+    expect(sendMessage).not.toHaveBeenCalled()
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
 })
@@ -434,7 +464,7 @@ describe("Teams adapter - message handling", () => {
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
-      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978 }),
     }))
     vi.doMock("../../mind/prompt", () => ({
       buildSystem: vi.fn().mockResolvedValue("system prompt"),
@@ -769,7 +799,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
-      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 4000 }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 4000 }),
     }))
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
@@ -1575,7 +1605,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       getTeamsConfig: vi.fn().mockReturnValue({ clientId, clientSecret, tenantId }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
-      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978 }),
     }))
   }
 
@@ -1924,7 +1954,7 @@ describe("Teams adapter - session persistence", () => {
       trimMessagesFn = ((msgs: any) => [...msgs]),
       parseSlashCommandFn = (() => null),
       dispatchFn = (() => ({ handled: false })),
-      teamsChannelConfig = { skipConfirmation: false, disableStreaming: false, port: 3978, maxConcurrentConversations: 10 },
+      teamsChannelConfig = { skipConfirmation: false, port: 3978, maxConcurrentConversations: 10 },
     } = overrides
 
     vi.doMock("../../heart/core", () => ({
@@ -2257,7 +2287,7 @@ describe("Teams adapter - session persistence", () => {
 
     mockTeamsDeps({
       runAgentFn,
-      teamsChannelConfig: { skipConfirmation: false, disableStreaming: false, port: 3978, maxConcurrentConversations: 1 },
+      teamsChannelConfig: { skipConfirmation: false, port: 3978, maxConcurrentConversations: 1 },
     })
     const teams = await import("../../senses/teams")
 
@@ -2346,7 +2376,7 @@ describe("Teams adapter - session persistence", () => {
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
-      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: true, disableStreaming: false, port: 3978 }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: true, port: 3978 }),
     }))
     vi.doMock("../../mind/prompt", () => ({
       buildSystem: vi.fn().mockResolvedValue("system prompt"),
@@ -2487,7 +2517,7 @@ describe("Teams adapter - session persistence", () => {
   })
 })
 
-describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
+describe("Teams adapter - unified chunked streaming (no disableStreaming)", () => {
   let mockStream: { emit: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> }
   let controller: AbortController
 
@@ -2500,89 +2530,23 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     controller = new AbortController()
   })
 
-  it("onTextChunk buffers text instead of calling stream.emit() when disableStreaming is true", async () => {
+  it("TeamsCallbackOptions does not accept disableStreaming (accepts flushIntervalMs)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    // This should work with flushIntervalMs instead of disableStreaming
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { flushIntervalMs: 2000 })
     callbacks.onTextChunk("Hello")
-    callbacks.onTextChunk(" world")
-    // Text should NOT be emitted yet (buffered internally)
+    // Text is always accumulated, never emitted per-token
     expect(mockStream.emit).not.toHaveBeenCalled()
-  })
-
-  it("onReasoningChunk skips stream.update() when disableStreaming is true", async () => {
-    vi.resetModules()
-    const teams = await import("../../senses/teams")
-    const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
-    callbacks.onReasoningChunk("analyzing")
-    callbacks.onReasoningChunk(" more")
-    // Reasoning updates are suppressed when streaming is disabled (too many HTTP round-trips)
-    expect(mockStream.update).not.toHaveBeenCalled()
-  })
-
-  it("onModelStart still calls stream.update() with thinking phrases when disableStreaming is true", async () => {
-    vi.resetModules()
-    const teams = await import("../../senses/teams")
-    const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
-    callbacks.onModelStart()
-    expect(mockStream.update).toHaveBeenCalled()
-    const calledWith = mockStream.update.mock.calls[0][0] as string
-    expect(calledWith).toMatch(/\.\.\.$/)
-    // Clean up timer
-    callbacks.onTextChunk("done")
-  })
-
-  it("onToolStart still calls stream.update() when disableStreaming is true", async () => {
-    vi.resetModules()
-    const teams = await import("../../senses/teams")
-    const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
-    callbacks.onToolStart("read_file", { path: "test.txt" })
-    expect(mockStream.update).toHaveBeenCalledWith("running read_file (test.txt)...")
-  })
-
-  it("onToolStart flushes accumulated text buffer before showing tool status", async () => {
-    vi.resetModules()
-    const teams = await import("../../senses/teams")
-    const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
-    callbacks.onTextChunk("accumulated text")
-    callbacks.onToolStart("read_file", { path: "test.txt" })
-    // First flush goes to stream.emit (primary output)
-    expect(mockStream.emit).toHaveBeenCalledWith("accumulated text")
-  })
-
-  it("onKick calls stream.update (not sendMessage) when disableStreaming is true", async () => {
-    vi.resetModules()
-    const teams = await import("../../senses/teams")
-    const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
-    callbacks.onKick!()
-    expect(mockStream.update).toHaveBeenCalledWith("\u21BB kick")
-    expect(sendMessage).not.toHaveBeenCalled()
-  })
-
-  it("onKick after abort does NOT call sendMessage when disableStreaming is true", async () => {
-    vi.resetModules()
-    const teams = await import("../../senses/teams")
-    const sendMessage = vi.fn().mockResolvedValue(undefined)
-    mockStream.emit.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
-    callbacks.flush() // trigger abort
-    sendMessage.mockClear()
-    callbacks.onKick!()
-    expect(sendMessage).not.toHaveBeenCalled()
   })
 
   it("safeSend catch: when sendMessage throws synchronously, controller is aborted", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockImplementation(() => { throw new Error("sync failure") })
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
-    // Trigger safeSend via terminal onError (onToolEnd/onKick now use safeUpdate)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
+    // Trigger safeSend via terminal onError
     callbacks.onError(new Error("boom"), "terminal")
     expect(controller.signal.aborted).toBe(true)
   })
@@ -2591,7 +2555,7 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
     // First: emit text to stream (sets streamHasContent)
     callbacks.onTextChunk("first response")
     await callbacks.flush()
@@ -2604,78 +2568,11 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
-  it("onToolEnd success calls stream.update with formatted result when disableStreaming is true", async () => {
-    vi.resetModules()
-    const teams = await import("../../senses/teams")
-    const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
-    callbacks.onToolEnd("read_file", "test.txt", true)
-    expect(mockStream.update).toHaveBeenCalledWith("\u2713 read_file (test.txt)")
-    expect(sendMessage).not.toHaveBeenCalled()
-  })
-
-  it("onToolEnd failure calls stream.update with formatted error when disableStreaming is true", async () => {
-    vi.resetModules()
-    const teams = await import("../../senses/teams")
-    const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
-    callbacks.onToolEnd("read_file", "missing.txt", false)
-    expect(mockStream.update).toHaveBeenCalledWith("\u2717 read_file: missing.txt")
-    expect(sendMessage).not.toHaveBeenCalled()
-  })
-
-  it("onToolEnd after abort does NOT call sendMessage when disableStreaming is true", async () => {
-    vi.resetModules()
-    const teams = await import("../../senses/teams")
-    const sendMessage = vi.fn().mockResolvedValue(undefined)
-    mockStream.emit.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
-    callbacks.onTextChunk("data") // triggers abort (buffered, so no emit, but marking stopped)
-    // Force abort by triggering safeEmit
-    callbacks.flush()
-    sendMessage.mockClear()
-    callbacks.onToolEnd("read_file", "test.txt", true)
-    expect(sendMessage).not.toHaveBeenCalled()
-  })
-
-  it("onError terminal calls sendMessage when disableStreaming is true", async () => {
-    vi.resetModules()
-    const teams = await import("../../senses/teams")
-    const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
-    callbacks.onError(new Error("something broke"), "terminal")
-    expect(sendMessage).toHaveBeenCalledWith("Error: something broke")
-    expect(mockStream.emit).not.toHaveBeenCalled()
-  })
-
-  it("onError transient calls stream.update when disableStreaming is true", async () => {
-    vi.resetModules()
-    const teams = await import("../../senses/teams")
-    const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
-    callbacks.onError(new Error("context overflow"), "transient")
-    expect(mockStream.update).toHaveBeenCalledWith("Error: context overflow")
-    expect(sendMessage).not.toHaveBeenCalled()
-    expect(mockStream.emit).not.toHaveBeenCalled()
-  })
-
-  it("onError terminal after abort does NOT call sendMessage when disableStreaming is true", async () => {
-    vi.resetModules()
-    const teams = await import("../../senses/teams")
-    const sendMessage = vi.fn().mockResolvedValue(undefined)
-    mockStream.emit.mockImplementationOnce(() => { throw new Error("403 Forbidden") })
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
-    callbacks.flush() // trigger abort via emit
-    sendMessage.mockClear()
-    callbacks.onError(new Error("broken"), "terminal")
-    expect(sendMessage).not.toHaveBeenCalled()
-  })
-
   it("flush() with no prior stream content: first text goes to stream.emit", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
     callbacks.onTextChunk("Hello")
     callbacks.onTextChunk(" world")
     callbacks.onTextChunk("!")
@@ -2689,8 +2586,8 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
   it("flush() with prior stream content but no sendMessage: text is silently dropped", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
-    // No sendMessage provided -- buffered mode without sendMessage
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, undefined, { disableStreaming: true })
+    // No sendMessage provided
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     // First iteration: text goes to emit
     callbacks.onTextChunk("first response")
     await callbacks.flush()
@@ -2705,7 +2602,7 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
     // First iteration: text goes to emit
     callbacks.onTextChunk("first response")
     await callbacks.flush()
@@ -2721,7 +2618,7 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
     // No text chunks at all
     await callbacks.flush()
     expect(mockStream.emit).toHaveBeenCalledWith("(completed with tool calls only \u2014 no text response)")
@@ -2732,7 +2629,7 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     const teams = await import("../../senses/teams")
     let resolveMsg: (() => void) | null = null
     const sendMessage = vi.fn().mockImplementation(() => new Promise<void>(r => { resolveMsg = r }))
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
     // First flush to get stream content
     callbacks.onTextChunk("first")
     await callbacks.flush()
@@ -2750,7 +2647,7 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
     callbacks.onTextChunk("text")
     await callbacks.flush()
     mockStream.emit.mockClear()
@@ -2765,8 +2662,8 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
-    // Text exceeds old 4000-char limit — should still be sent as one piece
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
+    // Text exceeds old 4000-char limit -- should still be sent as one piece
     const longText = "a".repeat(3000) + "\n\n" + "b".repeat(3000)
     callbacks.onTextChunk(longText)
     await callbacks.flush()
@@ -2780,13 +2677,13 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
     // First flush sets streamHasContent
     callbacks.onTextChunk("first")
     await callbacks.flush()
     mockStream.emit.mockClear()
     sendMessage.mockClear()
-    // Second flush with long text — sent as one message
+    // Second flush with long text -- sent as one message
     const longText = "x".repeat(3000) + "\n\n" + "y".repeat(3000)
     callbacks.onTextChunk(longText)
     await callbacks.flush()
@@ -2800,16 +2697,16 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
     const longText = "a".repeat(3000) + "\n\n" + "b".repeat(3000)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
     // First flush sets streamHasContent (goes to safeEmit, not sendMessage)
     callbacks.onTextChunk("first")
     await callbacks.flush()
-    // Reset completely — clear history AND queued implementations
+    // Reset completely -- clear history AND queued implementations
     sendMessage.mockReset()
     // Full-text send rejects (e.g. 413), subsequent chunk sends succeed
     sendMessage.mockRejectedValueOnce(new Error("413 Request Entity Too Large"))
     sendMessage.mockResolvedValue(undefined)
-    // Second flush with long text — full send fails, splits and retries
+    // Second flush with long text -- full send fails, splits and retries
     callbacks.onTextChunk(longText)
     await callbacks.flush()
     // First call was the full text (rejected), then two split chunks
@@ -2823,7 +2720,7 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
     // Accumulate long text
     const longText = "a".repeat(3000) + "\n\n" + "b".repeat(3000)
     callbacks.onTextChunk(longText)
@@ -2835,39 +2732,11 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     expect(sendMessage).not.toHaveBeenCalled()
   })
 
-  it("when disableStreaming is false, onTextChunk emits directly (no buffering)", async () => {
-    vi.resetModules()
-    const teams = await import("../../senses/teams")
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, undefined, { disableStreaming: false })
-    callbacks.onTextChunk("Hello")
-    expect(mockStream.emit).toHaveBeenCalledWith("Hello")
-  })
-
-  it("when disableStreaming is undefined, behavior is identical to current (no buffering)", async () => {
-    vi.resetModules()
-    const teams = await import("../../senses/teams")
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
-    callbacks.onTextChunk("Hello")
-    expect(mockStream.emit).toHaveBeenCalledWith("Hello")
-  })
-
-  it("flush() exists and is a no-op when disableStreaming is false", async () => {
-    vi.resetModules()
-    const teams = await import("../../senses/teams")
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, undefined, { disableStreaming: false })
-    callbacks.onTextChunk("Hello")
-    mockStream.emit.mockClear()
-    await callbacks.flush()
-    // flush() should not emit anything extra when not buffering
-    expect(mockStream.emit).not.toHaveBeenCalled()
-  })
-
-  it("stop-streaming (403) still works when disableStreaming is true: emit error aborts controller", async () => {
+  it("stop-streaming (403) via emit during flush aborts controller", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
-    // flush() will trigger the emit which throws 403
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
     callbacks.onTextChunk("data")
     mockStream.emit.mockImplementation(() => { throw new Error("403 Forbidden") })
     await callbacks.flush()
@@ -2878,25 +2747,15 @@ describe("Teams adapter - createTeamsCallbacks with disableStreaming", () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
     callbacks.onTextChunk("important content")
     // Kill the stream (e.g. platform error during generation)
     mockStream.update.mockImplementation(() => { throw new Error("403 Forbidden") })
-    callbacks.onModelStart() // triggers safeUpdate → markStopped
+    callbacks.onModelStart() // triggers safeUpdate -> markStopped
     // Stream is now dead. flush() should fall back to sendMessage instead of safeEmit.
     await callbacks.flush()
     expect(mockStream.emit).not.toHaveBeenCalledWith("important content")
     expect(sendMessage).toHaveBeenCalledWith("important content")
-  })
-
-  it("stop-streaming (403) via update still aborts when disableStreaming is true", async () => {
-    vi.resetModules()
-    const teams = await import("../../senses/teams")
-    const sendMessage = vi.fn().mockResolvedValue(undefined)
-    mockStream.update.mockImplementation(() => { throw new Error("403 Forbidden") })
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
-    callbacks.onToolStart("read_file", { path: "test.txt" })
-    expect(controller.signal.aborted).toBe(true)
   })
 })
 
@@ -2935,9 +2794,9 @@ describe("Teams adapter - safeSend serialization (Bug 2)", () => {
         return promise2.then(() => { order.push("send2-end") })
       })
 
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
 
-    // Trigger two safeSend calls via terminal onError (onToolEnd/onKick now use safeUpdate)
+    // Trigger two safeSend calls via terminal onError
     callbacks.onError(new Error("err1"), "terminal")
     callbacks.onError(new Error("err2"), "terminal")
 
@@ -2973,7 +2832,7 @@ describe("Teams adapter - safeSend serialization (Bug 2)", () => {
       .mockRejectedValueOnce(new Error("network failure"))
       .mockResolvedValueOnce(undefined)
 
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
 
     // First send will reject (triggers markStopped via chain .catch)
     callbacks.onError(new Error("err1"), "terminal")
@@ -2999,7 +2858,7 @@ describe("Teams adapter - safeSend serialization (Bug 2)", () => {
       .mockImplementationOnce(() => promise1) // first send: succeeds when resolved
       .mockRejectedValueOnce(new Error("second send failed")) // second send: rejects
 
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
 
     // First send starts synchronously (chain idle)
     callbacks.onError(new Error("err1"), "terminal")
@@ -3020,7 +2879,7 @@ describe("Teams adapter - safeSend serialization (Bug 2)", () => {
   })
 })
 
-describe("Teams adapter - handleTeamsMessage with disableStreaming", () => {
+describe("Teams adapter - handleTeamsMessage unified chunked streaming", () => {
   beforeEach(() => {
     // no env vars to clear
   })
@@ -3052,7 +2911,7 @@ describe("Teams adapter - handleTeamsMessage with disableStreaming", () => {
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
-      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978 }),
     }))
     vi.doMock("../../mind/prompt", () => ({
       buildSystem: vi.fn().mockResolvedValue("system prompt"),
@@ -3114,10 +2973,9 @@ describe("Teams adapter - handleTeamsMessage with disableStreaming", () => {
     }))
   }
 
-  it("disableStreaming flag is forwarded to createTeamsCallbacks - text is buffered", async () => {
+  it("handleTeamsMessage does not accept disableStreaming parameter -- text always accumulated", async () => {
     vi.resetModules()
     const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
-      // Simulate agent producing text chunks
       callbacks.onTextChunk("Hello")
       callbacks.onTextChunk(" world")
       return { usage: undefined }
@@ -3126,9 +2984,11 @@ describe("Teams adapter - handleTeamsMessage with disableStreaming", () => {
 
     const teams = await import("../../senses/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
-    await teams.handleTeamsMessage("test", mockStream as any, "conv-123", undefined, true)
+    // handleTeamsMessage no longer accepts disableStreaming parameter (5th arg)
+    // Text is always accumulated and flushed
+    await teams.handleTeamsMessage("test", mockStream as any, "conv-123")
 
-    // Text should have been emitted once via flush() after runAgent completes (not twice via streaming)
+    // Text should have been emitted once via flush() after runAgent completes
     const emitCalls = mockStream.emit.mock.calls.filter((c: any) => !c[0].startsWith("Error"))
     expect(emitCalls).toHaveLength(1)
     expect(emitCalls[0][0]).toBe("Hello world")
@@ -3136,7 +2996,6 @@ describe("Teams adapter - handleTeamsMessage with disableStreaming", () => {
 
   it("flush() is called after runAgent completes", async () => {
     vi.resetModules()
-    let emitCalledDuringAgent = false
     const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
       callbacks.onTextChunk("buffered text")
       return { usage: undefined }
@@ -3149,17 +3008,17 @@ describe("Teams adapter - handleTeamsMessage with disableStreaming", () => {
       update: vi.fn(),
       close: vi.fn(),
     }
-    await teams.handleTeamsMessage("test", mockStream as any, "conv-123", undefined, true)
+    await teams.handleTeamsMessage("test", mockStream as any, "conv-123")
 
     // The emit should have been called (by flush after runAgent)
     expect(mockStream.emit).toHaveBeenCalledWith("buffered text")
   })
 
-  it("when disableStreaming is false/undefined, behavior is unchanged (no buffering)", async () => {
+  it("RunAgentOptions does not include disableStreaming", async () => {
     vi.resetModules()
-    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
-      callbacks.onTextChunk("Hello")
-      callbacks.onTextChunk(" world")
+    let capturedOptions: any = null
+    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, _callbacks: any, _channel: any, _signal: any, options: any) => {
+      capturedOptions = options
       return { usage: undefined }
     })
     mockTeamsDeps2({ runAgentFn: mockRunAgent })
@@ -3168,116 +3027,14 @@ describe("Teams adapter - handleTeamsMessage with disableStreaming", () => {
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     await teams.handleTeamsMessage("test", mockStream as any, "conv-123")
 
-    // Text emitted directly (not buffered), so two emit calls
-    const textEmits = mockStream.emit.mock.calls.filter((c: any) => !c[0].startsWith("Error"))
-    expect(textEmits).toHaveLength(2)
-    expect(textEmits[0][0]).toBe("Hello")
-    expect(textEmits[1][0]).toBe(" world")
-  })
-
-  it("slash command /new does NOT call flush (emits directly)", async () => {
-    vi.resetModules()
-    const deleteSessionCalls: string[] = []
-    const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
-    mockTeamsDeps2({
-      runAgentFn,
-      deleteSessionCalls,
-      parseSlashCommandFn: (input: string) => input.startsWith("/") ? { command: input.slice(1).toLowerCase(), args: "" } : null,
-      dispatchFn: (name: string) => {
-        if (name === "new") return { handled: true, result: { action: "new" } }
-        return { handled: false }
-      },
-    })
-    const teams = await import("../../senses/teams")
-    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
-    await teams.handleTeamsMessage("/new", mockStream as any, "conv-123", undefined, true)
-
-    // Slash command emits directly, runAgent not called
-    expect(deleteSessionCalls.length).toBe(1)
-    expect(mockStream.emit).toHaveBeenCalledWith("session cleared")
-    expect(runAgentFn).not.toHaveBeenCalled()
+    // The options passed to runAgent should NOT contain disableStreaming
+    expect(capturedOptions).not.toHaveProperty("disableStreaming")
   })
 })
 
-describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
-  let savedArgv: string[]
-
-  beforeEach(() => {
-    savedArgv = [...process.argv]
-  })
-
-  afterEach(() => {
-    process.argv = savedArgv
-    // Config is loaded from config.json only, no env vars to clear
-    // no env vars to clear
-  })
-
-  it("when --disable-streaming is in argv, threads disableStreaming to handleTeamsMessage", async () => {
+describe("Teams adapter - startTeamsApp no --disable-streaming flag", () => {
+  it("startTeamsApp does not read --disable-streaming from argv", async () => {
     vi.resetModules()
-    // no env vars to clear
-    process.argv = ["node", "teams-entry.ts", "--disable-streaming"]
-
-    let capturedHandler: ((args: any) => Promise<void>) | null = null
-    vi.doMock("@microsoft/teams.apps", () => ({
-      App: class MockApp {
-        constructor(_opts: any) {}
-        on = vi.fn().mockImplementation((_event: string, handler: any) => {
-          capturedHandler = handler
-        })
-        event = vi.fn()
-        start = vi.fn()
-      },
-    }))
-    vi.doMock("@microsoft/teams.dev", () => ({
-      DevtoolsPlugin: class MockDevtoolsPlugin {},
-    }))
-
-    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
-      callbacks.onTextChunk("Hello")
-      callbacks.onTextChunk(" world")
-      return { usage: undefined }
-    })
-    vi.doMock("../../heart/core", () => ({
-      runAgent: mockRunAgent,
-      buildSystem: vi.fn().mockReturnValue("system prompt"),
-      summarizeArgs: vi.fn().mockReturnValue(""),
-    }))
-    vi.doMock("../../mind/prompt", () => ({
-      buildSystem: vi.fn().mockResolvedValue("system prompt"),
-      contextSection: vi.fn().mockReturnValue(""),
-    }))
-    vi.doMock("../../mind/context", () => ({
-      loadSession: vi.fn().mockReturnValue(null),
-      saveSession: vi.fn(),
-      deleteSession: vi.fn(),
-      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-
-      postTurn: vi.fn(),
-    }))
-
-    vi.spyOn(console, "log").mockImplementation(() => {})
-
-    const teams = await import("../../senses/teams")
-    teams.startTeamsApp()
-
-    expect(capturedHandler).not.toBeNull()
-    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
-    await capturedHandler!({
-      stream: mockStream,
-      activity: { text: "hello" },
-    })
-
-    // With --disable-streaming, two text chunks should be buffered and emitted as ONE call via flush()
-    const textEmits = mockStream.emit.mock.calls.filter((c: any) => !c[0].startsWith("Error"))
-    expect(textEmits).toHaveLength(1)
-    expect(textEmits[0][0]).toBe("Hello world")
-
-    vi.restoreAllMocks()
-  })
-
-  it("logs 'streaming: disabled' at startup when --disable-streaming is present", async () => {
-    vi.resetModules()
-    // no env vars to clear
     process.argv = ["node", "teams-entry.ts", "--disable-streaming"]
 
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -3302,162 +3059,52 @@ describe("Teams adapter - startTeamsApp --disable-streaming flag", () => {
     const teams = await import("../../senses/teams")
     teams.startTeamsApp()
 
+    // Startup log should NOT mention "streaming: disabled" even with --disable-streaming in argv
     const logCalls = consoleSpy.mock.calls.map((c: any) => c[0])
-    expect(logCalls.some((msg: string) => msg.includes("streaming: disabled"))).toBe(true)
-
-    consoleSpy.mockRestore()
-    vi.restoreAllMocks()
-  })
-
-  it("detects disableStreaming via teamsChannel config", async () => {
-    vi.resetModules()
-    process.argv = ["node", "teams-entry.ts"]
-
-    vi.doMock("@microsoft/teams.apps", () => ({
-      App: class MockApp {
-        constructor(_opts: any) {}
-        on = vi.fn()
-        event = vi.fn()
-        start = vi.fn()
-      },
-    }))
-    vi.doMock("@microsoft/teams.dev", () => ({
-      DevtoolsPlugin: class MockDevtoolsPlugin {},
-    }))
-    vi.doMock("../../heart/core", () => ({
-      runAgent: vi.fn(),
-      buildSystem: vi.fn().mockReturnValue("system prompt"),
-      summarizeArgs: vi.fn().mockReturnValue(""),
-    }))
-    vi.doMock("../../config", () => ({
-      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
-      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
-      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
-      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
-      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
-      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: true, port: 3978 }),
-    }))
-
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
-
-    const teams = await import("../../senses/teams")
-    teams.startTeamsApp()
-
-    const logCalls = consoleSpy.mock.calls.map((c: any) => c[0])
-    expect(logCalls.some((msg: string) => msg.includes("streaming: disabled"))).toBe(true)
-
-    consoleSpy.mockRestore()
-    vi.restoreAllMocks()
-  })
-
-  it("when --disable-streaming is NOT in argv, handleTeamsMessage is called without disableStreaming", async () => {
-    vi.resetModules()
-    process.argv = ["node", "teams-entry.ts"]
-
-    let capturedHandler: ((args: any) => Promise<void>) | null = null
-    vi.doMock("@microsoft/teams.apps", () => ({
-      App: class MockApp {
-        constructor(_opts: any) {}
-        on = vi.fn().mockImplementation((_event: string, handler: any) => {
-          capturedHandler = handler
-        })
-        event = vi.fn()
-        start = vi.fn()
-      },
-    }))
-    vi.doMock("@microsoft/teams.dev", () => ({
-      DevtoolsPlugin: class MockDevtoolsPlugin {},
-    }))
-
-    const mockRunAgent = vi.fn().mockImplementation(async (_msgs: any, callbacks: any) => {
-      callbacks.onTextChunk("Hello")
-      callbacks.onTextChunk(" world")
-      return { usage: undefined }
-    })
-    vi.doMock("../../heart/core", () => ({
-      runAgent: mockRunAgent,
-      buildSystem: vi.fn().mockReturnValue("system prompt"),
-      summarizeArgs: vi.fn().mockReturnValue(""),
-    }))
-    vi.doMock("../../config", () => ({
-      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
-      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
-      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
-      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
-      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
-      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
-    }))
-    vi.doMock("../../mind/prompt", () => ({
-      buildSystem: vi.fn().mockResolvedValue("system prompt"),
-      contextSection: vi.fn().mockReturnValue(""),
-    }))
-    vi.doMock("../../mind/context", () => ({
-      loadSession: vi.fn().mockReturnValue(null),
-      saveSession: vi.fn(),
-      deleteSession: vi.fn(),
-      trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-
-      postTurn: vi.fn(),
-    }))
-
-    vi.spyOn(console, "log").mockImplementation(() => {})
-
-    const teams = await import("../../senses/teams")
-    teams.startTeamsApp()
-
-    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
-    await capturedHandler!({
-      stream: mockStream,
-      activity: { text: "hello" },
-    })
-
-    // Without --disable-streaming, text should be streamed directly (two emits)
-    const textEmits = mockStream.emit.mock.calls.filter((c: any) => !c[0].startsWith("Error"))
-    expect(textEmits).toHaveLength(2)
-    expect(textEmits[0][0]).toBe("Hello")
-    expect(textEmits[1][0]).toBe(" world")
-
-    vi.restoreAllMocks()
-  })
-
-  it("logs 'streaming: enabled' when flag is absent", async () => {
-    vi.resetModules()
-    // no env vars to clear
-    process.argv = ["node", "teams-entry.ts"]
-
-    vi.doMock("@microsoft/teams.apps", () => ({
-      App: class MockApp {
-        constructor(_opts: any) {}
-        on = vi.fn()
-        event = vi.fn()
-        start = vi.fn()
-      },
-    }))
-    vi.doMock("@microsoft/teams.dev", () => ({
-      DevtoolsPlugin: class MockDevtoolsPlugin {},
-    }))
-    vi.doMock("../../heart/core", () => ({
-      runAgent: vi.fn(),
-      buildSystem: vi.fn().mockReturnValue("system prompt"),
-      summarizeArgs: vi.fn().mockReturnValue(""),
-    }))
-    vi.doMock("../../config", () => ({
-      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
-      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
-      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
-      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
-      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
-      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
-    }))
-
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
-
-    const teams = await import("../../senses/teams")
-    teams.startTeamsApp()
-
-    const logCalls = consoleSpy.mock.calls.map((c: any) => c[0])
-    expect(logCalls.some((msg: string) => msg.includes("streaming: enabled"))).toBe(true)
     expect(logCalls.some((msg: string) => msg.includes("streaming: disabled"))).toBe(false)
+
+    consoleSpy.mockRestore()
+    vi.restoreAllMocks()
+  })
+
+  it("startup log does not mention streaming mode (no dual-mode)", async () => {
+    vi.resetModules()
+    process.argv = ["node", "teams-entry.ts"]
+
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn()
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
+      getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978 }),
+    }))
+
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    // No dual-mode streaming log (no "streaming: enabled" or "streaming: disabled")
+    const logCalls = consoleSpy.mock.calls.map((c: any) => c[0])
+    expect(logCalls.some((msg: string) => msg.includes("streaming: disabled"))).toBe(false)
+    expect(logCalls.some((msg: string) => msg.includes("streaming: enabled"))).toBe(false)
 
     consoleSpy.mockRestore()
     vi.restoreAllMocks()
@@ -3488,7 +3135,7 @@ describe("Teams adapter - confirmation callback", () => {
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
-      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978 }),
     }))
     vi.doMock("../../mind/prompt", () => ({
       buildSystem: vi.fn().mockResolvedValue("system prompt"),
@@ -3813,7 +3460,7 @@ describe("Teams adapter - confirmation callback", () => {
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
-      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978 }),
     }))
     vi.doMock("../../mind/prompt", () => ({
       buildSystem: vi.fn().mockResolvedValue("system prompt"),
@@ -3898,7 +3545,7 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
-      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978 }),
     }))
     vi.doMock("../../mind/prompt", () => ({
       buildSystem: vi.fn().mockResolvedValue("system prompt"),
@@ -4033,7 +3680,7 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
-      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: true, port: 3978 }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978 }),
     }))
     vi.doMock("../../mind/prompt", () => ({
       buildSystem: vi.fn().mockResolvedValue("system prompt"),
@@ -4088,7 +3735,7 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
-      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, disableStreaming: false, port: 3978 }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978 }),
     }))
     vi.doMock("../../mind/prompt", () => ({
       buildSystem: vi.fn().mockResolvedValue("system prompt"),
@@ -4381,13 +4028,13 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
 })
 
 describe("Teams adapter - TeamsCallbacksWithFlush type", () => {
-  it("flush() returns a promise (async) in buffered mode", async () => {
+  it("flush() returns a promise (async)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
     const controller = new AbortController()
     const sendMessage = vi.fn().mockResolvedValue(undefined)
-    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage, { disableStreaming: true })
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
     callbacks.onTextChunk("text")
     // First flush goes to emit, second would go to sendMessage
     const result = callbacks.flush()
