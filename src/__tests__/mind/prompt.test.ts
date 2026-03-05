@@ -858,9 +858,9 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    // Should include instruction about name quality
+    // Should include instruction about name quality -- directive, saves immediately
     expect(result).toContain("name")
-    expect(result.toLowerCase()).toContain("prefer")
+    expect(result.toLowerCase()).toContain("save")
   })
 
   it("includes new-friend instruction when notes and toolPreferences both empty", async () => {
