@@ -70,7 +70,7 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 **Output**: `eslint.config.js` created, `package.json` updated with deps and lint script
 **Acceptance**: `npx eslint --print-config src/identity.ts` shows no-console as error; test files are not affected by no-console
 
-### ⬜ Unit 2: Annotate 8 console exception sites
+### ✅ Unit 2: Annotate 8 console exception sites
 **What**: Add `// eslint-disable-next-line no-console -- <category>: <reason>` above each of the 8 legitimate console.* calls:
 - `src/cli-entry.ts:9` -- `pre-boot guard: --agent check before imports`
 - `src/teams-entry.ts:9` -- `pre-boot guard: --agent check before imports`
@@ -426,3 +426,4 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 - 2026-03-05 11:16 Validation pass (Pass 3): fixed mind file paths in Unit 16 (channel/store/tokens are in src/mind/friends/, not src/mind/context/)
 - 2026-03-05 11:16 Quality pass (Pass 4): all units have What/Output/Acceptance, no TBDs, all emoji headers present, coverage requirements included
 - 2026-03-05 11:33 Unit 1 complete: ESLint v10 installed with no-console:error for src/**/*.ts, test files excluded, npm run lint script added
+- 2026-03-05 11:37 Unit 2 complete: 8 console exception sites annotated across 4 files, npm run lint passes clean
