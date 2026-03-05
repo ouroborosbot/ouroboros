@@ -38,7 +38,6 @@ export interface TeamsChannelConfig {
   skipConfirmation: boolean
   flushIntervalMs?: number
   port: number
-  maxConcurrentConversations: number
 }
 
 export interface IntegrationsConfig {
@@ -88,7 +87,6 @@ const DEFAULT_CONFIG: OuroborosConfig = {
   teamsChannel: {
     skipConfirmation: true,
     port: 3978,
-    maxConcurrentConversations: 10,
   },
   integrations: {
     perplexityApiKey: "",
@@ -214,7 +212,8 @@ export function getOAuthConfig(): OAuthConfig {
 
 export function getTeamsChannelConfig(): TeamsChannelConfig {
   const config = loadConfig()
-  return { ...config.teamsChannel }
+  const { skipConfirmation, flushIntervalMs, port } = config.teamsChannel
+  return { skipConfirmation, flushIntervalMs, port }
 }
 
 export function getIntegrationsConfig(): IntegrationsConfig {
