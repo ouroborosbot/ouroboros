@@ -12,7 +12,6 @@ vi.mock("../../identity", () => ({
   DEFAULT_AGENT_CONTEXT: {
     maxTokens: 80000,
     contextMargin: 20,
-    maxToolOutputChars: 20000,
   },
   getAgentName: vi.fn(() => "testagent"),
   getAgentRoot: vi.fn(() => "/mock/repo/testagent"),

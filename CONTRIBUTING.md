@@ -47,6 +47,7 @@ Any text generated for the end user MUST reach them. Truncation, silent drops, a
 - `{agent}/` is your directory — modify freely (`agent.json`, `psyche/`, `tasks/`, `skills/`, `manifest/`)
 - Always use a coding agent (Claude Code or equivalent) for code work
 - TypeScript: strict mode, named exports, no unused locals/params, no `any` without justification
+- Logging: use `emitNervesEvent()` for all runtime observability, never raw `console.*`. See the Logging Policy section in [AGENTS.md](AGENTS.md) for details.
 
 ## Tool Descriptions
 

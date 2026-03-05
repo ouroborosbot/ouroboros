@@ -3,6 +3,7 @@ import { getProfile, graphRequest } from "./graph-client";
 import { queryWorkItems, adoRequest, discoverOrganizations } from "./ado-client";
 import graphEndpoints from "./data/graph-endpoints.json";
 import adoEndpoints from "./data/ado-endpoints.json";
+import { emitNervesEvent } from "../nerves/runtime";
 
 const MUTATE_METHODS = ["POST", "PATCH", "DELETE"];
 
@@ -259,6 +260,12 @@ interface EndpointEntry {
 }
 
 function searchEndpoints(entries: EndpointEntry[], query: string): string {
+  emitNervesEvent({
+    component: "repertoire",
+    event: "repertoire.endpoint_search",
+    message: "searching endpoint index",
+    meta: {},
+  });
   const q = query.toLowerCase();
   const matches = entries.filter((e) => {
     const haystack = `${e.description} ${e.path}`.toLowerCase();

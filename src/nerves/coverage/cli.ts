@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from "fs"
-import { dirname, join } from "path"
+import { dirname, join, resolve } from "path"
 
 import { auditNervesCoverage } from "./audit"
 import { readLatestRun } from "./run-artifacts"
@@ -7,7 +7,8 @@ import { readLatestRun } from "./run-artifacts"
 interface CliArgs {
   runDir?: string
   eventsPath?: string
-  logpointsPath?: string
+  perTestPath?: string
+  sourceRoot?: string
   output?: string
 }
 
@@ -19,7 +20,8 @@ function parseArgs(argv: string[]): CliArgs {
     if (!next) continue
     if (token === "--run-dir") args.runDir = next
     if (token === "--events-path") args.eventsPath = next
-    if (token === "--logpoints-path") args.logpointsPath = next
+    if (token === "--per-test-path") args.perTestPath = next
+    if (token === "--source-root") args.sourceRoot = next
     if (token === "--output") args.output = next
   }
   return args
@@ -31,21 +33,25 @@ export function runAuditCli(argv: string[]): number {
   const runDir = args.runDir ?? latestRun?.run_dir
 
   if (!runDir) {
+    // eslint-disable-next-line no-console -- meta-tooling: audit error message
     console.error("nerves audit: no run directory found; provide --run-dir")
     return 2
   }
 
   const eventsPath = args.eventsPath ?? join(runDir, "vitest-events.ndjson")
-  const logpointsPath = args.logpointsPath ?? join(runDir, "vitest-logpoints.json")
+  const perTestPath = args.perTestPath ?? join(runDir, "vitest-events-per-test.json")
+  const sourceRoot = args.sourceRoot ?? resolve("src")
   const outputPath = args.output ?? join(runDir, "nerves-coverage.json")
 
   const report = auditNervesCoverage({
     eventsPath,
-    logpointsPath,
+    perTestPath,
+    sourceRoot,
   })
 
   mkdirSync(dirname(outputPath), { recursive: true })
   writeFileSync(outputPath, JSON.stringify(report, null, 2), "utf8")
+  // eslint-disable-next-line no-console -- meta-tooling: audit result message
   console.log(`nerves audit: ${report.overall_status} (${outputPath})`)
 
   return report.overall_status === "pass" ? 0 : 1

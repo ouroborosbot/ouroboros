@@ -37,7 +37,6 @@ vi.mock("../../identity", () => {
   const DEFAULT_AGENT_CONTEXT = {
     maxTokens: 80000,
     contextMargin: 20,
-    maxToolOutputChars: 20000,
   }
   return {
     DEFAULT_AGENT_CONTEXT,

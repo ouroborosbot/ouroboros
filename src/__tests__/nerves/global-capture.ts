@@ -1,9 +1,9 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
 import { homedir } from "os"
 import { dirname, join } from "path"
+import { beforeEach, afterAll } from "vitest"
 
 import { registerGlobalLogSink, type LogEvent } from "../../nerves"
-import { getDeclaredLogpoints } from "../../nerves/coverage/contract"
 
 const REPO_SLUG = "ouroboros-agent-harness"
 
@@ -18,54 +18,52 @@ function readActiveRunDir(): string | null {
   }
 }
 
-function asStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  return value.filter((item): item is string => typeof item === "string")
+// ---------- per-test event tracking ----------
+
+const PER_TEST_KEY = Symbol.for("ouroboros.nerves.per-test-events")
+
+interface PerTestState {
+  currentTest: string | null
+  events: Map<string, Array<{ component: string; event: string }>>
 }
 
-function mergeLogpointFile(logpointsPath: string, observed: string[]): void {
-  let existingDeclared: string[] = []
-  let existingObserved: string[] = []
-  if (existsSync(logpointsPath)) {
-    try {
-      const parsed = JSON.parse(readFileSync(logpointsPath, "utf8")) as {
-        declared?: unknown
-        observed?: unknown
-      }
-      existingDeclared = asStringArray(parsed.declared)
-      existingObserved = asStringArray(parsed.observed)
-    } catch {
-      existingDeclared = []
-      existingObserved = []
-    }
+const scope = globalThis as Record<PropertyKey, unknown>
+
+let perTestState = scope[PER_TEST_KEY] as PerTestState | undefined
+if (!perTestState) {
+  perTestState = { currentTest: null, events: new Map() }
+  scope[PER_TEST_KEY] = perTestState
+}
+const pts = perTestState
+
+function recordEventForCurrentTest(entry: LogEvent): void {
+  const testName = pts.currentTest
+  if (!testName) return
+  let list = pts.events.get(testName)
+  if (!list) {
+    list = []
+    pts.events.set(testName, list)
   }
-
-  const declared = new Set<string>([...existingDeclared, ...getDeclaredLogpoints()])
-  const observedSet = new Set<string>([...existingObserved, ...observed])
-  writeFileSync(
-    logpointsPath,
-    JSON.stringify(
-      {
-        declared: [...declared].sort(),
-        observed: [...observedSet].sort(),
-      },
-      null,
-      2,
-    ),
-    "utf8",
-  )
+  list.push({ component: entry.component, event: entry.event })
 }
+
+// Register vitest hooks for per-test tracking
+beforeEach((ctx) => {
+  const suiteName = ctx.task.suite?.name ?? ""
+  const testName = suiteName ? `${suiteName} > ${ctx.task.name}` : ctx.task.name
+  pts.currentTest = testName
+})
+
+// ---------- global ndjson capture ----------
 
 const CAPTURE_STATE_KEY = Symbol.for("ouroboros.nerves.capture-state")
 type CaptureState = {
   runDir: string
-  logpointsPath: string
   observed: Set<string>
   flushed: boolean
   unregister: () => void
 }
 
-const scope = globalThis as Record<PropertyKey, unknown>
 const existingState = scope[CAPTURE_STATE_KEY] as CaptureState | undefined
 
 const runDir = readActiveRunDir()
@@ -73,18 +71,18 @@ if (runDir && (!existingState || existingState.runDir !== runDir)) {
   existingState?.unregister()
 
   const eventsPath = join(runDir, "vitest-events.ndjson")
-  const logpointsPath = join(runDir, "vitest-logpoints.json")
+  const perTestPath = join(runDir, "vitest-events-per-test.json")
   mkdirSync(dirname(eventsPath), { recursive: true })
 
   const observed = new Set<string>()
   const unregister = registerGlobalLogSink((entry: LogEvent) => {
     appendFileSync(eventsPath, `${JSON.stringify(entry)}\n`, "utf8")
     observed.add(`${entry.component}:${entry.event}`)
+    recordEventForCurrentTest(entry)
   })
 
   const state: CaptureState = {
     runDir,
-    logpointsPath,
     observed,
     flushed: false,
     unregister,
@@ -95,9 +93,21 @@ if (runDir && (!existingState || existingState.runDir !== runDir)) {
     if (state.flushed) return
     state.flushed = true
     state.unregister()
-    mergeLogpointFile(state.logpointsPath, [...state.observed])
+
+    // Write per-test events JSON
+    const perTestData: Record<string, Array<{ component: string; event: string }>> = {}
+    for (const [testName, events] of pts.events) {
+      perTestData[testName] = events
+    }
+    writeFileSync(perTestPath, JSON.stringify(perTestData, null, 2), "utf8")
   }
 
+  afterAll(flush)
   process.once("beforeExit", flush)
   process.once("exit", flush)
+} else {
+  // Even without an active run dir, register the per-test sink so tests can verify tracking
+  registerGlobalLogSink((entry: LogEvent) => {
+    recordEventForCurrentTest(entry)
+  })
 }

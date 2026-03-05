@@ -1,3 +1,5 @@
+import { emitNervesEvent } from "../nerves/runtime"
+
 export interface SteeringFollowUp {
   conversationId: string
   text: string
@@ -20,6 +22,12 @@ export function createTurnCoordinator(): TurnCoordinator {
 
   return {
     async withTurnLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+      emitNervesEvent({
+        component: "engine",
+        event: "engine.turn_start",
+        message: "turn lock acquired",
+        meta: { key },
+      })
       const prev = turnLocks.get(key) ?? Promise.resolve()
       const run = prev.then(async () => {
         activeTurns.add(key)

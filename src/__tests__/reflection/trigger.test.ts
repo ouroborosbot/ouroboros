@@ -56,6 +56,35 @@ describe("reflection/trigger", () => {
       ])
     })
 
+    it("extracts prior reflection gaps from existing proposals", () => {
+      const tasksDir = path.join(tmpDir, "tasks")
+      fs.mkdirSync(tasksDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(tasksDir, "2026-03-01-planning-reflection-add-logging.md"),
+        "# Reflection Proposal\n\n## Gap\nAdd structured logging\n\n## Proposal\nAdd nerves.",
+      )
+      fs.writeFileSync(
+        path.join(tasksDir, "2026-03-02-planning-reflection-add-tests.md"),
+        "# Reflection Proposal\n\n## Gap\nAdd more tests\n\n## Proposal\nAdd coverage.",
+      )
+
+      const ctx = loadReflectionContext(tmpDir)
+      expect(ctx.priorReflectionGaps).toContain("Add structured logging")
+      expect(ctx.priorReflectionGaps).toContain("Add more tests")
+    })
+
+    it("skips reflection files with no Gap heading", () => {
+      const tasksDir = path.join(tmpDir, "tasks")
+      fs.mkdirSync(tasksDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(tasksDir, "2026-03-01-planning-reflection-no-gap.md"),
+        "# No gap heading here\nJust some text.",
+      )
+
+      const ctx = loadReflectionContext(tmpDir)
+      expect(ctx.priorReflectionGaps).toEqual([])
+    })
+
     it("limits to last 10 tasks", () => {
       const tasksDir = path.join(tmpDir, "tasks")
       fs.mkdirSync(tasksDir, { recursive: true })
@@ -77,6 +106,7 @@ describe("reflection/trigger", () => {
         constitution: "# My Rules",
         selfKnowledge: "I know things",
         recentTasks: ["task-a.md", "task-b.md"],
+        priorReflectionGaps: ["Add logging", "Add tests"],
       }
       const prompt = buildReflectionPrompt(input)
       expect(prompt).toContain("# My Arch")
@@ -84,6 +114,8 @@ describe("reflection/trigger", () => {
       expect(prompt).toContain("I know things")
       expect(prompt).toContain("- task-a.md")
       expect(prompt).toContain("- task-b.md")
+      expect(prompt).toContain("- Add logging")
+      expect(prompt).toContain("- Add tests")
       expect(prompt).toContain("GAP:")
       expect(prompt).toContain("CONSTITUTION_CHECK:")
     })
@@ -94,10 +126,12 @@ describe("reflection/trigger", () => {
         constitution: "",
         selfKnowledge: "",
         recentTasks: [],
+        priorReflectionGaps: [],
       }
       const prompt = buildReflectionPrompt(input)
       expect(prompt).toContain("critical gap")
       expect(prompt).toContain("No recent tasks")
+      expect(prompt).toContain("None yet")
     })
   })
 
