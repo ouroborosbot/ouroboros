@@ -106,9 +106,9 @@ ${(input.priorReflectionGaps ?? []).length > 0 ? input.priorReflectionGaps.map(g
 
 1. Review your architecture and capability matrix. What is the biggest gap? **Do NOT propose any gap listed in "Already-Proposed Gaps" above — find a NEW one.**
 2. Check against the constitution — is this something you can address autonomously, or does it require human review?
-   - Use "within-bounds" for: adding tests, adding validation, improving observability, adding documentation, small refactors, new utility functions, bug fixes, and anything that extends existing patterns without restructuring modules.
-   - Use "requires-review" ONLY for: restructuring core modules (heart, mind), changing existing provider interface contracts (not testing them), modifying the constitution itself, or removing existing functionality. Adding tests for existing provider code is ALWAYS within-bounds.
-   - When in doubt about small/medium effort items that ADD code without changing existing interfaces, prefer "within-bounds".
+   - Use "within-bounds" for: adding tests, adding validation, improving observability, adding documentation, small refactors, new utility functions, bug fixes, improving the reflection system itself, deduplication improvements, pruning/cleanup utilities, and anything that extends existing patterns without restructuring core modules.
+   - Use "requires-review" ONLY for: restructuring the heart/ module's core turn loop, changing existing provider interface contracts (not testing them), modifying the constitution itself, or removing existing user-facing functionality.
+   - ALMOST EVERYTHING is within-bounds. The bar for requires-review is very high. If you're adding code, tests, utilities, or improving existing systems — it's within-bounds. Only fundamental architectural changes to heart/ or removing functionality need review.
 3. Propose ONE specific, concrete improvement task. Include:
    - **Gap**: What's missing or broken
    - **Proposal**: What to build/change (be specific about files and modules)
