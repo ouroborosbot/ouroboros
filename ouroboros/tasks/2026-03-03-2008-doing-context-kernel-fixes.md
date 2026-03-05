@@ -462,7 +462,7 @@ These units replace units 16a-16c (deadline timer) and the `--disable-streaming`
 **Output**: Clean revert commit(s). `src/senses/teams.ts` and `src/__tests__/senses/teams.test.ts` match their 406bffe state.
 **Acceptance**: `git diff 406bffe -- src/senses/teams.ts src/__tests__/senses/teams.test.ts` shows no diff. All tests pass (the deadline timer tests are gone). Build clean.
 
-### ⬜ Unit 18a: Remove disableStreaming / buffered mode -- tests
+### ✅ Unit 18a: Remove disableStreaming / buffered mode -- tests
 **What**: Write tests verifying the unified chunked streaming behavior (no dual-mode branching). Tests should verify:
 1. `createTeamsCallbacks` no longer accepts `disableStreaming` option (or ignores it)
 2. `onTextChunk` always accumulates in `textBuffer` (never calls `safeEmit` per-token)
@@ -694,3 +694,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-04 16:00 Pass 3 -- Validation: all line numbers, variable names, interfaces verified against codebase. Fixed startTeamsApp line refs (516, 517, 605, 632, 508-511) and module comment block ref (82-93 not 83-93)
 - 2026-03-04 16:00 Pass 4 -- Quality: all 7 new units have What/Output/Acceptance, no TBD, all emojis present, added revert emoji to legend, fixed Unit 18a onError description (safeSend for terminal, safeUpdate for transient)
 - 2026-03-04 16:17 Unit 17a complete: restored teams.ts and teams.test.ts to 406bffe state via git checkout. Diff empty, 1289 tests pass, build clean
+- 2026-03-04 16:27 Unit 18a complete: 39 tests fail (red) -- updated teams.test.ts, prompt.test.ts, config.test.ts for unified chunked streaming behavior. Removed disableStreaming from all test expectations
