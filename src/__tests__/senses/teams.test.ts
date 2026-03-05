@@ -2719,6 +2719,21 @@ describe("Teams adapter - unified chunked streaming (no disableStreaming)", () =
     expect(sendMessage).toHaveBeenNthCalledWith(3, "b".repeat(3000))
   })
 
+  it("flush() recovers when stream.emit rejects asynchronously (e.g. 413)", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
+    // Buffer text while stream is alive
+    callbacks.onTextChunk("hello world")
+    // Make emit return a rejected promise (async 413) instead of throwing synchronously
+    mockStream.emit.mockReturnValue(Promise.reject(new Error("413")))
+    // flush() awaits tryEmit → async rejection → markStopped → falls through to sendMessage
+    await callbacks.flush()
+    expect(sendMessage).toHaveBeenCalledTimes(1)
+    expect(sendMessage).toHaveBeenCalledWith("hello world")
+  })
+
   it("flushTextBuffer sends full text without splitting", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
