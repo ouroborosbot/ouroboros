@@ -1,6 +1,6 @@
 {
   "name": "ouroboros",
-  "provider": "anthropic",
+  "provider": "openai-codex",
   "configPath": "~/.agentsecrets/ouroboros/secrets.json",
   "context": {
     "maxTokens": 80000,
