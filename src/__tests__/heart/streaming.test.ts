@@ -967,3 +967,288 @@ describe("streamResponsesApi", () => {
     expect(result.usage!.reasoning_tokens).toBe(0)
   })
 })
+
+// --- Unit 20a: FinalAnswerParser unit tests ---
+
+describe("FinalAnswerParser", () => {
+  let FinalAnswerParser: any
+
+  beforeEach(async () => {
+    vi.resetModules()
+    const config = await import("../../config")
+    config.resetConfigCache()
+    config.setTestConfig({ providers: { azure: { apiKey: "" }, minimax: { apiKey: "test-key", model: "test-model" } } })
+    const streaming = await import("../../heart/streaming")
+    FinalAnswerParser = streaming.FinalAnswerParser
+  })
+
+  it("parses {\"answer\":\"hello world\"} and returns hello world", () => {
+    const parser = new FinalAnswerParser()
+    const result = parser.process('{"answer":"hello world"}')
+    expect(result).toBe("hello world")
+    expect(parser.active).toBe(true)
+    expect(parser.complete).toBe(true)
+  })
+
+  it("handles JSON escapes: \\\" -> \", \\\\ -> \\, \\n -> newline, \\t -> tab, \\/ -> /", () => {
+    const parser = new FinalAnswerParser()
+    const result = parser.process('{"answer":"line1\\nline2\\t\\\\end\\\\\\/quote\\"done"}')
+    expect(result).toBe('line1\nline2\t\\end\\/quote"done')
+  })
+
+  it("handles unknown escape (e.g. \\x) by passing through the character", () => {
+    const parser = new FinalAnswerParser()
+    const result = parser.process('{"answer":"test\\xvalue"}')
+    expect(result).toBe("testxvalue")
+  })
+
+  it("emits nothing before prefix \"answer\":\" is matched", () => {
+    const parser = new FinalAnswerParser()
+    const result = parser.process('{"answe')
+    expect(result).toBe("")
+    expect(parser.active).toBe(false)
+    expect(parser.complete).toBe(false)
+  })
+
+  it("emits incrementally across multiple process() calls (delta chunking)", () => {
+    const parser = new FinalAnswerParser()
+    let out = ""
+    out += parser.process('{"ans')
+    out += parser.process('wer":"hel')
+    out += parser.process('lo wor')
+    out += parser.process('ld"}')
+    expect(out).toBe("hello world")
+    expect(parser.active).toBe(true)
+    expect(parser.complete).toBe(true)
+  })
+
+  it("stops at unescaped closing \" -- subsequent process() calls return empty string", () => {
+    const parser = new FinalAnswerParser()
+    const first = parser.process('{"answer":"done"}')
+    expect(first).toBe("done")
+    expect(parser.complete).toBe(true)
+    const second = parser.process("more stuff")
+    expect(second).toBe("")
+  })
+
+  it("active is false before prefix, true after", () => {
+    const parser = new FinalAnswerParser()
+    expect(parser.active).toBe(false)
+    parser.process('{"answer":"')
+    expect(parser.active).toBe(true)
+  })
+
+  it("complete is false until closing \", true after", () => {
+    const parser = new FinalAnswerParser()
+    parser.process('{"answer":"hello')
+    expect(parser.complete).toBe(false)
+    parser.process('"')
+    expect(parser.complete).toBe(true)
+  })
+
+  it("handles \"answer\": \" (space after colon) variant", () => {
+    const parser = new FinalAnswerParser()
+    const result = parser.process('{"answer": "spaced value"}')
+    expect(result).toBe("spaced value")
+    expect(parser.active).toBe(true)
+    expect(parser.complete).toBe(true)
+  })
+
+  it("returns empty string when prefix never matches (e.g. {\"other\":\"value\"})", () => {
+    const parser = new FinalAnswerParser()
+    const result = parser.process('{"other":"value"}')
+    expect(result).toBe("")
+    expect(parser.active).toBe(false)
+  })
+
+  it("handles empty answer {\"answer\":\"\"}", () => {
+    const parser = new FinalAnswerParser()
+    const result = parser.process('{"answer":""}')
+    expect(result).toBe("")
+    expect(parser.active).toBe(true)
+    expect(parser.complete).toBe(true)
+  })
+
+  it("handles escape sequence split across deltas (e.g. \\ in one delta, n in next)", () => {
+    const parser = new FinalAnswerParser()
+    let out = ""
+    out += parser.process('{"answer":"hello\\')
+    out += parser.process('nworld"}')
+    expect(out).toBe("hello\nworld")
+  })
+})
+
+// --- Unit 20a: streamChatCompletion final_answer streaming integration tests ---
+
+describe("streamChatCompletion final_answer streaming", () => {
+  let streamChatCompletion: any
+
+  function makeStream(chunks: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const chunk of chunks) {
+          yield chunk
+        }
+      },
+    }
+  }
+
+  function makeChunk(content?: string, toolCalls?: any[]) {
+    const delta: any = {}
+    if (content !== undefined) delta.content = content
+    if (toolCalls !== undefined) delta.tool_calls = toolCalls
+    return { choices: [{ delta }] }
+  }
+
+  function makeCallbacks(overrides: Partial<ChannelCallbacks> = {}): ChannelCallbacks {
+    return {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+      ...overrides,
+    }
+  }
+
+  beforeEach(async () => {
+    vi.resetModules()
+    const config = await import("../../config")
+    config.resetConfigCache()
+    config.setTestConfig({ providers: { azure: { apiKey: "" }, minimax: { apiKey: "test-key", model: "test-model" } } })
+    const streaming = await import("../../heart/streaming")
+    streamChatCompletion = streaming.streamChatCompletion
+  })
+
+  it("streams final_answer argument deltas progressively via onTextChunk", async () => {
+    const textChunks: string[] = []
+    const client = { chat: { completions: { create: vi.fn().mockReturnValue(makeStream([
+      makeChunk(undefined, [{ index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"ans' } }]),
+      makeChunk(undefined, [{ index: 0, function: { arguments: 'wer":"hel' } }]),
+      makeChunk(undefined, [{ index: 0, function: { arguments: 'lo wor' } }]),
+      makeChunk(undefined, [{ index: 0, function: { arguments: 'ld"}' } }]),
+    ])) } } }
+    const callbacks = makeCallbacks({ onTextChunk: (text: string) => textChunks.push(text) })
+    const result = await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
+    expect(textChunks.join("")).toBe("hello world")
+    expect(result.finalAnswerStreamed).toBe(true)
+  })
+
+  it("calls onClearText when final_answer tool call is first detected", async () => {
+    const onClearText = vi.fn()
+    const client = { chat: { completions: { create: vi.fn().mockReturnValue(makeStream([
+      makeChunk("some noise"),
+      makeChunk(undefined, [{ index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"answer":"done"}' } }]),
+    ])) } } }
+    const callbacks = makeCallbacks({ onClearText })
+    await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
+    expect(onClearText).toHaveBeenCalledTimes(1)
+  })
+
+  it("sets finalAnswerStreamed to true when final_answer detected", async () => {
+    const client = { chat: { completions: { create: vi.fn().mockReturnValue(makeStream([
+      makeChunk(undefined, [{ index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"answer":"done"}' } }]),
+    ])) } } }
+    const callbacks = makeCallbacks()
+    const result = await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
+    expect(result.finalAnswerStreamed).toBe(true)
+  })
+
+  it("does not stream arguments for non-final_answer tool calls", async () => {
+    const textChunks: string[] = []
+    const client = { chat: { completions: { create: vi.fn().mockReturnValue(makeStream([
+      makeChunk(undefined, [{ index: 0, id: "call_1", function: { name: "read_file", arguments: '{"path":"a.txt"}' } }]),
+    ])) } } }
+    const callbacks = makeCallbacks({ onTextChunk: (text: string) => textChunks.push(text) })
+    const result = await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
+    expect(textChunks).toEqual([])
+    expect(result.finalAnswerStreamed).toBe(false)
+  })
+
+  it("sets finalAnswerStreamed to false when prefix never matches", async () => {
+    const client = { chat: { completions: { create: vi.fn().mockReturnValue(makeStream([
+      makeChunk(undefined, [{ index: 0, id: "call_1", function: { name: "final_answer", arguments: '{"other":"value"}' } }]),
+    ])) } } }
+    const callbacks = makeCallbacks()
+    const result = await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
+    expect(result.finalAnswerStreamed).toBe(false)
+  })
+})
+
+// --- Unit 20a: streamResponsesApi final_answer streaming integration tests ---
+
+describe("streamResponsesApi final_answer streaming", () => {
+  let streamResponsesApi: any
+
+  function makeResponsesStream(events: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const event of events) {
+          yield event
+        }
+      },
+    }
+  }
+
+  function makeCallbacks(overrides: Partial<ChannelCallbacks> = {}): ChannelCallbacks {
+    return {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+      ...overrides,
+    }
+  }
+
+  beforeEach(async () => {
+    vi.resetModules()
+    const config = await import("../../config")
+    config.resetConfigCache()
+    config.setTestConfig({ providers: { azure: { apiKey: "" }, minimax: { apiKey: "test-key", model: "test-model" } } })
+    const streaming = await import("../../heart/streaming")
+    streamResponsesApi = streaming.streamResponsesApi
+  })
+
+  it("streams final_answer argument deltas progressively via onTextChunk", async () => {
+    const textChunks: string[] = []
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "final_answer", arguments: "" } },
+      { type: "response.function_call_arguments.delta", delta: '{"answer":"hel' },
+      { type: "response.function_call_arguments.delta", delta: 'lo world"}' },
+      { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "final_answer", arguments: '{"answer":"hello world"}' } },
+    ])) } }
+    const callbacks = makeCallbacks({ onTextChunk: (text: string) => textChunks.push(text) })
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(textChunks.join("")).toBe("hello world")
+    expect(result.finalAnswerStreamed).toBe(true)
+  })
+
+  it("calls onClearText when final_answer function call item is added", async () => {
+    const onClearText = vi.fn()
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_text.delta", delta: "noise" },
+      { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "final_answer", arguments: "" } },
+      { type: "response.function_call_arguments.delta", delta: '{"answer":"done"}' },
+      { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "final_answer", arguments: '{"answer":"done"}' } },
+    ])) } }
+    const callbacks = makeCallbacks({ onClearText })
+    await streamResponsesApi(client, {}, callbacks)
+    expect(onClearText).toHaveBeenCalledTimes(1)
+  })
+
+  it("sets finalAnswerStreamed to true when final_answer detected", async () => {
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "final_answer", arguments: "" } },
+      { type: "response.function_call_arguments.delta", delta: '{"answer":"done"}' },
+      { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "final_answer", arguments: '{"answer":"done"}' } },
+    ])) } }
+    const callbacks = makeCallbacks()
+    const result = await streamResponsesApi(client, {}, callbacks)
+    expect(result.finalAnswerStreamed).toBe(true)
+  })
+})
