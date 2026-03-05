@@ -834,7 +834,7 @@ describe("contextSection", () => {
     expect(result).toContain("save_friend_note")
   })
 
-  it("includes name-quality instruction with displayName", async () => {
+  it("separate name quality line is absent but save directive still present", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
       friend: {
@@ -844,6 +844,7 @@ describe("contextSection", () => {
         tenantMemberships: [],
         toolPreferences: {},
         notes: { name: "Jordan" },
+        totalTokens: 200_000,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -858,12 +859,13 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    // Should include instruction about name quality -- directive, saves immediately
-    expect(result).toContain("name")
+    // Separate "when i learn a name my friend prefers" line is absent
+    expect(result.toLowerCase()).not.toMatch(/when i learn a name my friend prefers/)
+    // But "save" still appears via the broader "save ANYTHING" directive
     expect(result.toLowerCase()).toContain("save")
   })
 
-  it("includes new-friend instruction when notes and toolPreferences both empty", async () => {
+  it("onboarding text appears for friend with totalTokens: 0", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
       friend: {
@@ -873,6 +875,7 @@ describe("contextSection", () => {
         tenantMemberships: [],
         toolPreferences: {},
         notes: {},
+        totalTokens: 0,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -887,11 +890,11 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    // Should include instruction about new friend
-    expect(result.toLowerCase()).toContain("new friend")
+    // Onboarding text should appear below threshold -- mentions learning about the friend
+    expect(result.toLowerCase()).toMatch(/learn|get to know/)
   })
 
-  it("does NOT include new-friend instruction when notes has entries", async () => {
+  it("onboarding text does NOT appear for friend with totalTokens: 200_000", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
       friend: {
@@ -901,6 +904,7 @@ describe("contextSection", () => {
         tenantMemberships: [],
         toolPreferences: {},
         notes: { role: "engineer" },
+        totalTokens: 200_000,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -915,10 +919,42 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    expect(result.toLowerCase()).not.toContain("new friend")
+    // Onboarding text should NOT appear above threshold
+    expect(result.toLowerCase()).not.toMatch(/new friend/)
+    expect(result.toLowerCase()).not.toMatch(/get to know/)
   })
 
-  it("does NOT include new-friend instruction when toolPreferences has entries", async () => {
+  it("onboarding text STILL appears when friend has notes but totalTokens below threshold", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: { role: "engineer" },
+        totalTokens: 50_000,
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // Notes presence is irrelevant -- onboarding is token-based
+    // 50K tokens is below 100K threshold, so onboarding text should appear
+    expect(result.toLowerCase()).toMatch(/learn|get to know/)
+  })
+
+  it("onboarding text STILL appears when friend has toolPreferences but totalTokens below threshold", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
       friend: {
@@ -928,6 +964,7 @@ describe("contextSection", () => {
         tenantMemberships: [],
         toolPreferences: { ado: "use area paths" },
         notes: {},
+        totalTokens: 50_000,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -942,7 +979,8 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    expect(result.toLowerCase()).not.toContain("new friend")
+    // Tool preferences are irrelevant -- onboarding is token-based
+    expect(result.toLowerCase()).toMatch(/learn|get to know/)
   })
 
   it("does NOT render toolPreferences in system prompt", async () => {
@@ -976,7 +1014,7 @@ describe("contextSection", () => {
     expect(result).toContain("role: engineer")
   })
 
-  it("includes priority guidance when friend context is present", async () => {
+  it("does NOT include priority guidance (removed -- overfitting)", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
       friend: {
@@ -986,6 +1024,7 @@ describe("contextSection", () => {
         tenantMemberships: [],
         toolPreferences: {},
         notes: { role: "engineer" },
+        totalTokens: 200_000,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -1000,9 +1039,8 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    // Should include priority guidance -- friend's request first
-    expect(result.toLowerCase()).toContain("request")
-    expect(result.toLowerCase()).toContain("first")
+    // Priority guidance line "my friend's request comes first" is removed
+    expect(result.toLowerCase()).not.toContain("request comes first")
   })
 
   it("includes working-memory trust instruction", async () => {
@@ -1064,7 +1102,7 @@ describe("contextSection", () => {
 
   // --- Unit 4a tests: friend context instructions rewrite ---
 
-  it("new-friend instruction interpolates displayName when known", async () => {
+  it("onboarding text interpolates displayName when known (via first-impressions)", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
       friend: {
@@ -1074,6 +1112,7 @@ describe("contextSection", () => {
         tenantMemberships: [],
         toolPreferences: {},
         notes: {},
+        totalTokens: 0,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -1088,13 +1127,11 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    // New-friend block should interpolate the displayName
+    // First-impressions content (included via isOnboarding) should contain the displayName
     expect(result).toContain("Jordan")
-    // The new-friend instruction should mention the displayName in context of what we know
-    expect(result).toMatch(/new friend.*Jordan|Jordan.*new friend/i)
   })
 
-  it("new-friend instruction says name is unknown when displayName is 'Unknown'", async () => {
+  it("onboarding text mentions unknown name when displayName is 'Unknown' (via first-impressions)", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
       friend: {
@@ -1104,6 +1141,7 @@ describe("contextSection", () => {
         tenantMemberships: [],
         toolPreferences: {},
         notes: {},
+        totalTokens: 0,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -1118,13 +1156,12 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    // When displayName is "Unknown", the instruction should say we don't know the name
+    // First-impressions should mention asking what they'd like to be called
     expect(result.toLowerCase()).toMatch(/don't know.*name|do not know.*name/)
-    // Should also mention asking what they'd like to be called
     expect(result.toLowerCase()).toMatch(/ask/)
   })
 
-  it("new-friend instruction is directive with action verbs, not aspirational", async () => {
+  it("onboarding text is directive with action verbs (via first-impressions)", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
       friend: {
@@ -1134,6 +1171,7 @@ describe("contextSection", () => {
         tenantMemberships: [],
         toolPreferences: {},
         notes: {},
+        totalTokens: 0,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -1148,13 +1186,13 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    // New-friend instruction should use directive language: "i save" not "i should learn"
+    // First-impressions text should be directive, not aspirational
     expect(result).not.toMatch(/should learn/)
-    // Should contain directive action -- saving immediately
-    expect(result.toLowerCase()).toMatch(/save.*immediately|immediately.*save|i save what i learn/)
+    // Should contain directive about saving
+    expect(result.toLowerCase()).toMatch(/save/)
   })
 
-  it("priority guidance mentions both helping AND getting to know them", async () => {
+  it("does NOT include 'get to know' in contextSection for returning friends (moved to onboarding-only)", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
       friend: {
@@ -1164,6 +1202,7 @@ describe("contextSection", () => {
         tenantMemberships: [],
         toolPreferences: {},
         notes: { role: "engineer" },
+        totalTokens: 200_000,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -1178,8 +1217,8 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    // Priority guidance should clarify: help first AND get to know them
-    expect(result.toLowerCase()).toMatch(/get to know/)
+    // "get to know" is now onboarding-only, not always-on
+    expect(result.toLowerCase()).not.toMatch(/get to know/)
   })
 
   it("memory instruction lowers the bar -- saves anything learned, not just important things", async () => {
@@ -1212,7 +1251,7 @@ describe("contextSection", () => {
     expect(result.toLowerCase()).toMatch(/anything i learn/)
   })
 
-  it("name quality instruction is directive -- save immediately, not aspirational prefer", async () => {
+  it("separate name quality line is ABSENT -- folded into broader save directive", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {
       friend: {
@@ -1222,6 +1261,7 @@ describe("contextSection", () => {
         tenantMemberships: [],
         toolPreferences: {},
         notes: { name: "Jordan" },
+        totalTokens: 200_000,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",
         schemaVersion: 1,
@@ -1236,10 +1276,75 @@ describe("contextSection", () => {
       },
     }
     const result = contextSection(ctx)
-    // Name quality instruction should be directive, not aspirational
-    expect(result).not.toMatch(/i prefer to use/)
-    // Should say something about saving immediately when learning a name
-    expect(result.toLowerCase()).toMatch(/learn.*name.*save.*immediately|when i learn a name.*save/)
+    // Separate "when i learn a name" line is removed -- folded into "save ANYTHING"
+    expect(result.toLowerCase()).not.toMatch(/when i learn a name/)
+    // But "save" still appears via the broader directive
+    expect(result.toLowerCase()).toContain("save")
+  })
+
+  // --- Part B: Token-threshold-based instruction tests ---
+
+  it("always-on directives present at high totalTokens (200K)", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: { role: "engineer" },
+        totalTokens: 200_000,
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // All 4 always-on directives should be present at any token level
+    expect(result.toLowerCase()).toContain("ephemeral")
+    expect(result.toLowerCase()).toContain("source of truth")
+    expect(result.toLowerCase()).toContain("stale")
+    expect(result.toLowerCase()).toContain("save anything")
+  })
+
+  it("friend notes rendering always present at high totalTokens", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: { role: "engineer", project: "ouroboros" },
+        totalTokens: 200_000,
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // Notes should always render regardless of token count
+    expect(result).toContain("what i know about this friend")
+    expect(result).toContain("role: engineer")
+    expect(result).toContain("project: ouroboros")
   })
 })
 
