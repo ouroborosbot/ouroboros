@@ -61,11 +61,12 @@ export class FriendResolver {
 
     const friend: FriendRecord = {
       id: randomUUID(),
-      displayName: this.params.displayName,
+      name: this.params.displayName,
       externalIds: [externalId],
       tenantMemberships,
       toolPreferences: {},
-      notes: {},
+      notes: this.params.displayName !== "Unknown" ? { name: { value: this.params.displayName, savedAt: now } } : {},
+      totalTokens: 0,
       createdAt: now,
       updatedAt: now,
       schemaVersion: CURRENT_SCHEMA_VERSION,
