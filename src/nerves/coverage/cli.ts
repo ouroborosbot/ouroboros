@@ -31,6 +31,7 @@ export function runAuditCli(argv: string[]): number {
   const runDir = args.runDir ?? latestRun?.run_dir
 
   if (!runDir) {
+    // eslint-disable-next-line no-console -- meta-tooling: audit error message
     console.error("nerves audit: no run directory found; provide --run-dir")
     return 2
   }
@@ -46,6 +47,7 @@ export function runAuditCli(argv: string[]): number {
 
   mkdirSync(dirname(outputPath), { recursive: true })
   writeFileSync(outputPath, JSON.stringify(report, null, 2), "utf8")
+  // eslint-disable-next-line no-console -- meta-tooling: audit result message
   console.log(`nerves audit: ${report.overall_status} (${outputPath})`)
 
   return report.overall_status === "pass" ? 0 : 1
