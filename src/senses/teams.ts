@@ -98,7 +98,7 @@ export type TeamsCallbacksWithFlush = ChannelCallbacks & { flush(): void | Promi
 // First flush goes to safeEmit (primary output), subsequent flushes go to
 // safeSend (ctx.send). Tool results, kicks, and errors use safeUpdate
 // (transient status) or safeSend (terminal errors). Reasoning is accumulated
-// internally but never sent per-token (phrase rotation provides keep-alive).
+// and periodically pushed via safeUpdate on the same flush timer tick.
 export function createTeamsCallbacks(
   stream: TeamsStream,
   controller: AbortController,
@@ -116,10 +116,22 @@ export function createTeamsCallbacks(
   let flushTimer: NodeJS.Timeout | null = null
   const flushInterval = options?.flushIntervalMs ?? DEFAULT_FLUSH_INTERVAL_MS
 
+  // Track whether reasoning has changed since last flush (avoid redundant updates).
+  let lastFlushedReasoningLen = 0
+
+  // Periodic tick: flush text buffer and push reasoning updates.
+  function flushTick(): void {
+    flushTextBuffer()
+    if (reasoningBuf.length > lastFlushedReasoningLen) {
+      safeUpdate(reasoningBuf)
+      lastFlushedReasoningLen = reasoningBuf.length
+    }
+  }
+
   // Start the periodic flush timer. Idempotent -- no-op if already running.
   function startFlushTimer(): void {
     if (flushTimer) return
-    flushTimer = setInterval(() => flushTextBuffer(), flushInterval)
+    flushTimer = setInterval(flushTick, flushInterval)
   }
 
   // Stop the periodic flush timer. Idempotent.
@@ -244,9 +256,7 @@ export function createTeamsCallbacks(
       stopPhraseRotation()
       hadRealOutput = true
       reasoningBuf += text
-      // Reasoning is accumulated internally but never sent per-token -- each
-      // update is an HTTP round-trip. Phrase rotation and tool status updates
-      // provide sufficient keep-alive during reasoning phases.
+      startFlushTimer()
     },
     onTextChunk: (text: string) => {
       if (stopped) return
