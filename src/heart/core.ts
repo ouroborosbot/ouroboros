@@ -69,14 +69,24 @@ function getProviderRuntime(): ProviderRuntime {
     try {
       _providerRuntime = createProviderRegistry().resolve();
     } catch (error) {
-      console.error(error instanceof Error ? error.message : String(error));
+      emitNervesEvent({
+        level: "error",
+        event: "engine.provider_init_error",
+        component: "engine",
+        message: error instanceof Error ? error.message : String(error),
+        meta: {},
+      });
       process.exit(1);
       throw new Error("unreachable");
     }
     if (!_providerRuntime) {
-      console.error(
-        "provider runtime could not be initialized.",
-      );
+      emitNervesEvent({
+        level: "error",
+        event: "engine.provider_init_error",
+        component: "engine",
+        message: "provider runtime could not be initialized.",
+        meta: {},
+      });
       process.exit(1);
       throw new Error("unreachable");
     }
@@ -221,7 +231,6 @@ export async function runAgent(
 ): Promise<{ usage?: UsageData }> {
   const providerRuntime = getProviderRuntime();
   const provider = providerRuntime.id;
-  const { maxToolOutputChars } = getContextConfig();
   const toolChoiceRequired = options?.toolChoiceRequired ?? true;
   const traceId = options?.traceId;
   emitNervesEvent({
@@ -452,10 +461,6 @@ export async function runAgent(
             success = true;
           } catch (e) {
             toolResult = `error: ${e}`;
-            success = false;
-          }
-          if (toolResult.length > maxToolOutputChars) {
-            toolResult = `output too large (${toolResult.length} chars, limit ${maxToolOutputChars}). retry with narrower scope — e.g. read fewer lines, filter output, or use a more specific command.`;
             success = false;
           }
           callbacks.onToolEnd(tc.name, argSummary, success);

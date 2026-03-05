@@ -2,6 +2,7 @@
 // Tracks cumulative token usage per friend across turns.
 // Called from both CLI and Teams adapters after each agent turn.
 
+import { emitNervesEvent } from "../../nerves/runtime"
 import type { FriendStore } from "./store"
 import type { UsageData } from "../context"
 
@@ -21,4 +22,10 @@ export async function accumulateFriendTokens(
   record.totalTokens = (record.totalTokens ?? 0) + usage.output_tokens
   record.updatedAt = new Date().toISOString()
   await store.put(record.id, record)
+  emitNervesEvent({
+    component: "friends",
+    event: "friends.tokens_accumulated",
+    message: "tokens accumulated for friend",
+    meta: { friendId, outputTokens: usage.output_tokens },
+  })
 }

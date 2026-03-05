@@ -127,7 +127,6 @@ describe("loadAgentConfig", () => {
       context: {
         maxTokens: 80000,
         contextMargin: 20,
-        maxToolOutputChars: 20000,
       },
       phrases: {
         thinking: ["working"],
@@ -191,15 +190,22 @@ describe("loadAgentConfig", () => {
     provider: "minimax",
     }
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(agentJson))
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+
+    vi.resetModules()
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../nerves/runtime", () => ({ emitNervesEvent }))
 
     const { loadAgentConfig, resetIdentity } = await import("../identity")
     resetIdentity()
     loadAgentConfig()
 
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("agent.json is missing phrases"))
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+      level: "warn",
+      event: "config_identity.error",
+      component: "config/identity",
+      message: "agent config missing phrase pools; placeholders applied",
+    }))
     expect(fs.writeFileSync).toHaveBeenCalled()
-    warnSpy.mockRestore()
   })
 
   it("does NOT warn or write when agent.json already has phrases", async () => {

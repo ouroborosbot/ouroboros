@@ -4,8 +4,7 @@
   "configPath": "~/.agentsecrets/ouroboros/secrets.json",
   "context": {
     "maxTokens": 80000,
-    "contextMargin": 20,
-    "maxToolOutputChars": 20000
+    "contextMargin": 20
   },
   "phrases": {
     "thinking": [

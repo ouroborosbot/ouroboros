@@ -1,6 +1,7 @@
 // Semantic ADO tools -- enriched, single-call operations over the ADO API.
 // Phase 3: ado_backlog_list (query), mutation tools (3D).
 
+import { emitNervesEvent } from "../nerves/runtime"
 import type { ToolDefinition, ToolContext } from "./tools-base"
 import { adoRequest } from "./ado-client"
 import { resolveAdoContext } from "./ado-context"
@@ -301,6 +302,12 @@ export const adoSemanticToolDefinitions: ToolDefinition[] = [
       if (!ctx?.adoToken) {
         return "AUTH_REQUIRED:ado -- I need access to Azure DevOps. Please sign in when prompted."
       }
+      emitNervesEvent({
+        component: "repertoire",
+        event: "repertoire.ado_semantic_call",
+        message: "ado semantic tool invoked",
+        meta: {},
+      })
 
       const adoCtx = await resolveAdoContext(
         ctx.adoToken,

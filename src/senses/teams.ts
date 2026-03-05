@@ -11,6 +11,7 @@ import { sessionPath, getTeamsConfig, getTeamsChannelConfig } from "../config"
 import { loadSession, deleteSession, postTurn } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "../repertoire/commands"
 import { createTraceId } from "../nerves"
+import { emitNervesEvent } from "../nerves/runtime"
 import { FileFriendStore } from "../mind/friends/store-file"
 import { FriendResolver } from "../mind/friends/resolver"
 import { accumulateFriendTokens } from "../mind/friends/tokens"
@@ -565,11 +566,11 @@ export function startTeamsApp(): void {
           connectionName: cn,
           code: activity.value.state,
         })
-        console.log(`[teams] verify-state succeeded for connection "${cn}"`)
+        emitNervesEvent({ level: "info", event: "channel.verify_state", component: "channels", message: `verify-state succeeded for connection "${cn}"`, meta: { connectionName: cn } })
         return { status: 200 }
       } catch { /* try next */ }
     }
-    console.warn("[teams] verify-state failed for all connections")
+    emitNervesEvent({ level: "warn", event: "channel.verify_state", component: "channels", message: "verify-state failed for all connections", meta: {} })
     return { status: 412 }
   })
 
@@ -581,7 +582,7 @@ export function startTeamsApp(): void {
     const userId = activity.from?.id || ""
     const channelId = activity.channelId || "msteams"
 
-    console.log(`[teams] msg from=${userId.slice(0, 12)} conv=${convId.slice(0, 20)}`)
+    emitNervesEvent({ level: "info", event: "channel.message_received", component: "channels", message: "incoming teams message", meta: { userId: userId.slice(0, 12), conversationId: convId.slice(0, 20) } })
 
     // Resolve pending confirmations IMMEDIATELY — before token fetches or
     // the conversation lock.  The original message holds the lock while
@@ -624,7 +625,7 @@ export function startTeamsApp(): void {
         const githubRes = await api.users.token.get({ userId, connectionName: oauthConfig.githubConnectionName, channelId })
         githubToken = githubRes?.token
       } catch { /* no token yet — tool handler will trigger signin */ }
-      console.log(`[teams] tokens: graph=${graphToken ? "yes" : "no"} ado=${adoToken ? "yes" : "no"} github=${githubToken ? "yes" : "no"}`)
+      emitNervesEvent({ level: "info", event: "channel.token_status", component: "channels", message: "oauth token availability", meta: { graph: !!graphToken, ado: !!adoToken, github: !!githubToken } })
 
       const teamsContext: TeamsMessageContext = {
         graphToken,
@@ -633,11 +634,11 @@ export function startTeamsApp(): void {
         signin: async (cn: string) => {
           try {
             const result = await signin({ connectionName: cn })
-            console.log(`[teams] signin(${cn}): ${result ? "token received" : "no token"}`)
+            emitNervesEvent({ level: "info", event: "channel.signin_result", component: "channels", message: `signin(${cn}): ${result ? "token received" : "no token"}`, meta: { connectionName: cn, hasToken: !!result } })
             return result
           } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : String(e)
-            console.error(`[teams] signin(${cn}) failed: ${msg.slice(0, 100)}`)
+            emitNervesEvent({ level: "error", event: "channel.signin_error", component: "channels", message: `signin(${cn}) failed`, meta: { connectionName: cn, reason: msg.slice(0, 100) } })
             return undefined
           }
         },
@@ -655,7 +656,7 @@ export function startTeamsApp(): void {
       await handleTeamsMessage(text, stream, convId, teamsContext, ctxSend)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.error(`[teams] handler error: ${msg.slice(0, 200)}`)
+      emitNervesEvent({ level: "error", event: "channel.handler_error", component: "channels", message: msg.slice(0, 200), meta: {} })
     } finally {
       _turnCoordinator.endTurn(turnKey)
     }
@@ -668,7 +669,7 @@ export function startTeamsApp(): void {
   if (!process.listeners("unhandledRejection").some((l) => (l as AgentHandler).__agentHandler)) {
     const handler: AgentHandler = (err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err)
-      console.error(`[teams] unhandled rejection: ${msg.slice(0, 200)}`)
+      emitNervesEvent({ level: "error", event: "channel.unhandled_rejection", component: "channels", message: msg.slice(0, 200), meta: {} })
     }
     handler.__agentHandler = true
     process.on("unhandledRejection", handler)
@@ -676,10 +677,10 @@ export function startTeamsApp(): void {
 
   app.event("error", ({ error }) => {
     const msg = error instanceof Error ? error.message : String(error)
-    console.error(`[teams] app error: ${msg}`)
+    emitNervesEvent({ level: "error", event: "channel.app_error", component: "channels", message: msg, meta: {} })
   })
 
   const port = getTeamsChannelConfig().port
   app.start(port)
-  console.log(`Teams bot started on port ${port} with ${mode} (chunked streaming)`)
+  emitNervesEvent({ level: "info", event: "channel.app_started", component: "channels", message: `Teams bot started on port ${port} with ${mode} (chunked streaming)`, meta: { port, mode } })
 }

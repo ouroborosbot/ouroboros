@@ -17,6 +17,7 @@ import { FriendResolver } from "../mind/friends/resolver"
 import { accumulateFriendTokens } from "../mind/friends/tokens"
 import type { ToolContext } from "../repertoire/tools"
 import { configureCliRuntimeLogger } from "./cli-logging"
+import { emitNervesEvent } from "../nerves/runtime"
 
 // readline.Interface exposes undocumented mutable line/cursor for in-progress input
 type ReadlineInternals = readline.Interface & { line: string; cursor: number }
@@ -244,6 +245,12 @@ export class MarkdownStreamer {
 }
 
 export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void } {
+  emitNervesEvent({
+    component: "senses",
+    event: "senses.cli_callbacks_created",
+    message: "cli callbacks created",
+    meta: {},
+  })
   let currentSpinner: Spinner | null = null
   let hadReasoning = false
   let hadToolRun = false
@@ -374,6 +381,7 @@ export async function main() {
   let closed = false
   rl.on("close", () => { closed = true })
 
+  // eslint-disable-next-line no-console -- terminal UX: startup banner
   console.log(`\n${getAgentName()} (type /commands for help)\n`)
 
   const cliCallbacks = createCliCallbacks()
@@ -417,10 +425,12 @@ export async function main() {
             messages.length = 0
             messages.push({ role: "system", content: await buildSystem("cli") })
             deleteSession(sessPath)
+            // eslint-disable-next-line no-console -- terminal UX: session cleared
             console.log("session cleared")
             process.stdout.write("\x1b[36m> \x1b[0m")
             continue
           } else if (dispatchResult.result.action === "response") {
+            // eslint-disable-next-line no-console -- terminal UX: command dispatch result
             console.log(dispatchResult.result.message || "")
             process.stdout.write("\x1b[36m> \x1b[0m")
             continue
@@ -471,6 +481,7 @@ export async function main() {
     }
   } finally {
     rl.close()
+    // eslint-disable-next-line no-console -- terminal UX: goodbye
     console.log("bye")
   }
 }

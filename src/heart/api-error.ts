@@ -1,6 +1,8 @@
 // Shared error handling for Graph and ADO API responses.
 // Maps HTTP status codes to LLM-readable error messages.
 
+import { emitNervesEvent } from "../nerves/runtime"
+
 interface ApiResponse {
   status: number
   statusText: string
@@ -13,6 +15,13 @@ export function handleApiError(
 ): string {
   // Network error (no HTTP response)
   if (!responseOrError || typeof responseOrError !== "object" || !("status" in responseOrError)) {
+    emitNervesEvent({
+      level: "error",
+      component: "clients",
+      event: "client.error",
+      message: "network error",
+      meta: { service },
+    })
     return `NETWORK_ERROR: Could not reach ${service}.`
   }
 

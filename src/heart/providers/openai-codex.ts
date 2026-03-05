@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { getOpenAICodexConfig } from "../../config";
 import { loadAgentConfig } from "../../identity";
+import { emitNervesEvent } from "../../nerves/runtime";
 import type { ProviderRuntime, ProviderTurnRequest } from "../core";
 import type { ResponseItem } from "../streaming";
 import { streamResponsesApi, toResponsesInput, toResponsesTools } from "../streaming";
@@ -88,6 +89,12 @@ function getChatGPTAccountIdFromToken(token: string): string {
 }
 
 export function createOpenAICodexProviderRuntime(): ProviderRuntime {
+  emitNervesEvent({
+    component: "engine",
+    event: "engine.provider_init",
+    message: "openai-codex provider init",
+    meta: { provider: "openai-codex" },
+  });
   const codexConfig = getOpenAICodexConfig();
   if (!(codexConfig.model && codexConfig.oauthAccessToken)) {
     throw new Error(

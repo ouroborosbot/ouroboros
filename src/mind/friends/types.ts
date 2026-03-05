@@ -1,6 +1,8 @@
 // Context kernel type definitions.
 // FriendRecord (merged identity + memory), channel capabilities, and resolved context.
 
+import { emitNervesEvent } from "../../nerves/runtime"
+
 // -- Identity Provider --
 // Closed union: "aad" (Azure AD / Teams), "local" (CLI / OS), "teams-conversation" (fallback)
 export type IdentityProvider = "aad" | "local" | "teams-conversation"
@@ -8,6 +10,12 @@ export type IdentityProvider = "aad" | "local" | "teams-conversation"
 const IDENTITY_PROVIDERS: ReadonlySet<string> = new Set<IdentityProvider>(["aad", "local", "teams-conversation"])
 
 export function isIdentityProvider(value: unknown): value is IdentityProvider {
+  emitNervesEvent({
+    component: "friends",
+    event: "friends.identity_provider_check",
+    message: "identity provider validation",
+    meta: {},
+  })
   return typeof value === "string" && IDENTITY_PROVIDERS.has(value)
 }
 

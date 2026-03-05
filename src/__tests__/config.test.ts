@@ -21,7 +21,6 @@ vi.mock("../identity", () => ({
   DEFAULT_AGENT_CONTEXT: {
     maxTokens: 80000,
     contextMargin: 20,
-    maxToolOutputChars: 20000,
   },
 }))
 
@@ -189,7 +188,7 @@ describe("loadConfig", () => {
   it("ignores legacy context block from secrets.json", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(
       JSON.stringify({
-        context: { maxTokens: 1, contextMargin: 1, maxToolOutputChars: 1 },
+        context: { maxTokens: 1, contextMargin: 1 },
         providers: {
           minimax: { apiKey: "minimax-key", model: "MiniMax-M2.5" },
         },
@@ -203,7 +202,6 @@ describe("loadConfig", () => {
     // context must come from agent.json defaults, not legacy secrets.json context
     expect(config.context.maxTokens).toBe(80000)
     expect(config.context.contextMargin).toBe(20)
-    expect(config.context.maxToolOutputChars).toBe(20000)
     expect(config.providers.minimax.apiKey).toBe("minimax-key")
   })
 
@@ -478,7 +476,6 @@ describe("getContextConfig", () => {
       context: {
         maxTokens: 100000,
         contextMargin: 25,
-        maxToolOutputChars: 12345,
       },
     } as any)
 
@@ -486,7 +483,6 @@ describe("getContextConfig", () => {
       context: {
         maxTokens: 1,
         contextMargin: 2,
-        maxToolOutputChars: 3,
       },
     }
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(configData))
@@ -497,7 +493,6 @@ describe("getContextConfig", () => {
 
     expect(ctx.maxTokens).toBe(100000)
     expect(ctx.contextMargin).toBe(25)
-    expect(ctx.maxToolOutputChars).toBe(12345)
   })
 
   it("returns defaults when not configured", async () => {
@@ -519,7 +514,6 @@ describe("getContextConfig", () => {
       context: {
         maxTokens: "bad",
         contextMargin: 12,
-        maxToolOutputChars: null,
       },
     } as any)
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
@@ -530,7 +524,6 @@ describe("getContextConfig", () => {
 
     expect(ctx.maxTokens).toBe(80000)
     expect(ctx.contextMargin).toBe(12)
-    expect(ctx.maxToolOutputChars).toBe(20000)
   })
 
   it("falls back contextMargin to default when agent.json contextMargin is not numeric", async () => {
@@ -541,7 +534,6 @@ describe("getContextConfig", () => {
       context: {
         maxTokens: 91000,
         contextMargin: "bad",
-        maxToolOutputChars: 15000,
       },
     } as any)
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
@@ -552,7 +544,6 @@ describe("getContextConfig", () => {
 
     expect(ctx.maxTokens).toBe(91000)
     expect(ctx.contextMargin).toBe(20)
-    expect(ctx.maxToolOutputChars).toBe(15000)
   })
 
 })

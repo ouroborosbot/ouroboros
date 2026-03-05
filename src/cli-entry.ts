@@ -6,6 +6,7 @@
 
 // Fail fast if --agent is missing (before any src/ code tries getAgentName())
 if (!process.argv.includes("--agent")) {
+  // eslint-disable-next-line no-console -- pre-boot guard: --agent check before imports
   console.error("Missing required --agent <name> argument.\nUsage: node dist/cli-entry.js --agent ouroboros")
   process.exit(1)
 }
