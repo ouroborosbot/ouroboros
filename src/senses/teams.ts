@@ -625,7 +625,7 @@ export function startTeamsApp(): void {
         const githubRes = await api.users.token.get({ userId, connectionName: oauthConfig.githubConnectionName, channelId })
         githubToken = githubRes?.token
       } catch { /* no token yet — tool handler will trigger signin */ }
-      console.log(`[teams] tokens: graph=${graphToken ? "yes" : "no"} ado=${adoToken ? "yes" : "no"} github=${githubToken ? "yes" : "no"}`)
+      emitNervesEvent({ level: "info", event: "channel.token_status", component: "channels", message: "oauth token availability", meta: { graph: !!graphToken, ado: !!adoToken, github: !!githubToken } })
 
       const teamsContext: TeamsMessageContext = {
         graphToken,
@@ -634,11 +634,11 @@ export function startTeamsApp(): void {
         signin: async (cn: string) => {
           try {
             const result = await signin({ connectionName: cn })
-            console.log(`[teams] signin(${cn}): ${result ? "token received" : "no token"}`)
+            emitNervesEvent({ level: "info", event: "channel.signin_result", component: "channels", message: `signin(${cn}): ${result ? "token received" : "no token"}`, meta: { connectionName: cn, hasToken: !!result } })
             return result
           } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : String(e)
-            console.error(`[teams] signin(${cn}) failed: ${msg.slice(0, 100)}`)
+            emitNervesEvent({ level: "error", event: "channel.signin_error", component: "channels", message: `signin(${cn}) failed`, meta: { connectionName: cn, reason: msg.slice(0, 100) } })
             return undefined
           }
         },
