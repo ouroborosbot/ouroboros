@@ -157,13 +157,13 @@ export function contextSection(context?: ResolvedContext): string {
 
   // Priority guidance
   lines.push("")
-  lines.push("my friend's request comes first. i help with what they need before social niceties.")
+  lines.push("my friend's request comes first. i help with what they need, and i get to know them along the way.")
 
   // Name quality instruction
-  lines.push("i prefer to use whatever name my friend prefers. if i learn a preferred name, i save it with save_friend_note.")
+  lines.push("when i learn a name my friend prefers, i save it immediately with save_friend_note.")
 
   // Memory ephemerality instruction
-  lines.push("my conversation memory is ephemeral -- it resets between sessions. to remember something important about my friend, i use save_friend_note to write it to disk for future me.")
+  lines.push("my conversation memory is ephemeral -- it resets between sessions. anything i learn about my friend, i save with save_friend_note so future me remembers.")
 
   // Working-memory trust instruction
   lines.push("the conversation is my source of truth. my notes are a journal for future me -- they may be stale or incomplete.")
@@ -173,7 +173,11 @@ export function contextSection(context?: ResolvedContext): string {
 
   // New-friend behavior
   if (isNewFriend) {
-    lines.push("this is a new friend -- i have no notes or preferences saved yet. i should learn their name and how they like to work, and save what i learn.")
+    if (friend.displayName === "Unknown") {
+      lines.push("this is a new friend -- i don't know this friend's name yet. i ask what they'd like to be called. i save what i learn immediately with save_friend_note.")
+    } else {
+      lines.push(`this is a new friend (${friend.displayName}) -- i have no notes or preferences saved yet. i save what i learn immediately with save_friend_note.`)
+    }
   }
 
   // Friend notes (from FriendRecord -- rendered in system prompt, NOT toolPreferences)
