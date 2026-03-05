@@ -175,7 +175,6 @@ function toAnthropicUsage(raw: Record<string, unknown>): UsageData {
 
 function mergeAnthropicToolArguments(current: string, partial: string): string {
   if (!partial) return current
-  if (!current.trim()) return partial
 
   const trimmedCurrent = current.trim()
   const trimmedPartial = partial.trim()
