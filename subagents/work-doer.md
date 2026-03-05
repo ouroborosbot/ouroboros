@@ -230,3 +230,4 @@ When all units are `✅`:
 15. **Run full test suite** — before marking unit complete, not just new tests
 16. **Always compile** — run the project's build command after every implementation/refactor unit. Tests passing is necessary but not sufficient.
 17. **Checklist hygiene is mandatory** — keep doing/planning `Completion Criteria` checklists synchronized with verified completion evidence.
+18. **Verify APIs before importing** — before writing `import { Foo } from './bar'`, use `grep` or `read_file` to confirm `Foo` is actually exported from that module. Never assume an export exists — always check the source first. This prevents wasted cycles on "module has no exported member" errors.
