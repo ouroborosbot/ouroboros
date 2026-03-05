@@ -76,10 +76,10 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [x] Onboarding instructions only appear below 100K token threshold -- they drop from the system prompt once exceeded
 - [x] `ONBOARDING_TOKEN_THRESHOLD` exported from `first-impressions.ts` (easily changeable)
 - [x] Existing 4a/b/c prompt tests updated: priority guidance/name quality assertions flipped, isNewFriend tests rewritten for totalTokens-based detection
-- [ ] `notes` field changed from `Record<string, string>` to `Record<string, { value: string, savedAt: string }>` -- timestamped notes (schema version stays 1)
-- [ ] `save_friend_note` handler constructs `{ value, savedAt }` objects when saving notes
-- [ ] `contextSection()` renders notes with date prefix: `- role: [2026-03-05] software engineer`
-- [ ] All existing code that reads/writes notes updated for new structure (store-file.ts, resolver.ts, first-impressions.ts references)
+- [x] `notes` field changed from `Record<string, string>` to `Record<string, { value: string, savedAt: string }>` -- timestamped notes (schema version stays 1)
+- [x] `save_friend_note` handler constructs `{ value, savedAt }` objects when saving notes
+- [x] `contextSection()` renders notes with date prefix: `- role: [2026-03-05] software engineer`
+- [x] All existing code that reads/writes notes updated for new structure (store-file.ts, resolver.ts, first-impressions.ts references)
 - [ ] `save_friend_note` with key "name" redirects to `displayName` update instead of storing as a note -- returns descriptive message to model
 - [ ] User confirms on both surfaces: bot proactively calls `save_friend_note` when learning anything about the user
 - [ ] User confirms onboarding instructions disappear after sufficient conversation
@@ -955,7 +955,7 @@ All test files that construct `FriendRecord` objects with non-empty `notes` must
 **Output**: New/modified test cases across the files above
 **Acceptance**: New tests FAIL (red) because notes are still `Record<string, string>`. Updated existing tests also fail due to type mismatch until 22b implements the change.
 
-### ⬜ Unit 22b: Timestamped notes -- Implementation
+### ✅ Unit 22b: Timestamped notes -- Implementation
 **What**: Change the notes type from `Record<string, string>` to `Record<string, { value: string, savedAt: string }>` and update all code that reads/writes notes.
 
 Changes:
