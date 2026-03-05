@@ -166,7 +166,6 @@ export function loadAgentConfig(): AgentConfig {
       followup: existingPhrases?.followup ?? DEFAULT_AGENT_PHRASES.followup,
     }
     parsed.phrases = filled
-    console.warn("agent.json is missing phrases, added placeholders")
     emitNervesEvent({
       level: "warn",
       event: "config_identity.error",
