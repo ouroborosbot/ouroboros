@@ -4208,8 +4208,8 @@ describe("openai-codex oauth provider contract", () => {
     expect(mockResponsesCreate.mock.calls[0][0]).toEqual(expect.objectContaining({
       model: "gpt-5.2",
       tool_choice: "required",
-      metadata: { trace_id: "trace-openai-codex" },
     }))
+    expect(mockResponsesCreate.mock.calls[0][0]).not.toHaveProperty("metadata")
   })
 
   it("passes through non-auth response errors without re-auth wrapping", async () => {

@@ -150,7 +150,6 @@ export function createOpenAICodexProviderRuntime(): ProviderRuntime {
         store: false,
         include: ["reasoning.encrypted_content"],
       };
-      if (request.traceId) params.metadata = { trace_id: request.traceId };
       if (request.toolChoiceRequired) params.tool_choice = "required";
       try {
         const result = await streamResponsesApi(this.client as OpenAI, params, request.callbacks, request.signal);
