@@ -65,3 +65,26 @@ Task docs go in `<agent>/tasks/` with naming scheme `YYYY-MM-DD-HHMM-{planning|d
 - When a logical unit of work is complete and committable, commit immediately.
 - Keep commits atomic (one logical change per commit).
 - If a git remote is configured, push after each atomic commit.
+
+### Logging Policy
+
+All runtime observability goes through `emitNervesEvent()` from `src/nerves/runtime`. Raw `console.*` calls are banned in production code by ESLint `no-console: "error"`.
+
+**Console exception categories** (annotated with `// eslint-disable-next-line no-console -- <category>: <reason>`):
+- **pre-boot guard**: Code that runs before any imports (entrypoint arg checks)
+- **terminal UX**: Direct terminal output in the CLI adapter (banners, goodbye messages)
+- **meta-tooling**: The nerves audit CLI itself (cannot observe itself)
+
+**Automatic enforcement** -- five CI audit rules (no manual manifest):
+1. **every-test-emits**: Every test must emit at least one nerves event
+2. **start/end pairing**: Events ending in `_start` must have a matching `_end` or `_error` in the same test
+3. **error context**: Error-level events must have non-empty `meta` with diagnostic context
+4. **source coverage**: Every `component:event` key found in production source must be observed during tests
+5. **file completeness**: Every production file with executable code must have at least one `emitNervesEvent` call (type-only files are exempt)
+
+**Naming conventions**:
+- `event` and `component` must be **static string literals** (no template literals, no variables) -- the source scanner depends on this
+- Operations use `_start`/`_end`/`_error` suffix convention for pairing
+- Component names match the domain: `engine`, `mind`, `friends`, `repertoire`, `senses`, `clients`, `channels`
+
+**Two-layer enforcement**: The five deterministic audit rules catch structural violations automatically. Work-merger provides the judgment layer, reviewing new code paths for missing observability that the rules cannot detect.
