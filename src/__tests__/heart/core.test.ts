@@ -337,6 +337,54 @@ describe("runAgent", () => {
     expect(followUps).toEqual(["follow-up 1", "follow-up 2"])
   })
 
+  it("rebases openai-codex provider state from messages at each runAgent turn", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: makeOpenAICodexAccessToken(),
+        },
+      },
+    } as any)
+
+    mockResponsesCreate.mockReset()
+    mockResponsesCreate
+      .mockImplementationOnce((params: any) => {
+        const input = Array.isArray(params.input) ? params.input : []
+        expect(input.some((item: any) => item?.role === "user" && item?.content === "hello")).toBe(true)
+        return makeResponsesStream([{ type: "response.output_text.delta", delta: "first" }])
+      })
+      .mockImplementationOnce((params: any) => {
+        const input = Array.isArray(params.input) ? params.input : []
+        expect(input.some((item: any) => item?.role === "user" && item?.content === "what model are you?")).toBe(true)
+        return makeResponsesStream([{ type: "response.output_text.delta", delta: "second" }])
+      })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const core = await import("../../heart/core")
+    const messages: any[] = [{ role: "system", content: "test" }, { role: "user", content: "hello" }]
+    await core.runAgent(messages, callbacks)
+    messages.push({ role: "user", content: "what model are you?" })
+    await core.runAgent(messages, callbacks)
+
+    const assistantReplies = messages
+      .filter((m: any) => m.role === "assistant" && typeof m.content === "string")
+      .map((m: any) => m.content)
+    expect(assistantReplies).toContain("first")
+    expect(assistantReplies).toContain("second")
+  })
+
   it("propagates traceId option into model request metadata", async () => {
     mockCreate.mockReturnValue(
       makeStream([makeChunk("ok")])
