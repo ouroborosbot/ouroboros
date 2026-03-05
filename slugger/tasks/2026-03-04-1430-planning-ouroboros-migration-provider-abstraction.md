@@ -133,4 +133,4 @@ Keep scope disciplined: runtime provider abstraction + provider integrations onl
 - 2026-03-04 15:25 User approved planning doc for conversion to doing
 - 2026-03-04 15:32 Clarified that this task performs storage/config refactor before provider abstraction; legacy data migration itself is manual out-of-band via runbook
 - 2026-03-04 15:35 Added mandatory manual validation gates for Anthropic setup-token and OpenAI Codex OAuth with artifact evidence requirements
-- 2026-03-05 02:17 Added pre-Unit-5 planning scope for provider module extraction and CLI log/user-output separation; set status to NEEDS_REVIEW
+- 2026-03-04 18:26 Added pre-Unit-5 planning scope for provider module extraction and CLI log/user-output separation; set status to NEEDS_REVIEW
