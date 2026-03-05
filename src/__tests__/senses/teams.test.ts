@@ -736,9 +736,10 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     vi.restoreAllMocks()
   })
 
-  it("logs 'with DevtoolsPlugin' in DevtoolsPlugin mode", async () => {
+  it("emits app_started event with DevtoolsPlugin mode", async () => {
     vi.resetModules()
-    // no env vars to clear
+    const emitNervesEventLocal = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: emitNervesEventLocal }))
 
     vi.doMock("@microsoft/teams.apps", () => ({
       App: class MockApp {
@@ -757,14 +758,16 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
 
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
-
     const teams = await import("../../senses/teams")
     teams.startTeamsApp()
 
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("DevtoolsPlugin"))
+    expect(emitNervesEventLocal).toHaveBeenCalledWith(expect.objectContaining({
+      level: "info",
+      event: "channel.app_started",
+      component: "channels",
+      meta: expect.objectContaining({ mode: "DevtoolsPlugin" }),
+    }))
 
-    consoleSpy.mockRestore()
     vi.restoreAllMocks()
   })
 
@@ -1130,9 +1133,10 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     vi.restoreAllMocks()
   })
 
-  it("message handler catches errors without crashing", async () => {
+  it("message handler catches errors and emits handler_error event", async () => {
     vi.resetModules()
-    // no env vars to clear
+    const emitNervesEventLocal = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: emitNervesEventLocal }))
 
     let capturedHandler: ((args: any) => Promise<void>) | null = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -1155,9 +1159,6 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
 
-    vi.spyOn(console, "log").mockImplementation(() => {})
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
-
     const teams = await import("../../senses/teams")
     teams.startTeamsApp()
 
@@ -1167,14 +1168,19 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       activity: { text: "test" },
     })).resolves.not.toThrow()
 
-    expect(errorSpy).toHaveBeenCalled()
+    expect(emitNervesEventLocal).toHaveBeenCalledWith(expect.objectContaining({
+      level: "error",
+      event: "channel.handler_error",
+      component: "channels",
+    }))
 
     vi.restoreAllMocks()
   })
 
-  it("message handler catches non-Error thrown values", async () => {
+  it("message handler catches non-Error thrown values with handler_error event", async () => {
     vi.resetModules()
-    // no env vars to clear
+    const emitNervesEventLocal = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: emitNervesEventLocal }))
 
     let capturedHandler: ((args: any) => Promise<void>) | null = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -1197,9 +1203,6 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
 
-    vi.spyOn(console, "log").mockImplementation(() => {})
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
-
     const teams = await import("../../senses/teams")
     teams.startTeamsApp()
 
@@ -1209,7 +1212,12 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       activity: { text: "test" },
     })).resolves.not.toThrow()
 
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("string-crash"))
+    expect(emitNervesEventLocal).toHaveBeenCalledWith(expect.objectContaining({
+      level: "error",
+      event: "channel.handler_error",
+      component: "channels",
+      message: expect.stringContaining("string-crash"),
+    }))
 
     vi.restoreAllMocks()
   })
@@ -1422,9 +1430,10 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     vi.restoreAllMocks()
   })
 
-  it("app.event error handler logs error message", async () => {
+  it("app.event error handler emits app_error nerves event", async () => {
     vi.resetModules()
-    // no env vars to clear
+    const emitNervesEventLocal = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: emitNervesEventLocal }))
 
     let capturedEventHandler: ((args: any) => void) | null = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -1446,19 +1455,27 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
 
-    vi.spyOn(console, "log").mockImplementation(() => {})
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
-
     const teams = await import("../../senses/teams")
     teams.startTeamsApp()
 
     expect(capturedEventHandler).toBeDefined()
     capturedEventHandler!({ error: new Error("SDK blew up") })
-    expect(errorSpy).toHaveBeenCalledWith("[teams] app error: SDK blew up")
+    expect(emitNervesEventLocal).toHaveBeenCalledWith(expect.objectContaining({
+      level: "error",
+      event: "channel.app_error",
+      component: "channels",
+      message: "SDK blew up",
+    }))
 
     // Cover non-Error branch
+    emitNervesEventLocal.mockClear()
     capturedEventHandler!({ error: "string error" })
-    expect(errorSpy).toHaveBeenCalledWith("[teams] app error: string error")
+    expect(emitNervesEventLocal).toHaveBeenCalledWith(expect.objectContaining({
+      level: "error",
+      event: "channel.app_error",
+      component: "channels",
+      message: "string error",
+    }))
 
     vi.restoreAllMocks()
   })
@@ -1861,9 +1878,10 @@ describe("Teams adapter - unhandledRejection guard", () => {
     }
   })
 
-  it("registers unhandledRejection handler with __agentHandler marker (renamed from __ouroboros)", async () => {
+  it("registers unhandledRejection handler that emits unhandled_rejection event", async () => {
     vi.resetModules()
-    // no env vars to clear
+    const emitNervesEventLocal = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: emitNervesEventLocal }))
 
     vi.doMock("@microsoft/teams.apps", () => ({
       App: class MockApp {
@@ -1882,8 +1900,6 @@ describe("Teams adapter - unhandledRejection guard", () => {
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
 
-    vi.spyOn(console, "log").mockImplementation(() => {})
-
     const teams = await import("../../senses/teams")
     teams.startTeamsApp()
 
@@ -1891,14 +1907,23 @@ describe("Teams adapter - unhandledRejection guard", () => {
     const ouroboros = listeners.find((l) => (l as any).__agentHandler)
     expect(ouroboros).toBeDefined()
 
-    // Invoke the handler to cover the console.error line
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
     ;(ouroboros as Function)(new Error("test rejection"))
-    expect(errorSpy).toHaveBeenCalledWith("[teams] unhandled rejection: test rejection")
+    expect(emitNervesEventLocal).toHaveBeenCalledWith(expect.objectContaining({
+      level: "error",
+      event: "channel.unhandled_rejection",
+      component: "channels",
+      message: expect.stringContaining("test rejection"),
+    }))
 
     // Cover non-Error branch
+    emitNervesEventLocal.mockClear()
     ;(ouroboros as Function)("string rejection")
-    expect(errorSpy).toHaveBeenCalledWith("[teams] unhandled rejection: string rejection")
+    expect(emitNervesEventLocal).toHaveBeenCalledWith(expect.objectContaining({
+      level: "error",
+      event: "channel.unhandled_rejection",
+      component: "channels",
+      message: expect.stringContaining("string rejection"),
+    }))
 
     vi.restoreAllMocks()
   })
