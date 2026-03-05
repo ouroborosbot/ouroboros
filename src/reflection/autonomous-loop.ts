@@ -163,10 +163,17 @@ export async function runAutonomousLoop(config: LoopConfig): Promise<LoopResult>
   const planOutput = await runStage(
     "plan",
     plannerPrompt,
-    `Convert this reflection proposal into an actionable doing document:\n\n${proposalContent}`,
+    `Convert this reflection proposal into an actionable doing document. Use your tools to write the doing doc to disk in the tasks directory.\n\n${proposalContent}`,
     traceId,
   )
   stagesCompleted.push("plan")
+
+  // Write the plan output as a doing doc if the planner didn't already write one
+  const doingDocName = proposalPath.replace(/planning-/, "doing-")
+  if (!fs.existsSync(doingDocName)) {
+    fs.writeFileSync(doingDocName, planOutput, "utf-8")
+    console.log(`[loop] Wrote doing doc: ${doingDocName}`)
+  }
 
   // Stage 3: Do (work-doer executes the doing doc via TDD)
   if (stagesCompleted.length >= config.maxStages) {
@@ -177,7 +184,7 @@ export async function runAutonomousLoop(config: LoopConfig): Promise<LoopResult>
   const doOutput = await runStage(
     "do",
     doerPrompt,
-    `Execute this doing document. Follow TDD — tests first, then implementation.\n\n${planOutput}`,
+    `Execute the doing document at: ${doingDocName}\n\nRead it with read_file, then execute all work units using TDD. Use shell to run tests, write_file to create code, and commit after each unit.`,
     traceId,
   )
   stagesCompleted.push("do")
@@ -191,7 +198,7 @@ export async function runAutonomousLoop(config: LoopConfig): Promise<LoopResult>
   await runStage(
     "merge",
     mergerPrompt,
-    `Merge the completed work. Create a PR, verify CI, and merge.\n\nWork summary:\n${doOutput}`,
+    `Merge the completed work. Use shell to check git status/log for recent commits, run tests, then create a PR and merge.\n\nProject root: ${config.projectRoot}\nWork summary:\n${doOutput}`,
     traceId,
   )
   stagesCompleted.push("merge")
