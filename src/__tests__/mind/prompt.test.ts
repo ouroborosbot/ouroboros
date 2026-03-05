@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import * as path from "path"
+import * as nodeFs from "node:fs"
 
 vi.mock("fs", () => ({
   existsSync: vi.fn(),
@@ -19,16 +20,26 @@ vi.mock("../../repertoire/skills", () => ({
   loadSkill: vi.fn(),
 }))
 
-vi.mock("../../identity", () => ({
-  loadAgentConfig: vi.fn(() => ({
-    name: "testagent",
-    configPath: "~/.agentconfigs/testagent/config.json",
-  })),
-  getAgentName: vi.fn(() => "testagent"),
-  getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
-  getRepoRoot: vi.fn(() => "/mock/repo"),
-  resetIdentity: vi.fn(),
-}))
+vi.mock("../../identity", () => {
+  const DEFAULT_AGENT_CONTEXT = {
+    maxTokens: 80000,
+    contextMargin: 20,
+    maxToolOutputChars: 20000,
+  }
+  return {
+    DEFAULT_AGENT_CONTEXT,
+    loadAgentConfig: vi.fn(() => ({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
+      context: { ...DEFAULT_AGENT_CONTEXT },
+    })),
+    getAgentName: vi.fn(() => "testagent"),
+    getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
+    getRepoRoot: vi.fn(() => "/mock/repo"),
+    resetIdentity: vi.fn(),
+  }
+})
 
 vi.mock("openai", () => {
   class MockOpenAI {
@@ -52,6 +63,32 @@ const MOCK_IDENTITY = "i am Ouroboros.\ni use lowercase in my responses to the u
 const MOCK_LORE = "i am named after the ouroboros -- the ancient symbol of a serpent eating its own tail."
 const MOCK_FRIENDS = "my creator works at microsoft and talks to me through the CLI and Teams."
 
+function makeOpenAICodexAccessToken(accountId = "acct_test"): string {
+  const header = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url")
+  const payload = Buffer.from(
+    JSON.stringify({
+      "https://api.openai.com/auth": {
+        chatgpt_account_id: accountId,
+      },
+    })
+  ).toString("base64url")
+  return `${header}.${payload}.sig`
+}
+
+function setAgentProvider(provider: "azure" | "minimax" | "anthropic" | "openai-codex") {
+  const DEFAULT_AGENT_CONTEXT = {
+    maxTokens: 80000,
+    contextMargin: 20,
+    maxToolOutputChars: 20000,
+  }
+  vi.mocked(identity.loadAgentConfig).mockReturnValue({
+    name: "testagent",
+    configPath: "~/.agentsecrets/testagent/secrets.json",
+    provider,
+    context: { ...DEFAULT_AGENT_CONTEXT },
+  })
+}
+
 // Helper: configure readFileSync to return psyche files by path
 function setupReadFileSync() {
   vi.mocked(fs.readFileSync).mockImplementation((filePath: any, _encoding?: any) => {
@@ -60,7 +97,7 @@ function setupReadFileSync() {
     if (p.endsWith("IDENTITY.md")) return MOCK_IDENTITY
     if (p.endsWith("LORE.md")) return MOCK_LORE
     if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
-    if (p.endsWith("config.json")) return JSON.stringify({})
+    if (p.endsWith("secrets.json")) return JSON.stringify({})
     return ""
   })
 }
@@ -68,6 +105,7 @@ function setupReadFileSync() {
 describe("buildSystem", () => {
   beforeEach(() => {
     vi.resetModules()
+    setAgentProvider("minimax")
   })
 
   it("includes soul section with personality", async () => {
@@ -216,6 +254,7 @@ describe("buildSystem", () => {
   })
 
   it("includes azure provider string when azure config is set", async () => {
+    setAgentProvider("azure")
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
@@ -235,7 +274,68 @@ describe("buildSystem", () => {
     expect(result).toContain("azure openai (gpt-4o-deploy, model: test-model)")
   })
 
+  it("includes anthropic provider string when Anthropic model is configured with Claude setup-token credentials", async () => {
+    setAgentProvider("anthropic")
+    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, _encoding?: any) => {
+      const p = String(filePath)
+      if (p.endsWith("SOUL.md")) return MOCK_SOUL
+      if (p.endsWith("IDENTITY.md")) return MOCK_IDENTITY
+      if (p.endsWith("LORE.md")) return MOCK_LORE
+      if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
+      if (p.endsWith("secrets.json")) return JSON.stringify({})
+      return ""
+    })
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+          setupToken: `sk-ant-oat01-${"a".repeat(80)}`,
+        },
+      },
+    } as any)
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    try {
+      const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+      resetPsycheCache()
+      const result = await buildSystem()
+      expect(result).toContain("anthropic (claude-opus-4-6)")
+    } finally {
+      mockExit.mockRestore()
+    }
+  })
+
+  it("includes openai codex provider string when OpenAI Codex OAuth is configured", async () => {
+    setAgentProvider("openai-codex")
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: makeOpenAICodexAccessToken(),
+        },
+      },
+    } as any)
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    try {
+      const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+      resetPsycheCache()
+      const result = await buildSystem()
+      expect(result).toContain("openai codex (gpt-5.2)")
+    } finally {
+      mockExit.mockRestore()
+    }
+  })
+
   it("uses 'default' deployment when azure deployment is not set", async () => {
+    setAgentProvider("azure")
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
@@ -271,7 +371,7 @@ describe("buildSystem", () => {
       if (p.endsWith("IDENTITY.md")) return MOCK_IDENTITY
       if (p.endsWith("LORE.md")) return MOCK_LORE
       if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
-      if (p.endsWith("config.json")) return JSON.stringify({})
+      if (p.endsWith("secrets.json")) return JSON.stringify({})
       return ""
     })
     const { setTestConfig, resetConfigCache } = await import("../../config")
@@ -290,7 +390,7 @@ describe("buildSystem", () => {
       if (p.endsWith("IDENTITY.md")) return "custom identity content"
       if (p.endsWith("LORE.md")) return MOCK_LORE
       if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
-      if (p.endsWith("config.json")) return JSON.stringify({})
+      if (p.endsWith("secrets.json")) return JSON.stringify({})
       return ""
     })
     const { setTestConfig, resetConfigCache } = await import("../../config")
@@ -421,9 +521,18 @@ describe("buildSystem", () => {
   })
 })
 
+describe("provider section contract", () => {
+  it("does not hardcode provider-specific branching in prompt provider rendering", () => {
+    const sourcePath = path.resolve(__dirname, "..", "..", "mind", "prompt.ts")
+    const source = nodeFs.readFileSync(sourcePath, "utf-8")
+    expect(source).not.toContain('getProvider() === "azure"')
+  })
+})
+
 describe("runtimeInfoSection", () => {
   beforeEach(() => {
     vi.resetModules()
+    setAgentProvider("minimax")
   })
 
   it("always includes agent name and cwd", async () => {
@@ -476,6 +585,7 @@ describe("runtimeInfoSection", () => {
 describe("psyche loading", () => {
   beforeEach(() => {
     vi.resetModules()
+    setAgentProvider("minimax")
   })
 
   it("loads psyche files from agentRoot/psyche/", async () => {
@@ -498,7 +608,7 @@ describe("psyche loading", () => {
   it("handles missing psyche files gracefully (empty string, no crash)", async () => {
     vi.mocked(fs.readFileSync).mockImplementation((filePath: any, _encoding?: any) => {
       const p = String(filePath)
-      if (p.endsWith("config.json")) return JSON.stringify({})
+      if (p.endsWith("secrets.json")) return JSON.stringify({})
       throw new Error("ENOENT: no such file or directory")
     })
     const { setTestConfig, resetConfigCache } = await import("../../config")
@@ -546,6 +656,7 @@ describe("psyche loading", () => {
 describe("flagsSection removed", () => {
   it("flagsSection is no longer exported from prompt module", async () => {
     vi.resetModules()
+    setAgentProvider("minimax")
     setupReadFileSync()
     const promptModule = await import("../../mind/prompt")
     expect(promptModule).not.toHaveProperty("flagsSection")
@@ -555,6 +666,7 @@ describe("flagsSection removed", () => {
 describe("contextSection", () => {
   beforeEach(() => {
     vi.resetModules()
+    setAgentProvider("minimax")
   })
 
   it("returns empty string when context is undefined", async () => {
@@ -1379,6 +1491,7 @@ describe("contextSection", () => {
 describe("buildSystem with context", () => {
   beforeEach(() => {
     vi.resetModules()
+    setAgentProvider("minimax")
   })
 
   it("includes context section when context is provided", async () => {

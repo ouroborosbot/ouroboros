@@ -33,8 +33,14 @@ vi.mock("../../repertoire/skills", () => ({
 vi.mock("../../identity", () => ({
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
-    configPath: "~/.agentconfigs/testagent/config.json",
+    configPath: "~/.agentsecrets/testagent/secrets.json",
+    provider: "minimax",
   })),
+  DEFAULT_AGENT_CONTEXT: {
+    maxTokens: 80000,
+    contextMargin: 20,
+    maxToolOutputChars: 20000,
+  },
   getAgentName: vi.fn(() => "testagent"),
   getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
   getRepoRoot: vi.fn(() => "/mock/repo"),
@@ -44,6 +50,9 @@ vi.mock("../../identity", () => ({
 // We need to mock OpenAI before importing core
 const mockCreate = vi.fn()
 const mockResponsesCreate = vi.fn()
+const mockOpenAICtor = vi.fn()
+const mockAnthropicMessagesCreate = vi.fn()
+const mockAnthropicCtor = vi.fn()
 vi.mock("openai", () => {
   class MockOpenAI {
     chat = {
@@ -54,7 +63,9 @@ vi.mock("openai", () => {
     responses = {
       create: mockResponsesCreate,
     }
-    constructor(_opts?: any) {}
+    constructor(opts?: any) {
+      mockOpenAICtor(opts)
+    }
   }
   return {
     default: MockOpenAI,
@@ -62,12 +73,38 @@ vi.mock("openai", () => {
   }
 })
 
+vi.mock("@anthropic-ai/sdk", () => {
+  class MockAnthropic {
+    messages = {
+      create: mockAnthropicMessagesCreate,
+    }
+    constructor(opts?: any) {
+      mockAnthropicCtor(opts)
+    }
+  }
+  return {
+    default: MockAnthropic,
+  }
+})
+
 import * as fs from "fs"
+import * as nodeFs from "node:fs"
+import * as path from "path"
 import { execSync, spawnSync } from "child_process"
+import * as identity from "../../identity"
 import type { ChannelCallbacks } from "../../heart/core"
 
 // Dynamic config helpers -- must be re-imported after vi.resetModules()
+async function setAgentProvider(provider: "azure" | "minimax" | "anthropic" | "openai-codex") {
+  vi.mocked(identity.loadAgentConfig).mockReturnValue({
+    name: "testagent",
+    configPath: "~/.agentsecrets/testagent/secrets.json",
+    provider,
+  })
+}
+
 async function setupMinimax(apiKey = "test-key", model = "test-model") {
+  await setAgentProvider("minimax")
   const config = await import("../../config")
   config.resetConfigCache()
   config.setTestConfig({ providers: { minimax: { apiKey, model } } })
@@ -79,12 +116,42 @@ async function setupAzure(
   deployment = "test-deployment",
   modelName = "gpt-5.2-chat",
 ) {
+  await setAgentProvider("azure")
   const config = await import("../../config")
   config.resetConfigCache()
   config.setTestConfig({ providers: { azure: { apiKey, endpoint, deployment, modelName } } })
 }
 
+function makeAnthropicSetupToken(): string {
+  return `sk-ant-oat01-${"a".repeat(80)}`
+}
+
+function encodeBase64Url(value: string): string {
+  return Buffer.from(value, "utf8")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "")
+}
+
+function makeOpenAICodexAccessToken(accountId = "chatgpt-account-test"): string {
+  const header = encodeBase64Url(JSON.stringify({ alg: "none", typ: "JWT" }))
+  const payload = encodeBase64Url(
+    JSON.stringify({
+      "https://api.openai.com/auth": {
+        chatgpt_account_id: accountId,
+      },
+    }),
+  )
+  return `${header}.${payload}.signature`
+}
+
 async function setupConfig(partial: Record<string, unknown>) {
+  const providers = (partial.providers ?? {}) as Record<string, unknown>
+  if (providers.azure) await setAgentProvider("azure")
+  else if (providers.anthropic) await setAgentProvider("anthropic")
+  else if (providers["openai-codex"]) await setAgentProvider("openai-codex")
+  else await setAgentProvider("minimax")
   const config = await import("../../config")
   config.resetConfigCache()
   config.setTestConfig(partial as any)
@@ -210,6 +277,7 @@ describe("runAgent", () => {
     vi.resetModules()
     mockCreate.mockReset()
     mockResponsesCreate.mockReset()
+    mockOpenAICtor.mockReset()
     // Restore default readFileSync so prompt.ts module-level psyche file loads work
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupMinimax()
@@ -267,6 +335,54 @@ describe("runAgent", () => {
     expect(drained).toHaveBeenCalledTimes(1)
     const followUps = messages.filter((m: any) => m.role === "user").map((m: any) => m.content)
     expect(followUps).toEqual(["follow-up 1", "follow-up 2"])
+  })
+
+  it("rebases openai-codex provider state from messages at each runAgent turn", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: makeOpenAICodexAccessToken(),
+        },
+      },
+    } as any)
+
+    mockResponsesCreate.mockReset()
+    mockResponsesCreate
+      .mockImplementationOnce((params: any) => {
+        const input = Array.isArray(params.input) ? params.input : []
+        expect(input.some((item: any) => item?.role === "user" && item?.content === "hello")).toBe(true)
+        return makeResponsesStream([{ type: "response.output_text.delta", delta: "first" }])
+      })
+      .mockImplementationOnce((params: any) => {
+        const input = Array.isArray(params.input) ? params.input : []
+        expect(input.some((item: any) => item?.role === "user" && item?.content === "what model are you?")).toBe(true)
+        return makeResponsesStream([{ type: "response.output_text.delta", delta: "second" }])
+      })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const core = await import("../../heart/core")
+    const messages: any[] = [{ role: "system", content: "test" }, { role: "user", content: "hello" }]
+    await core.runAgent(messages, callbacks)
+    messages.push({ role: "user", content: "what model are you?" })
+    await core.runAgent(messages, callbacks)
+
+    const assistantReplies = messages
+      .filter((m: any) => m.role === "assistant" && typeof m.content === "string")
+      .map((m: any) => m.content)
+    expect(assistantReplies).toContain("first")
+    expect(assistantReplies).toContain("second")
   })
 
   it("propagates traceId option into model request metadata", async () => {
@@ -2729,14 +2845,23 @@ describe("getClient", () => {
     expect(core.getProvider()).toBe("azure")
   })
 
-  it("falls back to MiniMax when Azure config is incomplete", async () => {
+  it("fails fast when selected Azure provider config is incomplete", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupConfig({ providers: { azure: { apiKey: "azure-test-key" }, minimax: { apiKey: "mm-key", model: "MiniMax-M2.5" } } })
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
-    const core = await import("../../heart/core")
-    expect(core.getModel()).toBe("MiniMax-M2.5")
-    expect(core.getProvider()).toBe("minimax")
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("provider 'azure' is selected"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
   })
 
   it("caches client across multiple runAgent invocations", async () => {
@@ -2848,7 +2973,7 @@ describe("getClient config integration", () => {
     expect(core.getProvider()).toBe("azure")
   })
 
-  it("config.json is the sole source for provider selection", async () => {
+  it("uses agent.json provider with secrets.json settings", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupMinimax("config-mm-key", "config-mm-model")
@@ -2942,6 +3067,1388 @@ describe("getClient config integration", () => {
     expect(mockExit).toHaveBeenCalledWith(1)
     mockExit.mockRestore()
     mockError.mockRestore()
+  })
+})
+
+describe("provider abstraction contract", () => {
+  it("exports createProviderRegistry for provider abstraction wiring", async () => {
+    const core = await import("../../heart/core")
+    expect(typeof (core as any).createProviderRegistry).toBe("function")
+  })
+
+  it("runAgent request path avoids hardcoded provider-name branches", () => {
+    const sourcePath = path.resolve(__dirname, "..", "..", "heart", "core.ts")
+    const source = nodeFs.readFileSync(sourcePath, "utf-8")
+    expect(source).not.toContain('if (provider === "azure")')
+  })
+
+  it("delegates provider runtime construction to dedicated provider modules", async () => {
+    const realFs = await vi.importActual<typeof import("node:fs")>("node:fs")
+    const sourcePath = path.resolve(__dirname, "..", "..", "heart", "core.ts")
+    const source = realFs.readFileSync(sourcePath, "utf-8")
+    expect(source).toContain('from "./providers/azure"')
+    expect(source).toContain('from "./providers/anthropic"')
+    expect(source).toContain('from "./providers/minimax"')
+    expect(source).not.toContain("const runtimeFactories:")
+    expect(source).not.toContain("streamAnthropicMessages(")
+  })
+
+  it("registry provider runtimes expose provider-owned turn execution hooks", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
+    const core = await import("../../heart/core")
+    const registry = (core as any).createProviderRegistry()
+    const runtime = registry.resolve()
+    expect(runtime).toBeTruthy()
+    expect(typeof runtime?.streamTurn).toBe("function")
+    expect(typeof runtime?.appendToolOutput).toBe("function")
+    expect(typeof runtime?.resetTurnState).toBe("function")
+  })
+
+  it("azure provider runtime safely ignores tool output before turn state initialization", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    expect(runtime?.id).toBe("azure")
+    expect(() => runtime?.appendToolOutput("call_1", "ok")).not.toThrow()
+  })
+
+  it("azure provider runtime rebuilds turn state inside streamTurn when unset", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
+    mockResponsesCreate.mockImplementationOnce(() => ({
+      [Symbol.asyncIterator]: async function* () {
+        yield { type: "response.output_text.delta", delta: "hello azure" }
+        yield { type: "response.completed" }
+      },
+    }))
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    expect(runtime?.id).toBe("azure")
+
+    const onTextChunk = vi.fn()
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk,
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const result = await runtime.streamTurn({
+      messages: [{ role: "user", content: "hi" }],
+      activeTools: [],
+      callbacks,
+    })
+    expect(result.toolCalls).toEqual([])
+    expect(onTextChunk).toHaveBeenCalledWith("hello azure")
+  })
+
+  it("fails fast when provider registry resolves null runtime", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    vi.doMock("../../heart/providers/azure", () => ({
+      createAzureProviderRuntime: () => null,
+    }))
+    await setupAzure()
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      vi.spyOn(core as any, "createProviderRegistry").mockReturnValue({
+        resolve: () => null,
+      } as any)
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith("provider runtime could not be initialized.")
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+      vi.doUnmock("../../heart/providers/azure")
+    }
+  })
+
+})
+
+describe("anthropic setup-token provider contract", () => {
+  function makeAnthropicEventStream(events: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const event of events) {
+          yield event
+        }
+      },
+    }
+  }
+
+  beforeEach(() => {
+    mockAnthropicMessagesCreate.mockReset()
+    mockAnthropicCtor.mockReset()
+    vi.mocked(execSync).mockReset()
+  })
+
+  it("uses Anthropic when setup-token credentials are configured in secrets.json", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+          setupToken: makeAnthropicSetupToken(),
+        },
+      },
+    })
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+
+    try {
+      const core = await import("../../heart/core")
+      expect(core.getProvider()).toBe("anthropic")
+      expect(core.getModel()).toBe("claude-opus-4-6")
+      expect(mockAnthropicCtor).toHaveBeenCalledWith(
+        expect.objectContaining({
+          authToken: makeAnthropicSetupToken(),
+        }),
+      )
+      expect(mockAnthropicCtor).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          apiKey: expect.any(String),
+        }),
+      )
+    } finally {
+      mockExit.mockRestore()
+    }
+  })
+
+  it("fails fast with setup-token prefix guidance when non-setup Anthropic token is found", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+          setupToken: "sk-ant-not-setup-token",
+        },
+      },
+    })
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("expected prefix sk-ant-oat01-"))
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("claude setup-token"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("fails fast with setup-token length guidance when token is too short", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+          setupToken: "sk-ant-oat01-short",
+        },
+      },
+    })
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("too short"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("fails fast with re-auth guidance when setup-token is blank after trimming", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+          setupToken: "   ",
+        },
+      },
+    })
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("no setup-token credential was found"))
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("claude setup-token"))
+      expect(mockError).toHaveBeenCalledWith(
+        expect.stringContaining("~/.agentsecrets/testagent/secrets.json"),
+      )
+      expect(mockError).toHaveBeenCalledWith(
+        expect.stringContaining("providers.anthropic.setupToken"),
+      )
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("fails fast when Anthropic model is configured but setupToken is missing from secrets config", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+        },
+      },
+    })
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockExit).toHaveBeenCalledWith(1)
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("model/setupToken is incomplete"))
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("claude setup-token"))
+      expect(mockError).toHaveBeenCalledWith(
+        expect.stringContaining("~/.agentsecrets/testagent/secrets.json"),
+      )
+      expect(mockError).toHaveBeenCalledWith(
+        expect.stringContaining("providers.anthropic.setupToken"),
+      )
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("maps canonical messages to Anthropic payload and streams tool/text/thinking/usage events", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: Date.now() + 60_000,
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+          setupToken: makeAnthropicSetupToken(),
+        },
+      },
+    })
+
+    mockAnthropicMessagesCreate.mockResolvedValue(makeAnthropicEventStream([
+      {
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "tool_use", id: "call0", name: "read_file", input: { path: "a.txt" } },
+      },
+      {
+        type: "content_block_start",
+        index: 1,
+        content_block: { type: "tool_use", id: "call1", name: "search" },
+      },
+      {
+        type: "content_block_delta",
+        delta: { type: "text_delta", text: "hello " },
+      },
+      {
+        type: "content_block_delta",
+        delta: { type: "thinking_delta", thinking: "reasoning " },
+      },
+      {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "input_json_delta", partial_json: ',\"line\":1' },
+      },
+      {
+        type: "content_block_delta",
+        index: 99,
+        delta: { type: "input_json_delta", partial_json: '{"ignored":true}' },
+      },
+      {
+        type: "content_block_stop",
+        index: 1,
+      },
+      {
+        type: "message_delta",
+        usage: {
+          input_tokens: 2,
+          cache_creation_input_tokens: 3,
+          cache_read_input_tokens: 4,
+          output_tokens: 5,
+        },
+      },
+    ]))
+
+    const streamStart = vi.fn()
+    const textChunk = vi.fn()
+    const reasoningChunk = vi.fn()
+    const controller = new AbortController()
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: streamStart,
+      onTextChunk: textChunk,
+      onReasoningChunk: reasoningChunk,
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const messages: any[] = [
+      { role: "system", content: [{ type: "text", text: "system from array" }] },
+      { role: "system", content: "ignored second system" },
+      { role: "user", content: "hello user" },
+      {
+        role: "assistant",
+        content: "assistant text",
+        tool_calls: [
+          { id: "tool1", type: "function", function: { name: "read_file", arguments: "{\"path\":\"f.txt\"}" } },
+        ],
+      },
+      {
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          { id: "tool2", type: "function", function: { name: "noop", arguments: " " } },
+          { id: "tool3", type: "function", function: { name: "noop", arguments: "not-json" } },
+          { id: "tool4", type: "function", function: { name: "noop", arguments: "3" } },
+        ],
+      },
+      { role: "assistant", content: null },
+      {
+        role: "tool",
+        tool_call_id: "tool1",
+        content: [
+          { type: "text", text: 42 as any },
+          { type: "text", text: "tool output" },
+        ],
+      },
+    ]
+
+    const activeTools: any[] = [
+      {
+        type: "function",
+        function: {
+          name: "read_file",
+          parameters: { type: "object", properties: { path: { type: "string" } } },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "search",
+        },
+      },
+    ]
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    expect(runtime.id).toBe("anthropic")
+    expect(() => runtime.resetTurnState(messages)).not.toThrow()
+    expect(() => runtime.appendToolOutput("noop-call", "ok")).not.toThrow()
+    const result = await runtime.streamTurn({
+      messages,
+      activeTools,
+      callbacks,
+      signal: controller.signal,
+      toolChoiceRequired: true,
+    })
+
+    expect(streamStart).toHaveBeenCalledTimes(1)
+    expect(textChunk).toHaveBeenCalledWith("hello ")
+    expect(reasoningChunk).toHaveBeenCalledWith("reasoning ")
+    expect(result.content).toBe("hello ")
+    expect(result.toolCalls).toEqual([
+      {
+        id: "call0",
+        name: "read_file",
+        arguments: "{\"path\":\"a.txt\",\"line\":1}",
+      },
+      {
+        id: "call1",
+        name: "search",
+        arguments: "{}",
+      },
+    ])
+    expect(result.usage).toEqual({
+      input_tokens: 9,
+      output_tokens: 5,
+      reasoning_tokens: 0,
+      total_tokens: 14,
+    })
+    expect(mockAnthropicMessagesCreate).toHaveBeenCalledTimes(1)
+    const [params, requestOptions] = mockAnthropicMessagesCreate.mock.calls[0]
+    expect(requestOptions).toEqual({ signal: controller.signal })
+    expect(params).toEqual(expect.objectContaining({
+      model: "claude-opus-4-6",
+      stream: true,
+      max_tokens: 4096,
+      system: "system from array",
+      tool_choice: { type: "any" },
+    }))
+    expect(Array.isArray((params as any).messages)).toBe(true)
+    expect(Array.isArray((params as any).tools)).toBe(true)
+  })
+
+  it("handles Anthropic tool argument merge/reset/fallback delta paths", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: Date.now() + 60_000,
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+          setupToken: makeAnthropicSetupToken(),
+        },
+      },
+    })
+
+    mockAnthropicMessagesCreate.mockResolvedValue(makeAnthropicEventStream([
+      {
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "tool_use", id: "call0", name: "read_file", input: {} },
+      },
+      {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "input_json_delta", partial_json: ',\"line\":1' },
+      },
+      {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "input_json_delta", partial_json: '{"path":"b.txt","line":2}' },
+      },
+      {
+        type: "content_block_start",
+        index: 1,
+        content_block: { type: "tool_use", id: "call1", name: "search", input: [] },
+      },
+      {
+        type: "content_block_delta",
+        index: 1,
+        delta: { type: "input_json_delta", partial_json: ',\"q\":\"snake\"' },
+      },
+    ]))
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    const result = await runtime.streamTurn({
+      messages: [{ role: "user", content: "hi" }],
+      activeTools: [
+        { type: "function", function: { name: "read_file" } },
+        { type: "function", function: { name: "search" } },
+      ],
+      callbacks: {
+        onModelStart: vi.fn(),
+        onModelStreamStart: vi.fn(),
+        onTextChunk: vi.fn(),
+        onReasoningChunk: vi.fn(),
+        onToolStart: vi.fn(),
+        onToolEnd: vi.fn(),
+        onError: vi.fn(),
+      },
+      signal: new AbortController().signal,
+    })
+
+    expect(result.toolCalls).toEqual([
+      { id: "call0", name: "read_file", arguments: '{"path":"b.txt","line":2}' },
+      { id: "call1", name: "search", arguments: '[],"q":"snake"' },
+    ])
+  })
+
+  it("returns early when Anthropic stream signal is aborted", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: Date.now() + 60_000,
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+          setupToken: makeAnthropicSetupToken(),
+        },
+      },
+    })
+
+    mockAnthropicMessagesCreate.mockResolvedValue(makeAnthropicEventStream([
+      { type: "content_block_delta", delta: { type: "text_delta", text: "ignored" } },
+    ]))
+
+    const streamStart = vi.fn()
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: streamStart,
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const controller = new AbortController()
+    controller.abort()
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    const result = await runtime.streamTurn({
+      messages: [{ role: "user", content: "hi" }],
+      activeTools: [],
+      callbacks,
+      signal: controller.signal,
+    })
+
+    expect(result.content).toBe("")
+    expect(result.toolCalls).toEqual([])
+    expect(result.outputItems).toEqual([])
+    expect(streamStart).not.toHaveBeenCalled()
+    expect(mockAnthropicMessagesCreate).toHaveBeenCalledWith(expect.any(Object), { signal: controller.signal })
+  })
+
+  it("wraps Anthropic auth failures from create() with setup-token guidance", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: Date.now() + 60_000,
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+          setupToken: makeAnthropicSetupToken(),
+        },
+      },
+    })
+
+    const authError: any = new Error("oauth authentication failed")
+    authError.status = 401
+    mockAnthropicMessagesCreate.mockRejectedValue(authError)
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    await expect(
+      runtime.streamTurn({
+        messages: [{ role: "user", content: "hi" }],
+        activeTools: [],
+        callbacks,
+      }),
+    ).rejects.toThrow("claude setup-token")
+  })
+
+  it("wraps Anthropic auth failures from streaming events with setup-token guidance", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: Date.now() + 60_000,
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+          setupToken: makeAnthropicSetupToken(),
+        },
+      },
+    })
+
+    const streamError = Object.assign(new Error("invalid api key"), { status: 403 })
+    mockAnthropicMessagesCreate.mockResolvedValue({
+      [Symbol.asyncIterator]: async function* () {
+        yield { type: "content_block_delta", delta: { type: "text_delta", text: "partial" } }
+        throw streamError
+      },
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    await expect(
+      runtime.streamTurn({
+        messages: [{ role: "user", content: "hi" }],
+        activeTools: [],
+        callbacks,
+      }),
+    ).rejects.toThrow("Anthropic authentication failed")
+  })
+
+  it("preserves non-auth Anthropic errors without rewriting guidance", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: Date.now() + 60_000,
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+          setupToken: makeAnthropicSetupToken(),
+        },
+      },
+    })
+
+    mockAnthropicMessagesCreate.mockRejectedValue(new Error("transport failed"))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    await expect(
+      runtime.streamTurn({
+        messages: [{ role: "user", content: "hi" }],
+        activeTools: [],
+        callbacks,
+      }),
+    ).rejects.toThrow("transport failed")
+  })
+
+  it("fails fast when setup-token contains only whitespace characters", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+          setupToken: "\n \t",
+        },
+      },
+    })
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("no setup-token credential was found"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("handles nullish Anthropic stream fields and unknown events safely", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: Date.now() + 60_000,
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+          setupToken: makeAnthropicSetupToken(),
+        },
+      },
+    })
+
+    mockAnthropicMessagesCreate.mockResolvedValue(makeAnthropicEventStream([
+      { type: "content_block_start", index: 2, content_block: { type: "tool_use" } },
+      { type: "content_block_delta", delta: { type: "thinking_delta" } },
+      { type: "content_block_delta", delta: { type: "text_delta" } },
+      { type: "content_block_delta" },
+      { type: "content_block_delta", index: 2, delta: { type: "input_json_delta" } },
+      { type: "content_block_stop", index: 999 },
+      { type: "content_block_start", index: 4, content_block: { type: "not_tool_use" } },
+      { type: "message_delta", usage: {} },
+      { type: "message_delta", usage: "invalid" },
+      {},
+      { type: "mystery" },
+    ]))
+
+    const streamStart = vi.fn()
+    const textChunk = vi.fn()
+    const reasoningChunk = vi.fn()
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: streamStart,
+      onTextChunk: textChunk,
+      onReasoningChunk: reasoningChunk,
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    const result = await runtime.streamTurn({
+      messages: [
+        { role: "system", content: "" },
+        { role: "assistant", content: null },
+        { role: "unknown", content: "ignored" } as any,
+      ],
+      activeTools: [],
+      callbacks,
+    })
+
+    expect(streamStart).toHaveBeenCalledTimes(1)
+    expect(textChunk).toHaveBeenCalledWith("")
+    expect(reasoningChunk).toHaveBeenCalledWith("")
+    expect(result.content).toBe("")
+    expect(result.toolCalls).toEqual([
+      {
+        id: "",
+        name: "",
+        arguments: "",
+      },
+    ])
+    expect(result.usage).toEqual({
+      input_tokens: 0,
+      output_tokens: 0,
+      reasoning_tokens: 0,
+      total_tokens: 0,
+    })
+  })
+
+  it("converts non-Error thrown values into terminal errors", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: Date.now() + 60_000,
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+          setupToken: makeAnthropicSetupToken(),
+        },
+      },
+    })
+
+    mockAnthropicMessagesCreate.mockRejectedValue("plain-string-failure")
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    await expect(
+      runtime.streamTurn({
+        messages: [{ role: "user", content: "hi" }],
+        activeTools: [],
+        callbacks,
+      }),
+    ).rejects.toThrow("plain-string-failure")
+  })
+
+  it("logs non-Error provider-resolution failures before exiting", async () => {
+    vi.resetModules()
+    await setAgentProvider("anthropic")
+    vi.doMock("../../config", () => ({
+      getAzureConfig: () => ({
+        apiKey: "",
+        endpoint: "",
+        deployment: "",
+        modelName: "",
+        apiVersion: "",
+      }),
+      getAnthropicConfig: () => {
+        throw "config-exploded"
+      },
+      getMinimaxConfig: () => ({
+        apiKey: "",
+        model: "",
+      }),
+      getContextConfig: () => ({
+        maxToolOutputChars: 50000,
+        maxTokens: 120000,
+        contextMargin: 2000,
+      }),
+    }))
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith("config-exploded")
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+      vi.doUnmock("../../config")
+    }
+  })
+})
+
+describe("openai-codex oauth provider contract", () => {
+  function makeResponsesStream(events: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const event of events) {
+          yield event
+        }
+      },
+    }
+  }
+
+  beforeEach(() => {
+    mockResponsesCreate.mockReset()
+    mockOpenAICtor.mockReset()
+  })
+
+  it("uses openai-codex when oauth credentials are configured in secrets.json", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: makeOpenAICodexAccessToken(),
+        },
+      },
+    } as any)
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+
+    try {
+      const core = await import("../../heart/core")
+      expect(core.getProvider()).toBe("openai-codex")
+      expect(core.getModel()).toBe("gpt-5.2")
+      expect(mockExit).not.toHaveBeenCalled()
+    } finally {
+      mockExit.mockRestore()
+    }
+  })
+
+  it("fails fast with oauth guidance when openai-codex oauthAccessToken is missing", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: "",
+        },
+      },
+    } as any)
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("openai-codex"))
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("oauthAccessToken"))
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("secrets.json"))
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("codex login"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("wraps openai-codex oauth auth failures with explicit re-auth guidance", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: makeOpenAICodexAccessToken(),
+        },
+      },
+    } as any)
+
+    const authError: any = new Error("authentication failed")
+    authError.status = 401
+    mockResponsesCreate.mockRejectedValue(authError)
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    await expect(
+      runtime.streamTurn({
+        messages: [{ role: "user", content: "hello" }],
+        activeTools: [],
+        callbacks,
+      }),
+    ).rejects.toThrow(/OpenAI Codex authentication failed[\s\S]*codex login/)
+  })
+
+  it("wraps openai-codex auth failures detected from error message markers", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: makeOpenAICodexAccessToken(),
+        },
+      },
+    } as any)
+
+    mockResponsesCreate.mockRejectedValue(new Error("invalid bearer token"))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    await expect(
+      runtime.streamTurn({
+        messages: [{ role: "user", content: "hello" }],
+        activeTools: [],
+        callbacks,
+      }),
+    ).rejects.toThrow("OpenAI Codex authentication failed")
+  })
+
+  it("fails fast when openai-codex oauthAccessToken contains only whitespace", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: " \n\t ",
+        },
+      },
+    } as any)
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("OAuth access token is empty"))
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("providers.openai-codex.oauthAccessToken"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("fails fast when openai-codex oauthAccessToken is missing chatgpt_account_id", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const tokenWithoutAccountId = `${encodeBase64Url(JSON.stringify({ alg: "none", typ: "JWT" }))}.${encodeBase64Url(JSON.stringify({ sub: "user-123" }))}.signature`
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: tokenWithoutAccountId,
+        },
+      },
+    } as any)
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("chatgpt_account_id"))
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("backend-api/codex"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("fails fast when openai-codex oauthAccessToken payload cannot be decoded as JSON", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const malformedPayload = Buffer.from("not-json", "utf8").toString("base64url")
+    const malformedToken = `${encodeBase64Url(JSON.stringify({ alg: "none", typ: "JWT" }))}.${malformedPayload}.signature`
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: malformedToken,
+        },
+      },
+    } as any)
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("chatgpt_account_id"))
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("backend-api/codex"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("fails fast when openai-codex oauthAccessToken is not JWT formatted", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: "not-a-jwt",
+        },
+      },
+    } as any)
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("chatgpt_account_id"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("fails fast when openai-codex oauthAccessToken payload is a JSON array", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const arrayPayloadToken = `${encodeBase64Url(JSON.stringify({ alg: "none", typ: "JWT" }))}.${encodeBase64Url(JSON.stringify([]))}.signature`
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: arrayPayloadToken,
+        },
+      },
+    } as any)
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("chatgpt_account_id"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("fails fast when openai-codex chatgpt_account_id is not a string", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const nonStringAccountIdToken = `${encodeBase64Url(JSON.stringify({ alg: "none", typ: "JWT" }))}.${encodeBase64Url(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: 123 } }))}.signature`
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: nonStringAccountIdToken,
+        },
+      },
+    } as any)
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("chatgpt_account_id"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("streams openai-codex responses and appends provider output items into turn state", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const accountId = "chatgpt-account-123"
+    const oauthAccessToken = makeOpenAICodexAccessToken(accountId)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken,
+        },
+      },
+    } as any)
+
+    mockResponsesCreate.mockImplementationOnce(() =>
+      makeResponsesStream([
+        { type: "response.output_text.delta", delta: "hi " },
+        {
+          type: "response.output_item.done",
+          item: {
+            type: "function_call",
+            id: "fc1",
+            call_id: "call1",
+            name: "read_file",
+            arguments: "{\"path\":\"README.md\"}",
+            status: "completed",
+          },
+        },
+      ]),
+    )
+    mockResponsesCreate.mockImplementationOnce((params: any) => {
+      const input = Array.isArray(params.input) ? params.input : []
+      expect(input.some((item: any) => item?.type === "function_call")).toBe(true)
+      expect(input.some((item: any) => item?.type === "function_call_output" && item?.call_id === "call1")).toBe(true)
+      return makeResponsesStream([{ type: "response.output_text.delta", delta: "done" }])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    expect(mockOpenAICtor).toHaveBeenCalledWith(expect.objectContaining({
+      apiKey: oauthAccessToken,
+      baseURL: "https://chatgpt.com/backend-api/codex",
+      timeout: 30000,
+      maxRetries: 0,
+      defaultHeaders: {
+        "chatgpt-account-id": accountId,
+        "OpenAI-Beta": "responses=experimental",
+        originator: "ouroboros",
+      },
+    }))
+    expect(() => runtime.appendToolOutput("call1", "ignored-before-reset")).not.toThrow()
+
+    const first = await runtime.streamTurn({
+      messages: [{ role: "user", content: "hello" }],
+      activeTools: [
+        {
+          type: "function",
+          function: {
+            name: "read_file",
+          },
+        },
+      ],
+      callbacks,
+      traceId: "trace-openai-codex",
+      toolChoiceRequired: true,
+    })
+    runtime.appendToolOutput("call1", "tool-output")
+    const second = await runtime.streamTurn({
+      messages: [{ role: "user", content: "followup" }],
+      activeTools: [],
+      callbacks,
+    })
+
+    expect(first.content).toBe("hi ")
+    expect(first.toolCalls).toEqual([
+      {
+        id: "call1",
+        name: "read_file",
+        arguments: "{\"path\":\"README.md\"}",
+      },
+    ])
+    expect(second.content).toBe("done")
+    expect(mockResponsesCreate).toHaveBeenCalledTimes(2)
+    expect(mockResponsesCreate.mock.calls[0][0]).toEqual(expect.objectContaining({
+      model: "gpt-5.2",
+      tool_choice: "required",
+    }))
+    expect(mockResponsesCreate.mock.calls[0][0]).not.toHaveProperty("metadata")
+  })
+
+  it("passes through non-auth response errors without re-auth wrapping", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: makeOpenAICodexAccessToken(),
+        },
+      },
+    } as any)
+
+    mockResponsesCreate.mockRejectedValue("plain-failure")
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    await expect(
+      runtime.streamTurn({
+        messages: [{ role: "user", content: "hello" }],
+        activeTools: [],
+        callbacks,
+      }),
+    ).rejects.toThrow("plain-failure")
+  })
+
+  it("passes through non-auth Error instances without re-auth wrapping", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: makeOpenAICodexAccessToken(),
+        },
+      },
+    } as any)
+
+    mockResponsesCreate.mockRejectedValue(new Error("upstream timeout"))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    await expect(
+      runtime.streamTurn({
+        messages: [{ role: "user", content: "hello" }],
+        activeTools: [],
+        callbacks,
+      }),
+    ).rejects.toThrow("upstream timeout")
   })
 })
 

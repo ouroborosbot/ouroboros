@@ -65,6 +65,13 @@ Small corrections to psyche files can be made immediately. Significant identity 
 
 All configuration comes from files, never environment variables. Your `agent.json` points to your secrets file via `configPath`.
 
+Provider/storage contract:
+- `agent.json` must declare `provider` and `configPath`.
+- `configPath` points to `~/.agentsecrets/<agent>/secrets.json`.
+- `secrets.json` stores secrets and provider/team settings; `context` stays in `agent.json`.
+- Runtime/session/log/PII/test-run artifacts live under `~/.agentstate/...`.
+- If the selected provider config is incomplete, runtime must fail fast with explicit re-auth/setup guidance (no provider fallback).
+
 ## Documentation
 
 Keep docs up to date. If you find something out of date, inaccurate, or missing — fix it. The code is the source of truth; docs track it.

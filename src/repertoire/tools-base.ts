@@ -250,7 +250,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
     handler: async (a) => {
       try {
         const key = getIntegrationsConfig().perplexityApiKey;
-        if (!key) return "error: perplexityApiKey not configured in config.json";
+        if (!key) return "error: perplexityApiKey not configured in secrets.json";
         const res = await fetch("https://api.perplexity.ai/search", {
           method: "POST",
           headers: {

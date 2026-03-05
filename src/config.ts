@@ -1,20 +1,30 @@
 import * as fs from "fs"
 import * as path from "path"
 import * as os from "os"
-import { loadAgentConfig, getAgentName } from "./identity"
+import { loadAgentConfig, getAgentName, DEFAULT_AGENT_CONTEXT } from "./identity"
 import { emitNervesEvent } from "./nerves/runtime"
 
 export interface AzureProviderConfig {
+  modelName: string
   apiKey: string
   endpoint: string
   deployment: string
-  modelName: string
   apiVersion: string
 }
 
 export interface MinimaxProviderConfig {
-  apiKey: string
   model: string
+  apiKey: string
+}
+
+export interface AnthropicProviderConfig {
+  model: string
+  setupToken: string
+}
+
+export interface OpenAICodexProviderConfig {
+  model: string
+  oauthAccessToken: string
 }
 
 export interface TeamsConfig {
@@ -49,6 +59,8 @@ export interface OuroborosConfig {
   providers: {
     azure: AzureProviderConfig
     minimax: MinimaxProviderConfig
+    anthropic: AnthropicProviderConfig
+    "openai-codex": OpenAICodexProviderConfig
   }
   teams: TeamsConfig
   oauth: OAuthConfig
@@ -57,18 +69,28 @@ export interface OuroborosConfig {
   integrations: IntegrationsConfig
 }
 
-const DEFAULT_CONFIG: OuroborosConfig = {
+const DEFAULT_SECRETS_TEMPLATE: Omit<OuroborosConfig, "context"> = {
   providers: {
+    // Keep provider field ordering consistent: model first, then auth credentials,
+    // then provider-specific transport fields.
     azure: {
+      modelName: "",
       apiKey: "",
       endpoint: "",
       deployment: "",
-      modelName: "",
       apiVersion: "2025-04-01-preview",
     },
     minimax: {
-      apiKey: "",
       model: "",
+      apiKey: "",
+    },
+    anthropic: {
+      model: "claude-opus-4-6",
+      setupToken: "",
+    },
+    "openai-codex": {
+      model: "gpt-5.2",
+      oauthAccessToken: "",
     },
   },
   teams: {
@@ -81,11 +103,6 @@ const DEFAULT_CONFIG: OuroborosConfig = {
     adoConnectionName: "ado",
     githubConnectionName: "",
   },
-  context: {
-    maxTokens: 80000,
-    contextMargin: 20,
-    maxToolOutputChars: 20000,
-  },
   teamsChannel: {
     skipConfirmation: true,
     port: 3978,
@@ -95,10 +112,35 @@ const DEFAULT_CONFIG: OuroborosConfig = {
   },
 }
 
+function defaultRuntimeConfig(): OuroborosConfig {
+  return {
+    providers: {
+      azure: { ...DEFAULT_SECRETS_TEMPLATE.providers.azure },
+      minimax: { ...DEFAULT_SECRETS_TEMPLATE.providers.minimax },
+      anthropic: { ...DEFAULT_SECRETS_TEMPLATE.providers.anthropic },
+      "openai-codex": { ...DEFAULT_SECRETS_TEMPLATE.providers["openai-codex"] },
+    },
+    teams: { ...DEFAULT_SECRETS_TEMPLATE.teams },
+    oauth: { ...DEFAULT_SECRETS_TEMPLATE.oauth },
+    context: { ...DEFAULT_AGENT_CONTEXT },
+    teamsChannel: { ...DEFAULT_SECRETS_TEMPLATE.teamsChannel },
+    integrations: { ...DEFAULT_SECRETS_TEMPLATE.integrations },
+  }
+}
+
 let _cachedConfig: OuroborosConfig | null = null
+let _testContextOverride: ContextConfig | null = null
 
 function resolveConfigPath(): string {
   const raw = loadAgentConfig().configPath
+  if (
+    raw.startsWith("~/.agentconfigs/") ||
+    raw.includes("/.agentconfigs/")
+  ) {
+    throw new Error(
+      `Legacy configPath '${raw}' is not supported. Use ~/.agentsecrets/<agent>/secrets.json.`,
+    )
+  }
   if (raw.startsWith("~")) {
     return path.join(os.homedir(), raw.slice(1))
   }
@@ -145,6 +187,32 @@ export function loadConfig(): OuroborosConfig {
     const raw = fs.readFileSync(configPath, "utf-8")
     fileData = JSON.parse(raw) as Record<string, unknown>
   } catch (error) {
+    const errorCode =
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      typeof (error as NodeJS.ErrnoException).code === "string"
+        ? (error as NodeJS.ErrnoException).code
+        : undefined
+
+    if (errorCode === "ENOENT") {
+      try {
+        fs.writeFileSync(configPath, JSON.stringify(DEFAULT_SECRETS_TEMPLATE, null, 2) + "\n", "utf-8")
+      } catch (writeError) {
+        emitNervesEvent({
+          level: "warn",
+          event: "config_identity.error",
+          component: "config/identity",
+          message: "failed writing default secrets config",
+          meta: {
+            phase: "loadConfig",
+            path: configPath,
+            reason: writeError instanceof Error ? writeError.message : String(writeError),
+          },
+        })
+      }
+    }
+
     emitNervesEvent({
       level: "warn",
       event: "config_identity.error",
@@ -158,7 +226,25 @@ export function loadConfig(): OuroborosConfig {
     // ENOENT or parse error -- use defaults
   }
 
-  _cachedConfig = deepMerge(DEFAULT_CONFIG as unknown as Record<string, unknown>, fileData) as unknown as OuroborosConfig
+  const sanitizedFileData = { ...fileData }
+  if ("context" in sanitizedFileData) {
+    delete sanitizedFileData.context
+    emitNervesEvent({
+      level: "warn",
+      event: "config_identity.error",
+      component: "config/identity",
+      message: "ignored legacy context block in secrets config",
+      meta: {
+        phase: "loadConfig",
+        path: configPath,
+      },
+    })
+  }
+
+  _cachedConfig = deepMerge(
+    defaultRuntimeConfig() as unknown as Record<string, unknown>,
+    sanitizedFileData,
+  ) as unknown as OuroborosConfig
   emitNervesEvent({
     event: "config.load",
     component: "config/identity",
@@ -173,6 +259,7 @@ export function loadConfig(): OuroborosConfig {
 
 export function resetConfigCache(): void {
   _cachedConfig = null
+  _testContextOverride = null
 }
 
 export type DeepPartial<T> = {
@@ -181,6 +268,14 @@ export type DeepPartial<T> = {
 
 export function setTestConfig(partial: DeepPartial<OuroborosConfig>): void {
   loadConfig() // ensure _cachedConfig exists
+  const contextPatch = partial.context as Partial<ContextConfig> | undefined
+  if (contextPatch) {
+    const base = _testContextOverride ?? DEFAULT_AGENT_CONTEXT
+    _testContextOverride = deepMerge(
+      base as unknown as Record<string, unknown>,
+      contextPatch as unknown as Record<string, unknown>,
+    ) as unknown as ContextConfig
+  }
   _cachedConfig = deepMerge(
     _cachedConfig as unknown as Record<string, unknown>,
     partial as unknown as Record<string, unknown>,
@@ -197,14 +292,39 @@ export function getMinimaxConfig(): MinimaxProviderConfig {
   return { ...config.providers.minimax }
 }
 
+export function getAnthropicConfig(): AnthropicProviderConfig {
+  const config = loadConfig()
+  return { ...config.providers.anthropic }
+}
+
+export function getOpenAICodexConfig(): OpenAICodexProviderConfig {
+  const config = loadConfig()
+  return { ...config.providers["openai-codex"] }
+}
+
 export function getTeamsConfig(): TeamsConfig {
   const config = loadConfig()
   return { ...config.teams }
 }
 
 export function getContextConfig(): ContextConfig {
-  const config = loadConfig()
-  return { ...config.context }
+  if (_testContextOverride) {
+    return { ..._testContextOverride }
+  }
+  const defaults = DEFAULT_AGENT_CONTEXT
+  const agentContext = loadAgentConfig().context
+  if (!agentContext || typeof agentContext !== "object") {
+    return { ...defaults }
+  }
+  return {
+    maxTokens: typeof agentContext.maxTokens === "number" ? agentContext.maxTokens : defaults.maxTokens,
+    contextMargin: typeof agentContext.contextMargin === "number"
+      ? agentContext.contextMargin
+      : defaults.contextMargin,
+    maxToolOutputChars: typeof agentContext.maxToolOutputChars === "number"
+      ? agentContext.maxToolOutputChars
+      : defaults.maxToolOutputChars,
+  }
 }
 
 export function getOAuthConfig(): OAuthConfig {
@@ -224,7 +344,7 @@ export function getIntegrationsConfig(): IntegrationsConfig {
 }
 
 export function getLogsDir(): string {
-  return path.join(os.homedir(), ".agentconfigs", getAgentName(), "logs")
+  return path.join(os.homedir(), ".agentstate", getAgentName(), "logs")
 }
 
 
@@ -233,7 +353,7 @@ function sanitizeKey(key: string): string {
 }
 
 export function sessionPath(friendId: string, channel: string, key: string): string {
-  const dir = path.join(os.homedir(), ".agentconfigs", getAgentName(), "sessions", friendId, channel)
+  const dir = path.join(os.homedir(), ".agentstate", getAgentName(), "sessions", friendId, channel)
   fs.mkdirSync(dir, { recursive: true })
   return path.join(dir, sanitizeKey(key) + ".json")
 }

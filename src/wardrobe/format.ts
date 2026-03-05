@@ -3,7 +3,14 @@
 
 import { emitNervesEvent } from "../nerves/runtime"
 
+function compactSummary(summary: string): string {
+  const oneLine = summary.replace(/\s+/g, " ").trim()
+  if (oneLine.length <= 120) return oneLine
+  return oneLine.slice(0, 120) + "..."
+}
+
 export function formatToolResult(name: string, summary: string, success: boolean): string {
+  const compacted = compactSummary(summary)
   emitNervesEvent({
     event: "channel.message_sent",
     component: "channels",
@@ -12,14 +19,14 @@ export function formatToolResult(name: string, summary: string, success: boolean
       kind: "tool_result",
       name,
       success,
-      has_summary: summary.length > 0,
+      has_summary: compacted.length > 0,
     },
   })
 
   if (success) {
-    return "\u2713 " + name + (summary ? " (" + summary + ")" : "")
+    return "\u2713 " + name + (compacted ? " (" + compacted + ")" : "")
   }
-  return "\u2717 " + name + ": " + summary
+  return "\u2717 " + name + ": " + compacted
 }
 
 export function formatKick(): string {
