@@ -187,3 +187,4 @@ Achieve 100% automatic nerves observability enforcement: replace the manual `REQ
 - 2026-03-05 10:05 Scope expanded: bidirectional audit + full nerves coverage of all production files
 - 2026-03-05 10:09 Resolved all open questions: skip 3 pure-type/infra files, runtime-primary enforcement model, domain grouping
 - 2026-03-05 10:29 Major scope change: replace REQUIRED_EVENTS with 4 automatic audit rules
+- 2026-03-05 10:34 Resolved: Rule 1 no exemptions (all tests emit), beforeEach/afterEach per-test tracking, Rule 2 within single test. File count now 20 (only types.ts skipped).
