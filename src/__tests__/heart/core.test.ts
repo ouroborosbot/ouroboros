@@ -3883,6 +3883,16 @@ describe("anthropic setup-token provider contract", () => {
 })
 
 describe("openai-codex oauth provider contract", () => {
+  function makeResponsesStream(events: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const event of events) {
+          yield event
+        }
+      },
+    }
+  }
+
   beforeEach(() => {
     mockResponsesCreate.mockReset()
   })
@@ -3977,6 +3987,226 @@ describe("openai-codex oauth provider contract", () => {
         callbacks,
       }),
     ).rejects.toThrow("OpenAI Codex authentication failed")
+  })
+
+  it("wraps openai-codex auth failures detected from error message markers", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.3-codex",
+          oauthAccessToken: "oauth-test-token",
+        },
+      },
+    } as any)
+
+    mockResponsesCreate.mockRejectedValue(new Error("invalid bearer token"))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    await expect(
+      runtime.streamTurn({
+        messages: [{ role: "user", content: "hello" }],
+        activeTools: [],
+        callbacks,
+      }),
+    ).rejects.toThrow("OpenAI Codex authentication failed")
+  })
+
+  it("fails fast when openai-codex oauthAccessToken contains only whitespace", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.3-codex",
+          oauthAccessToken: " \n\t ",
+        },
+      },
+    } as any)
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("OAuth access token is empty"))
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("providers.openai-codex.oauthAccessToken"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("streams openai-codex responses and appends provider output items into turn state", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.3-codex",
+          oauthAccessToken: "oauth-test-token",
+        },
+      },
+    } as any)
+
+    mockResponsesCreate.mockImplementationOnce(() =>
+      makeResponsesStream([
+        { type: "response.output_text.delta", delta: "hi " },
+        {
+          type: "response.output_item.done",
+          item: {
+            type: "function_call",
+            id: "fc1",
+            call_id: "call1",
+            name: "read_file",
+            arguments: "{\"path\":\"README.md\"}",
+            status: "completed",
+          },
+        },
+      ]),
+    )
+    mockResponsesCreate.mockImplementationOnce((params: any) => {
+      const input = Array.isArray(params.input) ? params.input : []
+      expect(input.some((item: any) => item?.type === "function_call")).toBe(true)
+      expect(input.some((item: any) => item?.type === "function_call_output" && item?.call_id === "call1")).toBe(true)
+      return makeResponsesStream([{ type: "response.output_text.delta", delta: "done" }])
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    expect(() => runtime.appendToolOutput("call1", "ignored-before-reset")).not.toThrow()
+
+    const first = await runtime.streamTurn({
+      messages: [{ role: "user", content: "hello" }],
+      activeTools: [
+        {
+          type: "function",
+          function: {
+            name: "read_file",
+          },
+        },
+      ],
+      callbacks,
+      traceId: "trace-openai-codex",
+      toolChoiceRequired: true,
+    })
+    runtime.appendToolOutput("call1", "tool-output")
+    const second = await runtime.streamTurn({
+      messages: [{ role: "user", content: "followup" }],
+      activeTools: [],
+      callbacks,
+    })
+
+    expect(first.content).toBe("hi ")
+    expect(first.toolCalls).toEqual([
+      {
+        id: "call1",
+        name: "read_file",
+        arguments: "{\"path\":\"README.md\"}",
+      },
+    ])
+    expect(second.content).toBe("done")
+    expect(mockResponsesCreate).toHaveBeenCalledTimes(2)
+    expect(mockResponsesCreate.mock.calls[0][0]).toEqual(expect.objectContaining({
+      model: "gpt-5.3-codex",
+      tool_choice: "required",
+      metadata: { trace_id: "trace-openai-codex" },
+    }))
+  })
+
+  it("passes through non-auth response errors without re-auth wrapping", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.3-codex",
+          oauthAccessToken: "oauth-test-token",
+        },
+      },
+    } as any)
+
+    mockResponsesCreate.mockRejectedValue("plain-failure")
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    await expect(
+      runtime.streamTurn({
+        messages: [{ role: "user", content: "hello" }],
+        activeTools: [],
+        callbacks,
+      }),
+    ).rejects.toThrow("plain-failure")
+  })
+
+  it("passes through non-auth Error instances without re-auth wrapping", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.3-codex",
+          oauthAccessToken: "oauth-test-token",
+        },
+      },
+    } as any)
+
+    mockResponsesCreate.mockRejectedValue(new Error("upstream timeout"))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    await expect(
+      runtime.streamTurn({
+        messages: [{ role: "user", content: "hello" }],
+        activeTools: [],
+        callbacks,
+      }),
+    ).rejects.toThrow("upstream timeout")
   })
 })
 

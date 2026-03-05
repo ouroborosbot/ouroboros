@@ -6,6 +6,12 @@ import type { ResponseItem } from "../streaming";
 import { streamResponsesApi, toResponsesInput, toResponsesTools } from "../streaming";
 
 interface HttpError extends Error { status?: number }
+const OPENAI_CODEX_AUTH_FAILURE_MARKERS = [
+  "authentication failed",
+  "unauthorized",
+  "invalid api key",
+  "invalid bearer token",
+]
 
 function getOpenAICodexSecretsPathForGuidance(): string {
   return loadAgentConfig().configPath;
@@ -33,12 +39,7 @@ function isOpenAICodexAuthFailure(error: unknown): boolean {
   const status = (error as HttpError).status;
   if (status === 401 || status === 403) return true;
   const lower = error.message.toLowerCase();
-  return (
-    lower.includes("authentication failed") ||
-    lower.includes("unauthorized") ||
-    lower.includes("invalid api key") ||
-    lower.includes("invalid bearer token")
-  );
+  return OPENAI_CODEX_AUTH_FAILURE_MARKERS.some((marker) => lower.includes(marker));
 }
 
 function withOpenAICodexAuthGuidance(error: unknown): Error {
