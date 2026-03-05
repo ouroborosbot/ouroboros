@@ -76,8 +76,14 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [x] Onboarding instructions only appear below 100K token threshold -- they drop from the system prompt once exceeded
 - [x] `ONBOARDING_TOKEN_THRESHOLD` exported from `first-impressions.ts` (easily changeable)
 - [x] Existing 4a/b/c prompt tests updated: priority guidance/name quality assertions flipped, isNewFriend tests rewritten for totalTokens-based detection
+- [ ] `notes` field changed from `Record<string, string>` to `Record<string, { value: string, savedAt: string }>` -- timestamped notes (schema version stays 1)
+- [ ] `save_friend_note` handler constructs `{ value, savedAt }` objects when saving notes
+- [ ] `contextSection()` renders notes with date prefix: `- role: [2026-03-05] software engineer`
+- [ ] All existing code that reads/writes notes updated for new structure (store-file.ts, resolver.ts, first-impressions.ts references)
+- [ ] `save_friend_note` with key "name" redirects to `displayName` update instead of storing as a note -- returns descriptive message to model
 - [ ] User confirms on both surfaces: bot proactively calls `save_friend_note` when learning anything about the user
 - [ ] User confirms onboarding instructions disappear after sufficient conversation
+- [ ] User confirms notes display with date prefix in system prompt
 
 ### All Gates
 - [ ] 100% test coverage on all new and modified code
@@ -918,6 +924,103 @@ Tests to KEEP AS-IS (these currently pass and assert behavior we are keeping):
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new/modified code, all tests green
 
+### ⬜ Unit 22a: Timestamped notes -- Tests
+**What**: Write failing tests covering the change from `Record<string, string>` to `Record<string, { value: string, savedAt: string }>` for the `notes` field. Tests span four files:
+
+**`src/__tests__/repertoire/tools.test.ts`** (save_friend_note handler):
+1. type "note" saves structured `{ value, savedAt }` object: verify `store.put` is called with `notes: { role: { value: "engineering manager", savedAt: expect.stringMatching(/^\d{4}-/) } }`
+2. type "note" with existing structured note and no override returns conflict showing the value (not `[object Object]`)
+3. type "note" with override=true replaces structured note, `savedAt` is updated to current time
+4. type "name" still updates displayName (existing behavior) but does NOT store in `notes.name` -- verify `notes` does not contain key "name" after save
+
+**`src/__tests__/mind/prompt.test.ts`** (contextSection rendering):
+5. Notes render with date prefix: friend with `notes: { role: { value: "software engineer", savedAt: "2026-03-05T00:00:00.000Z" } }` renders as `- role: [2026-03-05] software engineer` in contextSection output
+6. Multiple notes render with correct dates: friend with two timestamped notes renders both with their respective dates
+
+**`src/__tests__/mind/friends/store-file.test.ts`** (persistence):
+7. Structured notes round-trip through put/get: store.put with `{ role: { value: "engineer", savedAt: "2026-03-05T..." } }` then store.get returns the same structure
+
+**`src/__tests__/mind/friends/resolver.test.ts`** (auto-name):
+8. Auto-populated name note uses structured format: new friend with displayName "Jordan" gets `notes: { name: { value: "Jordan", savedAt: expect.any(String) } }`
+9. Auto-populated name note for "Unknown" displayName still produces empty `notes: {}`
+
+**Output**: New/modified test cases in the four test files above
+**Acceptance**: Tests exist and FAIL (red) because notes are still `Record<string, string>`
+
+### ⬜ Unit 22b: Timestamped notes -- Implementation
+**What**: Change the notes type from `Record<string, string>` to `Record<string, { value: string, savedAt: string }>` and update all code that reads/writes notes.
+
+Changes:
+
+1. **`src/mind/friends/types.ts`**: Change `notes: Record<string, string>` to `notes: Record<string, { value: string, savedAt: string }>` on `FriendRecord` interface (line 43)
+
+2. **`src/mind/friends/store-file.ts`**:
+   - Update `AgentKnowledgeData.notes` type from `Record<string, string>` to `Record<string, { value: string, savedAt: string }>` (line 17)
+   - No changes to put/get/merge -- they pass notes through as-is, the type change propagates naturally
+
+3. **`src/mind/friends/resolver.ts`**: In `resolveOrCreate()`, change the auto-name note from `{ name: this.params.displayName }` to `{ name: { value: this.params.displayName, savedAt: now } }` (line 68). `now` is already defined as `new Date().toISOString()` on line 51.
+
+4. **`src/repertoire/tools-base.ts`** (save_friend_note handler):
+   - In the `type === "note"` block (line 332-338): change `record.notes[a.key]` reads to access `.value` for the conflict message (existing value display). Change the updated notes construction from `{ ...record.notes, [a.key]: a.content }` to `{ ...record.notes, [a.key]: { value: a.content, savedAt: new Date().toISOString() } }`
+   - In the `type === "name"` block (line 315-318): stop writing to `notes.name`. Change from `{ ...record, displayName: a.content, notes: { ...record.notes, name: a.content }, updatedAt: ... }` to `{ ...record, displayName: a.content, updatedAt: ... }` -- remove the `notes` spread that adds `name`. Return message now says `"saved: displayName = ${a.content}"`
+   - Update the conflict message for existing note to display `existing.value` instead of raw `existing` (since it's now an object)
+
+5. **`src/mind/prompt.ts`** (contextSection): In the notes rendering loop (lines 171-173), change from `lines.push(\`- ${key}: ${value}\`)` to extract the date from `savedAt` and render as `lines.push(\`- ${key}: [${value.savedAt.slice(0, 10)}] ${value.value}\`)`. This produces format `- role: [2026-03-05] software engineer at Contoso`.
+
+**Schema version stays at 1** -- friend records will be bombed for testing. No migration needed.
+
+**Output**: Modified `src/mind/friends/types.ts`, `src/mind/friends/store-file.ts`, `src/mind/friends/resolver.ts`, `src/repertoire/tools-base.ts`, `src/mind/prompt.ts`
+**Acceptance**: All tests PASS (green), no warnings
+
+### ⬜ Unit 22c: Timestamped notes -- Coverage & Refactor
+**What**: Verify 100% coverage on all modified code paths:
+1. **types.ts**: type change only, no runtime code to cover
+2. **store-file.ts**: structured notes round-trip through put/get/merge
+3. **resolver.ts**: auto-name note uses `{ value, savedAt }` structure; "Unknown" path still produces empty notes
+4. **tools-base.ts**: note save constructs `{ value, savedAt }`, conflict message displays `.value`, override replaces with new `savedAt`, name type no longer writes to notes
+5. **prompt.ts**: notes rendered with date prefix `[YYYY-MM-DD]`
+
+**Output**: Coverage report
+**Acceptance**: 100% coverage on new/modified code, all tests green
+
+### ⬜ Unit 23a: "name" note -> displayName redirect -- Tests
+**What**: Write failing tests verifying that `save_friend_note` with `type: "note"` and `key: "name"` redirects to a displayName update instead of storing as a note.
+
+**`src/__tests__/repertoire/tools.test.ts`**:
+1. type "note" key "name" updates `displayName` on the record: `execTool("save_friend_note", { type: "note", key: "name", content: "Ari" })` -> `store.put` called with `displayName: "Ari"`, notes does NOT contain key "name"
+2. type "note" key "name" returns descriptive redirect message: result contains "displayName" and the new name value, and indicates it was stored as displayName not a note (e.g. "Updated friend's display name to 'Ari' (stored as displayName, not a note)")
+3. type "note" key "name" with override=true still redirects to displayName (override is irrelevant for name redirect)
+4. type "note" key "name" does NOT check for existing note conflict (no "already have a note" message) -- it always updates displayName
+
+**Output**: New test cases in `src/__tests__/repertoire/tools.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because the note handler currently stores `{ key: "name" }` as a regular note
+
+### ⬜ Unit 23b: "name" note -> displayName redirect -- Implementation
+**What**: Add a redirect check at the top of the `type === "note"` block in `src/repertoire/tools-base.ts` (before the existing conflict check):
+
+```typescript
+// Redirect "name" key to displayName
+if (a.key === "name") {
+  const updated: FriendRecord = { ...record, displayName: a.content, updatedAt: new Date().toISOString() }
+  await ctx.friendStore.put(friendId, updated)
+  return `updated friend's display name to '${a.content}' (stored as displayName, not a note)`
+}
+```
+
+This intercepts `key: "name"` before the existing/override logic runs, so it always succeeds. The `type: "name"` path (lines 315-318) already updates displayName -- this makes `type: "note", key: "name"` do the same thing, keeping displayName as the canonical source for the friend's name.
+
+**Output**: Modified `src/repertoire/tools-base.ts`
+**Acceptance**: All tests PASS (green), no warnings
+
+### ⬜ Unit 23c: "name" note -> displayName redirect -- Coverage & Refactor
+**What**: Verify 100% coverage on the redirect path:
+1. `key === "name"` branch taken: displayName updated, early return with descriptive message
+2. `key !== "name"` branch: falls through to existing note save logic (already covered by existing tests)
+3. Verify no dead code introduced -- the `type: "name"` path still works independently
+
+**Output**: Coverage report
+**Acceptance**: 100% coverage on new/modified code, all tests green
+
 ---
 
 ### GATE 3 CHECKPOINT
@@ -932,6 +1035,9 @@ Tests to KEEP AS-IS (these currently pass and assert behavior we are keeping):
 - Priority guidance line is ABSENT from system prompt
 - Separate name quality line is ABSENT from system prompt
 - `totalTokens` increments after each turn (visible in friend JSON files on disk)
+- Notes display with date prefix in system prompt (e.g. `- role: [2026-03-05] software engineer`)
+- `save_friend_note` with key "name" updates displayName (not stored as a note) and returns descriptive message
+- Friend JSON files on disk show structured notes with `{ value, savedAt }` format
 
 ---
 
