@@ -96,6 +96,21 @@ describe("autonomous-loop", () => {
     expect(tasks.some(f => f.includes("planning-reflection"))).toBe(true)
   })
 
+  it("skips writing task in dry-run mode even for requires-review", async () => {
+    mockReflectionOutput(
+      "GAP: Restructure heart module\nCONSTITUTION_CHECK: requires-review\nEFFORT: large\n\nPROPOSAL:\nRewrite the provider runtime."
+    )
+
+    const result = await runAutonomousLoop(makeConfig({ dryRun: true }))
+
+    expect(result.stagesCompleted).toEqual(["reflect"])
+    expect(result.exitCode).toBe(0)
+
+    // Should NOT have written a task file in dry-run
+    const tasks = fs.readdirSync(path.join(agentRoot, "tasks"))
+    expect(tasks.some(f => f.includes("planning-reflection"))).toBe(false)
+  })
+
   it("stops after reflection in dry-run mode", async () => {
     mockReflectionOutput(
       "GAP: Add logging\nCONSTITUTION_CHECK: within-bounds\nEFFORT: small\n\nPROPOSAL:\nAdd structured logging."
@@ -121,6 +136,77 @@ describe("autonomous-loop", () => {
     expect(result.stagesCompleted).toEqual(["reflect", "plan", "do", "merge"])
     expect(result.exitCode).toBe(42) // restart requested
     expect(mockRunAgent).toHaveBeenCalledTimes(4)
+  })
+
+  it("respects maxStages=1 (stops after reflect only)", async () => {
+    mockReflectionOutput(
+      "GAP: Add logging\nCONSTITUTION_CHECK: within-bounds\nEFFORT: small\n\nPROPOSAL:\nAdd logging."
+    )
+
+    const result = await runAutonomousLoop(makeConfig({ maxStages: 1 }))
+
+    expect(result.stagesCompleted).toEqual(["reflect"])
+    expect(result.exitCode).toBe(0)
+    expect(mockRunAgent).toHaveBeenCalledTimes(1)
+  })
+
+  it("skips writing doing doc when planner already created it", async () => {
+    mockReflectionOutput(
+      "GAP: Add logging\nCONSTITUTION_CHECK: within-bounds\nEFFORT: small\n\nPROPOSAL:\nAdd logging."
+    )
+
+    mockRunAgent.mockImplementationOnce(async (_msgs, callbacks) => {
+      const taskFiles = fs.readdirSync(path.join(agentRoot, "tasks"))
+      const planningFile = taskFiles.find(f => f.includes("planning-"))
+      if (planningFile) {
+        const doingFile = planningFile.replace(/planning-/, "doing-")
+        fs.writeFileSync(path.join(agentRoot, "tasks", doingFile), "# Pre-existing doing doc", "utf-8")
+      }
+      callbacks.onTextChunk("Plan output text")
+      return { usage: undefined }
+    })
+    mockStageOutput("Implemented. All tests pass.")
+    mockStageOutput("PR merged.")
+
+    const result = await runAutonomousLoop(makeConfig())
+
+    expect(result.stagesCompleted).toEqual(["reflect", "plan", "do", "merge"])
+    expect(result.exitCode).toBe(42)
+  })
+
+  it("respects maxStages=3 (stops before merge)", async () => {
+    mockReflectionOutput(
+      "GAP: Add logging\nCONSTITUTION_CHECK: within-bounds\nEFFORT: small\n\nPROPOSAL:\nAdd logging."
+    )
+    mockStageOutput("# Doing doc")
+    mockStageOutput("Implemented. All tests pass.")
+
+    const result = await runAutonomousLoop(makeConfig({ maxStages: 3 }))
+
+    expect(result.stagesCompleted).toEqual(["reflect", "plan", "do"])
+    expect(result.exitCode).toBe(0)
+    expect(mockRunAgent).toHaveBeenCalledTimes(3)
+  })
+
+  it("invokes all channel callbacks including no-ops", async () => {
+    mockRunAgent.mockImplementationOnce(async (_msgs, callbacks) => {
+      callbacks.onModelStart()
+      callbacks.onModelStreamStart()
+      callbacks.onReasoningChunk("thinking...")
+      callbacks.onToolStart("read_file")
+      callbacks.onToolEnd("read_file", "read 100 lines", true)
+      callbacks.onToolEnd("write_file", "write failed", false)
+      callbacks.onError(new Error("something broke"), "warning")
+      callbacks.onTextChunk(
+        "GAP: Test callbacks\nCONSTITUTION_CHECK: within-bounds\nEFFORT: small\n\nPROPOSAL:\nTest."
+      )
+      return { usage: undefined }
+    })
+
+    const result = await runAutonomousLoop(makeConfig({ dryRun: true }))
+
+    expect(result.stagesCompleted).toEqual(["reflect"])
+    expect(result.exitCode).toBe(0)
   })
 
   it("respects maxStages limit", async () => {

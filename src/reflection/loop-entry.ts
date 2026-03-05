@@ -10,6 +10,7 @@ if (!process.argv.includes("--agent")) {
 
 import { runAutonomousLoop } from "./autonomous-loop"
 import { getAgentRoot } from "../identity"
+import { emitNervesEvent } from "../nerves/runtime"
 import * as path from "path"
 
 const dryRun = process.argv.includes("--dry-run")
@@ -19,6 +20,13 @@ const maxStages = maxStagesIdx >= 0 ? parseInt(process.argv[maxStagesIdx + 1], 1
 async function main() {
   const agentRoot = getAgentRoot()
   const projectRoot = path.resolve(agentRoot, "..")
+
+  emitNervesEvent({
+    event: "loop.entry_start",
+    component: "reflection",
+    message: "Autonomous loop CLI entry",
+    meta: { dryRun, maxStages },
+  })
 
   console.log(`[loop] Agent root: ${agentRoot}`)
   console.log(`[loop] Project root: ${projectRoot}`)

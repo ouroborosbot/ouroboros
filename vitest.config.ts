@@ -13,6 +13,7 @@ export default defineConfig({
       exclude: [
         "src/__tests__/**",
         "src/*-entry.ts",
+        "src/reflection/*-entry.ts",
         "src/mind/friends/store.ts",
         "src/nerves/coverage/cli-main.ts",
       ],
