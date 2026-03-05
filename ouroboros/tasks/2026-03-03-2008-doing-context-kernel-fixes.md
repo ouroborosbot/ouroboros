@@ -693,3 +693,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-04 15:58 Pass 2 -- Granularity: clarified onError terminal routing (safeSend not safeEmit), onReasoningChunk rationale, removed redundant verify-already-reverted items from 19b
 - 2026-03-04 16:00 Pass 3 -- Validation: all line numbers, variable names, interfaces verified against codebase. Fixed startTeamsApp line refs (516, 517, 605, 632, 508-511) and module comment block ref (82-93 not 83-93)
 - 2026-03-04 16:00 Pass 4 -- Quality: all 7 new units have What/Output/Acceptance, no TBD, all emojis present, added revert emoji to legend, fixed Unit 18a onError description (safeSend for terminal, safeUpdate for transient)
+- 2026-03-04 16:17 Unit 17a complete: restored teams.ts and teams.test.ts to 406bffe state via git checkout. Diff empty, 1289 tests pass, build clean
