@@ -3012,6 +3012,28 @@ describe("provider abstraction contract", () => {
     const source = nodeFs.readFileSync(sourcePath, "utf-8")
     expect(source).not.toContain('if (provider === "azure")')
   })
+
+  it("registry provider runtimes expose provider-owned turn execution hooks", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
+    const core = await import("../../heart/core")
+    const registry = (core as any).createProviderRegistry()
+    const runtime = registry.resolve()
+    expect(runtime).toBeTruthy()
+    expect(typeof runtime?.streamTurn).toBe("function")
+    expect(typeof runtime?.appendToolOutput).toBe("function")
+    expect(typeof runtime?.resetTurnState).toBe("function")
+  })
+
+  it("runAgent keeps provider-specific native input handling out of engine loop", () => {
+    const sourcePath = path.resolve(__dirname, "..", "..", "heart", "core.ts")
+    const source = nodeFs.readFileSync(sourcePath, "utf-8")
+    expect(source).not.toContain("let providerInput")
+    expect(source).not.toContain("toResponsesInput(messages)")
+    expect(source).not.toContain("streamResponsesApi(")
+    expect(source).not.toContain("streamChatCompletion(")
+  })
 })
 
 describe("hasToolIntent", () => {

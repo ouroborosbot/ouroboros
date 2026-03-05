@@ -97,7 +97,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Refactored registry code and coverage artifact for provider selection and error branches.
 **Acceptance**: 100% coverage on new abstraction code with full related tests green.
 
-### ⬜ Unit 3a: Provider-owned streaming/input behavior — Tests
+### ✅ Unit 3a: Provider-owned streaming/input behavior — Tests
 **What**: Add failing tests around `src/heart/core.ts`/`src/heart/streaming.ts` to lock provider-owned streaming/input behavior instead of engine-level provider branches.
 **Output**: Failing tests proving provider-owned streaming/input behavior contracts.
 **Acceptance**: Tests fail red against old flow.
@@ -191,6 +191,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 16:07 Completed Unit 2a red tests for provider registry contract with artifact captured at `unit-2a-red-run.txt`
 - 2026-03-04 16:04 Completed Unit 2b provider registry implementation and green targeted regression run (`unit-2b-test-run.txt`)
 - 2026-03-04 16:05 Completed Unit 2c refactor/coverage pass; targeted coverage reports `core.ts` and `prompt.ts` at 100% (`unit-2c-coverage-run.txt`)
+- 2026-03-04 16:06 Completed Unit 3a red tests for provider-owned streaming/input hooks with artifact captured at `unit-3a-red-run.txt`
 - 2026-03-04 15:44 Unit 0 complete: captured branch baseline, scripts, and touched-file map in `unit-0-baseline.md`
 - 2026-03-04 15:47 Unit 1a complete: added failing contract tests for `.agentsecrets`/`.agentstate` paths and `agent.json` context sourcing (`unit-1a-red-run.txt`)
 - 2026-03-04 15:53 Unit 1b complete: implemented secrets/state path contracts, moved context sourcing to `agent.json`, and added migration runbook (`unit-1b-*.txt`)
