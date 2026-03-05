@@ -140,7 +140,7 @@ Allow agents using the ouroboros harness to create GitHub issues via the GitHub 
 **Output**: Failing tests
 **Acceptance**: Tests exist and FAIL (red)
 
-### ⬜Unit 3b: Tool Registration -- Implementation
+### ✅Unit 3b: Tool Registration -- Implementation
 **What**: Update `src/repertoire/tools.ts`:
 1. Import `githubToolDefinitions` and `summarizeGithubArgs` from `./tools-github`
 2. Add `...githubToolDefinitions` to `allDefinitions` array
