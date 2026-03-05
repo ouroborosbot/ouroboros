@@ -128,6 +128,16 @@ emitNervesEvent({ component: "test", event: "test_end", message: "e" })
     expect(report.required_actions.length).toBeGreaterThan(0)
   })
 
+  it("handles malformed perTestPath JSON gracefully", () => {
+    const { eventsPath, perTestPath, sourceRoot } = createAuditFixture()
+
+    writeFileSync(eventsPath, "", "utf8")
+    writeFileSync(perTestPath, "{not-json", "utf8")
+
+    const report = auditNervesCoverage({ eventsPath, perTestPath, sourceRoot })
+    expect(report.nerves_coverage.every_test_emits.status).toBe("fail")
+  })
+
   it("handles missing perTestPath gracefully", () => {
     const { eventsPath, sourceRoot } = createAuditFixture()
 
@@ -149,5 +159,103 @@ emitNervesEvent({ component: "test", event: "test_end", message: "e" })
 
     // Rules that depend on per-test data should fail gracefully
     expect(report.nerves_coverage.every_test_emits.status).toBe("fail")
+  })
+
+  it("reports source_coverage failure when source keys are not observed", () => {
+    const { eventsPath, perTestPath, sourceRoot } = createAuditFixture()
+
+    // Events file has no events matching the source keys
+    writeFileSync(eventsPath, "", "utf8")
+    writeFileSync(perTestPath, JSON.stringify({}), "utf8")
+
+    // Source has emitNervesEvent but events are not observed
+    writeFileSync(join(sourceRoot, "mod.ts"), `
+import { emitNervesEvent } from "../nerves/runtime"
+emitNervesEvent({ component: "engine", event: "engine.turn_start", message: "s" })
+`, "utf8")
+
+    const report = auditNervesCoverage({ eventsPath, perTestPath, sourceRoot })
+    expect(report.nerves_coverage.source_coverage.status).toBe("fail")
+    expect(report.nerves_coverage.source_coverage.missing).toContain("engine:engine.turn_start")
+    expect(report.required_actions).toContainEqual(expect.objectContaining({
+      target: "source-coverage",
+    }))
+  })
+
+  it("reports file_completeness failure for non-type files without events", () => {
+    const { eventsPath, perTestPath, sourceRoot } = createAuditFixture()
+
+    writeFileSync(eventsPath, "", "utf8")
+    writeFileSync(perTestPath, JSON.stringify({}), "utf8")
+
+    // A non-type file with no emitNervesEvent call
+    writeFileSync(join(sourceRoot, "helper.ts"), `
+export function helper() { return 42 }
+`, "utf8")
+
+    const report = auditNervesCoverage({ eventsPath, perTestPath, sourceRoot })
+    expect(report.nerves_coverage.file_completeness.status).toBe("fail")
+    expect(report.required_actions).toContainEqual(expect.objectContaining({
+      target: "file-completeness",
+    }))
+  })
+
+  it("ignores non-ts files in source root", () => {
+    const { eventsPath, perTestPath, sourceRoot } = createAuditFixture()
+
+    writeFileSync(eventsPath, "", "utf8")
+    writeFileSync(perTestPath, JSON.stringify({}), "utf8")
+
+    // A non-ts file should be ignored
+    writeFileSync(join(sourceRoot, "readme.md"), "# Hello", "utf8")
+    writeFileSync(join(sourceRoot, "types.ts"), "export type Foo = string", "utf8")
+
+    const report = auditNervesCoverage({ eventsPath, perTestPath, sourceRoot })
+    // types.ts is type-only so exempt, readme.md is ignored
+    expect(report.nerves_coverage.file_completeness.status).toBe("pass")
+  })
+
+  it("scans subdirectories and skips __tests__ and nerves", () => {
+    const { eventsPath, perTestPath, sourceRoot } = createAuditFixture()
+
+    writeFileSync(eventsPath, JSON.stringify({
+      ts: "2026-03-05T00:00:00.000Z",
+      level: "info",
+      event: "sub.event",
+      trace_id: "t1",
+      component: "sub",
+      message: "msg",
+      meta: {},
+    }) + "\n", "utf8")
+
+    writeFileSync(perTestPath, JSON.stringify({
+      "some test": [{ component: "sub", event: "sub.event" }],
+    }), "utf8")
+
+    // Create a subdirectory with a source file
+    const subDir = join(sourceRoot, "submod")
+    mkdirSync(subDir, { recursive: true })
+    writeFileSync(join(subDir, "logic.ts"), `
+import { emitNervesEvent } from "../../nerves/runtime"
+emitNervesEvent({ component: "sub", event: "sub.event", message: "s" })
+`, "utf8")
+
+    // Create __tests__ and nerves dirs that should be skipped
+    const testsDir = join(sourceRoot, "__tests__")
+    mkdirSync(testsDir, { recursive: true })
+    writeFileSync(join(testsDir, "skip.ts"), `
+emitNervesEvent({ component: "should", event: "not_scan", message: "" })
+`, "utf8")
+
+    const nervesDir = join(sourceRoot, "nerves")
+    mkdirSync(nervesDir, { recursive: true })
+    writeFileSync(join(nervesDir, "skip.ts"), `
+emitNervesEvent({ component: "should", event: "not_scan", message: "" })
+`, "utf8")
+
+    const report = auditNervesCoverage({ eventsPath, perTestPath, sourceRoot })
+    // Only sub.event should be found, not the skipped dirs
+    expect(report.nerves_coverage.source_coverage.declared_keys).toBe(1)
+    expect(report.overall_status).toBe("pass")
   })
 })
