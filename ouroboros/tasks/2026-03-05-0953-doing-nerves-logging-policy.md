@@ -107,17 +107,17 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 **Output**: Coverage report showing 100% on new code
 **Acceptance**: 100% coverage on new code, tests still green
 
-### ⬜ Unit 5a: Strip REQUIRED_EVENTS from contract -- tests
+### ✅ Unit 5a: Strip REQUIRED_EVENTS from contract -- tests
 **What**: Write tests for the updated contract.ts (no REQUIRED_EVENTS, no RequiredEvent interface, no getRequiredEventKeys, no getDeclaredLogpoints). Tests verify: `REQUIRED_ENVELOPE_FIELDS` still exported, `SENSITIVE_PATTERNS` still exported, `eventKey()` still works, old exports are gone.
 **Output**: Updated `src/__tests__/nerves/coverage-contract.test.ts`
 **Acceptance**: Tests FAIL (red) -- REQUIRED_EVENTS still exists
 
-### ⬜ Unit 5b: Strip REQUIRED_EVENTS from contract -- implementation
+### ✅ Unit 5b: Strip REQUIRED_EVENTS from contract -- implementation
 **What**: Remove `REQUIRED_EVENTS`, `RequiredEvent` interface, `getRequiredEventKeys()`, `getDeclaredLogpoints()` from `src/nerves/coverage/contract.ts`. Keep `REQUIRED_ENVELOPE_FIELDS`, `SENSITIVE_PATTERNS`, `eventKey()`. Remove `src/__tests__/nerves/emit-new-events.test.ts` (artifact of old model). Update `global-capture.ts`: remove `getDeclaredLogpoints()` import and `mergeLogpointFile()` function (logpoints concept replaced by per-test tracking from Unit 4). Remove `getRequiredEventKeys` import from `audit.ts`.
 **Output**: Cleaned contract.ts, deleted emit-new-events.test.ts, updated global-capture.ts, updated audit.ts imports
 **Acceptance**: Tests from 5a PASS (green). No imports of removed exports remain.
 
-### ⬜ Unit 5c: Strip REQUIRED_EVENTS -- coverage & refactor
+### ✅ Unit 5c: Strip REQUIRED_EVENTS -- coverage & refactor
 **What**: Verify coverage, refactor if needed.
 **Output**: Coverage report showing 100% on changed code
 **Acceptance**: 100% coverage on changed code, tests still green
@@ -429,3 +429,4 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 - 2026-03-05 11:37 Unit 2 complete: 8 console exception sites annotated across 4 files, npm run lint passes clean
 - 2026-03-05 11:40 Unit 3 complete: lint step added to run-coverage-gate.cjs, runs before vitest, short-circuits on failure
 - 2026-03-05 11:40 Unit 4a/4b/4c complete: per-test event tracking in global-capture.ts with beforeEach hooks, Map-based event association, vitest-events-per-test.json output
+- 2026-03-05 11:42 Unit 5a/5b/5c complete: REQUIRED_EVENTS stripped from contract.ts, event_catalog and logpoint_coverage removed from audit.ts, emit-new-events.test.ts deleted
