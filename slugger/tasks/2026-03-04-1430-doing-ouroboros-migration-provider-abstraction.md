@@ -23,7 +23,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [ ] Anthropic setup-token flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
 - [ ] OpenAI Codex OAuth flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
 - [ ] Provider selection is per-agent and config-driven (no global singleton lock-in).
-- [ ] Provider-specific implementation logic is extracted from `src/heart/core.ts` into `src/heart/providers/*` modules before Unit 5 work, with behavior parity confirmed by tests.
+- [x] Provider-specific implementation logic is extracted from `src/heart/core.ts` into `src/heart/providers/*` modules before Unit 5 work, with behavior parity confirmed by tests.
 - [ ] CLI channel output keeps user-visible plain text separate from nerves logs (no raw NDJSON log events interleaved in stdout model responses).
 - [ ] Nerves logs remain machine-readable and persistent (append-only NDJSON) for multi-agent auditing and runtime validation.
 - [ ] Anthropic streamed tool calls assemble valid JSON arguments and execute reliably (no malformed concatenated argument payloads), backed by regression tests.
@@ -141,7 +141,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Provider-module refactor plus artifact logs `unit-4e-green-run.txt` and `unit-4e-jest.json`.
 **Acceptance**: Boundary tests pass green, targeted regression suites stay green, and artifacts are saved under the task artifacts directory.
 
-### ⬜ Unit 4f: Provider module extraction pre-Unit-5 pass — Coverage & Refactor
+### ✅ Unit 4f: Provider module extraction pre-Unit-5 pass — Coverage & Refactor
 **What**: Refactor extracted provider module code for clarity and verify full branch/error-path coverage.
 **Output**: Coverage artifacts `unit-4f-coverage.txt` and `unit-4f-coverage-summary.json`.
 **Acceptance**: New provider-module code is at 100% coverage, related tests remain green, and coverage artifacts are saved.
@@ -257,3 +257,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 18:41 Pass 4 (Quality) confirmed completion criteria, coverage section, and unit emoji/status formatting with no additional content gaps
 - 2026-03-04 18:44 Unit 4d complete: added failing provider-module boundary tests in `core.test.ts`/`streaming.test.ts` with red artifacts (`unit-4d-red-run.txt`, `unit-4d-red-jest.json`, `unit-4d-red-run.exit`)
 - 2026-03-04 18:50 Unit 4e complete: extracted Azure/Anthropic/MiniMax runtimes into `src/heart/providers/*` with green targeted tests and clean build (`unit-4e-green-run.txt`, `unit-4e-jest.json`, `unit-4e-build.txt`)
+- 2026-03-04 18:52 Unit 4f complete: reached 100% coverage on `src/heart/providers/*` and kept build green (`unit-4f-coverage.txt`, `unit-4f-coverage-summary.json`, `unit-4f-build.txt`)
