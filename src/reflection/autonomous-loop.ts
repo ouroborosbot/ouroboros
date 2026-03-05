@@ -175,6 +175,7 @@ export async function runAutonomousLoop(config: LoopConfig): Promise<LoopResult>
     console.log(`[loop] Wrote doing doc: ${doingDocName}`)
   }
 
+
   // Stage 3: Do (work-doer executes the doing doc via TDD)
   if (stagesCompleted.length >= config.maxStages) {
     return { proposal, stagesCompleted, exitCode: 0 }
