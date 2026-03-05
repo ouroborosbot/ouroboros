@@ -1,6 +1,6 @@
 # Planning: Nerves Logging Policy Enforcement
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-03-05 09:54
 
 ## Goal
@@ -23,6 +23,7 @@ Enforce the console-to-nerves migration with an ESLint `no-console` rule so new 
   - Each exception requires `// eslint-disable-next-line no-console -- <category>: <reason>`
   - New events must be registered in `src/nerves/coverage/contract.ts` REQUIRED_EVENTS
 - Add brief logging policy mention in CONTRIBUTING.md under the Code section
+- Integrate `npm run lint` into `scripts/run-coverage-gate.cjs` as a step before vitest
 - Verify `npm run lint` passes with all annotations in place
 - Verify `npm test` still passes (ESLint should not interfere with test execution)
 
@@ -31,7 +32,7 @@ Enforce the console-to-nerves migration with an ESLint `no-console` rule so new 
 - Changes to the nerves runtime or coverage system itself
 - Adding ESLint rules beyond no-console (keep config minimal)
 - Creating a cross-agent-docs file for logging (keep it simple in AGENTS.md for now)
-- CI pipeline changes (lint should be run manually or added to CI in a separate task)
+- CI pipeline changes beyond the coverage gate integration
 
 ## Completion Criteria
 - [ ] ESLint installed and configured with `no-console: "error"` for `src/**/*.ts` (excluding tests)
@@ -39,6 +40,7 @@ Enforce the console-to-nerves migration with an ESLint `no-console` rule so new 
 - [ ] `npm run lint` passes cleanly (zero violations)
 - [ ] Logging Policy section added to AGENTS.md
 - [ ] Logging policy mention added to CONTRIBUTING.md
+- [ ] `npm run lint` integrated into `scripts/run-coverage-gate.cjs`
 - [ ] `npm test` still passes
 - [ ] No warnings
 - [ ] 100% test coverage on all new code
@@ -52,19 +54,22 @@ Enforce the console-to-nerves migration with an ESLint `no-console` rule so new 
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [ ] Should the `lint` script be added to the existing `test:coverage` gate, or kept as a separate manual step for now?
+- [x] Should the `lint` script be added to the existing `test:coverage` gate? -- YES, integrate `npm run lint` as a step in `scripts/run-coverage-gate.cjs` so CI catches violations automatically.
 
 ## Decisions Made
 - Use ESLint flat config (`eslint.config.js`) since the project has no existing ESLint setup
 - Keep ESLint config minimal (only no-console rule) to avoid scope creep
 - Exclude test files from no-console since they are not production code
 - Three exception categories: pre-boot guard, terminal UX, meta-tooling (carried from prior planning)
+- Integrate lint into `scripts/run-coverage-gate.cjs` so CI catches violations automatically
+- Test files (`src/__tests__/**`) must be excluded from no-console -- some tests mock/spy on console
 
 ## Context / References
 - Prior planning doc: `ouroboros/tasks/2026-03-04-2354-planning-nerves-console-migration.md` (completed)
 - Branch: `ouroboros/nerves-console-migration` (console-to-nerves conversions already committed)
 - `src/nerves/runtime.ts` -- `emitNervesEvent()` API
 - `src/nerves/coverage/contract.ts` -- `REQUIRED_EVENTS` array
+- `scripts/run-coverage-gate.cjs` -- coverage gate script to integrate lint into
 - 8 exception sites confirmed at current line numbers via grep
 
 ## Notes
@@ -72,3 +77,4 @@ No existing ESLint setup in the project. ESLint + parser need to be installed fr
 
 ## Progress Log
 - 2026-03-05 09:54 Created
+- 2026-03-05 09:54 Resolved open questions, updated decisions, approved
