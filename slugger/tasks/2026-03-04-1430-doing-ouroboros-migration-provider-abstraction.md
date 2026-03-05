@@ -39,7 +39,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [x] Migration runbook is docs-only (no script) and includes explicit move/verify instructions for the other machine.
 - [x] Provider IDs are explicitly locked and implemented as `azure`, `minimax`, `anthropic`, `openai-codex`.
 - [x] Model fields are explicitly supported for each in-scope provider via `secrets.json` without introducing additional model-selection features.
-- [ ] All relevant docs are updated for the new provider/config/storage contracts (including `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, and `cross-agent-docs/agent-storage-migration-playbook.md`).
+- [x] All relevant docs are updated for the new provider/config/storage contracts (including `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, and `cross-agent-docs/agent-storage-migration-playbook.md`).
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -202,12 +202,12 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Artifact log with timestamp, provider id, model, command/entrypoint used, and outcome.
 **Acceptance**: Live OpenAI Codex run succeeds via OAuth auth; failure mode includes explicit re-auth guidance; evidence artifact is present.
 
-### ⬜ Unit 6a: Migration runbook and storage-contract docs
+### ✅ Unit 6a: Migration runbook and storage-contract docs
 **What**: Finalize `cross-agent-docs/agent-storage-migration-playbook.md` with explicit `~/.agentconfigs` -> `~/.agentsecrets`/`~/.agentstate` moves, validation steps, and post-migration cleanup notes for the other machine.
 **Output**: Migration runbook updates and supporting docs aligned to new storage boundaries.
 **Acceptance**: Runbook has explicit move/verify/cleanup steps and matches implemented storage paths.
 
-### ⬜ Unit 6b: Provider/config contract docs
+### ✅ Unit 6b: Provider/config contract docs
 **What**: Update `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, `slugger/agent.json`, and related provider/config docs to reflect provider IDs, auth profile flows, and fail-fast behavior.
 **Output**: Documentation updates aligned to implemented provider/config behavior.
 **Acceptance**: Documentation reflects final runtime provider behavior and config contracts without contradictions.
@@ -277,3 +277,5 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 22:04 Uniform tool summaries: standardized `summarizeArgs` and Teams summaries to `key=value` format across tools (base + Teams), with one-line/truncated formatter still enforced; summary-focused regressions green.
 - 2026-03-04 22:09 Unknown-tool fallback normalized: replaced JSON fallback summary with uniform `key=value` summarization for unrecognized tool names, including long-value truncation parity.
 - 2026-03-04 22:28 Unit 5d complete: executed live OpenAI Codex OAuth manual validation with successful CLI/tool turn evidence plus controlled invalid-token failure-path re-auth guidance evidence (`unit-5d-manual-validation.txt`, `unit-5d-manual-validation.json`, `unit-5d-manual-validation.stderr.txt`).
+- 2026-03-04 22:30 Unit 6a complete: finalized migration runbook verification/cleanup contract for `~/.agentconfigs` to `~/.agentsecrets` + `~/.agentstate` transition (`cross-agent-docs/agent-storage-migration-playbook.md`).
+- 2026-03-04 22:30 Unit 6b complete: aligned provider/config/storage docs with implemented runtime contracts and fail-fast/no-fallback behavior (`README.md`, `CONTRIBUTING.md`, `AGENTS.md`).

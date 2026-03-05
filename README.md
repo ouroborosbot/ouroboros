@@ -1,6 +1,6 @@
 # Ouroboros Agent Harness
 
-A minimal, multi-agent harness for building AI agents that can read files, write code, run commands, and modify themselves. Written in TypeScript, powered by Azure OpenAI or MiniMax, deployable as a CLI REPL or a Microsoft Teams bot.
+A minimal, multi-agent harness for building AI agents that can read files, write code, run commands, and modify themselves. Written in TypeScript, supporting Azure OpenAI, MiniMax, Anthropic (setup-token), and OpenAI Codex (OAuth), deployable as a CLI REPL or a Microsoft Teams bot.
 
 The name is structural: the original agent -- Ouroboros -- was grown recursively from a 150-line while loop, bootstrapping itself through agentic self-modification. A snake eating its own tail. The metaphor runs deep: the agent literally consumes its own context window, trimming old conversation to stay within token budget while preserving identity through layered memory (psyche files, session persistence, git history). It eats its tail to survive across turns. The harness preserves that architecture while supporting multiple agents, each with their own personality, skills, and configuration.
 
@@ -19,7 +19,12 @@ ouroboros/                        # repo root
     teams-entry.ts                # Teams entrypoint
     heart/                        # core agent loop and streaming
       core.ts                     # agent loop, client init, ChannelCallbacks
-      streaming.ts                # Azure Responses API + MiniMax Chat Completions
+      streaming.ts                # provider event normalization + stream callbacks
+      providers/                  # provider-specific runtime/adapters
+        azure.ts                  # Azure OpenAI Responses provider
+        minimax.ts                # MiniMax Chat Completions provider
+        anthropic.ts              # Anthropic setup-token provider
+        openai-codex.ts           # OpenAI Codex OAuth provider
       kicks.ts                    # self-correction: empty, narration, tool_required
       api-error.ts                # error classification
     mind/                         # prompt, context, memory
@@ -134,7 +139,7 @@ Missing psyche files produce empty strings, not crashes. You can write your own 
 
 **The heart** (`heart/core.ts`): `runAgent()` is a while loop. Each iteration: send conversation to the model, stream the response, if the model made tool calls execute them and loop, if it gave a text answer exit. Maximum 10 tool rounds per turn.
 
-**Streaming** (`heart/streaming.ts`): two provider paths. Azure OpenAI uses the Responses API with structured events (reasoning, text, tool calls). MiniMax uses Chat Completions with `<think>` tags parsed by a state machine. Both normalize into the same 7+2 callbacks.
+**Streaming** (`heart/streaming.ts` + `heart/providers/*`): provider-specific adapters normalize streamed events into the same callback contract. Azure OpenAI uses Responses API events; MiniMax uses Chat Completions with `<think>` parsing; Anthropic uses setup-token auth with streamed tool-call/input deltas; OpenAI Codex uses `chatgpt.com/backend-api/codex/responses` with OAuth token auth.
 
 **ChannelCallbacks** (`heart/core.ts`): the contract between heart and display. 7 core events:
 - `onModelStart` -- model request sent
@@ -177,7 +182,7 @@ Design principles: don't persist what you can re-derive; conversation IS the cac
 
 **Skills** (`repertoire/skills.ts`): markdown files in `{your-dir}/skills/`. Listed with `list_skills`, loaded with `load_skill`. The loaded text is injected into conversation as a tool result.
 
-**Config** (`config.ts`): provider credentials, Teams connection info, OAuth config, Teams channel settings, and integrations are loaded from the secrets.json file pointed to by your agent.json `configPath`. Context window settings come from `agent.json` `context`. No environment variables in `src/` -- everything comes from files.
+**Config** (`config.ts`): provider credentials, Teams connection info, OAuth config, Teams channel settings, and integrations are loaded from the `secrets.json` file pointed to by your `agent.json` `configPath`. Context window settings come from `agent.json` `context`. Runtime fails fast if the selected `agent.json.provider` is not fully configured in `secrets.json`; there is no silent provider fallback. No environment variables in `src/` -- everything comes from files.
 
 For Anthropic and OpenAI Codex auth bootstrap, use:
 
