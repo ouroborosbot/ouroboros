@@ -68,7 +68,7 @@ Task docs go in `<agent>/tasks/` with naming scheme `YYYY-MM-DD-HHMM-{planning|d
 
 ### Logging Policy
 
-All runtime observability goes through `emitNervesEvent()` from `src/nerves/runtime`. Raw `console.*` calls are banned in production code by ESLint `no-console: "error"`.
+All runtime logging goes through `emitNervesEvent()` from `src/nerves/runtime`. Raw `console.*` calls are banned in production code by ESLint `no-console: "error"`.
 
 **Console exception categories** (annotated with `// eslint-disable-next-line no-console -- <category>: <reason>`):
 - **pre-boot guard**: Code that runs before any imports (entrypoint arg checks)
@@ -87,4 +87,4 @@ All runtime observability goes through `emitNervesEvent()` from `src/nerves/runt
 - Operations use `_start`/`_end`/`_error` suffix convention for pairing
 - Component names match the domain: `engine`, `mind`, `friends`, `repertoire`, `senses`, `clients`, `channels`
 
-**Two-layer enforcement**: The five deterministic audit rules catch structural violations automatically. Work-merger provides the judgment layer, reviewing new code paths for missing observability that the rules cannot detect.
+**Two-layer enforcement**: The five deterministic audit rules catch structural violations automatically. Work-merger provides the judgment layer, reviewing new code paths for missing nerves events that the rules cannot detect.
