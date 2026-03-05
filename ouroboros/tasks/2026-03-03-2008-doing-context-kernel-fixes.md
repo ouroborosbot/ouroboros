@@ -706,7 +706,7 @@ The phrase rotation timer (1.5s interval for `safeUpdate`) continues to run duri
 **Output**: New test cases in `src/__tests__/mind/prompt.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because current instructions are aspirational
 
-### ⬜ Unit 4b: Bug 3 (friend context instructions) -- Implementation
+### ✅ Unit 4b: Bug 3 (friend context instructions) -- Implementation
 **What**: Rewrite ~4 lines of prompt text in `contextSection()` at `src/mind/prompt.ts`:
 - Line 178 (priority guidance): clarify that priority means "help first AND get to know them" not "help only"
 - Line 181 (name quality): make directive -- "when i learn a name, i save it immediately" not "i prefer"
