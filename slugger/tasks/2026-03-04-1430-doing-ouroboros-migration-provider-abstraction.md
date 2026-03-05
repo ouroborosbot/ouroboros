@@ -21,7 +21,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [x] Anthropic provider is integrated behind the same provider interface with setup-token auth profile support.
 - [x] OpenAI Codex provider is integrated behind the same provider interface with OAuth auth profile support.
 - [x] Anthropic setup-token flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
-- [ ] OpenAI Codex OAuth flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
+- [x] OpenAI Codex OAuth flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
 - [ ] Provider selection is per-agent and config-driven (no global singleton lock-in).
 - [x] Provider-specific implementation logic is extracted from `src/heart/core.ts` into `src/heart/providers/*` modules before Unit 5 work, with behavior parity confirmed by tests.
 - [x] CLI channel output keeps user-visible plain text separate from nerves logs (no raw NDJSON log events interleaved in stdout model responses).
@@ -197,7 +197,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Refactored OpenAI Codex provider code and coverage artifact for auth/response branches.
 **Acceptance**: 100% coverage on new OpenAI Codex integration code and tests green.
 
-### ⬜ Unit 5d: OpenAI Codex OAuth integration — Manual validation gate
+### ✅ Unit 5d: OpenAI Codex OAuth integration — Manual validation gate
 **What**: Execute a real end-to-end OpenAI Codex turn using OAuth profile auth (no mocks) and capture sanitized evidence.
 **Output**: Artifact log with timestamp, provider id, model, command/entrypoint used, and outcome.
 **Acceptance**: Live OpenAI Codex run succeeds via OAuth auth; failure mode includes explicit re-auth guidance; evidence artifact is present.
@@ -276,3 +276,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 21:56 Tool result visibility tweak: `save_friend_note` now surfaces summarized params (`type/key/content`) and channel formatter compacts summaries to one line with truncation, so CLI/Teams tool-result lines stay readable while exposing key params.
 - 2026-03-04 22:04 Uniform tool summaries: standardized `summarizeArgs` and Teams summaries to `key=value` format across tools (base + Teams), with one-line/truncated formatter still enforced; summary-focused regressions green.
 - 2026-03-04 22:09 Unknown-tool fallback normalized: replaced JSON fallback summary with uniform `key=value` summarization for unrecognized tool names, including long-value truncation parity.
+- 2026-03-04 22:28 Unit 5d complete: executed live OpenAI Codex OAuth manual validation with successful CLI/tool turn evidence plus controlled invalid-token failure-path re-auth guidance evidence (`unit-5d-manual-validation.txt`, `unit-5d-manual-validation.json`, `unit-5d-manual-validation.stderr.txt`).
