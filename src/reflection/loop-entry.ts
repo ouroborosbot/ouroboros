@@ -1,3 +1,5 @@
+/* eslint-disable no-console -- terminal UX: CLI entry point for autonomous loop */
+
 // Entry point for `npm run reflect:loop` — runs a full autonomous cycle.
 // Usage: node dist/reflection/loop-entry.js --agent ouroboros [--dry-run] [--max-stages N]
 
