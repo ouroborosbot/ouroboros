@@ -87,7 +87,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Failing abstraction/registry tests for per-agent provider lookup and engine integration contracts.
 **Acceptance**: Tests fail red and prove engine no longer depends on hardcoded provider branching.
 
-### ⬜ Unit 2b: Provider abstraction registry — Implementation
+### ✅ Unit 2b: Provider abstraction registry — Implementation
 **What**: Implement provider abstraction + registry, rewire `src/heart/core.ts` request path to use provider interface selection, and update prompt provider reporting in `src/mind/prompt.ts` to consume abstraction output.
 **Output**: Provider interface, registry wiring, engine integration changes.
 **Acceptance**: Provider abstraction tests pass green and Azure/MiniMax regression tests remain passing.
@@ -189,6 +189,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 15:35 Added manual validation gates for live Anthropic setup-token and OpenAI Codex OAuth verification with required artifacts
 - 2026-03-04 15:38 Quality pass: confirmed unit headers/acceptance completeness and set status to READY_FOR_EXECUTION
 - 2026-03-04 16:07 Completed Unit 2a red tests for provider registry contract with artifact captured at `unit-2a-red-run.txt`
+- 2026-03-04 16:04 Completed Unit 2b provider registry implementation and green targeted regression run (`unit-2b-test-run.txt`)
 - 2026-03-04 15:44 Unit 0 complete: captured branch baseline, scripts, and touched-file map in `unit-0-baseline.md`
 - 2026-03-04 15:47 Unit 1a complete: added failing contract tests for `.agentsecrets`/`.agentstate` paths and `agent.json` context sourcing (`unit-1a-red-run.txt`)
 - 2026-03-04 15:53 Unit 1b complete: implemented secrets/state path contracts, moved context sourcing to `agent.json`, and added migration runbook (`unit-1b-*.txt`)

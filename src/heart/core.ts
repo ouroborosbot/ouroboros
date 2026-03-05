@@ -14,53 +14,103 @@ import { trimMessages } from "../mind/context";
 import { buildSystem } from "../mind/prompt";
 import type { Channel } from "../mind/prompt";
 
-let _client: OpenAI | null = null;
-let _model: string | null = null;
-let _provider: "azure" | "minimax" | null = null;
+export type ProviderId = "azure" | "minimax";
+type ProviderTransport = "responses" | "chat_completions";
 
-function getClient(): OpenAI {
-  if (!_client) {
-    const azureConfig = getAzureConfig();
-    const minimaxConfig = getMinimaxConfig();
+interface ProviderRuntime {
+  id: ProviderId;
+  model: string;
+  transport: ProviderTransport;
+  client: OpenAI;
+}
 
-    if (azureConfig.apiKey && azureConfig.endpoint && azureConfig.deployment && azureConfig.modelName) {
-      _client = new AzureOpenAI({
-        apiKey: azureConfig.apiKey,
-        endpoint: azureConfig.endpoint.replace(/\/openai.*$/, ""),
-        deployment: azureConfig.deployment,
-        apiVersion: azureConfig.apiVersion,
-        timeout: 30000,
-        maxRetries: 0,
-      });
-      _model = azureConfig.modelName;
-      _provider = "azure";
-    } else if (minimaxConfig.apiKey) {
-      _client = new OpenAI({
-        apiKey: minimaxConfig.apiKey,
-        baseURL: "https://api.minimaxi.chat/v1",
-        timeout: 30000,
-        maxRetries: 0,
-      });
-      _model = minimaxConfig.model;
-      _provider = "minimax";
-    } else {
+interface ProviderRegistry {
+  resolve(): ProviderRuntime | null;
+}
+
+let _providerRuntime: ProviderRuntime | null = null;
+
+export function createProviderRegistry(): ProviderRegistry {
+  const runtimes: Array<() => ProviderRuntime | null> = [
+    () => {
+      const azureConfig = getAzureConfig();
+      if (!(azureConfig.apiKey && azureConfig.endpoint && azureConfig.deployment && azureConfig.modelName)) {
+        return null;
+      }
+      return {
+        id: "azure",
+        model: azureConfig.modelName,
+        transport: "responses",
+        client: new AzureOpenAI({
+          apiKey: azureConfig.apiKey,
+          endpoint: azureConfig.endpoint.replace(/\/openai.*$/, ""),
+          deployment: azureConfig.deployment,
+          apiVersion: azureConfig.apiVersion,
+          timeout: 30000,
+          maxRetries: 0,
+        }),
+      };
+    },
+    () => {
+      const minimaxConfig = getMinimaxConfig();
+      if (!minimaxConfig.apiKey) return null;
+      return {
+        id: "minimax",
+        model: minimaxConfig.model,
+        transport: "chat_completions",
+        client: new OpenAI({
+          apiKey: minimaxConfig.apiKey,
+          baseURL: "https://api.minimaxi.chat/v1",
+          timeout: 30000,
+          maxRetries: 0,
+        }),
+      };
+    },
+  ];
+  return {
+    resolve(): ProviderRuntime | null {
+      for (const runtimeFactory of runtimes) {
+        const runtime = runtimeFactory();
+        if (runtime) return runtime;
+      }
+      return null;
+    },
+  };
+}
+
+function getProviderRuntime(): ProviderRuntime {
+  if (!_providerRuntime) {
+    _providerRuntime = createProviderRegistry().resolve();
+    if (!_providerRuntime) {
       console.error(
         "no provider configured. set azure or minimax credentials in secrets.json.",
       );
       process.exit(1);
+      throw new Error("unreachable");
     }
   }
-  return _client;
+  return _providerRuntime;
+}
+
+function getClient(): OpenAI {
+  return getProviderRuntime().client;
 }
 
 export function getModel(): string {
-  if (_model === null) getClient(); // ensure initialized
-  return _model!;
+  return getProviderRuntime().model;
 }
 
-export function getProvider(): "azure" | "minimax" {
-  if (_provider === null) getClient(); // ensure initialized
-  return _provider!;
+export function getProvider(): ProviderId {
+  return getProviderRuntime().id;
+}
+
+export function getProviderDisplayLabel(): string {
+  const model = getModel();
+  const providerLabelBuilders: Record<ProviderId, () => string> = {
+    azure: () => `azure openai (${getAzureConfig().deployment || "default"}, model: ${model})`,
+    minimax: () => `minimax (${model})`,
+  };
+  return providerLabelBuilders[getProvider()]();
 }
 
 // Re-export tools, execTool, summarizeArgs from ./tools for backward compat
@@ -178,9 +228,11 @@ export async function runAgent(
   signal?: AbortSignal,
   options?: RunAgentOptions,
 ): Promise<{ usage?: UsageData }> {
-  const client = getClient();
-  const provider = getProvider();
-  const model = getModel();
+  const providerRuntime = getProviderRuntime();
+  const client = providerRuntime.client;
+  const provider = providerRuntime.id;
+  const model = providerRuntime.model;
+  const usesResponsesApi = providerRuntime.transport === "responses";
   const { maxToolOutputChars } = getContextConfig();
   const traceId = options?.traceId;
   emitNervesEvent({
@@ -238,12 +290,12 @@ export async function runAgent(
   let retryCount = 0;
   let lastKickReason: KickReason | null = null;
 
-  // For Azure Responses API: maintain native input array with original output
-  // items (reasoning, function_calls) in correct order.  Initialized from CC
-  // messages on first iteration (session resumption), then kept in sync with
+  // For responses-style providers: maintain native input array with original
+  // output items (reasoning, function_calls) in correct order. Initialized from
+  // CC messages on first iteration (session resumption), then kept in sync with
   // the API's own output items for accurate multi-turn tool loops.
-  let azureInput: ResponseItem[] | null = null;
-  let azureInstructions = "";
+  let providerInput: ResponseItem[] | null = null;
+  let providerInstructions = "";
 
   // Prevent MaxListenersExceeded warning — each iteration adds a listener
   try { require("events").setMaxListeners(MAX_TOOL_ROUNDS + 5, signal); } catch { /* unsupported */ }
@@ -265,8 +317,8 @@ export async function runAgent(
       for (const followUp of steeringFollowUps) {
         messages.push({ role: "user", content: followUp.text });
       }
-      // Rebuild Azure native input from canonical messages after injection.
-      azureInput = null;
+      // Rebuild provider native input from canonical messages after injection.
+      providerInput = null;
     }
     // Yield so pending I/O (stdin Ctrl-C) can be processed between iterations
     await new Promise((r) => setImmediate(r));
@@ -276,17 +328,17 @@ export async function runAgent(
 
       let result: TurnResult;
 
-      if (provider === "azure") {
+      if (usesResponsesApi) {
         // First iteration: build from CC messages (handles session resumption)
-        if (!azureInput) {
+        if (!providerInput) {
           const { instructions, input } = toResponsesInput(messages);
-          azureInput = input;
-          azureInstructions = instructions;
+          providerInput = input;
+          providerInstructions = instructions;
         }
         const azureParams: Record<string, unknown> = {
           model,
-          input: azureInput,
-          instructions: azureInstructions,
+          input: providerInput,
+          instructions: providerInstructions,
           tools: toResponsesTools(activeTools),
           reasoning: { effort: "medium", summary: "detailed" },
           stream: true,
@@ -303,7 +355,7 @@ export async function runAgent(
         );
         // Append ALL output items (reasoning + function_calls + text) in order
         for (const item of result.outputItems) {
-          azureInput.push(item);
+          providerInput.push(item);
         }
       } else {
         const createParams: Record<string, unknown> = { messages, tools: activeTools, stream: true };
@@ -351,8 +403,8 @@ export async function runAgent(
             ? result.content + "\n\n" + kick.message
             : kick.message;
           messages.push({ role: "assistant", content: kickContent });
-          // Discard azureInput so it's rebuilt from messages on retry
-          azureInput = null;
+          // Discard providerInput so it's rebuilt from messages on retry
+          providerInput = null;
           continue;
         }
         messages.push(msg);
@@ -391,8 +443,8 @@ export async function runAgent(
           if (tc.name === "final_answer") {
             const rejection = "rejected: final_answer must be the only tool call. Finish your work first, then call final_answer alone.";
             messages.push({ role: "tool", tool_call_id: tc.id, content: rejection });
-            if (azureInput) {
-              azureInput.push({ type: "function_call_output", call_id: tc.id, output: rejection });
+            if (providerInput) {
+              providerInput.push({ type: "function_call_output", call_id: tc.id, output: rejection });
             }
             continue;
           }
@@ -414,8 +466,8 @@ export async function runAgent(
               callbacks.onToolStart(tc.name, args);
               callbacks.onToolEnd(tc.name, argSummary, false);
               messages.push({ role: "tool", tool_call_id: tc.id, content: cancelled });
-              if (azureInput) {
-                azureInput.push({ type: "function_call_output", call_id: tc.id, output: cancelled });
+              if (providerInput) {
+                providerInput.push({ type: "function_call_output", call_id: tc.id, output: cancelled });
               }
               continue;
             }
@@ -436,9 +488,9 @@ export async function runAgent(
           }
           callbacks.onToolEnd(tc.name, argSummary, success);
           messages.push({ role: "tool", tool_call_id: tc.id, content: toolResult });
-          // Keep Azure input in sync with tool results
-          if (azureInput) {
-            azureInput.push({ type: "function_call_output", call_id: tc.id, output: toolResult });
+          // Keep responses-input state in sync with tool results
+          if (providerInput) {
+            providerInput.push({ type: "function_call_output", call_id: tc.id, output: toolResult });
           }
         }
       }
@@ -455,7 +507,7 @@ export async function runAgent(
         const { maxTokens, contextMargin } = getContextConfig();
         const trimmed = trimMessages(messages, maxTokens, contextMargin, maxTokens * 2);
         messages.splice(0, messages.length, ...trimmed);
-        azureInput = null; // force rebuild from trimmed messages
+        providerInput = null; // force rebuild from trimmed messages
         callbacks.onError(new Error("context trimmed, retrying..."), "transient");
         continue;
       }
@@ -474,7 +526,7 @@ export async function runAgent(
           }
         });
         if (aborted) { stripLastToolCalls(messages); break; }
-        azureInput = null; // force rebuild on retry
+        providerInput = null; // force rebuild on retry
         continue;
       }
       callbacks.onError(e instanceof Error ? e : new Error(String(e)), "terminal");
