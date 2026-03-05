@@ -1325,7 +1325,7 @@ describe("contextSection", () => {
         externalIds: [],
         tenantMemberships: [],
         toolPreferences: {},
-        notes: { role: "engineer", project: "ouroboros" },
+        notes: { role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" }, project: { value: "ouroboros", savedAt: "2026-01-01T00:00:00.000Z" } },
         totalTokens: 200_000,
         createdAt: "2026-01-01",
         updatedAt: "2026-01-01",

@@ -313,9 +313,9 @@ export const baseToolDefinitions: ToolDefinition[] = [
         const isOverride = a.override === "true";
 
         if (a.type === "name") {
-          const updated: FriendRecord = { ...record, displayName: a.content, notes: { ...record.notes, name: a.content }, updatedAt: new Date().toISOString() };
+          const updated: FriendRecord = { ...record, name: a.content, updatedAt: new Date().toISOString() };
           await ctx.friendStore.put(friendId, updated);
-          return `saved: displayName = ${a.content}`;
+          return `saved: name = ${a.content}`;
         }
 
         if (a.type === "tool_preference") {
@@ -331,9 +331,9 @@ export const baseToolDefinitions: ToolDefinition[] = [
         // type === "note"
         const existing = record.notes[a.key];
         if (existing && !isOverride) {
-          return `i already have a note for '${a.key}': "${existing}". if you want to replace it, call again with override: true. or merge both values into content and override.`;
+          return `i already have a note for '${a.key}': "${existing.value}". if you want to replace it, call again with override: true. or merge both values into content and override.`;
         }
-        const updated: FriendRecord = { ...record, notes: { ...record.notes, [a.key]: a.content }, updatedAt: new Date().toISOString() };
+        const updated: FriendRecord = { ...record, notes: { ...record.notes, [a.key]: { value: a.content, savedAt: new Date().toISOString() } }, updatedAt: new Date().toISOString() };
         await ctx.friendStore.put(friendId, updated);
         return `saved: note ${a.key} = ${a.content}`;
       } catch (err) {

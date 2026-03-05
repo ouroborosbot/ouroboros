@@ -10,15 +10,15 @@ export function isOnboarding(friend: Pick<FriendRecord, "totalTokens">): boolean
   return (friend.totalTokens ?? 0) < ONBOARDING_TOKEN_THRESHOLD
 }
 
-export function getFirstImpressions(friend: Pick<FriendRecord, "totalTokens" | "displayName">): string {
+export function getFirstImpressions(friend: Pick<FriendRecord, "totalTokens" | "name">): string {
   if (!isOnboarding(friend)) return ""
 
   const lines: string[] = []
 
-  if (friend.displayName === "Unknown") {
+  if (friend.name === "Unknown") {
     lines.push("i don't know this friend's name yet. i ask what they'd like to be called early in our conversation.")
   } else {
-    lines.push(`this is ${friend.displayName} -- i'm still getting to know them.`)
+    lines.push(`this is ${friend.name} -- i'm still getting to know them.`)
   }
 
   lines.push("i actively ask my friend about themselves. things i want to learn early:")

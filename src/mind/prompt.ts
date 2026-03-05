@@ -132,8 +132,8 @@ export function contextSection(context?: ResolvedContext): string {
   if (!friendOrIdentity) return ""
   const emailId = friendOrIdentity.externalIds.find(e => e.provider === "aad")
   const idDisplay = emailId
-    ? `${friendOrIdentity.displayName} (${emailId.externalId})`
-    : friendOrIdentity.displayName
+    ? `${friendOrIdentity.name} (${emailId.externalId})`
+    : friendOrIdentity.name
   lines.push(`friend: ${idDisplay}`)
 
   // Channel
@@ -168,8 +168,8 @@ export function contextSection(context?: ResolvedContext): string {
   if (Object.keys(friend.notes).length > 0) {
     lines.push("")
     lines.push("## what i know about this friend")
-    for (const [key, value] of Object.entries(friend.notes)) {
-      lines.push(`- ${key}: ${value}`)
+    for (const [key, entry] of Object.entries(friend.notes)) {
+      lines.push(`- ${key}: [${entry.savedAt.slice(0, 10)}] ${entry.value}`)
     }
   }
 
