@@ -251,3 +251,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 15:53 Unit 1b complete: implemented secrets/state path contracts, moved context sourcing to `agent.json`, and added migration runbook (`unit-1b-*.txt`)
 - 2026-03-04 15:56 Unit 1c complete: achieved green coverage gate + nerves audit after branch-coverage hardening (`unit-1c-*.txt`)
 - 2026-03-04 18:34 Added pre-Unit-5 Unit 4d-4m scope for provider module extraction, CLI/log channel separation, and Anthropic streamed tool-argument hardening
+- 2026-03-04 18:39 Pass 1 (First Draft) rerun on Units 4d-4m: structure/order unchanged and aligned with planning scope
