@@ -1021,7 +1021,7 @@ This intercepts `key: "name"` before the existing/override logic runs, so it alw
 **Output**: Modified `src/repertoire/tools-base.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 23c: "name" note -> displayName redirect -- Coverage & Refactor
+### ✅ Unit 23c: "name" note -> displayName redirect -- Coverage & Refactor
 **What**: Verify 100% coverage on the redirect path:
 1. `key === "name"` branch taken: displayName updated, early return with descriptive message
 2. `key !== "name"` branch: falls through to existing note save logic (already covered by existing tests)
