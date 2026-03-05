@@ -422,3 +422,6 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 
 ## Progress Log
 - 2026-03-05 11:12 Created from planning doc (Pass 1)
+- 2026-03-05 11:15 Granularity pass (Pass 2): added Output to all c-units and Phase C units, split Unit 11 into 11a/11b/11c TDD triplet
+- 2026-03-05 11:16 Validation pass (Pass 3): fixed mind file paths in Unit 16 (channel/store/tokens are in src/mind/friends/, not src/mind/context/)
+- 2026-03-05 11:16 Quality pass (Pass 4): all units have What/Output/Acceptance, no TBDs, all emoji headers present, coverage requirements included
