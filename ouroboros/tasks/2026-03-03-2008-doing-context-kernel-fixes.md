@@ -795,3 +795,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-04 17:29 Pass 3 -- Validation: all line numbers, variable names, interfaces verified against codebase -- no corrections needed
 - 2026-03-04 17:29 Pass 4 -- Quality: all 3 new units have What/Output/Acceptance, no TBD, all emojis present, clarified done-state test expectation
 - 2026-03-04 17:35 Unit 20a complete: 21 failing tests -- 12 FinalAnswerParser unit tests, 5 streamChatCompletion integration, 3 streamResponsesApi integration, 1 core.ts finalAnswerStreamed flag test. 1275 existing tests pass, 21 new fail (red)
+- 2026-03-04 17:43 Unit 20b complete: FinalAnswerParser class (buffer-based prefix scan, JSON escape handling), wired into streamChatCompletion and streamResponsesApi with sole-tool-call guard, finalAnswerStreamed flag on TurnResult, core.ts skips re-emit when already streamed. Updated 3 existing tests for streaming behavior. 1296 tests pass, build clean
