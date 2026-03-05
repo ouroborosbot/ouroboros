@@ -368,13 +368,18 @@ export async function runAgent(
             // JSON parsing failed (e.g. truncated output) — answer stays undefined (retry)
           }
 
-          // Clear any streamed noise (e.g. refusal text) before emitting or retrying.
-          callbacks.onClearText?.();
-
           if (answer != null) {
-            // Emit the answer through the callback pipeline so channels receive it.
-            // Never truncate — channel adapters handle splitting long messages.
-            callbacks.onTextChunk(answer);
+            if (result.finalAnswerStreamed) {
+              // The streaming layer already parsed and emitted the answer
+              // progressively via FinalAnswerParser. Skip clearing and
+              // re-emitting to avoid double-delivery.
+            } else {
+              // Clear any streamed noise (e.g. refusal text) before emitting.
+              callbacks.onClearText?.();
+              // Emit the answer through the callback pipeline so channels receive it.
+              // Never truncate -- channel adapters handle splitting long messages.
+              callbacks.onTextChunk(answer);
+            }
             // Keep the full assistant message (with tool_calls) for debuggability,
             // plus a synthetic tool response so the conversation stays valid on resume.
             messages.push(msg);
@@ -384,9 +389,10 @@ export async function runAgent(
             }
             done = true;
           } else {
-            // Answer is undefined — the model's final_answer was incomplete or
-            // malformed. Push the assistant msg + error tool result and let the
-            // model try again.
+            // Answer is undefined -- the model's final_answer was incomplete or
+            // malformed. Clear any partial streamed text or noise, then push the
+            // assistant msg + error tool result and let the model try again.
+            callbacks.onClearText?.();
             const retryError = "your final_answer was incomplete or malformed. call final_answer again with your complete response.";
             messages.push(msg);
             messages.push({ role: "tool", tool_call_id: result.toolCalls[0].id, content: retryError });
