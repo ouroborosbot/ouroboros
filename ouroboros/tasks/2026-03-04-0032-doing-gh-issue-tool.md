@@ -72,7 +72,7 @@ Allow agents using the ouroboros harness to create GitHub issues via the GitHub 
 **Output**: Failing tests in `src/__tests__/repertoire/github-client.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `github-client.ts` does not exist yet
 
-### ⬜Unit 1b: GitHub API Client -- Implementation
+### ✅Unit 1b: GitHub API Client -- Implementation
 **What**: Create `src/repertoire/github-client.ts` following `graph-client.ts` pattern exactly:
 - `GITHUB_BASE = "https://api.github.com"`
 - `githubRequest(token, method, path, body?)` function
