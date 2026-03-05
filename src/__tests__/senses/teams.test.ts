@@ -1471,6 +1471,12 @@ describe("Teams adapter - startTeamsApp signin.verify-state handler", () => {
     vi.resetModules()
     const emitNervesEventMock = vi.fn()
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: emitNervesEventMock }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/test-session"),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978, flushIntervalMs: 1000 }),
+    }))
 
     const handlers: Record<string, (args: any) => Promise<any>> = {}
     vi.doMock("@microsoft/teams.apps", () => ({
