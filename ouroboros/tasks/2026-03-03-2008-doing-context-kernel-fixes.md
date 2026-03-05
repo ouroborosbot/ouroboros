@@ -697,7 +697,7 @@ The phrase rotation timer (1.5s interval for `safeUpdate`) continues to run duri
 
 ### GATE 3: Friend Context Instructions
 
-### ⬜ Unit 4a: Bug 3 (friend context instructions) -- Tests
+### ✅ Unit 4a: Bug 3 (friend context instructions) -- Tests
 **What**: Write tests in `src/__tests__/mind/prompt.test.ts` for the rewritten friend context instructions. Tests should verify:
 1. New-friend instruction includes displayName interpolation (when displayName is "Unknown", instruction says something about not knowing the name)
 2. New-friend instruction is directive (contains action verbs like "save" not aspirational like "should learn")
