@@ -200,7 +200,7 @@ Note: These tests may need to be integration-style or verify behavior through mo
 **Output**: Updated `src/senses/teams.ts`
 **Acceptance**: All Unit 5a tests PASS (green), existing tests still pass
 
-### ⬜Unit 5c: Teams Token Handling -- Coverage & Refactor
+### ✅Unit 5c: Teams Token Handling -- Coverage & Refactor
 **What**: Verify coverage on new token fetch branches and AUTH_REQUIRED handling.
 **Output**: 100% coverage on new lines
 **Acceptance**: `npm test` passes, no warnings
@@ -242,3 +242,6 @@ Note: These tests may need to be integration-style or verify behavior through mo
 - 2026-03-04 21:59 Unit 4a complete: 2 tests for github in Teams channel capabilities (1 failing as expected).
 - 2026-03-04 22:00 Unit 4b complete: added "github" to Teams availableIntegrations, fixed channel+resolver tests.
 - 2026-03-04 22:00 Unit 4c complete: 100% coverage on channel.ts, all 1367 tests pass.
+- 2026-03-04 22:02 Unit 5a complete: 3 tests for GitHub token handling (2 failing as expected).
+- 2026-03-04 22:04 Unit 5b complete: teams.ts updated with githubToken handling, all 1370 tests pass.
+- 2026-03-04 22:04 Unit 5c complete: 100% coverage on teams.ts confirmed.
