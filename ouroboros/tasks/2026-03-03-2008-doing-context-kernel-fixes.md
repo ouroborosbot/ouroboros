@@ -86,7 +86,7 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 ## Work Units
 
 ### Legend
-⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
+⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked · ⏪ Reverted
 
 **CRITICAL: Every unit header MUST start with status emoji.**
 
@@ -467,7 +467,7 @@ These units replace units 16a-16c (deadline timer) and the `--disable-streaming`
 1. `createTeamsCallbacks` no longer accepts `disableStreaming` option (or ignores it)
 2. `onTextChunk` always accumulates in `textBuffer` (never calls `safeEmit` per-token)
 3. `onReasoningChunk` always accumulates in `reasoningBuf` (never calls `safeUpdate` per-token)
-4. `onToolEnd`, `onKick`, `onError` no longer branch on `buffered` flag -- all use `safeUpdate` for status/results
+4. `onToolEnd` and `onKick` always use `safeUpdate`; `onError` terminal always uses `safeSend`, transient always uses `safeUpdate` -- no `buffered` branching
 5. `onToolStart` always flushes `textBuffer` before showing tool status
 
 These tests replace the "createTeamsCallbacks with disableStreaming" describe block. Keep tests for: `safeSend` serialization, `sendChain` error handling, `flushTextBuffer`, `flush()`, dead-stream fallback, error recovery splitting.
@@ -685,3 +685,7 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-04 15:14 Unit 16a complete: 5 tests for deadline timer -- buffered fast/slow, streaming fast/slow, abort cleanup. 2 fail (red): buffered slow + streaming slow (no deadline timer yet). 3 pass: fast paths + cleanup (no timer to interfere)
 - 2026-03-04 15:16 Unit 16b complete: 12s deadline timer in createTeamsCallbacks -- STREAM_DEADLINE_MS constant, deadlineFired/deadlineTimer state, cancelDeadline() on first safeEmit, flush/flushTextBuffer routing via sendMessage when fired, cleanup on abort/markStopped. 1294 tests pass across 45 files, build clean
 - 2026-03-04 15:19 Unit 16c complete: 100% coverage on all new deadline timer code. 1 v8 ignore for unreachable defensive branch (stopped check in setTimeout callback -- markStopped always clears timer first). Pre-existing gaps (onClearText, ctxSend, !sendMessage) unchanged. 1294 tests pass, no warnings
+- 2026-03-04 15:58 Added units 17a-19c for chunked streaming. Marked 16a-16c as reverted with research findings. Updated 15a note, Gate 2 checkpoint, and completion criteria. (Pass 1 -- First Draft)
+- 2026-03-04 15:58 Pass 2 -- Granularity: clarified onError terminal routing (safeSend not safeEmit), onReasoningChunk rationale, removed redundant verify-already-reverted items from 19b
+- 2026-03-04 16:00 Pass 3 -- Validation: all line numbers, variable names, interfaces verified against codebase. Fixed startTeamsApp line refs (516, 517, 605, 632, 508-511) and module comment block ref (82-93 not 83-93)
+- 2026-03-04 16:00 Pass 4 -- Quality: all 7 new units have What/Output/Acceptance, no TBD, all emojis present, added revert emoji to legend, fixed Unit 18a onError description (safeSend for terminal, safeUpdate for transient)
