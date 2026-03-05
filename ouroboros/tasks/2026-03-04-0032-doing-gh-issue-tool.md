@@ -172,7 +172,7 @@ Allow agents using the ouroboros harness to create GitHub issues via the GitHub 
 **Output**: Tests green, no coverage gaps
 **Acceptance**: `npm test` passes, no warnings
 
-### ⬜Unit 5a: Teams Token Handling -- Tests
+### ✅Unit 5a: Teams Token Handling -- Tests
 **What**: Write tests verifying `teams.ts` fetches `githubToken` and handles `AUTH_REQUIRED:github`:
 - `handleTeamsMessage` passes `githubToken` in `ToolContext` when `teamsContext.githubToken` is set
 - After agent loop, if messages contain `AUTH_REQUIRED:github`, `teamsContext.signin("github")` is called
