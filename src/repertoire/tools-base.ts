@@ -9,6 +9,7 @@ import type { FriendStore } from "../mind/friends/store";
 export interface ToolContext {
   graphToken?: string;
   adoToken?: string;
+  githubToken?: string;
   signin: (connectionName: string) => Promise<string | undefined>;
   context?: ResolvedContext;
   friendStore?: FriendStore;
