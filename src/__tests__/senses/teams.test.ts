@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import type { ChannelCallbacks } from "../../heart/core"
+import { emitNervesEvent } from "../../nerves/runtime"
+
+vi.mock("../../nerves/runtime", () => ({
+  emitNervesEvent: vi.fn(),
+}))
 
 vi.mock("../../identity", () => ({
   getAgentName: vi.fn(() => "testagent"),
@@ -1464,6 +1469,8 @@ describe("Teams adapter - startTeamsApp signin.verify-state handler", () => {
 
   function setupVerifyStateTest() {
     vi.resetModules()
+    const emitNervesEventMock = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: emitNervesEventMock }))
 
     const handlers: Record<string, (args: any) => Promise<any>> = {}
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -1485,12 +1492,11 @@ describe("Teams adapter - startTeamsApp signin.verify-state handler", () => {
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
 
-    return handlers
+    return { handlers, emitNervesEventMock }
   }
 
   it("returns 404 when activity.value.state is missing", async () => {
-    const handlers = setupVerifyStateTest()
-    vi.spyOn(console, "log").mockImplementation(() => {})
+    const { handlers } = setupVerifyStateTest()
     const teams = await import("../../senses/teams")
     teams.startTeamsApp()
 
@@ -1511,9 +1517,8 @@ describe("Teams adapter - startTeamsApp signin.verify-state handler", () => {
     expect(result2).toEqual({ status: 404 })
   })
 
-  it("returns 200 and logs success when a connection matches", async () => {
-    const handlers = setupVerifyStateTest()
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+  it("returns 200 and emits verify_state info event when a connection matches", async () => {
+    const { handlers, emitNervesEventMock } = setupVerifyStateTest()
     const teams = await import("../../senses/teams")
     teams.startTeamsApp()
 
@@ -1528,13 +1533,15 @@ describe("Teams adapter - startTeamsApp signin.verify-state handler", () => {
     })
 
     expect(result).toEqual({ status: 200 })
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("verify-state succeeded"))
+    expect(emitNervesEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      level: "info",
+      event: "channel.verify_state",
+      component: "channels",
+    }))
   })
 
-  it("returns 412 and warns when all connections fail", async () => {
-    const handlers = setupVerifyStateTest()
-    vi.spyOn(console, "log").mockImplementation(() => {})
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+  it("returns 412 and emits verify_state warn event when all connections fail", async () => {
+    const { handlers, emitNervesEventMock } = setupVerifyStateTest()
     const teams = await import("../../senses/teams")
     teams.startTeamsApp()
 
@@ -1547,7 +1554,72 @@ describe("Teams adapter - startTeamsApp signin.verify-state handler", () => {
     })
 
     expect(result).toEqual({ status: 412 })
-    expect(warnSpy).toHaveBeenCalledWith("[teams] verify-state failed for all connections")
+    expect(emitNervesEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      level: "warn",
+      event: "channel.verify_state",
+      component: "channels",
+      message: "verify-state failed for all connections",
+    }))
+  })
+})
+
+describe("Teams adapter - channel.message_received event", () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("emits channel.message_received nerves event on incoming message", async () => {
+    vi.resetModules()
+    const emitNervesEventMock = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: emitNervesEventMock }))
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/test-session"),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978, flushIntervalMs: 1000 }),
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn().mockResolvedValue({ usage: undefined }),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: {
+        text: "hello",
+        conversation: { id: "conv-123" },
+        from: { id: "user-abc123456789" },
+        channelId: "msteams",
+      },
+      api: { users: { token: { get: vi.fn().mockResolvedValue({}) } } },
+      signin: vi.fn(),
+    })
+
+    expect(emitNervesEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      level: "info",
+      event: "channel.message_received",
+      component: "channels",
+    }))
   })
 })
 
