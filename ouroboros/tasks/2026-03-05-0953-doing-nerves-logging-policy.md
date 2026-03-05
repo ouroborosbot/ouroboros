@@ -137,17 +137,17 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 **Output**: Coverage report showing 100% on scanner and Rule 4 code
 **Acceptance**: 100% coverage, tests green
 
-### ⬜ Unit 7a: Audit Rule 5 (file completeness) -- tests
+### ✅ Unit 7a: Audit Rule 5 (file completeness) -- tests
 **What**: Write tests for the file completeness check. Test cases: production file with emitNervesEvent call (pass), production file with zero calls (fail), pure type-only file with zero calls (pass -- exempt), file with only `type`/`interface`/`enum` but no `function`/`class`/`const` (exempt). Scanner detects exemption automatically via heuristic.
 **Output**: Tests in coverage-audit.test.ts
 **Acceptance**: Tests FAIL (red)
 
-### ⬜ Unit 7b: Audit Rule 5 (file completeness) -- implementation
+### ✅ Unit 7b: Audit Rule 5 (file completeness) -- implementation
 **What**: Implement file completeness check in audit.ts. Uses the same source scanner from Rule 4 to discover which production files have `emitNervesEvent` calls. For files with zero calls, check if the file is type-only (no `function`/`class`/`const` declarations -- only `type`/`interface`/`enum`). Flag non-exempt files with zero calls.
 **Output**: New audit check section
 **Acceptance**: Tests from 7a PASS (green)
 
-### ⬜ Unit 7c: Audit Rule 5 -- coverage & refactor
+### ✅ Unit 7c: Audit Rule 5 -- coverage & refactor
 **What**: Verify coverage, refactor.
 **Output**: Coverage report showing 100% on Rule 5 code
 **Acceptance**: 100% coverage, tests green
@@ -431,3 +431,4 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 - 2026-03-05 11:40 Unit 4a/4b/4c complete: per-test event tracking in global-capture.ts with beforeEach hooks, Map-based event association, vitest-events-per-test.json output
 - 2026-03-05 11:42 Unit 5a/5b/5c complete: REQUIRED_EVENTS stripped from contract.ts, event_catalog and logpoint_coverage removed from audit.ts, emit-new-events.test.ts deleted
 - 2026-03-05 11:44 Unit 6a/6b/6c complete: source scanner (source-scanner.ts) with regex extraction of component:event keys, 100% coverage
+- 2026-03-05 11:46 Unit 7a/7b/7c complete: file completeness check (file-completeness.ts), isTypeOnlyFile heuristic, 100% coverage
