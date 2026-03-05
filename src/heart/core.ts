@@ -56,8 +56,25 @@ interface AnthropicCredential {
   token: string;
 }
 
+function getAnthropicSecretsPathForGuidance(): string {
+  return loadAgentConfig().configPath;
+}
+
+function getAnthropicSetupTokenInstructions(): string {
+  return [
+    "Fix:",
+    "  1. Run `claude setup-token`",
+    `  2. Open ${getAnthropicSecretsPathForGuidance()}`,
+    "  3. Set providers.anthropic.setupToken to the returned token",
+  ].join("\n");
+}
+
 function getAnthropicReauthGuidance(reason: string): string {
-  return `${reason} Run \`claude setup-token\`, then set providers.anthropic.setupToken in secrets.json.`;
+  return [
+    "Anthropic configuration error.",
+    reason,
+    getAnthropicSetupTokenInstructions(),
+  ].join("\n");
 }
 
 function resolveAnthropicSetupTokenCredential(): AnthropicCredential {
@@ -387,12 +404,14 @@ export function createProviderRegistry(): ProviderRegistry {
       const anthropicConfig = getAnthropicConfig();
       if (!(anthropicConfig.model && anthropicConfig.setupToken)) {
         throw new Error(
-          "provider 'anthropic' is selected in agent.json but providers.anthropic.model/setupToken is incomplete in secrets.json.",
+          getAnthropicReauthGuidance(
+            "provider 'anthropic' is selected in agent.json but providers.anthropic.model/setupToken is incomplete in secrets.json.",
+          ),
         );
       }
       const credential = resolveAnthropicSetupTokenCredential();
       const client = new Anthropic({
-        apiKey: credential.token,
+        authToken: credential.token,
         timeout: 30000,
         maxRetries: 0,
         defaultHeaders: {
