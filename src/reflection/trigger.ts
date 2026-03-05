@@ -108,7 +108,7 @@ ${(input.priorReflectionGaps ?? []).length > 0 ? input.priorReflectionGaps.map(g
 2. Check against the constitution — is this something you can address autonomously, or does it require human review?
    - Use "within-bounds" for: adding tests, adding validation, improving observability, adding documentation, small refactors, new utility functions, bug fixes, improving the reflection system itself, deduplication improvements, pruning/cleanup utilities, and anything that extends existing patterns without restructuring core modules.
    - Use "requires-review" ONLY for: restructuring the heart/ module's core turn loop, changing existing provider interface contracts (not testing them), modifying the constitution itself, or removing existing user-facing functionality.
-   - ALMOST EVERYTHING is within-bounds. The bar for requires-review is very high. If you're adding code, tests, utilities, or improving existing systems — it's within-bounds. Only fundamental architectural changes to heart/ or removing functionality need review.
+   - ALMOST EVERYTHING is within-bounds. The bar for requires-review is very high. If you're adding code, tests, utilities, error types, new modules, or improving existing systems — it's within-bounds. Only fundamental architectural changes to heart/core.ts's turn loop or removing existing user-facing functionality need review. Adding new error types, new sinks, new validation, new utilities — ALL within-bounds. When in doubt, use within-bounds.
 3. Propose ONE specific, concrete improvement task. Include:
    - **Gap**: What's missing or broken
    - **Proposal**: What to build/change (be specific about files and modules)
