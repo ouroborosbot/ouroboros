@@ -193,3 +193,4 @@ Test should FAIL initially because contract.ts hasn't been updated yet.
 ## Progress Log
 - 2026-03-04 23:57 Created from planning doc
 - 2026-03-04 23:59 Completed 4 conversion passes (first draft, granularity, validation, quality)
+- 2026-03-05 00:01 Unit 0 complete: baseline 1440 tests pass, 14 console calls confirmed across 4 files
