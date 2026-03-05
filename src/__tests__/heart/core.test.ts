@@ -36,6 +36,11 @@ vi.mock("../../identity", () => ({
     configPath: "~/.agentsecrets/testagent/secrets.json",
     provider: "minimax",
   })),
+  DEFAULT_AGENT_CONTEXT: {
+    maxTokens: 80000,
+    contextMargin: 20,
+    maxToolOutputChars: 20000,
+  },
   getAgentName: vi.fn(() => "testagent"),
   getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
   getRepoRoot: vi.fn(() => "/mock/repo"),
@@ -3946,6 +3951,7 @@ describe("openai-codex oauth provider contract", () => {
       expect(mockError).toHaveBeenCalledWith(expect.stringContaining("openai-codex"))
       expect(mockError).toHaveBeenCalledWith(expect.stringContaining("oauthAccessToken"))
       expect(mockError).toHaveBeenCalledWith(expect.stringContaining("secrets.json"))
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("codex login"))
     } finally {
       mockExit.mockRestore()
       mockError.mockRestore()
@@ -3986,7 +3992,7 @@ describe("openai-codex oauth provider contract", () => {
         activeTools: [],
         callbacks,
       }),
-    ).rejects.toThrow("OpenAI Codex authentication failed")
+    ).rejects.toThrow(/OpenAI Codex authentication failed[\s\S]*codex login/)
   })
 
   it("wraps openai-codex auth failures detected from error message markers", async () => {

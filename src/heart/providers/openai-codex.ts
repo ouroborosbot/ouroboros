@@ -20,7 +20,7 @@ function getOpenAICodexSecretsPathForGuidance(): string {
 function getOpenAICodexOAuthInstructions(): string {
   return [
     "Fix:",
-    "  1. Run OpenAI Codex OAuth setup to get a fresh token",
+    "  1. Run `codex login` to complete OAuth and get a fresh token",
     `  2. Open ${getOpenAICodexSecretsPathForGuidance()}`,
     "  3. Set providers.openai-codex.oauthAccessToken to the OAuth access token",
   ].join("\n");
