@@ -65,17 +65,17 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 
 ### Gate 3: Friend Context Instructions
 - [x] Friend context instructions at prompt.ts:178-194 rewritten to be directive with displayName interpolation and aggressive saving (4a/b/c -- now superseded by 21g/h/i)
-- [ ] `FriendRecord` has `totalTokens: number` field (schema version stays 1)
-- [ ] Token accumulation: after each agent turn, `FriendRecord.totalTokens` is updated with `usage.total_tokens` via `accumulateFriendTokens()` helper called from both adapters
-- [ ] `FriendResolver` auto-populates a `"name"` note from `displayName` on first contact (when displayName is not "Unknown")
-- [ ] `isNewFriend` replaced with `isOnboarding = (friend.totalTokens ?? 0) < ONBOARDING_TOKEN_THRESHOLD` (100K tokens)
-- [ ] Always-on instructions (permanent in contextSection, never gated): memory ephemerality, working-memory trust, stale notes awareness, save aggressively
-- [ ] Priority guidance line ("my friend's request comes first...") removed entirely (overfitting)
-- [ ] Separate "name quality" line removed -- folded into broader "save anything" directive
-- [ ] Onboarding-only instructions in `src/mind/first-impressions.ts`: encourage conversation, inform capabilities, new-friend greeting
-- [ ] Onboarding instructions only appear below 100K token threshold -- they drop from the system prompt once exceeded
-- [ ] `ONBOARDING_TOKEN_THRESHOLD` exported from `first-impressions.ts` (easily changeable)
-- [ ] Existing 4a/b/c prompt tests updated: priority guidance/name quality assertions flipped, isNewFriend tests rewritten for totalTokens-based detection
+- [x] `FriendRecord` has `totalTokens: number` field (schema version stays 1)
+- [x] Token accumulation: after each agent turn, `FriendRecord.totalTokens` is updated with `usage.total_tokens` via `accumulateFriendTokens()` helper called from both adapters
+- [x] `FriendResolver` auto-populates a `"name"` note from `displayName` on first contact (when displayName is not "Unknown")
+- [x] `isNewFriend` replaced with `isOnboarding = (friend.totalTokens ?? 0) < ONBOARDING_TOKEN_THRESHOLD` (100K tokens)
+- [x] Always-on instructions (permanent in contextSection, never gated): memory ephemerality, working-memory trust, stale notes awareness, save aggressively
+- [x] Priority guidance line ("my friend's request comes first...") removed entirely (overfitting)
+- [x] Separate "name quality" line removed -- folded into broader "save anything" directive
+- [x] Onboarding-only instructions in `src/mind/first-impressions.ts`: encourage conversation, inform capabilities, new-friend greeting
+- [x] Onboarding instructions only appear below 100K token threshold -- they drop from the system prompt once exceeded
+- [x] `ONBOARDING_TOKEN_THRESHOLD` exported from `first-impressions.ts` (easily changeable)
+- [x] Existing 4a/b/c prompt tests updated: priority guidance/name quality assertions flipped, isNewFriend tests rewritten for totalTokens-based detection
 - [ ] User confirms on both surfaces: bot proactively calls `save_friend_note` when learning anything about the user
 - [ ] User confirms onboarding instructions disappear after sufficient conversation
 
@@ -910,7 +910,7 @@ Tests to KEEP AS-IS (these currently pass and assert behavior we are keeping):
 **Output**: Modified `src/mind/prompt.ts`, new `src/mind/first-impressions.ts`, modified `src/mind/friends/resolver.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 21i: Prompt rewrite + first-impressions module + auto-name -- Coverage & Refactor
+### ✅ Unit 21i: Prompt rewrite + first-impressions module + auto-name -- Coverage & Refactor
 **What**: Verify 100% coverage on all modified/new code:
 1. **`first-impressions.ts`**: `isOnboarding` returns true below threshold, false at/above; `getFirstImpressions` returns non-empty below, empty at/above; displayName "Unknown" vs known branches; `totalTokens` undefined treated as 0 via `?? 0`; `ONBOARDING_TOKEN_THRESHOLD` export
 2. **`prompt.ts` contextSection**: all 4 always-on directives present at all token levels; no priority guidance line; no name quality line; onboarding text included below threshold, absent above; friend notes rendering always present when notes exist
@@ -1022,3 +1022,4 @@ Tests to KEEP AS-IS (these currently pass and assert behavior we are keeping):
 - 2026-03-04 18:59 Unit 21f complete: tokens.ts 100% coverage. teams.ts 98.63/98.64/95.91/99.22 -- uncovered lines 266, 594 are pre-existing (onClearText, ctxSend). Token accumulation call site at line 498 covered. No refactoring needed
 - 2026-03-04 19:03 Unit 21g complete: 8 failing tests across 3 files -- 6 prompt.test.ts (priority guidance absent, get-to-know absent, name quality absent x2, onboarding threshold, save-anything directive), 2 resolver.test.ts (auto-name Jordan, auto-name Unknown skipped), 1 first-impressions.test.ts file fails at import. 1310 other tests pass
 - 2026-03-04 19:05 Unit 21h complete: contextSection rewritten (removed priority guidance, name quality line, isNewFriend; added 4 always-on directives + getFirstImpressions call). Created first-impressions.ts (ONBOARDING_TOKEN_THRESHOLD=100K, isOnboarding, getFirstImpressions with displayName/Unknown variants). Auto-name in resolver.ts (notes: { name: displayName } when not "Unknown"). 1329 tests pass, build clean
+- 2026-03-04 19:06 Unit 21i complete: first-impressions.ts 100% coverage. prompt.ts 100% lines/funcs (branches 95.34% -- only gap is pre-existing supportsStreaming false at lines 143-144). resolver.ts 100% coverage. All Gate 3 completion criteria checked. No refactoring needed
