@@ -518,7 +518,7 @@ Also verify the removal propagates:
 **Output**: Modified files listed above
 **Acceptance**: All tests PASS (green), no warnings. No references to `disableStreaming` or `buffered` remain in `src/` (except possibly test file comments explaining what was removed). `npm run teams:no-stream` no longer exists.
 
-### ⬜ Unit 18c: Remove disableStreaming / buffered mode -- coverage & refactor
+### ✅ Unit 18c: Remove disableStreaming / buffered mode -- coverage & refactor
 **What**: Verify 100% coverage on all modified code paths. With the `buffered` branching removed, there should be fewer branches to cover. Verify:
 1. `onTextChunk` always accumulates (single path)
 2. `onReasoningChunk` always accumulates (single path)
@@ -696,3 +696,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-04 16:17 Unit 17a complete: restored teams.ts and teams.test.ts to 406bffe state via git checkout. Diff empty, 1289 tests pass, build clean
 - 2026-03-04 16:27 Unit 18a complete: 39 tests fail (red) -- updated teams.test.ts, prompt.test.ts, config.test.ts for unified chunked streaming behavior. Removed disableStreaming from all test expectations
 - 2026-03-04 16:33 Unit 18b complete: removed all disableStreaming/buffered mode code across 5 files -- teams.ts (callbacks, handleTeamsMessage, startTeamsApp), core.ts (RunAgentOptions), prompt.ts (BuildSystemOptions, flagsSection removed), config.ts (TeamsChannelConfig), package.json (teams:no-stream script). 1263 tests pass, build clean
+- 2026-03-04 16:34 Unit 18c complete: 100% coverage on all modified files (config.ts, core.ts, prompt.ts). teams.ts uncovered lines 222, 542 are pre-existing gaps (onClearText, ctxSend). Zero references to disableStreaming/buffered/--disable-streaming/teams:no-stream in source code. No refactoring needed
