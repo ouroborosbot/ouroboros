@@ -1,7 +1,7 @@
 # Planning: Tool Execution Observability (Correlated Spans)
 
 **Status**: drafting
-**Created**: [git timestamp from initial commit]
+**Created**: 2026-03-05 01:28
 
 ## Goal
 Improve tool execution observability by emitting correlated start/end/error telemetry for each `execTool()` invocation, including a per-invocation trace ID, duration, and safe argument summaries.
@@ -64,4 +64,4 @@ Improve tool execution observability by emitting correlated start/end/error tele
 Keep telemetry events consistent and safe by default; tests should assert correlation and terminal-event guarantees.
 
 ## Progress Log
-- [timestamp from git] Created
+- 2026-03-05 01:28 Created
