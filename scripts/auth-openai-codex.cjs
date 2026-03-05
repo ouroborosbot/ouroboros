@@ -27,6 +27,7 @@ function printHelp() {
   console.log("Usage: node scripts/auth-openai-codex.cjs --agent <name>")
   console.log("")
   console.log("Bootstraps OpenAI Codex OAuth and writes providers.openai-codex.oauthAccessToken to secrets.json.")
+  console.log("The token is used against chatgpt.com/backend-api/codex/responses.")
 }
 
 function readCodexAccessToken() {

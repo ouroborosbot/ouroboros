@@ -10,8 +10,12 @@ const OPENAI_CODEX_AUTH_FAILURE_MARKERS = [
   "authentication failed",
   "unauthorized",
   "invalid api key",
+  "invalid x-api-key",
   "invalid bearer token",
 ]
+const OPENAI_CODEX_BACKEND_BASE_URL = "https://chatgpt.com/backend-api/codex";
+
+type JsonRecord = Record<string, unknown>;
 
 function getOpenAICodexSecretsPathForGuidance(): string {
   return loadAgentConfig().configPath;
@@ -29,6 +33,7 @@ function getOpenAICodexOAuthInstructions(): string {
     "     (or run `codex login` and set the OAuth token manually)",
     `  2. Open ${getOpenAICodexSecretsPathForGuidance()}`,
     "  3. Confirm providers.openai-codex.oauthAccessToken is set",
+    "  4. This provider uses chatgpt.com/backend-api/codex/responses (not api.openai.com/responses).",
   ].join("\n");
 }
 
@@ -56,6 +61,32 @@ function withOpenAICodexAuthGuidance(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
+function decodeJwtPayload(token: string): JsonRecord | null {
+  const parts = token.split(".");
+  if (parts.length < 2) return null;
+  try {
+    const padded = parts[1]!
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(parts[1]!.length / 4) * 4, "=");
+    const payload = JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as unknown;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+    return payload as JsonRecord;
+  } catch {
+    return null;
+  }
+}
+
+function getChatGPTAccountIdFromToken(token: string): string {
+  const payload = decodeJwtPayload(token);
+  if (!payload) return "";
+  const authClaim = payload["https://api.openai.com/auth"];
+  if (!authClaim || typeof authClaim !== "object" || Array.isArray(authClaim)) return "";
+  const accountId = (authClaim as JsonRecord).chatgpt_account_id;
+  if (typeof accountId !== "string") return "";
+  return accountId.trim();
+}
+
 export function createOpenAICodexProviderRuntime(): ProviderRuntime {
   const codexConfig = getOpenAICodexConfig();
   if (!(codexConfig.model && codexConfig.oauthAccessToken)) {
@@ -73,8 +104,22 @@ export function createOpenAICodexProviderRuntime(): ProviderRuntime {
       ),
     );
   }
+  const chatgptAccountId = getChatGPTAccountIdFromToken(token);
+  if (!chatgptAccountId) {
+    throw new Error(
+      getOpenAICodexReauthGuidance(
+        "OpenAI Codex OAuth access token is missing a chatgpt_account_id claim required for chatgpt.com/backend-api/codex.",
+      ),
+    );
+  }
   const client = new OpenAI({
     apiKey: token,
+    baseURL: OPENAI_CODEX_BACKEND_BASE_URL,
+    defaultHeaders: {
+      "chatgpt-account-id": chatgptAccountId,
+      "OpenAI-Beta": "responses=experimental",
+      originator: "ouroboros",
+    },
     timeout: 30000,
     maxRetries: 0,
   });
