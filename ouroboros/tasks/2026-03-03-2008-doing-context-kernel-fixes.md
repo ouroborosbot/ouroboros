@@ -595,7 +595,7 @@ The phrase rotation timer (1.5s interval for `safeUpdate`) continues to run duri
    - Handles unknown escape (e.g. `\x`) by passing through the character
    - Emits nothing before prefix `"answer":"` is matched
    - Emits incrementally across multiple `process()` calls (delta chunking)
-   - Stops at unescaped closing `"` (no output after)
+   - Stops at unescaped closing `"` -- subsequent `process()` calls return empty string
    - `active` is false before prefix, true after
    - `complete` is false until closing `"`, true after
    - Handles `"answer": "` (space after colon) variant
