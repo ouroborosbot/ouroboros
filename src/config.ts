@@ -41,8 +41,14 @@ export interface TeamsChannelConfig {
   port: number
 }
 
+export interface GitHubConfig {
+  owner: string
+  repo: string
+}
+
 export interface IntegrationsConfig {
   perplexityApiKey: string
+  github: GitHubConfig
 }
 
 export interface OuroborosConfig {
@@ -92,6 +98,10 @@ const DEFAULT_CONFIG: OuroborosConfig = {
   },
   integrations: {
     perplexityApiKey: "",
+    github: {
+      owner: "ouroborosbot",
+      repo: "ouroboros-agent-harness",
+    },
   },
 }
 
