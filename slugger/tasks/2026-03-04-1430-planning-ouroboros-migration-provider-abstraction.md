@@ -17,6 +17,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - Move provider-specific streaming/input state handling out of the engine loop into provider implementations.
 - Add a pre-Unit-5 provider maintainability pass that extracts provider-specific runtime logic from `src/heart/core.ts` into `src/heart/providers/{anthropic,azure,minimax}.ts` with no behavior change.
 - Add a pre-Unit-5 logging channel separation pass so CLI user-facing text remains clean while nerves logs route to operator-native sinks (append-only NDJSON persistence under `~/.agentstate/<agent>/logs` and non-user-facing stderr sink behavior).
+- Add a pre-Unit-5 Anthropic tool-call hardening pass to fix streamed tool-argument assembly so tool invocations receive valid JSON arguments.
 - Add Anthropic provider integration as a final step with setup-token auth profile support (OpenClaw-compatible flow: `claude setup-token` then token paste).
 - Add OpenAI Codex provider integration as a final step with OAuth subscription auth profile support (OpenClaw-compatible `openai-codex` flow).
 - Define mandatory manual validation gates for Anthropic setup-token and OpenAI Codex OAuth using real auth profiles, with operator-readable evidence artifacts.
@@ -55,6 +56,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [ ] Provider-specific implementation logic is extracted from `src/heart/core.ts` into `src/heart/providers/*` modules before Unit 5 work, with behavior parity confirmed by tests.
 - [ ] CLI channel output keeps user-visible plain text separate from nerves logs (no raw NDJSON log events interleaved in stdout model responses).
 - [ ] Nerves logs remain machine-readable and persistent (append-only NDJSON) for multi-agent auditing and runtime validation.
+- [ ] Anthropic streamed tool calls assemble valid JSON arguments and execute reliably (no malformed concatenated argument payloads), backed by regression tests.
 - [ ] Secrets/state boundary is enforced (`~/.agentsecrets` for secrets only; runtime/session/log/PII/test artifacts moved to `~/.agentstate`).
 - [ ] `secrets.json` retains `providers` + `teams`; `context` is loaded from `agent.json`.
 - [ ] `agent.json.configPath` resolves to `~/.agentsecrets/<agent>/secrets.json`.
@@ -102,6 +104,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - Anthropic setup-token and OpenAI Codex OAuth require explicit manual end-to-end validation gates before task completion is accepted.
 - Before OpenAI Codex Unit 5 work, perform a focused maintainability pass to split provider-specific runtime code out of `src/heart/core.ts` into `src/heart/providers/*`, preserving current behavior.
 - CLI observability is a cross-channel contract: user-facing text stays on channel-native output (stdout for CLI), while structured nerves logs go to operator-native sinks (append-only NDJSON persistence and non-user-facing stderr/file sinks), never as user-visible transcript text.
+- Anthropic streamed tool-call argument assembly hardening is required before Unit 5 to prevent malformed tool arguments from breaking invocation flow.
 
 ## Context / References
 - `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration/provider-abstraction.md`
@@ -115,6 +118,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - `/Users/arimendelow/Projects/openclaw/src/agents/model-forward-compat.ts`
 - `/Users/arimendelow/Projects/openclaw/README.md`
 - `/Users/arimendelow/Projects/ouroboros-agent-harness/README.md`
+- `/Users/arimendelow/.agentstate/ouroboros/sessions/267e5aad-a8ec-410a-9bcb-6c949360b45c/cli/session.json`
 
 ## Notes
 Keep scope disciplined: runtime provider abstraction + provider integrations only, no additional architecture expansion.
@@ -134,3 +138,4 @@ Keep scope disciplined: runtime provider abstraction + provider integrations onl
 - 2026-03-04 15:32 Clarified that this task performs storage/config refactor before provider abstraction; legacy data migration itself is manual out-of-band via runbook
 - 2026-03-04 15:35 Added mandatory manual validation gates for Anthropic setup-token and OpenAI Codex OAuth with artifact evidence requirements
 - 2026-03-04 18:26 Added pre-Unit-5 planning scope for provider module extraction and CLI log/user-output separation; set status to NEEDS_REVIEW
+- 2026-03-04 18:32 Added pre-Unit-5 Anthropic tool-argument hardening scope and completion criteria for malformed streamed tool-call payloads
