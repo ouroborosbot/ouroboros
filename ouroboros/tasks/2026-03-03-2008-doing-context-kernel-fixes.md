@@ -822,7 +822,7 @@ Changes:
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new/modified code, all tests green
 
-### ⬜ Unit 21g: Prompt rewrite + first-impressions module + auto-name -- Tests
+### ✅ Unit 21g: Prompt rewrite + first-impressions module + auto-name -- Tests
 **What**: Write failing tests covering the three-part instruction architecture change. This unit modifies existing tests that were written for 4a/b/c AND adds new tests.
 
 **Part A -- Update existing 4a tests in `src/__tests__/mind/prompt.test.ts`:**
@@ -1020,3 +1020,4 @@ Tests to KEEP AS-IS (these currently pass and assert behavior we are keeping):
 - 2026-03-04 18:57 Unit 21d complete: 6 failing tests for accumulateFriendTokens -- first turn (0 -> 1500), subsequent (3000 -> 5000), no-op undefined, no-op zero, record not found, legacy undefined totalTokens. All fail (tokens.ts doesn't exist)
 - 2026-03-04 18:58 Unit 21e complete: accumulateFriendTokens helper in tokens.ts (early-return guards, ?? 0 fallback, updatedAt refresh). Wired into teams.ts after postTurn (guarded by toolContext?.context?.friend?.id) and cli.ts after postTurn. 1313 tests pass, build clean
 - 2026-03-04 18:59 Unit 21f complete: tokens.ts 100% coverage. teams.ts 98.63/98.64/95.91/99.22 -- uncovered lines 266, 594 are pre-existing (onClearText, ctxSend). Token accumulation call site at line 498 covered. No refactoring needed
+- 2026-03-04 19:03 Unit 21g complete: 8 failing tests across 3 files -- 6 prompt.test.ts (priority guidance absent, get-to-know absent, name quality absent x2, onboarding threshold, save-anything directive), 2 resolver.test.ts (auto-name Jordan, auto-name Unknown skipped), 1 first-impressions.test.ts file fails at import. 1310 other tests pass
