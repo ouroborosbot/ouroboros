@@ -992,7 +992,7 @@ Changes:
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new/modified code, all tests green
 
-### ⬜ Unit 23a: "name" note -> displayName redirect -- Tests
+### ✅ Unit 23a: "name" note -> displayName redirect -- Tests
 **What**: Write failing tests verifying that `save_friend_note` with `type: "note"` and `key: "name"` redirects to a displayName update instead of storing as a note.
 
 **`src/__tests__/repertoire/tools.test.ts`**:
