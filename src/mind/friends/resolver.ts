@@ -66,6 +66,7 @@ export class FriendResolver {
       tenantMemberships,
       toolPreferences: {},
       notes: {},
+      totalTokens: 0,
       createdAt: now,
       updatedAt: now,
       schemaVersion: CURRENT_SCHEMA_VERSION,

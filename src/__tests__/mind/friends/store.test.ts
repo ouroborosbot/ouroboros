@@ -10,6 +10,7 @@ function makeFriend(overrides: Partial<FriendRecord> = {}): FriendRecord {
     tenantMemberships: [],
     toolPreferences: {},
     notes: {},
+    totalTokens: 0,
     createdAt: "2026-03-02T00:00:00.000Z",
     updatedAt: "2026-03-02T00:00:00.000Z",
     schemaVersion: 1,

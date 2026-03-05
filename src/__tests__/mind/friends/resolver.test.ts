@@ -13,6 +13,7 @@ function makeFriend(overrides: Partial<FriendRecord> = {}): FriendRecord {
     tenantMemberships: ["t1"],
     toolPreferences: { ado: "flat backlog view" },
     notes: { role: "engineering manager" },
+    totalTokens: 0,
     createdAt: "2026-03-02T00:00:00.000Z",
     updatedAt: "2026-03-02T00:00:00.000Z",
     schemaVersion: 1,
