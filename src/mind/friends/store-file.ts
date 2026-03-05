@@ -15,6 +15,7 @@ interface AgentKnowledgeData {
   displayName: string
   toolPreferences: Record<string, string>
   notes: Record<string, string>
+  totalTokens: number
   createdAt: string
   updatedAt: string
   schemaVersion: number
@@ -62,6 +63,7 @@ export class FileFriendStore implements FriendStore {
       displayName: record.displayName,
       toolPreferences: record.toolPreferences,
       notes: record.notes,
+      totalTokens: record.totalTokens,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
       schemaVersion: record.schemaVersion,
@@ -137,6 +139,7 @@ export class FileFriendStore implements FriendStore {
       displayName: agentData.displayName,
       toolPreferences: agentData.toolPreferences,
       notes: agentData.notes,
+      totalTokens: agentData.totalTokens ?? 0,
       createdAt: agentData.createdAt,
       updatedAt: agentData.updatedAt,
       schemaVersion: agentData.schemaVersion,

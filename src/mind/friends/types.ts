@@ -41,6 +41,7 @@ export interface FriendRecord {
   tenantMemberships: string[]             // PII
   toolPreferences: Record<string, string> // keyed by integration name
   notes: Record<string, string>           // general friend knowledge
+  totalTokens: number                     // cumulative token usage across all turns
   createdAt: string                       // ISO date
   updatedAt: string
   schemaVersion: number
