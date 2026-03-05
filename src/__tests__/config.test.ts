@@ -25,6 +25,7 @@ import * as identity from "../identity"
 beforeEach(() => {
   vi.mocked(fs.readFileSync).mockReset()
   vi.mocked(fs.mkdirSync).mockReset()
+  vi.mocked(fs.writeFileSync).mockReset()
   vi.mocked(identity.loadAgentConfig).mockReturnValue({
     name: "testagent",
     configPath: "~/.agentsecrets/testagent/secrets.json",
@@ -101,6 +102,18 @@ describe("loadConfig", () => {
     expect(config.providers.minimax.apiKey).toBe("")
     expect(config.context.maxTokens).toBe(80000)
     expect(config.context.contextMargin).toBe(20)
+
+    const expectedPath = path.join(os.homedir(), ".agentsecrets", "testagent", "secrets.json")
+    expect(fs.writeFileSync).toHaveBeenCalledTimes(1)
+    expect(fs.writeFileSync).toHaveBeenCalledWith(expectedPath, expect.any(String), "utf-8")
+    const written = vi.mocked(fs.writeFileSync).mock.calls[0]?.[1]
+    const parsed = JSON.parse(String(written)) as Record<string, unknown>
+    expect(parsed).toHaveProperty("providers")
+    expect(parsed).not.toHaveProperty("teams")
+    expect(parsed).not.toHaveProperty("oauth")
+    expect(parsed).not.toHaveProperty("context")
+    expect(parsed).not.toHaveProperty("teamsChannel")
+    expect(parsed).not.toHaveProperty("integrations")
   })
 
   it("returns defaults when file contains invalid JSON", async () => {
