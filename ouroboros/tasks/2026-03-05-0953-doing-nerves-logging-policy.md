@@ -65,7 +65,7 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 
 ## Phase A: ESLint and Console Enforcement
 
-### ⬜ Unit 1: Install ESLint and create config
+### ✅ Unit 1: Install ESLint and create config
 **What**: Install `eslint` and `typescript-eslint` as devDependencies. Create `eslint.config.js` (flat config) with `no-console: "error"` scoped to `src/**/*.ts`, explicitly ignoring `src/__tests__/**` from the no-console rule. Add `"lint": "eslint src/"` script to `package.json`.
 **Output**: `eslint.config.js` created, `package.json` updated with deps and lint script
 **Acceptance**: `npx eslint --print-config src/identity.ts` shows no-console as error; test files are not affected by no-console
