@@ -30,7 +30,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [x] Secrets/state boundary is enforced (`~/.agentsecrets` for secrets only; runtime/session/log/PII/test artifacts moved to `~/.agentstate`).
 - [x] `secrets.json` retains `providers` + `teams`; `context` is loaded from `agent.json`.
 - [x] `agent.json.configPath` resolves to `~/.agentsecrets/<agent>/secrets.json`.
-- [ ] Missing/expired provider credentials fail fast with explicit re-auth guidance; no silent fallback.
+- [x] Missing/expired provider credentials fail fast with explicit re-auth guidance; no silent fallback.
 - [x] A migration runbook exists in-repo for cross-machine post-pull reorganization of legacy `~/.agentconfigs` data.
 - [x] Legacy `~/.agentconfigs` migration is fully documented as a one-time manual operation for other machines (no runtime back-compat branches in normal execution code), with no data loss and clear operator guidance.
 - [x] Storage/config refactor executes before provider abstraction refactor work so implementation targets final storage/config contracts.
@@ -191,7 +191,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: OpenAI Codex provider and auth profile integration.
 **Acceptance**: OpenAI Codex tests pass green with explicit re-auth guidance on auth failure.
 
-### ⬜ Unit 5c: OpenAI Codex OAuth integration — Coverage & Refactor
+### ✅ Unit 5c: OpenAI Codex OAuth integration — Coverage & Refactor
 **What**: Refactor OpenAI Codex provider code and cover all auth and response branches.
 **Output**: Refactored OpenAI Codex provider code and coverage artifact for auth/response branches.
 **Acceptance**: 100% coverage on new OpenAI Codex integration code and tests green.
@@ -267,3 +267,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 19:20 Unit 4m complete: executed live Anthropic setup-token CLI validation, captured tool-call/session evidence, and captured fail-fast + runtime re-auth guidance evidence (`unit-4m-manual-validation.txt`, `unit-4m-manual-validation.json`, `unit-4m-manual-validation.stderr.txt`)
 - 2026-03-04 19:30 Unit 5a complete: added red OpenAI Codex OAuth provider/config/prompt/identity contract tests with failing evidence artifacts (`unit-5a-red-run.txt`, `unit-5a-jest.json`, `unit-5a-red-run.exit`)
 - 2026-03-04 19:32 Unit 5b complete: implemented OpenAI Codex OAuth provider runtime + config/identity/core wiring with green targeted suites and build (`unit-5b-test-run.txt`, `unit-5b-jest.json`, `unit-5b-build.txt`)
+- 2026-03-04 19:36 Unit 5c complete: covered/refined OpenAI Codex OAuth provider runtime branches and reached 100% targeted coverage with build green (`unit-5c-coverage.txt`, `unit-5c-coverage-summary.json`, `unit-5c-build.txt`)
