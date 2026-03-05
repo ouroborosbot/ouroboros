@@ -16,7 +16,7 @@ describe("getChannelCapabilities", () => {
   it("returns Teams capabilities with ado and graph integrations", () => {
     const caps = getChannelCapabilities("teams")
     expect(caps.channel).toBe("teams")
-    expect(caps.availableIntegrations).toEqual(["ado", "graph"])
+    expect(caps.availableIntegrations).toEqual(["ado", "graph", "github"])
     expect(caps.supportsMarkdown).toBe(true)
     expect(caps.supportsStreaming).toBe(true)
     expect(caps.supportsRichCards).toBe(true)
