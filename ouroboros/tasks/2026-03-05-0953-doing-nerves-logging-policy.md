@@ -2,7 +2,7 @@
 
 **Status**: drafting
 **Execution Mode**: direct
-**Created**: TBD
+**Created**: 2026-03-05 11:12
 **Planning**: ./2026-03-05-0953-planning-nerves-logging-policy.md
 **Artifacts**: ./2026-03-05-0953-doing-nerves-logging-policy/
 
@@ -104,6 +104,7 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 
 ### ⬜ Unit 4c: Per-test event tracking -- coverage & refactor
 **What**: Verify 100% coverage on new per-test tracking code. Refactor if needed.
+**Output**: Coverage report showing 100% on new code
 **Acceptance**: 100% coverage on new code, tests still green
 
 ### ⬜ Unit 5a: Strip REQUIRED_EVENTS from contract -- tests
@@ -118,6 +119,7 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 
 ### ⬜ Unit 5c: Strip REQUIRED_EVENTS -- coverage & refactor
 **What**: Verify coverage, refactor if needed.
+**Output**: Coverage report showing 100% on changed code
 **Acceptance**: 100% coverage on changed code, tests still green
 
 ### ⬜ Unit 6a: Audit Rule 4 (source coverage) -- tests
@@ -132,6 +134,7 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 
 ### ⬜ Unit 6c: Audit Rule 4 -- coverage & refactor
 **What**: Verify coverage, refactor.
+**Output**: Coverage report showing 100% on scanner and Rule 4 code
 **Acceptance**: 100% coverage, tests green
 
 ### ⬜ Unit 7a: Audit Rule 5 (file completeness) -- tests
@@ -146,6 +149,7 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 
 ### ⬜ Unit 7c: Audit Rule 5 -- coverage & refactor
 **What**: Verify coverage, refactor.
+**Output**: Coverage report showing 100% on Rule 5 code
 **Acceptance**: 100% coverage, tests green
 
 ### ⬜ Unit 8a: Audit Rule 1 (every-test-emits) -- tests
@@ -160,6 +164,7 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 
 ### ⬜ Unit 8c: Audit Rule 1 -- coverage & refactor
 **What**: Verify coverage, refactor.
+**Output**: Coverage report showing 100% on Rule 1 code
 **Acceptance**: 100% coverage, tests green
 
 ### ⬜ Unit 9a: Audit Rule 2 (start/end pairing) -- tests
@@ -174,6 +179,7 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 
 ### ⬜ Unit 9c: Audit Rule 2 -- coverage & refactor
 **What**: Verify coverage, refactor.
+**Output**: Coverage report showing 100% on Rule 2 code
 **Acceptance**: 100% coverage, tests green
 
 ### ⬜ Unit 10a: Audit Rule 3 (error context) -- tests
@@ -188,12 +194,23 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 
 ### ⬜ Unit 10c: Audit Rule 3 -- coverage & refactor
 **What**: Verify coverage, refactor.
+**Output**: Coverage report showing 100% on Rule 3 code
 **Acceptance**: 100% coverage, tests green
 
-### ⬜ Unit 11: Audit integration -- rewrite top-level report
-**What**: Rewrite `auditNervesCoverage()` to produce a report with the new 5-rule structure plus preserved schema/redaction check. Update the report types (`NervesCoverageReport`, etc.) to reflect new sections: `source_coverage` (Rule 4), `file_completeness` (Rule 5), `every_test_emits` (Rule 1), `start_end_pairing` (Rule 2), `error_context` (Rule 3), `schema_redaction` (preserved). Remove old `event_catalog` and `logpoint_coverage` sections. Update `scripts/run-coverage-gate.cjs` if the report shape changed. Update `src/nerves/coverage/cli.ts` if needed.
+### ⬜ Unit 11a: Audit integration -- tests
+**What**: Write tests for the rewritten `auditNervesCoverage()` top-level report. Tests verify: report contains all 5 rule sections (`every_test_emits`, `start_end_pairing`, `error_context`, `source_coverage`, `file_completeness`) plus `schema_redaction`; old sections (`event_catalog`, `logpoint_coverage`) are gone; overall pass/fail aggregates correctly from individual rule results.
+**Output**: Tests in coverage-audit.test.ts for the integration/report shape
+**Acceptance**: Tests FAIL (red) -- old report shape still in place
+
+### ⬜ Unit 11b: Audit integration -- implementation
+**What**: Rewrite `auditNervesCoverage()` to produce a report with the new 5-rule structure plus preserved schema/redaction check. Update the report types (`NervesCoverageReport`, etc.) to reflect new sections. Remove old `event_catalog` and `logpoint_coverage` sections. Update `scripts/run-coverage-gate.cjs` if the report shape changed. Update `src/nerves/coverage/cli.ts` if needed.
 **Output**: Updated audit.ts, report types, gate script, CLI
-**Acceptance**: `npm test` passes. Audit produces a report with all 5 rules + schema/redaction.
+**Acceptance**: Tests from 11a PASS (green). `npm test` passes.
+
+### ⬜ Unit 11c: Audit integration -- coverage & refactor
+**What**: Verify coverage on rewritten audit integration code. Refactor if needed.
+**Output**: Coverage report showing 100% on integration code
+**Acceptance**: 100% coverage, tests green
 
 ---
 
@@ -201,50 +218,62 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 
 ### ⬜ Unit 12a: heart/providers/anthropic.ts -- tests
 **What**: Write failing tests that expect nerves events from anthropic provider code paths: API call start/end, streaming events, error handling. All events must use static string literals and follow start/end pairing convention.
+**Output**: New/updated test expectations for anthropic.ts nerves events
 **Acceptance**: Tests FAIL (red)
 
 ### ⬜ Unit 12b: heart/providers/anthropic.ts -- implementation
 **What**: Add `emitNervesEvent` calls to all observable code paths in anthropic.ts. Use static string literals for `event` and `component`. Follow `_start`/`_end`/`_error` naming for operations. Error events must have non-empty meta with context.
+**Output**: Updated anthropic.ts with emitNervesEvent calls
 **Acceptance**: Tests from 12a PASS (green)
 
 ### ⬜ Unit 12c: heart/providers/anthropic.ts -- coverage & refactor
 **What**: Verify coverage, refactor.
+**Output**: Coverage report showing 100% on new anthropic.ts code
 **Acceptance**: 100% coverage on new code, tests green
 
 ### ⬜ Unit 13a: heart/providers (azure, minimax, openai-codex) -- tests
 **What**: Write failing tests that expect nerves events from the 3 remaining provider files: init, error paths.
+**Output**: New/updated test expectations for azure.ts, minimax.ts, openai-codex.ts
 **Acceptance**: Tests FAIL (red)
 
 ### ⬜ Unit 13b: heart/providers (azure, minimax, openai-codex) -- implementation
 **What**: Add `emitNervesEvent` calls to all observable code paths in azure.ts, minimax.ts, openai-codex.ts.
+**Output**: Updated azure.ts, minimax.ts, openai-codex.ts with emitNervesEvent calls
 **Acceptance**: Tests from 13a PASS (green)
 
 ### ⬜ Unit 13c: heart/providers (azure, minimax, openai-codex) -- coverage & refactor
 **What**: Verify coverage, refactor.
+**Output**: Coverage report showing 100% on new provider code
 **Acceptance**: 100% coverage on new code, tests green
 
 ### ⬜ Unit 14a: heart/streaming.ts -- tests
 **What**: Write failing tests that expect nerves events from stream processing: chunk processing start/end, stream errors, stream completion.
+**Output**: New/updated test expectations for streaming.ts
 **Acceptance**: Tests FAIL (red)
 
 ### ⬜ Unit 14b: heart/streaming.ts -- implementation
 **What**: Add `emitNervesEvent` calls to all observable code paths in streaming.ts.
+**Output**: Updated streaming.ts with emitNervesEvent calls
 **Acceptance**: Tests from 14a PASS (green)
 
 ### ⬜ Unit 14c: heart/streaming.ts -- coverage & refactor
 **What**: Verify coverage, refactor.
+**Output**: Coverage report showing 100% on new streaming code
 **Acceptance**: 100% coverage on new code, tests green
 
 ### ⬜ Unit 15a: heart (turn-coordinator, api-error) -- tests
 **What**: Write failing tests that expect nerves events from turn-coordinator.ts and api-error.ts.
+**Output**: New/updated test expectations for turn-coordinator.ts and api-error.ts
 **Acceptance**: Tests FAIL (red)
 
 ### ⬜ Unit 15b: heart (turn-coordinator, api-error) -- implementation
 **What**: Add `emitNervesEvent` calls to all observable code paths.
+**Output**: Updated turn-coordinator.ts and api-error.ts with emitNervesEvent calls
 **Acceptance**: Tests from 15a PASS (green)
 
 ### ⬜ Unit 15c: heart (turn-coordinator, api-error) -- coverage & refactor
 **What**: Verify coverage, refactor.
+**Output**: Coverage report showing 100% on new code
 **Acceptance**: 100% coverage on new code, tests green
 
 ---
@@ -253,26 +282,32 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 
 ### ⬜ Unit 16a: mind (first-impressions, channel, store, tokens) -- tests
 **What**: Write failing tests that expect nerves events from first-impressions.ts, channel.ts, store.ts (factory), and tokens.ts. These are small files (13-38 lines each).
+**Output**: New/updated test expectations for the 4 mind files
 **Acceptance**: Tests FAIL (red)
 
 ### ⬜ Unit 16b: mind (first-impressions, channel, store, tokens) -- implementation
 **What**: Add `emitNervesEvent` calls to all observable code paths in these 4 files.
+**Output**: Updated first-impressions.ts, channel.ts, store.ts, tokens.ts with emitNervesEvent calls
 **Acceptance**: Tests from 16a PASS (green)
 
 ### ⬜ Unit 16c: mind (first-impressions, channel, store, tokens) -- coverage & refactor
 **What**: Verify coverage, refactor.
+**Output**: Coverage report showing 100% on new mind code
 **Acceptance**: 100% coverage on new code, tests green
 
 ### ⬜ Unit 17a: mind/friends/store-file.ts -- tests
 **What**: Write failing tests that expect nerves events from store-file.ts (178 lines, file I/O, error handling).
+**Output**: New/updated test expectations for store-file.ts
 **Acceptance**: Tests FAIL (red)
 
 ### ⬜ Unit 17b: mind/friends/store-file.ts -- implementation
 **What**: Add `emitNervesEvent` calls to all observable code paths in store-file.ts.
+**Output**: Updated store-file.ts with emitNervesEvent calls
 **Acceptance**: Tests from 17a PASS (green)
 
 ### ⬜ Unit 17c: mind/friends/store-file.ts -- coverage & refactor
 **What**: Verify coverage, refactor.
+**Output**: Coverage report showing 100% on new store-file code
 **Acceptance**: 100% coverage on new code, tests green
 
 ---
@@ -281,38 +316,47 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 
 ### ⬜ Unit 18a: repertoire/ado-semantic.ts -- tests
 **What**: Write failing tests that expect nerves events from ado-semantic.ts (950 lines, largest file -- ADO semantic operations, API calls, errors).
+**Output**: New/updated test expectations for ado-semantic.ts
 **Acceptance**: Tests FAIL (red)
 
 ### ⬜ Unit 18b: repertoire/ado-semantic.ts -- implementation
 **What**: Add `emitNervesEvent` calls to all observable code paths in ado-semantic.ts.
+**Output**: Updated ado-semantic.ts with emitNervesEvent calls
 **Acceptance**: Tests from 18a PASS (green)
 
 ### ⬜ Unit 18c: repertoire/ado-semantic.ts -- coverage & refactor
 **What**: Verify coverage, refactor.
+**Output**: Coverage report showing 100% on new ado-semantic code
 **Acceptance**: 100% coverage on new code, tests green
 
 ### ⬜ Unit 19a: repertoire (ado-context, ado-templates) -- tests
 **What**: Write failing tests that expect nerves events from ado-context.ts and ado-templates.ts.
+**Output**: New/updated test expectations for ado-context.ts and ado-templates.ts
 **Acceptance**: Tests FAIL (red)
 
 ### ⬜ Unit 19b: repertoire (ado-context, ado-templates) -- implementation
 **What**: Add `emitNervesEvent` calls to all observable code paths.
+**Output**: Updated ado-context.ts and ado-templates.ts with emitNervesEvent calls
 **Acceptance**: Tests from 19a PASS (green)
 
 ### ⬜ Unit 19c: repertoire (ado-context, ado-templates) -- coverage & refactor
 **What**: Verify coverage, refactor.
+**Output**: Coverage report showing 100% on new repertoire code
 **Acceptance**: 100% coverage on new code, tests green
 
 ### ⬜ Unit 20a: repertoire (tools-base, tools-github, tools-teams) -- tests
 **What**: Write failing tests that expect nerves events from tools-base.ts, tools-github.ts, and tools-teams.ts.
+**Output**: New/updated test expectations for the 3 tools files
 **Acceptance**: Tests FAIL (red)
 
 ### ⬜ Unit 20b: repertoire (tools-base, tools-github, tools-teams) -- implementation
 **What**: Add `emitNervesEvent` calls to all observable code paths.
+**Output**: Updated tools-base.ts, tools-github.ts, tools-teams.ts with emitNervesEvent calls
 **Acceptance**: Tests from 20a PASS (green)
 
 ### ⬜ Unit 20c: repertoire (tools-base, tools-github, tools-teams) -- coverage & refactor
 **What**: Verify coverage, refactor.
+**Output**: Coverage report showing 100% on new tools code
 **Acceptance**: 100% coverage on new code, tests green
 
 ---
@@ -321,14 +365,17 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 
 ### ⬜ Unit 21a: senses (cli.ts, cli-logging.ts) -- tests
 **What**: Write failing tests that expect nerves events from cli.ts (REPL, commands, session management) and cli-logging.ts (logger setup).
+**Output**: New/updated test expectations for cli.ts and cli-logging.ts
 **Acceptance**: Tests FAIL (red)
 
 ### ⬜ Unit 21b: senses (cli.ts, cli-logging.ts) -- implementation
 **What**: Add `emitNervesEvent` calls to all observable code paths.
+**Output**: Updated cli.ts and cli-logging.ts with emitNervesEvent calls
 **Acceptance**: Tests from 21a PASS (green)
 
 ### ⬜ Unit 21c: senses (cli.ts, cli-logging.ts) -- coverage & refactor
 **What**: Verify coverage, refactor.
+**Output**: Coverage report showing 100% on new senses code
 **Acceptance**: 100% coverage on new code, tests green
 
 ---
@@ -374,4 +421,4 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 - **Start/end pairing**: Operations use `_start`/`_end`/`_error` naming convention. The audit enforces this per-test.
 
 ## Progress Log
-- TBD Created from planning doc
+- 2026-03-05 11:12 Created from planning doc (Pass 1)
