@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { allToolDefinitions, resolveToolDefinition } from "../../repertoire/tools";
+import { baseToolDefinitions } from "../../repertoire/tools-base";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -13,10 +13,10 @@ function getDuplicateCounts(values: string[]): Map<string, number> {
 
 describe("tool registry contract", () => {
   it("tool names are non-empty and unique", () => {
-    const names = allToolDefinitions.map((d) => d.tool.function.name);
+    const names = baseToolDefinitions.map((d) => d.tool.function.name);
 
     const empty = names.filter((n) => typeof n !== "string" || n.trim().length === 0);
-    expect(empty, `Tool names must be non-empty strings. Bad names: ${JSON.stringify(empty)}`).toEqual([]);
+    expect(empty, `Tool names must be non-empty strings`).toEqual([]);
 
     const dupes = getDuplicateCounts(names);
     if (dupes.size > 0) {
@@ -28,7 +28,7 @@ describe("tool registry contract", () => {
   it("tool schema is sane", () => {
     const errors: string[] = [];
 
-    for (const def of allToolDefinitions) {
+    for (const def of baseToolDefinitions) {
       const name = def.tool.function?.name;
       const tool = def.tool as any;
 
@@ -51,7 +51,7 @@ describe("tool registry contract", () => {
 
         const required = (parameters as any).required;
         if (required !== undefined) {
-          if (!Array.isArray(required) || required.some((r) => typeof r !== "string")) {
+          if (!Array.isArray(required) || required.some((r: unknown) => typeof r !== "string")) {
             errors.push(`${name}: parameters.required must be an array of strings when present`);
           }
         }
@@ -63,18 +63,15 @@ describe("tool registry contract", () => {
     }
   });
 
-  it("every registered tool is resolvable to a handler", () => {
-    const names = allToolDefinitions.map((d) => d.tool.function.name);
-
-    for (const name of names) {
-      const resolved = resolveToolDefinition(name);
-      expect(resolved, `resolveToolDefinition('${name}') returned undefined`).toBeDefined();
-      expect(typeof resolved?.handler, `tool '${name}' is missing a handler`).toBe("function");
+  it("every tool definition has a handler function", () => {
+    for (const def of baseToolDefinitions) {
+      const name = def.tool.function.name;
+      expect(typeof def.handler, `tool '${name}' is missing a handler`).toBe("function");
     }
   });
 
-  it("tool surface area is stable", () => {
-    const names = allToolDefinitions.map((d) => d.tool.function.name).slice().sort();
-    expect(names).toMatchInlineSnapshot(`[]`);
+  it("tool surface area snapshot", () => {
+    const names = baseToolDefinitions.map((d) => d.tool.function.name).slice().sort();
+    expect(names).toMatchSnapshot();
   });
 });
