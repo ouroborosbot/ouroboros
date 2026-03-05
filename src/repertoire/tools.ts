@@ -146,6 +146,12 @@ function summarizeKeyValues(args: Record<string, string>, keys: string[], maxVal
   return parts.join(" ")
 }
 
+function summarizeUnknownArgs(args: Record<string, string>): string {
+  const keys = Object.keys(args)
+  if (keys.length === 0) return ""
+  return summarizeKeyValues(args, keys)
+}
+
 export function summarizeArgs(name: string, args: Record<string, string>): string {
   // Check teams tools first
   const teamsSummary = summarizeTeamsArgs(name, args);
@@ -164,5 +170,5 @@ export function summarizeArgs(name: string, args: Record<string, string>): strin
     return summarizeKeyValues(args, ["type", "key", "content"]);
   }
   if (name === "ado_backlog_list") return summarizeKeyValues(args, ["organization", "project"]);
-  return JSON.stringify(args).slice(0, 30);
+  return summarizeUnknownArgs(args);
 }
