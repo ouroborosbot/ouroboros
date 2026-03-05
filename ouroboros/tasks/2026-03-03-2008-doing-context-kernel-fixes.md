@@ -770,7 +770,7 @@ Changes:
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new/modified code, all tests green
 
-### ⬜ Unit 21d: Token accumulation after each turn -- Tests
+### ✅ Unit 21d: Token accumulation after each turn -- Tests
 **What**: Write failing tests for a new `accumulateFriendTokens(store, friendId, usage)` helper. Test the helper directly in `src/__tests__/mind/friends/tokens.test.ts` -- this avoids needing to test through interactive readline (CLI) or the full Teams handler.
 
 Tests:
@@ -1017,3 +1017,4 @@ Tests to KEEP AS-IS (these currently pass and assert behavior we are keeping):
 - 2026-03-04 18:52 Unit 21a complete: verified 4 pre-existing failing tests -- 3 store-file (totalTokens persistence, read-back, legacy fallback) + 1 resolver (initializes totalTokens: 0). All fail as expected, 1303 other tests pass
 - 2026-03-04 18:55 Unit 21b complete: added totalTokens to FriendRecord (types.ts), AgentKnowledgeData + put/merge (store-file.ts), resolveOrCreate (resolver.ts). Updated 4 makeFriend helpers in test files. 1307 tests pass, build clean
 - 2026-03-04 18:56 Unit 21c complete: 100% coverage on store-file.ts, resolver.ts, types.ts (stmts/branches/funcs/lines). All totalTokens paths covered. No refactoring needed
+- 2026-03-04 18:57 Unit 21d complete: 6 failing tests for accumulateFriendTokens -- first turn (0 -> 1500), subsequent (3000 -> 5000), no-op undefined, no-op zero, record not found, legacy undefined totalTokens. All fail (tokens.ts doesn't exist)
