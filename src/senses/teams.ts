@@ -65,38 +65,36 @@ export function splitMessage(text: string, maxLen: number): string[] {
 
 // Options for createTeamsCallbacks controlling streaming behavior.
 export interface TeamsCallbackOptions {
-  disableStreaming?: boolean
+  flushIntervalMs?: number
   conversationId?: string
 }
 
-// Extended callbacks type that includes flush() for buffered streaming mode.
-// flush() is async in buffered mode (awaits sendMessage); sync no-op in streaming mode.
+// Extended callbacks type that includes flush() for chunked streaming.
+// flush() is async (awaits sendMessage for content after the first emit).
 export type TeamsCallbacksWithFlush = ChannelCallbacks & { flush(): void | Promise<void> }
 
 // Create Teams-specific callbacks for the agent loop.
 // The SDK handles cumulative text, debouncing (500ms), and the streaming
 // protocol (streamSequence, streamId, informative/streaming/final types).
-// We just send deltas and let the SDK do the rest.
 //
-// Dual-mode rendering:
-// - Streaming mode (default): tool results, kicks, and terminal errors are
-//   emitted inline in the stream via safeEmit. Transient errors use safeUpdate.
-// - Buffered mode (disableStreaming=true): tool results, kicks, and terminal
-//   errors are sent as separate messages via sendMessage. Text is accumulated
-//   and flushed: first flush to stream.emit (primary output), subsequent to
-//   sendMessage. Transient errors still use safeUpdate.
+// Chunked streaming (unified mode):
+// Text is always accumulated in textBuffer and flushed periodically (via a
+// flush timer started on first onTextChunk) or at end-of-turn via flush().
+// First flush goes to safeEmit (primary output), subsequent flushes go to
+// safeSend (ctx.send). Tool results, kicks, and errors use safeUpdate
+// (transient status) or safeSend (terminal errors). Reasoning is accumulated
+// internally but never sent per-token (phrase rotation provides keep-alive).
 export function createTeamsCallbacks(
   stream: TeamsStream,
   controller: AbortController,
   sendMessage?: (text: string) => Promise<void>,
   options?: TeamsCallbackOptions,
 ): TeamsCallbacksWithFlush {
-  const buffered = options?.disableStreaming === true
   let stopped = false // set when stream signals cancellation (403)
   let hadToolRun = false
   let hadRealOutput = false // true once reasoning/tool output shown; suppresses phrases
   let reasoningBuf = "" // accumulated reasoning text for status display
-  let textBuffer = "" // accumulated text output when disableStreaming is true
+  let textBuffer = "" // accumulated text output for chunked streaming
   let streamHasContent = false // tracks whether primary output has received content
   let phraseTimer: NodeJS.Timeout | null = null
   let lastPhrase = ""
@@ -141,7 +139,7 @@ export function createTeamsCallbacks(
     }
   }
 
-  // Safely send a separate message via sendMessage (buffered mode only).
+  // Safely send a separate message via sendMessage (for content after first emit).
   // Serialized via promise chain -- concurrent calls execute sequentially.
   // If any send fails, the chain halts via markStopped().
   let sendChain = Promise.resolve()
@@ -211,26 +209,21 @@ export function createTeamsCallbacks(
       stopPhraseRotation()
       hadRealOutput = true
       reasoningBuf += text
-      // When streaming is disabled, skip per-token reasoning updates — each one
-      // is an HTTP round-trip through devtunnel. The phrase rotation and tool
-      // status updates still fire (those are infrequent).
-      if (!buffered) safeUpdate(reasoningBuf)
+      // Reasoning is accumulated internally but never sent per-token -- each
+      // update is an HTTP round-trip. Phrase rotation and tool status updates
+      // provide sufficient keep-alive during reasoning phases.
     },
     onTextChunk: (text: string) => {
       if (stopped) return
       stopPhraseRotation()
-      if (buffered) {
-        textBuffer += text
-      } else {
-        safeEmit(text)
-      }
+      textBuffer += text
     },
     onClearText: () => {
       textBuffer = ""
     },
     onToolStart: (name: string, args: Record<string, string>) => {
       stopPhraseRotation()
-      if (buffered) flushTextBuffer()
+      flushTextBuffer()
       const argSummary = Object.values(args).join(", ")
       safeUpdate(`running ${name} (${argSummary})...`)
       hadToolRun = true
@@ -238,22 +231,12 @@ export function createTeamsCallbacks(
     onToolEnd: (name: string, summary: string, success: boolean) => {
       stopPhraseRotation()
       const msg = formatToolResult(name, summary, success)
-      if (buffered) {
-        // Show as transient stream status (not a separate message) to avoid
-        // cross-channel ordering issues on Copilot Chat
-        safeUpdate(msg)
-      } else {
-        safeEmit("\n\n" + msg + "\n\n")
-      }
+      safeUpdate(msg)
     },
     onKick: () => {
       stopPhraseRotation()
       const msg = formatKick()
-      if (buffered) {
-        safeUpdate(msg)
-      } else {
-        safeEmit("\n\n" + msg + "\n\n")
-      }
+      safeUpdate(msg)
     },
     onError: (error: Error, severity: "transient" | "terminal") => {
       stopPhraseRotation()
@@ -261,10 +244,8 @@ export function createTeamsCallbacks(
       const msg = formatError(error)
       if (severity === "transient") {
         safeUpdate(msg)
-      } else if (buffered) {
-        safeSend(msg)
       } else {
-        safeEmit("\n\n" + msg + "\n\n")
+        safeSend(msg)
       }
     },
     onConfirmAction: options?.conversationId
@@ -361,7 +342,7 @@ export interface TeamsMessageContext {
 }
 
 // Handle an incoming Teams message
-export async function handleTeamsMessage(text: string, stream: TeamsStream, conversationId: string, teamsContext?: TeamsMessageContext, disableStreaming?: boolean, sendMessage?: (text: string) => Promise<void>): Promise<void> {
+export async function handleTeamsMessage(text: string, stream: TeamsStream, conversationId: string, teamsContext?: TeamsMessageContext, sendMessage?: (text: string) => Promise<void>): Promise<void> {
   const maxConcurrent = Math.max(1, getTeamsChannelConfig().maxConcurrentConversations || 10)
   if (_inFlightTeamsTurns >= maxConcurrent) {
     const message = "I can't do that from here right now because this single-replica preview is already handling its maximum concurrent conversations. Please retry in a moment."
@@ -442,18 +423,16 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
 
   // Run agent
   const controller = new AbortController()
-  const callbacks = createTeamsCallbacks(stream, controller, sendMessage, { disableStreaming, conversationId })
+  const callbacks = createTeamsCallbacks(stream, controller, sendMessage, { conversationId })
   const traceId = createTraceId()
 
   const agentOptions: RunAgentOptions = {}
   agentOptions.traceId = traceId
   if (toolContext) agentOptions.toolContext = toolContext
-  if (disableStreaming) agentOptions.disableStreaming = true
   if (getTeamsChannelConfig().skipConfirmation) agentOptions.skipConfirmation = true
   const result = await runAgent(messages, callbacks, "teams", controller.signal, agentOptions)
 
-  // Flush any buffered text (when disableStreaming is true, text was accumulated
-  // instead of streamed; flush emits it as a single message to Teams)
+  // Flush any remaining accumulated text at end of turn
   await callbacks.flush()
 
   // After the agent loop, check if any tool returned AUTH_REQUIRED and trigger signin.
@@ -474,14 +453,8 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
 
 // Start the Teams app in DevtoolsPlugin mode (local dev) or Bot Service mode (real Teams).
 // Mode is determined by getTeamsConfig().clientId.
-// Supports --disable-streaming CLI flag to buffer text output instead of streaming it.
-// Rationale: devtunnel nginx relay buffers chunked responses, causing compounding latency.
+// Text is always accumulated in textBuffer and flushed periodically (chunked streaming).
 export function startTeamsApp(): void {
-  // npm run teams:no-stream  → passes --disable-streaming via process.argv
-  // npm run teams -- --disable-streaming → also works via process.argv
-  // teamsChannel.disableStreaming in config.json → also works
-  const disableStreaming = process.argv.includes("--disable-streaming")
-    || getTeamsChannelConfig().disableStreaming
   const mentionStripping = { activity: { mentions: { stripText: true as const } } }
   const teamsConfig = getTeamsConfig()
 
@@ -569,7 +542,7 @@ export function startTeamsApp(): void {
       await ctx.send({ type: "message", text: t, replyToId: activity.id })
     }
     try {
-      await withConversationLock(convId, () => handleTeamsMessage(text, stream, convId, teamsContext, disableStreaming, ctxSend))
+      await withConversationLock(convId, () => handleTeamsMessage(text, stream, convId, teamsContext, ctxSend))
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       console.error(`[teams] handler error: ${msg.slice(0, 200)}`)
@@ -596,5 +569,5 @@ export function startTeamsApp(): void {
 
   const port = getTeamsChannelConfig().port
   app.start(port)
-  console.log(`Teams bot started on port ${port} with ${mode} (streaming: ${disableStreaming ? "disabled" : "enabled"})`)
+  console.log(`Teams bot started on port ${port} with ${mode} (chunked streaming)`)
 }

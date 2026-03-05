@@ -36,7 +36,7 @@ export interface ContextConfig {
 
 export interface TeamsChannelConfig {
   skipConfirmation: boolean
-  disableStreaming: boolean
+  flushIntervalMs?: number
   port: number
   maxConcurrentConversations: number
 }
@@ -87,7 +87,6 @@ const DEFAULT_CONFIG: OuroborosConfig = {
   },
   teamsChannel: {
     skipConfirmation: true,
-    disableStreaming: false,
     port: 3978,
     maxConcurrentConversations: 10,
   },

@@ -92,7 +92,6 @@ export interface ChannelCallbacks {
 
 export interface RunAgentOptions {
   toolChoiceRequired?: boolean;
-  disableStreaming?: boolean;
   skipConfirmation?: boolean;
   toolContext?: ToolContext;
   traceId?: string;
