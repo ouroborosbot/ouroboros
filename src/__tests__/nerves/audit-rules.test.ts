@@ -90,6 +90,18 @@ describe("Rule 2: start/end pairing", () => {
     expect(result.status).toBe("pass")
   })
 
+  it("handles non-array event values gracefully", () => {
+    const data = {
+      "test A": "not-an-array" as unknown as PerTestEvents[string],
+      "test B": [
+        { component: "engine", event: "turn_start" },
+        { component: "engine", event: "turn_end" },
+      ],
+    } as unknown as PerTestEvents
+    const result = checkStartEndPairing(data)
+    expect(result.status).toBe("pass")
+  })
+
   it("scopes pairing within a single test", () => {
     const data: PerTestEvents = {
       "test A": [
@@ -148,6 +160,14 @@ describe("Rule 3: error context", () => {
         { component: "engine", event: "turn_start", level: "info", meta: {} },
       ],
     }
+    const result = checkErrorContext(data)
+    expect(result.status).toBe("pass")
+  })
+
+  it("handles non-array event values gracefully", () => {
+    const data = {
+      "test A": "not-an-array" as unknown as PerTestEvents[string],
+    } as unknown as PerTestEvents
     const result = checkErrorContext(data)
     expect(result.status).toBe("pass")
   })
