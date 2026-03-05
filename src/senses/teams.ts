@@ -176,6 +176,24 @@ export function createTeamsCallbacks(
     }
   }
 
+  // Awaitable emit — returns true if the emit succeeded, false if it failed.
+  // Used by flush() so it can fall back to sendMessage on async 413/failure.
+  async function tryEmit(text: string): Promise<boolean> {
+    if (stopped) return false
+    try {
+      const result = stream.emit(text)
+      streamHasContent = true
+      // Await the async HTTP call if the SDK returns a promise
+      if (result && typeof (result as { then?: Function }).then === "function") {
+        await (result as Promise<unknown>)
+      }
+      return true
+    } catch {
+      markStopped()
+      return false
+    }
+  }
+
   // Safely send a status update to the stream.
   // On error (e.g. 403 from Teams stop button), abort the controller.
   function safeUpdate(text: string): void {
@@ -316,9 +334,10 @@ export function createTeamsCallbacks(
         const text = textBuffer
         textBuffer = ""
         if (!stopped) {
-          // Stream is alive — emit remaining text (SDK accumulates cumulatively).
-          // If safeEmit fails (e.g. 403), it marks stopped — fall through to sendMessage.
-          safeEmit(text)
+          // Stream is alive — await the emit so we can catch async 413/failure
+          // and fall through to sendMessage recovery.
+          const ok = await tryEmit(text)
+          if (!ok) markStopped()
         }
         if (stopped && sendMessage) {
           // Stream is dead — fall back to sendMessage; split on failure as recovery.
