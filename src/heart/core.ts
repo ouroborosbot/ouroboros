@@ -69,13 +69,16 @@ function getProviderRuntime(): ProviderRuntime {
     try {
       _providerRuntime = createProviderRegistry().resolve();
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       emitNervesEvent({
         level: "error",
         event: "engine.provider_init_error",
         component: "engine",
-        message: error instanceof Error ? error.message : String(error),
+        message: msg,
         meta: {},
       });
+      // eslint-disable-next-line no-console -- pre-boot guard: provider init failure
+      console.error(`\n[fatal] ${msg}\n`);
       process.exit(1);
       throw new Error("unreachable");
     }
