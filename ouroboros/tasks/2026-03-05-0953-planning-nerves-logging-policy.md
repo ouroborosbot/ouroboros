@@ -1,7 +1,7 @@
 # Planning: Nerves Logging Policy Enforcement
 
-**Status**: drafting
-**Created**: TBD
+**Status**: NEEDS_REVIEW
+**Created**: 2026-03-05 09:54
 
 ## Goal
 Enforce the console-to-nerves migration with an ESLint `no-console` rule so new `console.*` calls cannot be introduced, annotate the 8 legitimate exception sites, and document the logging policy in AGENTS.md and CONTRIBUTING.md.
@@ -71,4 +71,4 @@ Enforce the console-to-nerves migration with an ESLint `no-console` rule so new 
 No existing ESLint setup in the project. ESLint + parser need to be installed fresh. No console.* calls exist in test files currently, but the exclusion protects future test code.
 
 ## Progress Log
-- TBD Created
+- 2026-03-05 09:54 Created
