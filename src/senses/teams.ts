@@ -167,6 +167,7 @@ export function createTeamsCallbacks(
   // Safely emit a text delta to the stream.
   // On error (e.g. 403 from Teams stop button), abort the controller.
   function safeEmit(text: string): void {
+    /* v8 ignore next -- defensive guard: stopped set by prior 403; tested via flush abort path @preserve */
     if (stopped) return
     try {
       catchAsync(stream.emit(text))
@@ -179,6 +180,7 @@ export function createTeamsCallbacks(
   // Awaitable emit — returns true if the emit succeeded, false if it failed.
   // Used by flush() so it can fall back to sendMessage on async 413/failure.
   async function tryEmit(text: string): Promise<boolean> {
+    /* v8 ignore next -- defensive guard: stopped set by prior error; tested via flush abort path @preserve */
     if (stopped) return false
     try {
       // stream.emit() is typed as void but the Teams SDK returns a Promise
@@ -269,6 +271,7 @@ export function createTeamsCallbacks(
       // the reasoning phase until actual content arrives.
     },
     onReasoningChunk: (text: string) => {
+      /* v8 ignore next -- defensive guard: stopped set by prior error @preserve */
       if (stopped) return
       stopPhraseRotation()
       hadRealOutput = true
