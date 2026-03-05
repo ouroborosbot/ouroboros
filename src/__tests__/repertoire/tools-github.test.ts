@@ -4,12 +4,6 @@ vi.mock("../../repertoire/github-client", () => ({
   githubRequest: vi.fn(),
 }))
 
-vi.mock("../../config", () => ({
-  getIntegrationsConfig: () => ({
-    perplexityApiKey: "",
-    github: { owner: "ouroborosbot", repo: "ouroboros-agent-harness" },
-  }),
-}))
 
 import { githubRequest } from "../../repertoire/github-client"
 import { githubToolDefinitions, summarizeGithubArgs } from "../../repertoire/tools-github"
