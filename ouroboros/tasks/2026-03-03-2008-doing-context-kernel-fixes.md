@@ -56,11 +56,11 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [x] `--disable-streaming` / buffered mode removed entirely (no `disableStreaming`, no `buffered` flag, no `teams:no-stream` script, no `flagsSection`)
 - [x] Chunked streaming implemented -- periodic flush every ~1s via `flushTextBuffer()`
 - [x] Single unified streaming mode (no dual-mode branching)
-- [ ] `final_answer` tool call arguments streamed progressively via `FinalAnswerParser` state machine -- text appears as model generates, not all at once after stream ends
-- [ ] Both streaming paths (Chat Completions and Azure Responses API) intercept `final_answer` deltas and emit via `onTextChunk`
-- [ ] `onClearText` called when `final_answer` tool call starts to clear noise
-- [ ] `finalAnswerStreamed` flag on `TurnResult` -- core.ts skips redundant `onClearText`/`onTextChunk` when already streamed
-- [ ] Fallback: when parser prefix never matches, existing core.ts behavior unchanged
+- [x] `final_answer` tool call arguments streamed progressively via `FinalAnswerParser` state machine -- text appears as model generates, not all at once after stream ends
+- [x] Both streaming paths (Chat Completions and Azure Responses API) intercept `final_answer` deltas and emit via `onTextChunk`
+- [x] `onClearText` called when `final_answer` tool call starts to clear noise
+- [x] `finalAnswerStreamed` flag on `TurnResult` -- core.ts skips redundant `onClearText`/`onTextChunk` when already streamed
+- [x] Fallback: when parser prefix never matches, existing core.ts behavior unchanged
 - [ ] User confirms on Teams: model uses final_answer cleanly, no 413 errors, no "Sorry something went wrong", prompt sections emit correctly, responses arrive in periodic chunks (not per-token, not all-at-once)
 
 ### Gate 3: Friend Context Instructions
@@ -658,7 +658,7 @@ The phrase rotation timer (1.5s interval for `safeUpdate`) continues to run duri
 **Output**: Modified `src/heart/streaming.ts` and `src/heart/core.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 20c: Stream final_answer arguments -- Coverage & Refactor
+### ✅ Unit 20c: Stream final_answer arguments -- Coverage & Refactor
 **What**: Verify 100% coverage on all new code. Coverage targets:
 1. `FinalAnswerParser` -- all branches: prefix matching (both variants), escape sequences (all 6 cases including default), unescaped `"` stop, `done` early-return, empty delta
 2. `streamChatCompletion` -- `final_answer` detection branch, parser activation, `onClearText` call, `onTextChunk` forwarding, `finalAnswerStreamed` flag set
