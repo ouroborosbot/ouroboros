@@ -762,8 +762,8 @@ Changes:
 ### ⬜ Unit 21d: Token accumulation after each turn -- Tests
 **What**: Write failing tests verifying token accumulation in both adapters:
 
-1. **Teams adapter** (`src/__tests__/senses/teams.test.ts`): after `handleTeamsMessage` completes, the friend record on disk has `totalTokens` incremented by `usage.total_tokens` from the agent loop result. Test both cases: first turn (0 -> N) and subsequent turn (existing tokens + new tokens).
-2. **CLI adapter** (`src/__tests__/senses/cli.test.ts`): after a turn completes in `main()`, the friend record on disk has `totalTokens` updated. (If CLI tests are integration-heavy, a focused unit test for the accumulation helper is acceptable.)
+1. **`accumulateFriendTokens` helper** (`src/__tests__/mind/friends/tokens.test.ts`): first turn (0 -> N), subsequent turn (existing tokens + new tokens), record persisted with updated `updatedAt`.
+2. **CLI adapter**: the CLI `main()` loop is hard to test in isolation (interactive readline). Extract a helper `accumulateFriendTokens(store, friendId, usage)` in a shared location (e.g. `src/mind/friends/tokens.ts`) and test it directly. Both adapters call this helper. Tests in `src/__tests__/mind/friends/tokens.test.ts`.
 3. **No usage data**: when `runAgent` returns no usage (e.g. abort), `totalTokens` is NOT updated (no-op).
 4. **No friend context**: when `toolContext` has no friend, accumulation is skipped (no crash).
 
@@ -774,24 +774,23 @@ Changes:
 **What**: After each agent turn, read the friend record from disk, increment `totalTokens` by `usage.total_tokens`, and persist. This must happen after `postTurn()` (which saves the session) so the friend record update doesn't race with session save.
 
 Changes:
-1. **`src/senses/teams.ts`** in `handleTeamsMessage()`: after `postTurn(messages, sessPath, result.usage)` (line 493), add token accumulation:
+1. **`src/mind/friends/tokens.ts`** (new file): export `accumulateFriendTokens(store: FriendStore, friendId: string, usage?: UsageData): Promise<void>`. Logic:
    ```
-   if (result.usage?.total_tokens && toolContext?.context?.friend?.id) {
-     const freshRecord = await store.get(toolContext.context.friend.id)
-     if (freshRecord) {
-       freshRecord.totalTokens = (freshRecord.totalTokens ?? 0) + result.usage.total_tokens
-       freshRecord.updatedAt = new Date().toISOString()
-       await store.put(freshRecord.id, freshRecord)
-     }
-   }
+   if (!usage?.total_tokens) return
+   const record = await store.get(friendId)
+   if (!record) return
+   record.totalTokens = (record.totalTokens ?? 0) + usage.total_tokens
+   record.updatedAt = new Date().toISOString()
+   await store.put(record.id, record)
    ```
-2. **`src/senses/cli.ts`** in `main()`: after `postTurn(messages, sessPath, result?.usage)` (line 463), add same pattern using `friendStore`, `resolvedContext.friend.id`, and `result?.usage`.
+2. **`src/senses/teams.ts`** in `handleTeamsMessage()`: after `postTurn(messages, sessPath, result.usage)` (line 493), call `await accumulateFriendTokens(store, toolContext.context.friend.id, result.usage)` (guarded by `toolContext?.context?.friend?.id`).
+3. **`src/senses/cli.ts`** in `main()`: after `postTurn(messages, sessPath, result?.usage)` (line 463), call `await accumulateFriendTokens(friendStore, resolvedContext.friend.id, result?.usage)`.
 
-**Output**: Modified `src/senses/teams.ts`, `src/senses/cli.ts`
+**Output**: New `src/mind/friends/tokens.ts`, modified `src/senses/teams.ts`, `src/senses/cli.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
 ### ⬜ Unit 21f: Token accumulation -- Coverage & Refactor
-**What**: Verify 100% coverage on the token accumulation code in both adapters. Cover: usage present (tokens added), usage absent (no-op), no friend context (skip). Verify no race between session save and friend record update.
+**What**: Verify 100% coverage on `accumulateFriendTokens` helper and its call sites in both adapters. Cover: usage present (tokens added), usage absent (no-op), record not found on disk (no-op), no friend context in adapter (skip). Verify no race between session save and friend record update.
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new/modified code, all tests green
 
