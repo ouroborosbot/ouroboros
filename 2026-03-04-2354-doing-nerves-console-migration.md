@@ -1,6 +1,6 @@
 # Doing: Replace console.* calls with emitNervesEvent
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-03-04 23:57
 **Planning**: ./2026-03-04-2354-planning-nerves-console-migration.md
@@ -16,14 +16,14 @@
 Eliminate all `console.log/warn/error` calls from production source files by converting them to structured `emitNervesEvent()` calls, and register the new events in the nerves coverage contract so the CI audit gate passes.
 
 ## Completion Criteria
-- [ ] Zero `console.*` calls in `src/senses/teams.ts`, `src/heart/core.ts`, `src/mind/friends/resolver.ts`
+- [x] Zero `console.*` calls in `src/senses/teams.ts`, `src/heart/core.ts`, `src/mind/friends/resolver.ts`
 - [x] The one `console.warn` in `src/identity.ts` is removed (nerves event already exists there)
-- [ ] All new events registered in `REQUIRED_EVENTS` in `contract.ts`
-- [ ] `npm run test:coverage` passes (nerves audit gate green)
-- [ ] No sensitive data (tokens, secrets) in event meta (respect SENSITIVE_PATTERNS)
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] All new events registered in `REQUIRED_EVENTS` in `contract.ts`
+- [x] `npm run test:coverage` passes (nerves audit gate green)
+- [x] No sensitive data (tokens, secrets) in event meta (respect SENSITIVE_PATTERNS)
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -172,7 +172,7 @@ Test should FAIL initially because contract.ts hasn't been updated yet.
 **What**: Verify coverage. The contract is a data-only file so coverage is trivially 100%.
 **Acceptance**: Coverage passes, tests green.
 
-### ⬜ Unit 6: Final Gate -- Full Test Suite + Nerves Audit
+### ✅ Unit 6: Final Gate -- Full Test Suite + Nerves Audit
 **What**: Run the full test suite (`npm test`) and nerves coverage gate (`npm run test:coverage`). Verify:
 1. All tests pass
 2. No warnings
@@ -198,3 +198,5 @@ Test should FAIL initially because contract.ts hasn't been updated yet.
 - 2026-03-05 00:03 Unit 2a+2b+2c complete: resolver.ts console.error replaced, 100% coverage
 - 2026-03-05 00:10 Unit 3a+3b+3c complete: core.ts 2 console.error calls replaced, 17 related tests updated
 - 2026-03-05 00:19 Units 4a-4g complete: teams.ts 10 console calls replaced, 100% coverage
+- 2026-03-05 00:22 Units 5a-5c complete: 11 new events added to REQUIRED_EVENTS contract, 100% coverage
+- 2026-03-05 00:25 Unit 6 complete: all 1446 tests pass, nerves audit pass, coverage gate pass, zero console.* in target files
