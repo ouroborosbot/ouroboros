@@ -133,53 +133,53 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 
 ### ⬜ Unit 4d: Provider module extraction pre-Unit-5 pass — Tests
 **What**: Add failing tests that lock provider module boundaries so provider-specific runtime logic is owned in `src/heart/providers/{anthropic,azure,minimax}.ts` and no longer embedded in `src/heart/core.ts`.
-**Output**: Failing boundary tests covering provider module ownership and engine/provider handoff contracts.
-**Acceptance**: Tests fail red and identify provider-specific runtime logic still anchored in `src/heart/core.ts`.
+**Output**: Failing boundary tests plus artifact logs `unit-4d-red-run.txt` and `unit-4d-red-jest.json`.
+**Acceptance**: Tests fail red, logs are saved under the task artifacts directory, and failures identify provider-specific runtime logic still anchored in `src/heart/core.ts`.
 
 ### ⬜ Unit 4e: Provider module extraction pre-Unit-5 pass — Implementation
 **What**: Extract provider-specific runtime logic from `src/heart/core.ts` into provider modules under `src/heart/providers/` with no behavior change.
-**Output**: Provider-module refactor commit moving runtime logic into `anthropic.ts`, `azure.ts`, and `minimax.ts`.
-**Acceptance**: Boundary tests pass green and existing Azure/MiniMax/Anthropic regression tests remain green.
+**Output**: Provider-module refactor plus artifact logs `unit-4e-green-run.txt` and `unit-4e-jest.json`.
+**Acceptance**: Boundary tests pass green, targeted regression suites stay green, and artifacts are saved under the task artifacts directory.
 
 ### ⬜ Unit 4f: Provider module extraction pre-Unit-5 pass — Coverage & Refactor
 **What**: Refactor extracted provider module code for clarity and verify full branch/error-path coverage.
-**Output**: Coverage artifacts proving 100% coverage on newly added provider-module code.
-**Acceptance**: New provider-module code is at 100% coverage and related tests remain green.
+**Output**: Coverage artifacts `unit-4f-coverage.txt` and `unit-4f-coverage-summary.json`.
+**Acceptance**: New provider-module code is at 100% coverage, related tests remain green, and coverage artifacts are saved.
 
 ### ⬜ Unit 4g: CLI user-output vs nerves-log separation pre-Unit-5 pass — Tests
 **What**: Add failing CLI tests that enforce channel separation: user-facing model text on stdout only; structured nerves logs routed to operator sinks (stderr and append-only NDJSON files) and never interleaved into user transcript text.
-**Output**: Failing channel-separation tests in CLI/nerves-related test suites.
-**Acceptance**: Tests fail red against current interleaving behavior.
+**Output**: Failing channel-separation tests plus artifact logs `unit-4g-red-run.txt` and `unit-4g-jest.json`.
+**Acceptance**: Tests fail red against current interleaving behavior and logs are saved under the task artifacts directory.
 
 ### ⬜ Unit 4h: CLI user-output vs nerves-log separation pre-Unit-5 pass — Implementation
 **What**: Implement sink separation so CLI output stays user-facing while nerves logs are emitted to operator-native sinks, including append-only NDJSON persistence under `~/.agentstate/<agent>/logs`.
-**Output**: CLI/logging sink updates with persistent NDJSON log path behavior.
-**Acceptance**: Channel-separation tests pass green and CLI user text no longer contains structured log lines.
+**Output**: CLI/logging sink updates plus artifact logs `unit-4h-green-run.txt` and `unit-4h-jest.json`.
+**Acceptance**: Channel-separation tests pass green, CLI user text no longer contains structured log lines, and artifacts are saved under the task artifacts directory.
 
 ### ⬜ Unit 4i: CLI user-output vs nerves-log separation pre-Unit-5 pass — Coverage & Refactor
 **What**: Refactor sink separation code and cover stdout/stderr/file routing branches and error paths.
-**Output**: Coverage artifacts for CLI/log sink code paths.
-**Acceptance**: New sink-separation code is at 100% coverage and related tests remain green.
+**Output**: Coverage artifacts `unit-4i-coverage.txt` and `unit-4i-coverage-summary.json`.
+**Acceptance**: New sink-separation code is at 100% coverage, related tests remain green, and coverage artifacts are saved.
 
 ### ⬜ Unit 4j: Anthropic streamed tool-argument hardening pre-Unit-5 pass — Tests
 **What**: Add failing regression tests for Anthropic streamed tool calls to reproduce malformed argument assembly (including `content_block_start` + `input_json_delta` concatenation cases) and require valid JSON arguments to tools.
-**Output**: Failing Anthropic tool-call assembly tests with fixtures derived from real failing session traces.
-**Acceptance**: Tests fail red on current malformed-argument behavior.
+**Output**: Failing Anthropic tool-call assembly tests plus artifacts `unit-4j-red-run.txt` and `unit-4j-jest.json`.
+**Acceptance**: Tests fail red on current malformed-argument behavior and artifacts are saved under the task artifacts directory.
 
 ### ⬜ Unit 4k: Anthropic streamed tool-argument hardening pre-Unit-5 pass — Implementation
 **What**: Fix Anthropic stream tool-argument assembly so each tool call receives correctly reconstructed JSON arguments and tool execution proceeds reliably.
-**Output**: Anthropic stream assembly fix in provider code and supporting parser updates as needed.
-**Acceptance**: Anthropic tool-assembly tests pass green and no malformed argument payloads are emitted.
+**Output**: Anthropic stream assembly fix plus artifact logs `unit-4k-green-run.txt` and `unit-4k-jest.json`.
+**Acceptance**: Anthropic tool-assembly tests pass green, no malformed argument payloads are emitted, and artifacts are saved under the task artifacts directory.
 
 ### ⬜ Unit 4l: Anthropic streamed tool-argument hardening pre-Unit-5 pass — Coverage & Refactor
 **What**: Refactor Anthropic argument assembly handling and cover all edge/error paths for streamed tool-argument reconstruction.
-**Output**: Coverage artifacts for Anthropic tool-argument assembly branches.
-**Acceptance**: New Anthropic hardening code is at 100% coverage and related tests remain green.
+**Output**: Coverage artifacts `unit-4l-coverage.txt` and `unit-4l-coverage-summary.json`.
+**Acceptance**: New Anthropic hardening code is at 100% coverage, related tests remain green, and coverage artifacts are saved.
 
 ### ⬜ Unit 4m: Anthropic setup-token integration — Manual validation gate
 **What**: Execute a real end-to-end Anthropic turn using the setup-token profile path (no mocks), including a tool-calling prompt, and capture sanitized evidence.
-**Output**: Artifact log with timestamp, provider id, model, command/entrypoint used, tool-call outcome, and final response outcome.
-**Acceptance**: Live Anthropic run succeeds via setup-token auth; tool calls execute with valid arguments; failure mode includes explicit re-auth guidance; evidence artifact is present.
+**Output**: Manual validation artifacts `unit-4m-manual-validation.txt`, `unit-4m-manual-validation.json`, and `unit-4m-manual-validation.stderr.txt`.
+**Acceptance**: Live Anthropic run succeeds via setup-token auth, tool calls execute with valid arguments, failure mode includes explicit re-auth guidance, and all manual artifacts are present.
 
 ### ⬜ Unit 5a: OpenAI Codex OAuth integration — Tests
 **What**: Add failing tests for `openai-codex` provider behavior, OAuth profile loading contract, and explicit auth-failure messaging in provider/config test suites.
@@ -252,3 +252,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 15:56 Unit 1c complete: achieved green coverage gate + nerves audit after branch-coverage hardening (`unit-1c-*.txt`)
 - 2026-03-04 18:34 Added pre-Unit-5 Unit 4d-4m scope for provider module extraction, CLI/log channel separation, and Anthropic streamed tool-argument hardening
 - 2026-03-04 18:39 Pass 1 (First Draft) rerun on Units 4d-4m: structure/order unchanged and aligned with planning scope
+- 2026-03-04 18:39 Pass 2 (Granularity) refined Units 4d-4m outputs/acceptance with explicit per-unit artifact files
