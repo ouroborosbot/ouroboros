@@ -3026,6 +3026,16 @@ describe("provider abstraction contract", () => {
     expect(typeof runtime?.resetTurnState).toBe("function")
   })
 
+  it("azure provider runtime safely ignores tool output before turn state initialization", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    expect(runtime?.id).toBe("azure")
+    expect(() => runtime?.appendToolOutput("call_1", "ok")).not.toThrow()
+  })
+
 })
 
 describe("hasToolIntent", () => {
