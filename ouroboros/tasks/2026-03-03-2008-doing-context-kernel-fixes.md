@@ -528,7 +528,7 @@ Also verify the removal propagates:
 **Output**: Coverage report
 **Acceptance**: 100% coverage on modified code, all tests green, no warnings
 
-### ⬜ Unit 19a: Chunked streaming (periodic flush timer) -- tests
+### ✅ Unit 19a: Chunked streaming (periodic flush timer) -- tests
 **What**: Write failing tests in `src/__tests__/senses/teams.test.ts` for the periodic flush timer. Use `vi.useFakeTimers()`. Tests should verify:
 1. **Periodic flush fires**: after `onTextChunk` accumulates text, advancing time by the flush interval (~1500-2000ms) triggers `flushTextBuffer()` -- first flush goes to `safeEmit`, subsequent to `safeSend`
 2. **Multiple flushes**: text accumulated across multiple intervals is flushed periodically -- each interval flushes whatever has accumulated since last flush
@@ -697,3 +697,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-04 16:27 Unit 18a complete: 39 tests fail (red) -- updated teams.test.ts, prompt.test.ts, config.test.ts for unified chunked streaming behavior. Removed disableStreaming from all test expectations
 - 2026-03-04 16:33 Unit 18b complete: removed all disableStreaming/buffered mode code across 5 files -- teams.ts (callbacks, handleTeamsMessage, startTeamsApp), core.ts (RunAgentOptions), prompt.ts (BuildSystemOptions, flagsSection removed), config.ts (TeamsChannelConfig), package.json (teams:no-stream script). 1263 tests pass, build clean
 - 2026-03-04 16:34 Unit 18c complete: 100% coverage on all modified files (config.ts, core.ts, prompt.ts). teams.ts uncovered lines 222, 542 are pre-existing gaps (onClearText, ctxSend). Zero references to disableStreaming/buffered/--disable-streaming/teams:no-stream in source code. No refactoring needed
+- 2026-03-04 16:36 Unit 19a complete: 11 tests for periodic flush timer using vi.useFakeTimers(). 8 fail (red) -- no periodic timer exists yet. 3 pass vacuously (cleanup tests). Tests cover: timer fires at interval, multiple flushes, empty no-op, start on first text chunk, abort/flush/markStopped cleanup, first flush within 15s, reasoning phase isolation, end-of-turn flush, flushIntervalMs override
