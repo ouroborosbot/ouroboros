@@ -46,7 +46,7 @@ Eliminate all `console.log/warn/error` calls from production source files by con
 ### Legend
 ⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
-### ⬜ Unit 0: Setup
+### ✅ Unit 0: Setup
 **What**: Create branch (already done: `ouroboros/nerves-console-migration`). Verify existing tests pass. Identify all console.* calls to convert and confirm count matches planning (14 calls across 4 files).
 **Output**: Baseline test run passes. Console call inventory confirmed.
 **Acceptance**: `npm test` passes. Grep confirms exactly 14 console.* calls in target files.
