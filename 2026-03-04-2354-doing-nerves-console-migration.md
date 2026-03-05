@@ -44,7 +44,7 @@ Eliminate all `console.log/warn/error` calls from production source files by con
 ## Work Units
 
 ### Legend
-- Not started / In progress / Done / Blocked
+⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
 ### ⬜ Unit 0: Setup
 **What**: Create branch (already done: `ouroboros/nerves-console-migration`). Verify existing tests pass. Identify all console.* calls to convert and confirm count matches planning (14 calls across 4 files).
