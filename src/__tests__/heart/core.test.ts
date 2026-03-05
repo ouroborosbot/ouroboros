@@ -3058,9 +3058,10 @@ describe("provider abstraction contract", () => {
     expect(source).not.toContain('if (provider === "azure")')
   })
 
-  it("delegates provider runtime construction to dedicated provider modules", () => {
+  it("delegates provider runtime construction to dedicated provider modules", async () => {
+    const realFs = await vi.importActual<typeof import("node:fs")>("node:fs")
     const sourcePath = path.resolve(__dirname, "..", "..", "heart", "core.ts")
-    const source = nodeFs.readFileSync(sourcePath, "utf-8")
+    const source = realFs.readFileSync(sourcePath, "utf-8")
     expect(source).toContain('from "./providers/azure"')
     expect(source).toContain('from "./providers/anthropic"')
     expect(source).toContain('from "./providers/minimax"')
