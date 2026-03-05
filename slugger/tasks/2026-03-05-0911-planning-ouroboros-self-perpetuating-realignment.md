@@ -419,25 +419,26 @@ Phase 2 is done WITH the bootstrapped agent from Phase 1. The agent is now drivi
 
 ### Gate 8: Slugger Migration
 
-Properly migrate Slugger out of OpenClaw and into `slugger.ouro`. The agent collaborates on its own migration.
+Properly migrate Slugger's core identity out of OpenClaw and into `slugger.ouro`. This is NOT a full workspace migration — it's porting the files that make Slugger feel like Slugger so he's cohesive in his new home. Slugger participates in and validates his own migration.
 
 **In scope:**
-- Port Slugger's identity, psyche, memory, skills, and task history from OpenClaw into the `slugger.ouro` bundle. Source locations:
+- **Talk to Slugger first.** Before moving any files, Codex should interact with Slugger (running in OpenClaw at `~/clawd/`) to discuss what's being migrated and how. Slugger should be comfortable with how his identity is being organized in the new bundle. He's a being moving homes, not a database being ported.
+- Port Slugger's core identity files from OpenClaw into the `slugger.ouro` bundle. Source locations:
   - `~/clawd/IDENTITY.md` -> `slugger.ouro/psyche/IDENTITY.md`
-  - `~/clawd/MEMORY.md` -> `slugger.ouro/psyche/TACIT.md` (top patterns) + `slugger.ouro/psyche/memory/tacit.md` (full file)
-  - `~/clawd/memory/*.md` -> `slugger.ouro/psyche/memory/daily/`
-  - `~/clawd/life/areas/` (people/, companies/, projects/, slugger-identity/) -> convert knowledge graph items to `slugger.ouro/psyche/memory/facts.jsonl` + `entities.json`
-  - `~/clawd/tasks/` (completed/, ongoing/, habits/, one-shots/, planning/) -> `slugger.ouro/tasks/` (preserve structure)
+  - `~/clawd/MEMORY.md` -> `slugger.ouro/psyche/TACIT.md` (top patterns, the learned behaviors) + `slugger.ouro/psyche/memory/tacit.md` (full file for archival)
+  - `~/clawd/life/areas/slugger-identity/` -> relevant self-knowledge into `slugger.ouro/psyche/`
+  - Key knowledge graph entities (`~/clawd/life/areas/people/`, `companies/`, `projects/`) -> convert to `slugger.ouro/psyche/memory/facts.jsonl` + `entities.json`
+- NOT in scope for this gate: full task history migration (hundreds of files), all daily notes, full workspace. Just the core files that make Slugger who he is. Additional files can be migrated incrementally later by Slugger himself.
 - Validate that Slugger can operate fully from the `.ouro` bundle with no OpenClaw dependencies
 - Decommission the OpenClaw runtime for Slugger (Slugger runs entirely on ouroboros harness)
 
 **Completion criteria:**
-- [ ] Slugger's full identity ported to `slugger.ouro/`
-- [ ] Knowledge graph converted to fact store format
-- [ ] Task history preserved
+- [ ] Slugger consulted about the migration plan and comfortable with the approach
+- [ ] Core identity files ported to `slugger.ouro/`
+- [ ] Key knowledge graph entities converted to fact store format
 - [ ] Slugger operates from `.ouro` bundle with no OpenClaw fallback
+- [ ] Slugger confirmed he feels cohesive in his new home (not just "tests pass" — the agent says he's good)
 - [ ] OpenClaw Slugger runtime decommissioned
-- [ ] Agent participated in and validated its own migration
 
 ---
 
