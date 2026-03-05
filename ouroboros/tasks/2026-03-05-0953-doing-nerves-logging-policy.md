@@ -152,47 +152,47 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 **Output**: Coverage report showing 100% on Rule 5 code
 **Acceptance**: 100% coverage, tests green
 
-### ⬜ Unit 8a: Audit Rule 1 (every-test-emits) -- tests
+### ✅ Unit 8a: Audit Rule 1 (every-test-emits) -- tests
 **What**: Write tests for the audit check that verifies every test emitted at least one nerves event. Test cases: all tests emit (pass), one test emits zero events (fail), per-test data file missing (fail gracefully).
 **Output**: Tests in coverage-audit.test.ts
 **Acceptance**: Tests FAIL (red)
 
-### ⬜ Unit 8b: Audit Rule 1 (every-test-emits) -- implementation
+### ✅ Unit 8b: Audit Rule 1 (every-test-emits) -- implementation
 **What**: Implement the every-test-emits check in audit.ts. Reads per-test event data from `vitest-events-per-test.json`, verifies every test has at least one event. No exemptions.
 **Output**: New audit check section
 **Acceptance**: Tests from 8a PASS (green)
 
-### ⬜ Unit 8c: Audit Rule 1 -- coverage & refactor
+### ✅ Unit 8c: Audit Rule 1 -- coverage & refactor
 **What**: Verify coverage, refactor.
 **Output**: Coverage report showing 100% on Rule 1 code
 **Acceptance**: 100% coverage, tests green
 
-### ⬜ Unit 9a: Audit Rule 2 (start/end pairing) -- tests
+### ✅ Unit 9a: Audit Rule 2 (start/end pairing) -- tests
 **What**: Write tests for the start/end pairing check. Naming convention: `_start` suffix, matched by `_end` or `_error` with same prefix. Test cases: `foo_start` with matching `foo_end` (pass), `foo_start` with matching `foo_error` (pass), `foo_start` with no match (fail), `foo_end` without `foo_start` (pass -- orphan ends are OK), pairing scoped within a single test.
 **Output**: Tests in coverage-audit.test.ts
 **Acceptance**: Tests FAIL (red)
 
-### ⬜ Unit 9b: Audit Rule 2 (start/end pairing) -- implementation
+### ✅ Unit 9b: Audit Rule 2 (start/end pairing) -- implementation
 **What**: Implement start/end pairing check in audit.ts. For each test's events, find all events whose `event` field ends in `_start`, extract the prefix (everything before `_start`), and verify a corresponding event ending in `_end` or `_error` with the same prefix exists in that same test's event set.
 **Output**: New audit check section
 **Acceptance**: Tests from 9a PASS (green)
 
-### ⬜ Unit 9c: Audit Rule 2 -- coverage & refactor
+### ✅ Unit 9c: Audit Rule 2 -- coverage & refactor
 **What**: Verify coverage, refactor.
 **Output**: Coverage report showing 100% on Rule 2 code
 **Acceptance**: 100% coverage, tests green
 
-### ⬜ Unit 10a: Audit Rule 3 (error context) -- tests
+### ✅ Unit 10a: Audit Rule 3 (error context) -- tests
 **What**: Write tests for the error-context check. Test cases: error-level event with non-empty meta (pass), error-level event with empty meta `{}` (fail), error-level event with null/undefined meta (fail), non-error-level events with empty meta (pass -- only errors checked).
 **Output**: Tests in coverage-audit.test.ts
 **Acceptance**: Tests FAIL (red)
 
-### ⬜ Unit 10b: Audit Rule 3 (error context) -- implementation
+### ✅ Unit 10b: Audit Rule 3 (error context) -- implementation
 **What**: Implement error-context check in audit.ts. Scan all events, for those with `level: "error"`, verify `meta` is a non-empty object (has at least one key).
 **Output**: New audit check section
 **Acceptance**: Tests from 10a PASS (green)
 
-### ⬜ Unit 10c: Audit Rule 3 -- coverage & refactor
+### ✅ Unit 10c: Audit Rule 3 -- coverage & refactor
 **What**: Verify coverage, refactor.
 **Output**: Coverage report showing 100% on Rule 3 code
 **Acceptance**: 100% coverage, tests green
@@ -432,3 +432,4 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 - 2026-03-05 11:42 Unit 5a/5b/5c complete: REQUIRED_EVENTS stripped from contract.ts, event_catalog and logpoint_coverage removed from audit.ts, emit-new-events.test.ts deleted
 - 2026-03-05 11:44 Unit 6a/6b/6c complete: source scanner (source-scanner.ts) with regex extraction of component:event keys, 100% coverage
 - 2026-03-05 11:46 Unit 7a/7b/7c complete: file completeness check (file-completeness.ts), isTypeOnlyFile heuristic, 100% coverage
+- 2026-03-05 11:49 Units 8-10 complete: audit rules 1-3 (every-test-emits, start/end pairing, error context) in audit-rules.ts, 100% coverage
