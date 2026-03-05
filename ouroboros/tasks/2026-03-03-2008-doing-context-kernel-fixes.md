@@ -497,8 +497,8 @@ Also verify the removal propagates:
 7. `onKick`: remove `if (buffered)` branch -- always use `safeUpdate` (not `safeEmit`)
 8. `onError`: remove `else if (buffered)` branch -- terminal errors always use `safeSend` (not `safeEmit`, which would inject error text into accumulated content), transient always use `safeUpdate`
 9. `handleTeamsMessage`: remove `disableStreaming` parameter, remove `agentOptions.disableStreaming` setting
-10. `startTeamsApp`: remove `--disable-streaming` argv check, remove `getTeamsChannelConfig().disableStreaming` check, remove `disableStreaming` from `withConversationLock` call, update startup log message
-11. Update the module-level comment block (lines 83-93) to describe the unified chunked streaming approach
+10. `startTeamsApp`: remove `--disable-streaming` argv check (line 516), remove `getTeamsChannelConfig().disableStreaming` check (line 517), remove `disableStreaming` arg from `handleTeamsMessage` call (line 605), update startup log (line 632), update module comment (lines 508-511)
+11. Update the module-level comment block (lines 82-93) to describe the unified chunked streaming approach (remove "Dual-mode rendering" section, describe chunked streaming: text accumulated in textBuffer, flushed periodically via safeEmit)
 
 **`src/heart/core.ts`**:
 12. Remove `disableStreaming` from `RunAgentOptions` interface (line 95)
