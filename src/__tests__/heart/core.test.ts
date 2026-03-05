@@ -87,7 +87,7 @@ import * as identity from "../../identity"
 import type { ChannelCallbacks } from "../../heart/core"
 
 // Dynamic config helpers -- must be re-imported after vi.resetModules()
-async function setAgentProvider(provider: "azure" | "minimax" | "anthropic") {
+async function setAgentProvider(provider: "azure" | "minimax" | "anthropic" | "openai-codex") {
   vi.mocked(identity.loadAgentConfig).mockReturnValue({
     name: "testagent",
     configPath: "~/.agentsecrets/testagent/secrets.json",
@@ -122,6 +122,7 @@ async function setupConfig(partial: Record<string, unknown>) {
   const providers = (partial.providers ?? {}) as Record<string, unknown>
   if (providers.azure) await setAgentProvider("azure")
   else if (providers.anthropic) await setAgentProvider("anthropic")
+  else if (providers["openai-codex"]) await setAgentProvider("openai-codex")
   else await setAgentProvider("minimax")
   const config = await import("../../config")
   config.resetConfigCache()
@@ -3878,6 +3879,104 @@ describe("anthropic setup-token provider contract", () => {
       mockError.mockRestore()
       vi.doUnmock("../../config")
     }
+  })
+})
+
+describe("openai-codex oauth provider contract", () => {
+  beforeEach(() => {
+    mockResponsesCreate.mockReset()
+  })
+
+  it("uses openai-codex when oauth credentials are configured in secrets.json", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.3-codex",
+          oauthAccessToken: "oauth-test-token",
+        },
+      },
+    } as any)
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+
+    try {
+      const core = await import("../../heart/core")
+      expect(core.getProvider()).toBe("openai-codex")
+      expect(core.getModel()).toBe("gpt-5.3-codex")
+      expect(mockExit).not.toHaveBeenCalled()
+    } finally {
+      mockExit.mockRestore()
+    }
+  })
+
+  it("fails fast with oauth guidance when openai-codex oauthAccessToken is missing", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.3-codex",
+          oauthAccessToken: "",
+        },
+      },
+    } as any)
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("openai-codex"))
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("oauthAccessToken"))
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("secrets.json"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("wraps openai-codex oauth auth failures with explicit re-auth guidance", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.3-codex",
+          oauthAccessToken: "oauth-test-token",
+        },
+      },
+    } as any)
+
+    const authError: any = new Error("authentication failed")
+    authError.status = 401
+    mockResponsesCreate.mockRejectedValue(authError)
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    await expect(
+      runtime.streamTurn({
+        messages: [{ role: "user", content: "hello" }],
+        activeTools: [],
+        callbacks,
+      }),
+    ).rejects.toThrow("OpenAI Codex authentication failed")
   })
 })
 

@@ -312,6 +312,26 @@ describe("loadAgentConfig", () => {
     const { loadAgentConfig, resetIdentity } = await import("../identity")
     resetIdentity()
     expect(() => loadAgentConfig()).toThrow(/must include provider/)
+    expect(() => loadAgentConfig()).toThrow(/openai-codex/)
+  })
+
+  it("accepts openai-codex as a valid provider", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      name: "ouroboros",
+      configPath: "~/.agentsecrets/ouroboros/secrets.json",
+      provider: "openai-codex",
+      phrases: {
+        thinking: ["thinking"],
+        tool: ["tool"],
+        followup: ["followup"],
+      },
+    }))
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    const config = loadAgentConfig()
+    expect(config.provider).toBe("openai-codex")
   })
 
   it("handles non-Error read failures when loading agent.json", async () => {
