@@ -4413,9 +4413,10 @@ describe("Teams adapter - GitHub token handling", () => {
     vi.doMock("../../mind/friends/tokens", () => ({
       accumulateFriendTokens: vi.fn(),
     }))
-    vi.doMock("../../nerves", () => ({
-      createTraceId: vi.fn().mockReturnValue("trace-gh"),
-    }))
+    vi.doMock("../../nerves", async () => {
+      const actual = await vi.importActual<typeof import("../../nerves")>("../../nerves")
+      return { ...actual, createTraceId: vi.fn().mockReturnValue("trace-gh") }
+    })
     vi.doMock("../../heart/turn-coordinator", () => ({
       createTurnCoordinator: vi.fn().mockReturnValue({
         withTurnLock: vi.fn().mockImplementation((_key: string, fn: () => Promise<void>) => fn()),
