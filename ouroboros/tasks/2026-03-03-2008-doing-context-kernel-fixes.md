@@ -814,7 +814,7 @@ Changes:
 **Output**: New `src/mind/friends/tokens.ts`, modified `src/senses/teams.ts`, `src/senses/cli.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 21f: Token accumulation -- Coverage & Refactor
+### ✅ Unit 21f: Token accumulation -- Coverage & Refactor
 **What**: Verify 100% coverage on `accumulateFriendTokens()` and its call sites. Specifically:
 - `tokens.ts`: usage present (tokens added), usage absent (no-op early return), usage.total_tokens is 0 (no-op early return), record not found (no crash, no put), legacy record with undefined totalTokens (?? 0 fallback)
 - `teams.ts`: token accumulation call guarded by `toolContext?.context?.friend?.id` -- verify both branches (context present and absent)
@@ -1019,3 +1019,4 @@ Tests to KEEP AS-IS (these currently pass and assert behavior we are keeping):
 - 2026-03-04 18:56 Unit 21c complete: 100% coverage on store-file.ts, resolver.ts, types.ts (stmts/branches/funcs/lines). All totalTokens paths covered. No refactoring needed
 - 2026-03-04 18:57 Unit 21d complete: 6 failing tests for accumulateFriendTokens -- first turn (0 -> 1500), subsequent (3000 -> 5000), no-op undefined, no-op zero, record not found, legacy undefined totalTokens. All fail (tokens.ts doesn't exist)
 - 2026-03-04 18:58 Unit 21e complete: accumulateFriendTokens helper in tokens.ts (early-return guards, ?? 0 fallback, updatedAt refresh). Wired into teams.ts after postTurn (guarded by toolContext?.context?.friend?.id) and cli.ts after postTurn. 1313 tests pass, build clean
+- 2026-03-04 18:59 Unit 21f complete: tokens.ts 100% coverage. teams.ts 98.63/98.64/95.91/99.22 -- uncovered lines 266, 594 are pre-existing (onClearText, ctxSend). Token accumulation call site at line 498 covered. No refactoring needed
