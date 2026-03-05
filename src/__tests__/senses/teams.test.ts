@@ -188,16 +188,20 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   // --- onReasoningChunk tests ---
 
-  it("onReasoningChunk accumulates reasoning without calling update (no per-token HTTP)", async () => {
+  it("onReasoningChunk accumulates and flushes reasoning via periodic update (not per-token)", async () => {
+    vi.useFakeTimers()
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onReasoningChunk("analyzing code")
-    // Reasoning text is accumulated internally, NOT sent per-token via update
-    // (phrase rotation and tool status updates provide keep-alive during reasoning)
+    // NOT sent per-token -- accumulated internally
     expect(mockStream.update).not.toHaveBeenCalled()
+    // After flush interval, reasoning is pushed via safeUpdate
+    vi.advanceTimersByTime(teams.DEFAULT_FLUSH_INTERVAL_MS)
+    expect(mockStream.update).toHaveBeenCalledWith("analyzing code")
     expect(mockStream.emit).not.toHaveBeenCalled()
+    vi.useRealTimers()
   })
 
   it("onReasoningChunk after stop (403) is still a no-op", async () => {
@@ -288,16 +292,21 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
-  it("onReasoningChunk accumulates without calling update (no per-token HTTP)", async () => {
+  it("onReasoningChunk accumulates multiple chunks and flushes cumulative text", async () => {
+    vi.useFakeTimers()
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
 
     callbacks.onReasoningChunk("step 1")
     callbacks.onReasoningChunk(" step 2")
-    // Reasoning is accumulated internally but NOT sent per-token via update
+    // NOT sent per-token
     expect(mockStream.update).not.toHaveBeenCalled()
+    // After flush interval, cumulative reasoning pushed via update
+    vi.advanceTimersByTime(teams.DEFAULT_FLUSH_INTERVAL_MS)
+    expect(mockStream.update).toHaveBeenCalledWith("step 1 step 2")
     expect(mockStream.emit).not.toHaveBeenCalled()
+    vi.useRealTimers()
   })
 
   it("text without prior reasoning accumulates in buffer", async () => {
@@ -1821,7 +1830,7 @@ describe("Teams adapter - phrase rotation", () => {
     callbacks.onTextChunk("done")
   })
 
-  it("onReasoningChunk stops phrase rotation and shows reasoning", async () => {
+  it("onReasoningChunk stops phrase rotation and shows reasoning via periodic flush", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
@@ -1829,9 +1838,10 @@ describe("Teams adapter - phrase rotation", () => {
     callbacks.onModelStart()
     callbacks.onReasoningChunk("thinking hard")
     mockStream.update.mockClear()
-    vi.advanceTimersByTime(3000)
-    // No more phrase rotation after reasoning arrives
-    expect(mockStream.update).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(teams.DEFAULT_FLUSH_INTERVAL_MS)
+    // Phrase rotation stopped, but reasoning is flushed via periodic timer
+    expect(mockStream.update).toHaveBeenCalledTimes(1)
+    expect(mockStream.update).toHaveBeenCalledWith("thinking hard")
     // cleanup
     callbacks.onTextChunk("done")
   })
@@ -4181,18 +4191,19 @@ describe("Teams adapter - periodic flush timer", () => {
     expect(mockStream.emit).toHaveBeenCalledTimes(1)
   })
 
-  it("reasoning phase does NOT start flush timer -- only onTextChunk starts it", async () => {
+  it("reasoning phase starts flush timer and pushes reasoning via update", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
-    // Reasoning chunks should NOT start the flush timer
+    // Reasoning chunks start the flush timer
     callbacks.onReasoningChunk("thinking about it...")
     callbacks.onReasoningChunk("more reasoning...")
-    vi.advanceTimersByTime(teams.DEFAULT_FLUSH_INTERVAL_MS * 5)
-    // No emit or sendMessage calls from reasoning
+    vi.advanceTimersByTime(teams.DEFAULT_FLUSH_INTERVAL_MS)
+    // Reasoning flushed via update, not emit or sendMessage
+    expect(mockStream.update).toHaveBeenCalledWith("thinking about it...more reasoning...")
     expect(mockStream.emit).not.toHaveBeenCalled()
     expect(sendMessage).not.toHaveBeenCalled()
-    // Now text starts -- timer should start
+    // Now text starts -- next tick flushes text via emit
     callbacks.onTextChunk("answer: ")
     vi.advanceTimersByTime(teams.DEFAULT_FLUSH_INTERVAL_MS)
     expect(mockStream.emit).toHaveBeenCalledWith("answer: ")
