@@ -24,7 +24,7 @@ export const githubToolDefinitions: ToolDefinition[] = [
         return "AUTH_REQUIRED:github -- I need access to GitHub. Please sign in when prompted."
       }
       const owner = "ouroborosbot"
-      const repo = "ouroboros-agent-harness"
+      const repo = "ouroboros"
       const payload: Record<string, unknown> = { title: args.title }
       if (args.body) payload.body = args.body
       if (args.labels) {
