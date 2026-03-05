@@ -6,6 +6,7 @@ import { randomUUID } from "crypto"
 import type { FriendStore } from "./store"
 import type { IdentityProvider, FriendRecord, ResolvedContext, ExternalId } from "./types"
 import { getChannelCapabilities } from "./channel"
+import { emitNervesEvent } from "../../nerves/runtime"
 
 export interface FriendResolverParams {
   provider: IdentityProvider
@@ -76,7 +77,13 @@ export class FriendResolver {
     try {
       await this.store.put(friend.id, friend)
     } catch (err) {
-      console.error("failed to persist friend record:", err)
+      emitNervesEvent({
+        level: "error",
+        event: "friends.persist_error",
+        component: "friends",
+        message: "failed to persist friend record",
+        meta: { reason: err instanceof Error ? err.message : String(err) },
+      })
     }
 
     return friend
