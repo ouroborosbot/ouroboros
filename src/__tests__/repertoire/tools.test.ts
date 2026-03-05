@@ -1452,7 +1452,7 @@ describe("ado_mutate without authority checks (authority removed)", () => {
       adoToken: "test-token",
       signin: vi.fn(),
       context: {
-        friend: { id: "id", displayName: "test", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "", updatedAt: "", schemaVersion: 1 },
+        friend: { id: "id", name: "test", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "", updatedAt: "", schemaVersion: 1 },
         channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
       },
     }
@@ -1676,7 +1676,7 @@ describe("save_friend_note tool", () => {
   function makeFriend(overrides: Record<string, any> = {}) {
     return {
       id: "uuid-1",
-      displayName: "Jordan",
+      name: "Jordan",
       externalIds: [{ provider: "aad", externalId: "aad-1", linkedAt: "2026-01-01" }],
       tenantMemberships: ["t1"],
       toolPreferences: {},
@@ -1784,7 +1784,7 @@ describe("save_friend_note tool", () => {
 
   // -- type: "name" tests --
 
-  it("type 'name' updates displayName and notes['name']", async () => {
+  it("type 'name' updates name field (not a note)", async () => {
     vi.resetModules()
     const { execTool } = await import("../../repertoire/tools")
     const ctx = makeCtx()
@@ -1793,10 +1793,12 @@ describe("save_friend_note tool", () => {
     expect(ctx.friendStore.put).toHaveBeenCalledWith(
       "uuid-1",
       expect.objectContaining({
-        displayName: "Jordan Lee",
-        notes: { name: "Jordan Lee" },
+        name: "Jordan Lee",
       }),
     )
+    // notes should NOT contain "name" key -- name is stored on the record, not as a note
+    const putArg = ctx.friendStore.put.mock.calls[0][1]
+    expect(putArg.notes).not.toHaveProperty("name")
   })
 
   it("type 'name' does not require key parameter", async () => {
@@ -1851,7 +1853,7 @@ describe("save_friend_note tool", () => {
 
   // -- type: "note" tests --
 
-  it("type 'note' saves new note", async () => {
+  it("type 'note' saves new note with structured { value, savedAt }", async () => {
     vi.resetModules()
     const { execTool } = await import("../../repertoire/tools")
     const ctx = makeCtx()
@@ -1860,31 +1862,32 @@ describe("save_friend_note tool", () => {
     expect(ctx.friendStore.put).toHaveBeenCalledWith(
       "uuid-1",
       expect.objectContaining({
-        notes: { role: "engineering manager" },
+        notes: { role: { value: "engineering manager", savedAt: expect.stringMatching(/^\d{4}-/) } },
       }),
     )
   })
 
-  it("type 'note' with existing value and no override returns conflict", async () => {
+  it("type 'note' with existing structured value and no override returns conflict showing value", async () => {
     vi.resetModules()
     const { execTool } = await import("../../repertoire/tools")
-    const ctx = makeCtx({ friendOverrides: { notes: { role: "old role" } } })
+    const ctx = makeCtx({ friendOverrides: { notes: { role: { value: "old role", savedAt: "2026-01-01T00:00:00.000Z" } } } })
     const result = await execTool("save_friend_note", { type: "note", key: "role", content: "new role" }, ctx)
     expect(ctx.friendStore.put).not.toHaveBeenCalled()
     expect(result).toContain("old role")
+    expect(result).not.toContain("[object Object]")
     expect(result).toMatch(/override|merge/i)
   })
 
-  it("type 'note' with existing value and override=true overwrites", async () => {
+  it("type 'note' with existing value and override=true replaces with updated savedAt", async () => {
     vi.resetModules()
     const { execTool } = await import("../../repertoire/tools")
-    const ctx = makeCtx({ friendOverrides: { notes: { role: "old role" } } })
+    const ctx = makeCtx({ friendOverrides: { notes: { role: { value: "old role", savedAt: "2026-01-01T00:00:00.000Z" } } } })
     const result = await execTool("save_friend_note", { type: "note", key: "role", content: "new role", override: "true" }, ctx)
     expect(result).toContain("saved")
     expect(ctx.friendStore.put).toHaveBeenCalledWith(
       "uuid-1",
       expect.objectContaining({
-        notes: { role: "new role" },
+        notes: { role: { value: "new role", savedAt: expect.stringMatching(/^\d{4}-/) } },
       }),
     )
   })

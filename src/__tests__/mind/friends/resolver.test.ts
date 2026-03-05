@@ -6,13 +6,13 @@ import type { FriendRecord } from "../../../mind/friends/types"
 function makeFriend(overrides: Partial<FriendRecord> = {}): FriendRecord {
   return {
     id: "uuid-1",
-    displayName: "Jordan",
+    name: "Jordan",
     externalIds: [
       { provider: "aad", externalId: "aad-id-1", tenantId: "t1", linkedAt: "2026-03-02T00:00:00.000Z" },
     ],
     tenantMemberships: ["t1"],
     toolPreferences: { ado: "flat backlog view" },
-    notes: { role: "engineering manager" },
+    notes: { role: { value: "engineering manager", savedAt: "2026-01-01T00:00:00.000Z" } },
     totalTokens: 0,
     createdAt: "2026-03-02T00:00:00.000Z",
     updatedAt: "2026-03-02T00:00:00.000Z",
@@ -43,7 +43,7 @@ describe("FriendResolver", () => {
     })
 
     const ctx = await resolver.resolve()
-    expect(ctx.friend.displayName).toBe("Jordan")
+    expect(ctx.friend.name).toBe("Jordan")
     expect(ctx.friend.id).toBe("uuid-1")
     expect(ctx.channel.channel).toBe("teams")
     expect(ctx.channel.availableIntegrations).toEqual(["ado", "graph"])
@@ -85,13 +85,13 @@ describe("FriendResolver", () => {
 
       const ctx = await resolver.resolve()
       // Should have created a new friend
-      expect(ctx.friend.displayName).toBe("New Person")
+      expect(ctx.friend.name).toBe("New Person")
       expect(ctx.friend.externalIds[0].provider).toBe("aad")
       expect(ctx.friend.externalIds[0].externalId).toBe("new-aad-id")
       expect(ctx.friend.externalIds[0].tenantId).toBe("t1")
       expect(ctx.friend.tenantMemberships).toEqual(["t1"])
       expect(ctx.friend.toolPreferences).toEqual({})
-      expect(ctx.friend.notes).toEqual({ name: "New Person" })
+      expect(ctx.friend.notes).toEqual({ name: { value: "New Person", savedAt: expect.any(String) } })
       expect(ctx.friend.id).toBeTruthy()
       // Should have saved via store.put
       expect(store.put).toHaveBeenCalledTimes(1)
@@ -161,7 +161,7 @@ describe("FriendResolver", () => {
       })
 
       const ctx = await resolver.resolve()
-      expect(ctx.friend.notes).toEqual({ name: "Jordan" })
+      expect(ctx.friend.notes).toEqual({ name: { value: "Jordan", savedAt: expect.any(String) } })
     })
 
     it("does NOT auto-populate name note when displayName is 'Unknown'", async () => {
@@ -199,7 +199,7 @@ describe("FriendResolver", () => {
 
   describe("returning friend flow", () => {
     it("does NOT overwrite displayName on existing records", async () => {
-      const existing = makeFriend({ displayName: "My Preferred Name" })
+      const existing = makeFriend({ name: "My Preferred Name" })
       const store = createMockStore(existing)
 
       const resolver = new FriendResolver(store, {
@@ -211,8 +211,8 @@ describe("FriendResolver", () => {
       })
 
       const ctx = await resolver.resolve()
-      // Should keep the existing displayName, not overwrite with system-provided
-      expect(ctx.friend.displayName).toBe("My Preferred Name")
+      // Should keep the existing name, not overwrite with system-provided
+      expect(ctx.friend.name).toBe("My Preferred Name")
     })
 
     it("does not call store.put for existing friends", async () => {
@@ -323,7 +323,7 @@ describe("FriendResolver", () => {
 
       const ctx = await resolver.resolve()
       // Should still resolve (creates new friend on search failure)
-      expect(ctx.friend.displayName).toBe("User")
+      expect(ctx.friend.name).toBe("User")
     })
 
     it("handles store.put failure gracefully on new friend creation", async () => {
@@ -340,7 +340,7 @@ describe("FriendResolver", () => {
 
       // Should still resolve even if put fails
       const ctx = await resolver.resolve()
-      expect(ctx.friend.displayName).toBe("User")
+      expect(ctx.friend.name).toBe("User")
     })
   })
 })

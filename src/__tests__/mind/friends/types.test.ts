@@ -100,30 +100,30 @@ describe("FriendRecord type", () => {
   it("constructs with all required fields", () => {
     const record: FriendRecord = {
       id: "uuid-1",
-      displayName: "Jordan",
+      name: "Jordan",
       externalIds: [
         { provider: "aad", externalId: "aad-id", tenantId: "t1", linkedAt: "2026-03-02T00:00:00.000Z" },
       ],
       tenantMemberships: ["t1"],
       toolPreferences: { ado: "flat backlog view" },
-      notes: { role: "engineering manager" },
+      notes: { role: { value: "engineering manager", savedAt: "2026-01-01T00:00:00.000Z" } },
       createdAt: "2026-03-02T00:00:00.000Z",
       updatedAt: "2026-03-02T00:00:00.000Z",
       schemaVersion: 1,
     }
     expect(record.id).toBe("uuid-1")
-    expect(record.displayName).toBe("Jordan")
+    expect(record.name).toBe("Jordan")
     expect(record.externalIds).toHaveLength(1)
     expect(record.tenantMemberships).toEqual(["t1"])
     expect(record.toolPreferences.ado).toBe("flat backlog view")
-    expect(record.notes.role).toBe("engineering manager")
+    expect(record.notes.role.value).toBe("engineering manager")
     expect(record.schemaVersion).toBe(1)
   })
 
   it("constructs with empty toolPreferences and notes", () => {
     const record: FriendRecord = {
       id: "uuid-2",
-      displayName: "Alex",
+      name: "Alex",
       externalIds: [],
       tenantMemberships: [],
       toolPreferences: {},
@@ -173,7 +173,7 @@ describe("ResolvedContext type", () => {
   it("constructs with friend and channel (no identity, no memory, no checker)", () => {
     const friend: FriendRecord = {
       id: "uuid-1",
-      displayName: "Jordan",
+      name: "Jordan",
       externalIds: [],
       tenantMemberships: [],
       toolPreferences: {},

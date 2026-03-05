@@ -5519,11 +5519,11 @@ describe("confirmation system", () => {
 
     const freshRecord = {
       id: "uuid-1",
-      displayName: "Updated Name",
+      name: "Updated Name",
       externalIds: [],
       tenantMemberships: [],
       toolPreferences: { ado: "use iteration paths" },
-      notes: { name: "Updated Name" },
+      notes: { name: { value: "Updated Name", savedAt: "2026-01-01T00:00:00.000Z" } },
       createdAt: "2026-01-01",
       updatedAt: "2026-01-01",
       schemaVersion: 1,
@@ -5548,7 +5548,7 @@ describe("confirmation system", () => {
         context: {
           friend: {
             id: "uuid-1",
-            displayName: "Old Name",
+            name: "Old Name",
             externalIds: [],
             tenantMemberships: [],
             toolPreferences: {},
@@ -5605,7 +5605,7 @@ describe("confirmation system", () => {
         context: {
           friend: {
             id: "uuid-1",
-            displayName: "Old Name",
+            name: "Old Name",
             externalIds: [],
             tenantMemberships: [],
             toolPreferences: {},
@@ -5649,7 +5649,7 @@ describe("confirmation system", () => {
 
     const freshRecord = {
       id: "uuid-1",
-      displayName: "Test User",
+      name: "Test User",
       externalIds: [],
       tenantMemberships: [],
       toolPreferences: { ado: "use area path Team\\Backend" },
@@ -5679,7 +5679,7 @@ describe("confirmation system", () => {
         context: {
           friend: {
             id: "uuid-1",
-            displayName: "Test User",
+            name: "Test User",
             externalIds: [],
             tenantMemberships: [],
             toolPreferences: { ado: "use area path Team\\Backend" },
@@ -5728,11 +5728,11 @@ describe("confirmation system", () => {
 
     const freshRecord = {
       id: "uuid-1",
-      displayName: "Fresh Name",
+      name: "Fresh Name",
       externalIds: [],
       tenantMemberships: [],
       toolPreferences: {},
-      notes: { name: "Fresh Name" },
+      notes: { name: { value: "Fresh Name", savedAt: "2026-01-01T00:00:00.000Z" } },
       createdAt: "2026-01-01",
       updatedAt: "2026-01-01",
       schemaVersion: 1,
@@ -5757,7 +5757,7 @@ describe("confirmation system", () => {
         context: {
           friend: {
             id: "uuid-1",
-            displayName: "Old Name",
+            name: "Old Name",
             externalIds: [],
             tenantMemberships: [],
             toolPreferences: {},
@@ -5779,7 +5779,7 @@ describe("confirmation system", () => {
     } as any)
 
     // System prompt should have been rebuilt with fresh context
-    // The fresh record has displayName "Fresh Name" and note "name: Fresh Name"
+    // The fresh record has name "Fresh Name" and note "name: Fresh Name"
     // These should appear in the system prompt via contextSection
     const systemContent = messages[0].content
     expect(systemContent).toContain("Fresh Name")

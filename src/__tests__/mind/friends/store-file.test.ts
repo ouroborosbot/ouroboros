@@ -23,13 +23,13 @@ afterEach(async () => {
 function makeFriend(overrides: Partial<FriendRecord> = {}): FriendRecord {
   return {
     id: "uuid-1",
-    displayName: "Jordan",
+    name: "Jordan",
     externalIds: [
       { provider: "aad", externalId: "aad-id-1", tenantId: "t1", linkedAt: "2026-03-02T00:00:00.000Z" },
     ],
     tenantMemberships: ["t1"],
     toolPreferences: { ado: "flat backlog view" },
-    notes: { role: "engineering manager" },
+    notes: { role: { value: "engineering manager", savedAt: "2026-01-01T00:00:00.000Z" } },
     totalTokens: 0,
     createdAt: "2026-03-02T00:00:00.000Z",
     updatedAt: "2026-03-02T00:00:00.000Z",
@@ -68,11 +68,11 @@ describe("FileFriendStore", () => {
       const result = await store.get("uuid-1")
       expect(result).not.toBeNull()
       expect(result!.id).toBe("uuid-1")
-      expect(result!.displayName).toBe("Jordan")
+      expect(result!.name).toBe("Jordan")
       expect(result!.externalIds).toHaveLength(1)
       expect(result!.tenantMemberships).toEqual(["t1"])
       expect(result!.toolPreferences).toEqual({ ado: "flat backlog view" })
-      expect(result!.notes).toEqual({ role: "engineering manager" })
+      expect(result!.notes).toEqual({ role: { value: "engineering manager", savedAt: "2026-01-01T00:00:00.000Z" } })
     })
 
     it("returns null when only agent knowledge exists (missing PII)", async () => {
@@ -81,7 +81,7 @@ describe("FileFriendStore", () => {
       await fs.mkdir(agentKnowledgePath, { recursive: true })
       await fs.writeFile(
         path.join(agentKnowledgePath, "uuid-1.json"),
-        JSON.stringify({ id: "uuid-1", displayName: "Jordan", toolPreferences: {}, notes: {}, createdAt: "", updatedAt: "", schemaVersion: 1 }),
+        JSON.stringify({ id: "uuid-1", name: "Jordan", toolPreferences: {}, notes: {}, createdAt: "", updatedAt: "", schemaVersion: 1 }),
       )
       // get() should still return a record with defaults for PII fields
       const result = await store.get("uuid-1")
@@ -104,7 +104,7 @@ describe("FileFriendStore", () => {
       await fs.mkdir(agentKnowledgePath, { recursive: true })
       await fs.writeFile(
         path.join(agentKnowledgePath, "uuid-1.json"),
-        JSON.stringify({ id: "uuid-1", displayName: "Jordan", toolPreferences: {}, notes: {}, createdAt: "", updatedAt: "", schemaVersion: 1 }),
+        JSON.stringify({ id: "uuid-1", name: "Jordan", toolPreferences: {}, notes: {}, createdAt: "", updatedAt: "", schemaVersion: 1 }),
       )
       // Write corrupted PII
       await fs.mkdir(piiBridgePath, { recursive: true })
@@ -122,13 +122,13 @@ describe("FileFriendStore", () => {
       const friend = makeFriend()
       await store.put("uuid-1", friend)
 
-      // Read agent knowledge file directly -- should have id, displayName, toolPreferences, notes, createdAt, updatedAt, schemaVersion
+      // Read agent knowledge file directly -- should have id, name, toolPreferences, notes, createdAt, updatedAt, schemaVersion
       const agentFile = path.join(agentKnowledgePath, "uuid-1.json")
       const agentData = JSON.parse(await fs.readFile(agentFile, "utf-8"))
       expect(agentData.id).toBe("uuid-1")
-      expect(agentData.displayName).toBe("Jordan")
+      expect(agentData.name).toBe("Jordan")
       expect(agentData.toolPreferences).toEqual({ ado: "flat backlog view" })
-      expect(agentData.notes).toEqual({ role: "engineering manager" })
+      expect(agentData.notes).toEqual({ role: { value: "engineering manager", savedAt: "2026-01-01T00:00:00.000Z" } })
       expect(agentData.createdAt).toBe("2026-03-02T00:00:00.000Z")
       expect(agentData.updatedAt).toBe("2026-03-02T00:00:00.000Z")
       expect(agentData.schemaVersion).toBe(1)
@@ -145,17 +145,17 @@ describe("FileFriendStore", () => {
       expect(piiData.tenantMemberships).toEqual(["t1"])
       expect(piiData.schemaVersion).toBe(1)
       // PII bridge should NOT contain agent knowledge fields
-      expect(piiData.displayName).toBeUndefined()
+      expect(piiData.name).toBeUndefined()
       expect(piiData.toolPreferences).toBeUndefined()
       expect(piiData.notes).toBeUndefined()
     })
 
     it("overwrites existing files on second put", async () => {
       const store = new FileFriendStore(agentKnowledgePath, piiBridgePath)
-      await store.put("uuid-1", makeFriend({ displayName: "V1" }))
-      await store.put("uuid-1", makeFriend({ displayName: "V2" }))
+      await store.put("uuid-1", makeFriend({ name: "V1" }))
+      await store.put("uuid-1", makeFriend({ name: "V2" }))
       const result = await store.get("uuid-1")
-      expect(result!.displayName).toBe("V2")
+      expect(result!.name).toBe("V2")
     })
   })
 
@@ -185,7 +185,7 @@ describe("FileFriendStore", () => {
       const found = await store.findByExternalId("aad", "aad-id-1")
       expect(found).not.toBeNull()
       expect(found!.id).toBe("uuid-1")
-      expect(found!.displayName).toBe("Jordan")
+      expect(found!.name).toBe("Jordan")
     })
 
     it("returns null when no match found", async () => {
@@ -233,12 +233,12 @@ describe("FileFriendStore", () => {
       const store = new FileFriendStore(agentKnowledgePath, piiBridgePath)
       const friend = makeFriend({
         toolPreferences: { ado: "tree view" },
-        notes: { role: "SDE" },
+        notes: { role: { value: "SDE", savedAt: "2026-01-01T00:00:00.000Z" } },
       })
       await store.put("uuid-1", friend)
       const found = await store.findByExternalId("aad", "aad-id-1")
       expect(found!.toolPreferences).toEqual({ ado: "tree view" })
-      expect(found!.notes).toEqual({ role: "SDE" })
+      expect(found!.notes).toEqual({ role: { value: "SDE", savedAt: "2026-01-01T00:00:00.000Z" } })
       expect(found!.externalIds[0].provider).toBe("aad")
     })
 
@@ -344,7 +344,7 @@ describe("FileFriendStore", () => {
         path.join(agentKnowledgePath, "legacy-uuid.json"),
         JSON.stringify({
           id: "legacy-uuid",
-          displayName: "Legacy Friend",
+          name: "Legacy Friend",
           toolPreferences: {},
           notes: {},
           createdAt: "2026-01-01T00:00:00.000Z",
@@ -374,16 +374,16 @@ describe("FileFriendStore", () => {
   describe("concurrent operations", () => {
     it("concurrent puts to different IDs do not corrupt each other", async () => {
       const store = new FileFriendStore(agentKnowledgePath, piiBridgePath)
-      const f1 = makeFriend({ id: "uuid-1", displayName: "Friend1" })
-      const f2 = makeFriend({ id: "uuid-2", displayName: "Friend2" })
+      const f1 = makeFriend({ id: "uuid-1", name: "Friend1" })
+      const f2 = makeFriend({ id: "uuid-2", name: "Friend2" })
       await Promise.all([
         store.put("uuid-1", f1),
         store.put("uuid-2", f2),
       ])
       const r1 = await store.get("uuid-1")
       const r2 = await store.get("uuid-2")
-      expect(r1!.displayName).toBe("Friend1")
-      expect(r2!.displayName).toBe("Friend2")
+      expect(r1!.name).toBe("Friend1")
+      expect(r2!.name).toBe("Friend2")
     })
   })
 })
