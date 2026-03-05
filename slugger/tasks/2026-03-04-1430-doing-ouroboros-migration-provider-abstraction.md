@@ -26,7 +26,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [x] Provider-specific implementation logic is extracted from `src/heart/core.ts` into `src/heart/providers/*` modules before Unit 5 work, with behavior parity confirmed by tests.
 - [x] CLI channel output keeps user-visible plain text separate from nerves logs (no raw NDJSON log events interleaved in stdout model responses).
 - [x] Nerves logs remain machine-readable and persistent (append-only NDJSON) for multi-agent auditing and runtime validation.
-- [ ] Anthropic streamed tool calls assemble valid JSON arguments and execute reliably (no malformed concatenated argument payloads), backed by regression tests.
+- [x] Anthropic streamed tool calls assemble valid JSON arguments and execute reliably (no malformed concatenated argument payloads), backed by regression tests.
 - [x] Secrets/state boundary is enforced (`~/.agentsecrets` for secrets only; runtime/session/log/PII/test artifacts moved to `~/.agentstate`).
 - [x] `secrets.json` retains `providers` + `teams`; `context` is loaded from `agent.json`.
 - [x] `agent.json.configPath` resolves to `~/.agentsecrets/<agent>/secrets.json`.
@@ -161,17 +161,17 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Coverage artifacts `unit-4i-coverage.txt` and `unit-4i-coverage-summary.json`.
 **Acceptance**: New sink-separation code is at 100% coverage, related tests remain green, and coverage artifacts are saved.
 
-### ⬜ Unit 4j: Anthropic streamed tool-argument hardening pre-Unit-5 pass — Tests
+### ✅ Unit 4j: Anthropic streamed tool-argument hardening pre-Unit-5 pass — Tests
 **What**: Add failing regression tests in `src/__tests__/heart/core.test.ts` for Anthropic streamed tool calls to reproduce malformed argument assembly (including `content_block_start` + `input_json_delta` concatenation cases) and require valid JSON arguments to tools.
 **Output**: Failing Anthropic tool-call assembly tests plus artifacts `unit-4j-red-run.txt` and `unit-4j-jest.json`.
 **Acceptance**: Tests fail red on current malformed-argument behavior and artifacts are saved under the task artifacts directory.
 
-### ⬜ Unit 4k: Anthropic streamed tool-argument hardening pre-Unit-5 pass — Implementation
+### ✅ Unit 4k: Anthropic streamed tool-argument hardening pre-Unit-5 pass — Implementation
 **What**: Fix Anthropic stream tool-argument assembly in `src/heart/core.ts` (or extracted Anthropic provider module from Unit 4e) so each tool call receives correctly reconstructed JSON arguments and tool execution proceeds reliably.
 **Output**: Anthropic stream assembly fix plus artifact logs `unit-4k-green-run.txt` and `unit-4k-jest.json`.
 **Acceptance**: Anthropic tool-assembly tests pass green, no malformed argument payloads are emitted, and artifacts are saved under the task artifacts directory.
 
-### ⬜ Unit 4l: Anthropic streamed tool-argument hardening pre-Unit-5 pass — Coverage & Refactor
+### ✅ Unit 4l: Anthropic streamed tool-argument hardening pre-Unit-5 pass — Coverage & Refactor
 **What**: Refactor Anthropic argument assembly handling and cover all edge/error paths for streamed tool-argument reconstruction.
 **Output**: Coverage artifacts `unit-4l-coverage.txt` and `unit-4l-coverage-summary.json`.
 **Acceptance**: New Anthropic hardening code is at 100% coverage, related tests remain green, and coverage artifacts are saved.
@@ -261,3 +261,6 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 18:55 Unit 4g complete: added failing CLI logging-separation contract test requiring NDJSON runtime logger wiring (`unit-4g-red-run.txt`, `unit-4g-jest.json`, `unit-4g-red-run.exit`)
 - 2026-03-04 18:57 Unit 4h complete: configured CLI runtime nerves logger to append-only NDJSON sink and kept CLI suites/build green (`unit-4h-green-run.txt`, `unit-4h-jest.json`, `unit-4h-senses-regression.txt`, `unit-4h-build.txt`)
 - 2026-03-04 18:59 Unit 4i complete: refactored CLI logging setup into `src/senses/cli-logging.ts` and achieved 100% coverage/build on logging-separation code (`unit-4i-coverage.txt`, `unit-4i-coverage-summary.json`, `unit-4i-build.txt`)
+- 2026-03-04 19:01 Unit 4j complete: added Anthropic streamed tool-argument red regression for malformed `content_block_start` + `input_json_delta` assembly (`unit-4j-red-run.txt`, `unit-4j-jest.json`, `unit-4j-red-run.exit`)
+- 2026-03-04 19:04 Unit 4k complete: implemented Anthropic streamed tool-argument reconstruction hardening with green targeted tests/build (`unit-4k-green-run.txt`, `unit-4k-jest.json`, `unit-4k-build.txt`)
+- 2026-03-04 19:07 Unit 4l complete: added edge-path Anthropic argument assembly coverage tests and reached 100% coverage/build on provider hardening code (`unit-4l-coverage.txt`, `unit-4l-coverage-summary.json`, `unit-4l-build.txt`)
