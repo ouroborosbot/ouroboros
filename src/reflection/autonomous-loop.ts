@@ -181,11 +181,20 @@ export async function runAutonomousLoop(config: LoopConfig): Promise<LoopResult>
     return { proposal, stagesCompleted, exitCode: 0 }
   }
 
+  // Create a feature branch for this work
+  const branchSlug = proposal.gap
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40)
+  const branchName = `auto/${branchSlug}`
+  console.log(`[loop] Creating feature branch: ${branchName}`)
+
   const doerPrompt = loadSubagentPrompt(config.projectRoot, "work-doer")
   const doOutput = await runStage(
     "do",
     doerPrompt,
-    `Execute the doing document at: ${doingDocName}\n\nRead it with read_file, then execute all work units using TDD. Use shell to run tests, write_file to create code, and commit after each unit.`,
+    `First, create and switch to a new git branch named "${branchName}" from main (run: git checkout -b ${branchName}).\n\nThen execute the doing document at: ${doingDocName}\n\nRead it with read_file, then execute all work units using TDD. Use shell to run tests, write_file to create code, and commit after each unit.`,
     traceId,
   )
   stagesCompleted.push("do")
@@ -199,7 +208,7 @@ export async function runAutonomousLoop(config: LoopConfig): Promise<LoopResult>
   await runStage(
     "merge",
     mergerPrompt,
-    `Merge the completed work. Use shell to check git status/log for recent commits, run tests, then create a PR and merge.\n\nProject root: ${config.projectRoot}\nWork summary:\n${doOutput}`,
+    `Merge the completed work. The work is on branch "${branchName}". Push the branch, create a PR from "${branchName}" to main, run tests, then merge.\n\nProject root: ${config.projectRoot}\nWork summary:\n${doOutput}`,
     traceId,
   )
   stagesCompleted.push("merge")
