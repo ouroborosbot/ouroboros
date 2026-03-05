@@ -159,17 +159,18 @@ export async function runAutonomousLoop(config: LoopConfig): Promise<LoopResult>
     return { proposal, stagesCompleted, exitCode: 0 }
   }
 
-  const plannerPrompt = loadSubagentPrompt(config.projectRoot, "work-planner")
+  // Use autonomous planner (no human approval gates) for the loop
+  const plannerPrompt = loadSubagentPrompt(config.projectRoot, "autonomous-planner")
+  const doingDocName = proposalPath.replace(/planning-/, "doing-")
   const planOutput = await runStage(
     "plan",
     plannerPrompt,
-    `Convert this reflection proposal into an actionable doing document. Use your tools to write the doing doc to disk in the tasks directory.\n\n${proposalContent}`,
+    `Convert this reflection proposal into an actionable doing document.\n\nWrite the doing doc to: ${doingDocName}\n\nProject root: ${config.projectRoot}\n\nProposal:\n${proposalContent}`,
     traceId,
   )
   stagesCompleted.push("plan")
 
   // Write the plan output as a doing doc if the planner didn't already write one
-  const doingDocName = proposalPath.replace(/planning-/, "doing-")
   if (!fs.existsSync(doingDocName)) {
     fs.writeFileSync(doingDocName, planOutput, "utf-8")
     console.log(`[loop] Wrote doing doc: ${doingDocName}`)
@@ -190,11 +191,23 @@ export async function runAutonomousLoop(config: LoopConfig): Promise<LoopResult>
   const branchName = `auto/${branchSlug}`
   console.log(`[loop] Creating feature branch: ${branchName}`)
 
+  // Try to create feature branch (non-fatal — doer can handle it via tools)
+  let branchCreated = false
+  try {
+    const { execSync } = await import("child_process")
+    execSync("git checkout main", { cwd: config.projectRoot, stdio: "pipe" })
+    execSync(`git checkout -b ${branchName}`, { cwd: config.projectRoot, stdio: "pipe" })
+    branchCreated = true
+    console.log(`[loop] Switched to branch: ${branchName}`)
+  } catch (e) {
+    console.log(`[loop] Could not create branch automatically, doer will handle it`)
+  }
+
   const doerPrompt = loadSubagentPrompt(config.projectRoot, "work-doer")
   const doOutput = await runStage(
     "do",
     doerPrompt,
-    `First, create and switch to a new git branch named "${branchName}" from main (run: git checkout -b ${branchName}).\n\nThen execute the doing document at: ${doingDocName}\n\nRead it with read_file, then execute all work units using TDD. Use shell to run tests, write_file to create code, and commit after each unit.`,
+    `Execute the doing document at: ${doingDocName}\n\n${branchCreated ? `You are already on branch "${branchName}".` : `First create and switch to branch "${branchName}" from main.`} Project root: ${config.projectRoot}\n\nRead the doing doc with read_file (use the full absolute path above), then execute all work units using TDD. Use shell to run tests, write_file to create code, and commit after each unit.`,
     traceId,
   )
   stagesCompleted.push("do")

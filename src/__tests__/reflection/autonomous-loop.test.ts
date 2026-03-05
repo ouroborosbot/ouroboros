@@ -44,6 +44,7 @@ describe("autonomous-loop", () => {
 
     // Write subagent prompts
     fs.writeFileSync(path.join(tmpDir, "subagents", "work-planner.md"), "You are a planner.")
+    fs.writeFileSync(path.join(tmpDir, "subagents", "autonomous-planner.md"), "You are an autonomous planner.")
     fs.writeFileSync(path.join(tmpDir, "subagents", "work-doer.md"), "You are a doer.")
     fs.writeFileSync(path.join(tmpDir, "subagents", "work-merger.md"), "You are a merger.")
 
@@ -144,8 +145,8 @@ describe("autonomous-loop", () => {
   })
 
   it("handles missing subagent prompt gracefully", async () => {
-    // Remove work-planner prompt
-    fs.unlinkSync(path.join(tmpDir, "subagents", "work-planner.md"))
+    // Remove autonomous-planner prompt (used by the loop for planning stage)
+    fs.unlinkSync(path.join(tmpDir, "subagents", "autonomous-planner.md"))
 
     mockReflectionOutput(
       "GAP: Add tests\nCONSTITUTION_CHECK: within-bounds\nEFFORT: small\n\nPROPOSAL:\nAdd tests."
