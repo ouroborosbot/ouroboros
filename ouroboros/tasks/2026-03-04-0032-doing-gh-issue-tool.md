@@ -128,7 +128,7 @@ Allow agents using the ouroboros harness to create GitHub issues via the GitHub 
 **Output**: 100% coverage confirmed
 **Acceptance**: `npm test` passes, coverage 100% on new lines, no warnings
 
-### ⬜Unit 3a: Tool Registration -- Tests
+### ✅Unit 3a: Tool Registration -- Tests
 **What**: Write tests verifying `github_create_issue` is properly integrated in the registration layer (`tools.ts`):
 - `allDefinitions` includes `github_create_issue` (verifiable via `execTool` and `isConfirmationRequired`)
 - `isConfirmationRequired("github_create_issue")` returns `true`
