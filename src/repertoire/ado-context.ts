@@ -4,6 +4,7 @@
 
 import { discoverOrganizations, discoverProjects } from "./ado-client"
 import type { ResolvedContext } from "../mind/friends/types"
+import { emitNervesEvent } from "../nerves/runtime"
 
 export interface AdoContextOk {
   ok: true
@@ -38,6 +39,12 @@ export async function resolveAdoContext(
   context: ResolvedContext,
   args?: AdoContextArgs,
 ): Promise<AdoContextResult> {
+  emitNervesEvent({
+    component: "repertoire",
+    event: "repertoire.ado_context_resolve",
+    message: "resolving ado context",
+    meta: {},
+  })
   // Reject if ADO integration is not available
   if (!context.channel.availableIntegrations.includes("ado")) {
     return { ok: false, error: "ADO integration is not available in this channel." }

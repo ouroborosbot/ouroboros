@@ -1,5 +1,6 @@
 import type { ToolDefinition } from "./tools-base"
 import { githubRequest } from "./github-client"
+import { emitNervesEvent } from "../nerves/runtime"
 
 export const githubToolDefinitions: ToolDefinition[] = [
   {
@@ -20,6 +21,12 @@ export const githubToolDefinitions: ToolDefinition[] = [
       },
     },
     handler: async (args, ctx) => {
+      emitNervesEvent({
+        component: "repertoire",
+        event: "repertoire.github_tool_call",
+        message: "github tool invoked",
+        meta: {},
+      })
       if (!ctx?.githubToken) {
         return "AUTH_REQUIRED:github -- I need access to GitHub. Please sign in when prompted."
       }

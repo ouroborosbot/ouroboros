@@ -2,6 +2,7 @@
 // derives hierarchy rules, and validates parent/child work item type relationships.
 
 import { adoRequest } from "./ado-client"
+import { emitNervesEvent } from "../nerves/runtime"
 
 export interface ProcessTemplate {
   templateName: string
@@ -60,6 +61,12 @@ export async function fetchProcessTemplate(
   organization: string,
   project: string,
 ): Promise<ProcessTemplate | null> {
+  emitNervesEvent({
+    component: "repertoire",
+    event: "repertoire.ado_template_fetch",
+    message: "fetching process template",
+    meta: {},
+  })
   try {
     // Step 1: Get the process template type from project properties
     const propsResult = await adoRequest(

@@ -6,6 +6,7 @@
 import * as fs from "fs"
 import * as fsPromises from "fs/promises"
 import * as path from "path"
+import { emitNervesEvent } from "../../nerves/runtime"
 import type { FriendStore } from "./store"
 import type { FriendRecord } from "./types"
 
@@ -39,6 +40,12 @@ export class FileFriendStore implements FriendStore {
     // Auto-create directories on construction
     fs.mkdirSync(agentKnowledgePath, { recursive: true })
     fs.mkdirSync(piiBridgePath, { recursive: true })
+    emitNervesEvent({
+      component: "friends",
+      event: "friends.store_init",
+      message: "file friend store initialized",
+      meta: {},
+    })
   }
 
   async get(id: string): Promise<FriendRecord | null> {

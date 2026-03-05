@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { getAnthropicConfig } from "../../config";
 import { loadAgentConfig } from "../../identity";
 import type { UsageData } from "../../mind/context";
+import { emitNervesEvent } from "../../nerves/runtime";
 import type { ProviderRuntime, ProviderTurnRequest } from "../core";
 import type { TurnResult } from "../streaming";
 
@@ -344,6 +345,12 @@ async function streamAnthropicMessages(
 }
 
 export function createAnthropicProviderRuntime(): ProviderRuntime {
+  emitNervesEvent({
+    component: "engine",
+    event: "engine.provider_init",
+    message: "anthropic provider init",
+    meta: { provider: "anthropic" },
+  });
   const anthropicConfig = getAnthropicConfig();
   if (!(anthropicConfig.model && anthropicConfig.setupToken)) {
     throw new Error(

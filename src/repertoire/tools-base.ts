@@ -5,6 +5,7 @@ import { listSkills, loadSkill } from "./skills";
 import { getIntegrationsConfig } from "../config";
 import type { Integration, ResolvedContext, FriendRecord } from "../mind/friends/types";
 import type { FriendStore } from "../mind/friends/store";
+import { emitNervesEvent } from "../nerves/runtime";
 
 export interface ToolContext {
   graphToken?: string;
@@ -292,6 +293,12 @@ export const baseToolDefinitions: ToolDefinition[] = [
       },
     },
     handler: async (a, ctx) => {
+      emitNervesEvent({
+        component: "repertoire",
+        event: "repertoire.save_friend_note",
+        message: "save friend note invoked",
+        meta: { type: a.type },
+      });
       if (!ctx?.context) {
         return "i can't save notes -- no friend context available";
       }
