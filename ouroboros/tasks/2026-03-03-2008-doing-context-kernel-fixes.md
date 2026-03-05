@@ -586,7 +586,7 @@ The phrase rotation timer (1.5s interval for `safeUpdate`) continues to run duri
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new/modified code, all tests green, no warnings
 
-### ⬜ Unit 20a: Stream final_answer arguments -- Tests
+### ✅ Unit 20a: Stream final_answer arguments -- Tests
 **What**: Write failing tests for progressive streaming of `final_answer` tool call arguments. Tests cover:
 
 1. **FinalAnswerParser unit tests** (in `src/__tests__/heart/streaming.test.ts`):
