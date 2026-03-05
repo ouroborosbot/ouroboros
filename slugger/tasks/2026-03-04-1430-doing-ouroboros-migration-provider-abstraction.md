@@ -1,6 +1,6 @@
 # Doing: Ouroboros Migration - Provider Abstraction
 
-**Status**: in-progress
+**Status**: done
 **Execution Mode**: pending
 **Created**: 2026-03-04 15:26
 **Planning**: ./2026-03-04-1430-planning-ouroboros-migration-provider-abstraction.md
@@ -16,13 +16,13 @@
 Replace the global provider singleton with a per-agent provider abstraction while preserving current Azure/MiniMax behavior, then add Anthropic setup-token auth support and OpenAI Codex OAuth subscription support as final integration steps, with explicit auth-failure hard-stop behavior and a clean secrets/state path boundary.
 
 ## Completion Criteria
-- [ ] Provider abstraction is in place and engine no longer branches on hardcoded provider names in the request path.
-- [ ] Azure and MiniMax behavior is preserved with passing regression tests.
+- [x] Provider abstraction is in place and engine no longer branches on hardcoded provider names in the request path.
+- [x] Azure and MiniMax behavior is preserved with passing regression tests.
 - [x] Anthropic provider is integrated behind the same provider interface with setup-token auth profile support.
 - [x] OpenAI Codex provider is integrated behind the same provider interface with OAuth auth profile support.
 - [x] Anthropic setup-token flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
 - [x] OpenAI Codex OAuth flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
-- [ ] Provider selection is per-agent and config-driven (no global singleton lock-in).
+- [x] Provider selection is per-agent and config-driven (no global singleton lock-in).
 - [x] Provider-specific implementation logic is extracted from `src/heart/core.ts` into `src/heart/providers/*` modules before Unit 5 work, with behavior parity confirmed by tests.
 - [x] CLI channel output keeps user-visible plain text separate from nerves logs (no raw NDJSON log events interleaved in stdout model responses).
 - [x] Nerves logs remain machine-readable and persistent (append-only NDJSON) for multi-agent auditing and runtime validation.
@@ -40,9 +40,9 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [x] Provider IDs are explicitly locked and implemented as `azure`, `minimax`, `anthropic`, `openai-codex`.
 - [x] Model fields are explicitly supported for each in-scope provider via `secrets.json` without introducing additional model-selection features.
 - [x] All relevant docs are updated for the new provider/config/storage contracts (including `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, and `cross-agent-docs/agent-storage-migration-playbook.md`).
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -212,12 +212,12 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Documentation updates aligned to implemented provider/config behavior.
 **Acceptance**: Documentation reflects final runtime provider behavior and config contracts without contradictions.
 
-### ⬜ Unit 7a: Full-suite and coverage verification
+### ✅ Unit 7a: Full-suite and coverage verification
 **What**: Run full test suite, coverage checks, and static checks; assemble execution evidence in artifacts.
 **Output**: Full verification log and coverage artifacts in task artifacts directory.
 **Acceptance**: All tests pass, no warnings, new-code coverage is 100%, manual Anthropic/OpenAI auth validation artifacts are present, and completion criteria are all satisfied.
 
-### ⬜ Unit 7b: Completion checklist and closeout
+### ✅ Unit 7b: Completion checklist and closeout
 **What**: Validate completion criteria checkboxes against evidence and prepare merge-ready summary.
 **Output**: Updated doing checklist and closeout summary artifact referencing evidence locations.
 **Acceptance**: Every completion checkbox has direct evidence and task is ready for work-doer execution/closure flow.
@@ -279,3 +279,5 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 22:28 Unit 5d complete: executed live OpenAI Codex OAuth manual validation with successful CLI/tool turn evidence plus controlled invalid-token failure-path re-auth guidance evidence (`unit-5d-manual-validation.txt`, `unit-5d-manual-validation.json`, `unit-5d-manual-validation.stderr.txt`).
 - 2026-03-04 22:30 Unit 6a complete: finalized migration runbook verification/cleanup contract for `~/.agentconfigs` to `~/.agentsecrets` + `~/.agentstate` transition (`cross-agent-docs/agent-storage-migration-playbook.md`).
 - 2026-03-04 22:30 Unit 6b complete: aligned provider/config/storage docs with implemented runtime contracts and fail-fast/no-fallback behavior (`README.md`, `CONTRIBUTING.md`, `AGENTS.md`).
+- 2026-03-04 22:48 Unit 7a complete: reran full verification pipeline (`npm run build`, `npm test`, `npm run test:coverage`) with all exits 0, 44/44 test files green, 1332/1332 tests green, and coverage gate pass (`unit-7a-*.txt`, `unit-7a-verification.md`, `~/.agentstate/test-runs/ouroboros-agent-harness/2026-03-05T06-46-44-481Z/*`).
+- 2026-03-04 22:48 Unit 7b complete: synchronized completion criteria in doing/planning docs and finalized closeout evidence summary (`unit-7b-closeout-summary.md`).

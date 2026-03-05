@@ -1,6 +1,6 @@
 # Planning: Ouroboros Migration - Provider Abstraction
 
-**Status**: NEEDS_REVIEW
+**Status**: done
 **Created**: 2026-03-04 14:30
 
 ## Goal
@@ -46,32 +46,32 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - Daemon/gateway, multi-replica routing, or non-provider architecture expansion.
 
 ## Completion Criteria
-- [ ] Provider abstraction is in place and engine no longer branches on hardcoded provider names in the request path.
-- [ ] Azure and MiniMax behavior is preserved with passing regression tests.
-- [ ] Anthropic provider is integrated behind the same provider interface with setup-token auth profile support.
-- [ ] OpenAI Codex provider is integrated behind the same provider interface with OAuth auth profile support.
-- [ ] Anthropic setup-token flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
-- [ ] OpenAI Codex OAuth flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
-- [ ] Provider selection is per-agent and config-driven (no global singleton lock-in).
-- [ ] Provider-specific implementation logic is extracted from `src/heart/core.ts` into `src/heart/providers/*` modules before Unit 5 work, with behavior parity confirmed by tests.
-- [ ] CLI channel output keeps user-visible plain text separate from nerves logs (no raw NDJSON log events interleaved in stdout model responses).
-- [ ] Nerves logs remain machine-readable and persistent (append-only NDJSON) for multi-agent auditing and runtime validation.
-- [ ] Anthropic streamed tool calls assemble valid JSON arguments and execute reliably (no malformed concatenated argument payloads), backed by regression tests.
-- [ ] Secrets/state boundary is enforced (`~/.agentsecrets` for secrets only; runtime/session/log/PII/test artifacts moved to `~/.agentstate`).
-- [ ] `secrets.json` retains `providers` + `teams`; `context` is loaded from `agent.json`.
-- [ ] `agent.json.configPath` resolves to `~/.agentsecrets/<agent>/secrets.json`.
-- [ ] Missing/expired provider credentials fail fast with explicit re-auth guidance; no silent fallback.
-- [ ] A migration runbook exists in-repo for cross-machine post-pull reorganization of legacy `~/.agentconfigs` data.
-- [ ] Legacy `~/.agentconfigs` migration is fully documented as a one-time manual operation for other machines (no runtime back-compat branches in normal execution code), with no data loss and clear operator guidance.
-- [ ] Storage/config refactor executes before provider abstraction refactor work so implementation targets final storage/config contracts.
-- [ ] Actual cross-machine data migration is out-of-band from this task's code execution and handled via the migration runbook instructions.
-- [ ] Migration runbook is docs-only (no script) and includes explicit move/verify instructions for the other machine.
-- [ ] Provider IDs are explicitly locked and implemented as `azure`, `minimax`, `anthropic`, `openai-codex`.
-- [ ] Model fields are explicitly supported for each in-scope provider via `secrets.json` without introducing additional model-selection features.
-- [ ] All relevant docs are updated for the new provider/config/storage contracts (including `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, and `cross-agent-docs/agent-storage-migration-playbook.md`).
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] Provider abstraction is in place and engine no longer branches on hardcoded provider names in the request path.
+- [x] Azure and MiniMax behavior is preserved with passing regression tests.
+- [x] Anthropic provider is integrated behind the same provider interface with setup-token auth profile support.
+- [x] OpenAI Codex provider is integrated behind the same provider interface with OAuth auth profile support.
+- [x] Anthropic setup-token flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
+- [x] OpenAI Codex OAuth flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
+- [x] Provider selection is per-agent and config-driven (no global singleton lock-in).
+- [x] Provider-specific implementation logic is extracted from `src/heart/core.ts` into `src/heart/providers/*` modules before Unit 5 work, with behavior parity confirmed by tests.
+- [x] CLI channel output keeps user-visible plain text separate from nerves logs (no raw NDJSON log events interleaved in stdout model responses).
+- [x] Nerves logs remain machine-readable and persistent (append-only NDJSON) for multi-agent auditing and runtime validation.
+- [x] Anthropic streamed tool calls assemble valid JSON arguments and execute reliably (no malformed concatenated argument payloads), backed by regression tests.
+- [x] Secrets/state boundary is enforced (`~/.agentsecrets` for secrets only; runtime/session/log/PII/test artifacts moved to `~/.agentstate`).
+- [x] `secrets.json` retains `providers` + `teams`; `context` is loaded from `agent.json`.
+- [x] `agent.json.configPath` resolves to `~/.agentsecrets/<agent>/secrets.json`.
+- [x] Missing/expired provider credentials fail fast with explicit re-auth guidance; no silent fallback.
+- [x] A migration runbook exists in-repo for cross-machine post-pull reorganization of legacy `~/.agentconfigs` data.
+- [x] Legacy `~/.agentconfigs` migration is fully documented as a one-time manual operation for other machines (no runtime back-compat branches in normal execution code), with no data loss and clear operator guidance.
+- [x] Storage/config refactor executes before provider abstraction refactor work so implementation targets final storage/config contracts.
+- [x] Actual cross-machine data migration is out-of-band from this task's code execution and handled via the migration runbook instructions.
+- [x] Migration runbook is docs-only (no script) and includes explicit move/verify instructions for the other machine.
+- [x] Provider IDs are explicitly locked and implemented as `azure`, `minimax`, `anthropic`, `openai-codex`.
+- [x] Model fields are explicitly supported for each in-scope provider via `secrets.json` without introducing additional model-selection features.
+- [x] All relevant docs are updated for the new provider/config/storage contracts (including `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, and `cross-agent-docs/agent-storage-migration-playbook.md`).
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -139,3 +139,4 @@ Keep scope disciplined: runtime provider abstraction + provider integrations onl
 - 2026-03-04 15:35 Added mandatory manual validation gates for Anthropic setup-token and OpenAI Codex OAuth with artifact evidence requirements
 - 2026-03-04 18:26 Added pre-Unit-5 planning scope for provider module extraction and CLI log/user-output separation; set status to NEEDS_REVIEW
 - 2026-03-04 18:34 Added pre-Unit-5 Anthropic tool-argument hardening scope and completion criteria for malformed streamed tool-call payloads
+- 2026-03-04 22:48 Completion criteria synchronized to done based on Unit 0-7 evidence and final verification artifacts
