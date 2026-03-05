@@ -181,7 +181,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Manual validation artifacts `unit-4m-manual-validation.txt`, `unit-4m-manual-validation.json`, and `unit-4m-manual-validation.stderr.txt`.
 **Acceptance**: Live Anthropic run succeeds via setup-token auth, tool calls execute with valid arguments, failure mode includes explicit re-auth guidance, and all manual artifacts are present.
 
-### ⬜ Unit 5a: OpenAI Codex OAuth integration — Tests
+### ✅ Unit 5a: OpenAI Codex OAuth integration — Tests
 **What**: Add failing tests for `openai-codex` provider behavior, OAuth profile loading contract, and explicit auth-failure messaging in provider/config test suites.
 **Output**: Failing OpenAI Codex provider/auth tests for success and fail-fast error paths.
 **Acceptance**: OpenAI Codex tests fail red before implementation.
@@ -265,3 +265,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 19:04 Unit 4k complete: implemented Anthropic streamed tool-argument reconstruction hardening with green targeted tests/build (`unit-4k-green-run.txt`, `unit-4k-jest.json`, `unit-4k-build.txt`)
 - 2026-03-04 19:07 Unit 4l complete: added edge-path Anthropic argument assembly coverage tests and reached 100% coverage/build on provider hardening code (`unit-4l-coverage.txt`, `unit-4l-coverage-summary.json`, `unit-4l-build.txt`)
 - 2026-03-04 19:20 Unit 4m complete: executed live Anthropic setup-token CLI validation, captured tool-call/session evidence, and captured fail-fast + runtime re-auth guidance evidence (`unit-4m-manual-validation.txt`, `unit-4m-manual-validation.json`, `unit-4m-manual-validation.stderr.txt`)
+- 2026-03-04 19:30 Unit 5a complete: added red OpenAI Codex OAuth provider/config/prompt/identity contract tests with failing evidence artifacts (`unit-5a-red-run.txt`, `unit-5a-jest.json`, `unit-5a-red-run.exit`)
