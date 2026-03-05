@@ -24,8 +24,8 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [ ] OpenAI Codex OAuth flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
 - [ ] Provider selection is per-agent and config-driven (no global singleton lock-in).
 - [x] Provider-specific implementation logic is extracted from `src/heart/core.ts` into `src/heart/providers/*` modules before Unit 5 work, with behavior parity confirmed by tests.
-- [ ] CLI channel output keeps user-visible plain text separate from nerves logs (no raw NDJSON log events interleaved in stdout model responses).
-- [ ] Nerves logs remain machine-readable and persistent (append-only NDJSON) for multi-agent auditing and runtime validation.
+- [x] CLI channel output keeps user-visible plain text separate from nerves logs (no raw NDJSON log events interleaved in stdout model responses).
+- [x] Nerves logs remain machine-readable and persistent (append-only NDJSON) for multi-agent auditing and runtime validation.
 - [ ] Anthropic streamed tool calls assemble valid JSON arguments and execute reliably (no malformed concatenated argument payloads), backed by regression tests.
 - [x] Secrets/state boundary is enforced (`~/.agentsecrets` for secrets only; runtime/session/log/PII/test artifacts moved to `~/.agentstate`).
 - [x] `secrets.json` retains `providers` + `teams`; `context` is loaded from `agent.json`.
@@ -146,12 +146,12 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Coverage artifacts `unit-4f-coverage.txt` and `unit-4f-coverage-summary.json`.
 **Acceptance**: New provider-module code is at 100% coverage, related tests remain green, and coverage artifacts are saved.
 
-### ⬜ Unit 4g: CLI user-output vs nerves-log separation pre-Unit-5 pass — Tests
+### ✅ Unit 4g: CLI user-output vs nerves-log separation pre-Unit-5 pass — Tests
 **What**: Add failing channel-separation tests in `src/__tests__/senses/cli.test.ts`, `src/__tests__/senses/cli-ux.test.ts`, and `src/__tests__/nerves/sinks.test.ts`: user-facing model text on stdout only; structured nerves logs routed to operator sinks (stderr and append-only NDJSON files) and never interleaved into user transcript text.
 **Output**: Failing channel-separation tests plus artifact logs `unit-4g-red-run.txt` and `unit-4g-jest.json`.
 **Acceptance**: Tests fail red against current interleaving behavior and logs are saved under the task artifacts directory.
 
-### ⬜ Unit 4h: CLI user-output vs nerves-log separation pre-Unit-5 pass — Implementation
+### ✅ Unit 4h: CLI user-output vs nerves-log separation pre-Unit-5 pass — Implementation
 **What**: Implement sink separation in `src/senses/cli.ts`, `src/nerves/index.ts`, and any required logger wiring so CLI output stays user-facing while nerves logs are emitted to operator-native sinks, including append-only NDJSON persistence under `~/.agentstate/<agent>/logs`.
 **Output**: CLI/logging sink updates plus artifact logs `unit-4h-green-run.txt` and `unit-4h-jest.json`.
 **Acceptance**: Channel-separation tests pass green, CLI user text no longer contains structured log lines, and artifacts are saved under the task artifacts directory.
@@ -258,3 +258,5 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 18:44 Unit 4d complete: added failing provider-module boundary tests in `core.test.ts`/`streaming.test.ts` with red artifacts (`unit-4d-red-run.txt`, `unit-4d-red-jest.json`, `unit-4d-red-run.exit`)
 - 2026-03-04 18:50 Unit 4e complete: extracted Azure/Anthropic/MiniMax runtimes into `src/heart/providers/*` with green targeted tests and clean build (`unit-4e-green-run.txt`, `unit-4e-jest.json`, `unit-4e-build.txt`)
 - 2026-03-04 18:52 Unit 4f complete: reached 100% coverage on `src/heart/providers/*` and kept build green (`unit-4f-coverage.txt`, `unit-4f-coverage-summary.json`, `unit-4f-build.txt`)
+- 2026-03-04 18:55 Unit 4g complete: added failing CLI logging-separation contract test requiring NDJSON runtime logger wiring (`unit-4g-red-run.txt`, `unit-4g-jest.json`, `unit-4g-red-run.exit`)
+- 2026-03-04 18:57 Unit 4h complete: configured CLI runtime nerves logger to append-only NDJSON sink and kept CLI suites/build green (`unit-4h-green-run.txt`, `unit-4h-jest.json`, `unit-4h-senses-regression.txt`, `unit-4h-build.txt`)
