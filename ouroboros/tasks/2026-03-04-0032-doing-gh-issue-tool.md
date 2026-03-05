@@ -85,7 +85,7 @@ Allow agents using the ouroboros harness to create GitHub issues via the GitHub 
 **Output**: Working `src/repertoire/github-client.ts`
 **Acceptance**: All Unit 1a tests PASS (green), no warnings
 
-### ⬜Unit 1c: GitHub API Client -- Coverage & Refactor
+### ✅Unit 1c: GitHub API Client -- Coverage & Refactor
 **What**: Verify 100% branch coverage on `github-client.ts`. All paths should already be covered by 1a tests. Refactor if needed.
 **Output**: 100% coverage confirmed, clean code
 **Acceptance**: `npm test` passes, coverage report shows 100% on new lines, no warnings
@@ -231,3 +231,5 @@ Note: These tests may need to be integration-style or verify behavior through mo
 - 2026-03-04 09:33 Pass 4 -- Quality: fixed unit header markers from [N] to emoji format. All units have acceptance criteria, no TBDs, completion criteria testable, coverage requirements present. Status updated to READY_FOR_EXECUTION.
 - 2026-03-04 21:52 Unit 0 complete: added githubToken to ToolContext and githubConnectionName to OAuthConfig. Types compile, all 1330 tests pass.
 - 2026-03-04 21:53 Unit 1a complete: 14 failing tests for github-client.ts (module not found, as expected).
+- 2026-03-04 21:54 Unit 1b complete: github-client.ts implemented, all 13 tests pass.
+- 2026-03-04 21:54 Unit 1c complete: 100% coverage on github-client.ts confirmed. 1343 total tests pass.
