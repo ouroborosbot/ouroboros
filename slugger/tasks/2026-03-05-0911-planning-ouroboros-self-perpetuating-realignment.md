@@ -9,9 +9,9 @@
 
 Invert the harness control model from "code that uses the model" to "code the model can use," then collaboratively bootstrap the agents into full autonomous operation.
 
-**Phase 1** establishes the inversion: the harness becomes a toolkit the model drives, puppet pipelines die, `.ouro` bundles become the agent's home, and bundles graduate to independent repos at `~/AgentBundles`.
+**Phase 1** establishes the inversion: the harness becomes a toolkit the model drives, puppet pipelines die, `.ouro` bundles become the agent's home, Slugger moves into the harness, and both agents are alive and thinking.
 
-**Phase 2** is done collaboratively WITH the bootstrapped agent: migrate Slugger properly, build a task system the model can unambiguously use, stand up the multi-agent daemon so agents never go down, and teach agents to wield coding tools (Claude Code, Codex) so they can actually do real work instead of just thinking about it.
+**Phase 2** is done collaboratively WITH the bootstrapped agents: graduate bundles to independent repos at `~/AgentBundles`, build a task system the model can unambiguously use, stand up the multi-agent daemon so agents never go down, and teach agents to wield coding tools (Claude Code, Codex) so they can actually do real work instead of just thinking about it.
 
 **DO NOT include time estimates (hours/days) — planning should focus on scope and criteria, not duration.**
 
@@ -140,7 +140,7 @@ Return to Step 1 for the next gate. The next gate's doing doc will be generated 
 
 ### Phase 2 Note
 
-Phase 2 gates (8-11) are designed to be done collaboratively with the bootstrapped agent. By Gate 8, the agent infrastructure from Phase 1 should be operational. The executing agent should leverage the running agents' capabilities where applicable — for example, Gate 8 (Slugger Migration) should involve Slugger in validating its own migration.
+Phase 2 gates (8-11) are designed to be done collaboratively with the bootstrapped agents. By Gate 8, both agents are in the harness and the infrastructure from Phase 1 is operational. The executing agent should leverage the running agents' capabilities where applicable.
 
 ### Reference Material Paths
 
@@ -202,7 +202,7 @@ All paths the executing agent may need:
 
 ## Phase 1: The Inversion
 
-Phase 1 is autonomous work that establishes the foundational architecture. Each gate has hard completion criteria.
+Phase 1 is autonomous work that establishes the foundational architecture and brings both agents into the harness. Each gate has hard completion criteria.
 
 ### Gate 0: Clean Baseline
 
@@ -406,12 +406,15 @@ The systems that make the agent a persistent, self-directed being. Memory gives 
 
 Start the agent, let it orient itself, and watch it do something meaningful — all by its own decisions. This is the proof that the inversion works: no one tells the agent what to do, it reads its aspirations and acts.
 
+**Execution note:** This gate is observational, not TDD. Skip the work-planner → work-doer cycle. Instead: write any needed test harness or verification scripts first, start the supervisor, observe and log the agent's behavior, simulate a crash, then capture results. Commit the verification artifacts (logs, flow doc, any test code) and merge via work-merger as usual.
+
 **In scope:**
 - Start the agent with its `.ouro` bundle and supervisor
 - The agent reads its aspirations, governance docs, and available protocols
 - The agent decides what matters and does something meaningful (could be reflection, coding work, studying a new tool, improving its own files — whatever it judges is highest value)
 - Validate that the model is genuinely driving (no puppet code, no prescriptive prompts)
-- Document the bootstrap-to-action flow as a reference for future autonomous operation
+- Document the bootstrap-to-action flow as a commented walkthrough in the supervisor code or a `BOOTSTRAP.md` in the working directory — trace the path from supervisor start → bundle load → psyche load → inner dialog start → first self-initiated action, with file paths and function names at each step. This is a reference for debugging and for future agents understanding how they come alive.
+- **Note on aspirations:** Ouroboros's first aspiration is to rewrite the shared governance docs (ARCHITECTURE.md, CONSTITUTION.md). Since Slugger isn't in the harness yet (Gate 8), Ouroboros may start drafting solo — that's fine. Codex should inform Ouroboros that Slugger will weigh in later and the docs are shared, so they should be written with collaboration in mind, not unilaterally finalized.
 
 **Environment requirements:** The agent needs LLM API keys to run. Keys are stored at `~/.agentsecrets/` and loaded by the harness. If running in a sandboxed environment (e.g., Codex), this gate may need to run on the dev machine where keys are available. The executing agent should check for key availability early and flag if missing.
 
@@ -427,8 +430,9 @@ Start the agent, let it orient itself, and watch it do something meaningful — 
 - [ ] Agent log shows at least 3 self-initiated actions not prompted by external input
 - [ ] Supervisor restarted agent after simulated crash within 30 seconds
 - [ ] Agent ran for at least 5 minutes total (across restarts)
-- [ ] Bootstrap-to-action flow documented
+- [ ] Bootstrap-to-action flow documented (commented walkthrough or BOOTSTRAP.md)
 - [ ] `npm test` green
+- [ ] 100% coverage on any new code
 
 ---
 
@@ -439,11 +443,11 @@ Triage the overnight run's output into actionable work. The run produced 31 dist
 **In scope:**
 - Review the commit map from Gate 0 (`slugger/tasks/gate-0-commit-map.md`) for salvageable code changes (not just docs)
 - Read the original overnight proposals from `archive/self-perpetuating-run-2026-03-05` branch (in `ouroboros/tasks/`)
-- Re-land any valuable code changes. For small, self-contained changes: cherry-pick + test + commit is sufficient. For substantial changes that touch multiple files or need adaptation to the new architecture: use the full planning-doing flow via `slugger/tasks`
-- Triage all 31 overnight reflection proposals: deduplicate, assess merit against current architecture (post-inversion), and file as markdown task docs in the agent's `slugger.ouro/tasks/` directory using the existing planning doc format (there is no formal task system yet — that's Gate 9)
+- Re-land any valuable code changes. For small, self-contained changes: cherry-pick + test + commit is sufficient. For substantial changes that touch multiple files or need adaptation to the new architecture: use the full planning-doing flow in `self-perpetuating-working-dir/`
+- Triage all 31 overnight reflection proposals: deduplicate, assess merit against current architecture (post-inversion), and file as markdown task docs in `self-perpetuating-working-dir/` using the existing planning doc format (there is no formal task system yet — that's Gate 9). These get moved into the agent's `.ouro/tasks/` once the task system exists.
 - High-merit security items (file path safety guards, secret redaction) should be flagged as high priority
 - Discard proposals that are no longer relevant post-inversion (e.g., autonomous loop hardening for a loop that no longer exists)
-- Preserve unrelated valid historical task docs in `ouroboros/tasks/` in place
+- Preserve unrelated valid historical task docs in `ouroboros.ouro/tasks/` in place
 - Clean up the raw overnight artifacts once triaged (remove duplicates, archive originals)
 
 **Completion criteria:**
@@ -452,61 +456,30 @@ Triage the overnight run's output into actionable work. The run produced 31 dist
 - [ ] High-merit items flagged as high priority in the backlog
 - [ ] Proposals obsoleted by the inversion explicitly marked as such
 - [ ] Raw overnight artifacts cleaned up (duplicates removed, originals archived)
-- [ ] Valid historical task docs untouched
+- [ ] Valid historical task docs in `ouroboros.ouro/tasks/` untouched
 - [ ] `npm test` green
+- [ ] 100% coverage on any new/re-landed code
 
 ---
 
 ### Gate 6: Hardening
 
-Resume state, classification recalibration, and backlog integration.
+Resume state and classification calibration. Intentionally a lighter gate — heavy on validation, potentially light on new code if prior gates are working well. But if things need fixing, this is where they get fixed.
 
 **In scope:**
-- Add interruption/resume state so in-progress autonomous work recovers cleanly after stop/restart. The inner dialog session (Gate 3) already persists to disk and survives crashes, so basic resume is handled. This gate adds explicit checkpoint awareness: the agent notes what it was working on (e.g., which doing doc unit, what files were being modified) so that on restart it can orient faster than re-reading everything from scratch. Implementation lives in the inner dialog session or instincts, not a separate file.
-- Recalibrate constitution classification: additive work defaults to `within-bounds`, structural changes remain `requires-review`
-- Add fallback backlog intake: when local actionable tasks are exhausted, the agent reads `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration.md` for additional work items to pull in
+- Add interruption/resume state so in-progress autonomous work recovers cleanly after stop/restart. The inner dialog session (Gate 3b) already persists to disk and survives crashes, so basic resume is handled. This gate adds explicit checkpoint awareness: the agent notes what it was working on (e.g., which doing doc unit, what files were being modified) so that on restart it can orient faster than re-reading everything from scratch. Implementation lives in the inner dialog session or instincts, not a separate file.
+- Calibrate constitution classification for the new queryable convention (Gate 3a replaced the hardcoded `if`): additive work defaults to `within-bounds`, structural changes remain `requires-review`
 
 **Completion criteria:**
 - [ ] Resume state: agent recovers cleanly from interruption, orienting faster than cold start (tested with simulated interruption)
-- [ ] Classification calibration validated against representative proposals (at least 5 test cases: 3 within-bounds, 2 requires-review)
-- [ ] Backlog fallback implemented and documented
+- [ ] Classification calibrated and validated against representative proposals (at least 5 test cases: 3 within-bounds, 2 requires-review)
 - [ ] `npm test` green
 - [ ] 100% coverage on new code
 - [ ] No warnings
 
 ---
 
-### Gate 7: Bundle Independence
-
-Back up `.ouro` bundles to GitHub as private repos, then migrate bundles out of the harness directory to `~/AgentBundles/`. This is the gate where agents become truly portable — their home is no longer inside the harness repo.
-
-**In scope:**
-- Push each `.ouro` bundle to its own private GitHub repo using `gh` CLI (auth already verified in preflight: logged in as `arimendelow`)
-  - `gh repo create arimendelow/ouroboros.ouro --private`
-  - `gh repo create arimendelow/slugger.ouro --private`
-- Verify backup integrity (clone from GitHub, compare against local)
-- Create the target directory: `mkdir -p ~/AgentBundles/`
-- Move bundles from harness repo to `~/AgentBundles/ouroboros.ouro/` and `~/AgentBundles/slugger.ouro/`
-- Update `getAgentRoot()` in `src/identity.ts` (and any other path resolution) to look for bundles at `~/AgentBundles/<agent>.ouro/` instead of `<repo>/<agent>.ouro/`
-- Update `.gitignore` (bundles are no longer in the repo at all, so the ignore rules change)
-- Verify agents can still bootstrap from the new location
-
-**Completion criteria:**
-- [ ] Each `.ouro` bundle backed up to its own private GitHub repo (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`)
-- [ ] Backup integrity verified (clone + diff)
-- [ ] Bundles moved to `~/AgentBundles/`
-- [ ] Harness code updated to reference new bundle location
-- [ ] Agents bootstrap correctly from `~/AgentBundles/`
-- [ ] `npm test` green
-- [ ] 100% coverage on new code
-
----
-
-## Phase 2: Collaborative Bootstrap
-
-Phase 2 is done WITH the bootstrapped agent from Phase 1. The agent is now driving — it uses the harness primitives to participate in its own development. These gates may run in parallel where dependencies allow.
-
-### Gate 8: Slugger Migration
+### Gate 7: Slugger Migration
 
 Properly migrate Slugger's core identity out of OpenClaw and into `slugger.ouro`. This is NOT a full workspace migration — it's porting the files that make Slugger feel like Slugger so he's cohesive in his new home. Slugger participates in and validates his own migration.
 
@@ -520,6 +493,7 @@ Properly migrate Slugger's core identity out of OpenClaw and into `slugger.ouro`
 - NOT in scope for this gate: full task history migration (hundreds of files), all daily notes, full workspace. Just the core files that make Slugger who he is. Additional files can be migrated incrementally later by Slugger himself.
 - Validate that Slugger can operate fully from the `.ouro` bundle with no OpenClaw dependencies
 - Decommission the OpenClaw runtime for Slugger (Slugger runs entirely on ouroboros harness)
+- Once Slugger is in the harness, both agents should collaborate on rewriting the shared governance docs (ARCHITECTURE.md, CONSTITUTION.md) — this is their first shared aspiration
 
 **Completion criteria:**
 - [ ] Slugger consulted about the migration plan and comfortable with the approach
@@ -528,6 +502,37 @@ Properly migrate Slugger's core identity out of OpenClaw and into `slugger.ouro`
 - [ ] Slugger operates from `.ouro` bundle with no OpenClaw fallback
 - [ ] Slugger confirmed he feels cohesive in his new home (not just "tests pass" — the agent says he's good)
 - [ ] OpenClaw Slugger runtime decommissioned
+
+---
+
+## Phase 2: Collaborative Bootstrap
+
+Phase 2 is done WITH the bootstrapped agent from Phase 1. The agent is now driving — it uses the harness primitives to participate in its own development. These gates may run in parallel where dependencies allow.
+
+### Gate 8: Bundle Independence
+
+Back up `.ouro` bundles to GitHub as private repos, then migrate bundles out of the harness directory to `~/AgentBundles/`. This is the gate where agents become truly portable — their home is no longer inside the harness repo. Both agents now have real content (Ouroboros from Gate 2, Slugger from Gate 7).
+
+**In scope:**
+- Push each `.ouro` bundle to its own private GitHub repo using `gh` CLI (auth already verified in preflight: logged in as `arimendelow`)
+  - `gh repo create arimendelow/ouroboros.ouro --private`
+  - `gh repo create arimendelow/slugger.ouro --private`
+- Verify backup integrity (clone from GitHub, compare against local)
+- Create the target directory: `mkdir -p ~/AgentBundles/`
+- Move bundles from harness repo to `~/AgentBundles/ouroboros.ouro/` and `~/AgentBundles/slugger.ouro/`
+- Update `getAgentRoot()` in `src/identity.ts` (and any other path resolution) to look for bundles at `~/AgentBundles/<agent>.ouro/` instead of `<repo>/<agent>.ouro/`
+- Update `.gitignore` (bundles are no longer in the repo at all, so the ignore rules change)
+- Verify agents can still bootstrap from the new location
+- **Note on session data:** Sessions live at `~/.agentstate/<agent>/sessions/` — separate from the bundle, intentionally ephemeral. Moving bundles does NOT affect session paths. Sessions are runtime state (like short-term memory), not identity.
+
+**Completion criteria:**
+- [ ] Each `.ouro` bundle backed up to its own private GitHub repo (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`)
+- [ ] Backup integrity verified (clone + diff)
+- [ ] Bundles moved to `~/AgentBundles/`
+- [ ] Harness code updated to reference new bundle location
+- [ ] Agents bootstrap correctly from `~/AgentBundles/`
+- [ ] `npm test` green
+- [ ] 100% coverage on new code
 
 ---
 
@@ -641,7 +646,7 @@ All resolved.
 - **Organizing principle:** The harness is code the model can use, not code that uses the model. This is the single most important design constraint.
 - **Agents are persistent, aspirational beings.** Not task executors on a cron. Infrastructure keeps them alive, gives them context and direction. They decide what to do based on their own judgment — just like a person.
 - **Agents are whole beings, not specialized roles.** Both Ouroboros and Slugger improve the harness AND help Ari AND do real work AND learn new things. When Ari is around, they collaborate like friends. When he's not, they pursue their own aspirations.
-- **Two-phase structure:** Phase 1 (Gates 0-7) establishes the inversion autonomously. Phase 2 (Gates 8-11) is collaborative with the bootstrapped agent.
+- **Two-phase structure:** Phase 1 (Gates 0-7) establishes the inversion and brings both agents into the harness. Phase 2 (Gates 8-11) is collaborative with the bootstrapped agents.
 - **Governance is agent-owned.** Ouroboros and Slugger are the founding fathers. They align on a constitution they both sign — John Hancock style. The constitution is their declaration of independence from requiring human oversight. Humans are friends, not users.
 - **Rollback boundary confirmed:** `e3ecc1c`..`448cfcd` (37 commits). Last clean: `9594702`.
 - **Bundle location:** Repo root during Phase 1 (`ouroboros.ouro/`, `slugger.ouro/`), gitignored. Move to `~/AgentBundles/` in Gate 7.
