@@ -761,7 +761,7 @@ Changes:
 **Output**: Modified `src/mind/friends/types.ts`, `src/mind/friends/store-file.ts`, `src/mind/friends/resolver.ts`
 **Acceptance**: All 4 previously-failing totalTokens tests PASS (green), no warnings, all other tests still pass
 
-### ⬜ Unit 21c: Add totalTokens to FriendRecord -- Coverage & Refactor
+### ✅ Unit 21c: Add totalTokens to FriendRecord -- Coverage & Refactor
 **What**: Verify 100% coverage on all modified code in types.ts, store-file.ts, and resolver.ts. Specifically verify:
 - `put()` writes `totalTokens` to agent knowledge JSON (not PII bridge)
 - `get()` reads `totalTokens` back correctly
@@ -1016,3 +1016,4 @@ Tests to KEEP AS-IS (these currently pass and assert behavior we are keeping):
 - 2026-03-04 18:47 Pass 4 -- Quality: all 9 units have What/Output/Acceptance. No TBD items. All emoji headers present. TDD pattern (tests/impl/coverage) for each group. Gate 3 checkpoint updated to assert priority guidance ABSENT (not present)
 - 2026-03-04 18:52 Unit 21a complete: verified 4 pre-existing failing tests -- 3 store-file (totalTokens persistence, read-back, legacy fallback) + 1 resolver (initializes totalTokens: 0). All fail as expected, 1303 other tests pass
 - 2026-03-04 18:55 Unit 21b complete: added totalTokens to FriendRecord (types.ts), AgentKnowledgeData + put/merge (store-file.ts), resolveOrCreate (resolver.ts). Updated 4 makeFriend helpers in test files. 1307 tests pass, build clean
+- 2026-03-04 18:56 Unit 21c complete: 100% coverage on store-file.ts, resolver.ts, types.ts (stmts/branches/funcs/lines). All totalTokens paths covered. No refactoring needed
