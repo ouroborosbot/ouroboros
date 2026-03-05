@@ -49,6 +49,20 @@ function main() {
   writeJson(activePath, info)
   writeJson(latestPath, info)
 
+  const lintExit = runNpm(["run", "lint"]).status ?? 1
+  if (lintExit !== 0) {
+    const summary = {
+      overall_status: "fail",
+      lint: { status: "fail" },
+      code_coverage: { status: "skip" },
+      nerves_coverage: { status: "skip" },
+      required_actions: [{ type: "lint", target: "eslint", reason: "npm run lint failed" }],
+    }
+    writeJson(summaryPath, summary)
+    console.log(`coverage gate: fail (${summaryPath})`)
+    process.exit(1)
+  }
+
   const vitestExit = runNpm(["run", "test:coverage:vitest"]).status ?? 1
 
   if (existsSync(activePath)) {
@@ -99,6 +113,7 @@ function main() {
 
   const summary = {
     overall_status: overallStatus,
+    lint: { status: "pass" },
     code_coverage: {
       status: codeCoverageStatus,
     },
