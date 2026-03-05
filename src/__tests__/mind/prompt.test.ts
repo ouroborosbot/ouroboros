@@ -54,7 +54,7 @@ const MOCK_IDENTITY = "i am Ouroboros.\ni use lowercase in my responses to the u
 const MOCK_LORE = "i am named after the ouroboros -- the ancient symbol of a serpent eating its own tail."
 const MOCK_FRIENDS = "my creator works at microsoft and talks to me through the CLI and Teams."
 
-function setAgentProvider(provider: "azure" | "minimax" | "anthropic") {
+function setAgentProvider(provider: "azure" | "minimax" | "anthropic" | "openai-codex") {
   vi.mocked(identity.loadAgentConfig).mockReturnValue({
     name: "testagent",
     configPath: "~/.agentsecrets/testagent/secrets.json",
@@ -276,6 +276,32 @@ describe("buildSystem", () => {
       resetPsycheCache()
       const result = await buildSystem()
       expect(result).toContain("anthropic (claude-opus-4-6)")
+    } finally {
+      mockExit.mockRestore()
+    }
+  })
+
+  it("includes openai codex provider string when OpenAI Codex OAuth is configured", async () => {
+    setAgentProvider("openai-codex")
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.3-codex",
+          oauthAccessToken: "oauth-token-for-tests",
+        },
+      },
+    } as any)
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    try {
+      const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+      resetPsycheCache()
+      const result = await buildSystem()
+      expect(result).toContain("openai codex (gpt-5.3-codex)")
     } finally {
       mockExit.mockRestore()
     }

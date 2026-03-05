@@ -118,6 +118,10 @@ describe("loadConfig", () => {
           model: "claude-opus-4-6",
           setupToken: "",
         },
+        "openai-codex": {
+          model: "gpt-5.3-codex",
+          oauthAccessToken: "",
+        },
       },
     })
     expect(parsed).not.toHaveProperty("teams")
@@ -332,6 +336,31 @@ describe("getMinimaxConfig", () => {
     expect(mm.model).toBe("mm-model")
   })
 
+})
+
+describe("getOpenAICodexConfig", () => {
+  beforeEach(async () => {
+    vi.resetModules()
+  })
+
+  it("exports openai-codex config getter and returns oauth config from secrets.json", async () => {
+    const configData = {
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.3-codex",
+          oauthAccessToken: "oauth-token-123",
+        },
+      },
+    }
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(configData))
+
+    const config = await import("../config")
+    expect(typeof (config as any).getOpenAICodexConfig).toBe("function")
+    const codex = (config as any).getOpenAICodexConfig()
+
+    expect(codex.model).toBe("gpt-5.3-codex")
+    expect(codex.oauthAccessToken).toBe("oauth-token-123")
+  })
 })
 
 describe("getTeamsConfig", () => {
