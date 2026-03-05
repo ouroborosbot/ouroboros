@@ -624,9 +624,9 @@ describe("contextSection", () => {
         channel: "teams" as const,
         availableIntegrations: ["ado" as const, "graph" as const],
         supportsMarkdown: true,
-        supportsStreaming: false,
+        supportsStreaming: true,
         supportsRichCards: true,
-        maxMessageLength: 4000,
+        maxMessageLength: Infinity,
       },
     }
     const result = contextSection(ctx)
@@ -651,16 +651,17 @@ describe("contextSection", () => {
         channel: "teams" as const,
         availableIntegrations: ["ado" as const, "graph" as const],
         supportsMarkdown: true,
-        supportsStreaming: false,
+        supportsStreaming: true,
         supportsRichCards: true,
-        maxMessageLength: 4000,
+        maxMessageLength: Infinity,
       },
     }
     const result = contextSection(ctx)
     expect(result).toContain("channel: teams")
     expect(result).toContain("markdown")
-    expect(result).toContain("no streaming")
-    expect(result).toContain("max 4000 chars")
+    expect(result).toContain("streaming")
+    expect(result).not.toContain("no streaming")
+    expect(result).not.toContain("max ")
   })
 
   it("renders CLI channel with streaming", async () => {
@@ -1090,9 +1091,9 @@ describe("buildSystem with context", () => {
         channel: "teams" as const,
         availableIntegrations: ["ado" as const, "graph" as const],
         supportsMarkdown: true,
-        supportsStreaming: false,
+        supportsStreaming: true,
         supportsRichCards: true,
-        maxMessageLength: 4000,
+        maxMessageLength: Infinity,
       },
     }
     const result = await buildSystem("teams", undefined, ctx)

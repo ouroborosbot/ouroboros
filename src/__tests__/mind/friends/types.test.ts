@@ -158,14 +158,14 @@ describe("ChannelCapabilities type", () => {
       channel: "teams",
       availableIntegrations: ["ado", "graph"],
       supportsMarkdown: true,
-      supportsStreaming: false,
+      supportsStreaming: true,
       supportsRichCards: true,
-      maxMessageLength: 4000,
+      maxMessageLength: Infinity,
     }
     expect(caps.channel).toBe("teams")
     expect(caps.availableIntegrations).toEqual(["ado", "graph"])
     expect(caps.supportsRichCards).toBe(true)
-    expect(caps.maxMessageLength).toBe(4000)
+    expect(caps.maxMessageLength).toBe(Infinity)
   })
 })
 
