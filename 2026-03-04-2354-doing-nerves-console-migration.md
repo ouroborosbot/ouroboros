@@ -146,7 +146,7 @@ Tests should FAIL initially.
 **What**: Verify 100% coverage on all new emitNervesEvent calls in teams.ts. Clean up any remaining console spy mocks in tests that are no longer needed.
 **Acceptance**: 100% coverage on new code, tests still green, no stale console spies.
 
-### ⬜ Unit 5a: contract.ts -- Tests
+### ✅ Unit 5a: contract.ts -- Tests
 **What**: Write a test that verifies all new events are present in `REQUIRED_EVENTS`. The test should import `getRequiredEventKeys()` and assert that the new event keys are included:
 - `channels:channel.verify_state`
 - `channels:channel.message_received`
@@ -163,12 +163,12 @@ Test should FAIL initially because contract.ts hasn't been updated yet.
 **Output**: Failing test for new required events.
 **Acceptance**: Test exists, runs, and FAILS (red).
 
-### ⬜ Unit 5b: contract.ts -- Implementation
+### ✅ Unit 5b: contract.ts -- Implementation
 **What**: Add 11 new entries to `REQUIRED_EVENTS` in `src/nerves/coverage/contract.ts`.
 **Output**: Updated contract with all new required events.
 **Acceptance**: Test from 5a passes (green).
 
-### ⬜ Unit 5c: contract.ts -- Coverage & Refactor
+### ✅ Unit 5c: contract.ts -- Coverage & Refactor
 **What**: Verify coverage. The contract is a data-only file so coverage is trivially 100%.
 **Acceptance**: Coverage passes, tests green.
 
