@@ -68,10 +68,14 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [ ] `FriendRecord` has `totalTokens: number` field (schema version stays 1)
 - [ ] Token accumulation: after each agent turn, `FriendRecord.totalTokens` is updated with `usage.total_tokens`
 - [ ] `FriendResolver` auto-populates a `"name"` note from `displayName` on first contact (when displayName is not "Unknown")
-- [ ] `isNewFriend` replaced with token threshold check (`totalTokens < ONBOARDING_TOKEN_THRESHOLD`)
-- [ ] Onboarding instructions only appear below threshold -- they drop from the system prompt once exceeded
-- [ ] Onboarding instruction text and threshold constant live in an auditable location (reviewed by user)
-- [ ] User confirms on both surfaces: bot helps first, introduces along the way, proactively calls `save_friend_note` when learning anything about the user without being asked
+- [ ] `isNewFriend` replaced with `isOnboarding = (friend.totalTokens ?? 0) < ONBOARDING_TOKEN_THRESHOLD` (100K tokens)
+- [ ] Always-on instructions (permanent in contextSection): memory ephemerality, working-memory trust, stale notes awareness, save aggressively
+- [ ] Priority guidance line removed entirely (overfitting)
+- [ ] Separate "name quality" line removed -- folded into "save anything" directive
+- [ ] Onboarding-only instructions in `src/mind/first-impressions.ts`: encourage conversation, inform capabilities, new-friend greeting
+- [ ] Onboarding instructions only appear below 100K token threshold -- they drop from the system prompt once exceeded
+- [ ] `ONBOARDING_TOKEN_THRESHOLD` exported from `first-impressions.ts` (easily changeable)
+- [ ] User confirms on both surfaces: bot proactively calls `save_friend_note` when learning anything about the user
 - [ ] User confirms onboarding instructions disappear after sufficient conversation
 
 ### All Gates
@@ -797,72 +801,93 @@ Changes:
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new/modified code, all tests green
 
-### ⬜ Unit 21g: Auto-populate name note + token-based onboarding -- Tests
-**What**: Write failing tests verifying:
+### ⬜ Unit 21g: Always-on instructions + onboarding split + auto-name -- Tests
+**What**: Write failing tests verifying the refined instruction architecture:
 
-1. **Auto-populate name note** (`src/__tests__/mind/friends/resolver.test.ts`): when `FriendResolver.resolveOrCreate()` creates a new friend with `displayName` != "Unknown", the initial `notes` record includes `{ name: displayName }`. When `displayName` is "Unknown", `notes` is empty `{}` (don't save "Unknown" as a name).
-2. **Token threshold check** (`src/__tests__/mind/prompt.test.ts`): `contextSection()` uses `totalTokens < ONBOARDING_TOKEN_THRESHOLD` instead of the notes-exist check. Specifically:
-   - Friend with `totalTokens: 0` and no notes -> onboarding instructions appear (new friend block)
-   - Friend with `totalTokens: 0` and has notes (e.g. auto-populated name) -> onboarding instructions still appear (below threshold)
-   - Friend with `totalTokens: THRESHOLD - 1` -> onboarding instructions still appear
-   - Friend with `totalTokens: THRESHOLD` -> onboarding instructions DO NOT appear
-   - Friend with `totalTokens: THRESHOLD + 1000` -> onboarding instructions DO NOT appear
-3. **Onboarding content** (`src/__tests__/mind/prompt.test.ts`): the onboarding block includes memory instructions ("my conversation memory is ephemeral"), name-quality instruction, and working-memory trust instruction ONLY when below threshold. Above threshold, these instructions are absent.
-4. **Non-onboarding instructions persist** (`src/__tests__/mind/prompt.test.ts`): priority guidance ("my friend's request comes first") and friend notes rendering ("what i know about this friend") are NOT gated by the threshold -- they always appear regardless of totalTokens.
+**Always-on instructions** stay in `contextSection()` in `prompt.ts` (permanent, never gated):
 
-**Output**: New test cases
-**Acceptance**: Tests exist and FAIL (red) because `isNewFriend` still uses notes-exist check and no threshold constant exists
+1. **Memory ephemerality** (`src/__tests__/mind/prompt.test.ts`): contextSection always contains "save anything you learn, memory resets between sessions" or equivalent -- THE most important directive. Verified for both onboarding AND post-onboarding friends.
+2. **Working-memory trust** (`src/__tests__/mind/prompt.test.ts`): contextSection always contains "conversation is source of truth, notes may be stale" -- verified at all token levels.
+3. **Stale notes awareness** (`src/__tests__/mind/prompt.test.ts`): contextSection always contains "check and update stale notes when learning something new" -- verified at all token levels.
+4. **Save aggressively** (`src/__tests__/mind/prompt.test.ts`): contextSection always contains "save ANYTHING learned about the friend immediately with save_friend_note" -- verified at all token levels. This replaces the old separate "name quality" line -- name saving is folded into the broader "save anything" directive.
+5. **Friend notes rendering** (`src/__tests__/mind/prompt.test.ts`): "what i know about this friend" section always appears when notes exist -- not gated by threshold.
 
-### ⬜ Unit 21h: Auto-populate name note + token-based onboarding -- Implementation
-**What**: Two changes:
+**Removed instructions** (verify absent):
 
-1. **Auto-populate name in resolver** (`src/mind/friends/resolver.ts`): in `resolveOrCreate()`, when creating a new friend, if `this.params.displayName !== "Unknown"`, set `notes: { name: this.params.displayName }` instead of `notes: {}`.
+6. **No priority guidance line** (`src/__tests__/mind/prompt.test.ts`): "my friend's request comes first" line is REMOVED entirely -- it was overfitting, solving a problem that doesn't exist. Verify it does NOT appear in contextSection output.
 
-2. **Token-based onboarding in prompt** (`src/mind/prompt.ts`):
-   - Export a constant `ONBOARDING_TOKEN_THRESHOLD = 50_000` (default -- user reviews exact value in Unit 21j; ~5-10 conversations worth of tokens)
-   - Replace the `isNewFriend` calculation at line 156:
-     ```
-     // OLD: const isNewFriend = !hasNotes && !hasPrefs
-     // NEW:
-     const isOnboarding = (friend.totalTokens ?? 0) < ONBOARDING_TOKEN_THRESHOLD
-     ```
-   - Gate the following instructions behind `isOnboarding` (they only appear below threshold):
-     - Name quality instruction (line 163: "when i learn a name...")
-     - Memory ephemerality instruction (line 166: "my conversation memory is ephemeral...")
-     - Working-memory trust instruction (line 169: "the conversation is my source of truth...")
-     - Stale notes awareness instruction (line 172: "when i learn something that might invalidate...")
-     - The new-friend block (lines 175-180: displayName-specific text for Unknown vs known)
-   - Keep these instructions OUTSIDE the gate (always appear):
-     - Priority guidance (line 160: "my friend's request comes first...")
-     - Friend notes rendering (lines 184-190: "what i know about this friend")
+**Onboarding-only instructions** live in `src/mind/first-impressions.ts` (below threshold only):
 
-   NOTE: The exact boundary between "onboarding" and "permanent" instructions is debatable. Memory ephemerality, working-memory trust, and stale notes awareness are operational instructions that could be useful for established friends too. Unit 21j is the discussion checkpoint where user decides the exact boundary. Initial implementation gates all five instruction blocks behind the threshold; user can promote any to permanent in 21j.
+7. **`getFirstImpressions()` below threshold** (`src/__tests__/mind/first-impressions.test.ts`): returns non-empty string when `totalTokens < ONBOARDING_TOKEN_THRESHOLD` (100,000). Content includes: encourage conversation to learn about the friend, inform about agent capabilities, new-friend greeting behavior.
+8. **`getFirstImpressions()` at/above threshold** (`src/__tests__/mind/first-impressions.test.ts`): returns empty string when `totalTokens >= ONBOARDING_TOKEN_THRESHOLD`.
+9. **Threshold constant** (`src/__tests__/mind/first-impressions.test.ts`): `ONBOARDING_TOKEN_THRESHOLD` is exported and equals `100_000`.
+10. **`isOnboarding` helper** (`src/__tests__/mind/first-impressions.test.ts`): `isOnboarding(friend)` returns true when `(friend.totalTokens ?? 0) < ONBOARDING_TOKEN_THRESHOLD`, false otherwise.
+11. **Token boundary tests**: `totalTokens: 0` -> onboarding, `totalTokens: 99_999` -> onboarding, `totalTokens: 100_000` -> NOT onboarding, `totalTokens: undefined` -> onboarding (treated as 0).
 
-   The onboarding block drops from the system prompt once `totalTokens >= ONBOARDING_TOKEN_THRESHOLD`, reducing prompt size for established friends.
+**Auto-populate name note** (in resolver):
 
-**Output**: Modified `src/mind/friends/resolver.ts`, `src/mind/prompt.ts`
+12. **Name auto-population** (`src/__tests__/mind/friends/resolver.test.ts`): when `FriendResolver.resolveOrCreate()` creates a new friend with `displayName` != "Unknown", the initial `notes` record includes `{ name: displayName }`. When `displayName` is "Unknown", `notes` is empty `{}`.
+
+**Integration** (prompt.ts calls first-impressions):
+
+13. **`contextSection()` includes onboarding** (`src/__tests__/mind/prompt.test.ts`): when friend is below threshold, `contextSection()` output includes the first-impressions text. When above threshold, it does not.
+
+**Output**: New test cases in `src/__tests__/mind/prompt.test.ts`, `src/__tests__/mind/first-impressions.test.ts`, `src/__tests__/mind/friends/resolver.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because: `first-impressions.ts` doesn't exist, `isNewFriend` still uses notes-exist check, priority guidance line still present, always-on instructions not yet reworded, name auto-population not implemented
+
+### ⬜ Unit 21h: Always-on instructions + onboarding split + auto-name -- Implementation
+**What**: Three sets of changes implementing the refined instruction architecture:
+
+1. **Rewrite always-on instructions in `contextSection()`** (`src/mind/prompt.ts`):
+   - REMOVE the priority guidance line ("my friend's request comes first...") -- overfitting, solving a problem that doesn't exist
+   - REMOVE the separate "name quality" line -- folded into the broader "save anything" directive
+   - REWRITE/KEEP these four always-on directives (permanent, in contextSection, never gated):
+     a. **Memory ephemerality** (THE #1 most important): "save anything you learn, memory resets between sessions" -- without this, everything is broken
+     b. **Working-memory trust**: "conversation is source of truth, notes may be stale"
+     c. **Stale notes awareness**: "check and update stale notes when learning something new"
+     d. **Save aggressively**: "save ANYTHING learned about the friend immediately with save_friend_note" -- expanded from just name saving
+   - REMOVE `isNewFriend` logic and the associated if-block (lines 175-181) -- replaced by onboarding module
+   - ADD `isOnboarding` check using imported `isOnboarding()` helper
+   - When `isOnboarding(friend)` is true, append the result of `getFirstImpressions(friend)` to the context section
+   - KEEP friend notes rendering ("what i know about this friend") -- always appears, not gated
+
+2. **Create `src/mind/first-impressions.ts`** (new file):
+   - Export `ONBOARDING_TOKEN_THRESHOLD = 100_000` (100K tokens cumulative -- easily changeable constant)
+   - Export `isOnboarding(friend: FriendRecord): boolean` -- returns `(friend.totalTokens ?? 0) < ONBOARDING_TOKEN_THRESHOLD`
+   - Export `getFirstImpressions(friend: FriendRecord): string` -- returns onboarding instruction text when below threshold, empty string when at/above
+   - Onboarding content (only appears below threshold):
+     a. Encourage conversation to learn about the friend -- preferences, what they do, etc.
+     b. Inform the friend about what the agent is capable of
+     c. New-friend greeting/getting-to-know-you behavior (with displayName interpolation for "Unknown" vs known)
+
+3. **Auto-populate name in resolver** (`src/mind/friends/resolver.ts`):
+   - In `resolveOrCreate()`, when creating a new friend, if `this.params.displayName !== "Unknown"`, set `notes: { name: this.params.displayName }` instead of `notes: {}`
+
+**Output**: Modified `src/mind/prompt.ts`, new `src/mind/first-impressions.ts`, modified `src/mind/friends/resolver.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 21i: Auto-populate name note + token-based onboarding -- Coverage & Refactor
-**What**: Verify 100% coverage on all modified code:
-1. Resolver: name auto-populated when displayName != "Unknown", empty notes when "Unknown"
-2. Prompt: onboarding instructions appear below threshold, absent above threshold
-3. Prompt: priority guidance and notes rendering always appear
-4. Prompt: threshold boundary (exact threshold value = no onboarding)
-5. Prompt: `totalTokens` undefined/missing treated as 0 (backward compat via `?? 0`)
+### ⬜ Unit 21i: Always-on instructions + onboarding split + auto-name -- Coverage & Refactor
+**What**: Verify 100% coverage on all modified/new code:
+1. `first-impressions.ts`: `isOnboarding` true/false, `getFirstImpressions` below/at/above threshold, `ONBOARDING_TOKEN_THRESHOLD` export, displayName "Unknown" vs known in onboarding text, `totalTokens` undefined treated as 0
+2. `prompt.ts` contextSection: always-on instructions present at all token levels, no priority guidance line, no name quality line, onboarding text appears below threshold, absent above threshold, friend notes rendering always present
+3. `resolver.ts`: name auto-populated when displayName != "Unknown", empty notes when "Unknown"
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new/modified code, all tests green
 
-### ⬜ Unit 21j: Onboarding instruction content review (DISCUSSION)
-**What**: Review with user: the exact onboarding instruction text and the threshold constant value. Items to discuss:
-1. **Threshold value**: `ONBOARDING_TOKEN_THRESHOLD` -- what's the right number? 50000 tokens is ~5-10 conversations. Too low and onboarding drops too fast; too high and it bloats prompts for too long.
-2. **Which instructions are onboarding-only vs permanent**: The current plan gates memory/name/stale-notes/working-memory instructions behind the threshold. User may want some of these to be permanent.
-3. **Placement**: The threshold constant and onboarding text live in `src/mind/prompt.ts` (alongside `contextSection()`). Is this auditable enough, or should the onboarding text be in a separate file (e.g. `src/mind/onboarding.ts` or a psyche file)?
-4. **New-friend text**: The "this is a new friend" block currently fires on notes-exist. After this change it fires on totalTokens. Should there be a distinct "first conversation" message (totalTokens === 0) vs "still getting to know you" (0 < totalTokens < threshold)?
+### ✅ Unit 21j: Onboarding instruction content review (DISCUSSION -- pre-execution)
+**What**: Discussion checkpoint completed BEFORE execution began. User refined the requirements with these decisions:
 
-This unit is a discussion checkpoint -- no code changes. Implementation of any decisions feeds back into Unit 21h adjustments.
-**Output**: Documented decisions in doing doc
-**Acceptance**: User has reviewed and approved the onboarding instruction content and threshold
+**Decisions made**:
+1. **Threshold value**: 100,000 tokens cumulative (not 50K). Stored on FriendRecord.totalTokens, updated after each agent turn.
+2. **Always-on vs onboarding-only split**:
+   - **Always-on** (permanent in prompt.ts contextSection): memory ephemerality (#1 most important), working-memory trust, stale notes awareness, save aggressively (expanded from just name saving)
+   - **Onboarding-only** (below threshold, in `src/mind/first-impressions.ts`): encourage conversation, inform about capabilities, new-friend greeting
+   - **Removed entirely**: priority guidance ("help first, get to know along the way") -- overfitting. Separate "name quality" line -- folded into "save anything" directive.
+3. **Placement**: onboarding instructions in `src/mind/first-impressions.ts` (separate from prompt.ts for auditability). Always-on instructions stay in contextSection.
+4. **No first-conversation distinction**: `isOnboarding` is a simple threshold check, no special `totalTokens === 0` case.
+
+**Output**: Decisions documented in this unit and incorporated into units 21g-21i specs
+**Acceptance**: User reviewed and approved before execution
 
 ---
 
