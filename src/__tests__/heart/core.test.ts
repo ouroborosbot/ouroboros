@@ -2797,11 +2797,12 @@ describe("getClient", () => {
 
   it("exits when no env vars are set", async () => {
     vi.resetModules()
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
 
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
     }) as any)
-    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
       const core = await import("../../heart/core")
@@ -2819,10 +2820,13 @@ describe("getClient", () => {
     }
 
     expect(mockExit).toHaveBeenCalledWith(1)
-    expect(mockError).toHaveBeenCalled()
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+      level: "error",
+      event: "engine.provider_init_error",
+      component: "engine",
+    }))
 
     mockExit.mockRestore()
-    mockError.mockRestore()
   })
 
   it("uses MiniMax when minimax config is set", async () => {
@@ -2848,19 +2852,24 @@ describe("getClient", () => {
   it("fails fast when selected Azure provider config is incomplete", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
     await setupConfig({ providers: { azure: { apiKey: "azure-test-key" }, minimax: { apiKey: "mm-key", model: "MiniMax-M2.5" } } })
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
     }) as any)
-    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
       const core = await import("../../heart/core")
       expect(() => core.getProvider()).toThrow("process.exit called")
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("provider 'azure' is selected"))
+      expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+        level: "error",
+        event: "engine.provider_init_error",
+        component: "engine",
+        message: expect.stringContaining("provider 'azure' is selected"),
+      }))
     } finally {
       mockExit.mockRestore()
-      mockError.mockRestore()
     }
   })
 
@@ -3188,6 +3197,9 @@ describe("provider abstraction contract", () => {
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     const emitNervesEvent = vi.fn()
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
+    vi.doMock("../../heart/providers/azure", () => ({
+      createAzureProviderRuntime: () => { throw new Error("provider exploded") },
+    }))
     await setupAzure()
 
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
@@ -3196,9 +3208,6 @@ describe("provider abstraction contract", () => {
 
     try {
       const core = await import("../../heart/core")
-      vi.spyOn(core as any, "createProviderRegistry").mockReturnValue({
-        resolve: () => { throw new Error("provider exploded") },
-      } as any)
       expect(() => core.getProvider()).toThrow("process.exit called")
       expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
         level: "error",
@@ -3208,6 +3217,7 @@ describe("provider abstraction contract", () => {
       }))
     } finally {
       mockExit.mockRestore()
+      vi.doUnmock("../../heart/providers/azure")
     }
   })
 
@@ -3268,6 +3278,8 @@ describe("anthropic setup-token provider contract", () => {
   it("fails fast with setup-token prefix guidance when non-setup Anthropic token is found", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
     await setupConfig({
       providers: {
         anthropic: {
@@ -3280,22 +3292,25 @@ describe("anthropic setup-token provider contract", () => {
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
     }) as any)
-    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
       const core = await import("../../heart/core")
       expect(() => core.getProvider()).toThrow("process.exit called")
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("expected prefix sk-ant-oat01-"))
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("claude setup-token"))
+      expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+        level: "error",
+        event: "engine.provider_init_error",
+        message: expect.stringContaining("expected prefix sk-ant-oat01-"),
+      }))
     } finally {
       mockExit.mockRestore()
-      mockError.mockRestore()
     }
   })
 
   it("fails fast with setup-token length guidance when token is too short", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
     await setupConfig({
       providers: {
         anthropic: {
@@ -3308,21 +3323,25 @@ describe("anthropic setup-token provider contract", () => {
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
     }) as any)
-    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
       const core = await import("../../heart/core")
       expect(() => core.getProvider()).toThrow("process.exit called")
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("too short"))
+      expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+        level: "error",
+        event: "engine.provider_init_error",
+        message: expect.stringContaining("too short"),
+      }))
     } finally {
       mockExit.mockRestore()
-      mockError.mockRestore()
     }
   })
 
   it("fails fast with re-auth guidance when setup-token is blank after trimming", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
     await setupConfig({
       providers: {
         anthropic: {
@@ -3335,28 +3354,27 @@ describe("anthropic setup-token provider contract", () => {
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
     }) as any)
-    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
       const core = await import("../../heart/core")
       expect(() => core.getProvider()).toThrow("process.exit called")
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("no setup-token credential was found"))
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("claude setup-token"))
-      expect(mockError).toHaveBeenCalledWith(
-        expect.stringContaining("~/.agentsecrets/testagent/secrets.json"),
-      )
-      expect(mockError).toHaveBeenCalledWith(
-        expect.stringContaining("providers.anthropic.setupToken"),
-      )
+      const msg = emitNervesEvent.mock.calls.find(
+        (c: any[]) => c[0]?.event === "engine.provider_init_error",
+      )?.[0]?.message ?? ""
+      expect(msg).toContain("no setup-token credential was found")
+      expect(msg).toContain("claude setup-token")
+      expect(msg).toContain("~/.agentsecrets/testagent/secrets.json")
+      expect(msg).toContain("providers.anthropic.setupToken")
     } finally {
       mockExit.mockRestore()
-      mockError.mockRestore()
     }
   })
 
   it("fails fast when Anthropic model is configured but setupToken is missing from secrets config", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
     await setupConfig({
       providers: {
         anthropic: {
@@ -3368,23 +3386,20 @@ describe("anthropic setup-token provider contract", () => {
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
     }) as any)
-    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
       const core = await import("../../heart/core")
       expect(() => core.getProvider()).toThrow("process.exit called")
       expect(mockExit).toHaveBeenCalledWith(1)
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("model/setupToken is incomplete"))
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("claude setup-token"))
-      expect(mockError).toHaveBeenCalledWith(
-        expect.stringContaining("~/.agentsecrets/testagent/secrets.json"),
-      )
-      expect(mockError).toHaveBeenCalledWith(
-        expect.stringContaining("providers.anthropic.setupToken"),
-      )
+      const msg = emitNervesEvent.mock.calls.find(
+        (c: any[]) => c[0]?.event === "engine.provider_init_error",
+      )?.[0]?.message ?? ""
+      expect(msg).toContain("model/setupToken is incomplete")
+      expect(msg).toContain("claude setup-token")
+      expect(msg).toContain("~/.agentsecrets/testagent/secrets.json")
+      expect(msg).toContain("providers.anthropic.setupToken")
     } finally {
       mockExit.mockRestore()
-      mockError.mockRestore()
     }
   })
 
@@ -3817,6 +3832,8 @@ describe("anthropic setup-token provider contract", () => {
   it("fails fast when setup-token contains only whitespace characters", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
     await setupConfig({
       providers: {
         anthropic: {
@@ -3829,15 +3846,17 @@ describe("anthropic setup-token provider contract", () => {
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
     }) as any)
-    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
       const core = await import("../../heart/core")
       expect(() => core.getProvider()).toThrow("process.exit called")
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("no setup-token credential was found"))
+      expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+        level: "error",
+        event: "engine.provider_init_error",
+        message: expect.stringContaining("no setup-token credential was found"),
+      }))
     } finally {
       mockExit.mockRestore()
-      mockError.mockRestore()
     }
   })
 
@@ -3961,6 +3980,8 @@ describe("anthropic setup-token provider contract", () => {
   it("logs non-Error provider-resolution failures before exiting", async () => {
     vi.resetModules()
     await setAgentProvider("anthropic")
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
     vi.doMock("../../config", () => ({
       getAzureConfig: () => ({
         apiKey: "",
@@ -3986,15 +4007,17 @@ describe("anthropic setup-token provider contract", () => {
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
     }) as any)
-    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
       const core = await import("../../heart/core")
       expect(() => core.getProvider()).toThrow("process.exit called")
-      expect(mockError).toHaveBeenCalledWith("config-exploded")
+      expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+        level: "error",
+        event: "engine.provider_init_error",
+        message: "config-exploded",
+      }))
     } finally {
       mockExit.mockRestore()
-      mockError.mockRestore()
       vi.doUnmock("../../config")
     }
   })
@@ -4045,6 +4068,8 @@ describe("openai-codex oauth provider contract", () => {
   it("fails fast with oauth guidance when openai-codex oauthAccessToken is missing", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
     await setupConfig({
       providers: {
         "openai-codex": {
@@ -4057,18 +4082,19 @@ describe("openai-codex oauth provider contract", () => {
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
     }) as any)
-    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
       const core = await import("../../heart/core")
       expect(() => core.getProvider()).toThrow("process.exit called")
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("openai-codex"))
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("oauthAccessToken"))
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("secrets.json"))
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("codex login"))
+      const msg = emitNervesEvent.mock.calls.find(
+        (c: any[]) => c[0]?.event === "engine.provider_init_error",
+      )?.[0]?.message ?? ""
+      expect(msg).toContain("openai-codex")
+      expect(msg).toContain("oauthAccessToken")
+      expect(msg).toContain("secrets.json")
+      expect(msg).toContain("codex login")
     } finally {
       mockExit.mockRestore()
-      mockError.mockRestore()
     }
   })
 
@@ -4147,6 +4173,8 @@ describe("openai-codex oauth provider contract", () => {
   it("fails fast when openai-codex oauthAccessToken contains only whitespace", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
     await setupConfig({
       providers: {
         "openai-codex": {
@@ -4159,22 +4187,25 @@ describe("openai-codex oauth provider contract", () => {
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
     }) as any)
-    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
       const core = await import("../../heart/core")
       expect(() => core.getProvider()).toThrow("process.exit called")
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("OAuth access token is empty"))
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("providers.openai-codex.oauthAccessToken"))
+      const msg = emitNervesEvent.mock.calls.find(
+        (c: any[]) => c[0]?.event === "engine.provider_init_error",
+      )?.[0]?.message ?? ""
+      expect(msg).toContain("OAuth access token is empty")
+      expect(msg).toContain("providers.openai-codex.oauthAccessToken")
     } finally {
       mockExit.mockRestore()
-      mockError.mockRestore()
     }
   })
 
   it("fails fast when openai-codex oauthAccessToken is missing chatgpt_account_id", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
     const tokenWithoutAccountId = `${encodeBase64Url(JSON.stringify({ alg: "none", typ: "JWT" }))}.${encodeBase64Url(JSON.stringify({ sub: "user-123" }))}.signature`
     await setupConfig({
       providers: {
@@ -4188,22 +4219,25 @@ describe("openai-codex oauth provider contract", () => {
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
     }) as any)
-    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
       const core = await import("../../heart/core")
       expect(() => core.getProvider()).toThrow("process.exit called")
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("chatgpt_account_id"))
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("backend-api/codex"))
+      const msg = emitNervesEvent.mock.calls.find(
+        (c: any[]) => c[0]?.event === "engine.provider_init_error",
+      )?.[0]?.message ?? ""
+      expect(msg).toContain("chatgpt_account_id")
+      expect(msg).toContain("backend-api/codex")
     } finally {
       mockExit.mockRestore()
-      mockError.mockRestore()
     }
   })
 
   it("fails fast when openai-codex oauthAccessToken payload cannot be decoded as JSON", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
     const malformedPayload = Buffer.from("not-json", "utf8").toString("base64url")
     const malformedToken = `${encodeBase64Url(JSON.stringify({ alg: "none", typ: "JWT" }))}.${malformedPayload}.signature`
     await setupConfig({
@@ -4218,22 +4252,25 @@ describe("openai-codex oauth provider contract", () => {
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
     }) as any)
-    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
       const core = await import("../../heart/core")
       expect(() => core.getProvider()).toThrow("process.exit called")
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("chatgpt_account_id"))
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("backend-api/codex"))
+      const msg = emitNervesEvent.mock.calls.find(
+        (c: any[]) => c[0]?.event === "engine.provider_init_error",
+      )?.[0]?.message ?? ""
+      expect(msg).toContain("chatgpt_account_id")
+      expect(msg).toContain("backend-api/codex")
     } finally {
       mockExit.mockRestore()
-      mockError.mockRestore()
     }
   })
 
   it("fails fast when openai-codex oauthAccessToken is not JWT formatted", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
     await setupConfig({
       providers: {
         "openai-codex": {
@@ -4246,21 +4283,25 @@ describe("openai-codex oauth provider contract", () => {
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
     }) as any)
-    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
       const core = await import("../../heart/core")
       expect(() => core.getProvider()).toThrow("process.exit called")
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("chatgpt_account_id"))
+      expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+        level: "error",
+        event: "engine.provider_init_error",
+        message: expect.stringContaining("chatgpt_account_id"),
+      }))
     } finally {
       mockExit.mockRestore()
-      mockError.mockRestore()
     }
   })
 
   it("fails fast when openai-codex oauthAccessToken payload is a JSON array", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
     const arrayPayloadToken = `${encodeBase64Url(JSON.stringify({ alg: "none", typ: "JWT" }))}.${encodeBase64Url(JSON.stringify([]))}.signature`
     await setupConfig({
       providers: {
@@ -4274,21 +4315,25 @@ describe("openai-codex oauth provider contract", () => {
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
     }) as any)
-    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
       const core = await import("../../heart/core")
       expect(() => core.getProvider()).toThrow("process.exit called")
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("chatgpt_account_id"))
+      expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+        level: "error",
+        event: "engine.provider_init_error",
+        message: expect.stringContaining("chatgpt_account_id"),
+      }))
     } finally {
       mockExit.mockRestore()
-      mockError.mockRestore()
     }
   })
 
   it("fails fast when openai-codex chatgpt_account_id is not a string", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
     const nonStringAccountIdToken = `${encodeBase64Url(JSON.stringify({ alg: "none", typ: "JWT" }))}.${encodeBase64Url(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: 123 } }))}.signature`
     await setupConfig({
       providers: {
@@ -4302,15 +4347,17 @@ describe("openai-codex oauth provider contract", () => {
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
     }) as any)
-    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
       const core = await import("../../heart/core")
       expect(() => core.getProvider()).toThrow("process.exit called")
-      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("chatgpt_account_id"))
+      expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+        level: "error",
+        event: "engine.provider_init_error",
+        message: expect.stringContaining("chatgpt_account_id"),
+      }))
     } finally {
       mockExit.mockRestore()
-      mockError.mockRestore()
     }
   })
 
