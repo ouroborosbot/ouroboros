@@ -110,7 +110,7 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 **Acceptance**: Tests FAIL (red) -- REQUIRED_EVENTS still exists
 
 ### ⬜ Unit 5b: Strip REQUIRED_EVENTS from contract -- implementation
-**What**: Remove `REQUIRED_EVENTS`, `getRequiredEventKeys()`, `getDeclaredLogpoints()` from `src/nerves/coverage/contract.ts`. Keep `REQUIRED_ENVELOPE_FIELDS`, `SENSITIVE_PATTERNS`, `eventKey()`. Remove `src/__tests__/nerves/emit-new-events.test.ts` (artifact of old model). Update `global-capture.ts` to remove `getDeclaredLogpoints()` usage.
+**What**: Remove `REQUIRED_EVENTS`, `RequiredEvent` interface, `getRequiredEventKeys()`, `getDeclaredLogpoints()` from `src/nerves/coverage/contract.ts`. Keep `REQUIRED_ENVELOPE_FIELDS`, `SENSITIVE_PATTERNS`, `eventKey()`. Remove `src/__tests__/nerves/emit-new-events.test.ts` (artifact of old model). Update `global-capture.ts`: remove `getDeclaredLogpoints()` import and `mergeLogpointFile()` function (logpoints concept replaced by per-test tracking from Unit 4). Remove `getRequiredEventKeys` import from `audit.ts`.
 **Output**: Cleaned contract.ts, deleted emit-new-events.test.ts, updated global-capture.ts
 **Acceptance**: Tests from 5a PASS (green). No imports of removed exports remain.
 
