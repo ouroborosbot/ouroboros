@@ -236,6 +236,46 @@ describe("buildSystem", () => {
     expect(result).toContain("azure openai (gpt-4o-deploy, model: test-model)")
   })
 
+  it("includes anthropic provider string when Anthropic model is configured with Claude setup-token credentials", async () => {
+    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, _encoding?: any) => {
+      const p = String(filePath)
+      if (p.endsWith("SOUL.md")) return MOCK_SOUL
+      if (p.endsWith("IDENTITY.md")) return MOCK_IDENTITY
+      if (p.endsWith("LORE.md")) return MOCK_LORE
+      if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
+      if (p.endsWith("secrets.json")) return JSON.stringify({})
+      if (p.endsWith(path.join(".claude", ".credentials.json"))) {
+        return JSON.stringify({
+          claudeAiOauth: {
+            accessToken: `sk-ant-oat01-${"a".repeat(80)}`,
+            expiresAt: Date.now() + 60_000,
+          },
+        })
+      }
+      return ""
+    })
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({
+      providers: {
+        anthropic: {
+          model: "claude-sonnet-4-6",
+        },
+      },
+    } as any)
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    try {
+      const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+      resetPsycheCache()
+      const result = await buildSystem()
+      expect(result).toContain("anthropic (claude-sonnet-4-6)")
+    } finally {
+      mockExit.mockRestore()
+    }
+  })
+
   it("uses 'default' deployment when azure deployment is not set", async () => {
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")

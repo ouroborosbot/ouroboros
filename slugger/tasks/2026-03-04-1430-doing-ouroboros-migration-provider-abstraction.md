@@ -112,17 +112,17 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Refactored provider streaming/input code and branch coverage artifact.
 **Acceptance**: 100% coverage on new provider-side streaming code and tests green.
 
-### ⬜ Unit 4a: Anthropic setup-token integration — Tests
+### ✅ Unit 4a: Anthropic setup-token integration — Tests
 **What**: Add failing tests for Anthropic provider behavior, setup-token profile loading contract, and explicit auth-failure messaging in the same heart/config test suites used by provider selection.
 **Output**: Failing Anthropic provider/auth tests for success and fail-fast error paths.
 **Acceptance**: Anthropic tests fail red before implementation.
 
-### ⬜ Unit 4b: Anthropic setup-token integration — Implementation
+### ✅ Unit 4b: Anthropic setup-token integration — Implementation
 **What**: Implement Anthropic provider behind the abstraction using setup-token auth profile flow and explicit fail-fast auth errors.
 **Output**: Anthropic provider and auth profile integration.
 **Acceptance**: Anthropic tests pass green with explicit re-auth guidance on auth failure.
 
-### ⬜ Unit 4c: Anthropic setup-token integration — Coverage & Refactor
+### ✅ Unit 4c: Anthropic setup-token integration — Coverage & Refactor
 **What**: Refactor Anthropic provider code and cover all auth and response branches.
 **Output**: Refactored Anthropic provider code and coverage artifact for auth/stream branches.
 **Acceptance**: 100% coverage on new Anthropic integration code and tests green.
@@ -194,6 +194,9 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 16:06 Completed Unit 3a red tests for provider-owned streaming/input hooks with artifact captured at `unit-3a-red-run.txt`
 - 2026-03-04 16:08 Completed Unit 3b provider-owned streaming/input implementation with green targeted regression run (`unit-3b-test-run.txt`)
 - 2026-03-04 16:10 Completed Unit 3c refactor/coverage pass; targeted coverage reports `core.ts` and `prompt.ts` at 100% (`unit-3c-coverage-run.txt`)
+- 2026-03-04 16:23 Completed Unit 4a Anthropic setup-token red tests for provider selection, setup-token profile loading, and re-auth guidance (`unit-4a-red-run.txt`)
+- 2026-03-04 16:27 Completed Unit 4b Anthropic setup-token implementation and green targeted Anthropic regression run (`unit-4b-test-run.txt`)
+- 2026-03-04 16:38 Completed Unit 4c Anthropic coverage/refactor pass; targeted coverage reports `core.ts` and `prompt.ts` at 100% (`unit-4c-test-run.txt`, `unit-4c-coverage-run.txt`)
 - 2026-03-04 15:44 Unit 0 complete: captured branch baseline, scripts, and touched-file map in `unit-0-baseline.md`
 - 2026-03-04 15:47 Unit 1a complete: added failing contract tests for `.agentsecrets`/`.agentstate` paths and `agent.json` context sourcing (`unit-1a-red-run.txt`)
 - 2026-03-04 15:53 Unit 1b complete: implemented secrets/state path contracts, moved context sourcing to `agent.json`, and added migration runbook (`unit-1b-*.txt`)

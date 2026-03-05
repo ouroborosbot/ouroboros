@@ -44,6 +44,7 @@ vi.mock("../../identity", () => ({
 // We need to mock OpenAI before importing core
 const mockCreate = vi.fn()
 const mockResponsesCreate = vi.fn()
+const mockAnthropicMessagesCreate = vi.fn()
 vi.mock("openai", () => {
   class MockOpenAI {
     chat = {
@@ -59,6 +60,18 @@ vi.mock("openai", () => {
   return {
     default: MockOpenAI,
     AzureOpenAI: MockOpenAI,
+  }
+})
+
+vi.mock("@anthropic-ai/sdk", () => {
+  class MockAnthropic {
+    messages = {
+      create: mockAnthropicMessagesCreate,
+    }
+    constructor(_opts?: any) {}
+  }
+  return {
+    default: MockAnthropic,
   }
 })
 
@@ -84,6 +97,10 @@ async function setupAzure(
   const config = await import("../../config")
   config.resetConfigCache()
   config.setTestConfig({ providers: { azure: { apiKey, endpoint, deployment, modelName } } })
+}
+
+function makeAnthropicSetupToken(): string {
+  return `sk-ant-oat01-${"a".repeat(80)}`
 }
 
 async function setupConfig(partial: Record<string, unknown>) {
@@ -3036,6 +3053,841 @@ describe("provider abstraction contract", () => {
     expect(() => runtime?.appendToolOutput("call_1", "ok")).not.toThrow()
   })
 
+})
+
+describe("anthropic setup-token provider contract", () => {
+  function makeAnthropicEventStream(events: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const event of events) {
+          yield event
+        }
+      },
+    }
+  }
+
+  beforeEach(() => {
+    mockAnthropicMessagesCreate.mockReset()
+    vi.mocked(execSync).mockReset()
+  })
+
+  it("uses Anthropic when setup-token credentials are available from Claude CLI profile", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, encoding?: any) => {
+      const p = String(filePath)
+      if (p.endsWith(path.join(".claude", ".credentials.json"))) {
+        return JSON.stringify({
+          claudeAiOauth: {
+            accessToken: makeAnthropicSetupToken(),
+            expiresAt: Date.now() + 60_000,
+          },
+        })
+      }
+      return defaultReadFileSync(filePath, encoding)
+    })
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-sonnet-4-6",
+        },
+      },
+    })
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+
+    try {
+      const core = await import("../../heart/core")
+      expect(core.getProvider()).toBe("anthropic")
+      expect(core.getModel()).toBe("claude-sonnet-4-6")
+    } finally {
+      mockExit.mockRestore()
+    }
+  })
+
+  it("uses keychain setup-token credentials with ISO expiry and trimmed token", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: `  ${makeAnthropicSetupToken()}  `,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+    }) as any)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-sonnet-4-6",
+        },
+      },
+    })
+
+    const core = await import("../../heart/core")
+    expect(core.getProvider()).toBe("anthropic")
+    expect(vi.mocked(execSync)).toHaveBeenCalledWith(
+      'security find-generic-password -s "Claude Code-credentials" -w',
+      expect.objectContaining({ encoding: "utf8", timeout: 5000 }),
+    )
+  })
+
+  it("falls back to file credentials when keychain payload is invalid", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: "not-a-date",
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, encoding?: any) => {
+      const p = String(filePath)
+      if (p.endsWith(path.join(".claude", ".credentials.json"))) {
+        return JSON.stringify({
+          claudeAiOauth: {
+            accessToken: makeAnthropicSetupToken(),
+            expiresAt: Date.now() + 60_000,
+          },
+        })
+      }
+      return defaultReadFileSync(filePath, encoding)
+    })
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-sonnet-4-6",
+        },
+      },
+    })
+
+    const core = await import("../../heart/core")
+    expect(core.getProvider()).toBe("anthropic")
+  })
+
+  it("treats keychain lookup as unsupported on non-macOS and falls back to file", async () => {
+    vi.resetModules()
+    const originalPlatform = process.platform
+    Object.defineProperty(process, "platform", { value: "linux" })
+    vi.mocked(execSync).mockImplementation((() => {
+      throw new Error("should not be called")
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, encoding?: any) => {
+      const p = String(filePath)
+      if (p.endsWith(path.join(".claude", ".credentials.json"))) {
+        return JSON.stringify({
+          claudeAiOauth: {
+            accessToken: makeAnthropicSetupToken(),
+            expiresAt: Date.now() + 60_000,
+          },
+        })
+      }
+      return defaultReadFileSync(filePath, encoding)
+    })
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-sonnet-4-6",
+        },
+      },
+    })
+
+    try {
+      const core = await import("../../heart/core")
+      expect(core.getProvider()).toBe("anthropic")
+      expect(vi.mocked(execSync)).not.toHaveBeenCalled()
+    } finally {
+      Object.defineProperty(process, "platform", { value: originalPlatform })
+    }
+  })
+
+  it("fails fast with setup-token prefix guidance when non-setup Anthropic token is found", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockImplementation((() => {
+      throw new Error("missing keychain")
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, encoding?: any) => {
+      const p = String(filePath)
+      if (p.endsWith(path.join(".claude", ".credentials.json"))) {
+        return JSON.stringify({
+          claudeAiOauth: {
+            accessToken: "sk-ant-not-setup-token",
+            expiresAt: Date.now() + 60_000,
+          },
+        })
+      }
+      return defaultReadFileSync(filePath, encoding)
+    })
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-sonnet-4-6",
+        },
+      },
+    })
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("expected prefix sk-ant-oat01-"))
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("claude setup-token"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("fails fast with setup-token length guidance when token is too short", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockImplementation((() => {
+      throw new Error("missing keychain")
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, encoding?: any) => {
+      const p = String(filePath)
+      if (p.endsWith(path.join(".claude", ".credentials.json"))) {
+        return JSON.stringify({
+          claudeAiOauth: {
+            accessToken: "sk-ant-oat01-short",
+            expiresAt: Date.now() + 60_000,
+          },
+        })
+      }
+      return defaultReadFileSync(filePath, encoding)
+    })
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-sonnet-4-6",
+        },
+      },
+    })
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("too short"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("fails fast with setup-token expiry guidance when token is expired", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockImplementation((() => {
+      throw new Error("missing keychain")
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, encoding?: any) => {
+      const p = String(filePath)
+      if (p.endsWith(path.join(".claude", ".credentials.json"))) {
+        return JSON.stringify({
+          claudeAiOauth: {
+            accessToken: makeAnthropicSetupToken(),
+            expiresAt: Date.now() - 1,
+          },
+        })
+      }
+      return defaultReadFileSync(filePath, encoding)
+    })
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-sonnet-4-6",
+        },
+      },
+    })
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("expired"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("fails fast with re-auth guidance when Anthropic model is configured but setup-token credentials are missing", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-sonnet-4-6",
+        },
+      },
+    })
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockExit).toHaveBeenCalledWith(1)
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("claude setup-token"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("maps canonical messages to Anthropic payload and streams tool/text/thinking/usage events", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: Date.now() + 60_000,
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-sonnet-4-6",
+        },
+      },
+    })
+
+    mockAnthropicMessagesCreate.mockResolvedValue(makeAnthropicEventStream([
+      {
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "tool_use", id: "call0", name: "read_file", input: { path: "a.txt" } },
+      },
+      {
+        type: "content_block_start",
+        index: 1,
+        content_block: { type: "tool_use", id: "call1", name: "search" },
+      },
+      {
+        type: "content_block_delta",
+        delta: { type: "text_delta", text: "hello " },
+      },
+      {
+        type: "content_block_delta",
+        delta: { type: "thinking_delta", thinking: "reasoning " },
+      },
+      {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "input_json_delta", partial_json: ',\"line\":1' },
+      },
+      {
+        type: "content_block_delta",
+        index: 99,
+        delta: { type: "input_json_delta", partial_json: '{"ignored":true}' },
+      },
+      {
+        type: "content_block_stop",
+        index: 1,
+      },
+      {
+        type: "message_delta",
+        usage: {
+          input_tokens: 2,
+          cache_creation_input_tokens: 3,
+          cache_read_input_tokens: 4,
+          output_tokens: 5,
+        },
+      },
+    ]))
+
+    const streamStart = vi.fn()
+    const textChunk = vi.fn()
+    const reasoningChunk = vi.fn()
+    const controller = new AbortController()
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: streamStart,
+      onTextChunk: textChunk,
+      onReasoningChunk: reasoningChunk,
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const messages: any[] = [
+      { role: "system", content: [{ type: "text", text: "system from array" }] },
+      { role: "system", content: "ignored second system" },
+      { role: "user", content: "hello user" },
+      {
+        role: "assistant",
+        content: "assistant text",
+        tool_calls: [
+          { id: "tool1", type: "function", function: { name: "read_file", arguments: "{\"path\":\"f.txt\"}" } },
+        ],
+      },
+      {
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          { id: "tool2", type: "function", function: { name: "noop", arguments: " " } },
+          { id: "tool3", type: "function", function: { name: "noop", arguments: "not-json" } },
+          { id: "tool4", type: "function", function: { name: "noop", arguments: "3" } },
+        ],
+      },
+      { role: "assistant", content: null },
+      { role: "tool", tool_call_id: "tool1", content: [{ type: "text", text: "tool output" }] },
+    ]
+
+    const activeTools: any[] = [
+      {
+        type: "function",
+        function: {
+          name: "read_file",
+          parameters: { type: "object", properties: { path: { type: "string" } } },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "search",
+        },
+      },
+    ]
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    expect(runtime.id).toBe("anthropic")
+    expect(() => runtime.resetTurnState(messages)).not.toThrow()
+    expect(() => runtime.appendToolOutput("noop-call", "ok")).not.toThrow()
+    const result = await runtime.streamTurn({
+      messages,
+      activeTools,
+      callbacks,
+      signal: controller.signal,
+      toolChoiceRequired: true,
+    })
+
+    expect(streamStart).toHaveBeenCalledTimes(1)
+    expect(textChunk).toHaveBeenCalledWith("hello ")
+    expect(reasoningChunk).toHaveBeenCalledWith("reasoning ")
+    expect(result.content).toBe("hello ")
+    expect(result.toolCalls).toEqual([
+      {
+        id: "call0",
+        name: "read_file",
+        arguments: "{\"path\":\"a.txt\"},\"line\":1",
+      },
+      {
+        id: "call1",
+        name: "search",
+        arguments: "{}",
+      },
+    ])
+    expect(result.usage).toEqual({
+      input_tokens: 9,
+      output_tokens: 5,
+      reasoning_tokens: 0,
+      total_tokens: 14,
+    })
+    expect(mockAnthropicMessagesCreate).toHaveBeenCalledTimes(1)
+    const [params, requestOptions] = mockAnthropicMessagesCreate.mock.calls[0]
+    expect(requestOptions).toEqual({ signal: controller.signal })
+    expect(params).toEqual(expect.objectContaining({
+      model: "claude-sonnet-4-6",
+      stream: true,
+      max_tokens: 4096,
+      system: "system from array",
+      tool_choice: { type: "any" },
+    }))
+    expect(Array.isArray((params as any).messages)).toBe(true)
+    expect(Array.isArray((params as any).tools)).toBe(true)
+  })
+
+  it("returns early when Anthropic stream signal is aborted", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: Date.now() + 60_000,
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-sonnet-4-6",
+        },
+      },
+    })
+
+    mockAnthropicMessagesCreate.mockResolvedValue(makeAnthropicEventStream([
+      { type: "content_block_delta", delta: { type: "text_delta", text: "ignored" } },
+    ]))
+
+    const streamStart = vi.fn()
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: streamStart,
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const controller = new AbortController()
+    controller.abort()
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    const result = await runtime.streamTurn({
+      messages: [{ role: "user", content: "hi" }],
+      activeTools: [],
+      callbacks,
+      signal: controller.signal,
+    })
+
+    expect(result.content).toBe("")
+    expect(result.toolCalls).toEqual([])
+    expect(result.outputItems).toEqual([])
+    expect(streamStart).not.toHaveBeenCalled()
+    expect(mockAnthropicMessagesCreate).toHaveBeenCalledWith(expect.any(Object), { signal: controller.signal })
+  })
+
+  it("wraps Anthropic auth failures from create() with setup-token guidance", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: Date.now() + 60_000,
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-sonnet-4-6",
+        },
+      },
+    })
+
+    const authError: any = new Error("oauth authentication failed")
+    authError.status = 401
+    mockAnthropicMessagesCreate.mockRejectedValue(authError)
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    await expect(
+      runtime.streamTurn({
+        messages: [{ role: "user", content: "hi" }],
+        activeTools: [],
+        callbacks,
+      }),
+    ).rejects.toThrow("claude setup-token")
+  })
+
+  it("wraps Anthropic auth failures from streaming events with setup-token guidance", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: Date.now() + 60_000,
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-sonnet-4-6",
+        },
+      },
+    })
+
+    const streamError = Object.assign(new Error("invalid api key"), { status: 403 })
+    mockAnthropicMessagesCreate.mockResolvedValue({
+      [Symbol.asyncIterator]: async function* () {
+        yield { type: "content_block_delta", delta: { type: "text_delta", text: "partial" } }
+        throw streamError
+      },
+    })
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    await expect(
+      runtime.streamTurn({
+        messages: [{ role: "user", content: "hi" }],
+        activeTools: [],
+        callbacks,
+      }),
+    ).rejects.toThrow("Anthropic authentication failed")
+  })
+
+  it("preserves non-auth Anthropic errors without rewriting guidance", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: Date.now() + 60_000,
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-sonnet-4-6",
+        },
+      },
+    })
+
+    mockAnthropicMessagesCreate.mockRejectedValue(new Error("transport failed"))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    await expect(
+      runtime.streamTurn({
+        messages: [{ role: "user", content: "hi" }],
+        activeTools: [],
+        callbacks,
+      }),
+    ).rejects.toThrow("transport failed")
+  })
+
+  it("fails fast when credential payload shapes are malformed", async () => {
+    const malformedPayloads = [
+      null,
+      { nope: {} },
+      { claudeAiOauth: { accessToken: "", expiresAt: Date.now() + 60_000 } },
+      { claudeAiOauth: { accessToken: makeAnthropicSetupToken(), expiresAt: {} } },
+      { claudeAiOauth: { accessToken: makeAnthropicSetupToken(), expiresAt: 0 } },
+    ]
+
+    for (const payload of malformedPayloads) {
+      vi.resetModules()
+      vi.mocked(execSync).mockImplementation((() => {
+        throw new Error("missing keychain")
+      }) as any)
+      vi.mocked(fs.readFileSync).mockImplementation((filePath: any, encoding?: any) => {
+        const p = String(filePath)
+        if (p.endsWith(path.join(".claude", ".credentials.json"))) {
+          return JSON.stringify(payload)
+        }
+        return defaultReadFileSync(filePath, encoding)
+      })
+      await setupConfig({
+        providers: {
+          anthropic: {
+            model: "claude-sonnet-4-6",
+          },
+        },
+      })
+
+      const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+        throw new Error("process.exit called")
+      }) as any)
+      const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+      try {
+        const core = await import("../../heart/core")
+        expect(() => core.getProvider()).toThrow("process.exit called")
+        expect(mockError).toHaveBeenCalledWith(expect.stringContaining("no Claude setup-token credential was found"))
+      } finally {
+        mockExit.mockRestore()
+        mockError.mockRestore()
+      }
+    }
+  })
+
+  it("handles nullish Anthropic stream fields and unknown events safely", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: Date.now() + 60_000,
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-sonnet-4-6",
+        },
+      },
+    })
+
+    mockAnthropicMessagesCreate.mockResolvedValue(makeAnthropicEventStream([
+      { type: "content_block_start", index: 2, content_block: { type: "tool_use" } },
+      { type: "content_block_delta", delta: { type: "thinking_delta" } },
+      { type: "content_block_delta", delta: { type: "text_delta" } },
+      { type: "content_block_delta" },
+      { type: "content_block_delta", index: 2, delta: { type: "input_json_delta" } },
+      { type: "content_block_stop", index: 999 },
+      { type: "content_block_start", index: 4, content_block: { type: "not_tool_use" } },
+      { type: "message_delta", usage: {} },
+      { type: "message_delta", usage: "invalid" },
+      {},
+      { type: "mystery" },
+    ]))
+
+    const streamStart = vi.fn()
+    const textChunk = vi.fn()
+    const reasoningChunk = vi.fn()
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: streamStart,
+      onTextChunk: textChunk,
+      onReasoningChunk: reasoningChunk,
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    const result = await runtime.streamTurn({
+      messages: [
+        { role: "system", content: "" },
+        { role: "assistant", content: null },
+        { role: "unknown", content: "ignored" } as any,
+      ],
+      activeTools: [],
+      callbacks,
+    })
+
+    expect(streamStart).toHaveBeenCalledTimes(1)
+    expect(textChunk).toHaveBeenCalledWith("")
+    expect(reasoningChunk).toHaveBeenCalledWith("")
+    expect(result.content).toBe("")
+    expect(result.toolCalls).toEqual([
+      {
+        id: "",
+        name: "",
+        arguments: "",
+      },
+    ])
+    expect(result.usage).toEqual({
+      input_tokens: 0,
+      output_tokens: 0,
+      reasoning_tokens: 0,
+      total_tokens: 0,
+    })
+  })
+
+  it("converts non-Error thrown values into terminal errors", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: Date.now() + 60_000,
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-sonnet-4-6",
+        },
+      },
+    })
+
+    mockAnthropicMessagesCreate.mockRejectedValue("plain-string-failure")
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk: vi.fn(),
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    await expect(
+      runtime.streamTurn({
+        messages: [{ role: "user", content: "hi" }],
+        activeTools: [],
+        callbacks,
+      }),
+    ).rejects.toThrow("plain-string-failure")
+  })
+
+  it("logs non-Error provider-resolution failures before exiting", async () => {
+    vi.resetModules()
+    vi.doMock("../../config", () => ({
+      getAzureConfig: () => ({
+        apiKey: "",
+        endpoint: "",
+        deployment: "",
+        modelName: "",
+        apiVersion: "",
+      }),
+      getAnthropicConfig: () => {
+        throw "config-exploded"
+      },
+      getMinimaxConfig: () => ({
+        apiKey: "",
+        model: "",
+      }),
+      getContextConfig: () => ({
+        maxToolOutputChars: 50000,
+        maxTokens: 120000,
+        contextMargin: 2000,
+      }),
+    }))
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith("config-exploded")
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+      vi.doUnmock("../../config")
+    }
+  })
 })
 
 describe("hasToolIntent", () => {
