@@ -1892,6 +1892,59 @@ describe("save_friend_note tool", () => {
     )
   })
 
+  // -- type: "note" key: "name" -> name field redirect tests --
+
+  it("type 'note' key 'name' redirects to name field update (not a note)", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "note", key: "name", content: "Ari" }, ctx)
+    expect(ctx.friendStore.put).toHaveBeenCalledWith(
+      "uuid-1",
+      expect.objectContaining({
+        name: "Ari",
+      }),
+    )
+    // notes should NOT contain key "name"
+    const putArg = ctx.friendStore.put.mock.calls[0][1]
+    expect(putArg.notes).not.toHaveProperty("name")
+  })
+
+  it("type 'note' key 'name' returns descriptive redirect message", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "note", key: "name", content: "Ari" }, ctx)
+    // Should indicate it was stored as name, not a note
+    expect(result.toLowerCase()).toContain("name")
+    expect(result).toContain("Ari")
+    expect(result.toLowerCase()).toMatch(/name.*not a note|stored as.*name/)
+  })
+
+  it("type 'note' key 'name' with override=true still redirects to name field", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    const ctx = makeCtx()
+    const result = await execTool("save_friend_note", { type: "note", key: "name", content: "Ari", override: "true" }, ctx)
+    expect(ctx.friendStore.put).toHaveBeenCalledWith(
+      "uuid-1",
+      expect.objectContaining({
+        name: "Ari",
+      }),
+    )
+  })
+
+  it("type 'note' key 'name' does NOT check for existing note conflict", async () => {
+    vi.resetModules()
+    const { execTool } = await import("../../repertoire/tools")
+    // Give the friend an existing "name" note to verify it's bypassed
+    const ctx = makeCtx({ friendOverrides: { notes: { name: { value: "Old Name", savedAt: "2026-01-01T00:00:00.000Z" } } } })
+    const result = await execTool("save_friend_note", { type: "note", key: "name", content: "New Name" }, ctx)
+    // Should NOT return conflict message, should always update
+    expect(result).not.toContain("already have")
+    expect(ctx.friendStore.put).toHaveBeenCalled()
+  })
+
   // -- Disk write / no in-memory mutation tests --
 
   it("writes to disk via friendStore.put, reads fresh record via friendStore.get", async () => {
