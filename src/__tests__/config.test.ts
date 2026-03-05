@@ -149,6 +149,65 @@ describe("loadConfig", () => {
     expect(parsed).not.toHaveProperty("context")
   })
 
+  it("continues with defaults when writing default secrets config fails after ENOENT", async () => {
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      const err: any = new Error("ENOENT")
+      err.code = "ENOENT"
+      throw err
+    })
+    vi.mocked(fs.writeFileSync).mockImplementation(() => {
+      throw new Error("disk full")
+    })
+
+    const { loadConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const config = loadConfig()
+
+    expect(fs.writeFileSync).toHaveBeenCalledTimes(1)
+    expect(config.providers.minimax.apiKey).toBe("")
+    expect(config.context.maxTokens).toBe(80000)
+  })
+
+  it("continues with defaults when writing default secrets config throws non-Error", async () => {
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      const err: any = new Error("ENOENT")
+      err.code = "ENOENT"
+      throw err
+    })
+    vi.mocked(fs.writeFileSync).mockImplementation(() => {
+      throw "disk-fail"
+    })
+
+    const { loadConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const config = loadConfig()
+
+    expect(fs.writeFileSync).toHaveBeenCalledTimes(1)
+    expect(config.providers.azure.apiKey).toBe("")
+    expect(config.context.maxTokens).toBe(80000)
+  })
+
+  it("ignores legacy context block from secrets.json", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        context: { maxTokens: 1, contextMargin: 1, maxToolOutputChars: 1 },
+        providers: {
+          minimax: { apiKey: "minimax-key", model: "MiniMax-M2.5" },
+        },
+      })
+    )
+
+    const { loadConfig, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const config = loadConfig()
+
+    // context must come from agent.json defaults, not legacy secrets.json context
+    expect(config.context.maxTokens).toBe(80000)
+    expect(config.context.contextMargin).toBe(20)
+    expect(config.context.maxToolOutputChars).toBe(20000)
+    expect(config.providers.minimax.apiKey).toBe("minimax-key")
+  })
+
   it("returns defaults when file contains invalid JSON", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue("not json {{{")
 
