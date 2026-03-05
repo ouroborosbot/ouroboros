@@ -56,6 +56,11 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [x] `--disable-streaming` / buffered mode removed entirely (no `disableStreaming`, no `buffered` flag, no `teams:no-stream` script, no `flagsSection`)
 - [x] Chunked streaming implemented -- periodic flush every ~1s via `flushTextBuffer()`
 - [x] Single unified streaming mode (no dual-mode branching)
+- [ ] `final_answer` tool call arguments streamed progressively via `FinalAnswerParser` state machine -- text appears as model generates, not all at once after stream ends
+- [ ] Both streaming paths (Chat Completions and Azure Responses API) intercept `final_answer` deltas and emit via `onTextChunk`
+- [ ] `onClearText` called when `final_answer` tool call starts to clear noise
+- [ ] `finalAnswerStreamed` flag on `TurnResult` -- core.ts skips redundant `onClearText`/`onTextChunk` when already streamed
+- [ ] Fallback: when parser prefix never matches, existing core.ts behavior unchanged
 - [ ] User confirms on Teams: model uses final_answer cleanly, no 413 errors, no "Sorry something went wrong", prompt sections emit correctly, responses arrive in periodic chunks (not per-token, not all-at-once)
 
 ### Gate 3: Friend Context Instructions
@@ -581,6 +586,89 @@ The phrase rotation timer (1.5s interval for `safeUpdate`) continues to run duri
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new/modified code, all tests green, no warnings
 
+### ⬜ Unit 20a: Stream final_answer arguments -- Tests
+**What**: Write failing tests for progressive streaming of `final_answer` tool call arguments. Tests cover:
+
+1. **FinalAnswerParser unit tests** (in `src/__tests__/heart/streaming.test.ts`):
+   - Parses `{"answer":"hello world"}` and returns `"hello world"`
+   - Handles JSON escapes: `\"` -> `"`, `\\` -> `\`, `\n` -> newline, `\t` -> tab, `\/` -> `/`
+   - Handles unknown escape (e.g. `\x`) by passing through the character
+   - Emits nothing before prefix `"answer":"` is matched
+   - Emits incrementally across multiple `process()` calls (delta chunking)
+   - Stops at unescaped closing `"` (no output after)
+   - `active` is false before prefix, true after
+   - `complete` is false until closing `"`, true after
+   - Handles `"answer": "` (space after colon) variant
+   - Returns empty string when prefix never matches (e.g. `{"other":"value"}`)
+   - Handles empty answer `{"answer":""}`
+   - Handles escape sequence split across deltas (e.g. `\` in one delta, `n` in next)
+
+2. **streamChatCompletion integration tests** (in `src/__tests__/heart/streaming.test.ts`):
+   - When `final_answer` tool call streams argument deltas, `onTextChunk` is called with parsed answer text progressively
+   - `onClearText` is called when `final_answer` tool call starts (before any answer text)
+   - `finalAnswerStreamed` is `true` in the returned `TurnResult`
+   - When tool call is not `final_answer`, no streaming of arguments occurs (normal behavior)
+   - When prefix never matches (malformed JSON), `finalAnswerStreamed` is `false`
+
+3. **streamResponsesApi integration tests** (in `src/__tests__/heart/streaming.test.ts`):
+   - Same as above but for Azure Responses API: `response.function_call_arguments.delta` events for `final_answer` emit via `onTextChunk`
+   - `onClearText` called when `final_answer` function call item is added
+   - `finalAnswerStreamed` is `true` in the returned `TurnResult`
+
+4. **core.ts integration tests** (in `src/__tests__/heart/core.test.ts`):
+   - When `finalAnswerStreamed` is `true`: core.ts skips `onClearText` and `onTextChunk` (no double-emit), still pushes messages and tool result
+   - When `finalAnswerStreamed` is `false`: existing behavior unchanged -- `onClearText` + `onTextChunk` called
+
+**Output**: New test cases in `src/__tests__/heart/streaming.test.ts` and `src/__tests__/heart/core.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because `FinalAnswerParser` doesn't exist, streaming functions don't intercept `final_answer` arguments, `TurnResult` has no `finalAnswerStreamed` flag, and core.ts doesn't check it
+
+### ⬜ Unit 20b: Stream final_answer arguments -- Implementation
+**What**: Implement progressive streaming of `final_answer` tool call arguments.
+
+1. **`FinalAnswerParser` class** in `src/heart/streaming.ts` (exported):
+   - `process(delta: string): string` -- character-level state machine
+   - Buffers until prefix `"answer":"` or `"answer": "` is found
+   - After prefix: emits text, handles JSON escapes (`\"`, `\\`, `\n`, `\t`, `\/`, default passthrough)
+   - Stops at unescaped closing `"`
+   - `get active(): boolean` -- true after prefix matched
+   - `get complete(): boolean` -- true after closing `"` found
+
+2. **`finalAnswerStreamed` flag** on `TurnResult` interface (streaming.ts line 43-48):
+   - Add `finalAnswerStreamed?: boolean` to the interface
+
+3. **`streamChatCompletion` changes** (streaming.ts lines 127-267):
+   - Create `FinalAnswerParser` instance before the loop
+   - In the `d.tool_calls` block (line 243-256): when a tool call at index has `name === "final_answer"` and `tc.function?.arguments` is present, feed delta to parser via `process()`
+   - When parser first becomes `active`, call `callbacks.onClearText?.()` to clear noise
+   - If `process()` returns non-empty text, call `callbacks.onTextChunk(text)`
+   - In the return statement (line 261-266): set `finalAnswerStreamed: parser.active`
+
+4. **`streamResponsesApi` changes** (streaming.ts lines 269-359):
+   - Create `FinalAnswerParser` instance before the loop
+   - In `response.output_item.added` (line 307-315): when `event.item?.name === "final_answer"`, call `callbacks.onClearText?.()` to clear noise
+   - In `response.function_call_arguments.delta` (line 317-321): when `currentToolCall?.name === "final_answer"`, feed `event.delta` to parser, emit result via `callbacks.onTextChunk(text)` if non-empty
+   - In the return statement (line 353-358): set `finalAnswerStreamed: parser.active`
+
+5. **core.ts changes** (core.ts lines 353-397):
+   - After line 372 (`callbacks.onClearText?.()`), add conditional: if `result.finalAnswerStreamed`, skip `onClearText` and `onTextChunk`
+   - Specifically: wrap lines 372 and 377 in `if (!result.finalAnswerStreamed) { ... }` -- the `onClearText?.()` call at 372 and the `onTextChunk(answer)` call at 377
+   - Message push and tool result push (lines 380-384) remain unconditional
+   - Retry path (lines 386-396) remains unchanged -- `answer` is undefined triggers retry regardless of `finalAnswerStreamed`
+
+**Output**: Modified `src/heart/streaming.ts` and `src/heart/core.ts`
+**Acceptance**: All tests PASS (green), no warnings
+
+### ⬜ Unit 20c: Stream final_answer arguments -- Coverage & Refactor
+**What**: Verify 100% coverage on all new code. Coverage targets:
+1. `FinalAnswerParser` -- all branches: prefix matching (both variants), escape sequences (all 6 cases including default), unescaped `"` stop, `done` early-return, empty delta
+2. `streamChatCompletion` -- `final_answer` detection branch, parser activation, `onClearText` call, `onTextChunk` forwarding, `finalAnswerStreamed` flag set
+3. `streamResponsesApi` -- `final_answer` detection in `output_item.added`, parser feeding in `function_call_arguments.delta`, `onClearText` call, `onTextChunk` forwarding, `finalAnswerStreamed` flag set
+4. core.ts `isSoleFinalAnswer` block -- `finalAnswerStreamed` true path (skip clear+emit), false path (existing behavior)
+5. Non-`final_answer` tool calls still work normally (no parser activation)
+
+**Output**: Coverage report
+**Acceptance**: 100% coverage on new/modified code, all tests green, no warnings
+
 ---
 
 ### GATE 2 CHECKPOINT
@@ -599,6 +687,8 @@ The phrase rotation timer (1.5s interval for `safeUpdate`) continues to run duri
 - HTTP roundtrips reduced from hundreds to ~10-15 per response (stays within 1 req/sec Teams throttle)
 - No `--disable-streaming` flag, no dual-mode branching -- single unified streaming approach
 - `flagsSection` removed from prompt (no longer needed)
+- `final_answer` text streams progressively as model generates (not buffered until end of stream)
+- No duplicate content (answer not emitted twice -- streaming path + core.ts path are mutually exclusive via `finalAnswerStreamed` flag)
 - `teams:no-stream` npm script removed
 **Also resolves**: Bug 5 (response spam) and Bug 6 (platform timeout).
 **Proceed to Gate 3 only after user confirms.**
