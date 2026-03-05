@@ -1,6 +1,6 @@
 # Planning: Nerves Logging Policy Enforcement
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-03-05 09:54
 
 ## Goal
