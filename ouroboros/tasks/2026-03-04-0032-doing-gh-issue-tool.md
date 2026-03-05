@@ -90,7 +90,7 @@ Allow agents using the ouroboros harness to create GitHub issues via the GitHub 
 **Output**: 100% coverage confirmed, clean code
 **Acceptance**: `npm test` passes, coverage report shows 100% on new lines, no warnings
 
-### ⬜Unit 2a: GitHub Tool Definitions -- Tests
+### ✅Unit 2a: GitHub Tool Definitions -- Tests
 **What**: Write tests for `src/repertoire/tools-github.ts` following the pattern of teams/ADO tool tests in `tools.test.ts`. Tests should cover:
 - `githubToolDefinitions` array contains `github_create_issue` tool
 - Tool schema has correct parameters: `owner` (required), `repo` (required), `title` (required), `body` (optional), `labels` (optional)
