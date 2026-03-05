@@ -16,7 +16,7 @@ describe("getChannelCapabilities", () => {
   it("returns Teams capabilities with ado and graph integrations", () => {
     const caps = getChannelCapabilities("teams")
     expect(caps.channel).toBe("teams")
-    expect(caps.availableIntegrations).toEqual(["ado", "graph"])
+    expect(caps.availableIntegrations).toEqual(["ado", "graph", "github"])
     expect(caps.supportsMarkdown).toBe(true)
     expect(caps.supportsStreaming).toBe(true)
     expect(caps.supportsRichCards).toBe(true)
@@ -38,6 +38,16 @@ describe("getChannelCapabilities", () => {
     for (const integration of teamsCaps.availableIntegrations) {
       expect(isIntegration(integration)).toBe(true)
     }
+  })
+
+  it("teams channel includes github in availableIntegrations", () => {
+    const caps = getChannelCapabilities("teams")
+    expect(caps.availableIntegrations).toContain("github")
+  })
+
+  it("cli channel does NOT include github in availableIntegrations", () => {
+    const caps = getChannelCapabilities("cli")
+    expect(caps.availableIntegrations).not.toContain("github")
   })
 
   it("all capability fields are present and correctly typed", () => {

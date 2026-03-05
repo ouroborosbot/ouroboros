@@ -14,7 +14,7 @@ const CHANNEL_CAPABILITIES: Record<string, ChannelCapabilities> = {
   },
   teams: {
     channel: "teams",
-    availableIntegrations: ["ado", "graph"],
+    availableIntegrations: ["ado", "graph", "github"],
     supportsMarkdown: true,
     supportsStreaming: true,
     supportsRichCards: true,
