@@ -108,7 +108,7 @@ Allow agents using the ouroboros harness to create GitHub issues via the GitHub 
 **Output**: Failing tests in `src/__tests__/repertoire/tools-github.test.ts` (new file)
 **Acceptance**: Tests exist and FAIL (red) because `tools-github.ts` does not exist yet
 
-### ⬜Unit 2b: GitHub Tool Definitions -- Implementation
+### ✅Unit 2b: GitHub Tool Definitions -- Implementation
 **What**: Create `src/repertoire/tools-github.ts` following `tools-teams.ts` pattern:
 - Import `githubRequest` from `./github-client`
 - Export `githubToolDefinitions: ToolDefinition[]` with `github_create_issue`
