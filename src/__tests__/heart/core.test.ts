@@ -3366,7 +3366,14 @@ describe("anthropic setup-token provider contract", () => {
         ],
       },
       { role: "assistant", content: null },
-      { role: "tool", tool_call_id: "tool1", content: [{ type: "text", text: "tool output" }] },
+      {
+        role: "tool",
+        tool_call_id: "tool1",
+        content: [
+          { type: "text", text: 42 as any },
+          { type: "text", text: "tool output" },
+        ],
+      },
     ]
 
     const activeTools: any[] = [
