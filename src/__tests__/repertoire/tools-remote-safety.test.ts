@@ -15,11 +15,11 @@ describe("remote channel tool safety", () => {
     expect(names).not.toContain("gh_cli")
   })
 
-  it("github_create_issue appears in Teams tool list (integration tool, not blocked)", () => {
+  it("file_ouroboros_bug appears in Teams tool list (integration tool, not blocked)", () => {
     const tools = getToolsForChannel(getChannelCapabilities("teams"))
     const names = tools.map((t) => t.function.name)
 
-    expect(names).toContain("github_create_issue")
+    expect(names).toContain("file_ouroboros_bug")
   })
 
   it("returns explanatory denial messaging when remote context attempts local shell execution", async () => {

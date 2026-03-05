@@ -2046,33 +2046,33 @@ describe("save_friend_note tool", () => {
 })
 
 describe("github tool registration", () => {
-  it("allDefinitions includes github_create_issue (via execTool)", async () => {
+  it("allDefinitions includes file_ouroboros_bug (via execTool)", async () => {
     vi.resetModules()
     const { execTool } = await import("../../repertoire/tools")
-    // If github_create_issue is registered, calling it without a token returns AUTH_REQUIRED
-    const result = await execTool("github_create_issue", { owner: "o", repo: "r", title: "t" })
+    // If file_ouroboros_bug is registered, calling it without a token returns AUTH_REQUIRED
+    const result = await execTool("file_ouroboros_bug", { title: "t" })
     expect(result).toContain("AUTH_REQUIRED:github")
   })
 
-  it("isConfirmationRequired returns true for github_create_issue", async () => {
+  it("isConfirmationRequired returns true for file_ouroboros_bug", async () => {
     vi.resetModules()
     const { isConfirmationRequired } = await import("../../repertoire/tools")
-    expect(isConfirmationRequired("github_create_issue")).toBe(true)
+    expect(isConfirmationRequired("file_ouroboros_bug")).toBe(true)
   })
 
-  it("summarizeArgs returns title for github_create_issue", async () => {
+  it("summarizeArgs returns title for file_ouroboros_bug", async () => {
     vi.resetModules()
     const { summarizeArgs } = await import("../../repertoire/tools")
-    expect(summarizeArgs("github_create_issue", { title: "Fix bug" })).toBe("Fix bug")
+    expect(summarizeArgs("file_ouroboros_bug", { title: "Fix bug" })).toBe("Fix bug")
   })
 
-  it("summarizeArgs returns empty string for github_create_issue with no title", async () => {
+  it("summarizeArgs returns empty string for file_ouroboros_bug with no title", async () => {
     vi.resetModules()
     const { summarizeArgs } = await import("../../repertoire/tools")
-    expect(summarizeArgs("github_create_issue", {})).toBe("")
+    expect(summarizeArgs("file_ouroboros_bug", {})).toBe("")
   })
 
-  it("github_create_issue is NOT in REMOTE_BLOCKED_LOCAL_TOOLS", async () => {
+  it("file_ouroboros_bug is NOT in REMOTE_BLOCKED_LOCAL_TOOLS", async () => {
     vi.resetModules()
     const { execTool } = await import("../../repertoire/tools")
     // If it were blocked, calling it in a remote context would return "can't do that from here"
@@ -2102,11 +2102,11 @@ describe("github tool registration", () => {
     } as any
     const { githubRequest } = await import("../../repertoire/github-client")
     vi.mocked(githubRequest).mockResolvedValue('{"id":1}')
-    const result = await execTool("github_create_issue", { owner: "o", repo: "r", title: "t" }, remoteContext)
+    const result = await execTool("file_ouroboros_bug", { title: "t" }, remoteContext)
     expect(result).not.toContain("can't do that from here")
   })
 
-  it("getToolsForChannel with github integration returns github_create_issue", async () => {
+  it("getToolsForChannel with github integration returns file_ouroboros_bug", async () => {
     vi.resetModules()
     const { getToolsForChannel } = await import("../../repertoire/tools")
     const teamsCaps = {
@@ -2119,10 +2119,10 @@ describe("github tool registration", () => {
     }
     const result = getToolsForChannel(teamsCaps)
     const names = result.map((t: any) => t.function.name)
-    expect(names).toContain("github_create_issue")
+    expect(names).toContain("file_ouroboros_bug")
   })
 
-  it("getToolsForChannel with CLI caps does NOT return github_create_issue", async () => {
+  it("getToolsForChannel with CLI caps does NOT return file_ouroboros_bug", async () => {
     vi.resetModules()
     const { getToolsForChannel } = await import("../../repertoire/tools")
     const cliCaps = {
@@ -2135,6 +2135,6 @@ describe("github tool registration", () => {
     }
     const result = getToolsForChannel(cliCaps)
     const names = result.map((t: any) => t.function.name)
-    expect(names).not.toContain("github_create_issue")
+    expect(names).not.toContain("file_ouroboros_bug")
   })
 })
