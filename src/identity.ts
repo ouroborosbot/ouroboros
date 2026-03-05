@@ -5,6 +5,7 @@ import { emitNervesEvent } from "./nerves/runtime"
 export interface AgentConfig {
   name: string
   configPath: string
+  provider: "azure" | "minimax" | "anthropic"
   context?: {
     maxTokens?: number
     contextMargin?: number
@@ -186,6 +187,27 @@ export function loadAgentConfig(): AgentConfig {
     })
     throw new Error(
       `Legacy configPath '${rawConfigPath}' is not supported. Use ~/.agentsecrets/<agent>/secrets.json.`,
+    )
+  }
+
+  const rawProvider = parsed.provider
+  if (
+    rawProvider !== "azure" &&
+    rawProvider !== "minimax" &&
+    rawProvider !== "anthropic"
+  ) {
+    emitNervesEvent({
+      level: "error",
+      event: "config_identity.error",
+      component: "config/identity",
+      message: "agent config missing or invalid provider",
+      meta: {
+        path: configFile,
+        provider: rawProvider,
+      },
+    })
+    throw new Error(
+      `agent.json at ${configFile} must include provider: "azure", "minimax", or "anthropic".`,
     )
   }
 

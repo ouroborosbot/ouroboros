@@ -7,6 +7,7 @@ vi.mock("../../identity", () => ({
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
     configPath: "~/.agentsecrets/testagent/secrets.json",
+    provider: "minimax",
     phrases: {
       thinking: ["test thinking"],
       tool: ["test tool"],

@@ -7,6 +7,17 @@ function defaultReadFileSync(filePath: any, _encoding?: any): string {
   if (p.endsWith("IDENTITY.md")) return "mock identity"
   if (p.endsWith("LORE.md")) return "mock lore"
   if (p.endsWith("FRIENDS.md")) return "mock friends"
+  if (p.endsWith("auth-profiles.json")) {
+    return JSON.stringify({
+      profiles: {
+        "anthropic:default": {
+          provider: "anthropic",
+          type: "token",
+          token: `sk-ant-oat01-${"a".repeat(80)}`,
+        },
+      },
+    })
+  }
   if (p.endsWith("package.json")) return JSON.stringify({ name: "other" })
   return ""
 }
@@ -34,6 +45,7 @@ vi.mock("../../identity", () => ({
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
     configPath: "~/.agentsecrets/testagent/secrets.json",
+    provider: "minimax",
   })),
   getAgentName: vi.fn(() => "testagent"),
   getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
@@ -79,10 +91,20 @@ import * as fs from "fs"
 import * as nodeFs from "node:fs"
 import * as path from "path"
 import { execSync, spawnSync } from "child_process"
+import * as identity from "../../identity"
 import type { ChannelCallbacks } from "../../heart/core"
 
 // Dynamic config helpers -- must be re-imported after vi.resetModules()
+async function setAgentProvider(provider: "azure" | "minimax" | "anthropic") {
+  vi.mocked(identity.loadAgentConfig).mockReturnValue({
+    name: "testagent",
+    configPath: "~/.agentsecrets/testagent/secrets.json",
+    provider,
+  })
+}
+
 async function setupMinimax(apiKey = "test-key", model = "test-model") {
+  await setAgentProvider("minimax")
   const config = await import("../../config")
   config.resetConfigCache()
   config.setTestConfig({ providers: { minimax: { apiKey, model } } })
@@ -94,6 +116,7 @@ async function setupAzure(
   deployment = "test-deployment",
   modelName = "gpt-5.2-chat",
 ) {
+  await setAgentProvider("azure")
   const config = await import("../../config")
   config.resetConfigCache()
   config.setTestConfig({ providers: { azure: { apiKey, endpoint, deployment, modelName } } })
@@ -104,6 +127,10 @@ function makeAnthropicSetupToken(): string {
 }
 
 async function setupConfig(partial: Record<string, unknown>) {
+  const providers = (partial.providers ?? {}) as Record<string, unknown>
+  if (providers.azure) await setAgentProvider("azure")
+  else if (providers.anthropic) await setAgentProvider("anthropic")
+  else await setAgentProvider("minimax")
   const config = await import("../../config")
   config.resetConfigCache()
   config.setTestConfig(partial as any)
@@ -2753,14 +2780,23 @@ describe("getClient", () => {
     expect(core.getProvider()).toBe("azure")
   })
 
-  it("falls back to MiniMax when Azure config is incomplete", async () => {
+  it("fails fast when selected Azure provider config is incomplete", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupConfig({ providers: { azure: { apiKey: "azure-test-key" }, minimax: { apiKey: "mm-key", model: "MiniMax-M2.5" } } })
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
-    const core = await import("../../heart/core")
-    expect(core.getModel()).toBe("MiniMax-M2.5")
-    expect(core.getProvider()).toBe("minimax")
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("provider 'azure' is selected"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
   })
 
   it("caches client across multiple runAgent invocations", async () => {
@@ -2872,7 +2908,7 @@ describe("getClient config integration", () => {
     expect(core.getProvider()).toBe("azure")
   })
 
-  it("config.json is the sole source for provider selection", async () => {
+  it("uses agent.json provider with secrets.json settings", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupMinimax("config-mm-key", "config-mm-model")
@@ -3071,7 +3107,7 @@ describe("anthropic setup-token provider contract", () => {
     vi.mocked(execSync).mockReset()
   })
 
-  it("uses Anthropic when setup-token credentials are available from Claude CLI profile", async () => {
+  it("uses Anthropic when setup-token credentials are available from auth-profiles store", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation((filePath: any, encoding?: any) => {
       const p = String(filePath)
@@ -3088,7 +3124,7 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-sonnet-4-6",
+          model: "claude-opus-4-6",
         },
       },
     })
@@ -3100,117 +3136,24 @@ describe("anthropic setup-token provider contract", () => {
     try {
       const core = await import("../../heart/core")
       expect(core.getProvider()).toBe("anthropic")
-      expect(core.getModel()).toBe("claude-sonnet-4-6")
+      expect(core.getModel()).toBe("claude-opus-4-6")
     } finally {
       mockExit.mockRestore()
     }
   })
 
-  it("uses keychain setup-token credentials with ISO expiry and trimmed token", async () => {
-    vi.resetModules()
-    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
-    vi.mocked(execSync).mockReturnValue(JSON.stringify({
-      claudeAiOauth: {
-        accessToken: `  ${makeAnthropicSetupToken()}  `,
-        expiresAt: new Date(Date.now() + 60_000).toISOString(),
-      },
-    }) as any)
-    await setupConfig({
-      providers: {
-        anthropic: {
-          model: "claude-sonnet-4-6",
-        },
-      },
-    })
-
-    const core = await import("../../heart/core")
-    expect(core.getProvider()).toBe("anthropic")
-    expect(vi.mocked(execSync)).toHaveBeenCalledWith(
-      'security find-generic-password -s "Claude Code-credentials" -w',
-      expect.objectContaining({ encoding: "utf8", timeout: 5000 }),
-    )
-  })
-
-  it("falls back to file credentials when keychain payload is invalid", async () => {
-    vi.resetModules()
-    vi.mocked(execSync).mockReturnValue(JSON.stringify({
-      claudeAiOauth: {
-        accessToken: makeAnthropicSetupToken(),
-        expiresAt: "not-a-date",
-      },
-    }) as any)
-    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, encoding?: any) => {
-      const p = String(filePath)
-      if (p.endsWith(path.join(".claude", ".credentials.json"))) {
-        return JSON.stringify({
-          claudeAiOauth: {
-            accessToken: makeAnthropicSetupToken(),
-            expiresAt: Date.now() + 60_000,
-          },
-        })
-      }
-      return defaultReadFileSync(filePath, encoding)
-    })
-    await setupConfig({
-      providers: {
-        anthropic: {
-          model: "claude-sonnet-4-6",
-        },
-      },
-    })
-
-    const core = await import("../../heart/core")
-    expect(core.getProvider()).toBe("anthropic")
-  })
-
-  it("treats keychain lookup as unsupported on non-macOS and falls back to file", async () => {
-    vi.resetModules()
-    const originalPlatform = process.platform
-    Object.defineProperty(process, "platform", { value: "linux" })
-    vi.mocked(execSync).mockImplementation((() => {
-      throw new Error("should not be called")
-    }) as any)
-    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, encoding?: any) => {
-      const p = String(filePath)
-      if (p.endsWith(path.join(".claude", ".credentials.json"))) {
-        return JSON.stringify({
-          claudeAiOauth: {
-            accessToken: makeAnthropicSetupToken(),
-            expiresAt: Date.now() + 60_000,
-          },
-        })
-      }
-      return defaultReadFileSync(filePath, encoding)
-    })
-    await setupConfig({
-      providers: {
-        anthropic: {
-          model: "claude-sonnet-4-6",
-        },
-      },
-    })
-
-    try {
-      const core = await import("../../heart/core")
-      expect(core.getProvider()).toBe("anthropic")
-      expect(vi.mocked(execSync)).not.toHaveBeenCalled()
-    } finally {
-      Object.defineProperty(process, "platform", { value: originalPlatform })
-    }
-  })
-
   it("fails fast with setup-token prefix guidance when non-setup Anthropic token is found", async () => {
     vi.resetModules()
-    vi.mocked(execSync).mockImplementation((() => {
-      throw new Error("missing keychain")
-    }) as any)
     vi.mocked(fs.readFileSync).mockImplementation((filePath: any, encoding?: any) => {
       const p = String(filePath)
-      if (p.endsWith(path.join(".claude", ".credentials.json"))) {
+      if (p.endsWith("auth-profiles.json")) {
         return JSON.stringify({
-          claudeAiOauth: {
-            accessToken: "sk-ant-not-setup-token",
-            expiresAt: Date.now() + 60_000,
+          profiles: {
+            "anthropic:default": {
+              provider: "anthropic",
+              type: "token",
+              token: "sk-ant-not-setup-token",
+            },
           },
         })
       }
@@ -3219,7 +3162,7 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-sonnet-4-6",
+          model: "claude-opus-4-6",
         },
       },
     })
@@ -3242,16 +3185,16 @@ describe("anthropic setup-token provider contract", () => {
 
   it("fails fast with setup-token length guidance when token is too short", async () => {
     vi.resetModules()
-    vi.mocked(execSync).mockImplementation((() => {
-      throw new Error("missing keychain")
-    }) as any)
     vi.mocked(fs.readFileSync).mockImplementation((filePath: any, encoding?: any) => {
       const p = String(filePath)
-      if (p.endsWith(path.join(".claude", ".credentials.json"))) {
+      if (p.endsWith("auth-profiles.json")) {
         return JSON.stringify({
-          claudeAiOauth: {
-            accessToken: "sk-ant-oat01-short",
-            expiresAt: Date.now() + 60_000,
+          profiles: {
+            "anthropic:default": {
+              provider: "anthropic",
+              type: "token",
+              token: "sk-ant-oat01-short",
+            },
           },
         })
       }
@@ -3260,7 +3203,7 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-sonnet-4-6",
+          model: "claude-opus-4-6",
         },
       },
     })
@@ -3282,16 +3225,17 @@ describe("anthropic setup-token provider contract", () => {
 
   it("fails fast with setup-token expiry guidance when token is expired", async () => {
     vi.resetModules()
-    vi.mocked(execSync).mockImplementation((() => {
-      throw new Error("missing keychain")
-    }) as any)
     vi.mocked(fs.readFileSync).mockImplementation((filePath: any, encoding?: any) => {
       const p = String(filePath)
-      if (p.endsWith(path.join(".claude", ".credentials.json"))) {
+      if (p.endsWith("auth-profiles.json")) {
         return JSON.stringify({
-          claudeAiOauth: {
-            accessToken: makeAnthropicSetupToken(),
-            expiresAt: Date.now() - 1,
+          profiles: {
+            "anthropic:default": {
+              provider: "anthropic",
+              type: "token",
+              token: makeAnthropicSetupToken(),
+              expiresAt: Date.now() - 1,
+            },
           },
         })
       }
@@ -3300,7 +3244,7 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-sonnet-4-6",
+          model: "claude-opus-4-6",
         },
       },
     })
@@ -3322,11 +3266,15 @@ describe("anthropic setup-token provider contract", () => {
 
   it("fails fast with re-auth guidance when Anthropic model is configured but setup-token credentials are missing", async () => {
     vi.resetModules()
-    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, encoding?: any) => {
+      const p = String(filePath)
+      if (p.endsWith("auth-profiles.json")) return JSON.stringify({ profiles: {} })
+      return defaultReadFileSync(filePath, encoding)
+    })
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-sonnet-4-6",
+          model: "claude-opus-4-6",
         },
       },
     })
@@ -3359,7 +3307,7 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-sonnet-4-6",
+          model: "claude-opus-4-6",
         },
       },
     })
@@ -3501,7 +3449,7 @@ describe("anthropic setup-token provider contract", () => {
     const [params, requestOptions] = mockAnthropicMessagesCreate.mock.calls[0]
     expect(requestOptions).toEqual({ signal: controller.signal })
     expect(params).toEqual(expect.objectContaining({
-      model: "claude-sonnet-4-6",
+      model: "claude-opus-4-6",
       stream: true,
       max_tokens: 4096,
       system: "system from array",
@@ -3523,7 +3471,7 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-sonnet-4-6",
+          model: "claude-opus-4-6",
         },
       },
     })
@@ -3573,7 +3521,7 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-sonnet-4-6",
+          model: "claude-opus-4-6",
         },
       },
     })
@@ -3615,7 +3563,7 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-sonnet-4-6",
+          model: "claude-opus-4-6",
         },
       },
     })
@@ -3661,7 +3609,7 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-sonnet-4-6",
+          model: "claude-opus-4-6",
         },
       },
     })
@@ -3693,19 +3641,17 @@ describe("anthropic setup-token provider contract", () => {
     const malformedPayloads = [
       null,
       { nope: {} },
-      { claudeAiOauth: { accessToken: "", expiresAt: Date.now() + 60_000 } },
-      { claudeAiOauth: { accessToken: makeAnthropicSetupToken(), expiresAt: {} } },
-      { claudeAiOauth: { accessToken: makeAnthropicSetupToken(), expiresAt: 0 } },
+      { profiles: { "anthropic:default": {} } },
+      { profiles: { "anthropic:default": { provider: "anthropic", token: "" } } },
+      { profiles: { "anthropic:default": { provider: "anthropic", token: makeAnthropicSetupToken(), expiresAt: {} } } },
+      { profiles: { "anthropic:default": { provider: "anthropic", token: makeAnthropicSetupToken(), expiresAt: 0 } } },
     ]
 
     for (const payload of malformedPayloads) {
       vi.resetModules()
-      vi.mocked(execSync).mockImplementation((() => {
-        throw new Error("missing keychain")
-      }) as any)
       vi.mocked(fs.readFileSync).mockImplementation((filePath: any, encoding?: any) => {
         const p = String(filePath)
-        if (p.endsWith(path.join(".claude", ".credentials.json"))) {
+        if (p.endsWith("auth-profiles.json")) {
           return JSON.stringify(payload)
         }
         return defaultReadFileSync(filePath, encoding)
@@ -3713,7 +3659,7 @@ describe("anthropic setup-token provider contract", () => {
       await setupConfig({
         providers: {
           anthropic: {
-            model: "claude-sonnet-4-6",
+            model: "claude-opus-4-6",
           },
         },
       })
@@ -3726,7 +3672,7 @@ describe("anthropic setup-token provider contract", () => {
       try {
         const core = await import("../../heart/core")
         expect(() => core.getProvider()).toThrow("process.exit called")
-        expect(mockError).toHaveBeenCalledWith(expect.stringContaining("no Claude setup-token credential was found"))
+        expect(mockError).toHaveBeenCalledWith(expect.stringContaining("no setup-token credential was found"))
       } finally {
         mockExit.mockRestore()
         mockError.mockRestore()
@@ -3746,7 +3692,7 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-sonnet-4-6",
+          model: "claude-opus-4-6",
         },
       },
     })
@@ -3821,7 +3767,7 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-sonnet-4-6",
+          model: "claude-opus-4-6",
         },
       },
     })
@@ -3851,6 +3797,7 @@ describe("anthropic setup-token provider contract", () => {
 
   it("logs non-Error provider-resolution failures before exiting", async () => {
     vi.resetModules()
+    await setAgentProvider("anthropic")
     vi.doMock("../../config", () => ({
       getAzureConfig: () => ({
         apiKey: "",

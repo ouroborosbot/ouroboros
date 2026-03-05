@@ -15,6 +15,7 @@ vi.mock("../identity", () => ({
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
     configPath: "~/.agentsecrets/testagent/secrets.json",
+  provider: "minimax",
   })),
   getAgentName: vi.fn(() => "testagent"),
 }))
@@ -29,6 +30,7 @@ beforeEach(() => {
   vi.mocked(identity.loadAgentConfig).mockReturnValue({
     name: "testagent",
     configPath: "~/.agentsecrets/testagent/secrets.json",
+  provider: "minimax",
   })
   vi.mocked(identity.getAgentName).mockReturnValue("testagent")
 })
@@ -80,6 +82,7 @@ describe("loadConfig", () => {
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
       name: "testagent",
       configPath: "~/.agentconfigs/testagent/config.json",
+    provider: "minimax",
     })
 
     const { loadConfig, resetConfigCache } = await import("../config")
@@ -109,6 +112,13 @@ describe("loadConfig", () => {
     const written = vi.mocked(fs.writeFileSync).mock.calls[0]?.[1]
     const parsed = JSON.parse(String(written)) as Record<string, unknown>
     expect(parsed).toHaveProperty("providers")
+    expect(parsed).toMatchObject({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+        },
+      },
+    })
     expect(parsed).not.toHaveProperty("teams")
     expect(parsed).not.toHaveProperty("oauth")
     expect(parsed).not.toHaveProperty("context")
@@ -181,6 +191,7 @@ describe("loadConfig", () => {
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
       name: "myagent",
       configPath: "~/custom/path/config.json",
+    provider: "minimax",
     })
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
 
@@ -196,6 +207,7 @@ describe("loadConfig", () => {
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
       name: "myagent",
       configPath: "/absolute/path/config.json",
+    provider: "minimax",
     })
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
 
@@ -356,6 +368,7 @@ describe("getContextConfig", () => {
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
       context: {
         maxTokens: 100000,
         contextMargin: 25,
@@ -396,6 +409,7 @@ describe("getContextConfig", () => {
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
       context: {
         maxTokens: "bad",
         contextMargin: 12,
@@ -417,6 +431,7 @@ describe("getContextConfig", () => {
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
       context: {
         maxTokens: 91000,
         contextMargin: "bad",

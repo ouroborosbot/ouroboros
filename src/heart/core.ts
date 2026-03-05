@@ -1,10 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { execSync } from "child_process";
 import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
 import OpenAI, { AzureOpenAI } from "openai";
-import { getAnthropicConfig, getAzureConfig, getMinimaxConfig, getContextConfig } from "../config";
+import {
+  getAnthropicConfig,
+  getAzureConfig,
+  getAuthProfilesPath,
+  getContextConfig,
+  getMinimaxConfig,
+} from "../config";
+import { loadAgentConfig } from "../identity";
 import { execTool, summarizeArgs, finalAnswerTool, getToolsForChannel, isConfirmationRequired } from "../repertoire/tools";
 import type { ToolContext } from "../repertoire/tools";
 import { getChannelCapabilities } from "../mind/friends/channel";
@@ -56,66 +60,79 @@ interface AnthropicCredential {
 }
 
 function getAnthropicReauthGuidance(reason: string): string {
-  return `${reason} Run \`claude setup-token\` and retry.`;
+  return `${reason} Run \`claude setup-token\`, then store the token in ${getAuthProfilesPath()}.`;
 }
 
-function parseClaudeCliOauth(raw: unknown): AnthropicCredential | null {
-  if (!raw || typeof raw !== "object") return null;
-  const oauth = (raw as Record<string, unknown>).claudeAiOauth;
-  if (!oauth || typeof oauth !== "object") return null;
-
-  const accessToken = (oauth as Record<string, unknown>).accessToken;
-  const expiresAtRaw = (oauth as Record<string, unknown>).expiresAt;
-  if (typeof accessToken !== "string" || accessToken.trim().length === 0) return null;
-
-  let expiresAt: number;
-  if (typeof expiresAtRaw === "number") {
-    expiresAt = expiresAtRaw;
-  } else if (typeof expiresAtRaw === "string") {
-    const parsed = Date.parse(expiresAtRaw);
-    if (!Number.isFinite(parsed)) return null;
-    expiresAt = parsed;
-  } else {
-    return null;
+function parseExpiry(raw: unknown): number {
+  if (raw === undefined || raw === null) return Number.POSITIVE_INFINITY;
+  if (typeof raw === "number") return Number.isFinite(raw) && raw > 0 ? raw : Number.NaN;
+  if (typeof raw === "string") {
+    const parsed = Date.parse(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : Number.NaN;
   }
-
-  if (!Number.isFinite(expiresAt) || expiresAt <= 0) return null;
-  return { token: accessToken.trim(), expiresAt };
+  return Number.NaN;
 }
 
-function readAnthropicCredentialFromKeychain(): AnthropicCredential | null {
-  if (process.platform !== "darwin") return null;
+function toAnthropicCredential(profile: Record<string, unknown>): AnthropicCredential | null {
+  const provider = profile.provider;
+  if (typeof provider === "string" && provider !== "anthropic") return null;
+
+  const tokenRaw = typeof profile.token === "string"
+    ? profile.token
+    : (typeof profile.accessToken === "string" ? profile.accessToken : "");
+  if (!tokenRaw.trim()) return null;
+
+  const expiresAt = parseExpiry(profile.expiresAt ?? profile.expires);
+  if (Number.isNaN(expiresAt)) return null;
+
+  return {
+    token: tokenRaw.trim(),
+    expiresAt,
+  };
+}
+
+function readAnthropicCredentialFromAuthProfiles(): AnthropicCredential | null {
   try {
-    const raw = execSync(
-      'security find-generic-password -s "Claude Code-credentials" -w',
-      {
-        encoding: "utf8",
-        timeout: 5000,
-        stdio: ["pipe", "pipe", "pipe"],
-      },
-    ).trim();
-    return parseClaudeCliOauth(JSON.parse(raw) as Record<string, unknown>);
-  } catch {
-    return null;
-  }
-}
+    const raw = fs.readFileSync(getAuthProfilesPath(), "utf-8");
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
 
-function readAnthropicCredentialFromFile(): AnthropicCredential | null {
-  const credentialsPath = path.join(os.homedir(), ".claude", ".credentials.json");
-  try {
-    const raw = fs.readFileSync(credentialsPath, "utf-8");
-    return parseClaudeCliOauth(JSON.parse(raw) as Record<string, unknown>);
+    const profilesRaw = parsed.profiles;
+    if (profilesRaw && typeof profilesRaw === "object" && !Array.isArray(profilesRaw)) {
+      const profiles = profilesRaw as Record<string, unknown>;
+      const profileIds = Object.keys(profiles)
+        .filter((id) => id.startsWith("anthropic"))
+        .sort((a, b) => {
+          if (a === "anthropic:default") return -1;
+          if (b === "anthropic:default") return 1;
+          return a.localeCompare(b);
+        });
+      for (const profileId of profileIds) {
+        const entry = profiles[profileId];
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+        const credential = toAnthropicCredential(entry as Record<string, unknown>);
+        if (credential) return credential;
+      }
+    }
+
+    const anthropicRaw = parsed.anthropic;
+    if (anthropicRaw && typeof anthropicRaw === "object" && !Array.isArray(anthropicRaw)) {
+      return toAnthropicCredential({
+        provider: "anthropic",
+        ...(anthropicRaw as Record<string, unknown>),
+      });
+    }
   } catch {
-    return null;
+    // Missing/invalid auth profile file should produce explicit guidance via caller.
   }
+  return null;
 }
 
 function resolveAnthropicSetupTokenCredential(): AnthropicCredential {
-  const credential = readAnthropicCredentialFromKeychain() ?? readAnthropicCredentialFromFile();
+  const credential = readAnthropicCredentialFromAuthProfiles();
   if (!credential) {
     throw new Error(
       getAnthropicReauthGuidance(
-        "Anthropic model is configured but no Claude setup-token credential was found.",
+        "Anthropic provider is selected but no setup-token credential was found.",
       ),
     );
   }
@@ -139,12 +156,16 @@ function resolveAnthropicSetupTokenCredential(): AnthropicCredential {
   return credential;
 }
 
-function toAnthropicTextContent(content: OpenAI.ChatCompletionContentPart[] | string | null | undefined): string {
+function toAnthropicTextContent(content: unknown): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   return content
-    .filter((part): part is OpenAI.ChatCompletionContentPartText => part.type === "text")
-    .map((part) => part.text)
+    .filter((part): part is { type: string; text?: unknown } => (
+      typeof part === "object" &&
+      part !== null &&
+      (part as { type?: unknown }).type === "text"
+    ))
+    .map((part) => (typeof part.text === "string" ? part.text : ""))
     .join("\n");
 }
 
@@ -289,7 +310,7 @@ async function streamAnthropicMessages(
   let response: AsyncIterable<Record<string, unknown>>;
   try {
     response = await client.messages.create(
-      params as Anthropic.MessageCreateParamsStreaming,
+      params as unknown as Anthropic.MessageCreateParamsStreaming,
       request.signal ? { signal: request.signal } : {},
     ) as AsyncIterable<Record<string, unknown>>;
   } catch (error) {
@@ -382,11 +403,13 @@ async function streamAnthropicMessages(
 }
 
 export function createProviderRegistry(): ProviderRegistry {
-  const runtimes: Array<() => ProviderRuntime | null> = [
-    () => {
+  const runtimeFactories: Record<ProviderId, () => ProviderRuntime> = {
+    azure: () => {
       const azureConfig = getAzureConfig();
       if (!(azureConfig.apiKey && azureConfig.endpoint && azureConfig.deployment && azureConfig.modelName)) {
-        return null;
+        throw new Error(
+          "provider 'azure' is selected in agent.json but providers.azure is incomplete in secrets.json.",
+        );
       }
       const client = new AzureOpenAI({
         apiKey: azureConfig.apiKey,
@@ -412,9 +435,7 @@ export function createProviderRegistry(): ProviderRegistry {
           nativeInput.push({ type: "function_call_output", call_id: callId, output });
         },
         async streamTurn(request: ProviderTurnRequest): Promise<TurnResult> {
-          if (!nativeInput) {
-            this.resetTurnState(request.messages);
-          }
+          if (!nativeInput) this.resetTurnState(request.messages);
           const params: Record<string, unknown> = {
             model: this.model,
             input: nativeInput,
@@ -427,23 +448,19 @@ export function createProviderRegistry(): ProviderRegistry {
           };
           if (request.traceId) params.metadata = { trace_id: request.traceId };
           if (request.toolChoiceRequired) params.tool_choice = "required";
-          const result = await streamResponsesApi(
-            this.client,
-            params,
-            request.callbacks,
-            request.signal,
-          );
-          for (const item of result.outputItems) {
-            nativeInput!.push(item);
-          }
+          const result = await streamResponsesApi(this.client as OpenAI, params, request.callbacks, request.signal);
+          for (const item of result.outputItems) nativeInput!.push(item);
           return result;
         },
       };
     },
-    () => {
+    anthropic: () => {
       const anthropicConfig = getAnthropicConfig();
-      if (!anthropicConfig.model) return null;
-
+      if (!anthropicConfig.model) {
+        throw new Error(
+          "provider 'anthropic' is selected in agent.json but providers.anthropic.model is missing in secrets.json.",
+        );
+      }
       const credential = resolveAnthropicSetupTokenCredential();
       const client = new Anthropic({
         apiKey: credential.token,
@@ -453,7 +470,6 @@ export function createProviderRegistry(): ProviderRegistry {
           "anthropic-beta": ANTHROPIC_OAUTH_BETA_HEADER,
         },
       });
-
       return {
         id: "anthropic",
         model: anthropicConfig.model,
@@ -469,9 +485,13 @@ export function createProviderRegistry(): ProviderRegistry {
         },
       };
     },
-    () => {
+    minimax: () => {
       const minimaxConfig = getMinimaxConfig();
-      if (!minimaxConfig.apiKey) return null;
+      if (!minimaxConfig.apiKey) {
+        throw new Error(
+          "provider 'minimax' is selected in agent.json but providers.minimax.apiKey is missing in secrets.json.",
+        );
+      }
       const client = new OpenAI({
         apiKey: minimaxConfig.apiKey,
         baseURL: "https://api.minimaxi.chat/v1",
@@ -497,18 +517,16 @@ export function createProviderRegistry(): ProviderRegistry {
           if (this.model) params.model = this.model;
           if (request.traceId) params.metadata = { trace_id: request.traceId };
           if (request.toolChoiceRequired) params.tool_choice = "required";
-          return streamChatCompletion(this.client, params, request.callbacks, request.signal);
+          return streamChatCompletion(this.client as OpenAI, params, request.callbacks, request.signal);
         },
       };
     },
-  ];
+  };
+
   return {
     resolve(): ProviderRuntime | null {
-      for (const runtimeFactory of runtimes) {
-        const runtime = runtimeFactory();
-        if (runtime) return runtime;
-      }
-      return null;
+      const provider = loadAgentConfig().provider;
+      return runtimeFactories[provider]();
     },
   };
 }
@@ -524,7 +542,7 @@ function getProviderRuntime(): ProviderRuntime {
     }
     if (!_providerRuntime) {
       console.error(
-        "no provider configured. set azure, minimax, or anthropic credentials in secrets.json.",
+        "provider runtime could not be initialized.",
       );
       process.exit(1);
       throw new Error("unreachable");

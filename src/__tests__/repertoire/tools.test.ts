@@ -33,6 +33,7 @@ vi.mock("../../identity", () => ({
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
     configPath: "~/.agentsecrets/testagent/secrets.json",
+  provider: "minimax",
   })),
   getAgentName: vi.fn(() => "testagent"),
   getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
