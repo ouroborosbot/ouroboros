@@ -3413,7 +3413,7 @@ describe("anthropic setup-token provider contract", () => {
       {
         id: "call0",
         name: "read_file",
-        arguments: "{\"path\":\"a.txt\"},\"line\":1",
+        arguments: "{\"path\":\"a.txt\",\"line\":1}",
       },
       {
         id: "call1",
