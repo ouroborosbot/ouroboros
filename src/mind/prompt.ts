@@ -142,7 +142,8 @@ export function contextSection(context?: ResolvedContext): string {
   if (!ch.supportsStreaming) traits.push("no streaming")
   if (ch.supportsStreaming) traits.push("streaming")
   if (ch.supportsRichCards) traits.push("rich cards")
-  if (ch.maxMessageLength !== Infinity) traits.push(`max ${ch.maxMessageLength} chars`)
+  // maxMessageLength constraint removed -- chunked streaming handles delivery,
+  // error recovery splits on failure. No artificial limits in the prompt.
   /* v8 ignore next -- empty-traits branch unreachable: streaming/no-streaming always adds a trait @preserve */
   lines.push(`channel: ${ch.channel}${traits.length ? ` (${traits.join(", ")})` : ""}`)
 

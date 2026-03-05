@@ -16,9 +16,9 @@ const CHANNEL_CAPABILITIES: Record<string, ChannelCapabilities> = {
     channel: "teams",
     availableIntegrations: ["ado", "graph"],
     supportsMarkdown: true,
-    supportsStreaming: false,
+    supportsStreaming: true,
     supportsRichCards: true,
-    maxMessageLength: 4000,
+    maxMessageLength: Infinity,
   },
 }
 

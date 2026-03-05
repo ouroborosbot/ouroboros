@@ -622,9 +622,9 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
       channel: "teams" as const,
       availableIntegrations: ["ado" as const, "graph" as const],
       supportsMarkdown: true,
-      supportsStreaming: false,
+      supportsStreaming: true,
       supportsRichCards: true,
-      maxMessageLength: 4000,
+      maxMessageLength: Infinity,
     }
     const result = getToolsForChannel(teamsCaps)
     const names = result.map((t: any) => t.function.name)
@@ -668,9 +668,9 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
       channel: "teams" as const,
       availableIntegrations: ["graph" as const],
       supportsMarkdown: true,
-      supportsStreaming: false,
+      supportsStreaming: true,
       supportsRichCards: true,
-      maxMessageLength: 4000,
+      maxMessageLength: Infinity,
     }
     const result = getToolsForChannel(caps)
     const names = result.map((t: any) => t.function.name)
@@ -697,9 +697,9 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
       channel: "teams" as const,
       availableIntegrations: ["ado" as const],
       supportsMarkdown: true,
-      supportsStreaming: false,
+      supportsStreaming: true,
       supportsRichCards: true,
-      maxMessageLength: 4000,
+      maxMessageLength: Infinity,
     }
     const result = getToolsForChannel(caps)
     const names = result.map((t: any) => t.function.name)
@@ -727,9 +727,9 @@ describe("getToolsForChannel with toolPreferences", () => {
     channel: "teams" as const,
     availableIntegrations: ["ado" as const, "graph" as const],
     supportsMarkdown: true,
-    supportsStreaming: false,
+    supportsStreaming: true,
     supportsRichCards: true,
-    maxMessageLength: 4000,
+    maxMessageLength: Infinity,
   }
   const cliCaps = {
     channel: "cli" as const,
@@ -933,9 +933,9 @@ describe("ToolContext shape", () => {
           channel: "teams" as const,
           availableIntegrations: ["ado" as const, "graph" as const],
           supportsMarkdown: true,
-          supportsStreaming: false,
+          supportsStreaming: true,
           supportsRichCards: true,
-          maxMessageLength: 4000,
+          maxMessageLength: Infinity,
         },
       },
     }
@@ -1593,9 +1593,9 @@ describe("getToolsForChannel includes docs tools", () => {
       channel: "teams" as const,
       availableIntegrations: ["ado" as const, "graph" as const],
       supportsMarkdown: true,
-      supportsStreaming: false,
+      supportsStreaming: true,
       supportsRichCards: true,
-      maxMessageLength: 4000,
+      maxMessageLength: Infinity,
     }
     const teamsTools = getToolsForChannel(teamsCaps)
     const names = teamsTools.map((t: any) => t.function.name)
