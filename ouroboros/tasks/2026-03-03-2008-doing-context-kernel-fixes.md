@@ -924,7 +924,7 @@ Tests to KEEP AS-IS (these currently pass and assert behavior we are keeping):
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new/modified code, all tests green
 
-### ⬜ Unit 22a: Timestamped notes -- Tests
+### ✅ Unit 22a: Timestamped notes -- Tests
 **What**: Write NEW failing tests and UPDATE EXISTING tests for the change from `Record<string, string>` to `Record<string, { value: string, savedAt: string }>` for the `notes` field. Tests span multiple files.
 
 **New failing tests:**
