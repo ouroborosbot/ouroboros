@@ -40,6 +40,16 @@ describe("getChannelCapabilities", () => {
     }
   })
 
+  it("teams channel includes github in availableIntegrations", () => {
+    const caps = getChannelCapabilities("teams")
+    expect(caps.availableIntegrations).toContain("github")
+  })
+
+  it("cli channel does NOT include github in availableIntegrations", () => {
+    const caps = getChannelCapabilities("cli")
+    expect(caps.availableIntegrations).not.toContain("github")
+  })
+
   it("all capability fields are present and correctly typed", () => {
     for (const channel of ["cli", "teams"] as const) {
       const caps = getChannelCapabilities(channel)
