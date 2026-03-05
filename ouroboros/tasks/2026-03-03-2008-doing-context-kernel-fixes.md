@@ -747,7 +747,7 @@ Pre-existing failing tests (written during prior work, before implementation):
 **Output**: No new test files -- confirm 4 existing tests fail
 **Acceptance**: 4 tests FAIL (red), all other tests PASS
 
-### ⬜ Unit 21b: Add totalTokens to FriendRecord -- Implementation
+### ✅ Unit 21b: Add totalTokens to FriendRecord -- Implementation
 **What**: Add `totalTokens: number` to `FriendRecord` and wire it through the store and resolver. Keep `schemaVersion` at 1 (no migration needed -- friend records will be bombed for testing).
 
 Changes:
