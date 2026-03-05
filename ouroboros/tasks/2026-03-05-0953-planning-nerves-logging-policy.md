@@ -142,3 +142,4 @@ Achieve 100% nerves observability coverage across all production source files: e
 - 2026-03-05 09:54 Created
 - 2026-03-05 09:54 Resolved open questions, updated decisions, approved
 - 2026-03-05 10:05 Scope expanded: bidirectional audit + full nerves coverage of all production files
+- 2026-03-05 10:09 Resolved all open questions: skip 3 pure-type/infra files, runtime-primary enforcement model, domain grouping
