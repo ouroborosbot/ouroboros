@@ -136,7 +136,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Failing boundary tests plus artifact logs `unit-4d-red-run.txt` and `unit-4d-red-jest.json`.
 **Acceptance**: Tests fail red, logs are saved under the task artifacts directory, and failures identify provider-specific runtime logic still anchored in `src/heart/core.ts`.
 
-### ⬜ Unit 4e: Provider module extraction pre-Unit-5 pass — Implementation
+### ✅ Unit 4e: Provider module extraction pre-Unit-5 pass — Implementation
 **What**: Create `src/heart/providers/` and extract provider-specific runtime logic from `src/heart/core.ts` into `src/heart/providers/{anthropic,azure,minimax}.ts` with no behavior change.
 **Output**: Provider-module refactor plus artifact logs `unit-4e-green-run.txt` and `unit-4e-jest.json`.
 **Acceptance**: Boundary tests pass green, targeted regression suites stay green, and artifacts are saved under the task artifacts directory.
@@ -256,3 +256,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 18:40 Pass 3 (Validation) aligned Units 4d-4m to actual repository test/runtime files and explicit provider-module creation path
 - 2026-03-04 18:41 Pass 4 (Quality) confirmed completion criteria, coverage section, and unit emoji/status formatting with no additional content gaps
 - 2026-03-04 18:44 Unit 4d complete: added failing provider-module boundary tests in `core.test.ts`/`streaming.test.ts` with red artifacts (`unit-4d-red-run.txt`, `unit-4d-red-jest.json`, `unit-4d-red-run.exit`)
+- 2026-03-04 18:50 Unit 4e complete: extracted Azure/Anthropic/MiniMax runtimes into `src/heart/providers/*` with green targeted tests and clean build (`unit-4e-green-run.txt`, `unit-4e-jest.json`, `unit-4e-build.txt`)
