@@ -2,6 +2,11 @@ import { describe, it, expect, vi } from "vitest"
 import { FriendResolver } from "../../../mind/friends/resolver"
 import type { FriendStore } from "../../../mind/friends/store"
 import type { FriendRecord } from "../../../mind/friends/types"
+import { emitNervesEvent } from "../../../nerves/runtime"
+
+vi.mock("../../../nerves/runtime", () => ({
+  emitNervesEvent: vi.fn(),
+}))
 
 function makeFriend(overrides: Partial<FriendRecord> = {}): FriendRecord {
   return {
@@ -341,6 +346,53 @@ describe("FriendResolver", () => {
       // Should still resolve even if put fails
       const ctx = await resolver.resolve()
       expect(ctx.friend.name).toBe("User")
+    })
+
+    it("emits friends.persist_error nerves event when store.put throws", async () => {
+      vi.mocked(emitNervesEvent).mockClear()
+      const store = createMockStore()
+      ;(store.findByExternalId as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+      ;(store.put as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("disk full"))
+
+      const resolver = new FriendResolver(store, {
+        provider: "local",
+        externalId: "user",
+        displayName: "User",
+        channel: "cli",
+      })
+
+      await resolver.resolve()
+
+      expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+        level: "error",
+        event: "friends.persist_error",
+        component: "friends",
+        message: "failed to persist friend record",
+        meta: { reason: "disk full" },
+      }))
+    })
+
+    it("emits friends.persist_error with stringified reason for non-Error throws", async () => {
+      vi.mocked(emitNervesEvent).mockClear()
+      const store = createMockStore()
+      ;(store.findByExternalId as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+      ;(store.put as ReturnType<typeof vi.fn>).mockRejectedValue("raw string error")
+
+      const resolver = new FriendResolver(store, {
+        provider: "local",
+        externalId: "user",
+        displayName: "User",
+        channel: "cli",
+      })
+
+      await resolver.resolve()
+
+      expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+        level: "error",
+        event: "friends.persist_error",
+        component: "friends",
+        meta: { reason: "raw string error" },
+      }))
     })
   })
 })
