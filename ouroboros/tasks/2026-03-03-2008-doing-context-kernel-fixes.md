@@ -544,7 +544,7 @@ Also verify the removal propagates:
 **Output**: New test cases in `src/__tests__/senses/teams.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because no periodic flush timer exists yet
 
-### ⬜ Unit 19b: Chunked streaming (periodic flush timer) -- implementation
+### ✅ Unit 19b: Chunked streaming (periodic flush timer) -- implementation
 **What**: Implement the periodic flush timer in `createTeamsCallbacks` (`src/senses/teams.ts`):
 
 1. Add constant `DEFAULT_FLUSH_INTERVAL_MS = 1_000` (1s -- at the Teams 1 req/sec throttle floor; tune up if 429s observed). Export for testability. Add a comment block above the constant documenting why chunked streaming exists and this specific value, with links:
@@ -698,3 +698,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-04 16:33 Unit 18b complete: removed all disableStreaming/buffered mode code across 5 files -- teams.ts (callbacks, handleTeamsMessage, startTeamsApp), core.ts (RunAgentOptions), prompt.ts (BuildSystemOptions, flagsSection removed), config.ts (TeamsChannelConfig), package.json (teams:no-stream script). 1263 tests pass, build clean
 - 2026-03-04 16:34 Unit 18c complete: 100% coverage on all modified files (config.ts, core.ts, prompt.ts). teams.ts uncovered lines 222, 542 are pre-existing gaps (onClearText, ctxSend). Zero references to disableStreaming/buffered/--disable-streaming/teams:no-stream in source code. No refactoring needed
 - 2026-03-04 16:36 Unit 19a complete: 11 tests for periodic flush timer using vi.useFakeTimers(). 8 fail (red) -- no periodic timer exists yet. 3 pass vacuously (cleanup tests). Tests cover: timer fires at interval, multiple flushes, empty no-op, start on first text chunk, abort/flush/markStopped cleanup, first flush within 15s, reasoning phase isolation, end-of-turn flush, flushIntervalMs override
+- 2026-03-04 16:38 Unit 19b complete: periodic flush timer implemented -- DEFAULT_FLUSH_INTERVAL_MS=1000, startFlushTimer/stopFlushTimer helpers, onTextChunk starts timer, markStopped/flush/abort cleans up, flushIntervalMs threaded from config. 1274 tests pass, build clean
