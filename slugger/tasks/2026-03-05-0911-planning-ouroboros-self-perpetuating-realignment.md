@@ -78,7 +78,7 @@ After preflight, this planning doc is at `slugger/tasks/2026-03-05-0911-planning
 
 ### Per-Gate Execution Loop
 
-For each gate (0 through 11), execute this cycle:
+For each gate (0, 1, 2, 3a, 3b, 4, 5, 6, 7, 8, 9, 10, 11), execute this cycle:
 
 **Step 1: Branch**
 ```
@@ -316,21 +316,43 @@ Implement the `.ouro` bundle structure and relocate shared governance docs. This
 
 ---
 
-### Gate 3: Harness Primitives + Aspiration Layer
+### Gate 3a: Pipeline Teardown + Harness Tools
 
-Build the toolkit layer — the tools and conventions the model calls into. Remove the puppet pipeline. Add the aspiration layer that gives agents direction without being prescriptive.
-
-**This is the largest gate. Work-planner should expect 20+ TDD units** covering: puppet removal, harness tools, memory system (3 layers + write pipeline), aspiration layer, inner dialog session + instincts, and supervisor with heartbeat.
+Remove the puppet pipeline and build the toolkit layer — the tools and conventions the model calls into. This is the inversion: code goes from using the model to being usable by the model.
 
 **In scope:**
 - Implement harness tools per Gate 1 design (protocol loading, governance loading, reflection context, etc.)
-- Make subagent protocols loadable knowledge: model reads them from its bundle, follows them by choice
+- Make protocols loadable knowledge the model reads and follows by choice. Two sources: shared subagent protocols from repo-root `subagents/` (work-planner, work-doer, work-merger), and agent-specific skills from `<agent>.ouro/skills/`. The loading convention must handle both.
 - Remove `autonomous-loop.ts`, `loop-entry.ts`, and the puppet `runStage()` pipeline
 - Remove `autonomous-loop.test.ts` (tests for removed code)
 - Clean up `package.json` scripts that reference removed files: `reflect` and `reflect:dry` (reference `reflect-entry.js`), `reflect:loop` and `reflect:loop:dry` (reference `loop-entry.js`)
 - Refactor `trigger.ts`: keep the context-loading utilities (they're useful), remove the pipeline orchestration
 - Constitution gate becomes a queryable convention, not a hardcoded `if` statement
 - Reflection becomes a capability the model can invoke, not a stage in a pipeline
+
+**Completion criteria:**
+- [ ] Harness tools implemented per Gate 1 design, with tests
+- [ ] Protocols loadable from both sources: shared subagent protocols (`subagents/`) and agent-specific skills (`<agent>.ouro/skills/`)
+- [ ] `autonomous-loop.ts` removed
+- [ ] `loop-entry.ts` removed
+- [ ] `autonomous-loop.test.ts` removed
+- [ ] `package.json` scripts cleaned up (no references to removed files)
+- [ ] Pipeline orchestration removed from `trigger.ts`
+- [ ] Context-loading utilities preserved and tested
+- [ ] Constitution compliance queryable as a tool/convention
+- [ ] `npm test` green
+- [ ] 100% coverage on new code
+- [ ] No warnings
+
+---
+
+### Gate 3b: Memory, Aspirations, Inner Dialog + Supervisor
+
+The systems that make the agent a persistent, self-directed being. Memory gives it continuity, aspirations give it direction, inner dialog gives it autonomous thought, supervisor keeps it alive.
+
+**This is the largest gate. Work-planner should expect 15+ TDD units** covering: memory system (3 layers + write pipeline), aspiration layer, inner dialog session + instincts, and supervisor with heartbeat.
+
+**In scope:**
 - **Agent memory system:** Implement the three-layer memory architecture from `memory-system.md` (NOTE: the spec uses `data/memory/` paths — translate all to `psyche/memory/` per our bundle naming decision):
   - **Layer 1 (Reflexive):** Psyche files always loaded into system prompt (already exists). Add dynamic `CONTEXT.md` regenerated on session start.
   - **Layer 2 (Associative):** Memory trigger detector + retriever that pre-fetches relevant facts before each model call, injected as a `## recalled context` section in the system prompt. TF-IDF + entity matching for v1 (no embeddings dependency).
@@ -353,18 +375,9 @@ Build the toolkit layer — the tools and conventions the model calls into. Remo
   - **Important context (Ralph loop):** This pattern is related to the "Ralph loop" concept (Geoffrey Huntley) — a while-true loop that keeps an AI agent working. Key insight from that pattern: progress lives in files and git, not the context window. Key risk: spinning in a tight loop burning tokens with no progress. The instincts system is how the agent avoids this — it develops judgment about when to work and when to rest, rather than relying on hardcoded cost caps.
 - **Heartbeat:** When the agent decides it has nothing urgent to do, it "rests" — but rest does NOT mean off. The agent must never go permanently dormant with no way to wake itself. The supervisor sends a periodic heartbeat nudge into the inner dialog session at a harness-level default interval. On heartbeat, the agent checks in: anything changed? Any new tasks? Any aspirations worth pursuing? If yes, it works. If no, it goes back to rest until the next heartbeat. The heartbeat is the simplest possible instinct — the baseline "check in with yourself."
 - **Supervisor:** A minimal Node.js process supervisor that keeps the agent alive and starts its inner dialog. Not a cron, not a task scheduler — just "make sure this agent is running and thinking." The existing `self-restart.sh` (exit code 42) is the seed — upgrade to a proper Node.js supervisor with: child process spawning, crash detection, restart with backoff, health check, inner dialog session startup, and heartbeat timer. This is NOT the full daemon from Gate 10 — just enough to keep one agent alive and thinking.
-- **Out of scope for Gate 3:** External event waking (git push, new task appearing, etc.) — separate concern. Session interaction model (how friend messages interrupt/interleave with inner dialog beyond basic concurrency) — Gate 10 daemon territory. Detailed cost guardrails — developed collaboratively with the agent post-bootstrap.
+- **Out of scope for Gate 3b:** External event waking (git push, new task appearing, etc.) — separate concern. Session interaction model (how friend messages interrupt/interleave with inner dialog beyond basic concurrency) — Gate 10 daemon territory. Detailed cost guardrails — developed collaboratively with the agent post-bootstrap.
 
 **Completion criteria:**
-- [ ] Harness tools implemented per Gate 1 design, with tests
-- [ ] Subagent protocols loadable from bundle (model reads, not injected)
-- [ ] `autonomous-loop.ts` removed
-- [ ] `loop-entry.ts` removed
-- [ ] `autonomous-loop.test.ts` removed
-- [ ] `package.json` scripts cleaned up (no references to removed files)
-- [ ] Pipeline orchestration removed from `trigger.ts`
-- [ ] Context-loading utilities preserved and tested
-- [ ] Constitution compliance queryable as a tool/convention
 - [ ] Agent memory: fact extraction runs after each engine turn (regex highlight detector)
 - [ ] Agent memory: extract-before-trim hook prevents fact loss on context window trim
 - [ ] Agent memory: `memory_search` tool callable by the model
