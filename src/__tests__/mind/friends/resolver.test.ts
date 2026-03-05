@@ -131,6 +131,22 @@ describe("FriendResolver", () => {
       expect(ctx.friend.updatedAt).toBe(ctx.friend.createdAt)
     })
 
+    it("initializes totalTokens to 0 on newly created friend records", async () => {
+      const store = createMockStore()
+      ;(store.findByExternalId as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+
+      const resolver = new FriendResolver(store, {
+        provider: "aad",
+        externalId: "new-aad-id",
+        tenantId: "t1",
+        displayName: "New Person",
+        channel: "teams",
+      })
+
+      const ctx = await resolver.resolve()
+      expect(ctx.friend.totalTokens).toBe(0)
+    })
+
     it("creates new friend without tenantId for local provider", async () => {
       const store = createMockStore()
       ;(store.findByExternalId as ReturnType<typeof vi.fn>).mockResolvedValue(null)

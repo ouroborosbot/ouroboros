@@ -314,6 +314,62 @@ describe("FileFriendStore", () => {
     })
   })
 
+  describe("totalTokens persistence", () => {
+    it("persists totalTokens in agent knowledge file", async () => {
+      const store = new FileFriendStore(agentKnowledgePath, piiBridgePath)
+      const friend = makeFriend({ totalTokens: 5000 })
+      await store.put("uuid-1", friend)
+
+      // Read agent knowledge file directly -- should have totalTokens
+      const agentFile = path.join(agentKnowledgePath, "uuid-1.json")
+      const agentData = JSON.parse(await fs.readFile(agentFile, "utf-8"))
+      expect(agentData.totalTokens).toBe(5000)
+    })
+
+    it("reads totalTokens back from disk via get()", async () => {
+      const store = new FileFriendStore(agentKnowledgePath, piiBridgePath)
+      const friend = makeFriend({ totalTokens: 12345 })
+      await store.put("uuid-1", friend)
+      const result = await store.get("uuid-1")
+      expect(result).not.toBeNull()
+      expect(result!.totalTokens).toBe(12345)
+    })
+
+    it("returns totalTokens: 0 for legacy record lacking the field", async () => {
+      const store = new FileFriendStore(agentKnowledgePath, piiBridgePath)
+      // Write a legacy agent knowledge file WITHOUT totalTokens
+      await fs.mkdir(agentKnowledgePath, { recursive: true })
+      await fs.writeFile(
+        path.join(agentKnowledgePath, "legacy-uuid.json"),
+        JSON.stringify({
+          id: "legacy-uuid",
+          displayName: "Legacy Friend",
+          toolPreferences: {},
+          notes: {},
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          schemaVersion: 1,
+          // NOTE: no totalTokens field -- simulating pre-totalTokens record
+        }),
+      )
+      // Write corresponding PII bridge
+      await fs.mkdir(piiBridgePath, { recursive: true })
+      await fs.writeFile(
+        path.join(piiBridgePath, "legacy-uuid.json"),
+        JSON.stringify({
+          id: "legacy-uuid",
+          externalIds: [],
+          tenantMemberships: [],
+          schemaVersion: 1,
+        }),
+      )
+
+      const result = await store.get("legacy-uuid")
+      expect(result).not.toBeNull()
+      expect(result!.totalTokens).toBe(0)
+    })
+  })
+
   describe("concurrent operations", () => {
     it("concurrent puts to different IDs do not corrupt each other", async () => {
       const store = new FileFriendStore(agentKnowledgePath, piiBridgePath)
