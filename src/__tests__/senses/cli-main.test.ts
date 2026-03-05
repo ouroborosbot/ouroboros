@@ -58,6 +58,7 @@ vi.mock("readline", () => ({
 vi.mock("../../heart/core", () => ({
   runAgent: (...a: any[]) => mocks.runAgent(...a),
   buildSystem: (...a: any[]) => mocks.buildSystem(...a),
+  getProvider: () => "azure",
 }))
 vi.mock("../../config", () => ({
   sessionPath: (...a: any[]) => mocks.sessionPath(...a),
