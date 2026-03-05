@@ -18,6 +18,7 @@ export interface ReflectionInput {
   constitution: string
   selfKnowledge: string
   recentTasks: string[]
+  priorReflectionGaps: string[]
 }
 
 export interface ReflectionProposal {
@@ -60,7 +61,20 @@ export function loadReflectionContext(agentRoot?: string): ReflectionInput {
     // no tasks dir is fine
   }
 
-  return { architecture, constitution, selfKnowledge, recentTasks }
+  // Extract gaps from existing reflection proposals to avoid duplicates
+  const priorReflectionGaps: string[] = []
+  try {
+    const allFiles = fs.readdirSync(tasksDir).filter(f => f.includes("reflection-"))
+    for (const file of allFiles) {
+      try {
+        const content = fs.readFileSync(path.join(tasksDir, file), "utf-8")
+        const gapMatch = content.match(/^## Gap\s*\n(.+)$/m)
+        if (gapMatch) priorReflectionGaps.push(gapMatch[1].trim())
+      } catch { /* skip unreadable */ }
+    }
+  } catch { /* no tasks dir */ }
+
+  return { architecture, constitution, selfKnowledge, recentTasks, priorReflectionGaps }
 }
 
 /**
@@ -85,9 +99,12 @@ ${input.selfKnowledge || "(No self-knowledge yet — you are starting fresh.)"}
 ## Recent Tasks
 ${input.recentTasks.length > 0 ? input.recentTasks.map(t => `- ${t}`).join("\n") : "(No recent tasks found.)"}
 
+## Already-Proposed Gaps (DO NOT REPEAT THESE)
+${(input.priorReflectionGaps ?? []).length > 0 ? input.priorReflectionGaps.map(g => `- ${g}`).join("\n") : "(None yet.)"}
+
 ## Instructions
 
-1. Review your architecture and capability matrix. What is the biggest gap?
+1. Review your architecture and capability matrix. What is the biggest gap? **Do NOT propose any gap listed in "Already-Proposed Gaps" above — find a NEW one.**
 2. Check against the constitution — is this something you can address autonomously, or does it require human review?
 3. Propose ONE specific, concrete improvement task. Include:
    - **Gap**: What's missing or broken
