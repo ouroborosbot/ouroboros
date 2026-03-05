@@ -28,10 +28,7 @@ export const githubToolDefinitions: ToolDefinition[] = [
       const payload: Record<string, unknown> = { title: args.title }
       if (args.body) payload.body = args.body
       if (args.labels) {
-        const parsed = args.labels.split(",").map((l) => l.trim())
-        if (parsed.length > 0 && parsed[0] !== "") {
-          payload.labels = parsed
-        }
+        payload.labels = args.labels.split(",").map((l) => l.trim())
       }
       return githubRequest(ctx.githubToken, "POST", `/repos/${args.owner}/${args.repo}/issues`, JSON.stringify(payload))
     },
