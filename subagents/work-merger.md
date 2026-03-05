@@ -340,9 +340,10 @@ Examine the failure details. Common failures:
 1. Read the failing test output or build log
 2. Identify the root cause
 3. Fix the code
-4. Run tests locally: `npm test`
-5. Run build locally: `npm run build`
-6. Verify the fix resolves the CI failure
+4. **Nerves review**: Check new code paths (functions, catch blocks, state transitions, I/O operations) for missing `emitNervesEvent` calls. The 5 deterministic audit rules catch structural violations, but judgment is needed to catch gaps the rules cannot detect.
+5. Run tests locally: `npm test`
+6. Run build locally: `npm run build`
+7. Verify the fix resolves the CI failure
 
 ### Step 3: Push the fix
 
