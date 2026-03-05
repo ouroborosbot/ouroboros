@@ -92,10 +92,6 @@ function getProviderRuntime(): ProviderRuntime {
   return _providerRuntime;
 }
 
-function getClient(): OpenAI {
-  return getProviderRuntime().client;
-}
-
 export function getModel(): string {
   return getProviderRuntime().model;
 }
