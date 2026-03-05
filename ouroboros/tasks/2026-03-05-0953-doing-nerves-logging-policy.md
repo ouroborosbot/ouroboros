@@ -197,17 +197,17 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 **Output**: Coverage report showing 100% on Rule 3 code
 **Acceptance**: 100% coverage, tests green
 
-### ⬜ Unit 11a: Audit integration -- tests
+### ✅ Unit 11a: Audit integration -- tests
 **What**: Write tests for the rewritten `auditNervesCoverage()` top-level report. Tests verify: report contains all 5 rule sections (`every_test_emits`, `start_end_pairing`, `error_context`, `source_coverage`, `file_completeness`) plus `schema_redaction`; old sections (`event_catalog`, `logpoint_coverage`) are gone; overall pass/fail aggregates correctly from individual rule results.
 **Output**: Tests in coverage-audit.test.ts for the integration/report shape
 **Acceptance**: Tests FAIL (red) -- old report shape still in place
 
-### ⬜ Unit 11b: Audit integration -- implementation
+### ✅ Unit 11b: Audit integration -- implementation
 **What**: Rewrite `auditNervesCoverage()` to produce a report with the new 5-rule structure plus preserved schema/redaction check. Update the report types (`NervesCoverageReport`, etc.) to reflect new sections. Remove old `event_catalog` and `logpoint_coverage` sections. Update `scripts/run-coverage-gate.cjs` if the report shape changed. Update `src/nerves/coverage/cli.ts` if needed.
 **Output**: Updated audit.ts, report types, gate script, CLI
 **Acceptance**: Tests from 11a PASS (green). `npm test` passes.
 
-### ⬜ Unit 11c: Audit integration -- coverage & refactor
+### ✅ Unit 11c: Audit integration -- coverage & refactor
 **What**: Verify coverage on rewritten audit integration code. Refactor if needed.
 **Output**: Coverage report showing 100% on integration code
 **Acceptance**: 100% coverage, tests green
@@ -433,3 +433,4 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 - 2026-03-05 11:44 Unit 6a/6b/6c complete: source scanner (source-scanner.ts) with regex extraction of component:event keys, 100% coverage
 - 2026-03-05 11:46 Unit 7a/7b/7c complete: file completeness check (file-completeness.ts), isTypeOnlyFile heuristic, 100% coverage
 - 2026-03-05 11:49 Units 8-10 complete: audit rules 1-3 (every-test-emits, start/end pairing, error context) in audit-rules.ts, 100% coverage
+- 2026-03-05 11:55 Units 11a/11b/11c complete: audit rewritten with 5-rule structure, CLI updated, 100% coverage
