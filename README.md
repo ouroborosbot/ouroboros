@@ -90,7 +90,7 @@ Each agent has a directory at the repo root named after itself. Inside it:
 ```
 
 - `name`: must match your directory name.
-- `provider`: required provider selection (`azure`, `minimax`, or `anthropic`). Runtime does not fall back to other providers.
+- `provider`: required provider selection (`azure`, `minimax`, `anthropic`, or `openai-codex`). Runtime does not fall back to other providers.
 - `configPath`: absolute path (or `~`-prefixed) to your secrets.json with API keys and provider settings.
 - `phrases`: optional custom loading phrases. Falls back to hardcoded defaults if omitted.
 
@@ -177,7 +177,7 @@ Design principles: don't persist what you can re-derive; conversation IS the cac
 
 **Skills** (`repertoire/skills.ts`): markdown files in `{your-dir}/skills/`. Listed with `list_skills`, loaded with `load_skill`. The loaded text is injected into conversation as a tool result.
 
-**Config** (`config.ts`): provider credentials, context window settings, Teams connection info, OAuth config. All loaded from the secrets.json file pointed to by your agent.json `configPath`. No environment variables in `src/` -- everything comes from files.
+**Config** (`config.ts`): provider credentials, Teams connection info, OAuth config, Teams channel settings, and integrations are loaded from the secrets.json file pointed to by your agent.json `configPath`. Context window settings come from `agent.json` `context`. No environment variables in `src/` -- everything comes from files.
 
 For Anthropic, set `providers.anthropic.model` (recommended: `claude-opus-4-6`) and `providers.anthropic.setupToken` directly in `secrets.json`.
 

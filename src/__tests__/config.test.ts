@@ -18,6 +18,11 @@ vi.mock("../identity", () => ({
   provider: "minimax",
   })),
   getAgentName: vi.fn(() => "testagent"),
+  DEFAULT_AGENT_CONTEXT: {
+    maxTokens: 80000,
+    contextMargin: 20,
+    maxToolOutputChars: 20000,
+  },
 }))
 
 import * as fs from "fs"
@@ -123,12 +128,25 @@ describe("loadConfig", () => {
           oauthAccessToken: "",
         },
       },
+      teams: {
+        clientId: "",
+        clientSecret: "",
+        tenantId: "",
+      },
+      oauth: {
+        graphConnectionName: "graph",
+        adoConnectionName: "ado",
+      },
+      teamsChannel: {
+        skipConfirmation: true,
+        disableStreaming: false,
+        port: 3978,
+      },
+      integrations: {
+        perplexityApiKey: "",
+      },
     })
-    expect(parsed).not.toHaveProperty("teams")
-    expect(parsed).not.toHaveProperty("oauth")
     expect(parsed).not.toHaveProperty("context")
-    expect(parsed).not.toHaveProperty("teamsChannel")
-    expect(parsed).not.toHaveProperty("integrations")
   })
 
   it("returns defaults when file contains invalid JSON", async () => {
@@ -178,7 +196,7 @@ describe("loadConfig", () => {
 
   it("does not use OUROBOROS_CONFIG_PATH env var", async () => {
     process.env.OUROBOROS_CONFIG_PATH = "/tmp/should-not-be-used.json"
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ context: { maxTokens: 50000 } }))
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ providers: { azure: { apiKey: "x" } } }))
 
     const { loadConfig, resetConfigCache } = await import("../config")
     resetConfigCache()
@@ -224,7 +242,7 @@ describe("loadConfig", () => {
   })
 
   it("caches config after first load", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ context: { maxTokens: 50000 } }))
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ providers: { minimax: { apiKey: "k1" } } }))
 
     const { loadConfig, resetConfigCache } = await import("../config")
     resetConfigCache()
@@ -236,18 +254,18 @@ describe("loadConfig", () => {
   })
 
   it("re-reads from disk after resetConfigCache()", async () => {
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ context: { maxTokens: 50000 } }))
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ providers: { azure: { apiKey: "first" } } }))
 
     const { loadConfig, resetConfigCache } = await import("../config")
     resetConfigCache()
     const config1 = loadConfig()
 
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ context: { maxTokens: 60000 } }))
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ providers: { azure: { apiKey: "second" } } }))
     resetConfigCache()
     const config2 = loadConfig()
 
     expect(config1).not.toBe(config2)
-    expect(config2.context.maxTokens).toBe(60000)
+    expect(config2.providers.azure.apiKey).toBe("second")
     expect(fs.readFileSync).toHaveBeenCalledTimes(2)
   })
 

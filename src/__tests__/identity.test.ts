@@ -116,6 +116,27 @@ describe("loadAgentConfig", () => {
     vi.resetModules()
   })
 
+  it("builds a full default agent template with all supported fields", async () => {
+    const { buildDefaultAgentTemplate } = await import("../identity")
+    const template = buildDefaultAgentTemplate("ouroboros")
+
+    expect(template).toEqual({
+      name: "ouroboros",
+      provider: "anthropic",
+      configPath: "~/.agentsecrets/ouroboros/secrets.json",
+      context: {
+        maxTokens: 80000,
+        contextMargin: 20,
+        maxToolOutputChars: 20000,
+      },
+      phrases: {
+        thinking: ["working"],
+        tool: ["running tool"],
+        followup: ["processing"],
+      },
+    })
+  })
+
   it("reads and parses agent.json from agent root", async () => {
     process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
     const agentJson = {
