@@ -622,7 +622,7 @@ The phrase rotation timer (1.5s interval for `safeUpdate`) continues to run duri
 **Output**: New test cases in `src/__tests__/heart/streaming.test.ts` and `src/__tests__/heart/core.test.ts`
 **Acceptance**: Tests exist and FAIL (red) because `FinalAnswerParser` doesn't exist, streaming functions don't intercept `final_answer` arguments, `TurnResult` has no `finalAnswerStreamed` flag, and core.ts doesn't check it
 
-### ⬜ Unit 20b: Stream final_answer arguments -- Implementation
+### ✅ Unit 20b: Stream final_answer arguments -- Implementation
 **What**: Implement progressive streaming of `final_answer` tool call arguments.
 
 1. **`FinalAnswerParser` class** in `src/heart/streaming.ts` (exported):
