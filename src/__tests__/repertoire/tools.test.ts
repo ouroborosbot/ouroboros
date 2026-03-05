@@ -29,17 +29,26 @@ vi.mock("../../repertoire/ado-client", () => ({
   discoverOrganizations: vi.fn(),
 }))
 
-vi.mock("../../identity", () => ({
-  loadAgentConfig: vi.fn(() => ({
-    name: "testagent",
-    configPath: "~/.agentsecrets/testagent/secrets.json",
-  provider: "minimax",
-  })),
-  getAgentName: vi.fn(() => "testagent"),
-  getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
-  getRepoRoot: vi.fn(() => "/mock/repo"),
-  resetIdentity: vi.fn(),
-}))
+vi.mock("../../identity", () => {
+  const DEFAULT_AGENT_CONTEXT = {
+    maxTokens: 80000,
+    contextMargin: 20,
+    maxToolOutputChars: 20000,
+  }
+  return {
+    DEFAULT_AGENT_CONTEXT,
+    loadAgentConfig: vi.fn(() => ({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
+      context: { ...DEFAULT_AGENT_CONTEXT },
+    })),
+    getAgentName: vi.fn(() => "testagent"),
+    getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
+    getRepoRoot: vi.fn(() => "/mock/repo"),
+    resetIdentity: vi.fn(),
+  }
+})
 
 import * as fs from "fs"
 import { execSync, spawnSync } from "child_process"
@@ -421,6 +430,14 @@ describe("summarizeArgs", () => {
     const longVal = "a".repeat(80)
     const result = summarizeArgs("unknown_tool", { key: longVal })
     expect(result).toBe("key=" + "a".repeat(60) + "...")
+  })
+
+  it("ignores whitespace-only values for unknown tool summaries", () => {
+    const result = summarizeArgs("unknown_tool", {
+      empty: "   \n\t  ",
+      key: "value",
+    })
+    expect(result).toBe("key=value")
   })
 })
 
@@ -1195,6 +1212,11 @@ describe("summarizeArgs for graph/ado tools", () => {
     expect(summarizeArgs("graph_query", {})).toBe("")
   })
 
+  it("truncates long graph_query path values", () => {
+    const longPath = "/me/messages?" + "q=".repeat(80)
+    expect(summarizeArgs("graph_query", { path: longPath })).toBe("path=" + longPath.slice(0, 60) + "...")
+  })
+
   it("returns method + path for graph_mutate", () => {
     expect(summarizeArgs("graph_mutate", { method: "POST", path: "/me/messages" })).toBe("method=POST path=/me/messages")
   })
@@ -1209,6 +1231,10 @@ describe("summarizeArgs for graph/ado tools", () => {
 
   it("returns empty string parts for ado_query with no args", () => {
     expect(summarizeArgs("ado_query", {})).toBe("")
+  })
+
+  it("ignores whitespace-only path for ado_query summary", () => {
+    expect(summarizeArgs("ado_query", { organization: "myorg", path: "   " })).toBe("organization=myorg")
   })
 
   it("returns method + org + path for ado_mutate", () => {
@@ -1645,6 +1671,10 @@ describe("summarizeArgs for docs tools", () => {
 
   it("returns empty string for graph_docs with no query", () => {
     expect(summarizeArgs("graph_docs", {})).toBe("")
+  })
+
+  it("returns empty string for graph_docs whitespace-only query", () => {
+    expect(summarizeArgs("graph_docs", { query: "  \n  " })).toBe("")
   })
 
   it("returns query for ado_docs", () => {

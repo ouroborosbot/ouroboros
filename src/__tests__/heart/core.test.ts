@@ -3170,6 +3170,68 @@ describe("provider abstraction contract", () => {
     expect(() => runtime?.appendToolOutput("call_1", "ok")).not.toThrow()
   })
 
+  it("azure provider runtime rebuilds turn state inside streamTurn when unset", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupAzure()
+    mockResponsesCreate.mockImplementationOnce(() => ({
+      [Symbol.asyncIterator]: async function* () {
+        yield { type: "response.output_text.delta", delta: "hello azure" }
+        yield { type: "response.completed" }
+      },
+    }))
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    expect(runtime?.id).toBe("azure")
+
+    const onTextChunk = vi.fn()
+    const callbacks: ChannelCallbacks = {
+      onModelStart: vi.fn(),
+      onModelStreamStart: vi.fn(),
+      onTextChunk,
+      onReasoningChunk: vi.fn(),
+      onToolStart: vi.fn(),
+      onToolEnd: vi.fn(),
+      onError: vi.fn(),
+    }
+
+    const result = await runtime.streamTurn({
+      messages: [{ role: "user", content: "hi" }],
+      activeTools: [],
+      callbacks,
+    })
+    expect(result.toolCalls).toEqual([])
+    expect(onTextChunk).toHaveBeenCalledWith("hello azure")
+  })
+
+  it("fails fast when provider registry resolves null runtime", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    vi.doMock("../../heart/providers/azure", () => ({
+      createAzureProviderRuntime: () => null,
+    }))
+    await setupAzure()
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      vi.spyOn(core as any, "createProviderRegistry").mockReturnValue({
+        resolve: () => null,
+      } as any)
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith("provider runtime could not be initialized.")
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+      vi.doUnmock("../../heart/providers/azure")
+    }
+  })
+
 })
 
 describe("anthropic setup-token provider contract", () => {
@@ -4154,6 +4216,119 @@ describe("openai-codex oauth provider contract", () => {
       expect(() => core.getProvider()).toThrow("process.exit called")
       expect(mockError).toHaveBeenCalledWith(expect.stringContaining("chatgpt_account_id"))
       expect(mockError).toHaveBeenCalledWith(expect.stringContaining("backend-api/codex"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("fails fast when openai-codex oauthAccessToken payload cannot be decoded as JSON", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const malformedPayload = Buffer.from("not-json", "utf8").toString("base64url")
+    const malformedToken = `${encodeBase64Url(JSON.stringify({ alg: "none", typ: "JWT" }))}.${malformedPayload}.signature`
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: malformedToken,
+        },
+      },
+    } as any)
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("chatgpt_account_id"))
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("backend-api/codex"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("fails fast when openai-codex oauthAccessToken is not JWT formatted", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: "not-a-jwt",
+        },
+      },
+    } as any)
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("chatgpt_account_id"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("fails fast when openai-codex oauthAccessToken payload is a JSON array", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const arrayPayloadToken = `${encodeBase64Url(JSON.stringify({ alg: "none", typ: "JWT" }))}.${encodeBase64Url(JSON.stringify([]))}.signature`
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: arrayPayloadToken,
+        },
+      },
+    } as any)
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("chatgpt_account_id"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("fails fast when openai-codex chatgpt_account_id is not a string", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const nonStringAccountIdToken = `${encodeBase64Url(JSON.stringify({ alg: "none", typ: "JWT" }))}.${encodeBase64Url(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: 123 } }))}.signature`
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken: nonStringAccountIdToken,
+        },
+      },
+    } as any)
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("chatgpt_account_id"))
     } finally {
       mockExit.mockRestore()
       mockError.mockRestore()

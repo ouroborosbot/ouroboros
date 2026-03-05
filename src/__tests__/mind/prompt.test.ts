@@ -20,17 +20,26 @@ vi.mock("../../repertoire/skills", () => ({
   loadSkill: vi.fn(),
 }))
 
-vi.mock("../../identity", () => ({
-  loadAgentConfig: vi.fn(() => ({
-    name: "testagent",
-    configPath: "~/.agentsecrets/testagent/secrets.json",
-    provider: "minimax",
-  })),
-  getAgentName: vi.fn(() => "testagent"),
-  getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
-  getRepoRoot: vi.fn(() => "/mock/repo"),
-  resetIdentity: vi.fn(),
-}))
+vi.mock("../../identity", () => {
+  const DEFAULT_AGENT_CONTEXT = {
+    maxTokens: 80000,
+    contextMargin: 20,
+    maxToolOutputChars: 20000,
+  }
+  return {
+    DEFAULT_AGENT_CONTEXT,
+    loadAgentConfig: vi.fn(() => ({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
+      context: { ...DEFAULT_AGENT_CONTEXT },
+    })),
+    getAgentName: vi.fn(() => "testagent"),
+    getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
+    getRepoRoot: vi.fn(() => "/mock/repo"),
+    resetIdentity: vi.fn(),
+  }
+})
 
 vi.mock("openai", () => {
   class MockOpenAI {
@@ -54,11 +63,29 @@ const MOCK_IDENTITY = "i am Ouroboros.\ni use lowercase in my responses to the u
 const MOCK_LORE = "i am named after the ouroboros -- the ancient symbol of a serpent eating its own tail."
 const MOCK_FRIENDS = "my creator works at microsoft and talks to me through the CLI and Teams."
 
+function makeOpenAICodexAccessToken(accountId = "acct_test"): string {
+  const header = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url")
+  const payload = Buffer.from(
+    JSON.stringify({
+      "https://api.openai.com/auth": {
+        chatgpt_account_id: accountId,
+      },
+    })
+  ).toString("base64url")
+  return `${header}.${payload}.sig`
+}
+
 function setAgentProvider(provider: "azure" | "minimax" | "anthropic" | "openai-codex") {
+  const DEFAULT_AGENT_CONTEXT = {
+    maxTokens: 80000,
+    contextMargin: 20,
+    maxToolOutputChars: 20000,
+  }
   vi.mocked(identity.loadAgentConfig).mockReturnValue({
     name: "testagent",
     configPath: "~/.agentsecrets/testagent/secrets.json",
     provider,
+    context: { ...DEFAULT_AGENT_CONTEXT },
   })
 }
 
@@ -290,7 +317,7 @@ describe("buildSystem", () => {
       providers: {
         "openai-codex": {
           model: "gpt-5.2",
-          oauthAccessToken: "oauth-token-for-tests",
+          oauthAccessToken: makeOpenAICodexAccessToken(),
         },
       },
     } as any)
