@@ -64,17 +64,18 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [ ] User confirms on Teams: model uses final_answer cleanly, no 413 errors, no "Sorry something went wrong", prompt sections emit correctly, responses arrive in periodic chunks (not per-token, not all-at-once)
 
 ### Gate 3: Friend Context Instructions
-- [x] Friend context instructions at prompt.ts:178-194 rewritten to be directive with displayName interpolation and aggressive saving
+- [x] Friend context instructions at prompt.ts:178-194 rewritten to be directive with displayName interpolation and aggressive saving (4a/b/c -- now superseded by 21g/h/i)
 - [ ] `FriendRecord` has `totalTokens: number` field (schema version stays 1)
-- [ ] Token accumulation: after each agent turn, `FriendRecord.totalTokens` is updated with `usage.total_tokens`
+- [ ] Token accumulation: after each agent turn, `FriendRecord.totalTokens` is updated with `usage.total_tokens` via `accumulateFriendTokens()` helper called from both adapters
 - [ ] `FriendResolver` auto-populates a `"name"` note from `displayName` on first contact (when displayName is not "Unknown")
 - [ ] `isNewFriend` replaced with `isOnboarding = (friend.totalTokens ?? 0) < ONBOARDING_TOKEN_THRESHOLD` (100K tokens)
-- [ ] Always-on instructions (permanent in contextSection): memory ephemerality, working-memory trust, stale notes awareness, save aggressively
-- [ ] Priority guidance line removed entirely (overfitting)
-- [ ] Separate "name quality" line removed -- folded into "save anything" directive
+- [ ] Always-on instructions (permanent in contextSection, never gated): memory ephemerality, working-memory trust, stale notes awareness, save aggressively
+- [ ] Priority guidance line ("my friend's request comes first...") removed entirely (overfitting)
+- [ ] Separate "name quality" line removed -- folded into broader "save anything" directive
 - [ ] Onboarding-only instructions in `src/mind/first-impressions.ts`: encourage conversation, inform capabilities, new-friend greeting
 - [ ] Onboarding instructions only appear below 100K token threshold -- they drop from the system prompt once exceeded
 - [ ] `ONBOARDING_TOKEN_THRESHOLD` exported from `first-impressions.ts` (easily changeable)
+- [ ] Existing 4a/b/c prompt tests updated: priority guidance/name quality assertions flipped, isNewFriend tests rewritten for totalTokens-based detection
 - [ ] User confirms on both surfaces: bot proactively calls `save_friend_note` when learning anything about the user
 - [ ] User confirms onboarding instructions disappear after sufficient conversation
 
@@ -733,172 +734,203 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 **Acceptance**: 100% coverage on new/modified code, tests still green
 
 ### ⬜ Unit 21a: Add totalTokens to FriendRecord -- Tests
-**What**: Write failing tests verifying:
-1. `FriendRecord` type includes `totalTokens: number`
-2. `FileFriendStore.put()` persists `totalTokens` in the agent knowledge JSON file (it belongs in agent knowledge, not PII bridge)
-3. `FileFriendStore.get()` reads `totalTokens` back from disk
-4. `FileFriendStore.get()` returns `totalTokens: 0` when reading a legacy record that lacks the field (backward compat -- old records on disk won't have it)
-5. `FriendResolver.resolveOrCreate()` initializes `totalTokens: 0` on newly created friend records
+**What**: Tests already exist and FAIL (red). Verify that the 4 pre-written tests are failing as expected.
 
-Test in `src/__tests__/mind/friends/store-file.test.ts` and `src/__tests__/mind/friends/resolver.test.ts`.
-**Output**: New test cases
-**Acceptance**: Tests exist and FAIL (red) because `totalTokens` doesn't exist on `FriendRecord`
+Pre-existing failing tests (written during prior work, before implementation):
+- `src/__tests__/mind/friends/store-file.test.ts` "totalTokens persistence" (3 tests):
+  1. "persists totalTokens in agent knowledge file" -- FAILS: `AgentKnowledgeData` lacks `totalTokens`, so `put()` does not write it
+  2. "reads totalTokens back from disk via get()" -- FAILS: `merge()` does not include `totalTokens`
+  3. "returns totalTokens: 0 for legacy record lacking the field" -- FAILS: `merge()` has no `?? 0` fallback
+- `src/__tests__/mind/friends/resolver.test.ts` "first-encounter flow" (1 test):
+  4. "initializes totalTokens to 0 on newly created friend records" -- FAILS: `resolveOrCreate()` does not set `totalTokens`
+
+**Output**: No new test files -- confirm 4 existing tests fail
+**Acceptance**: 4 tests FAIL (red), all other tests PASS
 
 ### ⬜ Unit 21b: Add totalTokens to FriendRecord -- Implementation
-**What**: Add `totalTokens: number` to `FriendRecord` in `src/mind/friends/types.ts`. Keep `schemaVersion` at 1 (friend records will be bombed for testing -- no migration needed).
+**What**: Add `totalTokens: number` to `FriendRecord` and wire it through the store and resolver. Keep `schemaVersion` at 1 (no migration needed -- friend records will be bombed for testing).
 
 Changes:
-1. `src/mind/friends/types.ts`: add `totalTokens: number` to `FriendRecord` interface (after `notes`)
-2. `src/mind/friends/store-file.ts`:
+1. **`src/mind/friends/types.ts`**: add `totalTokens: number` to `FriendRecord` interface (after `notes`)
+2. **`src/mind/friends/store-file.ts`**:
    - Add `totalTokens: number` to `AgentKnowledgeData` interface
-   - Include `totalTokens` in `put()` split (agent knowledge data)
-   - Include `totalTokens` in `merge()` with `?? 0` fallback for legacy records
-3. `src/mind/friends/resolver.ts`: initialize `totalTokens: 0` in the new friend object in `resolveOrCreate()`
+   - In `put()`: include `totalTokens: record.totalTokens` in the agent knowledge data split
+   - In `merge()`: include `totalTokens: agentData.totalTokens ?? 0` for backward compat with legacy records on disk
+3. **`src/mind/friends/resolver.ts`**: in `resolveOrCreate()`, add `totalTokens: 0` to the new friend record literal (after `notes: {}`)
 
 **Output**: Modified `src/mind/friends/types.ts`, `src/mind/friends/store-file.ts`, `src/mind/friends/resolver.ts`
-**Acceptance**: All tests PASS (green), no warnings
+**Acceptance**: All 4 previously-failing totalTokens tests PASS (green), no warnings, all other tests still pass
 
 ### ⬜ Unit 21c: Add totalTokens to FriendRecord -- Coverage & Refactor
-**What**: Verify 100% coverage on all modified code. Cover: put with totalTokens, get with totalTokens, get with legacy record (no totalTokens on disk -- fallback to 0), resolveOrCreate initializes 0.
+**What**: Verify 100% coverage on all modified code in types.ts, store-file.ts, and resolver.ts. Specifically verify:
+- `put()` writes `totalTokens` to agent knowledge JSON (not PII bridge)
+- `get()` reads `totalTokens` back correctly
+- `merge()` returns `0` when legacy record on disk lacks `totalTokens`
+- `resolveOrCreate()` initializes `totalTokens: 0`
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new/modified code, all tests green
 
 ### ⬜ Unit 21d: Token accumulation after each turn -- Tests
-**What**: Write failing tests for a shared `accumulateFriendTokens(store, friendId, usage)` helper in `src/__tests__/mind/friends/tokens.test.ts`. Both adapters (CLI and Teams) will call this helper, so testing the helper directly provides full coverage without needing to test interactive readline or the full Teams handler.
+**What**: Write failing tests for a new `accumulateFriendTokens(store, friendId, usage)` helper. Test the helper directly in `src/__tests__/mind/friends/tokens.test.ts` -- this avoids needing to test through interactive readline (CLI) or the full Teams handler.
 
 Tests:
-1. First turn: record with `totalTokens: 0`, usage `{ total_tokens: 1500 }` -> record updated to `totalTokens: 1500`, `updatedAt` refreshed
-2. Subsequent turn: record with `totalTokens: 3000`, usage `{ total_tokens: 2000 }` -> record updated to `totalTokens: 5000`
-3. No usage data: `usage` is undefined -> no store reads/writes (no-op)
-4. Zero total_tokens: `usage.total_tokens` is 0 -> no store reads/writes (no-op)
-5. Record not found: store returns null -> no crash, no write
-6. Legacy record: record on disk has no `totalTokens` field -> treated as 0, accumulation works correctly
+1. First turn: record has `totalTokens: 0`, usage `{ total_tokens: 1500 }` -> store.put called with `totalTokens: 1500`, `updatedAt` refreshed
+2. Subsequent turn: record has `totalTokens: 3000`, usage `{ total_tokens: 2000 }` -> store.put called with `totalTokens: 5000`
+3. No usage data: `usage` is undefined -> store.get NOT called (no-op, early return)
+4. Zero total_tokens: `usage.total_tokens` is 0 -> store.get NOT called (no-op, early return)
+5. Record not found: store.get returns null -> store.put NOT called (no crash)
+6. Legacy record: record on disk has no `totalTokens` field (undefined) -> treated as 0 via `?? 0`, accumulation works correctly (e.g. undefined + 1500 = 1500)
 
-**Output**: New test cases
-**Acceptance**: Tests exist and FAIL (red) because no token accumulation logic exists yet
+Use a mock `FriendStore` (vi.fn() for get/put/delete/findByExternalId).
+
+**Output**: New `src/__tests__/mind/friends/tokens.test.ts`
+**Acceptance**: Tests exist and FAIL (red) because `src/mind/friends/tokens.ts` does not exist yet
 
 ### ⬜ Unit 21e: Token accumulation after each turn -- Implementation
-**What**: After each agent turn, read the friend record from disk, increment `totalTokens` by `usage.total_tokens`, and persist. This must happen after `postTurn()` (which saves the session) so the friend record update doesn't race with session save.
+**What**: Create the accumulation helper and wire it into both adapters. The helper runs after `postTurn()` to avoid racing with session save.
 
 Changes:
-1. **`src/mind/friends/tokens.ts`** (new file): export `accumulateFriendTokens(store: FriendStore, friendId: string, usage?: UsageData): Promise<void>`. Logic:
-   ```
-   if (!usage?.total_tokens) return
-   const record = await store.get(friendId)
-   if (!record) return
-   record.totalTokens = (record.totalTokens ?? 0) + usage.total_tokens
-   record.updatedAt = new Date().toISOString()
-   await store.put(record.id, record)
-   ```
-2. **`src/senses/teams.ts`** in `handleTeamsMessage()`: after `postTurn(messages, sessPath, result.usage)` (line 493), call `await accumulateFriendTokens(store, toolContext.context.friend.id, result.usage)` (guarded by `toolContext?.context?.friend?.id`).
-3. **`src/senses/cli.ts`** in `main()`: after `postTurn(messages, sessPath, result?.usage)` (line 463), call `await accumulateFriendTokens(friendStore, resolvedContext.friend.id, result?.usage)`.
+1. **`src/mind/friends/tokens.ts`** (new file):
+   - Import `FriendStore` from `./store` and `UsageData` from `../../mind/context`
+   - Export `accumulateFriendTokens(store: FriendStore, friendId: string, usage?: UsageData): Promise<void>`
+   - Logic: early return if `!usage?.total_tokens`; read record via `store.get(friendId)`; early return if null; set `record.totalTokens = (record.totalTokens ?? 0) + usage.total_tokens`; set `record.updatedAt = new Date().toISOString()`; `await store.put(record.id, record)`
+
+2. **`src/senses/teams.ts`** in `handleTeamsMessage()`:
+   - Import `accumulateFriendTokens` from `../mind/friends/tokens`
+   - After `postTurn(messages, sessPath, result.usage)` (currently line 493), add:
+     ```
+     if (toolContext?.context?.friend?.id) {
+       await accumulateFriendTokens(store, toolContext.context.friend.id, result.usage)
+     }
+     ```
+
+3. **`src/senses/cli.ts`** in `main()`:
+   - Import `accumulateFriendTokens` from `../mind/friends/tokens`
+   - After `postTurn(messages, sessPath, result?.usage)` (currently line 463), add:
+     ```
+     await accumulateFriendTokens(friendStore, resolvedContext.friend.id, result?.usage)
+     ```
 
 **Output**: New `src/mind/friends/tokens.ts`, modified `src/senses/teams.ts`, `src/senses/cli.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
 ### ⬜ Unit 21f: Token accumulation -- Coverage & Refactor
-**What**: Verify 100% coverage on `accumulateFriendTokens` helper and its call sites in both adapters. Cover: usage present (tokens added), usage absent (no-op), record not found on disk (no-op), no friend context in adapter (skip). Verify no race between session save and friend record update.
+**What**: Verify 100% coverage on `accumulateFriendTokens()` and its call sites. Specifically:
+- `tokens.ts`: usage present (tokens added), usage absent (no-op early return), usage.total_tokens is 0 (no-op early return), record not found (no crash, no put), legacy record with undefined totalTokens (?? 0 fallback)
+- `teams.ts`: token accumulation call guarded by `toolContext?.context?.friend?.id` -- verify both branches (context present and absent)
+- `cli.ts`: token accumulation call after postTurn -- verify it fires
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new/modified code, all tests green
 
-### ⬜ Unit 21g: Always-on instructions + onboarding split + auto-name -- Tests
-**What**: Write failing tests verifying the refined instruction architecture:
+### ⬜ Unit 21g: Prompt rewrite + first-impressions module + auto-name -- Tests
+**What**: Write failing tests covering the three-part instruction architecture change. This unit modifies existing tests that were written for 4a/b/c AND adds new tests.
 
-**Always-on instructions** stay in `contextSection()` in `prompt.ts` (permanent, never gated):
+**Part A -- Update existing 4a tests in `src/__tests__/mind/prompt.test.ts`:**
 
-1. **Memory ephemerality** (`src/__tests__/mind/prompt.test.ts`): contextSection always contains "save anything you learn, memory resets between sessions" or equivalent -- THE most important directive. Verified for both onboarding AND post-onboarding friends.
-2. **Working-memory trust** (`src/__tests__/mind/prompt.test.ts`): contextSection always contains "conversation is source of truth, notes may be stale" -- verified at all token levels.
-3. **Stale notes awareness** (`src/__tests__/mind/prompt.test.ts`): contextSection always contains "check and update stale notes when learning something new" -- verified at all token levels.
-4. **Save aggressively** (`src/__tests__/mind/prompt.test.ts`): contextSection always contains "save ANYTHING learned about the friend immediately with save_friend_note" -- verified at all token levels. This replaces the old separate "name quality" line -- name saving is folded into the broader "save anything" directive.
-5. **Friend notes rendering** (`src/__tests__/mind/prompt.test.ts`): "what i know about this friend" section always appears when notes exist -- not gated by threshold.
+Tests to CHANGE (these currently pass but assert behavior we are removing):
+- "includes priority guidance when friend context is present" (line 979) -- REWRITE to assert priority guidance is ABSENT. The line "my friend's request comes first" is being removed.
+- "priority guidance mentions both helping AND getting to know them" (line 1157) -- REWRITE to assert "get to know" does NOT appear in contextSection output (that behavior moves to onboarding-only).
+- "name quality instruction is directive -- save immediately" (line 1215) -- REWRITE to assert the separate name quality line is ABSENT. Name saving is now folded into the broader "save anything" directive.
+- "includes name-quality instruction with displayName" (line 837) -- REWRITE to assert the separate name quality line is absent, but "save" still appears (via the broader "save anything" directive).
+- "new-friend instruction when notes and toolPreferences both empty" (line 866) -- REWRITE: new-friend detection no longer uses `!hasNotes && !hasPrefs`. Instead test that a friend with `totalTokens: 0` gets onboarding text, and a friend with `totalTokens: 200_000` does NOT.
+- "does NOT include new-friend instruction when notes has entries" (line 894) -- REWRITE: the condition is now totalTokens-based, not notes-based. A friend with notes but `totalTokens: 50_000` SHOULD still get onboarding text (below threshold).
+- "does NOT include new-friend instruction when toolPreferences has entries" (line 921) -- REWRITE: same as above. toolPreferences are irrelevant to onboarding detection now.
+- "new-friend instruction interpolates displayName when known" (line 1067) -- MOVE: displayName interpolation is now in first-impressions.ts, not in contextSection directly. This test should verify that the first-impressions content (which includes displayName) appears in contextSection when `totalTokens: 0`.
+- "new-friend instruction says name is unknown when displayName is 'Unknown'" (line 1097) -- MOVE: same -- verify Unknown variant appears in contextSection via first-impressions inclusion.
+- "new-friend instruction is directive with action verbs" (line 1127) -- MOVE: directive language is now in first-impressions.ts. Verify it flows through contextSection.
 
-**Removed instructions** (verify absent):
+Tests to KEEP AS-IS (these currently pass and assert behavior we are keeping):
+- "includes memory ephemerality instruction" (line 808) -- KEEP
+- "includes working-memory trust instruction" (line 1008) -- KEEP
+- "includes stale notes awareness instruction" (line 1037) -- KEEP
+- "memory instruction lowers the bar -- saves anything learned" (line 1185) -- KEEP
 
-6. **No priority guidance line** (`src/__tests__/mind/prompt.test.ts`): "my friend's request comes first" line is REMOVED entirely -- it was overfitting, solving a problem that doesn't exist. Verify it does NOT appear in contextSection output.
+**Part B -- New tests in `src/__tests__/mind/prompt.test.ts`:**
 
-**Onboarding-only instructions** live in `src/mind/first-impressions.ts` (below threshold only):
+14. Always-on directives verified at high totalTokens: create a friend with `totalTokens: 200_000` (above threshold) and verify all 4 always-on instructions (memory ephemerality, working-memory trust, stale notes awareness, save aggressively) still appear.
+15. Onboarding text absent at high totalTokens: friend with `totalTokens: 200_000` -> contextSection does NOT contain onboarding/first-impressions text.
+16. Onboarding text present at low totalTokens: friend with `totalTokens: 0` -> contextSection DOES contain onboarding/first-impressions text.
+17. Friend notes rendering always present: friend with notes and `totalTokens: 200_000` -> "what i know about this friend" section still appears.
 
-7. **`getFirstImpressions()` below threshold** (`src/__tests__/mind/first-impressions.test.ts`): returns non-empty string when `totalTokens < ONBOARDING_TOKEN_THRESHOLD` (100,000). Content includes: encourage conversation to learn about the friend, inform about agent capabilities, new-friend greeting behavior.
-8. **`getFirstImpressions()` at/above threshold** (`src/__tests__/mind/first-impressions.test.ts`): returns empty string when `totalTokens >= ONBOARDING_TOKEN_THRESHOLD`.
-9. **Threshold constant** (`src/__tests__/mind/first-impressions.test.ts`): `ONBOARDING_TOKEN_THRESHOLD` is exported and equals `100_000`.
-10. **`isOnboarding` helper** (`src/__tests__/mind/first-impressions.test.ts`): `isOnboarding(friend)` returns true when `(friend.totalTokens ?? 0) < ONBOARDING_TOKEN_THRESHOLD`, false otherwise.
-11. **Token boundary tests**: `totalTokens: 0` -> onboarding, `totalTokens: 99_999` -> onboarding, `totalTokens: 100_000` -> NOT onboarding, `totalTokens: undefined` -> onboarding (treated as 0).
+**Part C -- New tests in `src/__tests__/mind/first-impressions.test.ts`:**
 
-**Auto-populate name note** (in resolver):
+18. `ONBOARDING_TOKEN_THRESHOLD` is exported and equals `100_000`
+19. `isOnboarding({ totalTokens: 0 })` returns true
+20. `isOnboarding({ totalTokens: 99_999 })` returns true
+21. `isOnboarding({ totalTokens: 100_000 })` returns false
+22. `isOnboarding({ totalTokens: 500_000 })` returns false
+23. `isOnboarding({ totalTokens: undefined })` returns true (treated as 0)
+24. `getFirstImpressions(friend)` with `totalTokens: 0, displayName: "Jordan"` returns non-empty string containing displayName
+25. `getFirstImpressions(friend)` with `totalTokens: 0, displayName: "Unknown"` returns non-empty string, mentions asking what they'd like to be called
+26. `getFirstImpressions(friend)` with `totalTokens: 100_000` returns empty string
+27. `getFirstImpressions(friend)` with `totalTokens: 200_000` returns empty string
+28. Content check: onboarding text encourages learning about the friend and mentions agent capabilities
 
-12. **Name auto-population** (`src/__tests__/mind/friends/resolver.test.ts`): when `FriendResolver.resolveOrCreate()` creates a new friend with `displayName` != "Unknown", the initial `notes` record includes `{ name: displayName }`. When `displayName` is "Unknown", `notes` is empty `{}`.
+**Part D -- New tests in `src/__tests__/mind/friends/resolver.test.ts`:**
 
-**Integration** (prompt.ts calls first-impressions):
+29. New friend with `displayName: "Jordan"` -> `notes` includes `{ name: "Jordan" }` (auto-populated)
+30. New friend with `displayName: "Unknown"` -> `notes` is `{}` (no auto-population)
+31. Existing friend with different displayName -> notes NOT overwritten (existing test "does NOT overwrite displayName" already covers this indirectly)
 
-13. **`contextSection()` includes onboarding** (`src/__tests__/mind/prompt.test.ts`): when friend is below threshold, `contextSection()` output includes the first-impressions text. When above threshold, it does not.
+**Output**: Modified `src/__tests__/mind/prompt.test.ts`, new `src/__tests__/mind/first-impressions.test.ts`, modified `src/__tests__/mind/friends/resolver.test.ts`
+**Acceptance**: New/rewritten tests FAIL (red) because: `first-impressions.ts` does not exist, priority guidance line still present, name quality line still present, `isNewFriend` still uses notes check, auto-name not implemented. Existing kept tests still PASS.
 
-**Output**: New test cases in `src/__tests__/mind/prompt.test.ts`, `src/__tests__/mind/first-impressions.test.ts`, `src/__tests__/mind/friends/resolver.test.ts`
-**Acceptance**: Tests exist and FAIL (red) because: `first-impressions.ts` doesn't exist, `isNewFriend` still uses notes-exist check, priority guidance line still present, always-on instructions not yet reworded, name auto-population not implemented
+### ⬜ Unit 21h: Prompt rewrite + first-impressions module + auto-name -- Implementation
+**What**: Three sets of changes implementing the refined instruction architecture.
 
-### ⬜ Unit 21h: Always-on instructions + onboarding split + auto-name -- Implementation
-**What**: Three sets of changes implementing the refined instruction architecture:
-
-1. **Rewrite always-on instructions in `contextSection()`** (`src/mind/prompt.ts`):
-   - REMOVE the priority guidance line ("my friend's request comes first...") -- overfitting, solving a problem that doesn't exist
-   - REMOVE the separate "name quality" line -- folded into the broader "save anything" directive
-   - REWRITE/KEEP these four always-on directives (permanent, in contextSection, never gated):
-     a. **Memory ephemerality** (THE #1 most important): "save anything you learn, memory resets between sessions" -- without this, everything is broken
-     b. **Working-memory trust**: "conversation is source of truth, notes may be stale"
-     c. **Stale notes awareness**: "check and update stale notes when learning something new"
-     d. **Save aggressively**: "save ANYTHING learned about the friend immediately with save_friend_note" -- expanded from just name saving
-   - REMOVE `isNewFriend` logic and the associated if-block (lines 175-181) -- replaced by onboarding module
-   - ADD `isOnboarding` check using imported `isOnboarding()` helper
-   - When `isOnboarding(friend)` is true, append the result of `getFirstImpressions(friend)` to the context section
-   - KEEP friend notes rendering ("what i know about this friend") -- always appears, not gated
+1. **Rewrite `contextSection()` in `src/mind/prompt.ts`**:
+   - ADD import: `import { isOnboarding, getFirstImpressions } from "./first-impressions"`
+   - REMOVE the priority guidance line (line 160-161): `"my friend's request comes first. i help with what they need, and i get to know them along the way."`
+   - REMOVE the separate name quality line (line 164): `"when i learn a name my friend prefers, i save it immediately with save_friend_note."`
+   - KEEP these four always-on directives (lines 167-172) -- reword the "save aggressively" one to be broader than just names:
+     a. Memory ephemerality: `"my conversation memory is ephemeral -- it resets between sessions. anything i learn about my friend, i save with save_friend_note so future me remembers."`
+     b. Working-memory trust: `"the conversation is my source of truth. my notes are a journal for future me -- they may be stale or incomplete."`
+     c. Stale notes awareness: `"when i learn something that might invalidate an existing note, i check related notes and update or override any that are stale."`
+     d. Save aggressively (REWORDED): `"i save ANYTHING i learn about my friend immediately with save_friend_note -- names, preferences, what they do, what they care about. when in doubt, save it."`
+   - REMOVE `isNewFriend` detection (line 156) and the entire if-block (lines 175-181)
+   - REMOVE `hasNotes` and `hasPrefs` variables (lines 154-155) -- only used by `isNewFriend` and the notes rendering check. Inline `Object.keys(friend.notes).length > 0` for the notes rendering check.
+   - ADD: after the four always-on directives, check `isOnboarding(friend)` and if true, append `getFirstImpressions(friend)` to the lines array
+   - KEEP friend notes rendering ("what i know about this friend") -- gated only by `Object.keys(friend.notes).length > 0`, not by threshold
 
 2. **Create `src/mind/first-impressions.ts`** (new file):
-   - Export `ONBOARDING_TOKEN_THRESHOLD = 100_000` (100K tokens cumulative -- easily changeable constant)
-   - Export `isOnboarding(friend: FriendRecord): boolean` -- returns `(friend.totalTokens ?? 0) < ONBOARDING_TOKEN_THRESHOLD`
-   - Export `getFirstImpressions(friend: FriendRecord): string` -- returns onboarding instruction text when below threshold, empty string when at/above
-   - Onboarding content (only appears below threshold):
-     a. Encourage conversation to learn about the friend -- preferences, what they do, etc.
-     b. Inform the friend about what the agent is capable of
-     c. New-friend greeting/getting-to-know-you behavior (with displayName interpolation for "Unknown" vs known)
+   - Import `FriendRecord` from `./friends/types`
+   - Export `ONBOARDING_TOKEN_THRESHOLD = 100_000`
+   - Export `isOnboarding(friend: Pick<FriendRecord, "totalTokens">): boolean` -- returns `(friend.totalTokens ?? 0) < ONBOARDING_TOKEN_THRESHOLD`
+   - Export `getFirstImpressions(friend: Pick<FriendRecord, "totalTokens" | "displayName">): string` -- returns empty string when `!isOnboarding(friend)`, otherwise returns onboarding instruction text
+   - Onboarding text content (only emitted below threshold):
+     a. If `displayName === "Unknown"`: line about asking what they'd like to be called
+     b. If displayName is known: line greeting them by name
+     c. Encourage conversation to learn about the friend (preferences, what they do, interests)
+     d. Brief line about what the agent can do (tools, skills, memory)
+     e. Directive to save what is learned immediately
 
-3. **Auto-populate name in resolver** (`src/mind/friends/resolver.ts`):
-   - In `resolveOrCreate()`, when creating a new friend, if `this.params.displayName !== "Unknown"`, set `notes: { name: this.params.displayName }` instead of `notes: {}`
+3. **Auto-populate name in `src/mind/friends/resolver.ts`**:
+   - In `resolveOrCreate()`, change `notes: {}` to `notes: this.params.displayName !== "Unknown" ? { name: this.params.displayName } : {}`
 
 **Output**: Modified `src/mind/prompt.ts`, new `src/mind/first-impressions.ts`, modified `src/mind/friends/resolver.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 21i: Always-on instructions + onboarding split + auto-name -- Coverage & Refactor
+### ⬜ Unit 21i: Prompt rewrite + first-impressions module + auto-name -- Coverage & Refactor
 **What**: Verify 100% coverage on all modified/new code:
-1. `first-impressions.ts`: `isOnboarding` true/false, `getFirstImpressions` below/at/above threshold, `ONBOARDING_TOKEN_THRESHOLD` export, displayName "Unknown" vs known in onboarding text, `totalTokens` undefined treated as 0
-2. `prompt.ts` contextSection: always-on instructions present at all token levels, no priority guidance line, no name quality line, onboarding text appears below threshold, absent above threshold, friend notes rendering always present
-3. `resolver.ts`: name auto-populated when displayName != "Unknown", empty notes when "Unknown"
+1. **`first-impressions.ts`**: `isOnboarding` returns true below threshold, false at/above; `getFirstImpressions` returns non-empty below, empty at/above; displayName "Unknown" vs known branches; `totalTokens` undefined treated as 0 via `?? 0`; `ONBOARDING_TOKEN_THRESHOLD` export
+2. **`prompt.ts` contextSection**: all 4 always-on directives present at all token levels; no priority guidance line; no name quality line; onboarding text included below threshold, absent above; friend notes rendering always present when notes exist
+3. **`resolver.ts`**: name auto-populated (`notes: { name: displayName }`) when displayName != "Unknown"; empty `notes: {}` when displayName is "Unknown"; existing friend flow unchanged
 **Output**: Coverage report
 **Acceptance**: 100% coverage on new/modified code, all tests green
-
-### ✅ Unit 21j: Onboarding instruction content review (DISCUSSION -- pre-execution)
-**What**: Discussion checkpoint completed BEFORE execution began. User refined the requirements with these decisions:
-
-**Decisions made**:
-1. **Threshold value**: 100,000 tokens cumulative (not 50K). Stored on FriendRecord.totalTokens, updated after each agent turn.
-2. **Always-on vs onboarding-only split**:
-   - **Always-on** (permanent in prompt.ts contextSection): memory ephemerality (#1 most important), working-memory trust, stale notes awareness, save aggressively (expanded from just name saving)
-   - **Onboarding-only** (below threshold, in `src/mind/first-impressions.ts`): encourage conversation, inform about capabilities, new-friend greeting
-   - **Removed entirely**: priority guidance ("help first, get to know along the way") -- overfitting. Separate "name quality" line -- folded into "save anything" directive.
-3. **Placement**: onboarding instructions in `src/mind/first-impressions.ts` (separate from prompt.ts for auditability). Always-on instructions stay in contextSection.
-4. **No first-conversation distinction**: `isOnboarding` is a simple threshold check, no special `totalTokens === 0` case.
-
-**Output**: Decisions documented in this unit and incorporated into units 21g-21i specs
-**Acceptance**: User reviewed and approved before execution
 
 ---
 
 ### GATE 3 CHECKPOINT
 **Manual test**: User tests on both Copilot Chat and standard Teams with fresh friend records (bomb existing friend data to reset).
 **Expected**:
-- Bot helps first, introduces itself along the way, proactively calls `save_friend_note` when learning anything about the user without being asked
-- New friend records have `totalTokens: 0` and a `name` note auto-populated from displayName
-- Onboarding instructions appear in the system prompt for new friends
-- After sufficient conversation (totalTokens >= threshold), onboarding instructions drop from the system prompt
-- Priority guidance and friend notes rendering always appear regardless of totalTokens
+- Bot proactively calls `save_friend_note` when learning anything about the user without being asked
+- New friend records have `totalTokens: 0` and a `name` note auto-populated from displayName (when not "Unknown")
+- Onboarding instructions appear in the system prompt for new friends (totalTokens below 100K)
+- After sufficient conversation (totalTokens >= 100K threshold), onboarding instructions drop from the system prompt
+- Always-on instructions (memory ephemerality, working-memory trust, stale notes, save aggressively) appear at ALL token levels
+- Friend notes rendering ("what i know about this friend") always appears when notes exist, regardless of totalTokens
+- Priority guidance line is ABSENT from system prompt
+- Separate name quality line is ABSENT from system prompt
 - `totalTokens` increments after each turn (visible in friend JSON files on disk)
 
 ---
