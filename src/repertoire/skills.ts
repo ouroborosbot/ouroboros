@@ -11,6 +11,9 @@ export function getSkillsDir(): string {
 // in-memory store for loaded skills
 const loadedSkills: string[] = [];
 
+// mtime-aware cache: skill name → { mtimeMs, content }
+const skillCache = new Map<string, { mtimeMs: number; content: string }>();
+
 export function listSkills(): string[] {
   emitNervesEvent({
     event: "repertoire.load_start",
@@ -62,7 +65,23 @@ export function loadSkill(skillName: string): string {
     throw new Error(`skill '${skillName}' not found`);
   }
 
+  const stat = fs.statSync(skillPath);
+  const cached = skillCache.get(skillName);
+  if (cached && cached.mtimeMs === stat.mtimeMs) {
+    if (!loadedSkills.includes(skillName)) {
+      loadedSkills.push(skillName);
+    }
+    emitNervesEvent({
+      event: "repertoire.load_end",
+      component: "repertoire",
+      message: "loaded skill",
+      meta: { operation: "loadSkill", skill: skillName, cached: true },
+    });
+    return cached.content;
+  }
+
   const content = fs.readFileSync(skillPath, "utf-8");
+  skillCache.set(skillName, { mtimeMs: stat.mtimeMs, content });
 
   if (!loadedSkills.includes(skillName)) {
     loadedSkills.push(skillName);
