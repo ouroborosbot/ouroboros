@@ -6,12 +6,13 @@ import { runAgent, ChannelCallbacks } from "../heart/core"
 import { buildSystem } from "../mind/prompt"
 import { pickPhrase, getPhrases } from "../wardrobe/phrases"
 import { formatToolResult, formatKick, formatError } from "../wardrobe/format"
-import { sessionPath } from "../config"
+import { logPath, sessionPath } from "../config"
 import { loadSession, deleteSession, postTurn } from "../mind/context"
 import type { UsageData } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand, getToolChoiceRequired } from "../repertoire/commands"
 import { getAgentName, getAgentRoot } from "../identity"
-import { createTraceId } from "../nerves"
+import { createLogger, createNdjsonFileSink, createTraceId } from "../nerves"
+import { setRuntimeLogger } from "../nerves/runtime"
 import { FileFriendStore } from "../mind/friends/store-file"
 import { FriendResolver } from "../mind/friends/resolver"
 import type { ToolContext } from "../repertoire/tools"
@@ -331,6 +332,14 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
   }
 }
 
+export function configureCliRuntimeLogger(_friendId: string): void {
+  const logger = createLogger({
+    level: "info",
+    sinks: [createNdjsonFileSink(logPath("cli", "runtime"))],
+  })
+  setRuntimeLogger(logger)
+}
+
 export async function main() {
   const registry = createCommandRegistry()
   registerDefaultCommands(registry)
@@ -356,6 +365,7 @@ export async function main() {
   }
 
   const friendId = resolvedContext.friend.id
+  configureCliRuntimeLogger(friendId)
   const sessPath = sessionPath(friendId, "cli", "session")
 
   // Load existing session or start fresh
