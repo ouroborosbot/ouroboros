@@ -605,7 +605,7 @@ The phrase rotation timer (1.5s interval for `safeUpdate`) continues to run duri
 
 2. **streamChatCompletion integration tests** (in `src/__tests__/heart/streaming.test.ts`):
    - When `final_answer` tool call streams argument deltas, `onTextChunk` is called with parsed answer text progressively
-   - `onClearText` is called when `final_answer` tool call starts (before any answer text)
+   - `onClearText` is called when `final_answer` tool call is first detected (name delta arrives) -- before any answer text
    - `finalAnswerStreamed` is `true` in the returned `TurnResult`
    - When tool call is not `final_answer`, no streaming of arguments occurs (normal behavior)
    - When prefix never matches (malformed JSON), `finalAnswerStreamed` is `false`
@@ -637,9 +637,9 @@ The phrase rotation timer (1.5s interval for `safeUpdate`) continues to run duri
    - Add `finalAnswerStreamed?: boolean` to the interface
 
 3. **`streamChatCompletion` changes** (streaming.ts lines 127-267):
-   - Create `FinalAnswerParser` instance before the loop
-   - In the `d.tool_calls` block (line 243-256): when a tool call at index has `name === "final_answer"` and `tc.function?.arguments` is present, feed delta to parser via `process()`
-   - When parser first becomes `active`, call `callbacks.onClearText?.()` to clear noise
+   - Create `FinalAnswerParser` instance before the loop; track `finalAnswerDetected = false`
+   - In the `d.tool_calls` block (line 243-256): when a tool call's `name === "final_answer"` is first seen, call `callbacks.onClearText?.()` and set `finalAnswerDetected = true`
+   - When `tc.function?.arguments` is present and the tool call at that index is `final_answer`, feed delta to parser via `process()`
    - If `process()` returns non-empty text, call `callbacks.onTextChunk(text)`
    - In the return statement (line 261-266): set `finalAnswerStreamed: parser.active`
 
