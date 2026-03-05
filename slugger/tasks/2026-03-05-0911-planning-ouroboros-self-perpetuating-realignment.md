@@ -12,6 +12,8 @@ Stabilize and realign Ouroboros so agents can use the harness to improve themsel
 
 ### In Scope
 - Audit and fix the reflect -> plan -> do -> merge handoff so it follows `work-planner`, `work-doer`, and `work-merger` gate semantics instead of bypassing them.
+- Audit and unwind undesired self-perpetuating-run commits that landed directly on `main`, restoring `main` health while preserving traceability.
+- Salvage valuable attempted work from the reverted set and reincorporate it through the correct `slugger/tasks` planning-doing flow with quality gates.
 - Relocate shared governance docs (`ARCHITECTURE`, `CONSTITUTION`) out of `ouroboros/` to a shared location and enforce agent preflight loading.
 - Clean and consolidate only the initial self-perpetuating-run reflection proposal debris from `ouroboros/tasks/` into `slugger/tasks/` with deduplication and actionable grouping, while preserving unrelated valid historical task docs in place.
 - Add interruption/resume state so in-progress autonomous work recovers cleanly after stop/restart.
@@ -26,6 +28,9 @@ Stabilize and realign Ouroboros so agents can use the harness to improve themsel
 
 ## Completion Criteria
 - [ ] A documented and tested orchestration contract exists for how agents invoke `work-planner` -> `work-doer` -> `work-merger` without shortcutting review gates.
+- [ ] A commit-level recovery map identifies which `main` commits from the initial self-perpetuating run are to be reverted vs salvaged.
+- [ ] `main` rollback is completed via explicit revert commits (no history rewrite), and post-revert validation confirms healthy baseline.
+- [ ] Valuable attempted work from the reverted set is re-landed through approved planning/doing docs under `slugger/tasks`.
 - [ ] Shared governance docs are moved to agreed shared location and referenced by all participating agents before work starts.
 - [ ] Initial self-perpetuating-run reflection artifacts are triaged, deduplicated, and rewritten/moved into correct agent task path with clear statuses, without disrupting valid pre-existing `ouroboros/tasks` work.
 - [ ] Resume state persists enough information to continue interrupted work from the last safe checkpoint.
@@ -44,6 +49,7 @@ Stabilize and realign Ouroboros so agents can use the harness to improve themsel
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
+- [ ] Confirm exact rollback boundary on `main` for the initial self-perpetuating run (candidate start: commit `e3ecc1c`, March 5, 2026).
 - [ ] Final shared location decision for governance docs: repo root (`/ARCHITECTURE.md`, `/CONSTITUTION.md`) vs a shared docs namespace.
 - [ ] Governance ownership contract: should `CONSTITUTION` remain human-only editable, or can agents propose edits via gated workflow.
 - [ ] For the targeted initial-run artifact subset, decide archival policy: keep originals as archived artifacts vs replace with canonical consolidated docs.
@@ -53,11 +59,13 @@ Stabilize and realign Ouroboros so agents can use the harness to improve themsel
 - Work for this task is tracked under `slugger/tasks/` because current branch agent context is `slugger/*`.
 - The objective is capability-first (code the agent can use), not prescriptive automation-first (code that uses the agent).
 - Pipeline recovery starts with correctness and gate compliance before autonomy expansion.
+- Recovery scope includes repairing `main` by reverting undesired initial self-perpetuating-run commits, then re-incorporating worthwhile changes through the proper task workflow.
 - Additive hardening changes default toward `within-bounds`; architectural boundary changes remain `requires-review`.
 - No environment-variable-based configuration will be introduced.
 - Valid historical task files under `ouroboros/tasks/` are preserved; cleanup/migration applies only to initial self-perpetuating-run artifacts.
 
 ## Context / References
+- `main` commit window candidate: `e3ecc1c`..`448cfcd` (March 5, 2026 initial self-perpetuating run)
 - `src/reflection/autonomous-loop.ts`
 - `src/reflection/trigger.ts`
 - `src/reflection/loop-entry.ts`
@@ -73,6 +81,7 @@ Stabilize and realign Ouroboros so agents can use the harness to improve themsel
 
 ## Notes
 Current branch baseline is green (`npm test`: 50 files passed, 1474 tests total, 1456 passed, 18 skipped), so red-state recovery likely requires explicit audit of `main` and/or the incorrectly merged PR lineage.
+`main` currently includes a dense run of March 5, 2026 self-perpetuating commits (many `docs(tasks)` plus reflection-loop edits). This plan now treats rollback + selective salvage as first-class scope.
 
 ## Progress Log
 - 2026-03-05 09:12 Created
