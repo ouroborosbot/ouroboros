@@ -2561,7 +2561,7 @@ describe("Teams adapter - unified chunked streaming (no disableStreaming)", () =
     expect(controller.signal.aborted).toBe(true)
   })
 
-  it("onToolStart flushes text to sendMessage when stream already has content", async () => {
+  it("onToolStart flushes text to safeEmit when stream already has content", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
@@ -2571,11 +2571,11 @@ describe("Teams adapter - unified chunked streaming (no disableStreaming)", () =
     await callbacks.flush()
     expect(mockStream.emit).toHaveBeenCalledWith("first response")
     mockStream.emit.mockClear()
-    // Second: accumulate more text, then onToolStart flushes via sendMessage (streamHasContent=true)
+    // Second: accumulate more text, then onToolStart flushes via safeEmit (cumulative stream)
     callbacks.onTextChunk("second text")
     callbacks.onToolStart("read_file", { path: "test.txt" })
-    expect(sendMessage).toHaveBeenCalledWith("second text")
-    expect(mockStream.emit).not.toHaveBeenCalled()
+    expect(mockStream.emit).toHaveBeenCalledWith("second text")
+    expect(sendMessage).not.toHaveBeenCalled()
   })
 
   it("flush() with no prior stream content: first text goes to stream.emit", async () => {
@@ -2593,22 +2593,21 @@ describe("Teams adapter - unified chunked streaming (no disableStreaming)", () =
     expect(sendMessage).not.toHaveBeenCalled()
   })
 
-  it("flush() with prior stream content but no sendMessage: text is silently dropped", async () => {
+  it("flush() with prior stream content: subsequent text still goes to safeEmit (cumulative)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
-    // No sendMessage provided
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     // First iteration: text goes to emit
     callbacks.onTextChunk("first response")
     await callbacks.flush()
     mockStream.emit.mockClear()
-    // Second iteration: no sendMessage, so text should be silently cleared (not emitted again)
+    // Second iteration: also goes to emit (SDK accumulates cumulatively)
     callbacks.onTextChunk("second response")
     await callbacks.flush()
-    expect(mockStream.emit).not.toHaveBeenCalled()
+    expect(mockStream.emit).toHaveBeenCalledWith("second response")
   })
 
-  it("flush() with prior stream content: text goes via sendMessage", async () => {
+  it("flush() with prior stream content: subsequent text goes to safeEmit not sendMessage", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
@@ -2617,11 +2616,11 @@ describe("Teams adapter - unified chunked streaming (no disableStreaming)", () =
     callbacks.onTextChunk("first response")
     await callbacks.flush()
     mockStream.emit.mockClear()
-    // Second iteration: text goes to sendMessage
+    // Second iteration: also goes to emit (cumulative stream), not sendMessage
     callbacks.onTextChunk("second response")
     await callbacks.flush()
-    expect(mockStream.emit).not.toHaveBeenCalled()
-    expect(sendMessage).toHaveBeenCalledWith("second response")
+    expect(mockStream.emit).toHaveBeenCalledWith("second response")
+    expect(sendMessage).not.toHaveBeenCalled()
   })
 
   it("flush() with no text and no prior stream content: emits fallback message", async () => {
@@ -2634,23 +2633,20 @@ describe("Teams adapter - unified chunked streaming (no disableStreaming)", () =
     expect(mockStream.emit).toHaveBeenCalledWith("(completed with tool calls only \u2014 no text response)")
   })
 
-  it("flush() is async and awaits sendMessage", async () => {
+  it("flush() with subsequent text uses safeEmit (sync, no await needed)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
-    let resolveMsg: (() => void) | null = null
-    const sendMessage = vi.fn().mockImplementation(() => new Promise<void>(r => { resolveMsg = r }))
+    const sendMessage = vi.fn().mockResolvedValue(undefined)
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
-    // First flush to get stream content
+    // First flush
     callbacks.onTextChunk("first")
     await callbacks.flush()
-    // Second flush goes to sendMessage
+    mockStream.emit.mockClear()
+    // Second flush — goes to safeEmit, not sendMessage
     callbacks.onTextChunk("second")
-    const flushPromise = callbacks.flush()
-    // sendMessage was called but not resolved yet
-    expect(sendMessage).toHaveBeenCalledWith("second")
-    // Resolve it
-    resolveMsg!()
-    await flushPromise
+    await callbacks.flush()
+    expect(mockStream.emit).toHaveBeenCalledWith("second")
+    expect(sendMessage).not.toHaveBeenCalled()
   })
 
   it("flush() with empty buffer after prior content is a no-op (does not send empty)", async () => {
@@ -2683,7 +2679,7 @@ describe("Teams adapter - unified chunked streaming (no disableStreaming)", () =
     expect(sendMessage).not.toHaveBeenCalled()
   })
 
-  it("flush() sends full text via sendMessage after prior content (no preemptive splitting)", async () => {
+  it("flush() sends full text via safeEmit after prior content (no preemptive splitting)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const sendMessage = vi.fn().mockResolvedValue(undefined)
@@ -2693,31 +2689,28 @@ describe("Teams adapter - unified chunked streaming (no disableStreaming)", () =
     await callbacks.flush()
     mockStream.emit.mockClear()
     sendMessage.mockClear()
-    // Second flush with long text -- sent as one message
+    // Second flush with long text -- sent via safeEmit (cumulative), not sendMessage
     const longText = "x".repeat(3000) + "\n\n" + "y".repeat(3000)
     callbacks.onTextChunk(longText)
     await callbacks.flush()
-    expect(mockStream.emit).not.toHaveBeenCalled()
-    expect(sendMessage).toHaveBeenCalledTimes(1)
-    expect(sendMessage).toHaveBeenCalledWith(longText)
+    expect(mockStream.emit).toHaveBeenCalledTimes(1)
+    expect(mockStream.emit).toHaveBeenCalledWith(longText)
+    expect(sendMessage).not.toHaveBeenCalled()
   })
 
-  it("flush() splits and retries when sendMessage fails (error recovery)", async () => {
+  it("flush() splits and retries when sendMessage fails on dead stream (error recovery)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
-    const sendMessage = vi.fn().mockResolvedValue(undefined)
+    const sendMessage = vi.fn()
     const longText = "a".repeat(3000) + "\n\n" + "b".repeat(3000)
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
-    // First flush sets streamHasContent (goes to safeEmit, not sendMessage)
-    callbacks.onTextChunk("first")
-    await callbacks.flush()
-    // Reset completely -- clear history AND queued implementations
-    sendMessage.mockReset()
-    // Full-text send rejects (e.g. 413), subsequent chunk sends succeed
+    // Buffer long text while stream is alive, then kill the stream
+    callbacks.onTextChunk(longText)
+    mockStream.emit.mockImplementation(() => { throw new Error("403") })
+    // Full-text sendMessage rejects (e.g. 413), subsequent chunk sends succeed
     sendMessage.mockRejectedValueOnce(new Error("413 Request Entity Too Large"))
     sendMessage.mockResolvedValue(undefined)
-    // Second flush with long text -- full send fails, splits and retries
-    callbacks.onTextChunk(longText)
+    // flush() tries safeEmit → 403 → markStopped → falls through to sendMessage
     await callbacks.flush()
     // First call was the full text (rejected), then two split chunks
     expect(sendMessage).toHaveBeenCalledTimes(3)
@@ -4087,7 +4080,7 @@ describe("Teams adapter - periodic flush timer", () => {
     expect(mockStream.emit).toHaveBeenCalledWith("hello ")
   })
 
-  it("multiple flushes across intervals -- first to safeEmit, subsequent to safeSend", async () => {
+  it("multiple flushes across intervals -- all go to safeEmit (cumulative stream)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller, sendMessage)
@@ -4095,12 +4088,13 @@ describe("Teams adapter - periodic flush timer", () => {
     callbacks.onTextChunk("chunk1 ")
     vi.advanceTimersByTime(teams.DEFAULT_FLUSH_INTERVAL_MS)
     expect(mockStream.emit).toHaveBeenCalledWith("chunk1 ")
-    // Second interval: more text accumulates, flush goes to safeSend
+    // Second interval: more text accumulates, also goes to safeEmit (SDK accumulates cumulatively)
     callbacks.onTextChunk("chunk2 ")
     vi.advanceTimersByTime(teams.DEFAULT_FLUSH_INTERVAL_MS)
-    // First flush was to emit, second should go to sendMessage (safeSend)
-    await vi.advanceTimersByTimeAsync(0) // flush promise chain
-    expect(sendMessage).toHaveBeenCalledWith("chunk2 ")
+    expect(mockStream.emit).toHaveBeenCalledWith("chunk2 ")
+    expect(mockStream.emit).toHaveBeenCalledTimes(2)
+    // No separate messages -- all via the stream
+    expect(sendMessage).not.toHaveBeenCalled()
   })
 
   it("no flush when buffer is empty -- timer tick is a no-op", async () => {
@@ -4152,12 +4146,8 @@ describe("Teams adapter - periodic flush timer", () => {
     // Call flush() (end of turn) before timer fires
     await callbacks.flush()
     expect(mockStream.emit).toHaveBeenCalledWith("turn text")
-    // After flush, add more text and advance timer -- should NOT flush
-    // because the periodic timer was stopped by flush()
-    callbacks.onTextChunk("after flush")
+    // Advance time -- periodic timer was stopped by flush(), no spurious flushes
     vi.advanceTimersByTime(teams.DEFAULT_FLUSH_INTERVAL_MS * 3)
-    // The "after flush" text should NOT be flushed by the periodic timer
-    // (flush() stopped the timer; a new turn would need to restart it)
     expect(mockStream.emit).toHaveBeenCalledTimes(1) // only the flush() call
   })
 
@@ -4219,10 +4209,10 @@ describe("Teams adapter - periodic flush timer", () => {
     expect(mockStream.emit).toHaveBeenCalledWith("first ")
     // More text arrives after first flush
     callbacks.onTextChunk("remaining ")
-    // End of turn -- flush() should send remaining via sendMessage (stream has content)
+    // End of turn -- flush() sends remaining via safeEmit (cumulative stream)
     await callbacks.flush()
-    await vi.advanceTimersByTimeAsync(0) // flush promise chain
-    expect(sendMessage).toHaveBeenCalledWith("remaining ")
+    expect(mockStream.emit).toHaveBeenCalledWith("remaining ")
+    expect(sendMessage).not.toHaveBeenCalled()
   })
 
   it("flushIntervalMs option overrides default", async () => {

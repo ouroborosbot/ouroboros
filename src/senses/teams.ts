@@ -211,16 +211,13 @@ export function createTeamsCallbacks(
     }
   }
 
-  // Flush accumulated text buffer. First flush goes to safeEmit (primary
-  // output gets real content). Subsequent flushes go to safeSend.
+  // Flush accumulated text buffer via safeEmit. The Teams SDK accumulates
+  // emitted text into a single streaming message (cumulative), so every
+  // periodic flush appends to the same response — not separate messages.
   // No preemptive splitting — sends full text. Error recovery happens in flush().
   function flushTextBuffer(): void {
     if (!textBuffer) return
-    if (!streamHasContent) {
-      safeEmit(textBuffer)
-    } else {
-      safeSend(textBuffer)
-    }
+    safeEmit(textBuffer)
     textBuffer = ""
   }
 
@@ -317,15 +314,16 @@ export function createTeamsCallbacks(
       if (textBuffer) {
         const text = textBuffer
         textBuffer = ""
-        if (!streamHasContent && !stopped) {
+        if (!stopped) {
+          // Stream is alive — emit remaining text (SDK accumulates cumulatively).
+          // If safeEmit fails (e.g. 403), it marks stopped — fall through to sendMessage.
           safeEmit(text)
-        } else if (sendMessage) {
-          // Stream already has content, is dead, or safeEmit isn't viable.
-          // Send as a separate message; split on failure as recovery.
+        }
+        if (stopped && sendMessage) {
+          // Stream is dead — fall back to sendMessage; split on failure as recovery.
           try {
             await sendMessage(text)
           } catch {
-            // Send failed (e.g. 413 size error) — split and retry
             const chunks = splitMessage(text, RECOVERY_CHUNK_SIZE)
             for (const chunk of chunks) await sendMessage(chunk)
           }
