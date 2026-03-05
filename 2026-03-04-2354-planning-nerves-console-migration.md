@@ -1,6 +1,6 @@
 # Planning: Replace console.* calls with emitNervesEvent
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-03-04 23:54
 
 ## Goal
