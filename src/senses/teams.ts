@@ -656,7 +656,7 @@ export function startTeamsApp(): void {
       await handleTeamsMessage(text, stream, convId, teamsContext, ctxSend)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.error(`[teams] handler error: ${msg.slice(0, 200)}`)
+      emitNervesEvent({ level: "error", event: "channel.handler_error", component: "channels", message: msg.slice(0, 200), meta: {} })
     } finally {
       _turnCoordinator.endTurn(turnKey)
     }
@@ -669,7 +669,7 @@ export function startTeamsApp(): void {
   if (!process.listeners("unhandledRejection").some((l) => (l as AgentHandler).__agentHandler)) {
     const handler: AgentHandler = (err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err)
-      console.error(`[teams] unhandled rejection: ${msg.slice(0, 200)}`)
+      emitNervesEvent({ level: "error", event: "channel.unhandled_rejection", component: "channels", message: msg.slice(0, 200), meta: {} })
     }
     handler.__agentHandler = true
     process.on("unhandledRejection", handler)
@@ -677,10 +677,10 @@ export function startTeamsApp(): void {
 
   app.event("error", ({ error }) => {
     const msg = error instanceof Error ? error.message : String(error)
-    console.error(`[teams] app error: ${msg}`)
+    emitNervesEvent({ level: "error", event: "channel.app_error", component: "channels", message: msg, meta: {} })
   })
 
   const port = getTeamsChannelConfig().port
   app.start(port)
-  console.log(`Teams bot started on port ${port} with ${mode} (chunked streaming)`)
+  emitNervesEvent({ level: "info", event: "channel.app_started", component: "channels", message: `Teams bot started on port ${port} with ${mode} (chunked streaming)`, meta: { port, mode } })
 }

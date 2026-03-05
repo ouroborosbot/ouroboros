@@ -1879,9 +1879,20 @@ describe("Teams adapter - unhandledRejection guard", () => {
   })
 
   it("registers unhandledRejection handler that emits unhandled_rejection event", async () => {
+    // Clean up any stale handlers from previous tests
+    for (const l of process.listeners("unhandledRejection")) {
+      if ((l as any).__agentHandler) process.removeListener("unhandledRejection", l)
+    }
+
     vi.resetModules()
     const emitNervesEventLocal = vi.fn()
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: emitNervesEventLocal }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/test-session"),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978, flushIntervalMs: 1000 }),
+    }))
 
     vi.doMock("@microsoft/teams.apps", () => ({
       App: class MockApp {
@@ -2075,8 +2086,10 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     vi.restoreAllMocks()
   })
 
-  it("logs 'with Bot Service' in bot mode", async () => {
+  it("emits app_started event with Bot Service mode", async () => {
     vi.resetModules()
+    const emitNervesEventLocal = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: emitNervesEventLocal }))
 
     vi.doMock("@microsoft/teams.apps", () => ({
       App: class MockApp {
@@ -2095,14 +2108,16 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
     }))
     mockBotConfig("test-id", "test-secret", "test-tenant")
 
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
-
     const teams = await import("../../senses/teams")
     teams.startTeamsApp()
 
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Bot Service"))
+    expect(emitNervesEventLocal).toHaveBeenCalledWith(expect.objectContaining({
+      level: "info",
+      event: "channel.app_started",
+      component: "channels",
+      meta: expect.objectContaining({ mode: "Bot Service" }),
+    }))
 
-    consoleSpy.mockRestore()
     vi.restoreAllMocks()
   })
 
