@@ -11,6 +11,7 @@ import { sessionPath, getTeamsConfig, getTeamsChannelConfig } from "../config"
 import { loadSession, deleteSession, postTurn } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } from "../repertoire/commands"
 import { createTraceId } from "../nerves"
+import { emitNervesEvent } from "../nerves/runtime"
 import { FileFriendStore } from "../mind/friends/store-file"
 import { FriendResolver } from "../mind/friends/resolver"
 import { accumulateFriendTokens } from "../mind/friends/tokens"
@@ -565,11 +566,11 @@ export function startTeamsApp(): void {
           connectionName: cn,
           code: activity.value.state,
         })
-        console.log(`[teams] verify-state succeeded for connection "${cn}"`)
+        emitNervesEvent({ level: "info", event: "channel.verify_state", component: "channels", message: `verify-state succeeded for connection "${cn}"`, meta: { connectionName: cn } })
         return { status: 200 }
       } catch { /* try next */ }
     }
-    console.warn("[teams] verify-state failed for all connections")
+    emitNervesEvent({ level: "warn", event: "channel.verify_state", component: "channels", message: "verify-state failed for all connections", meta: {} })
     return { status: 412 }
   })
 
@@ -581,7 +582,7 @@ export function startTeamsApp(): void {
     const userId = activity.from?.id || ""
     const channelId = activity.channelId || "msteams"
 
-    console.log(`[teams] msg from=${userId.slice(0, 12)} conv=${convId.slice(0, 20)}`)
+    emitNervesEvent({ level: "info", event: "channel.message_received", component: "channels", message: "incoming teams message", meta: { userId: userId.slice(0, 12), conversationId: convId.slice(0, 20) } })
 
     // Resolve pending confirmations IMMEDIATELY — before token fetches or
     // the conversation lock.  The original message holds the lock while
