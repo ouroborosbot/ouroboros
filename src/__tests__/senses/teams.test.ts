@@ -86,6 +86,18 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
     expect(() => callbacks.onModelStreamStart()).not.toThrow()
   })
 
+  it("onClearText resets the text buffer", async () => {
+    vi.resetModules()
+    const teams = await import("../../senses/teams")
+    const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
+    callbacks.onTextChunk("accumulated text")
+    callbacks.onClearText()
+    // After clear, flushing should not emit the accumulated text
+    // (it may emit a fallback "no text" message, but the original buffer is gone)
+    await callbacks.flush()
+    expect(mockStream.emit).not.toHaveBeenCalledWith("accumulated text")
+  })
+
   // --- Chunked streaming: text is always accumulated, never emitted per-token ---
 
   it("onTextChunk accumulates text in buffer (does not emit per-token)", async () => {

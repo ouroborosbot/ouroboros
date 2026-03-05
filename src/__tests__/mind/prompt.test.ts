@@ -693,6 +693,34 @@ describe("contextSection", () => {
     expect(result).not.toContain("no streaming")
   })
 
+  it("renders 'no streaming' trait when channel does not support streaming", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        name: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "cli" as const,
+        availableIntegrations: [] as any[],
+        supportsMarkdown: false,
+        supportsStreaming: false,
+        supportsRichCards: false,
+        maxMessageLength: Infinity,
+      },
+    }
+    const result = contextSection(ctx)
+    expect(result).toContain("no streaming")
+    expect(result).not.toContain(", streaming")
+  })
+
   it("renders notes section when friend has notes", async () => {
     const { contextSection } = await import("../../mind/prompt")
     const ctx = {

@@ -604,6 +604,7 @@ export function startTeamsApp(): void {
         displayName: activity.from?.name,
       }
 
+      /* v8 ignore next 5 -- bot-framework integration callback; tested via handleTeamsMessage sendMessage path @preserve */
       const ctxSend = async (t: string) => {
         // Use send with replyToId (not reply, which adds a blockquote).
         // replyToId anchors the message after the user's message in Copilot Chat.
