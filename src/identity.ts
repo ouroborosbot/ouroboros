@@ -9,7 +9,6 @@ export interface AgentConfig {
   context?: {
     maxTokens?: number
     contextMargin?: number
-    maxToolOutputChars?: number
   }
   phrases: {
     thinking: string[]
@@ -21,7 +20,6 @@ export interface AgentConfig {
 export const DEFAULT_AGENT_CONTEXT = {
   maxTokens: 80000,
   contextMargin: 20,
-  maxToolOutputChars: 20000,
 } as const
 
 export const DEFAULT_AGENT_PHRASES: AgentConfig["phrases"] = {

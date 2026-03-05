@@ -231,7 +231,6 @@ export async function runAgent(
 ): Promise<{ usage?: UsageData }> {
   const providerRuntime = getProviderRuntime();
   const provider = providerRuntime.id;
-  const { maxToolOutputChars } = getContextConfig();
   const toolChoiceRequired = options?.toolChoiceRequired ?? true;
   const traceId = options?.traceId;
   emitNervesEvent({
@@ -462,10 +461,6 @@ export async function runAgent(
             success = true;
           } catch (e) {
             toolResult = `error: ${e}`;
-            success = false;
-          }
-          if (toolResult.length > maxToolOutputChars) {
-            toolResult = `output too large (${toolResult.length} chars, limit ${maxToolOutputChars}). retry with narrower scope — e.g. read fewer lines, filter output, or use a more specific command.`;
             success = false;
           }
           callbacks.onToolEnd(tc.name, argSummary, success);
