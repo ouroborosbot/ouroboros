@@ -53,6 +53,13 @@ Task docs go in `<agent>/tasks/` with naming scheme `YYYY-MM-DD-HHMM-{planning|d
 - If configuration is needed, prefer explicit CLI arguments, committed config files, or in-repo defaults.
 - If a proposal would normally use env vars, stop and present a non-env-var alternative instead.
 
+### Runtime Config Contract (Required)
+
+- `agent.json` is the source of truth for agent identity, selected provider, `configPath`, phrases, and context settings.
+- `configPath` must target `~/.agentsecrets/<agent>/secrets.json`.
+- `secrets.json` stores provider/team credentials and related secret config; keep runtime/session/log/PII/test-run artifacts under `~/.agentstate/...`.
+- Selected provider config must be complete; runtime must fail fast with explicit guidance. Do not implement silent provider fallback behavior.
+
 ### Git Discipline
 
 - When a logical unit of work is complete and committable, commit immediately.

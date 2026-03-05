@@ -1,6 +1,6 @@
 # Ouroboros Agent Harness
 
-A minimal, multi-agent harness for building AI agents that can read files, write code, run commands, and modify themselves. Written in TypeScript, powered by Azure OpenAI or MiniMax, deployable as a CLI REPL or a Microsoft Teams bot.
+A minimal, multi-agent harness for building AI agents that can read files, write code, run commands, and modify themselves. Written in TypeScript, supporting Azure OpenAI, MiniMax, Anthropic (setup-token), and OpenAI Codex (OAuth), deployable as a CLI REPL or a Microsoft Teams bot.
 
 The name is structural: the original agent -- Ouroboros -- was grown recursively from a 150-line while loop, bootstrapping itself through agentic self-modification. A snake eating its own tail. The metaphor runs deep: the agent literally consumes its own context window, trimming old conversation to stay within token budget while preserving identity through layered memory (psyche files, session persistence, git history). It eats its tail to survive across turns. The harness preserves that architecture while supporting multiple agents, each with their own personality, skills, and configuration.
 
@@ -19,7 +19,12 @@ ouroboros/                        # repo root
     teams-entry.ts                # Teams entrypoint
     heart/                        # core agent loop and streaming
       core.ts                     # agent loop, client init, ChannelCallbacks
-      streaming.ts                # Azure Responses API + MiniMax Chat Completions
+      streaming.ts                # provider event normalization + stream callbacks
+      providers/                  # provider-specific runtime/adapters
+        azure.ts                  # Azure OpenAI Responses provider
+        minimax.ts                # MiniMax Chat Completions provider
+        anthropic.ts              # Anthropic setup-token provider
+        openai-codex.ts           # OpenAI Codex OAuth provider
       kicks.ts                    # self-correction: empty, narration, tool_required
       api-error.ts                # error classification
     mind/                         # prompt, context, memory
@@ -79,7 +84,8 @@ Each agent has a directory at the repo root named after itself. Inside it:
 ```json
 {
   "name": "ouroboros",
-  "configPath": "~/.agentconfigs/ouroboros/config.json",
+  "provider": "anthropic",
+  "configPath": "~/.agentsecrets/ouroboros/secrets.json",
   "phrases": {
     "thinking": ["chewing on that", "consulting the chaos gods"],
     "tool": ["rummaging through files", "doing science"],
@@ -89,7 +95,8 @@ Each agent has a directory at the repo root named after itself. Inside it:
 ```
 
 - `name`: must match your directory name.
-- `configPath`: absolute path (or `~`-prefixed) to your config.json with API keys and provider settings.
+- `provider`: required provider selection (`azure`, `minimax`, `anthropic`, or `openai-codex`). Runtime does not fall back to other providers.
+- `configPath`: absolute path (or `~`-prefixed) to your secrets.json with API keys and provider settings.
 - `phrases`: optional custom loading phrases. Falls back to hardcoded defaults if omitted.
 
 **psyche/** -- your personality files, loaded lazily into the system prompt at startup. See the psyche system section below.
@@ -132,7 +139,7 @@ Missing psyche files produce empty strings, not crashes. You can write your own 
 
 **The heart** (`heart/core.ts`): `runAgent()` is a while loop. Each iteration: send conversation to the model, stream the response, if the model made tool calls execute them and loop, if it gave a text answer exit. Maximum 10 tool rounds per turn.
 
-**Streaming** (`heart/streaming.ts`): two provider paths. Azure OpenAI uses the Responses API with structured events (reasoning, text, tool calls). MiniMax uses Chat Completions with `<think>` tags parsed by a state machine. Both normalize into the same 7+2 callbacks.
+**Streaming** (`heart/streaming.ts` + `heart/providers/*`): provider-specific adapters normalize streamed events into the same callback contract. Azure OpenAI uses Responses API events; MiniMax uses Chat Completions with `<think>` parsing; Anthropic uses setup-token auth with streamed tool-call/input deltas; OpenAI Codex uses `chatgpt.com/backend-api/codex/responses` with OAuth token auth.
 
 **ChannelCallbacks** (`heart/core.ts`): the contract between heart and display. 7 core events:
 - `onModelStart` -- model request sent
@@ -159,11 +166,11 @@ Plus 2 optional:
 - **FriendStore** (`friends/store.ts`): domain-specific persistence interface (`get`, `put`, `delete`, `findByExternalId`).
 - **FileFriendStore** (`friends/store-file.ts`): two-backend storage split by PII boundary:
   - **Agent knowledge** (`{agentRoot}/friends/{uuid}.json`): id, displayName, toolPreferences, notes, timestamps, schemaVersion. Committed to the repo -- no PII.
-  - **PII bridge** (`~/.agentconfigs/{agentName}/friends/{uuid}.json`): id, externalIds, tenantMemberships, schemaVersion. Local-only -- contains PII.
+  - **PII bridge** (`~/.agentstate/{agentName}/friends/{uuid}.json`): id, externalIds, tenantMemberships, schemaVersion. Local-only -- contains PII.
   - `get()` merges both backends. `put()` splits and writes both. `findByExternalId()` scans PII bridge, then merges with agent knowledge.
 - **Channel** (`friends/channel.ts`): `ChannelCapabilities` -- what the current channel supports (markdown, streaming, rich cards, max message length, available integrations).
 - **FriendResolver** (`friends/resolver.ts`): find-or-create by external ID. First encounter creates a new FriendRecord with system-provided name and empty notes/preferences. Returning friends are found via `findByExternalId()`. DisplayName is never overwritten on existing records.
-- **Session paths**: `~/.agentconfigs/{agentName}/sessions/{friendUuid}/{channel}/{sessionId}.json`. Each friend gets their own session directory.
+- **Session paths**: `~/.agentstate/{agentName}/sessions/{friendUuid}/{channel}/{sessionId}.json`. Each friend gets their own session directory.
 
 Design principles: don't persist what you can re-derive; conversation IS the cache; the model manages memory freeform via `save_friend_note`; toolPreferences go to tool descriptions (not system prompt); notes go to system prompt (not tool descriptions).
 
@@ -175,7 +182,12 @@ Design principles: don't persist what you can re-derive; conversation IS the cac
 
 **Skills** (`repertoire/skills.ts`): markdown files in `{your-dir}/skills/`. Listed with `list_skills`, loaded with `load_skill`. The loaded text is injected into conversation as a tool result.
 
-**Config** (`config.ts`): provider credentials, context window settings, Teams connection info, OAuth config. All loaded from the config.json file pointed to by your agent.json `configPath`. No environment variables in `src/` -- everything comes from files.
+**Config** (`config.ts`): provider credentials, Teams connection info, OAuth config, Teams channel settings, and integrations are loaded from the `secrets.json` file pointed to by your `agent.json` `configPath`. Context window settings come from `agent.json` `context`. Runtime fails fast if the selected `agent.json.provider` is not fully configured in `secrets.json`; there is no silent provider fallback. No environment variables in `src/` -- everything comes from files.
+
+For Anthropic and OpenAI Codex auth bootstrap, use:
+
+- `npm run auth:claude-setup-token` to run `claude setup-token` and save `providers.anthropic.setupToken`.
+- `npm run auth:openai-codex` to run Codex OAuth bootstrap and save `providers.openai-codex.oauthAccessToken`.
 
 ### What you can modify
 
@@ -191,6 +203,14 @@ npm run dev
 
 # CLI (slugger agent, once slugger/ directory exists)
 npm run dev:slugger
+
+# Auth bootstrap (ouroboros defaults)
+npm run auth:claude-setup-token
+npm run auth:openai-codex
+
+# Auth bootstrap for another agent
+npm run auth:claude-setup-token -- --agent slugger
+npm run auth:openai-codex -- --agent slugger
 
 # Teams bot
 npm run teams

@@ -1,0 +1,174 @@
+
+> ouroboros-agent-harness@1.0.0 test
+> vitest run src/__tests__/heart/core.test.ts
+
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+ ❯ src/__tests__/heart/core.test.ts (160 tests | 1 failed) 538ms
+     ✓ detects Node.js network error codes 111ms
+     ✓ detects fetch/network errors by message 0ms
+     ✓ detects HTTP status codes 429 and 5xx 0ms
+     ✓ returns false for non-transient errors 0ms
+     ✓ returns false for context overflow messages (not transient) 0ms
+     ✓ accepts an object with all required callback signatures 0ms
+     ✓ supports a traceId field in RunAgentOptions 0ms
+     ✓ fires onModelStart before API call 8ms
+     ✓ injects steering follow-ups as ordered user messages before model calls 4ms
+     ✓ propagates traceId option into model request metadata 2ms
+     ✓ emits engine lifecycle observability events for a successful turn 5ms
+     ✓ fires onModelStreamStart on first content token 2ms
+     ✓ routes inline think tags to onReasoningChunk and answer to onTextChunk (single chunk) 2ms
+     ✓ routes inline think tags split across chunks 2ms
+     ✓ content-only (no think tags) goes only to onTextChunk 2ms
+     ✓ think-only content goes only to onReasoningChunk 2ms
+     ✓ handles multiple think blocks in content 2ms
+     ✓ handles partial think tag at chunk boundary 1ms
+     ✓ handles think tags split across many chunks 1ms
+     ✓ handles partial close tag at chunk boundary inside think block 1ms
+     ✓ flushes remaining content buffer as text at end of stream 2ms
+     ✓ flushes remaining reasoning buffer at end of stream (unclosed think) 2ms
+     ✓ retains partial close tag prefix in reasoning buffer across chunks 2ms
+     ✓ flushes partial close tag prefix as reasoning at end of stream 1ms
+     ✓ handles empty reasoning before partial close tag prefix 1ms
+     ✓ handles empty content chunks in think tag processing 1ms
+     ✓ ends loop when response has no tool calls 2ms
+     ✓ fires onToolStart before tool execution and onToolEnd after 2ms
+     ✓ loops back for another model call after tool execution 2ms
+     ✓ fires onError on API errors with terminal severity and ends loop 1ms
+     ✓ pushes assistant message with content onto messages array 1ms
+     ✓ pushes assistant message with tool_calls and tool result messages 2ms
+     ✓ does NOT push user message (adapter responsibility) 2ms
+     ✓ handles tool call with arguments split across chunks 2ms
+     ✓ handles multiple tool calls in a single response 2ms
+     ✓ fires onToolEnd with success=false when tool throws 2ms
+     ✓ skips chunks with no delta 2ms
+     ✓ handles invalid JSON in tool call arguments gracefully 1ms
+     ✓ wraps non-Error thrown values in Error in onError callback 1ms
+     ✓ pushes assistant message without content when only tool calls are returned 1ms
+     ✓ handles tool call chunks with missing id and function name 1ms
+     ✓ handles tool call chunk with no function arguments 16ms
+     ✓ uses minimax model from config when set 2ms
+     ✓ calls onReasoningChunk for reasoning_content 1ms
+     ✓ calls onReasoningChunk for reasoning-only stream (kicks then gets real response) 1ms
+     ✓ stops immediately when signal is pre-aborted 2ms
+     ✓ stops streaming when signal is aborted mid-stream 2ms
+     ✓ breaks out of loop cleanly when signal aborted during catch 1ms
+     ✓ skips remaining tools when signal is aborted mid-tool-execution 1ms
+     ✓ fires onModelStreamStart on first reasoning_content token 1ms
+     ✓ calls onReasoningChunk for each reasoning chunk 1ms
+     ✓ handles multiple reasoning_content chunks before content 2ms
+     ✓ Azure provider calls mockResponsesCreate with Responses API params 4ms
+     ✓ Azure text-only response: assistant message pushed in CC format, loop ends 2ms
+     ✓ Azure: propagates traceId option into responses metadata 3ms
+     ✓ Azure tool-use turn: tool executed, result pushed, loop continues 3ms
+     ✓ Azure native input: output items + function_call_output in correct order 3ms
+     ✓ Azure native input: same array reference reused across iterations 5ms
+     ✓ does not pass reasoning params for MiniMax provider 2ms
+     ✓ MiniMax path calls mockCreate, not mockResponsesCreate 1ms
+     ✓ Azure: stores reasoning items as _reasoning_items on assistant message 2ms
+     ✓ Azure: does not set _reasoning_items when outputItems has no reasoning items 2ms
+     ✓ Azure: stores only reasoning items when outputItems has mixed types 3ms
+     ✓ Azure: azureInput.push still happens for each outputItem (existing behavior preserved) 3ms
+     ✓ MiniMax: does not set _reasoning_items (outputItems always empty) 2ms
+     ✓ returns usage from single API call (no tool calls) 1ms
+     ✓ returns usage from last API call when multiple tool rounds 1ms
+     ✓ returns undefined usage when no usage data available 1ms
+     ✓ returns undefined usage on error 1ms
+     ✓ recovers from Azure context_length_exceeded error by trimming and retrying 1ms
+     ✓ recovers from Azure overflow via error message (no .code) 1ms
+     ✓ recovers from MiniMax context window exceeds limit error 1ms
+     ✓ surfaces error via onError when retry also fails with overflow 1ms
+     ✓ does not catch non-overflow errors with overflow recovery 1ms
+     ✓ strips tool calls before trimming on mid-turn overflow 2ms
+     ✓ handles overflow error with empty message property 1ms
+     ✓ overflow on cold start with only system message still retries 1ms
+     ✓ retries on transient network errors with backoff and transient severity 3ms
+     ✓ gives up after MAX_RETRIES transient failures with terminal final error 2ms
+     ✓ aborts retry wait on signal abort 2ms
+     ✓ skips retry wait immediately when signal is already aborted 1ms
+     ✓ resets retry count after successful call 2ms
+     ✓ detects HTTP 429 and 5xx as transient errors 2ms
+     ✓ refreshes system prompt at start of runAgent when channel is passed 2ms
+     ✓ refreshes system prompt for teams channel 2ms
+     ✓ preserves non-system history when refreshing system prompt 1ms
+     ✓ falls back to existing system prompt when prompt refresh fails 3ms
+     ✓ injects default fallback prompt when refresh throws a non-Error and no system prompt exists 3ms
+     ✓ still works without channel parameter (backward compatible) 1ms
+     ✓ exits when no env vars are set 1ms
+     ✓ uses MiniMax when minimax config is set 1ms
+     ✓ prefers Azure when all Azure config is set 1ms
+     ✓ falls back to MiniMax when Azure config is incomplete 1ms
+     ✓ caches client across multiple runAgent invocations 2ms
+     ✓ omits model param in createParams when model is empty 2ms
+     ✓ uses azure config from config.json when apiKey is present 1ms
+     ✓ uses minimax config from config.json when apiKey is present 1ms
+     ✓ prefers azure when both providers are configured in config.json 1ms
+     ✓ config.json is the sole source for provider selection 1ms
+     ✓ stripLastToolCalls pops trailing tool messages 1ms
+     ✓ stripLastToolCalls removes empty assistant after stripping tool_calls 1ms
+     ✓ stripLastToolCalls is a no-op when no trailing tools 1ms
+     ✓ fires onError when tool loop limit is reached 3ms
+     ✓ exits when neither provider configured in config 1ms
+     ✓ exports createProviderRegistry for provider abstraction wiring 0ms
+     ✓ runAgent request path avoids hardcoded provider-name branches 0ms
+     × registry provider runtimes expose provider-owned turn execution hooks 9ms
+     ✓ runAgent keeps provider-specific native input handling out of engine loop 0ms
+     ✓ returns true for each intent phrase 0ms
+     ✓ returns false for text without intent phrases 0ms
+     ✓ is case-insensitive 0ms
+     ✓ fires onKick when model narrates intent without tool calls, then retries 2ms
+     ✓ kicks fire unconditionally -- no maxKicks cap, bounded by MAX_TOOL_ROUNDS 2ms
+     ✓ kick increments toolRounds and respects MAX_TOOL_ROUNDS 1ms
+     ✓ pushes self-correction message before retry 1ms
+     ✓ onKick callback receives no arguments 1ms
+     ✓ onKick callback is optional (no crash if not provided) 2ms
+     ✓ malformed assistant message is NOT in history after kick 3ms
+     ✓ Azure: kick cleans up azureInput output items and forces rebuild on retry 3ms
+     ✓ passes tool_choice: required in MiniMax createParams when toolChoiceRequired is true 1ms
+     ✓ passes tool_choice: required in Azure createParams when toolChoiceRequired is true 2ms
+     ✓ includes final_answer tool in tools list when toolChoiceRequired is true 1ms
+     ✓ does NOT include final_answer tool when toolChoiceRequired is false/undefined 1ms
+     ✓ does NOT pass tool_choice when toolChoiceRequired is not set 1ms
+     ✓ final_answer sole call: extracts answer text and terminates loop 2ms
+     ✓ final_answer mixed with other tool calls: other tools execute, final_answer rejected, loop continues 1ms
+     ✓ final_answer with empty answer arg: uses empty string 1ms
+     ✓ final_answer is never passed to execTool (intercepted before execution) 1ms
+     ✓ Azure: mixed final_answer rejection pushes to azureInput 2ms
+     ✓ final_answer with invalid JSON arguments: falls back to result.content 1ms
+     ✓ final_answer with valid JSON but no answer field: falls back to result.content 1ms
+     ✓ final_answer with invalid JSON and no content: falls back to empty string 1ms
+     ✓ final_answer with valid JSON, no answer field, and no content: falls back to empty string 1ms
+     ✓ kick fires when toolChoiceRequired is true and model narrates intent 1ms
+     ✓ after kick, model returns final_answer -- terminates cleanly 2ms
+     ✓ MAX_TOOL_ROUNDS budget accounts for kicks + tool rounds together 2ms
+     ✓ abort during kick attempt -- clean stop, no dangling messages 1ms
+     ✓ empty content with no tool_calls -- kicks (empty response is always wrong) 1ms
+     ✓ intent phrase only in model content triggers kick, not in tool results 2ms
+     ✓ final_answer with very long text -- full text preserved 1ms
+     ✓ toolChoiceRequired kicks even when content is empty (reasoning-only response) 1ms
+     ✓ uses getToolsForChannel to select tools based on channel 1ms
+     ✓ does not include graph/ado tools for cli channel 2ms
+     ✓ passes toolContext to execTool when calling graph/ado tools 108ms
+     ✓ after narration kick, final_answer is present in tools sent to API 3ms
+     ✓ after empty kick, final_answer is NOT in tools (narration-only injection) 2ms
+     ✓ model calls final_answer after narration kick -- terminates cleanly 2ms
+     ✓ activeTools computed per-iteration -- first call has no final_answer, after kick it does 2ms
+     ✓ toolChoiceRequired still includes final_answer even without prior kick 1ms
+     ✓ confirmation tool + confirmed executes normally 18ms
+     ✓ confirmation tool + denied returns cancelled message 2ms
+     ✓ confirmation tool + no callback returns cancelled (safe default) 2ms
+     ✓ non-confirmation tool executes normally without invoking callback 2ms
+     ✓ Azure: confirmation denied pushes cancelled to azureInput 3ms
+     ✓ skipConfirmation bypasses confirmation for mutate tools 18ms
+     ✓ truncates tool output exceeding maxToolOutputChars 2ms
+     ✓ re-reads friend record from disk each turn when friendStore is present 2ms
+     ✓ handles friendStore.get returning null gracefully 1ms
+     ✓ passes toolPreferences to getToolsForChannel when friend has preferences 1ms
+     ✓ rebuilds system prompt with fresh context when friendStore returns updated record 1ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 159 passed (160)
+   Start at  16:05:49
+   Duration  879ms (transform 274ms, setup 45ms, import 166ms, tests 538ms, environment 0ms)
+
