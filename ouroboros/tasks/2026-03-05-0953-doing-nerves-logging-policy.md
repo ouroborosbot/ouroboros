@@ -2,7 +2,7 @@
 
 **Status**: drafting
 **Execution Mode**: direct
-**Created**: TBD
+**Created**: 2026-03-05 10:41
 **Planning**: ./2026-03-05-0953-planning-nerves-logging-policy.md
 **Artifacts**: ./2026-03-05-0953-doing-nerves-logging-policy/
 
@@ -351,4 +351,4 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 - **CI iteration**: The coverage gate runs on PR checks. work-merger handles CI failures after the PR is created. The doer focuses on getting everything passing locally.
 
 ## Progress Log
-- TBD Created from planning doc
+- 2026-03-05 10:41 Created from planning doc
