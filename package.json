@@ -14,7 +14,11 @@
     "test:coverage": "node scripts/run-coverage-gate.cjs",
     "teams": "tsc && node dist/teams-entry.js --agent ouroboros",
     "lint": "eslint src/",
-    "manifest:package": "cd ouroboros/manifest && zip -r ../../manifest.zip manifest.json color.png outline.png"
+    "manifest:package": "cd ouroboros/manifest && zip -r ../../manifest.zip manifest.json color.png outline.png",
+    "reflect": "tsc && node dist/reflection/reflect-entry.js --agent ouroboros",
+    "reflect:dry": "tsc && node dist/reflection/reflect-entry.js --agent ouroboros --dry-run",
+    "reflect:loop": "tsc && node dist/reflection/loop-entry.js --agent ouroboros",
+    "reflect:loop:dry": "tsc && node dist/reflection/loop-entry.js --agent ouroboros --dry-run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

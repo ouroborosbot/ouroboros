@@ -1,0 +1,18 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`tool registry contract > tool surface area snapshot 1`] = `
+[
+  "claude",
+  "get_current_time",
+  "gh_cli",
+  "git_commit",
+  "list_directory",
+  "list_skills",
+  "load_skill",
+  "read_file",
+  "save_friend_note",
+  "shell",
+  "web_search",
+  "write_file",
+]
+`;
