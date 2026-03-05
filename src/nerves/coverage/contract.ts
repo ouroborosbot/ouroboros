@@ -23,6 +23,17 @@ export const REQUIRED_EVENTS: RequiredEvent[] = [
   { component: "repertoire", event: "repertoire.load_start" },
   { component: "repertoire", event: "repertoire.load_end" },
   { component: "repertoire", event: "repertoire.error" },
+  { component: "channels", event: "channel.verify_state" },
+  { component: "channels", event: "channel.message_received" },
+  { component: "channels", event: "channel.token_status" },
+  { component: "channels", event: "channel.signin_result" },
+  { component: "channels", event: "channel.signin_error" },
+  { component: "channels", event: "channel.handler_error" },
+  { component: "channels", event: "channel.unhandled_rejection" },
+  { component: "channels", event: "channel.app_error" },
+  { component: "channels", event: "channel.app_started" },
+  { component: "engine", event: "engine.provider_init_error" },
+  { component: "friends", event: "friends.persist_error" },
 ]
 
 export const REQUIRED_ENVELOPE_FIELDS = [
