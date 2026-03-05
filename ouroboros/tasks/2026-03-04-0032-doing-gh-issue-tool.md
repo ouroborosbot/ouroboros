@@ -154,7 +154,7 @@ Allow agents using the ouroboros harness to create GitHub issues via the GitHub 
 **Output**: 100% coverage, all tests green
 **Acceptance**: `npm test` passes, no warnings, no coverage gaps
 
-### ⬜Unit 4a: Channel Capabilities -- Tests
+### ✅Unit 4a: Channel Capabilities -- Tests
 **What**: Write tests verifying `"github"` is in Teams' `availableIntegrations`:
 - `getChannelCapabilities("teams").availableIntegrations` contains `"github"`
 - `getChannelCapabilities("cli").availableIntegrations` does NOT contain `"github"`
