@@ -5,7 +5,7 @@ import { emitNervesEvent } from "./nerves/runtime"
 export interface AgentConfig {
   name: string
   configPath: string
-  provider: "azure" | "minimax" | "anthropic"
+  provider: "azure" | "minimax" | "anthropic" | "openai-codex"
   context?: {
     maxTokens?: number
     contextMargin?: number
@@ -194,7 +194,8 @@ export function loadAgentConfig(): AgentConfig {
   if (
     rawProvider !== "azure" &&
     rawProvider !== "minimax" &&
-    rawProvider !== "anthropic"
+    rawProvider !== "anthropic" &&
+    rawProvider !== "openai-codex"
   ) {
     emitNervesEvent({
       level: "error",
@@ -207,7 +208,7 @@ export function loadAgentConfig(): AgentConfig {
       },
     })
     throw new Error(
-      `agent.json at ${configFile} must include provider: "azure", "minimax", or "anthropic".`,
+      `agent.json at ${configFile} must include provider: "azure", "minimax", "anthropic", or "openai-codex".`,
     )
   }
 
