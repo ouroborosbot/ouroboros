@@ -50,6 +50,7 @@ vi.mock("../../identity", () => ({
 // We need to mock OpenAI before importing core
 const mockCreate = vi.fn()
 const mockResponsesCreate = vi.fn()
+const mockOpenAICtor = vi.fn()
 const mockAnthropicMessagesCreate = vi.fn()
 const mockAnthropicCtor = vi.fn()
 vi.mock("openai", () => {
@@ -62,7 +63,9 @@ vi.mock("openai", () => {
     responses = {
       create: mockResponsesCreate,
     }
-    constructor(_opts?: any) {}
+    constructor(opts?: any) {
+      mockOpenAICtor(opts)
+    }
   }
   return {
     default: MockOpenAI,
@@ -121,6 +124,26 @@ async function setupAzure(
 
 function makeAnthropicSetupToken(): string {
   return `sk-ant-oat01-${"a".repeat(80)}`
+}
+
+function encodeBase64Url(value: string): string {
+  return Buffer.from(value, "utf8")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "")
+}
+
+function makeOpenAICodexAccessToken(accountId = "chatgpt-account-test"): string {
+  const header = encodeBase64Url(JSON.stringify({ alg: "none", typ: "JWT" }))
+  const payload = encodeBase64Url(
+    JSON.stringify({
+      "https://api.openai.com/auth": {
+        chatgpt_account_id: accountId,
+      },
+    }),
+  )
+  return `${header}.${payload}.signature`
 }
 
 async function setupConfig(partial: Record<string, unknown>) {
@@ -254,6 +277,7 @@ describe("runAgent", () => {
     vi.resetModules()
     mockCreate.mockReset()
     mockResponsesCreate.mockReset()
+    mockOpenAICtor.mockReset()
     // Restore default readFileSync so prompt.ts module-level psyche file loads work
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupMinimax()
@@ -3900,6 +3924,7 @@ describe("openai-codex oauth provider contract", () => {
 
   beforeEach(() => {
     mockResponsesCreate.mockReset()
+    mockOpenAICtor.mockReset()
   })
 
   it("uses openai-codex when oauth credentials are configured in secrets.json", async () => {
@@ -3909,7 +3934,7 @@ describe("openai-codex oauth provider contract", () => {
       providers: {
         "openai-codex": {
           model: "gpt-5.2",
-          oauthAccessToken: "oauth-test-token",
+          oauthAccessToken: makeOpenAICodexAccessToken(),
         },
       },
     } as any)
@@ -3965,7 +3990,7 @@ describe("openai-codex oauth provider contract", () => {
       providers: {
         "openai-codex": {
           model: "gpt-5.2",
-          oauthAccessToken: "oauth-test-token",
+          oauthAccessToken: makeOpenAICodexAccessToken(),
         },
       },
     } as any)
@@ -4002,7 +4027,7 @@ describe("openai-codex oauth provider contract", () => {
       providers: {
         "openai-codex": {
           model: "gpt-5.2",
-          oauthAccessToken: "oauth-test-token",
+          oauthAccessToken: makeOpenAICodexAccessToken(),
         },
       },
     } as any)
@@ -4058,14 +4083,45 @@ describe("openai-codex oauth provider contract", () => {
     }
   })
 
-  it("streams openai-codex responses and appends provider output items into turn state", async () => {
+  it("fails fast when openai-codex oauthAccessToken is missing chatgpt_account_id", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const tokenWithoutAccountId = `${encodeBase64Url(JSON.stringify({ alg: "none", typ: "JWT" }))}.${encodeBase64Url(JSON.stringify({ sub: "user-123" }))}.signature`
     await setupConfig({
       providers: {
         "openai-codex": {
           model: "gpt-5.2",
-          oauthAccessToken: "oauth-test-token",
+          oauthAccessToken: tokenWithoutAccountId,
+        },
+      },
+    } as any)
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const core = await import("../../heart/core")
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("chatgpt_account_id"))
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("backend-api/codex"))
+    } finally {
+      mockExit.mockRestore()
+      mockError.mockRestore()
+    }
+  })
+
+  it("streams openai-codex responses and appends provider output items into turn state", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const accountId = "chatgpt-account-123"
+    const oauthAccessToken = makeOpenAICodexAccessToken(accountId)
+    await setupConfig({
+      providers: {
+        "openai-codex": {
+          model: "gpt-5.2",
+          oauthAccessToken,
         },
       },
     } as any)
@@ -4105,6 +4161,17 @@ describe("openai-codex oauth provider contract", () => {
 
     const core = await import("../../heart/core")
     const runtime = (core as any).createProviderRegistry().resolve()
+    expect(mockOpenAICtor).toHaveBeenCalledWith(expect.objectContaining({
+      apiKey: oauthAccessToken,
+      baseURL: "https://chatgpt.com/backend-api/codex",
+      timeout: 30000,
+      maxRetries: 0,
+      defaultHeaders: {
+        "chatgpt-account-id": accountId,
+        "OpenAI-Beta": "responses=experimental",
+        originator: "ouroboros",
+      },
+    }))
     expect(() => runtime.appendToolOutput("call1", "ignored-before-reset")).not.toThrow()
 
     const first = await runtime.streamTurn({
@@ -4152,7 +4219,7 @@ describe("openai-codex oauth provider contract", () => {
       providers: {
         "openai-codex": {
           model: "gpt-5.2",
-          oauthAccessToken: "oauth-test-token",
+          oauthAccessToken: makeOpenAICodexAccessToken(),
         },
       },
     } as any)
@@ -4187,7 +4254,7 @@ describe("openai-codex oauth provider contract", () => {
       providers: {
         "openai-codex": {
           model: "gpt-5.2",
-          oauthAccessToken: "oauth-test-token",
+          oauthAccessToken: makeOpenAICodexAccessToken(),
         },
       },
     } as any)
