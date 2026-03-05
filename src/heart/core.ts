@@ -69,14 +69,24 @@ function getProviderRuntime(): ProviderRuntime {
     try {
       _providerRuntime = createProviderRegistry().resolve();
     } catch (error) {
-      console.error(error instanceof Error ? error.message : String(error));
+      emitNervesEvent({
+        level: "error",
+        event: "engine.provider_init_error",
+        component: "engine",
+        message: error instanceof Error ? error.message : String(error),
+        meta: {},
+      });
       process.exit(1);
       throw new Error("unreachable");
     }
     if (!_providerRuntime) {
-      console.error(
-        "provider runtime could not be initialized.",
-      );
+      emitNervesEvent({
+        level: "error",
+        event: "engine.provider_init_error",
+        component: "engine",
+        message: "provider runtime could not be initialized.",
+        meta: {},
+      });
       process.exit(1);
       throw new Error("unreachable");
     }
