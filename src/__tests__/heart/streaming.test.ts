@@ -468,7 +468,7 @@ describe("streamChatCompletion", () => {
     const client = { chat: { completions: { create: vi.fn().mockReturnValue(makeStream([makeChunk("hello")])) } } }
     const callbacks = makeCallbacks()
     const result = await streamChatCompletion(client, { messages: [], stream: true }, callbacks)
-    expect(result).toEqual({ content: "hello", toolCalls: [], outputItems: [] })
+    expect(result).toEqual({ content: "hello", toolCalls: [], outputItems: [], finalAnswerStreamed: false })
   })
 
   it("calls onModelStreamStart once on first content delta", async () => {
@@ -716,7 +716,7 @@ describe("streamResponsesApi", () => {
     ])) } }
     const callbacks = makeCallbacks()
     const result = await streamResponsesApi(client, {}, callbacks)
-    expect(result).toEqual({ content: "hello", toolCalls: [], outputItems: [] })
+    expect(result).toEqual({ content: "hello", toolCalls: [], outputItems: [], finalAnswerStreamed: false })
   })
 
   it("silently ignores unknown event types", async () => {

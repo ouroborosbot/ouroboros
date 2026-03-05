@@ -3718,6 +3718,7 @@ describe("tool_choice required and final_answer", () => {
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: () => {},
+      onClearText: () => { textChunks.length = 0 },
     }
 
     const messages: any[] = [{ role: "system", content: "test" }]
@@ -4083,6 +4084,7 @@ describe("tool_choice required and final_answer", () => {
       onToolStart: () => {},
       onToolEnd: () => {},
       onError: (err) => errors.push(err.message),
+      onClearText: () => { textChunks.length = 0 },
     }
 
     const messages: any[] = [{ role: "system", content: "test" }]
@@ -4228,8 +4230,11 @@ describe("tool_choice required and final_answer", () => {
     const messages: any[] = [{ role: "system", content: "test" }]
     await runAgent(messages, callbacks, undefined, undefined, { toolChoiceRequired: true })
 
-    // onClearText should be called on both attempts (once for retry, once for success)
-    expect(clearCount).toBe(2)
+    // onClearText is called 3 times:
+    // 1. Streaming layer clears noise when first detecting final_answer (attempt 1)
+    // 2. Core.ts clears partial streamed text on retry (truncated JSON)
+    // 3. Streaming layer clears noise when detecting final_answer (attempt 2)
+    expect(clearCount).toBe(3)
     // Only the final clean answer should remain
     expect(textChunks).toEqual(["clean answer"])
   })
