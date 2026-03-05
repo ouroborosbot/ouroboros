@@ -1214,9 +1214,10 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     vi.restoreAllMocks()
   })
 
-  it("signin wrapper catches errors and returns undefined", async () => {
+  it("signin wrapper catches errors and emits signin_error event", async () => {
     vi.resetModules()
-    // no env vars to clear
+    const emitNervesEventLocal = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: emitNervesEventLocal }))
 
     let capturedHandler: ((args: any) => Promise<void>) | null = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -1233,7 +1234,6 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
 
-    // runAgent calls graph_profile which returns AUTH_REQUIRED, triggering signin
     const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
     vi.doMock("../../heart/core", () => ({
       runAgent: mockRunAgent,
@@ -1249,12 +1249,8 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-
       postTurn: vi.fn(),
     }))
-
-    vi.spyOn(console, "log").mockImplementation(() => {})
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
 
     const teams = await import("../../senses/teams")
     teams.startTeamsApp()
@@ -1275,19 +1271,23 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       signin: failingSignin,
     })
 
-    // Grab the teamsContext.signin that was constructed and call it
     const handleCall = mockRunAgent.mock.calls[0]
     const opts = handleCall[4]
     const result = await opts.toolContext.signin("graph")
     expect(result).toBeUndefined()
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("signin(graph) failed"))
+    expect(emitNervesEventLocal).toHaveBeenCalledWith(expect.objectContaining({
+      level: "error",
+      event: "channel.signin_error",
+      component: "channels",
+    }))
 
     vi.restoreAllMocks()
   })
 
-  it("signin wrapper logs 'no token' when signin returns falsy", async () => {
+  it("signin wrapper emits signin_result when signin returns falsy", async () => {
     vi.resetModules()
-    // no env vars to clear
+    const emitNervesEventLocal = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: emitNervesEventLocal }))
 
     let capturedHandler: ((args: any) => Promise<void>) | null = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -1319,11 +1319,8 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-
       postTurn: vi.fn(),
     }))
-
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
 
     const teams = await import("../../senses/teams")
     teams.startTeamsApp()
@@ -1347,14 +1344,19 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     const opts = mockRunAgent.mock.calls[0][4]
     const result = await opts.toolContext.signin("graph")
     expect(result).toBeUndefined()
-    expect(logSpy).toHaveBeenCalledWith("[teams] signin(graph): no token")
+    expect(emitNervesEventLocal).toHaveBeenCalledWith(expect.objectContaining({
+      level: "info",
+      event: "channel.signin_result",
+      component: "channels",
+    }))
 
     vi.restoreAllMocks()
   })
 
-  it("signin wrapper handles non-Error thrown values", async () => {
+  it("signin wrapper handles non-Error thrown values with signin_error event", async () => {
     vi.resetModules()
-    // no env vars to clear
+    const emitNervesEventLocal = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: emitNervesEventLocal }))
 
     let capturedHandler: ((args: any) => Promise<void>) | null = null
     vi.doMock("@microsoft/teams.apps", () => ({
@@ -1386,12 +1388,8 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       saveSession: vi.fn(),
       deleteSession: vi.fn(),
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
-
       postTurn: vi.fn(),
     }))
-
-    vi.spyOn(console, "log").mockImplementation(() => {})
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
 
     const teams = await import("../../senses/teams")
     teams.startTeamsApp()
@@ -1415,7 +1413,11 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     const opts = mockRunAgent.mock.calls[0][4]
     const result = await opts.toolContext.signin("graph")
     expect(result).toBeUndefined()
-    expect(errorSpy).toHaveBeenCalledWith("[teams] signin(graph) failed: string-error")
+    expect(emitNervesEventLocal).toHaveBeenCalledWith(expect.objectContaining({
+      level: "error",
+      event: "channel.signin_error",
+      component: "channels",
+    }))
 
     vi.restoreAllMocks()
   })
@@ -1625,6 +1627,61 @@ describe("Teams adapter - channel.message_received event", () => {
       level: "info",
       event: "channel.message_received",
       component: "channels",
+    }))
+  })
+
+  it("emits channel.token_status nerves event with token availability", async () => {
+    vi.resetModules()
+    const emitNervesEventMock = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: emitNervesEventMock }))
+
+    let capturedHandler: ((args: any) => Promise<void>) | null = null
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((_event: string, handler: any) => {
+          capturedHandler = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../config", () => ({
+      sessionPath: vi.fn().mockReturnValue("/tmp/test-session"),
+      getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
+      getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978, flushIntervalMs: 1000 }),
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn().mockResolvedValue({ usage: undefined }),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
+    await capturedHandler!({
+      stream: mockStream,
+      activity: {
+        text: "hello",
+        conversation: { id: "conv-token-status" },
+        from: { id: "user-abc123456789" },
+        channelId: "msteams",
+      },
+      api: { users: { token: { get: vi.fn().mockResolvedValueOnce({ token: "g" }).mockResolvedValueOnce(null).mockResolvedValueOnce({ token: "gh" }) } } },
+      signin: vi.fn(),
+    })
+
+    expect(emitNervesEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      level: "info",
+      event: "channel.token_status",
+      component: "channels",
+      meta: expect.objectContaining({ graph: true, ado: false, github: true }),
     }))
   })
 })
