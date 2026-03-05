@@ -72,6 +72,7 @@ test -d ~/.agentstate/<agent>/sessions && echo "sessions: ok"
 test -d ~/.agentstate/<agent>/logs && echo "logs: ok"
 test -d ~/.agentstate/<agent>/friends && echo "friends: ok"
 test -d ~/.agentstate/test-runs/<repo_slug> && echo "test-runs: ok"
+test ! -f ~/.agentconfigs/<agent>/config.json && echo "legacy config moved: ok"
 ```
 
 Then run:
@@ -81,6 +82,9 @@ npm test
 ```
 
 ## 7) Cleanup
-After validation is complete on that machine, remove any empty legacy directories under `~/.agentconfigs/<agent>/` and stale legacy `~/.agentconfigs/test-runs/<repo_slug>/` if it still exists.
+After validation is complete on that machine:
+- remove any empty legacy directories under `~/.agentconfigs/<agent>/`
+- remove stale legacy `~/.agentconfigs/test-runs/<repo_slug>/` if it still exists
+- if `~/.agentconfigs/<agent>/` is empty, remove it
 
 Deletion of this playbook file can be decided by the operator after migration is confirmed complete everywhere it is needed.
