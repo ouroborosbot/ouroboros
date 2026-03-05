@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import * as path from "path"
+import * as nodeFs from "node:fs"
 
 vi.mock("fs", () => ({
   existsSync: vi.fn(),
@@ -383,6 +384,14 @@ describe("buildSystem", () => {
     resetPsycheCache()
     const result = await buildSystem("teams")
     expect(result).not.toContain("## my flags")
+  })
+})
+
+describe("provider section contract", () => {
+  it("does not hardcode provider-specific branching in prompt provider rendering", () => {
+    const sourcePath = path.resolve(__dirname, "..", "..", "mind", "prompt.ts")
+    const source = nodeFs.readFileSync(sourcePath, "utf-8")
+    expect(source).not.toContain('getProvider() === "azure"')
   })
 })
 

@@ -63,6 +63,8 @@ vi.mock("openai", () => {
 })
 
 import * as fs from "fs"
+import * as nodeFs from "node:fs"
+import * as path from "path"
 import { execSync, spawnSync } from "child_process"
 import type { ChannelCallbacks } from "../../heart/core"
 
@@ -2996,6 +2998,19 @@ describe("getClient config integration", () => {
     expect(mockExit).toHaveBeenCalledWith(1)
     mockExit.mockRestore()
     mockError.mockRestore()
+  })
+})
+
+describe("provider abstraction contract", () => {
+  it("exports createProviderRegistry for provider abstraction wiring", async () => {
+    const core = await import("../../heart/core")
+    expect(typeof (core as any).createProviderRegistry).toBe("function")
+  })
+
+  it("runAgent request path avoids hardcoded provider-name branches", () => {
+    const sourcePath = path.resolve(__dirname, "..", "..", "heart", "core.ts")
+    const source = nodeFs.readFileSync(sourcePath, "utf-8")
+    expect(source).not.toContain('if (provider === "azure")')
   })
 })
 
