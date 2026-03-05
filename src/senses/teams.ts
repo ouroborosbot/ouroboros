@@ -39,6 +39,21 @@ export function stripMentions(text: string): string {
 // Not used preemptively — the harness tries to send the full message first.
 const RECOVERY_CHUNK_SIZE = 4000
 
+// Default interval (ms) for the periodic flush timer in chunked streaming mode.
+// Text is accumulated in textBuffer and flushed via safeEmit/safeSend at this
+// interval. This replaces per-token streaming, which caused compounding latency:
+//
+// - Teams throttles streaming updates to 1 req/sec with exponential backoff
+//   https://learn.microsoft.com/en-us/microsoftteams/platform/bots/streaming-ux
+// - SDK debounces at 500ms internally and re-sends ALL cumulative text each chunk
+// - Per-token streaming generates 100+ HTTP POSTs per response, each throttled
+// - Copilot enforces a 15s timeout for the initial stream.emit()
+//   https://learn.microsoft.com/en-us/answers/questions/2288017/m365-custom-engine-agents-timeout-message-after-15
+//
+// At 1000ms (1 req/sec), we stay at the Teams throttle floor while keeping the
+// stream alive well within the 15s Copilot timeout. Tune up if 429s observed.
+export const DEFAULT_FLUSH_INTERVAL_MS = 1_000
+
 // Split text into chunks that fit within maxLen, breaking at paragraph
 // boundaries (\n\n), then line boundaries (\n), then word boundaries.
 // Never loses content — all text is preserved across chunks.
@@ -98,14 +113,34 @@ export function createTeamsCallbacks(
   let streamHasContent = false // tracks whether primary output has received content
   let phraseTimer: NodeJS.Timeout | null = null
   let lastPhrase = ""
+  let flushTimer: NodeJS.Timeout | null = null
+  const flushInterval = options?.flushIntervalMs ?? DEFAULT_FLUSH_INTERVAL_MS
+
+  // Start the periodic flush timer. Idempotent -- no-op if already running.
+  function startFlushTimer(): void {
+    if (flushTimer) return
+    flushTimer = setInterval(() => flushTextBuffer(), flushInterval)
+  }
+
+  // Stop the periodic flush timer. Idempotent.
+  function stopFlushTimer(): void {
+    if (flushTimer) { clearInterval(flushTimer); flushTimer = null }
+  }
 
   // Mark stream as broken and abort the agent loop.
   function markStopped(): void {
     if (stopped) return
     stopped = true
     stopPhraseRotation()
+    stopFlushTimer()
     controller.abort()
   }
+
+  // Clean up timers when the controller is aborted externally
+  controller.signal.addEventListener("abort", () => {
+    stopPhraseRotation()
+    stopFlushTimer()
+  })
 
   // Handle the result of a stream call: if it returns a Promise (the Teams SDK
   // does async HTTP under the hood even though the interface types it as void),
@@ -217,6 +252,7 @@ export function createTeamsCallbacks(
       if (stopped) return
       stopPhraseRotation()
       textBuffer += text
+      startFlushTimer()
     },
     onClearText: () => {
       textBuffer = ""
@@ -267,6 +303,7 @@ export function createTeamsCallbacks(
         }
       : undefined,
     flush: async () => {
+      stopFlushTimer()
       if (textBuffer) {
         const text = textBuffer
         textBuffer = ""
@@ -423,13 +460,14 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
 
   // Run agent
   const controller = new AbortController()
-  const callbacks = createTeamsCallbacks(stream, controller, sendMessage, { conversationId })
+  const channelConfig = getTeamsChannelConfig()
+  const callbacks = createTeamsCallbacks(stream, controller, sendMessage, { conversationId, flushIntervalMs: channelConfig.flushIntervalMs })
   const traceId = createTraceId()
 
   const agentOptions: RunAgentOptions = {}
   agentOptions.traceId = traceId
   if (toolContext) agentOptions.toolContext = toolContext
-  if (getTeamsChannelConfig().skipConfirmation) agentOptions.skipConfirmation = true
+  if (channelConfig.skipConfirmation) agentOptions.skipConfirmation = true
   const result = await runAgent(messages, callbacks, "teams", controller.signal, agentOptions)
 
   // Flush any remaining accumulated text at end of turn
