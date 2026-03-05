@@ -26,14 +26,14 @@ Eliminate all `console.log/warn/error` calls from production source files by con
 - Refactoring the nerves system itself
 
 ## Completion Criteria
-- [ ] Zero `console.*` calls in `src/senses/teams.ts`, `src/heart/core.ts`, `src/mind/friends/resolver.ts`
-- [ ] The one `console.warn` in `src/identity.ts` is removed (nerves event already exists there)
-- [ ] All new events registered in `REQUIRED_EVENTS` in `contract.ts`
-- [ ] `npm run test:coverage` passes (nerves audit gate green)
-- [ ] No sensitive data (tokens, secrets) in event meta (respect SENSITIVE_PATTERNS)
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] Zero `console.*` calls in `src/senses/teams.ts`, `src/heart/core.ts`, `src/mind/friends/resolver.ts`
+- [x] The one `console.warn` in `src/identity.ts` is removed (nerves event already exists there)
+- [x] All new events registered in `REQUIRED_EVENTS` in `contract.ts`
+- [x] `npm run test:coverage` passes (nerves audit gate green)
+- [x] No sensitive data (tokens, secrets) in event meta (respect SENSITIVE_PATTERNS)
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
