@@ -1,7 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { getModel, getProvider } from "../heart/core";
-import { getAzureConfig } from "../config";
+import { getProviderDisplayLabel } from "../heart/core";
 import { finalAnswerTool, getToolsForChannel } from "../repertoire/tools";
 import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName } from "../identity";
@@ -80,11 +79,7 @@ export function runtimeInfoSection(channel: Channel): string {
 }
 
 function providerSection(): string {
-  const model = getModel();
-  const provider = getProvider() === "azure"
-    ? `azure openai (${getAzureConfig().deployment || "default"}, model: ${model})`
-    : `minimax (${model})`;
-  return `## my provider\n${provider}`;
+  return `## my provider\n${getProviderDisplayLabel()}`;
 }
 
 function dateSection(): string {
