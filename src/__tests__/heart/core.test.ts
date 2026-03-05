@@ -3441,6 +3441,78 @@ describe("anthropic setup-token provider contract", () => {
     expect(Array.isArray((params as any).tools)).toBe(true)
   })
 
+  it("handles Anthropic tool argument merge/reset/fallback delta paths", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: Date.now() + 60_000,
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+          setupToken: makeAnthropicSetupToken(),
+        },
+      },
+    })
+
+    mockAnthropicMessagesCreate.mockResolvedValue(makeAnthropicEventStream([
+      {
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "tool_use", id: "call0", name: "read_file", input: {} },
+      },
+      {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "input_json_delta", partial_json: ',\"line\":1' },
+      },
+      {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "input_json_delta", partial_json: '{"path":"b.txt","line":2}' },
+      },
+      {
+        type: "content_block_start",
+        index: 1,
+        content_block: { type: "tool_use", id: "call1", name: "search", input: [] },
+      },
+      {
+        type: "content_block_delta",
+        index: 1,
+        delta: { type: "input_json_delta", partial_json: ',\"q\":\"snake\"' },
+      },
+    ]))
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    const result = await runtime.streamTurn({
+      messages: [{ role: "user", content: "hi" }],
+      activeTools: [
+        { type: "function", function: { name: "read_file" } },
+        { type: "function", function: { name: "search" } },
+      ],
+      callbacks: {
+        onModelStart: vi.fn(),
+        onModelStreamStart: vi.fn(),
+        onTextChunk: vi.fn(),
+        onReasoningChunk: vi.fn(),
+        onToolStart: vi.fn(),
+        onToolEnd: vi.fn(),
+        onError: vi.fn(),
+      },
+      signal: new AbortController().signal,
+    })
+
+    expect(result.toolCalls).toEqual([
+      { id: "call0", name: "read_file", arguments: '{"path":"b.txt","line":2}' },
+      { id: "call1", name: "search", arguments: '[],"q":"snake"' },
+    ])
+  })
+
   it("returns early when Anthropic stream signal is aborted", async () => {
     vi.resetModules()
     vi.mocked(execSync).mockReturnValue(JSON.stringify({
