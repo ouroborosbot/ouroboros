@@ -18,6 +18,32 @@ export interface AgentConfig {
   }
 }
 
+export const DEFAULT_AGENT_CONTEXT = {
+  maxTokens: 80000,
+  contextMargin: 20,
+  maxToolOutputChars: 20000,
+} as const
+
+export const DEFAULT_AGENT_PHRASES: AgentConfig["phrases"] = {
+  thinking: ["working"],
+  tool: ["running tool"],
+  followup: ["processing"],
+}
+
+export function buildDefaultAgentTemplate(agentName: string): AgentConfig {
+  return {
+    name: agentName,
+    provider: "anthropic",
+    configPath: `~/.agentsecrets/${agentName}/secrets.json`,
+    context: { ...DEFAULT_AGENT_CONTEXT },
+    phrases: {
+      thinking: [...DEFAULT_AGENT_PHRASES.thinking],
+      tool: [...DEFAULT_AGENT_PHRASES.tool],
+      followup: [...DEFAULT_AGENT_PHRASES.followup],
+    },
+  }
+}
+
 let _cachedAgentName: string | null = null
 let _cachedAgentConfig: AgentConfig | null = null
 
@@ -127,12 +153,6 @@ export function loadAgentConfig(): AgentConfig {
     )
   }
 
-  const PLACEHOLDER_PHRASES = {
-    thinking: ["working"],
-    tool: ["running tool"],
-    followup: ["processing"],
-  }
-
   const existingPhrases = parsed.phrases as Partial<AgentConfig["phrases"]> | undefined
   const needsFill = !existingPhrases ||
     !existingPhrases.thinking ||
@@ -141,9 +161,9 @@ export function loadAgentConfig(): AgentConfig {
 
   if (needsFill) {
     const filled = {
-      thinking: existingPhrases?.thinking ?? PLACEHOLDER_PHRASES.thinking,
-      tool: existingPhrases?.tool ?? PLACEHOLDER_PHRASES.tool,
-      followup: existingPhrases?.followup ?? PLACEHOLDER_PHRASES.followup,
+      thinking: existingPhrases?.thinking ?? DEFAULT_AGENT_PHRASES.thinking,
+      tool: existingPhrases?.tool ?? DEFAULT_AGENT_PHRASES.tool,
+      followup: existingPhrases?.followup ?? DEFAULT_AGENT_PHRASES.followup,
     }
     parsed.phrases = filled
     console.warn("agent.json is missing phrases, added placeholders")

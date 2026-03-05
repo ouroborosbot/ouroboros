@@ -1,7 +1,7 @@
 import * as fs from "fs"
 import * as path from "path"
 import * as os from "os"
-import { loadAgentConfig, getAgentName } from "./identity"
+import { loadAgentConfig, getAgentName, DEFAULT_AGENT_CONTEXT } from "./identity"
 import { emitNervesEvent } from "./nerves/runtime"
 
 export interface AzureProviderConfig {
@@ -68,7 +68,7 @@ export interface OuroborosConfig {
   integrations: IntegrationsConfig
 }
 
-const DEFAULT_CONFIG: OuroborosConfig = {
+const DEFAULT_SECRETS_TEMPLATE: Omit<OuroborosConfig, "context"> = {
   providers: {
     // Keep provider field ordering consistent: model first, then auth credentials,
     // then provider-specific transport fields.
@@ -84,11 +84,11 @@ const DEFAULT_CONFIG: OuroborosConfig = {
       apiKey: "",
     },
     anthropic: {
-      model: "",
+      model: "claude-opus-4-6",
       setupToken: "",
     },
     "openai-codex": {
-      model: "",
+      model: "gpt-5.2",
       oauthAccessToken: "",
     },
   },
@@ -101,11 +101,6 @@ const DEFAULT_CONFIG: OuroborosConfig = {
     graphConnectionName: "graph",
     adoConnectionName: "ado",
   },
-  context: {
-    maxTokens: 80000,
-    contextMargin: 20,
-    maxToolOutputChars: 20000,
-  },
   teamsChannel: {
     skipConfirmation: true,
     disableStreaming: false,
@@ -116,28 +111,20 @@ const DEFAULT_CONFIG: OuroborosConfig = {
   },
 }
 
-const DEFAULT_SECRETS_TEMPLATE: Record<string, unknown> = {
-  providers: {
-    // Keep this key order in sync with DEFAULT_CONFIG.providers for consistency.
-    azure: {
-      modelName: "",
-      apiKey: "",
-      endpoint: "",
-      deployment: "",
+function defaultRuntimeConfig(): OuroborosConfig {
+  return {
+    providers: {
+      azure: { ...DEFAULT_SECRETS_TEMPLATE.providers.azure },
+      minimax: { ...DEFAULT_SECRETS_TEMPLATE.providers.minimax },
+      anthropic: { ...DEFAULT_SECRETS_TEMPLATE.providers.anthropic },
+      "openai-codex": { ...DEFAULT_SECRETS_TEMPLATE.providers["openai-codex"] },
     },
-    minimax: {
-      model: "",
-      apiKey: "",
-    },
-    anthropic: {
-      model: "claude-opus-4-6",
-      setupToken: "",
-    },
-    "openai-codex": {
-      model: "gpt-5.2",
-      oauthAccessToken: "",
-    },
-  },
+    teams: { ...DEFAULT_SECRETS_TEMPLATE.teams },
+    oauth: { ...DEFAULT_SECRETS_TEMPLATE.oauth },
+    context: { ...DEFAULT_AGENT_CONTEXT },
+    teamsChannel: { ...DEFAULT_SECRETS_TEMPLATE.teamsChannel },
+    integrations: { ...DEFAULT_SECRETS_TEMPLATE.integrations },
+  }
 }
 
 let _cachedConfig: OuroborosConfig | null = null
@@ -238,7 +225,25 @@ export function loadConfig(): OuroborosConfig {
     // ENOENT or parse error -- use defaults
   }
 
-  _cachedConfig = deepMerge(DEFAULT_CONFIG as unknown as Record<string, unknown>, fileData) as unknown as OuroborosConfig
+  const sanitizedFileData = { ...fileData }
+  if ("context" in sanitizedFileData) {
+    delete sanitizedFileData.context
+    emitNervesEvent({
+      level: "warn",
+      event: "config_identity.error",
+      component: "config/identity",
+      message: "ignored legacy context block in secrets config",
+      meta: {
+        phase: "loadConfig",
+        path: configPath,
+      },
+    })
+  }
+
+  _cachedConfig = deepMerge(
+    defaultRuntimeConfig() as unknown as Record<string, unknown>,
+    sanitizedFileData,
+  ) as unknown as OuroborosConfig
   emitNervesEvent({
     event: "config.load",
     component: "config/identity",
@@ -264,7 +269,7 @@ export function setTestConfig(partial: DeepPartial<OuroborosConfig>): void {
   loadConfig() // ensure _cachedConfig exists
   const contextPatch = partial.context as Partial<ContextConfig> | undefined
   if (contextPatch) {
-    const base = _testContextOverride ?? DEFAULT_CONFIG.context
+    const base = _testContextOverride ?? DEFAULT_AGENT_CONTEXT
     _testContextOverride = deepMerge(
       base as unknown as Record<string, unknown>,
       contextPatch as unknown as Record<string, unknown>,
@@ -305,7 +310,7 @@ export function getContextConfig(): ContextConfig {
   if (_testContextOverride) {
     return { ..._testContextOverride }
   }
-  const defaults = DEFAULT_CONFIG.context
+  const defaults = DEFAULT_AGENT_CONTEXT
   const agentContext = loadAgentConfig().context
   if (!agentContext || typeof agentContext !== "object") {
     return { ...defaults }
