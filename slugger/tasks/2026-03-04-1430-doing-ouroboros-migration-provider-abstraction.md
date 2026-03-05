@@ -31,6 +31,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [x] `secrets.json` retains `providers` + `teams`; `context` is loaded from `agent.json`.
 - [x] `agent.json.configPath` resolves to `~/.agentsecrets/<agent>/secrets.json`.
 - [x] Missing/expired provider credentials fail fast with explicit re-auth guidance; no silent fallback.
+- [x] Auth bootstrap npm scripts exist for both new provider flows and write credentials into `secrets.json` (`auth:claude-setup-token`, `auth:openai-codex`).
 - [x] A migration runbook exists in-repo for cross-machine post-pull reorganization of legacy `~/.agentconfigs` data.
 - [x] Legacy `~/.agentconfigs` migration is fully documented as a one-time manual operation for other machines (no runtime back-compat branches in normal execution code), with no data loss and clear operator guidance.
 - [x] Storage/config refactor executes before provider abstraction refactor work so implementation targets final storage/config contracts.
@@ -268,3 +269,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 19:30 Unit 5a complete: added red OpenAI Codex OAuth provider/config/prompt/identity contract tests with failing evidence artifacts (`unit-5a-red-run.txt`, `unit-5a-jest.json`, `unit-5a-red-run.exit`)
 - 2026-03-04 19:32 Unit 5b complete: implemented OpenAI Codex OAuth provider runtime + config/identity/core wiring with green targeted suites and build (`unit-5b-test-run.txt`, `unit-5b-jest.json`, `unit-5b-build.txt`)
 - 2026-03-04 19:36 Unit 5c complete: covered/refined OpenAI Codex OAuth provider runtime branches and reached 100% targeted coverage with build green (`unit-5c-coverage.txt`, `unit-5c-coverage-summary.json`, `unit-5c-build.txt`)
+- 2026-03-04 20:29 Added auth bootstrap scripts (`auth:openai-codex`, `auth:claude-setup-token`) with tests, README wiring, and provider re-auth guidance updates.
