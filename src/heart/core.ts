@@ -1,10 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
-import * as fs from "fs";
 import OpenAI, { AzureOpenAI } from "openai";
 import {
   getAnthropicConfig,
   getAzureConfig,
-  getAuthProfilesPath,
   getContextConfig,
   getMinimaxConfig,
 } from "../config";
@@ -56,104 +54,35 @@ const ANTHROPIC_OAUTH_BETA_HEADER =
 
 interface AnthropicCredential {
   token: string;
-  expiresAt: number;
 }
 
 function getAnthropicReauthGuidance(reason: string): string {
-  return `${reason} Run \`claude setup-token\`, then store the token in ${getAuthProfilesPath()}.`;
-}
-
-function parseExpiry(raw: unknown): number {
-  if (raw === undefined || raw === null) return Number.POSITIVE_INFINITY;
-  if (typeof raw === "number") return Number.isFinite(raw) && raw > 0 ? raw : Number.NaN;
-  if (typeof raw === "string") {
-    const parsed = Date.parse(raw);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : Number.NaN;
-  }
-  return Number.NaN;
-}
-
-function toAnthropicCredential(profile: Record<string, unknown>): AnthropicCredential | null {
-  const provider = profile.provider;
-  if (typeof provider === "string" && provider !== "anthropic") return null;
-
-  const tokenRaw = typeof profile.token === "string"
-    ? profile.token
-    : (typeof profile.accessToken === "string" ? profile.accessToken : "");
-  if (!tokenRaw.trim()) return null;
-
-  const expiresAt = parseExpiry(profile.expiresAt ?? profile.expires);
-  if (Number.isNaN(expiresAt)) return null;
-
-  return {
-    token: tokenRaw.trim(),
-    expiresAt,
-  };
-}
-
-function readAnthropicCredentialFromAuthProfiles(): AnthropicCredential | null {
-  try {
-    const raw = fs.readFileSync(getAuthProfilesPath(), "utf-8");
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-
-    const profilesRaw = parsed.profiles;
-    if (profilesRaw && typeof profilesRaw === "object" && !Array.isArray(profilesRaw)) {
-      const profiles = profilesRaw as Record<string, unknown>;
-      const profileIds = Object.keys(profiles)
-        .filter((id) => id.startsWith("anthropic"))
-        .sort((a, b) => {
-          if (a === "anthropic:default") return -1;
-          if (b === "anthropic:default") return 1;
-          return a.localeCompare(b);
-        });
-      for (const profileId of profileIds) {
-        const entry = profiles[profileId];
-        if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
-        const credential = toAnthropicCredential(entry as Record<string, unknown>);
-        if (credential) return credential;
-      }
-    }
-
-    const anthropicRaw = parsed.anthropic;
-    if (anthropicRaw && typeof anthropicRaw === "object" && !Array.isArray(anthropicRaw)) {
-      return toAnthropicCredential({
-        provider: "anthropic",
-        ...(anthropicRaw as Record<string, unknown>),
-      });
-    }
-  } catch {
-    // Missing/invalid auth profile file should produce explicit guidance via caller.
-  }
-  return null;
+  return `${reason} Run \`claude setup-token\`, then set providers.anthropic.setupToken in secrets.json.`;
 }
 
 function resolveAnthropicSetupTokenCredential(): AnthropicCredential {
-  const credential = readAnthropicCredentialFromAuthProfiles();
-  if (!credential) {
+  const anthropicConfig = getAnthropicConfig();
+  const token = anthropicConfig.setupToken?.trim();
+  if (!token) {
     throw new Error(
       getAnthropicReauthGuidance(
         "Anthropic provider is selected but no setup-token credential was found.",
       ),
     );
   }
-  if (!credential.token.startsWith(ANTHROPIC_SETUP_TOKEN_PREFIX)) {
+  if (!token.startsWith(ANTHROPIC_SETUP_TOKEN_PREFIX)) {
     throw new Error(
       getAnthropicReauthGuidance(
         `Anthropic credential is not a setup-token (expected prefix ${ANTHROPIC_SETUP_TOKEN_PREFIX}).`,
       ),
     );
   }
-  if (credential.token.length < ANTHROPIC_SETUP_TOKEN_MIN_LENGTH) {
+  if (token.length < ANTHROPIC_SETUP_TOKEN_MIN_LENGTH) {
     throw new Error(
       getAnthropicReauthGuidance("Anthropic setup-token looks too short."),
     );
   }
-  if (credential.expiresAt <= Date.now()) {
-    throw new Error(
-      getAnthropicReauthGuidance("Anthropic setup-token is expired."),
-    );
-  }
-  return credential;
+  return { token };
 }
 
 function toAnthropicTextContent(content: unknown): string {
@@ -456,9 +385,9 @@ export function createProviderRegistry(): ProviderRegistry {
     },
     anthropic: () => {
       const anthropicConfig = getAnthropicConfig();
-      if (!anthropicConfig.model) {
+      if (!(anthropicConfig.model && anthropicConfig.setupToken)) {
         throw new Error(
-          "provider 'anthropic' is selected in agent.json but providers.anthropic.model is missing in secrets.json.",
+          "provider 'anthropic' is selected in agent.json but providers.anthropic.model/setupToken is incomplete in secrets.json.",
         );
       }
       const credential = resolveAnthropicSetupTokenCredential();

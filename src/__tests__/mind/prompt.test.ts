@@ -71,17 +71,6 @@ function setupReadFileSync() {
     if (p.endsWith("LORE.md")) return MOCK_LORE
     if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
     if (p.endsWith("secrets.json")) return JSON.stringify({})
-    if (p.endsWith("auth-profiles.json")) {
-      return JSON.stringify({
-        profiles: {
-          "anthropic:default": {
-            provider: "anthropic",
-            type: "token",
-            token: `sk-ant-oat01-${"a".repeat(80)}`,
-          },
-        },
-      })
-    }
     return ""
   })
 }
@@ -267,17 +256,6 @@ describe("buildSystem", () => {
       if (p.endsWith("LORE.md")) return MOCK_LORE
       if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
       if (p.endsWith("secrets.json")) return JSON.stringify({})
-      if (p.endsWith("auth-profiles.json")) {
-        return JSON.stringify({
-          profiles: {
-            "anthropic:default": {
-              provider: "anthropic",
-              type: "token",
-              token: `sk-ant-oat01-${"a".repeat(80)}`,
-            },
-          },
-        })
-      }
       return ""
     })
     const { setTestConfig, resetConfigCache } = await import("../../config")
@@ -286,6 +264,7 @@ describe("buildSystem", () => {
       providers: {
         anthropic: {
           model: "claude-opus-4-6",
+          setupToken: `sk-ant-oat01-${"a".repeat(80)}`,
         },
       },
     } as any)

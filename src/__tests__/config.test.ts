@@ -116,6 +116,7 @@ describe("loadConfig", () => {
       providers: {
         anthropic: {
           model: "claude-opus-4-6",
+          setupToken: "",
         },
       },
     })

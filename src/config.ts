@@ -19,6 +19,7 @@ export interface MinimaxProviderConfig {
 
 export interface AnthropicProviderConfig {
   model: string
+  setupToken: string
 }
 
 export interface TeamsConfig {
@@ -76,6 +77,7 @@ const DEFAULT_CONFIG: OuroborosConfig = {
     },
     anthropic: {
       model: "",
+      setupToken: "",
     },
   },
   teams: {
@@ -116,6 +118,7 @@ const DEFAULT_SECRETS_TEMPLATE: Record<string, unknown> = {
     },
     anthropic: {
       model: "claude-opus-4-6",
+      setupToken: "",
     },
   },
 }
@@ -314,10 +317,6 @@ export function getIntegrationsConfig(): IntegrationsConfig {
 
 export function getLogsDir(): string {
   return path.join(os.homedir(), ".agentstate", getAgentName(), "logs")
-}
-
-export function getAuthProfilesPath(): string {
-  return path.join(path.dirname(resolveConfigPath()), "auth-profiles.json")
 }
 
 
