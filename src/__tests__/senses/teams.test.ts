@@ -1457,6 +1457,100 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
   })
 })
 
+describe("Teams adapter - startTeamsApp signin.verify-state handler", () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function setupVerifyStateTest() {
+    vi.resetModules()
+
+    const handlers: Record<string, (args: any) => Promise<any>> = {}
+    vi.doMock("@microsoft/teams.apps", () => ({
+      App: class MockApp {
+        constructor(_opts: any) {}
+        on = vi.fn().mockImplementation((event: string, handler: any) => {
+          handlers[event] = handler
+        })
+        event = vi.fn()
+        start = vi.fn()
+      },
+    }))
+    vi.doMock("@microsoft/teams.dev", () => ({
+      DevtoolsPlugin: class MockDevtoolsPlugin {},
+    }))
+    vi.doMock("../../heart/core", () => ({
+      runAgent: vi.fn(),
+      buildSystem: vi.fn().mockReturnValue("system prompt"),
+      summarizeArgs: vi.fn().mockReturnValue(""),
+    }))
+
+    return handlers
+  }
+
+  it("returns 404 when activity.value.state is missing", async () => {
+    const handlers = setupVerifyStateTest()
+    vi.spyOn(console, "log").mockImplementation(() => {})
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const handler = handlers["signin.verify-state"]
+    expect(handler).toBeDefined()
+
+    const result = await handler({
+      api: { users: { token: { get: vi.fn() } } },
+      activity: { value: {}, channelId: "msteams", from: { id: "u1" } },
+    })
+    expect(result).toEqual({ status: 404 })
+
+    /* v8 ignore next -- branch: value is undefined @preserve */
+    const result2 = await handler({
+      api: { users: { token: { get: vi.fn() } } },
+      activity: { channelId: "msteams", from: { id: "u1" } },
+    })
+    expect(result2).toEqual({ status: 404 })
+  })
+
+  it("returns 200 and logs success when a connection matches", async () => {
+    const handlers = setupVerifyStateTest()
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const handler = handlers["signin.verify-state"]
+    const mockGet = vi.fn()
+      .mockRejectedValueOnce(new Error("wrong connection"))
+      .mockResolvedValueOnce({ token: "t" })
+
+    const result = await handler({
+      api: { users: { token: { get: mockGet } } },
+      activity: { value: { state: "code123" }, channelId: "msteams", from: { id: "u1" } },
+    })
+
+    expect(result).toEqual({ status: 200 })
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("verify-state succeeded"))
+  })
+
+  it("returns 412 and warns when all connections fail", async () => {
+    const handlers = setupVerifyStateTest()
+    vi.spyOn(console, "log").mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const teams = await import("../../senses/teams")
+    teams.startTeamsApp()
+
+    const handler = handlers["signin.verify-state"]
+    const mockGet = vi.fn().mockRejectedValue(new Error("no match"))
+
+    const result = await handler({
+      api: { users: { token: { get: mockGet } } },
+      activity: { value: { state: "code123" }, channelId: "msteams", from: { id: "u1" } },
+    })
+
+    expect(result).toEqual({ status: 412 })
+    expect(warnSpy).toHaveBeenCalledWith("[teams] verify-state failed for all connections")
+  })
+})
+
 describe("Teams adapter - startTeamsApp AAD extraction (Bug 1)", () => {
   afterEach(() => {
     vi.restoreAllMocks()
