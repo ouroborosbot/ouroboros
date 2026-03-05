@@ -1,6 +1,5 @@
 import type { ToolDefinition } from "./tools-base"
 import { githubRequest } from "./github-client"
-import { getIntegrationsConfig } from "../config"
 
 export const githubToolDefinitions: ToolDefinition[] = [
   {
@@ -24,7 +23,8 @@ export const githubToolDefinitions: ToolDefinition[] = [
       if (!ctx?.githubToken) {
         return "AUTH_REQUIRED:github -- I need access to GitHub. Please sign in when prompted."
       }
-      const { owner, repo } = getIntegrationsConfig().github
+      const owner = "ouroborosbot"
+      const repo = "ouroboros-agent-harness"
       const payload: Record<string, unknown> = { title: args.title }
       if (args.body) payload.body = args.body
       if (args.labels) {
