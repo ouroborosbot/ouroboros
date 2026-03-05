@@ -484,7 +484,7 @@ Also verify the removal propagates:
 **Output**: Updated tests in `src/__tests__/senses/teams.test.ts`, `src/__tests__/heart/core.test.ts`, `src/__tests__/mind/prompt.test.ts`, `src/__tests__/config.test.ts`
 **Acceptance**: Tests exist and FAIL because the `buffered` flag and dual-mode branching still exist
 
-### ⬜ Unit 18b: Remove disableStreaming / buffered mode -- implementation
+### ✅ Unit 18b: Remove disableStreaming / buffered mode -- implementation
 **What**: Remove all `disableStreaming` / `buffered` mode code across the codebase:
 
 **`src/senses/teams.ts`**:
