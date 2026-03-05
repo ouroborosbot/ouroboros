@@ -6,16 +6,16 @@ import { runAgent, ChannelCallbacks } from "../heart/core"
 import { buildSystem } from "../mind/prompt"
 import { pickPhrase, getPhrases } from "../wardrobe/phrases"
 import { formatToolResult, formatKick, formatError } from "../wardrobe/format"
-import { logPath, sessionPath } from "../config"
+import { sessionPath } from "../config"
 import { loadSession, deleteSession, postTurn } from "../mind/context"
 import type { UsageData } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand, getToolChoiceRequired } from "../repertoire/commands"
 import { getAgentName, getAgentRoot } from "../identity"
-import { createLogger, createNdjsonFileSink, createTraceId } from "../nerves"
-import { setRuntimeLogger } from "../nerves/runtime"
+import { createTraceId } from "../nerves"
 import { FileFriendStore } from "../mind/friends/store-file"
 import { FriendResolver } from "../mind/friends/resolver"
 import type { ToolContext } from "../repertoire/tools"
+import { configureCliRuntimeLogger } from "./cli-logging"
 
 // readline.Interface exposes undocumented mutable line/cursor for in-progress input
 type ReadlineInternals = readline.Interface & { line: string; cursor: number }
@@ -330,14 +330,6 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
       if (remaining) process.stdout.write(remaining)
     },
   }
-}
-
-export function configureCliRuntimeLogger(_friendId: string): void {
-  const logger = createLogger({
-    level: "info",
-    sinks: [createNdjsonFileSink(logPath("cli", "runtime"))],
-  })
-  setRuntimeLogger(logger)
 }
 
 export async function main() {

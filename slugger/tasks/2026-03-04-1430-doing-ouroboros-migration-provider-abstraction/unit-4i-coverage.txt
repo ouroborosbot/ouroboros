@@ -1,0 +1,20 @@
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+      Coverage enabled with v8
+
+ ✓ src/__tests__/senses/cli.test.ts (58 tests) 474ms
+ ✓ src/__tests__/senses/cli-main.test.ts (34 tests) 126ms
+ ✓ src/__tests__/senses/cli-logging.test.ts (1 test) 9ms
+
+ Test Files  3 passed (3)
+      Tests  93 passed (93)
+   Start at  18:59:16
+   Duration  1.19s (transform 213ms, setup 52ms, import 103ms, tests 609ms, environment 0ms)
+
+ % Coverage report from v8
+----------------|---------|----------|---------|---------|-------------------
+File            | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+----------------|---------|----------|---------|---------|-------------------
+All files       |     100 |      100 |     100 |     100 |                   
+ cli-logging.ts |     100 |      100 |     100 |     100 |                   
+----------------|---------|----------|---------|---------|-------------------

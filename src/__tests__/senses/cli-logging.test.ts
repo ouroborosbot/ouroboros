@@ -45,7 +45,7 @@ describe("CLI logging contract", () => {
   })
 
   it("exports a CLI runtime logger configurator that routes nerves logs to NDJSON sink", async () => {
-    const cli = await import("../../senses/cli")
+    const cli = await import("../../senses/cli-logging")
     expect(typeof (cli as { configureCliRuntimeLogger?: unknown }).configureCliRuntimeLogger).toBe("function")
     ;(cli as { configureCliRuntimeLogger: (friendId: string) => void }).configureCliRuntimeLogger("friend-123")
 
