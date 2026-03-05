@@ -760,12 +760,15 @@ Changes:
 **Acceptance**: 100% coverage on new/modified code, all tests green
 
 ### ⬜ Unit 21d: Token accumulation after each turn -- Tests
-**What**: Write failing tests verifying token accumulation in both adapters:
+**What**: Write failing tests for a shared `accumulateFriendTokens(store, friendId, usage)` helper in `src/__tests__/mind/friends/tokens.test.ts`. Both adapters (CLI and Teams) will call this helper, so testing the helper directly provides full coverage without needing to test interactive readline or the full Teams handler.
 
-1. **`accumulateFriendTokens` helper** (`src/__tests__/mind/friends/tokens.test.ts`): first turn (0 -> N), subsequent turn (existing tokens + new tokens), record persisted with updated `updatedAt`.
-2. **CLI adapter**: the CLI `main()` loop is hard to test in isolation (interactive readline). Extract a helper `accumulateFriendTokens(store, friendId, usage)` in a shared location (e.g. `src/mind/friends/tokens.ts`) and test it directly. Both adapters call this helper. Tests in `src/__tests__/mind/friends/tokens.test.ts`.
-3. **No usage data**: when `runAgent` returns no usage (e.g. abort), `totalTokens` is NOT updated (no-op).
-4. **No friend context**: when `toolContext` has no friend, accumulation is skipped (no crash).
+Tests:
+1. First turn: record with `totalTokens: 0`, usage `{ total_tokens: 1500 }` -> record updated to `totalTokens: 1500`, `updatedAt` refreshed
+2. Subsequent turn: record with `totalTokens: 3000`, usage `{ total_tokens: 2000 }` -> record updated to `totalTokens: 5000`
+3. No usage data: `usage` is undefined -> no store reads/writes (no-op)
+4. Zero total_tokens: `usage.total_tokens` is 0 -> no store reads/writes (no-op)
+5. Record not found: store returns null -> no crash, no write
+6. Legacy record: record on disk has no `totalTokens` field -> treated as 0, accumulation works correctly
 
 **Output**: New test cases
 **Acceptance**: Tests exist and FAIL (red) because no token accumulation logic exists yet
@@ -816,7 +819,7 @@ Changes:
 1. **Auto-populate name in resolver** (`src/mind/friends/resolver.ts`): in `resolveOrCreate()`, when creating a new friend, if `this.params.displayName !== "Unknown"`, set `notes: { name: this.params.displayName }` instead of `notes: {}`.
 
 2. **Token-based onboarding in prompt** (`src/mind/prompt.ts`):
-   - Export a constant `ONBOARDING_TOKEN_THRESHOLD` (initial value TBD -- user to review in Unit 21j, suggest 50000 as starting point based on ~5-10 conversations worth of tokens)
+   - Export a constant `ONBOARDING_TOKEN_THRESHOLD = 50_000` (default -- user reviews exact value in Unit 21j; ~5-10 conversations worth of tokens)
    - Replace the `isNewFriend` calculation at line 156:
      ```
      // OLD: const isNewFriend = !hasNotes && !hasPrefs
