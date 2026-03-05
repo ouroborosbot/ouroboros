@@ -1,6 +1,6 @@
 # Doing: Ouroboros Migration - Provider Abstraction
 
-**Status**: READY_FOR_EXECUTION
+**Status**: in-progress
 **Execution Mode**: pending
 **Created**: 2026-03-04 15:26
 **Planning**: ./2026-03-04-1430-planning-ouroboros-migration-provider-abstraction.md
@@ -23,6 +23,10 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - [ ] Anthropic setup-token flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
 - [ ] OpenAI Codex OAuth flow is manually validated end-to-end (real profile, not mocks) with evidence captured in task artifacts.
 - [ ] Provider selection is per-agent and config-driven (no global singleton lock-in).
+- [ ] Provider-specific implementation logic is extracted from `src/heart/core.ts` into `src/heart/providers/*` modules before Unit 5 work, with behavior parity confirmed by tests.
+- [ ] CLI channel output keeps user-visible plain text separate from nerves logs (no raw NDJSON log events interleaved in stdout model responses).
+- [ ] Nerves logs remain machine-readable and persistent (append-only NDJSON) for multi-agent auditing and runtime validation.
+- [ ] Anthropic streamed tool calls assemble valid JSON arguments and execute reliably (no malformed concatenated argument payloads), backed by regression tests.
 - [x] Secrets/state boundary is enforced (`~/.agentsecrets` for secrets only; runtime/session/log/PII/test artifacts moved to `~/.agentstate`).
 - [x] `secrets.json` retains `providers` + `teams`; `context` is loaded from `agent.json`.
 - [x] `agent.json.configPath` resolves to `~/.agentsecrets/<agent>/secrets.json`.
@@ -127,10 +131,55 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: Refactored Anthropic provider code and coverage artifact for auth/stream branches.
 **Acceptance**: 100% coverage on new Anthropic integration code and tests green.
 
-### ⬜ Unit 4d: Anthropic setup-token integration — Manual validation gate
-**What**: Execute a real end-to-end Anthropic turn using the setup-token profile path (no mocks) and capture sanitized evidence.
-**Output**: Artifact log with timestamp, provider id, model, command/entrypoint used, and outcome.
-**Acceptance**: Live Anthropic run succeeds via setup-token auth; failure mode includes explicit re-auth guidance; evidence artifact is present.
+### ⬜ Unit 4d: Provider module extraction pre-Unit-5 pass — Tests
+**What**: Add failing tests that lock provider module boundaries so provider-specific runtime logic is owned in `src/heart/providers/{anthropic,azure,minimax}.ts` and no longer embedded in `src/heart/core.ts`.
+**Output**: Failing boundary tests covering provider module ownership and engine/provider handoff contracts.
+**Acceptance**: Tests fail red and identify provider-specific runtime logic still anchored in `src/heart/core.ts`.
+
+### ⬜ Unit 4e: Provider module extraction pre-Unit-5 pass — Implementation
+**What**: Extract provider-specific runtime logic from `src/heart/core.ts` into provider modules under `src/heart/providers/` with no behavior change.
+**Output**: Provider-module refactor commit moving runtime logic into `anthropic.ts`, `azure.ts`, and `minimax.ts`.
+**Acceptance**: Boundary tests pass green and existing Azure/MiniMax/Anthropic regression tests remain green.
+
+### ⬜ Unit 4f: Provider module extraction pre-Unit-5 pass — Coverage & Refactor
+**What**: Refactor extracted provider module code for clarity and verify full branch/error-path coverage.
+**Output**: Coverage artifacts proving 100% coverage on newly added provider-module code.
+**Acceptance**: New provider-module code is at 100% coverage and related tests remain green.
+
+### ⬜ Unit 4g: CLI user-output vs nerves-log separation pre-Unit-5 pass — Tests
+**What**: Add failing CLI tests that enforce channel separation: user-facing model text on stdout only; structured nerves logs routed to operator sinks (stderr and append-only NDJSON files) and never interleaved into user transcript text.
+**Output**: Failing channel-separation tests in CLI/nerves-related test suites.
+**Acceptance**: Tests fail red against current interleaving behavior.
+
+### ⬜ Unit 4h: CLI user-output vs nerves-log separation pre-Unit-5 pass — Implementation
+**What**: Implement sink separation so CLI output stays user-facing while nerves logs are emitted to operator-native sinks, including append-only NDJSON persistence under `~/.agentstate/<agent>/logs`.
+**Output**: CLI/logging sink updates with persistent NDJSON log path behavior.
+**Acceptance**: Channel-separation tests pass green and CLI user text no longer contains structured log lines.
+
+### ⬜ Unit 4i: CLI user-output vs nerves-log separation pre-Unit-5 pass — Coverage & Refactor
+**What**: Refactor sink separation code and cover stdout/stderr/file routing branches and error paths.
+**Output**: Coverage artifacts for CLI/log sink code paths.
+**Acceptance**: New sink-separation code is at 100% coverage and related tests remain green.
+
+### ⬜ Unit 4j: Anthropic streamed tool-argument hardening pre-Unit-5 pass — Tests
+**What**: Add failing regression tests for Anthropic streamed tool calls to reproduce malformed argument assembly (including `content_block_start` + `input_json_delta` concatenation cases) and require valid JSON arguments to tools.
+**Output**: Failing Anthropic tool-call assembly tests with fixtures derived from real failing session traces.
+**Acceptance**: Tests fail red on current malformed-argument behavior.
+
+### ⬜ Unit 4k: Anthropic streamed tool-argument hardening pre-Unit-5 pass — Implementation
+**What**: Fix Anthropic stream tool-argument assembly so each tool call receives correctly reconstructed JSON arguments and tool execution proceeds reliably.
+**Output**: Anthropic stream assembly fix in provider code and supporting parser updates as needed.
+**Acceptance**: Anthropic tool-assembly tests pass green and no malformed argument payloads are emitted.
+
+### ⬜ Unit 4l: Anthropic streamed tool-argument hardening pre-Unit-5 pass — Coverage & Refactor
+**What**: Refactor Anthropic argument assembly handling and cover all edge/error paths for streamed tool-argument reconstruction.
+**Output**: Coverage artifacts for Anthropic tool-argument assembly branches.
+**Acceptance**: New Anthropic hardening code is at 100% coverage and related tests remain green.
+
+### ⬜ Unit 4m: Anthropic setup-token integration — Manual validation gate
+**What**: Execute a real end-to-end Anthropic turn using the setup-token profile path (no mocks), including a tool-calling prompt, and capture sanitized evidence.
+**Output**: Artifact log with timestamp, provider id, model, command/entrypoint used, tool-call outcome, and final response outcome.
+**Acceptance**: Live Anthropic run succeeds via setup-token auth; tool calls execute with valid arguments; failure mode includes explicit re-auth guidance; evidence artifact is present.
 
 ### ⬜ Unit 5a: OpenAI Codex OAuth integration — Tests
 **What**: Add failing tests for `openai-codex` provider behavior, OAuth profile loading contract, and explicit auth-failure messaging in provider/config test suites.
@@ -201,3 +250,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 15:47 Unit 1a complete: added failing contract tests for `.agentsecrets`/`.agentstate` paths and `agent.json` context sourcing (`unit-1a-red-run.txt`)
 - 2026-03-04 15:53 Unit 1b complete: implemented secrets/state path contracts, moved context sourcing to `agent.json`, and added migration runbook (`unit-1b-*.txt`)
 - 2026-03-04 15:56 Unit 1c complete: achieved green coverage gate + nerves audit after branch-coverage hardening (`unit-1c-*.txt`)
+- 2026-03-04 18:32 Added pre-Unit-5 Unit 4d-4m scope for provider module extraction, CLI/log channel separation, and Anthropic streamed tool-argument hardening
