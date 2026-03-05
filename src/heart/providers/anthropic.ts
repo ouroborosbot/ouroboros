@@ -173,6 +173,32 @@ function toAnthropicUsage(raw: Record<string, unknown>): UsageData {
   };
 }
 
+function mergeAnthropicToolArguments(current: string, partial: string): string {
+  if (!partial) return current
+  if (!current.trim()) return partial
+
+  const trimmedCurrent = current.trim()
+  const trimmedPartial = partial.trim()
+
+  // If streaming restarts with a full JSON object/array fragment, trust it.
+  if (trimmedPartial.startsWith("{") || trimmedPartial.startsWith("[")) {
+    return partial
+  }
+
+  // Anthropic can emit block.input as a complete object and then emit
+  // additional members as ',\"k\":v' deltas; merge those safely.
+  if (trimmedCurrent.startsWith("{") && trimmedCurrent.endsWith("}")) {
+    const inner = trimmedCurrent.slice(1, -1).trim()
+    let suffix = partial
+    if (!inner && suffix.startsWith(",")) {
+      suffix = suffix.slice(1)
+    }
+    return `{${inner}${suffix}}`
+  }
+
+  return current + partial
+}
+
 function isAnthropicAuthFailure(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const status = (error as HttpError).status;
@@ -275,7 +301,10 @@ async function streamAnthropicMessages(
           const index = Number(event.index);
           const existing = toolCalls.get(index);
           if (existing) {
-            existing.arguments += String(delta?.partial_json ?? "");
+            existing.arguments = mergeAnthropicToolArguments(
+              existing.arguments,
+              String(delta?.partial_json ?? ""),
+            );
           }
           continue;
         }
