@@ -179,7 +179,10 @@ Design principles: don't persist what you can re-derive; conversation IS the cac
 
 **Config** (`config.ts`): provider credentials, Teams connection info, OAuth config, Teams channel settings, and integrations are loaded from the secrets.json file pointed to by your agent.json `configPath`. Context window settings come from `agent.json` `context`. No environment variables in `src/` -- everything comes from files.
 
-For Anthropic, set `providers.anthropic.model` (recommended: `claude-opus-4-6`) and `providers.anthropic.setupToken` directly in `secrets.json`.
+For Anthropic and OpenAI Codex auth bootstrap, use:
+
+- `npm run auth:claude-setup-token` to run `claude setup-token` and save `providers.anthropic.setupToken`.
+- `npm run auth:openai-codex` to run Codex OAuth bootstrap and save `providers.openai-codex.oauthAccessToken`.
 
 ### What you can modify
 
@@ -195,6 +198,14 @@ npm run dev
 
 # CLI (slugger agent, once slugger/ directory exists)
 npm run dev:slugger
+
+# Auth bootstrap (ouroboros defaults)
+npm run auth:claude-setup-token
+npm run auth:openai-codex
+
+# Auth bootstrap for another agent
+npm run auth:claude-setup-token -- --agent slugger
+npm run auth:openai-codex -- --agent slugger
 
 # Teams bot
 npm run teams

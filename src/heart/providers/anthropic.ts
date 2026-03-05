@@ -21,12 +21,18 @@ function getAnthropicSecretsPathForGuidance(): string {
   return loadAgentConfig().configPath;
 }
 
+function getAnthropicAgentNameForGuidance(): string {
+  return loadAgentConfig().name;
+}
+
 function getAnthropicSetupTokenInstructions(): string {
+  const agentName = getAnthropicAgentNameForGuidance();
   return [
     "Fix:",
-    "  1. Run `claude setup-token`",
+    `  1. Run \`npm run auth:claude-setup-token -- --agent ${agentName}\``,
+    "     (or run `claude setup-token` and paste the token manually)",
     `  2. Open ${getAnthropicSecretsPathForGuidance()}`,
-    "  3. Set providers.anthropic.setupToken to the returned token",
+    "  3. Confirm providers.anthropic.setupToken is set",
   ].join("\n");
 }
 

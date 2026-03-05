@@ -17,12 +17,18 @@ function getOpenAICodexSecretsPathForGuidance(): string {
   return loadAgentConfig().configPath;
 }
 
+function getOpenAICodexAgentNameForGuidance(): string {
+  return loadAgentConfig().name;
+}
+
 function getOpenAICodexOAuthInstructions(): string {
+  const agentName = getOpenAICodexAgentNameForGuidance();
   return [
     "Fix:",
-    "  1. Run `codex login` to complete OAuth and get a fresh token",
+    `  1. Run \`npm run auth:openai-codex -- --agent ${agentName}\``,
+    "     (or run `codex login` and set the OAuth token manually)",
     `  2. Open ${getOpenAICodexSecretsPathForGuidance()}`,
-    "  3. Set providers.openai-codex.oauthAccessToken to the OAuth access token",
+    "  3. Confirm providers.openai-codex.oauthAccessToken is set",
   ].join("\n");
 }
 
