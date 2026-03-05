@@ -2,7 +2,7 @@
 
 **Status**: drafting
 **Execution Mode**: direct
-**Created**: TBD
+**Created**: 2026-03-05 09:56
 **Planning**: ./2026-03-05-0953-planning-nerves-logging-policy.md
 **Artifacts**: ./2026-03-05-0953-doing-nerves-logging-policy/
 
@@ -91,4 +91,4 @@ Not started: not started | In progress: in progress | Done: done | Blocked: bloc
 - **Decisions made**: Update docs immediately, commit right away
 
 ## Progress Log
-- TBD Created from planning doc
+- 2026-03-05 09:56 Created from planning doc
