@@ -64,7 +64,7 @@ Fix six bugs discovered during live testing of the context kernel on Microsoft 3
 - [ ] User confirms on Teams: model uses final_answer cleanly, no 413 errors, no "Sorry something went wrong", prompt sections emit correctly, responses arrive in periodic chunks (not per-token, not all-at-once)
 
 ### Gate 3: Friend Context Instructions
-- [ ] Friend context instructions at prompt.ts:178-194 rewritten to be directive with displayName interpolation and aggressive saving
+- [x] Friend context instructions at prompt.ts:178-194 rewritten to be directive with displayName interpolation and aggressive saving
 - [ ] User confirms on both surfaces: bot helps first, introduces along the way, proactively calls `save_friend_note` when learning anything about the user without being asked
 
 ### All Gates
@@ -716,7 +716,7 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 **Output**: Modified `src/mind/prompt.ts`
 **Acceptance**: All tests PASS (green), no warnings
 
-### ⬜ Unit 4c: Bug 3 (friend context instructions) -- Coverage & Refactor
+### ✅ Unit 4c: Bug 3 (friend context instructions) -- Coverage & Refactor
 **What**: Verify 100% coverage on modified `contextSection()`. Both new-friend and returning-friend paths should be covered. Verify displayName interpolation works for "Unknown" and non-"Unknown" values.
 **Output**: Coverage report showing full branch coverage
 **Acceptance**: 100% coverage on new/modified code, tests still green
