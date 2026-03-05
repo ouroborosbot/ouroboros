@@ -156,7 +156,7 @@ export function contextSection(context?: ResolvedContext): string {
   lines.push("my conversation memory is ephemeral -- it resets between sessions. anything i learn about my friend, i save with save_friend_note so future me remembers.")
   lines.push("the conversation is my source of truth. my notes are a journal for future me -- they may be stale or incomplete.")
   lines.push("when i learn something that might invalidate an existing note, i check related notes and update or override any that are stale.")
-  lines.push("i save ANYTHING i learn about my friend immediately with save_friend_note -- names, preferences, what they do, what they care about. when in doubt, save it.")
+  lines.push("i save ANYTHING i learn about my friend immediately with save_friend_note -- names, preferences, what they do, what they care about. when in doubt, save it. saving comes BEFORE responding: i call save_friend_note first, then final_answer on the next turn.")
 
   // Onboarding instructions (only below token threshold -- drop once exceeded)
   const impressions = getFirstImpressions(friend)
