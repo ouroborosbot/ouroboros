@@ -37,7 +37,7 @@ Achieve 100% automatic nerves observability enforcement: replace the manual `REQ
   - Track test name -> event keys mapping
   - Per-test data written to a file (e.g., `vitest-events-per-test.json`) for the audit to consume
   - `maxWorkers: 1` means no interleaving risk
-- Update or rewrite `src/__tests__/nerves/coverage-audit.test.ts` -- tests the new 4-rule audit
+- Update or rewrite `src/__tests__/nerves/coverage-audit.test.ts` -- tests the new 5-rule audit
 - Update or rewrite `src/__tests__/nerves/coverage-contract.test.ts` -- tests updated contract (no more REQUIRED_EVENTS)
 - Remove `src/__tests__/nerves/emit-new-events.test.ts` -- exists solely to emit REQUIRED_EVENTS for the old audit; no longer needed
 - Update `scripts/run-coverage-gate.cjs` if audit interface changes
@@ -81,7 +81,7 @@ Achieve 100% automatic nerves observability enforcement: replace the manual `REQ
 - Skipped (zero executable code):
   - `src/mind/friends/types.ts` -- pure TypeScript type definitions only
 
-**Phase D: Documentation**
+**Phase D: Documentation and work-merger integration**
 - Add "Logging Policy" section to AGENTS.md covering:
   - All runtime logging uses `emitNervesEvent()`, never raw `console.*`
   - Three categories of legitimate console exceptions (pre-boot guard, terminal UX, meta-tooling)
@@ -91,7 +91,13 @@ Achieve 100% automatic nerves observability enforcement: replace the manual `REQ
   - Error events must include context in meta
   - Static string literals only: `event` and `component` fields in `emitNervesEvent` must be string literals (no template literals, no variables) so the static scanner can extract them
   - File completeness: every production `.ts` file must have at least one `emitNervesEvent` call (pure type-only files exempt)
+  - Two-layer enforcement model: 5 deterministic audit rules (CI), plus work-merger judgment review (PR)
 - Add brief logging policy mention in CONTRIBUTING.md under the Code section
+- Update `subagents/work-merger.md` to add a nerves review step to its PR/CI workflow:
+  - When reviewing code changes on the branch, check for new code paths (functions, catch blocks, state transitions, I/O operations) that lack corresponding `emitNervesEvent` calls
+  - This is a judgment call that deterministic rules cannot automate -- "should this code path emit an event?"
+  - Add as a checklist item in the CI Failure Self-Repair or PR Workflow section
+  - The 5 audit rules catch what is automatable; work-merger catches what requires judgment
 
 ### Out of Scope
 - Converting any remaining console.* calls (already done on this branch)
@@ -116,6 +122,7 @@ Achieve 100% automatic nerves observability enforcement: replace the manual `REQ
 - [ ] `emit-new-events.test.ts` removed (no longer needed)
 - [ ] Logging Policy section added to AGENTS.md
 - [ ] Logging policy mention added to CONTRIBUTING.md
+- [ ] `subagents/work-merger.md` updated with nerves review checklist item
 - [ ] `npm test` still passes
 - [ ] No warnings
 - [ ] 100% test coverage on all new code
@@ -155,13 +162,14 @@ Achieve 100% automatic nerves observability enforcement: replace the manual `REQ
 - Rule 2 (start/end pairing): scoped within a single test. Naming convention: `_start` / `_end` / `_error` suffixes with shared prefix.
 - Rule 5 (file completeness): every production .ts file must have at least one emitNervesEvent call. Pure type-only files exempt (detected by absence of function/class/const declarations).
 - Static string literals only for `event` and `component` in emitNervesEvent calls -- no template literals, no variables. Enables reliable regex extraction.
+- Two-layer enforcement: 5 deterministic audit rules in CI (automatable), plus work-merger judgment review on PRs (catches new code paths missing events that rules cannot detect).
 
 ## Context / References
 - Prior planning doc: `ouroboros/tasks/2026-03-04-2354-planning-nerves-console-migration.md` (completed)
 - Branch: `ouroboros/nerves-console-migration`
 - `src/nerves/runtime.ts` -- `emitNervesEvent()` API: `{ level?, event, trace_id?, component, message, meta? }`
 - `src/nerves/coverage/contract.ts` -- currently has `REQUIRED_EVENTS` (31 entries), `REQUIRED_ENVELOPE_FIELDS`, `SENSITIVE_PATTERNS`, `eventKey()`. REQUIRED_EVENTS to be removed; others kept.
-- `src/nerves/coverage/audit.ts` -- current audit: checks REQUIRED_EVENTS observed, validates schema/redaction, checks logpoints. To be rewritten with 4 automatic rules.
+- `src/nerves/coverage/audit.ts` -- current audit: checks REQUIRED_EVENTS observed, validates schema/redaction, checks logpoints. To be rewritten with 5 automatic rules.
 - `src/__tests__/nerves/global-capture.ts` -- current global event capture via `registerGlobalLogSink`. Needs per-test tracking added.
 - `src/__tests__/nerves/coverage-audit.test.ts` -- tests for the audit. To be rewritten for new rules.
 - `src/__tests__/nerves/coverage-contract.test.ts` -- tests for contract. To be updated (no more REQUIRED_EVENTS).
@@ -172,6 +180,7 @@ Achieve 100% automatic nerves observability enforcement: replace the manual `REQ
 - 20 production files without emitNervesEvent calls (only types.ts skipped -- zero executable code)
 - Existing naming convention: `{component}:{component_prefix}.{action}` (e.g., `engine:engine.turn_start`)
 - Start/end pairing naming: `component.action_start` / `component.action_end` / `component.action_error` -- audit matches on `_start` suffix, looks for `_end` or `_error` with same prefix
+- `subagents/work-merger.md` -- merge agent spec. Currently has no code review checklist. Needs nerves review step added.
 
 **Blast radius of removing REQUIRED_EVENTS (6 files):**
 - `src/nerves/coverage/contract.ts` -- definition site
@@ -190,6 +199,7 @@ Achieve 100% automatic nerves observability enforcement: replace the manual `REQ
 - Static string literals requirement for `event`/`component` enables the regex scanner to reliably extract keys. If a call uses a variable or template literal, the scanner cannot discover it, and Rule 4 (source coverage) will not track it. This is a hard policy -- code review should catch violations.
 - Rule 5 (file completeness) closes the gap where someone adds a new production file whose code gets exercised by existing tests that already emit events from other modules. Without Rule 5, Rule 1 (every test emits) would pass because the test emits events from some other module, but the new file itself has zero observability.
 - The file completeness exemption for pure type files uses a heuristic: if a file has no `function`, `class`, or `const` declarations (only `type`, `interface`, `enum`), it is exempt. This should be simple to implement with regex.
+- Two-layer enforcement model: the 5 deterministic audit rules catch structural violations (missing events, broken pairing, empty error meta, unregistered call sites, empty files). But they cannot judge whether a *new* code path *should* have an event. That requires reading the code and understanding intent. work-merger fills this gap -- when reviewing PR changes, it checks for new functions/catch blocks/I/O operations that lack nerves calls. This is the "last mile" of observability enforcement.
 
 ## Progress Log
 - 2026-03-05 09:54 Created
