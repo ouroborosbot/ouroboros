@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "fs"
 
-import { REQUIRED_ENVELOPE_FIELDS, SENSITIVE_PATTERNS, getRequiredEventKeys } from "./contract"
+import { REQUIRED_ENVELOPE_FIELDS, SENSITIVE_PATTERNS } from "./contract"
 
 export interface AuditInput {
   eventsPath: string
@@ -13,33 +13,17 @@ export interface RequiredAction {
   reason: string
 }
 
-export interface EventCatalogCoverage {
-  status: "pass" | "fail"
-  required: number
-  observed: number
-  missing: string[]
-}
-
 export interface SchemaRedactionCoverage {
   status: "pass" | "fail"
   checked_events: number
   violations: string[]
 }
 
-export interface LogpointCoverage {
-  status: "pass" | "fail"
-  declared: number
-  observed: number
-  missing: string[]
-}
-
 export interface NervesCoverageReport {
   overall_status: "pass" | "fail"
   required_actions: RequiredAction[]
   nerves_coverage: {
-    event_catalog: EventCatalogCoverage
     schema_redaction: SchemaRedactionCoverage
-    logpoint_coverage: LogpointCoverage
   }
 }
 
@@ -53,12 +37,7 @@ interface ParsedEvent {
   meta?: unknown
 }
 
-interface LogpointsPayload {
-  declared?: unknown
-  observed?: unknown
-}
-
-function readEvents(eventsPath: string): ParsedEvent[] {
+export function readEvents(eventsPath: string): ParsedEvent[] {
   if (!existsSync(eventsPath)) return []
   const raw = readFileSync(eventsPath, "utf8")
   const lines = raw.split("\n").map((line) => line.trim()).filter(Boolean)
@@ -77,12 +56,7 @@ function readEvents(eventsPath: string): ParsedEvent[] {
   return parsed
 }
 
-function asStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  return value.filter((item): item is string => typeof item === "string")
-}
-
-function collectObservedEventKeys(events: ParsedEvent[]): string[] {
+export function collectObservedEventKeys(events: ParsedEvent[]): string[] {
   const observed = new Set<string>()
   for (const entry of events) {
     if (typeof entry.component === "string" && typeof entry.event === "string") {
@@ -92,7 +66,7 @@ function collectObservedEventKeys(events: ParsedEvent[]): string[] {
   return [...observed].sort()
 }
 
-function validateSchemaAndRedaction(events: ParsedEvent[]): string[] {
+export function validateSchemaAndRedaction(events: ParsedEvent[]): string[] {
   const violations: string[] = []
 
   events.forEach((entry, idx) => {
@@ -128,59 +102,16 @@ function validateSchemaAndRedaction(events: ParsedEvent[]): string[] {
 
 export function auditNervesCoverage(input: AuditInput): NervesCoverageReport {
   const events = readEvents(input.eventsPath)
-  const observedEventKeys = collectObservedEventKeys(events)
-  const requiredEventKeys = getRequiredEventKeys()
-
-  const missingEvents = requiredEventKeys.filter((key) => !observedEventKeys.includes(key))
-  const eventCatalogStatus: "pass" | "fail" = missingEvents.length === 0 ? "pass" : "fail"
 
   const schemaViolations = validateSchemaAndRedaction(events)
   const schemaStatus: "pass" | "fail" = schemaViolations.length === 0 ? "pass" : "fail"
 
-  let declaredLogpoints: string[] = []
-  let observedLogpoints: string[] = observedEventKeys
-
-  if (existsSync(input.logpointsPath)) {
-    try {
-      const payload = JSON.parse(readFileSync(input.logpointsPath, "utf8")) as LogpointsPayload
-      declaredLogpoints = asStringArray(payload.declared)
-      const capturedObserved = asStringArray(payload.observed)
-      if (capturedObserved.length > 0) {
-        observedLogpoints = [...new Set([...observedEventKeys, ...capturedObserved])].sort()
-      }
-    } catch {
-      declaredLogpoints = []
-      observedLogpoints = []
-    }
-  }
-
-  if (declaredLogpoints.length === 0) {
-    declaredLogpoints = requiredEventKeys
-  }
-
-  const missingLogpoints = declaredLogpoints.filter((key) => !observedLogpoints.includes(key))
-  const logpointStatus: "pass" | "fail" = missingLogpoints.length === 0 ? "pass" : "fail"
-
   const requiredActions: RequiredAction[] = []
-  if (eventCatalogStatus === "fail") {
-    requiredActions.push({
-      type: "logging",
-      target: "event-catalog",
-      reason: `missing required events: ${missingEvents.slice(0, 5).join(", ")}`,
-    })
-  }
   if (schemaStatus === "fail") {
     requiredActions.push({
       type: "logging",
       target: "schema-redaction",
       reason: `schema/redaction violations: ${schemaViolations.slice(0, 3).join("; ")}`,
-    })
-  }
-  if (logpointStatus === "fail") {
-    requiredActions.push({
-      type: "logging",
-      target: "logpoint-coverage",
-      reason: `missing declared logpoints: ${missingLogpoints.slice(0, 5).join(", ")}`,
     })
   }
 
@@ -190,22 +121,10 @@ export function auditNervesCoverage(input: AuditInput): NervesCoverageReport {
     overall_status: overallStatus,
     required_actions: requiredActions,
     nerves_coverage: {
-      event_catalog: {
-        status: eventCatalogStatus,
-        required: requiredEventKeys.length,
-        observed: observedEventKeys.length,
-        missing: missingEvents,
-      },
       schema_redaction: {
         status: schemaStatus,
         checked_events: events.length,
         violations: schemaViolations,
-      },
-      logpoint_coverage: {
-        status: logpointStatus,
-        declared: declaredLogpoints.length,
-        observed: observedLogpoints.length,
-        missing: missingLogpoints,
       },
     },
   }
