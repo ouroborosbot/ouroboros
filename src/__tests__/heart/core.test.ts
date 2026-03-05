@@ -3157,12 +3157,13 @@ describe("provider abstraction contract", () => {
     vi.doMock("../../heart/providers/azure", () => ({
       createAzureProviderRuntime: () => null,
     }))
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
     await setupAzure()
 
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
     }) as any)
-    const mockError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     try {
       const core = await import("../../heart/core")
@@ -3170,11 +3171,43 @@ describe("provider abstraction contract", () => {
         resolve: () => null,
       } as any)
       expect(() => core.getProvider()).toThrow("process.exit called")
-      expect(mockError).toHaveBeenCalledWith("provider runtime could not be initialized.")
+      expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+        level: "error",
+        event: "engine.provider_init_error",
+        component: "engine",
+        message: "provider runtime could not be initialized.",
+      }))
     } finally {
       mockExit.mockRestore()
-      mockError.mockRestore()
       vi.doUnmock("../../heart/providers/azure")
+    }
+  })
+
+  it("fails fast when provider registry resolve() throws", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
+    await setupAzure()
+
+    const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called")
+    }) as any)
+
+    try {
+      const core = await import("../../heart/core")
+      vi.spyOn(core as any, "createProviderRegistry").mockReturnValue({
+        resolve: () => { throw new Error("provider exploded") },
+      } as any)
+      expect(() => core.getProvider()).toThrow("process.exit called")
+      expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+        level: "error",
+        event: "engine.provider_init_error",
+        component: "engine",
+        message: "provider exploded",
+      }))
+    } finally {
+      mockExit.mockRestore()
     }
   })
 
