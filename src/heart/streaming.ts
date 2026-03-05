@@ -1,4 +1,5 @@
 import type OpenAI from "openai";
+import { emitNervesEvent } from "../nerves/runtime";
 import type { ChannelCallbacks } from "./core";
 
 export interface UsageData {
@@ -187,6 +188,12 @@ export async function streamChatCompletion(
   callbacks: ChannelCallbacks,
   signal?: AbortSignal,
 ): Promise<TurnResult> {
+  emitNervesEvent({
+    component: "engine",
+    event: "engine.stream_start",
+    message: "chat completion stream start",
+    meta: {},
+  });
   // Request usage data in the final streaming chunk
   createParams.stream_options = { include_usage: true };
   const response = await client.chat.completions.create(
@@ -350,6 +357,12 @@ export async function streamResponsesApi(
   callbacks: ChannelCallbacks,
   signal?: AbortSignal,
 ): Promise<TurnResult> {
+  emitNervesEvent({
+    component: "engine",
+    event: "engine.stream_start",
+    message: "responses API stream start",
+    meta: {},
+  });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Azure Responses API not in OpenAI SDK types
   const response = await (client as any).responses.create(
     createParams,

@@ -2,6 +2,7 @@
 // Onboarding instructions emitted below ONBOARDING_TOKEN_THRESHOLD.
 // These drop from the system prompt once cumulative token usage exceeds the threshold.
 
+import { emitNervesEvent } from "../nerves/runtime"
 import type { FriendRecord } from "./friends/types"
 
 export const ONBOARDING_TOKEN_THRESHOLD = 100_000
@@ -12,6 +13,12 @@ export function isOnboarding(friend: Pick<FriendRecord, "totalTokens">): boolean
 
 export function getFirstImpressions(friend: Pick<FriendRecord, "totalTokens" | "name">): string {
   if (!isOnboarding(friend)) return ""
+  emitNervesEvent({
+    component: "mind",
+    event: "mind.first_impressions",
+    message: "generating onboarding content",
+    meta: {},
+  })
 
   const lines: string[] = []
 

@@ -17,6 +17,7 @@ import { FriendResolver } from "../mind/friends/resolver"
 import { accumulateFriendTokens } from "../mind/friends/tokens"
 import type { ToolContext } from "../repertoire/tools"
 import { configureCliRuntimeLogger } from "./cli-logging"
+import { emitNervesEvent } from "../nerves/runtime"
 
 // readline.Interface exposes undocumented mutable line/cursor for in-progress input
 type ReadlineInternals = readline.Interface & { line: string; cursor: number }
@@ -244,6 +245,12 @@ export class MarkdownStreamer {
 }
 
 export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void } {
+  emitNervesEvent({
+    component: "senses",
+    event: "senses.cli_callbacks_created",
+    message: "cli callbacks created",
+    meta: {},
+  })
   let currentSpinner: Spinner | null = null
   let hadReasoning = false
   let hadToolRun = false

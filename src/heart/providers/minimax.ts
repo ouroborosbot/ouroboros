@@ -1,9 +1,16 @@
 import OpenAI from "openai";
 import { getMinimaxConfig } from "../../config";
+import { emitNervesEvent } from "../../nerves/runtime";
 import type { ProviderRuntime, ProviderTurnRequest } from "../core";
 import { streamChatCompletion } from "../streaming";
 
 export function createMinimaxProviderRuntime(): ProviderRuntime {
+  emitNervesEvent({
+    component: "engine",
+    event: "engine.provider_init",
+    message: "minimax provider init",
+    meta: { provider: "minimax" },
+  });
   const minimaxConfig = getMinimaxConfig();
   if (!minimaxConfig.apiKey) {
     throw new Error(

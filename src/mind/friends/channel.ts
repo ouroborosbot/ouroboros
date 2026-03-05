@@ -1,6 +1,7 @@
 // Channel capabilities -- hardcoded const map keyed by channel identifier.
 // Pure lookup, no I/O, cannot fail. Unknown channel gets minimal defaults.
 
+import { emitNervesEvent } from "../../nerves/runtime"
 import type { ChannelCapabilities } from "./types"
 
 const CHANNEL_CAPABILITIES: Record<string, ChannelCapabilities> = {
@@ -32,5 +33,11 @@ const DEFAULT_CAPABILITIES: ChannelCapabilities = {
 }
 
 export function getChannelCapabilities(channel: string): ChannelCapabilities {
+  emitNervesEvent({
+    component: "channels",
+    event: "channel.capabilities_lookup",
+    message: "channel capabilities lookup",
+    meta: { channel },
+  })
   return CHANNEL_CAPABILITIES[channel] ?? DEFAULT_CAPABILITIES
 }

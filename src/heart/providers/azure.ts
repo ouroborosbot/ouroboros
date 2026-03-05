@@ -1,10 +1,17 @@
 import OpenAI, { AzureOpenAI } from "openai";
 import { getAzureConfig } from "../../config";
+import { emitNervesEvent } from "../../nerves/runtime";
 import type { ProviderRuntime, ProviderTurnRequest } from "../core";
 import type { ResponseItem, TurnResult } from "../streaming";
 import { streamResponsesApi, toResponsesInput, toResponsesTools } from "../streaming";
 
 export function createAzureProviderRuntime(): ProviderRuntime {
+  emitNervesEvent({
+    component: "engine",
+    event: "engine.provider_init",
+    message: "azure provider init",
+    meta: { provider: "azure" },
+  });
   const azureConfig = getAzureConfig();
   if (!(azureConfig.apiKey && azureConfig.endpoint && azureConfig.deployment && azureConfig.modelName)) {
     throw new Error(
