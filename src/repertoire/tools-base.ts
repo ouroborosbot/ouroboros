@@ -329,6 +329,13 @@ export const baseToolDefinitions: ToolDefinition[] = [
         }
 
         // type === "note"
+        // Redirect "name" key to name field
+        if (a.key === "name") {
+          const updated: FriendRecord = { ...record, name: a.content, updatedAt: new Date().toISOString() };
+          await ctx.friendStore.put(friendId, updated);
+          return `updated friend's name to '${a.content}' (stored as name, not a note)`;
+        }
+
         const existing = record.notes[a.key];
         if (existing && !isOverride) {
           return `i already have a note for '${a.key}': "${existing.value}". if you want to replace it, call again with override: true. or merge both values into content and override.`;
