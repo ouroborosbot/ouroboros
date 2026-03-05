@@ -51,7 +51,7 @@ Eliminate all `console.log/warn/error` calls from production source files by con
 **Output**: Baseline test run passes. Console call inventory confirmed.
 **Acceptance**: `npm test` passes. Grep confirms exactly 14 console.* calls in target files.
 
-### ⬜ Unit 1a: identity.ts -- Tests
+### ✅ Unit 1a: identity.ts -- Tests
 **What**: No new tests needed. This is a pure deletion of a redundant `console.warn` on line 169 of `src/identity.ts`. The nerves event already exists on lines 170-176. Existing tests already cover the nerves event. Verify the existing test for the "missing phrases" path still passes after deletion.
 **Output**: Confirmation that existing tests cover this path.
 **Acceptance**: Existing identity tests pass and cover the missing-phrases branch.
