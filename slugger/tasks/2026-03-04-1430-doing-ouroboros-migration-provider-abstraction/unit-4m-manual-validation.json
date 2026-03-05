@@ -12,7 +12,7 @@
     "exit_code": 0,
     "stdout_has_structured_logs": false,
     "tool_execution_observed_in_stderr": true,
-    "expected_exact_text_present": true
+    "expected_exact_text_present": false
   },
   "session_evidence": {
     "session_path": "/Users/arimendelow/.agentstate/ouroboros/sessions/267e5aad-a8ec-410a-9bcb-6c949360b45c/cli/session.json",
