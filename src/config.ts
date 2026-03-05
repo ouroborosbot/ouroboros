@@ -102,6 +102,24 @@ const DEFAULT_CONFIG: OuroborosConfig = {
   },
 }
 
+const DEFAULT_SECRETS_TEMPLATE: Record<string, unknown> = {
+  providers: {
+    azure: {
+      apiKey: "",
+      endpoint: "",
+      deployment: "",
+      modelName: "",
+    },
+    minimax: {
+      apiKey: "",
+      model: "",
+    },
+    anthropic: {
+      model: "",
+    },
+  },
+}
+
 let _cachedConfig: OuroborosConfig | null = null
 let _testContextOverride: ContextConfig | null = null
 
@@ -161,6 +179,32 @@ export function loadConfig(): OuroborosConfig {
     const raw = fs.readFileSync(configPath, "utf-8")
     fileData = JSON.parse(raw) as Record<string, unknown>
   } catch (error) {
+    const errorCode =
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      typeof (error as NodeJS.ErrnoException).code === "string"
+        ? (error as NodeJS.ErrnoException).code
+        : undefined
+
+    if (errorCode === "ENOENT") {
+      try {
+        fs.writeFileSync(configPath, JSON.stringify(DEFAULT_SECRETS_TEMPLATE, null, 2) + "\n", "utf-8")
+      } catch (writeError) {
+        emitNervesEvent({
+          level: "warn",
+          event: "config_identity.error",
+          component: "config/identity",
+          message: "failed writing default secrets config",
+          meta: {
+            phase: "loadConfig",
+            path: configPath,
+            reason: writeError instanceof Error ? writeError.message : String(writeError),
+          },
+        })
+      }
+    }
+
     emitNervesEvent({
       level: "warn",
       event: "config_identity.error",
