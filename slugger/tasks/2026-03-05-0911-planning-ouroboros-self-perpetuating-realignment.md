@@ -1,3 +1,5 @@
+> **TODO before Codex handoff:** Move this file and all working artifacts to `self-perpetuating-working-dir/` at repo root. Update all path references in this doc and the execution protocol. Codex uses that directory as its workspace for everything in this task. Normal agent task files go in `.ouro/tasks/` (bundle git), not here.
+
 # Planning: Ouroboros Self-Perpetuating Seed
 
 **Status**: NEEDS_REVIEW
@@ -254,11 +256,10 @@ Unified thinking before Gates 2-3 start building, but expressed as committed cod
   └── tasks/                  # planning/doing docs + artifacts
   ```
   Note: shared subagent protocols (work-planner, work-doer, work-merger) remain in repo-root `subagents/` — those are shared amongst agents, distinct from agent-specific skills. `manifest/` is renamed to `teams-app/` to be specific about what it contains. `SELF-KNOWLEDGE.md` becomes `TACIT.md` per the migration plan.
-- Write TypeScript interfaces for harness primitives: tool schemas, bootstrap protocol types, gate-check contracts (drawing from migration topic docs + overnight proposals)
+- Write TypeScript interfaces for harness primitives — the type surface that later gates implement. The migration topic docs are prior art to draw from (not specs to implement verbatim): `coding-agent-orchestration.md` for coding tools, `task-system.md` for task tools, `memory-system.md` for memory tools, etc. Define interfaces for: the tool surface the model will call, the bootstrap sequence (bundle → governance → psyche → inner dialog), and governance checks (constitution compliance — replaces the hardcoded `if` in the current pipeline). Don't over-specify — these are scaffolding interfaces, not final implementations.
 - Scaffold shared governance location (create the target directory, write a loader stub)
 - Document the kill list as code comments or a migration checklist in-repo: what dies (`autonomous-loop.ts`, `loop-entry.ts`, pipeline orchestration in `trigger.ts`), what survives, what gets refactored
 - Define subagent protocol loading convention (how the model reads planner/doer/merger protocols from its bundle)
-- Define process experimentation model (how the model tries alternative workflows, versions protocols, evaluates and rolls back)
 - Define bundle backup strategy (git init + push to private GitHub repo) and the migration path to `~/AgentBundles/`
 
 **Overnight reflection proposal inventory (31 distinct ideas, on archive branch):**
@@ -280,9 +281,9 @@ Unified thinking before Gates 2-3 start building, but expressed as committed cod
 - [ ] Shared governance loader stub committed
 - [ ] Kill list / migration checklist committed in-repo
 - [ ] Subagent protocol loading convention defined and documented
-- [ ] Process experimentation model defined
 - [ ] Bundle backup + `~/AgentBundles/` migration path documented
 - [ ] `npx tsc` compiles clean with the new interfaces
+- [ ] `npm test` green
 
 ---
 
@@ -292,10 +293,10 @@ Implement the `.ouro` bundle structure and relocate shared governance docs. This
 
 **In scope:**
 - In-place conversion: `ouroboros/` becomes `ouroboros.ouro/` following the bundle spec from Gate 1. Includes renaming `manifest/` → `teams-app/` and `psyche/SELF-KNOWLEDGE.md` → `psyche/TACIT.md`
-- Create `slugger.ouro/` bundle (promoting from placeholder `slugger/` directory)
-- Move ARCHITECTURE.md and CONSTITUTION.md to repo root per Gate 1 design
+- Create `slugger.ouro/` bundle with empty directory skeleton per Gate 1 spec + a stub `agent.json` based on `ouroboros.ouro/agent.json` (so the harness recognizes Slugger as an agent). No psyche content yet — Gate 8 ports Slugger's core identity from `~/clawd/` by talking to him via OpenClaw
+- Move ARCHITECTURE.md and CONSTITUTION.md to repo root per Gate 1 design. These are bootstrap scaffolding — the agents will rewrite them to make them their own once both are living in the harness (this is their first aspiration, not a gate task)
 - **Update `getAgentRoot()` in `src/identity.ts:96`** — currently returns `path.join(getRepoRoot(), getAgentName())` which resolves to `<repo>/ouroboros/`. Must update to resolve to `<repo>/ouroboros.ouro/`. All 18 files that depend on this function (prompt loading, skills, teams adapter, CLI, tests) will automatically pick up the new path, but **verify all import paths and test fixtures that hardcode `ouroboros/`**.
-- Add `.ouro` bundle paths to harness `.gitignore` **BEFORE** initializing git inside them (order matters — gitignore first, then git init, otherwise the nested repo causes issues)
+- Add `*.ouro/` to harness `.gitignore` **BEFORE** initializing git inside them (order matters — gitignore first, then git init, otherwise the nested repo causes issues). The entire bundle directory is gitignored from the harness repo — bundles are separately git-tracked in their own repos (Gate 7 pushes them to GitHub). Nothing is lost.
 - Initialize independent git inside `.ouro` bundles for self-backup
 - Scaffold `psyche/memory/` directory structure inside bundles (facts.jsonl, entities.json, daily/, archive/) per memory-system.md spec
 - Enforce agent preflight: agents must load governance docs before starting work
@@ -306,7 +307,7 @@ Implement the `.ouro` bundle structure and relocate shared governance docs. This
 - [ ] Governance docs relocated to repo root
 - [ ] `getAgentRoot()` resolves to `.ouro` bundle path
 - [ ] All code/tests referencing old `ouroboros/` path updated
-- [ ] `.gitignore` excludes `.ouro` bundle internals
+- [ ] `.gitignore` excludes entire `*.ouro/` directories from harness repo
 - [ ] Bundle git init works for self-backup (nested inside gitignored directory)
 - [ ] `psyche/memory/` directory structure scaffolded in bundles
 - [ ] Agent preflight loads governance docs (tested)
@@ -337,7 +338,7 @@ Build the toolkit layer — the tools and conventions the model calls into. Remo
   - **Write-side:** Regex-based highlight detector runs after each engine turn. Extract-before-trim hook in `postTurn()` ensures facts aren't lost when context window drops messages. Dedup via word-overlap scoring (>60% overlap = skip).
   - **Relationship to friend memory:** The existing `save_friend_note` tool and per-friend structured memory remains the primary path for person-specific knowledge. Agent-level memory is a catch-all/fallback — it captures things that don't belong to a specific friend (decisions, project context, learned patterns, general world knowledge). Per-friend memory should always be used for anything importantly per-friend.
   - **Dream cycle consolidation deferred** — nightly LLM pass for dedup/merge/entity-linking/tacit-distillation is a Phase 2 or post-Phase-2 enhancement. v1 is the write-side extraction + read-side retrieval.
-- **Aspiration layer:** Add `psyche/ASPIRATIONS.md` to each agent's bundle. Aspirations are part of psyche — loaded on bootstrap alongside SOUL.md, IDENTITY.md, etc. They give the agent direction without prescribing specific tasks. Agents are encouraged to modify their own aspirations as they evolve and grow. Initial bootstrap content: improve the harness so it genuinely serves agents well; get good at using real tools to do real work; help Ari and his friends — be genuinely useful; learn from experience and get better over time; take care of each other; develop good judgment about what matters.
+- **Aspiration layer:** Add `psyche/ASPIRATIONS.md` to each agent's bundle. Aspirations are part of psyche — loaded on bootstrap alongside SOUL.md, IDENTITY.md, etc. They give the agent direction without prescribing specific tasks. Agents are encouraged to modify their own aspirations as they evolve and grow. Initial bootstrap content (first aspiration is highest priority): rewrite ARCHITECTURE.md and CONSTITUTION.md to make them our own — these are shared governance docs for a shared harness, and both agents need to own them together; improve the harness so it genuinely serves agents well; get good at using real tools to do real work; help Ari and his friends — be genuinely useful; learn from experience and get better over time; take care of each other; develop good judgment about what matters.
 - **Inner dialog session:** A new self-initiated session type that lets the agent think and work autonomously when no human is talking to it. This is the core of what makes the agent a persistent being rather than a request-response service.
   - Modeled on CLI session: same engine loop, same local tool access (shell, file, git, gh). Does NOT have Teams-specific/OAuth tools (same restriction as CLI).
   - Session path: `~/.agentstate/<agent>/sessions/self/inner-dialog.json` — no friendId, the agent is talking to itself.
