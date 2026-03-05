@@ -101,7 +101,7 @@ Implement the `.ouro` bundle structure and relocate shared governance docs. This
 - Move ARCHITECTURE.md and CONSTITUTION.md to shared location per Gate 1 design
 - Add `.ouro` bundle paths to harness `.gitignore` (bundle internals never committed to harness repo)
 - Initialize independent git inside `.ouro` bundles for self-backup
-- Scaffold `data/memory/` directory structure inside bundles (facts.jsonl, entities.json, daily/, archive/) per memory-system.md spec
+- Scaffold `psyche/memory/` directory structure inside bundles (facts.jsonl, entities.json, daily/, archive/) per memory-system.md spec
 - Enforce agent preflight: agents must load governance docs before starting work
 
 **Completion criteria:**
@@ -110,7 +110,7 @@ Implement the `.ouro` bundle structure and relocate shared governance docs. This
 - [ ] Governance docs relocated to shared location
 - [ ] `.gitignore` excludes `.ouro` bundle internals
 - [ ] Bundle git init works for self-backup
-- [ ] `data/memory/` directory structure scaffolded in bundles
+- [ ] `psyche/memory/` directory structure scaffolded in bundles
 - [ ] Agent preflight loads governance docs (tested)
 - [ ] `npm test` green
 - [ ] 100% coverage on new code
