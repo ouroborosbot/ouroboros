@@ -733,7 +733,7 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 **Output**: Coverage report showing full branch coverage
 **Acceptance**: 100% coverage on new/modified code, tests still green
 
-### ⬜ Unit 21a: Add totalTokens to FriendRecord -- Tests
+### ✅ Unit 21a: Add totalTokens to FriendRecord -- Tests
 **What**: Tests already exist and FAIL (red). Verify that the 4 pre-written tests are failing as expected.
 
 Pre-existing failing tests (written during prior work, before implementation):
