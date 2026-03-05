@@ -14,6 +14,7 @@ import { createTraceId } from "../nerves"
 import { emitNervesEvent } from "../nerves/runtime"
 import { FileFriendStore } from "../mind/friends/store-file"
 import { FriendResolver } from "../mind/friends/resolver"
+import { accumulateFriendTokens } from "../mind/friends/tokens"
 import { getAgentRoot, getAgentName } from "../identity"
 import * as os from "os"
 import * as path from "path"
@@ -491,6 +492,11 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
 
   // Trim context and save session
   postTurn(messages, sessPath, result.usage)
+
+  // Accumulate token usage on friend record
+  if (toolContext?.context?.friend?.id) {
+    await accumulateFriendTokens(store, toolContext.context.friend.id, result.usage)
+  }
   // SDK auto-closes the stream after our handler returns (app.process.js)
   } finally {
     _inFlightTeamsTurns = Math.max(0, _inFlightTeamsTurns - 1)
