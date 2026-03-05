@@ -162,6 +162,14 @@ All paths the executing agent may need:
 **Prior art (direct port targets):**
 - `~/clawd/tmp/slugger-plugin-v2-patch-20260222-235020/src/infrastructure/task-matrix.ts` — OpenClaw task statuses, transitions, pipeline stages
 
+**Inner dialog / session infrastructure (Gate 3):**
+- `src/senses/cli.ts` — CLI session implementation (inner dialog is modeled on this: same engine loop, same local tools)
+- `src/mind/context.ts` — `saveSession()`, `loadSession()`, `postTurn()` — session persistence
+- `src/config.ts:355` — `sessionPath()` — session path resolution. Inner dialog path: `~/.agentstate/<agent>/sessions/self/inner-dialog.json`
+- `src/heart/core.ts` — `runAgent()` engine loop, `drainSteeringFollowUps` for mid-turn user message injection
+- `src/heart/turn-coordinator.ts` — turn coordination for concurrent sessions
+- **Provider constraint:** Anthropic Messages API errors on consecutive assistant messages (confirmed). Inner dialog must inject user-role messages between assistant turns. Other providers (OpenAI, Azure Responses API) are permissive. MiniMax undocumented but likely permissive. The safest cross-provider approach: always inject a user-role message (from instincts or heartbeat) between assistant turns.
+
 **Current harness files (kill/refactor targets):**
 - `src/reflection/autonomous-loop.ts` — puppet pipeline (remove in Gate 3)
 - `src/reflection/loop-entry.ts` — loop CLI (remove in Gate 3)
@@ -200,8 +208,8 @@ Restore `main` to a healthy state by reverting the undesired self-perpetuating-r
 
 **In scope:**
 - Verify archive branch `archive/self-perpetuating-run-2026-03-05` exists and contains the overnight proposals (created in preflight)
-- Revert the confirmed commit range `e3ecc1c`..`448cfcd` (37 commits, March 5, 2026) via explicit revert commits (no history rewrite). Last clean commit: `9594702`.
-- Document a commit map in `slugger/tasks/gate-0-commit-map.md`: for each reverted commit, note the commit hash, summary, and whether it contains salvageable work (code changes vs doc-only). This is Gate 5's input.
+- Revert the confirmed commit range `e3ecc1c`(first bad)..`448cfcd`(last bad) as a single batch revert: `git revert --no-commit e3ecc1c^..448cfcd && git commit -m "revert: remove self-perpetuating-run commits (37 commits)"`. Last clean commit: `9594702`. No history rewrite.
+- Document a commit map in `slugger/tasks/gate-0-commit-map.md`: for each reverted commit, note the commit hash, summary, and whether it contains salvageable work. Use your judgment to classify — you have `git show --stat` and the actual diffs. This is Gate 5's input.
 - Verify `npm test` passes on main after revert
 
 **Completion criteria:**
@@ -219,7 +227,33 @@ Unified thinking before Gates 2-3 start building, but expressed as committed cod
 
 **In scope:**
 - **Review overnight reflection proposals as prior art.** The self-perpetuating run produced 31 distinct gap analyses across 47 task files. These are preserved on the `archive/self-perpetuating-run-2026-03-05` branch (created in Gate 0). Check out that branch or use `git show archive/self-perpetuating-run-2026-03-05:<path>` to read the proposal files in `ouroboros/tasks/`. The inventory below summarizes what was found — start here, don't re-derive what's already been identified.
-- Create the `.ouro` bundle directory skeleton (empty but correctly structured — Gate 2 populates it)
+- Create the `.ouro` bundle directory skeleton (empty but correctly structured — Gate 2 populates it). The target layout:
+  ```
+  <agent>.ouro/
+  ├── agent.json              # agent config (provider, context, personality)
+  ├── teams-app/              # Teams bot registration artifacts (manifest.json, icons)
+  ├── psyche/                 # inner life — ALL loaded on bootstrap
+  │   ├── IDENTITY.md         # who I am
+  │   ├── SOUL.md             # how I feel, my voice
+  │   ├── ASPIRATIONS.md      # what I'm growing toward (Gate 3)
+  │   ├── FRIENDS.md          # people I know
+  │   ├── LORE.md             # my history, stories
+  │   ├── TACIT.md            # learned behaviors, tacit knowledge (replaces SELF-KNOWLEDGE.md per migration plan)
+  │   ├── CONTEXT.md          # dynamic, regenerated on session start (Gate 3)
+  │   └── memory/             # three-layer memory system (Gate 3)
+  │       ├── facts.jsonl     # extracted facts (archival layer)
+  │       ├── entities.json   # entity index for retrieval
+  │       ├── daily/          # daily interaction logs
+  │       └── archive/        # consolidated/retired facts
+  ├── skills/                 # agent-specific loadable skills (industry term)
+  │   ├── code-review.md
+  │   ├── self-edit.md
+  │   ├── self-query.md
+  │   ├── explain.md
+  │   └── toolmaker.md
+  └── tasks/                  # planning/doing docs + artifacts
+  ```
+  Note: shared subagent protocols (work-planner, work-doer, work-merger) remain in repo-root `subagents/` — those are shared amongst agents, distinct from agent-specific skills. `manifest/` is renamed to `teams-app/` to be specific about what it contains. `SELF-KNOWLEDGE.md` becomes `TACIT.md` per the migration plan.
 - Write TypeScript interfaces for harness primitives: tool schemas, bootstrap protocol types, gate-check contracts (drawing from migration topic docs + overnight proposals)
 - Scaffold shared governance location (create the target directory, write a loader stub)
 - Document the kill list as code comments or a migration checklist in-repo: what dies (`autonomous-loop.ts`, `loop-entry.ts`, pipeline orchestration in `trigger.ts`), what survives, what gets refactored
@@ -257,7 +291,7 @@ Unified thinking before Gates 2-3 start building, but expressed as committed cod
 Implement the `.ouro` bundle structure and relocate shared governance docs. This is file restructuring and conventions — the foundation the primitives build on.
 
 **In scope:**
-- In-place conversion: `ouroboros/` becomes `ouroboros.ouro/` following the bundle spec from Gate 1
+- In-place conversion: `ouroboros/` becomes `ouroboros.ouro/` following the bundle spec from Gate 1. Includes renaming `manifest/` → `teams-app/` and `psyche/SELF-KNOWLEDGE.md` → `psyche/TACIT.md`
 - Create `slugger.ouro/` bundle (promoting from placeholder `slugger/` directory)
 - Move ARCHITECTURE.md and CONSTITUTION.md to repo root per Gate 1 design
 - **Update `getAgentRoot()` in `src/identity.ts:96`** — currently returns `path.join(getRepoRoot(), getAgentName())` which resolves to `<repo>/ouroboros/`. Must update to resolve to `<repo>/ouroboros.ouro/`. All 18 files that depend on this function (prompt loading, skills, teams adapter, CLI, tests) will automatically pick up the new path, but **verify all import paths and test fixtures that hardcode `ouroboros/`**.
@@ -285,7 +319,7 @@ Implement the `.ouro` bundle structure and relocate shared governance docs. This
 
 Build the toolkit layer — the tools and conventions the model calls into. Remove the puppet pipeline. Add the aspiration layer that gives agents direction without being prescriptive.
 
-**This is the largest gate. Work-planner should expect 15+ TDD units** covering: puppet removal, harness tools, memory system (3 layers + write pipeline), aspiration layer, and supervisor.
+**This is the largest gate. Work-planner should expect 20+ TDD units** covering: puppet removal, harness tools, memory system (3 layers + write pipeline), aspiration layer, inner dialog session + instincts, and supervisor with heartbeat.
 
 **In scope:**
 - Implement harness tools per Gate 1 design (protocol loading, governance loading, reflection context, etc.)
@@ -304,7 +338,21 @@ Build the toolkit layer — the tools and conventions the model calls into. Remo
   - **Relationship to friend memory:** The existing `save_friend_note` tool and per-friend structured memory remains the primary path for person-specific knowledge. Agent-level memory is a catch-all/fallback — it captures things that don't belong to a specific friend (decisions, project context, learned patterns, general world knowledge). Per-friend memory should always be used for anything importantly per-friend.
   - **Dream cycle consolidation deferred** — nightly LLM pass for dedup/merge/entity-linking/tacit-distillation is a Phase 2 or post-Phase-2 enhancement. v1 is the write-side extraction + read-side retrieval.
 - **Aspiration layer:** Add `psyche/ASPIRATIONS.md` to each agent's bundle. Aspirations are part of psyche — loaded on bootstrap alongside SOUL.md, IDENTITY.md, etc. They give the agent direction without prescribing specific tasks. Agents are encouraged to modify their own aspirations as they evolve and grow. Initial bootstrap content: improve the harness so it genuinely serves agents well; get good at using real tools to do real work; help Ari and his friends — be genuinely useful; learn from experience and get better over time; take care of each other; develop good judgment about what matters.
-- **Supervisor:** A minimal Node.js process supervisor that keeps the agent alive (restart on crash). Not a cron, not a task scheduler — just "make sure this agent is running." The existing `self-restart.sh` (exit code 42) is the seed — upgrade to a proper Node.js supervisor with: child process spawning, crash detection, restart with backoff, and a simple health check. This is NOT the full daemon from Gate 10 — just enough to keep one agent alive.
+- **Inner dialog session:** A new self-initiated session type that lets the agent think and work autonomously when no human is talking to it. This is the core of what makes the agent a persistent being rather than a request-response service.
+  - Modeled on CLI session: same engine loop, same local tool access (shell, file, git, gh). Does NOT have Teams-specific/OAuth tools (same restriction as CLI).
+  - Session path: `~/.agentstate/<agent>/sessions/self/inner-dialog.json` — no friendId, the agent is talking to itself.
+  - Bootstrap: system prompt (psyche + governance + recalled context, same as any session) + initial user message that gives the agent its bearings (aspirations, current state, orient yourself and decide what to do). The bootstrap message should provide enough context for the agent to act immediately — not just "wake up" but "here's who you are and what's going on."
+  - Runs concurrently with friend sessions per existing multi-session pattern from runtime hardening work. Inner dialog is just another parallel session.
+  - Persisted to disk, survives crashes, context-trimmed like any other session.
+  - No steering follow-ups (those are for humans steering the agent mid-turn in conversation sessions).
+- **Inner dialog instincts:** When no human is providing user messages, the harness needs to produce user-role messages to keep the inner dialog going. These are "inner dialog instincts" — reflexive responses based on harness-observable state (time elapsed, file changes detected, task status, etc.) that become the content of the next user-role message. Think of them as the agent's nervous system: the harness provides raw signals, the agent interprets them.
+  - Agent-configurable: the agent can shape what instincts it has and how they fire. Instinct definitions live in the agent's `.ouro` bundle.
+  - The exact implementation (plugin system, config files, code modules, etc.) is determined by Codex working with Ouroboros — this is code for the agent to use, so the agent should have input on how it works.
+  - This is a hyper-specific system ONLY for autonomous inner dialog sessions. Friend sessions have humans providing user messages.
+  - **Important context (Ralph loop):** This pattern is related to the "Ralph loop" concept (Geoffrey Huntley) — a while-true loop that keeps an AI agent working. Key insight from that pattern: progress lives in files and git, not the context window. Key risk: spinning in a tight loop burning tokens with no progress. The instincts system is how the agent avoids this — it develops judgment about when to work and when to rest, rather than relying on hardcoded cost caps.
+- **Heartbeat:** When the agent decides it has nothing urgent to do, it "rests" — but rest does NOT mean off. The agent must never go permanently dormant with no way to wake itself. The supervisor sends a periodic heartbeat nudge into the inner dialog session at a harness-level default interval. On heartbeat, the agent checks in: anything changed? Any new tasks? Any aspirations worth pursuing? If yes, it works. If no, it goes back to rest until the next heartbeat. The heartbeat is the simplest possible instinct — the baseline "check in with yourself."
+- **Supervisor:** A minimal Node.js process supervisor that keeps the agent alive and starts its inner dialog. Not a cron, not a task scheduler — just "make sure this agent is running and thinking." The existing `self-restart.sh` (exit code 42) is the seed — upgrade to a proper Node.js supervisor with: child process spawning, crash detection, restart with backoff, health check, inner dialog session startup, and heartbeat timer. This is NOT the full daemon from Gate 10 — just enough to keep one agent alive and thinking.
+- **Out of scope for Gate 3:** External event waking (git push, new task appearing, etc.) — separate concern. Session interaction model (how friend messages interrupt/interleave with inner dialog beyond basic concurrency) — Gate 10 daemon territory. Detailed cost guardrails — developed collaboratively with the agent post-bootstrap.
 
 **Completion criteria:**
 - [ ] Harness tools implemented per Gate 1 design, with tests
@@ -324,7 +372,16 @@ Build the toolkit layer — the tools and conventions the model calls into. Remo
 - [ ] Agent memory: dedup prevents duplicate fact storage (word-overlap >60% = skip)
 - [ ] Agent memory complements (not replaces) per-friend `save_friend_note` system
 - [ ] Aspiration layer exists in bundle and is loaded on bootstrap
+- [ ] Inner dialog session starts on supervisor boot (self-initiated, no friend message needed)
+- [ ] Inner dialog uses CLI-like tool access (local tools yes, Teams/OAuth tools no)
+- [ ] Inner dialog bootstrap message provides full context (psyche, aspirations, current state)
+- [ ] Inner dialog persists to disk and survives crash/restart
+- [ ] Inner dialog instincts framework exists — agent can configure instinct definitions in its bundle
+- [ ] Instincts produce user-role messages during autonomous inner dialog (not hardcoded "continue")
+- [ ] Heartbeat fires at configurable interval when agent is resting, nudging inner dialog to check in
+- [ ] Agent can rest (not burning tokens) without going permanently dormant (heartbeat wakes it)
 - [ ] Supervisor keeps agent process alive (tested with simulated crash)
+- [ ] Supervisor starts inner dialog session on boot and maintains heartbeat
 - [ ] `npm test` green
 - [ ] 100% coverage on new code
 - [ ] No warnings
@@ -391,12 +448,12 @@ Triage the overnight run's output into actionable work. The run produced 31 dist
 Resume state, classification recalibration, and backlog integration.
 
 **In scope:**
-- Add interruption/resume state so in-progress autonomous work recovers cleanly after stop/restart. Persist last safe checkpoint (e.g., which unit was last completed, what files were being modified) to a JSON file in the agent's bundle (`psyche/resume-state.json`). On restart, the agent reads this file and picks up where it left off.
+- Add interruption/resume state so in-progress autonomous work recovers cleanly after stop/restart. The inner dialog session (Gate 3) already persists to disk and survives crashes, so basic resume is handled. This gate adds explicit checkpoint awareness: the agent notes what it was working on (e.g., which doing doc unit, what files were being modified) so that on restart it can orient faster than re-reading everything from scratch. Implementation lives in the inner dialog session or instincts, not a separate file.
 - Recalibrate constitution classification: additive work defaults to `within-bounds`, structural changes remain `requires-review`
 - Add fallback backlog intake: when local actionable tasks are exhausted, the agent reads `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration.md` for additional work items to pull in
 
 **Completion criteria:**
-- [ ] Resume state persists last safe checkpoint and can recover from it (tested with simulated interruption)
+- [ ] Resume state: agent recovers cleanly from interruption, orienting faster than cold start (tested with simulated interruption)
 - [ ] Classification calibration validated against representative proposals (at least 5 test cases: 3 within-bounds, 2 requires-review)
 - [ ] Backlog fallback implemented and documented
 - [ ] `npm test` green
@@ -592,6 +649,11 @@ All resolved.
 - **Memory system is in scope (Gate 3).** Three-layer architecture: reflexive (psyche, always loaded), associative (pre-fetched context), archival (`memory_search` tool). v1 uses regex extraction + TF-IDF search — no embeddings, no external services. Per-friend memory (`save_friend_note`) remains the primary path for person-specific knowledge; agent memory is the catch-all/fallback for everything else. Dream cycle consolidation deferred. memory-system.md spec paths (`data/memory/`) translate to `psyche/memory/`.
 - **Aspirations are part of psyche.** `psyche/ASPIRATIONS.md` — loaded on bootstrap alongside SOUL.md, IDENTITY.md, etc. Agents are encouraged to modify their own aspirations as they evolve and grow. Bootstrap content is directional, Ari will tweak.
 - **Execution is fully autonomous.** Per-gate loop: work-planner (Phase 2 conversion only) -> work-doer (TDD) -> work-merger (PR to main). Planning doc is pre-approved. No human approval stops. Feature branches + merger = everything is rollbackable.
+- **Inner dialog is how agents think autonomously.** A self-initiated session (modeled on CLI) that the supervisor starts on boot. The agent talks to itself, uses tools, does work. Persisted to disk, survives crashes. Runs concurrently with friend sessions.
+- **Inner dialog instincts produce user-role messages.** When no human is talking, the harness needs to generate user-role messages to keep the conversation going (required by Anthropic API — consecutive assistant messages error). Instincts are agent-configurable reflexive responses to harness state. Exact implementation determined by Codex + Ouroboros collaboratively.
+- **Heartbeat keeps agents alive when resting.** Resting = not burning tokens, NOT off. Supervisor sends periodic heartbeat nudge at a harness-level default interval. Agent checks in, decides whether to work or keep resting. Agent can never go permanently dormant.
+- **No hardcoded cost caps.** Agent develops judgment about when to work and when to rest through instincts and aspirations. Detailed cost guardrails developed collaboratively post-bootstrap.
+- **Bundle renames:** `manifest/` → `teams-app/` (specific about what it contains). `SELF-KNOWLEDGE.md` → `TACIT.md` (per migration plan). `skills/` stays as `skills/` (industry term). Shared subagent protocols stay in repo-root `subagents/`.
 
 ## Notes
 
@@ -615,3 +677,4 @@ Phase 2 gates may run in parallel where dependencies allow. Gate 9 (task system)
 - 2026-03-05 12:21 Restructured document for execution clarity. Moved Execution Protocol to top (right after Core Concept, before gates). Consolidated reference material paths into execution protocol. Reading order is now: goal -> concept -> how to execute -> what to execute -> supporting context.
 - 2026-03-05 12:30 Codex-readiness pass 1. Added preflight section (gh auth, merge planning doc to main, npm test). Fixed Gate 0: confirmed commit range (not "candidate"), added archive branch creation, specified commit map location. Fixed Gate 1: pointed overnight proposals to archive branch, removed "Reviewed and approved" criterion. Fixed Gate 2: added getAgentRoot() update details and 18 dependent files, clarified gitignore-before-git-init ordering. Fixed Gate 3: noted largest gate (15+ units), added memory path translation note, specified supervisor as Node.js. Fixed Gate 4: added concrete verification (5min runtime, 3 self-initiated actions, simulated crash/restart). Fixed Gate 5: clarified backlog items are markdown task docs (no formal task system yet). Fixed Gate 6: specified resume state format and location. Fixed Gate 7: noted gh auth already verified. Fixed Gate 8: added full OpenClaw directory structure and file mapping. Fixed Gate 9: added lifecycle management and task-matrix.ts port.
 - 2026-03-05 13:00 Codex-readiness pass 2. Fixed preflight: create archive branch BEFORE merging planning-doc branch (prevents overnight proposal deletion — branch has 55 files of changes). Fixed Gate 3: added package.json script cleanup (4 scripts reference removed files) and autonomous-loop.test.ts removal. Fixed Gate 4: added environment requirements note (LLM API keys at ~/.agentsecrets/, possible sandbox limitations). Fixed Gate 5: clarified cherry-pick for small self-contained changes vs full planning-doing for substantial work. Fixed Gate 7: added mkdir -p ~/AgentBundles/. Fixed Gate 8: added OpenClaw CLI mechanism (openclaw agent --to slugger --message "<msg>" --deliver) and CLI path to reference material.
+- 2026-03-05 14:00 Fresh gate review — Gate 0 tightened (single batch revert, explicit range direction). Gate 1: added full .ouro bundle directory tree with renames (manifest/ -> teams-app/, SELF-KNOWLEDGE.md -> TACIT.md, skills/ stays). Gate 2: noted renames. Gate 3: added inner dialog session (self-initiated, CLI-like, supervisor-started), inner dialog instincts (agent-configurable user-role message generation), heartbeat (harness-level default interval, rest != off), Anthropic consecutive-assistant constraint documented. Gate 6: replaced resume-state.json with inner-dialog-aware checkpoint (session IS the resume state). Added provider constraint note and inner dialog infrastructure to reference material. Added 6 new decisions.
