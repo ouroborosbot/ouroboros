@@ -83,7 +83,7 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 **Output**: 4 files updated with 8 disable comments
 **Acceptance**: `npm run lint` passes with zero violations
 
-### ⬜ Unit 3: Integrate lint into coverage gate
+### ✅ Unit 3: Integrate lint into coverage gate
 **What**: Add `npm run lint` as a step in `scripts/run-coverage-gate.cjs`, running before vitest. If lint fails, the gate fails with a `type: "lint"` required action.
 **Output**: Updated `scripts/run-coverage-gate.cjs`
 **Acceptance**: `npm run test:coverage` runs lint as part of the gate; lint failure would cause gate failure
@@ -427,3 +427,4 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 - 2026-03-05 11:16 Quality pass (Pass 4): all units have What/Output/Acceptance, no TBDs, all emoji headers present, coverage requirements included
 - 2026-03-05 11:33 Unit 1 complete: ESLint v10 installed with no-console:error for src/**/*.ts, test files excluded, npm run lint script added
 - 2026-03-05 11:37 Unit 2 complete: 8 console exception sites annotated across 4 files, npm run lint passes clean
+- 2026-03-05 11:40 Unit 3 complete: lint step added to run-coverage-gate.cjs, runs before vitest, short-circuits on failure
