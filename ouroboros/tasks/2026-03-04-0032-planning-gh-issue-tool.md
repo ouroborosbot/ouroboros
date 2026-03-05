@@ -34,19 +34,19 @@ Allow agents using the ouroboros harness to create GitHub issues via the GitHub 
 - Multiple GitHub tools beyond `github_create_issue` (but architecture supports future expansion)
 
 ## Completion Criteria
-- [ ] `github-client.ts` exists with `githubRequest()` function following `graph-client.ts` pattern
-- [ ] `tools-github.ts` exists with `github_create_issue` tool definition following `tools-teams.ts` pattern
-- [ ] `ToolContext` in `tools-base.ts` includes `githubToken?: string`
-- [ ] `OAuthConfig` in `config.ts` includes `githubConnectionName: string`
-- [ ] Teams `availableIntegrations` includes `"github"` in `channel.ts`
-- [ ] `teams.ts` fetches `githubToken` and passes it to `ToolContext`, handles `AUTH_REQUIRED:github`
-- [ ] `tools.ts` imports and registers github tool definitions in `allDefinitions`
-- [ ] `summarizeArgs` handles `github_create_issue`
-- [ ] All existing tool enumeration tests updated for new tool
-- [ ] Remote safety tests confirm github tools appear in Teams channel (integration tool, not blocked)
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] `github-client.ts` exists with `githubRequest()` function following `graph-client.ts` pattern
+- [x] `tools-github.ts` exists with `github_create_issue` tool definition following `tools-teams.ts` pattern
+- [x] `ToolContext` in `tools-base.ts` includes `githubToken?: string`
+- [x] `OAuthConfig` in `config.ts` includes `githubConnectionName: string`
+- [x] Teams `availableIntegrations` includes `"github"` in `channel.ts`
+- [x] `teams.ts` fetches `githubToken` and passes it to `ToolContext`, handles `AUTH_REQUIRED:github`
+- [x] `tools.ts` imports and registers github tool definitions in `allDefinitions`
+- [x] `summarizeArgs` handles `github_create_issue`
+- [x] All existing tool enumeration tests updated for new tool
+- [x] Remote safety tests confirm github tools appear in Teams channel (integration tool, not blocked)
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**

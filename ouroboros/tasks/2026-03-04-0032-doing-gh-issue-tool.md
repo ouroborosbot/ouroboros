@@ -1,6 +1,6 @@
 # Doing: GitHub Integration Tool (github_create_issue)
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-03-04 09:29
 **Planning**: ./2026-03-04-0032-planning-gh-issue-tool.md
@@ -16,19 +16,19 @@
 Allow agents using the ouroboros harness to create GitHub issues via the GitHub REST API using per-user OAuth, following the same integration pattern as ADO and Graph tools. Issues are opened as the authenticated human user, not the bot identity.
 
 ## Completion Criteria
-- [ ] `github-client.ts` exists with `githubRequest()` function following `graph-client.ts` pattern
-- [ ] `tools-github.ts` exists with `github_create_issue` tool definition following `tools-teams.ts` pattern
-- [ ] `ToolContext` in `tools-base.ts` includes `githubToken?: string`
-- [ ] `OAuthConfig` in `config.ts` includes `githubConnectionName: string`
-- [ ] Teams `availableIntegrations` includes `"github"` in `channel.ts`
-- [ ] `teams.ts` fetches `githubToken` and passes it to `ToolContext`, handles `AUTH_REQUIRED:github`
-- [ ] `tools.ts` imports and registers github tool definitions in `allDefinitions`
-- [ ] `summarizeArgs` handles `github_create_issue`
-- [ ] All existing tool enumeration tests updated for new tool
-- [ ] Remote safety tests confirm github tools appear in Teams channel (integration tool, not blocked)
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] `github-client.ts` exists with `githubRequest()` function following `graph-client.ts` pattern
+- [x] `tools-github.ts` exists with `github_create_issue` tool definition following `tools-teams.ts` pattern
+- [x] `ToolContext` in `tools-base.ts` includes `githubToken?: string`
+- [x] `OAuthConfig` in `config.ts` includes `githubConnectionName: string`
+- [x] Teams `availableIntegrations` includes `"github"` in `channel.ts`
+- [x] `teams.ts` fetches `githubToken` and passes it to `ToolContext`, handles `AUTH_REQUIRED:github`
+- [x] `tools.ts` imports and registers github tool definitions in `allDefinitions`
+- [x] `summarizeArgs` handles `github_create_issue`
+- [x] All existing tool enumeration tests updated for new tool
+- [x] Remote safety tests confirm github tools appear in Teams channel (integration tool, not blocked)
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -205,7 +205,7 @@ Note: These tests may need to be integration-style or verify behavior through mo
 **Output**: 100% coverage on new lines
 **Acceptance**: `npm test` passes, no warnings
 
-### ⬜Unit 6: Update Existing Test Enumerations
+### ✅Unit 6: Update Existing Test Enumerations
 **What**: Update all existing tests that enumerate tool names, blocked tool sets, or integration counts. Specifically:
 - `tools.test.ts` line ~631, ~677, ~706, ~1602: `blockedLocalTools` sets do NOT need `github_create_issue` (it's an integration tool, not blocked locally). But the total tool count in Teams channel tests will increase by 1 (new github tool).
 - `tools.test.ts` "teams tool definitions include expected tool names" (~line 517): This tests `teamsToolDefinitions` from `tools-teams.ts`, which is unchanged. But there may be new tests needed for `githubToolDefinitions`.
@@ -245,3 +245,5 @@ Note: These tests may need to be integration-style or verify behavior through mo
 - 2026-03-04 22:02 Unit 5a complete: 3 tests for GitHub token handling (2 failing as expected).
 - 2026-03-04 22:04 Unit 5b complete: teams.ts updated with githubToken handling, all 1370 tests pass.
 - 2026-03-04 22:04 Unit 5c complete: 100% coverage on teams.ts confirmed.
+- 2026-03-04 22:05 Unit 6 complete: remote safety test updated, all 1371 tests pass, no warnings.
+- 2026-03-04 22:05 ALL UNITS COMPLETE: 1371 tests passing, 100% coverage on all new code, no warnings.
