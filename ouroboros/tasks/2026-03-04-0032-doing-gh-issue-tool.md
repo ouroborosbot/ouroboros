@@ -161,7 +161,7 @@ Allow agents using the ouroboros harness to create GitHub issues via the GitHub 
 **Output**: Failing tests
 **Acceptance**: Tests exist and FAIL (red)
 
-### ⬜Unit 4b: Channel Capabilities -- Implementation
+### ✅Unit 4b: Channel Capabilities -- Implementation
 **What**: Update `src/mind/friends/channel.ts`:
 - Add `"github"` to the Teams channel's `availableIntegrations` array: `["ado", "graph", "github"]`
 **Output**: Updated `channel.ts`
