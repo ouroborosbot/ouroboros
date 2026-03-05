@@ -925,27 +925,35 @@ Tests to KEEP AS-IS (these currently pass and assert behavior we are keeping):
 **Acceptance**: 100% coverage on new/modified code, all tests green
 
 ### ⬜ Unit 22a: Timestamped notes -- Tests
-**What**: Write failing tests covering the change from `Record<string, string>` to `Record<string, { value: string, savedAt: string }>` for the `notes` field. Tests span four files:
+**What**: Write NEW failing tests and UPDATE EXISTING tests for the change from `Record<string, string>` to `Record<string, { value: string, savedAt: string }>` for the `notes` field. Tests span multiple files.
+
+**New failing tests:**
 
 **`src/__tests__/repertoire/tools.test.ts`** (save_friend_note handler):
 1. type "note" saves structured `{ value, savedAt }` object: verify `store.put` is called with `notes: { role: { value: "engineering manager", savedAt: expect.stringMatching(/^\d{4}-/) } }`
 2. type "note" with existing structured note and no override returns conflict showing the value (not `[object Object]`)
 3. type "note" with override=true replaces structured note, `savedAt` is updated to current time
-4. type "name" still updates displayName (existing behavior) but does NOT store in `notes.name` -- verify `notes` does not contain key "name" after save
 
 **`src/__tests__/mind/prompt.test.ts`** (contextSection rendering):
-5. Notes render with date prefix: friend with `notes: { role: { value: "software engineer", savedAt: "2026-03-05T00:00:00.000Z" } }` renders as `- role: [2026-03-05] software engineer` in contextSection output
-6. Multiple notes render with correct dates: friend with two timestamped notes renders both with their respective dates
-
-**`src/__tests__/mind/friends/store-file.test.ts`** (persistence):
-7. Structured notes round-trip through put/get: store.put with `{ role: { value: "engineer", savedAt: "2026-03-05T..." } }` then store.get returns the same structure
+4. Notes render with date prefix: friend with `notes: { role: { value: "software engineer", savedAt: "2026-03-05T00:00:00.000Z" } }` renders as `- role: [2026-03-05] software engineer` in contextSection output
+5. Multiple notes render with correct dates: friend with two timestamped notes renders both with their respective dates
 
 **`src/__tests__/mind/friends/resolver.test.ts`** (auto-name):
-8. Auto-populated name note uses structured format: new friend with displayName "Jordan" gets `notes: { name: { value: "Jordan", savedAt: expect.any(String) } }`
-9. Auto-populated name note for "Unknown" displayName still produces empty `notes: {}`
+6. Auto-populated name note uses structured format: new friend with displayName "Jordan" gets `notes: { name: { value: "Jordan", savedAt: expect.any(String) } }`
 
-**Output**: New/modified test cases in the four test files above
-**Acceptance**: Tests exist and FAIL (red) because notes are still `Record<string, string>`
+**Existing tests to update** (change notes test data from `Record<string, string>` to `Record<string, { value: string, savedAt: string }>`):
+
+All test files that construct `FriendRecord` objects with non-empty `notes` must use the new structured format. Empty `notes: {}` is fine as-is. Key files:
+- `src/__tests__/repertoire/tools.test.ts`: update `makeCtx({ friendOverrides: { notes: { role: "old role" } } })` -> `{ role: { value: "old role", savedAt: "2026-01-01T00:00:00.000Z" } }`, update put assertions for note saves, update `notes: { name: "Jordan Lee" }` assertion on type "name" test to verify notes does NOT contain "name"
+- `src/__tests__/mind/prompt.test.ts`: ~15 test cases with `notes: { role: "engineer" }` or similar -> `{ role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } }`. Update rendering assertions from `role: engineer` to `role: [2026-01-01] engineer`
+- `src/__tests__/mind/friends/store-file.test.ts`: update test data and assertions for structured notes (lines 32, 84, 107, 236)
+- `src/__tests__/mind/friends/resolver.test.ts`: update existing auto-name assertion (line 15, and the first-encounter test)
+- `src/__tests__/mind/friends/types.test.ts`: update test data (line 109)
+- `src/__tests__/mind/friends/store.test.ts`: notes: {} is fine (line 12)
+- `src/__tests__/mind/friends/tokens.test.ts`: notes: {} is fine (line 13)
+
+**Output**: New/modified test cases across the files above
+**Acceptance**: New tests FAIL (red) because notes are still `Record<string, string>`. Updated existing tests also fail due to type mismatch until 22b implements the change.
 
 ### ⬜ Unit 22b: Timestamped notes -- Implementation
 **What**: Change the notes type from `Record<string, string>` to `Record<string, { value: string, savedAt: string }>` and update all code that reads/writes notes.
@@ -956,16 +964,17 @@ Changes:
 
 2. **`src/mind/friends/store-file.ts`**:
    - Update `AgentKnowledgeData.notes` type from `Record<string, string>` to `Record<string, { value: string, savedAt: string }>` (line 17)
-   - No changes to put/get/merge -- they pass notes through as-is, the type change propagates naturally
+   - No changes to put/get/merge logic -- they pass notes through as-is, the type change propagates naturally
 
 3. **`src/mind/friends/resolver.ts`**: In `resolveOrCreate()`, change the auto-name note from `{ name: this.params.displayName }` to `{ name: { value: this.params.displayName, savedAt: now } }` (line 68). `now` is already defined as `new Date().toISOString()` on line 51.
 
 4. **`src/repertoire/tools-base.ts`** (save_friend_note handler):
-   - In the `type === "note"` block (line 332-338): change `record.notes[a.key]` reads to access `.value` for the conflict message (existing value display). Change the updated notes construction from `{ ...record.notes, [a.key]: a.content }` to `{ ...record.notes, [a.key]: { value: a.content, savedAt: new Date().toISOString() } }`
-   - In the `type === "name"` block (line 315-318): stop writing to `notes.name`. Change from `{ ...record, displayName: a.content, notes: { ...record.notes, name: a.content }, updatedAt: ... }` to `{ ...record, displayName: a.content, updatedAt: ... }` -- remove the `notes` spread that adds `name`. Return message now says `"saved: displayName = ${a.content}"`
-   - Update the conflict message for existing note to display `existing.value` instead of raw `existing` (since it's now an object)
+   - In the `type === "note"` block (lines 332-338): change `record.notes[a.key]` reads to access `.value` for the conflict message. Change the updated notes construction from `{ ...record.notes, [a.key]: a.content }` to `{ ...record.notes, [a.key]: { value: a.content, savedAt: new Date().toISOString() } }`
+   - In the `type === "name"` block (lines 315-318): stop writing to `notes.name`. Change from `{ ...record, displayName: a.content, notes: { ...record.notes, name: a.content }, updatedAt: ... }` to `{ ...record, displayName: a.content, updatedAt: ... }`. Return message stays `"saved: displayName = ${a.content}"`
+   - Update the conflict message for existing note to display `existing.value` instead of raw `existing` (since it's now an object): `"${existing.value}"` not `"${existing}"`
+   - Update the success return for note saves to show value: `"saved: note ${a.key} = ${a.content}"` (content is already the plain string)
 
-5. **`src/mind/prompt.ts`** (contextSection): In the notes rendering loop (lines 171-173), change from `lines.push(\`- ${key}: ${value}\`)` to extract the date from `savedAt` and render as `lines.push(\`- ${key}: [${value.savedAt.slice(0, 10)}] ${value.value}\`)`. This produces format `- role: [2026-03-05] software engineer at Contoso`.
+5. **`src/mind/prompt.ts`** (contextSection): In the notes rendering loop (lines 171-173), change the loop variable destructuring and rendering. Current code: `for (const [key, value] of Object.entries(friend.notes)) { lines.push(\`- ${key}: ${value}\`) }`. Change to: `for (const [key, entry] of Object.entries(friend.notes)) { lines.push(\`- ${key}: [${entry.savedAt.slice(0, 10)}] ${entry.value}\`) }`. This produces format `- role: [2026-03-05] software engineer at Contoso`.
 
 **Schema version stays at 1** -- friend records will be bombed for testing. No migration needed.
 
