@@ -400,48 +400,22 @@ describe("buildSystem", () => {
     expect(result).not.toContain("- final_answer:")
   })
 
-  it("includes flags section when disableStreaming is true and channel is teams", async () => {
+  it("does not export flagsSection (removed)", async () => {
+    vi.resetModules()
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
-    resetPsycheCache()
-    const result = await buildSystem("teams", { disableStreaming: true })
-    expect(result).toContain("## my flags")
-    expect(result).toContain("streaming")
-    expect(result).toContain("disabled")
+    const promptModule = await import("../../mind/prompt")
+    // flagsSection should no longer be exported
+    expect(promptModule).not.toHaveProperty("flagsSection")
   })
 
-  it("does NOT include flags section when disableStreaming is true but channel is cli", async () => {
+  it("BuildSystemOptions does not accept disableStreaming", async () => {
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
-    const result = await buildSystem("cli", { disableStreaming: true })
-    expect(result).not.toContain("## my flags")
-  })
-
-  it("does NOT include flags section when disableStreaming is false", async () => {
-    setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
-    resetPsycheCache()
-    const result = await buildSystem("teams", { disableStreaming: false })
-    expect(result).not.toContain("## my flags")
-  })
-
-  it("does NOT include flags section when disableStreaming is undefined", async () => {
-    setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
-    resetPsycheCache()
+    // buildSystem with no options should never produce "## my flags"
     const result = await buildSystem("teams")
     expect(result).not.toContain("## my flags")
   })
@@ -569,66 +543,12 @@ describe("psyche loading", () => {
   })
 })
 
-describe("flagsSection rationale", () => {
-  beforeEach(() => {
+describe("flagsSection removed", () => {
+  it("flagsSection is no longer exported from prompt module", async () => {
     vi.resetModules()
-  })
-
-  it("mentions devtunnel relay buffering (microsoft/dev-tunnels#518)", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { flagsSection, resetPsycheCache } = await import("../../mind/prompt")
-    resetPsycheCache()
-    const result = flagsSection("teams", { disableStreaming: true })
-    expect(result).toContain("devtunnel")
-    expect(result).toContain("dev-tunnels#518")
-  })
-
-  it("mentions 60-second hard timeout", async () => {
-    setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { flagsSection, resetPsycheCache } = await import("../../mind/prompt")
-    resetPsycheCache()
-    const result = flagsSection("teams", { disableStreaming: true })
-    expect(result).toContain("60")
-    expect(result.toLowerCase()).toContain("timeout")
-  })
-
-  it("mentions no HTTP/2 support on devtunnels", async () => {
-    setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { flagsSection, resetPsycheCache } = await import("../../mind/prompt")
-    resetPsycheCache()
-    const result = flagsSection("teams", { disableStreaming: true })
-    expect(result).toContain("HTTP/2")
-  })
-
-  it("mentions Teams throttles streaming updates to 1 req/sec", async () => {
-    setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { flagsSection, resetPsycheCache } = await import("../../mind/prompt")
-    resetPsycheCache()
-    const result = flagsSection("teams", { disableStreaming: true })
-    expect(result).toContain("1 req/sec")
-  })
-
-  it("mentions buffering avoids compounding latency", async () => {
-    setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
-    resetConfigCache()
-    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
-    const { flagsSection, resetPsycheCache } = await import("../../mind/prompt")
-    resetPsycheCache()
-    const result = flagsSection("teams", { disableStreaming: true })
-    expect(result.toLowerCase()).toContain("latency")
+    const promptModule = await import("../../mind/prompt")
+    expect(promptModule).not.toHaveProperty("flagsSection")
   })
 })
 
