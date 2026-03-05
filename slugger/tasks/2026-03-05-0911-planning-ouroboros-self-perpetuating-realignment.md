@@ -13,7 +13,7 @@ Stabilize and realign Ouroboros so agents can use the harness to improve themsel
 ### In Scope
 - Audit and fix the reflect -> plan -> do -> merge handoff so it follows `work-planner`, `work-doer`, and `work-merger` gate semantics instead of bypassing them.
 - Relocate shared governance docs (`ARCHITECTURE`, `CONSTITUTION`) out of `ouroboros/` to a shared location and enforce agent preflight loading.
-- Clean and consolidate reflection proposal debris from `ouroboros/tasks/` into `slugger/tasks/` with deduplication and actionable grouping.
+- Clean and consolidate only the initial self-perpetuating-run reflection proposal debris from `ouroboros/tasks/` into `slugger/tasks/` with deduplication and actionable grouping, while preserving unrelated valid historical task docs in place.
 - Add interruption/resume state so in-progress autonomous work recovers cleanly after stop/restart.
 - Recalibrate constitution classification policy and reflection classification logic so additive work is default `within-bounds`, structural changes remain `requires-review`.
 - Add fallback backlog intake from `~/clawd/tasks/ongoing/2026-02-28-1900-ouroboros-migration.md` when local actionable tasks are exhausted.
@@ -27,7 +27,7 @@ Stabilize and realign Ouroboros so agents can use the harness to improve themsel
 ## Completion Criteria
 - [ ] A documented and tested orchestration contract exists for how agents invoke `work-planner` -> `work-doer` -> `work-merger` without shortcutting review gates.
 - [ ] Shared governance docs are moved to agreed shared location and referenced by all participating agents before work starts.
-- [ ] Existing reflection task corpus is triaged, deduplicated, and rewritten/moved into correct agent task path with clear statuses.
+- [ ] Initial self-perpetuating-run reflection artifacts are triaged, deduplicated, and rewritten/moved into correct agent task path with clear statuses, without disrupting valid pre-existing `ouroboros/tasks` work.
 - [ ] Resume state persists enough information to continue interrupted work from the last safe checkpoint.
 - [ ] Constitution classification guidance and trigger classification behavior are aligned and validated against representative proposals.
 - [ ] Backlog fallback to migration task file is implemented and documented.
@@ -46,7 +46,7 @@ Stabilize and realign Ouroboros so agents can use the harness to improve themsel
 ## Open Questions
 - [ ] Final shared location decision for governance docs: repo root (`/ARCHITECTURE.md`, `/CONSTITUTION.md`) vs a shared docs namespace.
 - [ ] Governance ownership contract: should `CONSTITUTION` remain human-only editable, or can agents propose edits via gated workflow.
-- [ ] Proposal cleanup policy: keep all original `ouroboros/tasks` docs as archived artifacts vs replace with canonical consolidated docs.
+- [ ] For the targeted initial-run artifact subset, decide archival policy: keep originals as archived artifacts vs replace with canonical consolidated docs.
 - [ ] Scope target for first autonomous operator: `ouroboros` only vs a generic multi-agent task protocol from the start.
 
 ## Decisions Made
@@ -55,6 +55,7 @@ Stabilize and realign Ouroboros so agents can use the harness to improve themsel
 - Pipeline recovery starts with correctness and gate compliance before autonomy expansion.
 - Additive hardening changes default toward `within-bounds`; architectural boundary changes remain `requires-review`.
 - No environment-variable-based configuration will be introduced.
+- Valid historical task files under `ouroboros/tasks/` are preserved; cleanup/migration applies only to initial self-perpetuating-run artifacts.
 
 ## Context / References
 - `src/reflection/autonomous-loop.ts`
