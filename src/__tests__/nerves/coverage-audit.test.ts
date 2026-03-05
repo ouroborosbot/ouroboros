@@ -3,6 +3,7 @@ import { join } from "path"
 import { tmpdir } from "os"
 
 import { describe, expect, it } from "vitest"
+import { collectObservedEventKeys, readEvents } from "../../nerves/coverage/audit"
 
 type AuditResult = {
   overall_status: "pass" | "fail"
@@ -142,5 +143,27 @@ describe("observability/coverage audit - schema_redaction", () => {
 
     expect(report.overall_status).toBe("pass")
     expect(report.nerves_coverage.schema_redaction.status).toBe("pass")
+  })
+})
+
+describe("collectObservedEventKeys", () => {
+  it("collects unique component:event keys from parsed events", () => {
+    const events = readEvents((() => {
+      const runDir = mkdtempSync(join(tmpdir(), "ouro-nerves-keys-"))
+      const p = join(runDir, "events.ndjson")
+      writeFileSync(p, [
+        JSON.stringify({ component: "engine", event: "turn_start" }),
+        JSON.stringify({ component: "engine", event: "turn_end" }),
+        JSON.stringify({ component: "engine", event: "turn_start" }),
+        JSON.stringify({ missing: "fields" }),
+      ].join("\n") + "\n", "utf8")
+      return p
+    })())
+    const keys = collectObservedEventKeys(events)
+    expect(keys).toEqual(["engine:turn_end", "engine:turn_start"])
+  })
+
+  it("returns empty array for no events", () => {
+    expect(collectObservedEventKeys([])).toEqual([])
   })
 })
