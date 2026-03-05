@@ -946,8 +946,8 @@ Tests to KEEP AS-IS (these currently pass and assert behavior we are keeping):
 All test files that construct `FriendRecord` objects with non-empty `notes` must use the new structured format. Empty `notes: {}` is fine as-is. Key files:
 - `src/__tests__/repertoire/tools.test.ts`: update `makeCtx({ friendOverrides: { notes: { role: "old role" } } })` -> `{ role: { value: "old role", savedAt: "2026-01-01T00:00:00.000Z" } }`, update put assertions for note saves, update `notes: { name: "Jordan Lee" }` assertion on type "name" test to verify notes does NOT contain "name"
 - `src/__tests__/mind/prompt.test.ts`: ~15 test cases with `notes: { role: "engineer" }` or similar -> `{ role: { value: "engineer", savedAt: "2026-01-01T00:00:00.000Z" } }`. Update rendering assertions from `role: engineer` to `role: [2026-01-01] engineer`
-- `src/__tests__/mind/friends/store-file.test.ts`: update test data and assertions for structured notes (lines 32, 84, 107, 236)
-- `src/__tests__/mind/friends/resolver.test.ts`: update existing auto-name assertion (line 15, and the first-encounter test)
+- `src/__tests__/mind/friends/store-file.test.ts`: update test data for structured notes -- `makeFriend` at line 32 (`notes: { role: "engineering manager" }`) and line 236 (`notes: { role: "SDE" }`). Lines 84 and 107 use `notes: {}` and need no change
+- `src/__tests__/mind/friends/resolver.test.ts`: update `makeFriend` at line 15 (`notes: { role: "engineering manager" }`), update auto-name assertions at lines 94 and 164 from `{ name: "..." }` to `{ name: { value: "...", savedAt: expect.any(String) } }`
 - `src/__tests__/mind/friends/types.test.ts`: update test data (line 109)
 - `src/__tests__/mind/friends/store.test.ts`: notes: {} is fine (line 12)
 - `src/__tests__/mind/friends/tokens.test.ts`: notes: {} is fine (line 13)
