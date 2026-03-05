@@ -181,9 +181,10 @@ export function createTeamsCallbacks(
   async function tryEmit(text: string): Promise<boolean> {
     if (stopped) return false
     try {
-      const result = stream.emit(text)
+      // stream.emit() is typed as void but the Teams SDK returns a Promise
+      // internally (async HTTP). Cast to capture the result for awaiting.
+      const result: unknown = stream.emit(text)
       streamHasContent = true
-      // Await the async HTTP call if the SDK returns a promise
       if (result && typeof (result as { then?: Function }).then === "function") {
         await (result as Promise<unknown>)
       }
