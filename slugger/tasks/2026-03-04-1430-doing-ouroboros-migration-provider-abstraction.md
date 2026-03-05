@@ -156,7 +156,7 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 **Output**: CLI/logging sink updates plus artifact logs `unit-4h-green-run.txt` and `unit-4h-jest.json`.
 **Acceptance**: Channel-separation tests pass green, CLI user text no longer contains structured log lines, and artifacts are saved under the task artifacts directory.
 
-### ⬜ Unit 4i: CLI user-output vs nerves-log separation pre-Unit-5 pass — Coverage & Refactor
+### ✅ Unit 4i: CLI user-output vs nerves-log separation pre-Unit-5 pass — Coverage & Refactor
 **What**: Refactor sink separation code and cover stdout/stderr/file routing branches and error paths.
 **Output**: Coverage artifacts `unit-4i-coverage.txt` and `unit-4i-coverage-summary.json`.
 **Acceptance**: New sink-separation code is at 100% coverage, related tests remain green, and coverage artifacts are saved.
@@ -260,3 +260,4 @@ Replace the global provider singleton with a per-agent provider abstraction whil
 - 2026-03-04 18:52 Unit 4f complete: reached 100% coverage on `src/heart/providers/*` and kept build green (`unit-4f-coverage.txt`, `unit-4f-coverage-summary.json`, `unit-4f-build.txt`)
 - 2026-03-04 18:55 Unit 4g complete: added failing CLI logging-separation contract test requiring NDJSON runtime logger wiring (`unit-4g-red-run.txt`, `unit-4g-jest.json`, `unit-4g-red-run.exit`)
 - 2026-03-04 18:57 Unit 4h complete: configured CLI runtime nerves logger to append-only NDJSON sink and kept CLI suites/build green (`unit-4h-green-run.txt`, `unit-4h-jest.json`, `unit-4h-senses-regression.txt`, `unit-4h-build.txt`)
+- 2026-03-04 18:59 Unit 4i complete: refactored CLI logging setup into `src/senses/cli-logging.ts` and achieved 100% coverage/build on logging-separation code (`unit-4i-coverage.txt`, `unit-4i-coverage-summary.json`, `unit-4i-build.txt`)
