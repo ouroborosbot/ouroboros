@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
+import * as nodeFs from "node:fs"
+import * as path from "path"
 import type { ChannelCallbacks } from "../../heart/core"
 
 vi.mock("../../identity", () => ({
@@ -104,6 +106,16 @@ describe("toResponsesTools", () => {
 
     const result = toResponsesTools(ccTools)
     expect(result[0].parameters).toBeNull()
+  })
+})
+
+describe("provider module boundary contract", () => {
+  it("has dedicated provider runtime modules for azure/anthropic/minimax", () => {
+    const providerDir = path.resolve(__dirname, "..", "..", "heart", "providers")
+    expect(nodeFs.existsSync(providerDir)).toBe(true)
+    expect(nodeFs.existsSync(path.join(providerDir, "azure.ts"))).toBe(true)
+    expect(nodeFs.existsSync(path.join(providerDir, "anthropic.ts"))).toBe(true)
+    expect(nodeFs.existsSync(path.join(providerDir, "minimax.ts"))).toBe(true)
   })
 })
 
