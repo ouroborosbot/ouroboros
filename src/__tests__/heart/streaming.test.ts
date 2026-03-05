@@ -1251,4 +1251,21 @@ describe("streamResponsesApi final_answer streaming", () => {
     const result = await streamResponsesApi(client, {}, callbacks)
     expect(result.finalAnswerStreamed).toBe(true)
   })
+
+  it("does not emit text when delta only contains prefix portion (no answer text yet)", async () => {
+    const textChunks: string[] = []
+    const client = { responses: { create: vi.fn().mockReturnValue(makeResponsesStream([
+      { type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "final_answer", arguments: "" } },
+      { type: "response.function_call_arguments.delta", delta: '{"ans' },
+      { type: "response.function_call_arguments.delta", delta: 'wer":"' },
+      { type: "response.function_call_arguments.delta", delta: 'hello"}' },
+      { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "final_answer", arguments: '{"answer":"hello"}' } },
+    ])) } }
+    const callbacks = makeCallbacks({ onTextChunk: (text: string) => textChunks.push(text) })
+    const result = await streamResponsesApi(client, {}, callbacks)
+    // First two deltas contain only prefix chars, no text emitted
+    // Third delta has answer text
+    expect(textChunks.join("")).toBe("hello")
+    expect(result.finalAnswerStreamed).toBe(true)
+  })
 })
