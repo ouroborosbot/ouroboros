@@ -75,17 +75,17 @@ Eliminate all `console.log/warn/error` calls from production source files by con
 **What**: Verify 100% coverage on the new emitNervesEvent call. Refactor if needed.
 **Acceptance**: 100% coverage on new code, tests still green.
 
-### ⬜ Unit 3a: core.ts -- Tests
+### ✅ Unit 3a: core.ts -- Tests
 **What**: Write/update tests in `src/__tests__/heart/core.test.ts` for the two `getProviderRuntime()` fatal error paths. Currently these test `console.error` via spies. Update them to verify `emitNervesEvent` is called with `{ component: "engine", event: "engine.provider_init_error", level: "error" }` instead. Tests should FAIL initially.
 **Output**: Failing tests for engine.provider_init_error event (two paths: resolve() throws, resolve() returns null).
 **Acceptance**: Tests exist, run, and FAIL (red).
 
-### ⬜ Unit 3b: core.ts -- Implementation
+### ✅ Unit 3b: core.ts -- Implementation
 **What**: In `src/heart/core.ts` `getProviderRuntime()`, replace the two `console.error(...)` calls with `emitNervesEvent({ level: "error", event: "engine.provider_init_error", component: "engine", message: ..., meta: {} })`. The `emitNervesEvent` import already exists in core.ts.
 **Output**: `src/heart/core.ts` with zero console.* calls.
 **Acceptance**: Tests from 3a pass (green). No console.* in file.
 
-### ⬜ Unit 3c: core.ts -- Coverage & Refactor
+### ✅ Unit 3c: core.ts -- Coverage & Refactor
 **What**: Verify 100% coverage on the new emitNervesEvent calls. Refactor if needed.
 **Acceptance**: 100% coverage on new code, tests still green.
 
@@ -196,3 +196,4 @@ Test should FAIL initially because contract.ts hasn't been updated yet.
 - 2026-03-05 00:01 Unit 0 complete: baseline 1440 tests pass, 14 console calls confirmed across 4 files
 - 2026-03-05 00:02 Unit 1a+1b complete: identity.ts console.warn removed, test updated to assert emitNervesEvent
 - 2026-03-05 00:03 Unit 2a+2b+2c complete: resolver.ts console.error replaced, 100% coverage
+- 2026-03-05 00:10 Unit 3a+3b+3c complete: core.ts 2 console.error calls replaced, 17 related tests updated
