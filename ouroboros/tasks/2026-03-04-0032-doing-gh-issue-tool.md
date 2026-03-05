@@ -149,7 +149,7 @@ Allow agents using the ouroboros harness to create GitHub issues via the GitHub 
 **Output**: Updated `src/repertoire/tools.ts`
 **Acceptance**: All Unit 3a tests PASS (green), all existing tests still pass
 
-### ⬜Unit 3c: Tool Registration -- Coverage & Refactor
+### ✅Unit 3c: Tool Registration -- Coverage & Refactor
 **What**: Verify coverage on new `summarizeArgs` branch and `allDefinitions` addition. Confirm no regressions.
 **Output**: 100% coverage, all tests green
 **Acceptance**: `npm test` passes, no warnings, no coverage gaps
@@ -236,3 +236,6 @@ Note: These tests may need to be integration-style or verify behavior through mo
 - 2026-03-04 21:55 Unit 2a complete: 15 failing tests for tools-github.ts (module not found).
 - 2026-03-04 21:55 Unit 2b complete: tools-github.ts implemented, all 15 tests pass.
 - 2026-03-04 21:56 Unit 2c complete: simplified labels parsing, 100% coverage on tools-github.ts. 1358 total tests pass.
+- 2026-03-04 21:57 Unit 3a complete: 7 tests for github tool registration (5 failing as expected).
+- 2026-03-04 21:58 Unit 3b complete: github tools registered in tools.ts, all tests pass (1365 total).
+- 2026-03-04 21:58 Unit 3c complete: 100% coverage on new code in tools.ts (line 130 uncovered branch is pre-existing).
