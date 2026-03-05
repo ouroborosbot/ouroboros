@@ -46,6 +46,7 @@ vi.mock("../../identity", () => ({
 const mockCreate = vi.fn()
 const mockResponsesCreate = vi.fn()
 const mockAnthropicMessagesCreate = vi.fn()
+const mockAnthropicCtor = vi.fn()
 vi.mock("openai", () => {
   class MockOpenAI {
     chat = {
@@ -69,7 +70,9 @@ vi.mock("@anthropic-ai/sdk", () => {
     messages = {
       create: mockAnthropicMessagesCreate,
     }
-    constructor(_opts?: any) {}
+    constructor(opts?: any) {
+      mockAnthropicCtor(opts)
+    }
   }
   return {
     default: MockAnthropic,
@@ -3093,6 +3096,7 @@ describe("anthropic setup-token provider contract", () => {
 
   beforeEach(() => {
     mockAnthropicMessagesCreate.mockReset()
+    mockAnthropicCtor.mockReset()
     vi.mocked(execSync).mockReset()
   })
 
@@ -3116,6 +3120,16 @@ describe("anthropic setup-token provider contract", () => {
       const core = await import("../../heart/core")
       expect(core.getProvider()).toBe("anthropic")
       expect(core.getModel()).toBe("claude-opus-4-6")
+      expect(mockAnthropicCtor).toHaveBeenCalledWith(
+        expect.objectContaining({
+          authToken: makeAnthropicSetupToken(),
+        }),
+      )
+      expect(mockAnthropicCtor).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          apiKey: expect.any(String),
+        }),
+      )
     } finally {
       mockExit.mockRestore()
     }
@@ -3198,6 +3212,12 @@ describe("anthropic setup-token provider contract", () => {
       expect(() => core.getProvider()).toThrow("process.exit called")
       expect(mockError).toHaveBeenCalledWith(expect.stringContaining("no setup-token credential was found"))
       expect(mockError).toHaveBeenCalledWith(expect.stringContaining("claude setup-token"))
+      expect(mockError).toHaveBeenCalledWith(
+        expect.stringContaining("~/.agentsecrets/testagent/secrets.json"),
+      )
+      expect(mockError).toHaveBeenCalledWith(
+        expect.stringContaining("providers.anthropic.setupToken"),
+      )
     } finally {
       mockExit.mockRestore()
       mockError.mockRestore()
@@ -3225,6 +3245,13 @@ describe("anthropic setup-token provider contract", () => {
       expect(() => core.getProvider()).toThrow("process.exit called")
       expect(mockExit).toHaveBeenCalledWith(1)
       expect(mockError).toHaveBeenCalledWith(expect.stringContaining("model/setupToken is incomplete"))
+      expect(mockError).toHaveBeenCalledWith(expect.stringContaining("claude setup-token"))
+      expect(mockError).toHaveBeenCalledWith(
+        expect.stringContaining("~/.agentsecrets/testagent/secrets.json"),
+      )
+      expect(mockError).toHaveBeenCalledWith(
+        expect.stringContaining("providers.anthropic.setupToken"),
+      )
     } finally {
       mockExit.mockRestore()
       mockError.mockRestore()
