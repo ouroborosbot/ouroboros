@@ -5,16 +5,16 @@ import { loadAgentConfig, getAgentName } from "./identity"
 import { emitNervesEvent } from "./nerves/runtime"
 
 export interface AzureProviderConfig {
+  modelName: string
   apiKey: string
   endpoint: string
   deployment: string
-  modelName: string
   apiVersion: string
 }
 
 export interface MinimaxProviderConfig {
-  apiKey: string
   model: string
+  apiKey: string
 }
 
 export interface AnthropicProviderConfig {
@@ -70,16 +70,18 @@ export interface OuroborosConfig {
 
 const DEFAULT_CONFIG: OuroborosConfig = {
   providers: {
+    // Keep provider field ordering consistent: model first, then auth credentials,
+    // then provider-specific transport fields.
     azure: {
+      modelName: "",
       apiKey: "",
       endpoint: "",
       deployment: "",
-      modelName: "",
       apiVersion: "2025-04-01-preview",
     },
     minimax: {
-      apiKey: "",
       model: "",
+      apiKey: "",
     },
     anthropic: {
       model: "",
@@ -116,15 +118,16 @@ const DEFAULT_CONFIG: OuroborosConfig = {
 
 const DEFAULT_SECRETS_TEMPLATE: Record<string, unknown> = {
   providers: {
+    // Keep this key order in sync with DEFAULT_CONFIG.providers for consistency.
     azure: {
+      modelName: "",
       apiKey: "",
       endpoint: "",
       deployment: "",
-      modelName: "",
     },
     minimax: {
-      apiKey: "",
       model: "",
+      apiKey: "",
     },
     anthropic: {
       model: "claude-opus-4-6",
