@@ -167,7 +167,7 @@ Allow agents using the ouroboros harness to create GitHub issues via the GitHub 
 **Output**: Updated `channel.ts`
 **Acceptance**: All Unit 4a tests PASS (green), existing tests still pass
 
-### ⬜Unit 4c: Channel Capabilities -- Coverage & Refactor
+### ✅Unit 4c: Channel Capabilities -- Coverage & Refactor
 **What**: Verify coverage. This is a data change, no new branches.
 **Output**: Tests green, no coverage gaps
 **Acceptance**: `npm test` passes, no warnings
@@ -239,3 +239,6 @@ Note: These tests may need to be integration-style or verify behavior through mo
 - 2026-03-04 21:57 Unit 3a complete: 7 tests for github tool registration (5 failing as expected).
 - 2026-03-04 21:58 Unit 3b complete: github tools registered in tools.ts, all tests pass (1365 total).
 - 2026-03-04 21:58 Unit 3c complete: 100% coverage on new code in tools.ts (line 130 uncovered branch is pre-existing).
+- 2026-03-04 21:59 Unit 4a complete: 2 tests for github in Teams channel capabilities (1 failing as expected).
+- 2026-03-04 22:00 Unit 4b complete: added "github" to Teams availableIntegrations, fixed channel+resolver tests.
+- 2026-03-04 22:00 Unit 4c complete: 100% coverage on channel.ts, all 1367 tests pass.
