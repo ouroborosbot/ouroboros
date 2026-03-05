@@ -122,17 +122,17 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 **Output**: Coverage report showing 100% on changed code
 **Acceptance**: 100% coverage on changed code, tests still green
 
-### ⬜ Unit 6a: Audit Rule 4 (source coverage) -- tests
+### ✅ Unit 6a: Audit Rule 4 (source coverage) -- tests
 **What**: Write tests for the static source scanner that extracts `component:event` keys from `emitNervesEvent` calls in production source files, and the audit check that verifies every discovered key was observed during tests. Test cases: single-line calls, multi-line calls, files with no calls (skipped), keys found but not observed (fail), all keys observed (pass). Scanner must only accept static string literals (no template literals, no variables).
 **Output**: Tests in `src/__tests__/nerves/coverage-audit.test.ts` (or new file for source scanner)
 **Acceptance**: Tests FAIL (red)
 
-### ⬜ Unit 6b: Audit Rule 4 (source coverage) -- implementation
+### ✅ Unit 6b: Audit Rule 4 (source coverage) -- implementation
 **What**: Implement static regex scanner that reads `src/**/*.ts` (excluding `__tests__/` and `nerves/`), extracts `component` and `event` string literals from `emitNervesEvent` calls (multi-line aware), and returns the set of `component:event` keys. Integrate into audit.ts as a new check section. Cross-reference discovered keys against observed events from the test run.
 **Output**: Source scanner function + audit integration
 **Acceptance**: Tests from 6a PASS (green)
 
-### ⬜ Unit 6c: Audit Rule 4 -- coverage & refactor
+### ✅ Unit 6c: Audit Rule 4 -- coverage & refactor
 **What**: Verify coverage, refactor.
 **Output**: Coverage report showing 100% on scanner and Rule 4 code
 **Acceptance**: 100% coverage, tests green
@@ -430,3 +430,4 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 - 2026-03-05 11:40 Unit 3 complete: lint step added to run-coverage-gate.cjs, runs before vitest, short-circuits on failure
 - 2026-03-05 11:40 Unit 4a/4b/4c complete: per-test event tracking in global-capture.ts with beforeEach hooks, Map-based event association, vitest-events-per-test.json output
 - 2026-03-05 11:42 Unit 5a/5b/5c complete: REQUIRED_EVENTS stripped from contract.ts, event_catalog and logpoint_coverage removed from audit.ts, emit-new-events.test.ts deleted
+- 2026-03-05 11:44 Unit 6a/6b/6c complete: source scanner (source-scanner.ts) with regex extraction of component:event keys, 100% coverage
