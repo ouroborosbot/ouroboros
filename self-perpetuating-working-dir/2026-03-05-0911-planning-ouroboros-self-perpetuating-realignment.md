@@ -1,5 +1,3 @@
-> **TODO before Codex handoff:** Move this file and all working artifacts to `self-perpetuating-working-dir/` at repo root. Update all path references in this doc and the execution protocol. Codex uses that directory as its workspace for everything in this task. Normal agent task files go in `.ouro/tasks/` (bundle git), not here.
-
 # Planning: Ouroboros Self-Perpetuating Seed
 
 **Status**: NEEDS_REVIEW
@@ -68,7 +66,7 @@ gh repo set-default --view
 # Expected: ouroborosbot/ouroboros
 ```
 
-After preflight, this planning doc is at `slugger/tasks/2026-03-05-0911-planning-ouroboros-self-perpetuating-realignment.md` on `main`.
+After preflight, this planning doc is at `self-perpetuating-working-dir/2026-03-05-0911-planning-ouroboros-self-perpetuating-realignment.md` on `main`. Codex should use `self-perpetuating-working-dir/` as its workspace for all artifacts created during this task (commit maps, doing docs, notes, etc.).
 
 ### Prerequisites
 
@@ -92,10 +90,10 @@ Branch naming: `slugger/gate-0-clean-baseline`, `slugger/gate-1-architectural-sc
 Invoke the `work-planner` skill. Because this planning doc is already approved, **skip Phase 1 (planning) entirely** — go straight to Phase 2 (conversion). The input is this gate's section from this planning doc.
 
 Tell work-planner:
-- Planning doc path: `slugger/tasks/2026-03-05-0911-planning-ouroboros-self-perpetuating-realignment.md`
+- Planning doc path: `self-perpetuating-working-dir/2026-03-05-0911-planning-ouroboros-self-perpetuating-realignment.md`
 - Convert ONLY the current gate's section (Gate N) into a doing doc
 - The planning doc is pre-approved — no approval gate needed
-- Place the doing doc in `slugger/tasks/` following the naming convention
+- Place the doing doc in `self-perpetuating-working-dir/` following the naming convention
 - Execution mode: `direct`
 
 Work-planner will run its 4 conversion passes (first draft, granularity, validation, quality) and produce a doing doc with TDD units. The doing doc is ready for execution immediately — no approval gate.
@@ -211,12 +209,12 @@ Restore `main` to a healthy state by reverting the undesired self-perpetuating-r
 **In scope:**
 - Verify archive branch `archive/self-perpetuating-run-2026-03-05` exists and contains the overnight proposals (created in preflight)
 - Revert the confirmed commit range `e3ecc1c`(first bad)..`448cfcd`(last bad) as a single batch revert: `git revert --no-commit e3ecc1c^..448cfcd && git commit -m "revert: remove self-perpetuating-run commits (37 commits)"`. Last clean commit: `9594702`. No history rewrite.
-- Document a commit map in `slugger/tasks/gate-0-commit-map.md`: for each reverted commit, note the commit hash, summary, and whether it contains salvageable work. Use your judgment to classify — you have `git show --stat` and the actual diffs. This is Gate 5's input.
+- Document a commit map in `self-perpetuating-working-dir/gate-0-commit-map.md`: for each reverted commit, note the commit hash, summary, and whether it contains salvageable work. Use your judgment to classify — you have `git show --stat` and the actual diffs. This is Gate 5's input.
 - Verify `npm test` passes on main after revert
 
 **Completion criteria:**
 - [ ] Archive branch `archive/self-perpetuating-run-2026-03-05` exists and contains overnight proposals (created in preflight)
-- [ ] Commit map documented at `slugger/tasks/gate-0-commit-map.md` (reverted vs salvageable)
+- [ ] Commit map documented at `self-perpetuating-working-dir/gate-0-commit-map.md` (reverted vs salvageable)
 - [ ] `main` reverted via explicit revert commits
 - [ ] `npm test` green on `main` post-revert
 - [ ] No force-push, no history rewrite
@@ -441,7 +439,7 @@ Start the agent, let it orient itself, and watch it do something meaningful — 
 Triage the overnight run's output into actionable work. The run produced 31 distinct ideas and some code changes — this gate sorts the wheat from the chaff and feeds it into the agent's backlog.
 
 **In scope:**
-- Review the commit map from Gate 0 (`slugger/tasks/gate-0-commit-map.md`) for salvageable code changes (not just docs)
+- Review the commit map from Gate 0 (`self-perpetuating-working-dir/gate-0-commit-map.md`) for salvageable code changes (not just docs)
 - Read the original overnight proposals from `archive/self-perpetuating-run-2026-03-05` branch (in `ouroboros/tasks/`)
 - Re-land any valuable code changes. For small, self-contained changes: cherry-pick + test + commit is sufficient. For substantial changes that touch multiple files or need adaptation to the new architecture: use the full planning-doing flow in `self-perpetuating-working-dir/`
 - Triage all 31 overnight reflection proposals: deduplicate, assess merit against current architecture (post-inversion), and file as markdown task docs in `self-perpetuating-working-dir/` using the existing planning doc format (there is no formal task system yet — that's Gate 9). These get moved into the agent's `.ouro/tasks/` once the task system exists.
@@ -607,7 +605,7 @@ Teach agents to use Claude Code and Codex (and whatever else works) to do real c
 - [ ] Sessions monitored for progress, stalls, completion, and blockers
 - [ ] Agent manages spawned session context effectively (scoped tasks, state files)
 - [ ] Failure recovery works (crash restart, stall detection, resume)
-- [ ] Agent successfully completes a real coding task by orchestrating an external coding tool
+- [ ] Agent successfully completes a real coding task end-to-end: work-planner → work-doer → work-merger pipeline orchestrated through external coding tools (Claude Code/Codex)
 - [ ] `npm test` green
 - [ ] 100% coverage on new code
 
@@ -656,7 +654,7 @@ All resolved.
 - **Governance docs:** Repo root (`/ARCHITECTURE.md`, `/CONSTITUTION.md`).
 - **GitHub repos:** `arimendelow/<agent>.ouro` (e.g., `arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`).
 - **Archival:** Overnight artifacts go to archive branch `archive/self-perpetuating-run-2026-03-05`. Canonical versions triaged into task backlog.
-- Work tracked under `slugger/tasks/` (current branch agent context is `slugger/*`).
+- Work tracked under `self-perpetuating-working-dir/` at repo root.
 - Pipeline recovery starts with correctness (Gate 0) before architecture (Gates 1-4).
 - `autonomous-loop.ts` is removed entirely (no puppeting). The model IS the loop.
 - Subagent protocols become loadable knowledge, not injected system prompts.
@@ -700,3 +698,4 @@ Phase 2 gates may run in parallel where dependencies allow. Gate 9 (task system)
 - 2026-03-05 12:30 Codex-readiness pass 1. Added preflight section (gh auth, merge planning doc to main, npm test). Fixed Gate 0: confirmed commit range (not "candidate"), added archive branch creation, specified commit map location. Fixed Gate 1: pointed overnight proposals to archive branch, removed "Reviewed and approved" criterion. Fixed Gate 2: added getAgentRoot() update details and 18 dependent files, clarified gitignore-before-git-init ordering. Fixed Gate 3: noted largest gate (15+ units), added memory path translation note, specified supervisor as Node.js. Fixed Gate 4: added concrete verification (5min runtime, 3 self-initiated actions, simulated crash/restart). Fixed Gate 5: clarified backlog items are markdown task docs (no formal task system yet). Fixed Gate 6: specified resume state format and location. Fixed Gate 7: noted gh auth already verified. Fixed Gate 8: added full OpenClaw directory structure and file mapping. Fixed Gate 9: added lifecycle management and task-matrix.ts port.
 - 2026-03-05 13:00 Codex-readiness pass 2. Fixed preflight: create archive branch BEFORE merging planning-doc branch (prevents overnight proposal deletion — branch has 55 files of changes). Fixed Gate 3: added package.json script cleanup (4 scripts reference removed files) and autonomous-loop.test.ts removal. Fixed Gate 4: added environment requirements note (LLM API keys at ~/.agentsecrets/, possible sandbox limitations). Fixed Gate 5: clarified cherry-pick for small self-contained changes vs full planning-doing for substantial work. Fixed Gate 7: added mkdir -p ~/AgentBundles/. Fixed Gate 8: added OpenClaw CLI mechanism (openclaw agent --to slugger --message "<msg>" --deliver) and CLI path to reference material.
 - 2026-03-05 14:00 Fresh gate review — Gate 0 tightened (single batch revert, explicit range direction). Gate 1: added full .ouro bundle directory tree with renames (manifest/ -> teams-app/, SELF-KNOWLEDGE.md -> TACIT.md, skills/ stays). Gate 2: noted renames. Gate 3: added inner dialog session (self-initiated, CLI-like, supervisor-started), inner dialog instincts (agent-configurable user-role message generation), heartbeat (harness-level default interval, rest != off), Anthropic consecutive-assistant constraint documented. Gate 6: replaced resume-state.json with inner-dialog-aware checkpoint (session IS the resume state). Added provider constraint note and inner dialog infrastructure to reference material. Added 6 new decisions.
+- 2026-03-05 15:30 Full gate review complete (all 13 gates). Gate 3 split into 3a (teardown) and 3b (build up). Gate 7/8 swapped (Slugger Migration now Phase 1, Bundle Independence now Phase 2). Supervisor designed for multi-agent from start. Gate 4 marked observational (skip work-planner). Gate 9 task location specified. Gate 10 separate repo clones per agent. Gate 11 end-to-end pipeline criterion. Moved all working files to self-perpetuating-working-dir/ at repo root.
