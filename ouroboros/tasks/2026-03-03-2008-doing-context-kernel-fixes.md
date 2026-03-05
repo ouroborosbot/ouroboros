@@ -794,3 +794,4 @@ Code structure of `contextSection()` unchanged. Only the string literals change.
 - 2026-03-04 17:28 Pass 2 -- Granularity: clarified onClearText timing in streamChatCompletion (called when name delta first detected, not when parser activates)
 - 2026-03-04 17:29 Pass 3 -- Validation: all line numbers, variable names, interfaces verified against codebase -- no corrections needed
 - 2026-03-04 17:29 Pass 4 -- Quality: all 3 new units have What/Output/Acceptance, no TBD, all emojis present, clarified done-state test expectation
+- 2026-03-04 17:35 Unit 20a complete: 21 failing tests -- 12 FinalAnswerParser unit tests, 5 streamChatCompletion integration, 3 streamResponsesApi integration, 1 core.ts finalAnswerStreamed flag test. 1275 existing tests pass, 21 new fail (red)
