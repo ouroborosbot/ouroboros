@@ -352,3 +352,4 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 
 ## Progress Log
 - 2026-03-05 10:41 Created from planning doc
+- 2026-03-05 10:42 All 4 conversion passes complete, READY_FOR_EXECUTION
