@@ -5,6 +5,7 @@ vi.mock("../../identity", () => ({
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
     configPath: "~/.agentsecrets/testagent/secrets.json",
+    provider: "minimax",
     phrases: {
       thinking: ["working"],
       tool: ["running tool"],
@@ -68,6 +69,7 @@ describe("phrases - getPhrases from agent.json", () => {
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
       phrases: {
         thinking: ["custom thinking"],
         tool: ["custom tool"],
@@ -88,6 +90,7 @@ describe("phrases - getPhrases from agent.json", () => {
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
       phrases: {
         thinking: ["working"],
         tool: ["running tool"],

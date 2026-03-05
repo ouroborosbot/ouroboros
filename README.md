@@ -79,7 +79,8 @@ Each agent has a directory at the repo root named after itself. Inside it:
 ```json
 {
   "name": "ouroboros",
-  "configPath": "~/.agentconfigs/ouroboros/config.json",
+  "provider": "anthropic",
+  "configPath": "~/.agentsecrets/ouroboros/secrets.json",
   "phrases": {
     "thinking": ["chewing on that", "consulting the chaos gods"],
     "tool": ["rummaging through files", "doing science"],
@@ -89,7 +90,8 @@ Each agent has a directory at the repo root named after itself. Inside it:
 ```
 
 - `name`: must match your directory name.
-- `configPath`: absolute path (or `~`-prefixed) to your config.json with API keys and provider settings.
+- `provider`: required provider selection (`azure`, `minimax`, or `anthropic`). Runtime does not fall back to other providers.
+- `configPath`: absolute path (or `~`-prefixed) to your secrets.json with API keys and provider settings.
 - `phrases`: optional custom loading phrases. Falls back to hardcoded defaults if omitted.
 
 **psyche/** -- your personality files, loaded lazily into the system prompt at startup. See the psyche system section below.
@@ -159,11 +161,11 @@ Plus 2 optional:
 - **FriendStore** (`friends/store.ts`): domain-specific persistence interface (`get`, `put`, `delete`, `findByExternalId`).
 - **FileFriendStore** (`friends/store-file.ts`): two-backend storage split by PII boundary:
   - **Agent knowledge** (`{agentRoot}/friends/{uuid}.json`): id, displayName, toolPreferences, notes, timestamps, schemaVersion. Committed to the repo -- no PII.
-  - **PII bridge** (`~/.agentconfigs/{agentName}/friends/{uuid}.json`): id, externalIds, tenantMemberships, schemaVersion. Local-only -- contains PII.
+  - **PII bridge** (`~/.agentstate/{agentName}/friends/{uuid}.json`): id, externalIds, tenantMemberships, schemaVersion. Local-only -- contains PII.
   - `get()` merges both backends. `put()` splits and writes both. `findByExternalId()` scans PII bridge, then merges with agent knowledge.
 - **Channel** (`friends/channel.ts`): `ChannelCapabilities` -- what the current channel supports (markdown, streaming, rich cards, max message length, available integrations).
 - **FriendResolver** (`friends/resolver.ts`): find-or-create by external ID. First encounter creates a new FriendRecord with system-provided name and empty notes/preferences. Returning friends are found via `findByExternalId()`. DisplayName is never overwritten on existing records.
-- **Session paths**: `~/.agentconfigs/{agentName}/sessions/{friendUuid}/{channel}/{sessionId}.json`. Each friend gets their own session directory.
+- **Session paths**: `~/.agentstate/{agentName}/sessions/{friendUuid}/{channel}/{sessionId}.json`. Each friend gets their own session directory.
 
 Design principles: don't persist what you can re-derive; conversation IS the cache; the model manages memory freeform via `save_friend_note`; toolPreferences go to tool descriptions (not system prompt); notes go to system prompt (not tool descriptions).
 
@@ -175,7 +177,9 @@ Design principles: don't persist what you can re-derive; conversation IS the cac
 
 **Skills** (`repertoire/skills.ts`): markdown files in `{your-dir}/skills/`. Listed with `list_skills`, loaded with `load_skill`. The loaded text is injected into conversation as a tool result.
 
-**Config** (`config.ts`): provider credentials, context window settings, Teams connection info, OAuth config. All loaded from the config.json file pointed to by your agent.json `configPath`. No environment variables in `src/` -- everything comes from files.
+**Config** (`config.ts`): provider credentials, context window settings, Teams connection info, OAuth config. All loaded from the secrets.json file pointed to by your agent.json `configPath`. No environment variables in `src/` -- everything comes from files.
+
+For Anthropic, set only `providers.anthropic.model` (recommended: `claude-opus-4-6`) in `secrets.json`. Store the setup-token (`claude setup-token`) in `~/.agentsecrets/<agent>/auth-profiles.json`; runtime reads Anthropic auth from that file.
 
 ### What you can modify
 

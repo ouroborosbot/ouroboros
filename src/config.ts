@@ -115,7 +115,7 @@ const DEFAULT_SECRETS_TEMPLATE: Record<string, unknown> = {
       model: "",
     },
     anthropic: {
-      model: "",
+      model: "claude-opus-4-6",
     },
   },
 }
@@ -314,6 +314,10 @@ export function getIntegrationsConfig(): IntegrationsConfig {
 
 export function getLogsDir(): string {
   return path.join(os.homedir(), ".agentstate", getAgentName(), "logs")
+}
+
+export function getAuthProfilesPath(): string {
+  return path.join(path.dirname(resolveConfigPath()), "auth-profiles.json")
 }
 
 

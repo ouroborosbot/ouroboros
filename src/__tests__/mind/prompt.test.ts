@@ -24,6 +24,7 @@ vi.mock("../../identity", () => ({
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
     configPath: "~/.agentsecrets/testagent/secrets.json",
+    provider: "minimax",
   })),
   getAgentName: vi.fn(() => "testagent"),
   getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
@@ -53,6 +54,14 @@ const MOCK_IDENTITY = "i am Ouroboros.\ni use lowercase in my responses to the u
 const MOCK_LORE = "i am named after the ouroboros -- the ancient symbol of a serpent eating its own tail."
 const MOCK_FRIENDS = "my creator works at microsoft and talks to me through the CLI and Teams."
 
+function setAgentProvider(provider: "azure" | "minimax" | "anthropic") {
+  vi.mocked(identity.loadAgentConfig).mockReturnValue({
+    name: "testagent",
+    configPath: "~/.agentsecrets/testagent/secrets.json",
+    provider,
+  })
+}
+
 // Helper: configure readFileSync to return psyche files by path
 function setupReadFileSync() {
   vi.mocked(fs.readFileSync).mockImplementation((filePath: any, _encoding?: any) => {
@@ -62,6 +71,17 @@ function setupReadFileSync() {
     if (p.endsWith("LORE.md")) return MOCK_LORE
     if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
     if (p.endsWith("secrets.json")) return JSON.stringify({})
+    if (p.endsWith("auth-profiles.json")) {
+      return JSON.stringify({
+        profiles: {
+          "anthropic:default": {
+            provider: "anthropic",
+            type: "token",
+            token: `sk-ant-oat01-${"a".repeat(80)}`,
+          },
+        },
+      })
+    }
     return ""
   })
 }
@@ -69,6 +89,7 @@ function setupReadFileSync() {
 describe("buildSystem", () => {
   beforeEach(() => {
     vi.resetModules()
+    setAgentProvider("minimax")
   })
 
   it("includes soul section with personality", async () => {
@@ -217,6 +238,7 @@ describe("buildSystem", () => {
   })
 
   it("includes azure provider string when azure config is set", async () => {
+    setAgentProvider("azure")
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
@@ -237,6 +259,7 @@ describe("buildSystem", () => {
   })
 
   it("includes anthropic provider string when Anthropic model is configured with Claude setup-token credentials", async () => {
+    setAgentProvider("anthropic")
     vi.mocked(fs.readFileSync).mockImplementation((filePath: any, _encoding?: any) => {
       const p = String(filePath)
       if (p.endsWith("SOUL.md")) return MOCK_SOUL
@@ -244,11 +267,14 @@ describe("buildSystem", () => {
       if (p.endsWith("LORE.md")) return MOCK_LORE
       if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
       if (p.endsWith("secrets.json")) return JSON.stringify({})
-      if (p.endsWith(path.join(".claude", ".credentials.json"))) {
+      if (p.endsWith("auth-profiles.json")) {
         return JSON.stringify({
-          claudeAiOauth: {
-            accessToken: `sk-ant-oat01-${"a".repeat(80)}`,
-            expiresAt: Date.now() + 60_000,
+          profiles: {
+            "anthropic:default": {
+              provider: "anthropic",
+              type: "token",
+              token: `sk-ant-oat01-${"a".repeat(80)}`,
+            },
           },
         })
       }
@@ -259,7 +285,7 @@ describe("buildSystem", () => {
     setTestConfig({
       providers: {
         anthropic: {
-          model: "claude-sonnet-4-6",
+          model: "claude-opus-4-6",
         },
       },
     } as any)
@@ -270,13 +296,14 @@ describe("buildSystem", () => {
       const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
       resetPsycheCache()
       const result = await buildSystem()
-      expect(result).toContain("anthropic (claude-sonnet-4-6)")
+      expect(result).toContain("anthropic (claude-opus-4-6)")
     } finally {
       mockExit.mockRestore()
     }
   })
 
   it("uses 'default' deployment when azure deployment is not set", async () => {
+    setAgentProvider("azure")
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
@@ -438,6 +465,7 @@ describe("provider section contract", () => {
 describe("runtimeInfoSection", () => {
   beforeEach(() => {
     vi.resetModules()
+    setAgentProvider("minimax")
   })
 
   it("always includes agent name and cwd", async () => {
@@ -490,6 +518,7 @@ describe("runtimeInfoSection", () => {
 describe("psyche loading", () => {
   beforeEach(() => {
     vi.resetModules()
+    setAgentProvider("minimax")
   })
 
   it("loads psyche files from agentRoot/psyche/", async () => {
@@ -560,6 +589,7 @@ describe("psyche loading", () => {
 describe("flagsSection rationale", () => {
   beforeEach(() => {
     vi.resetModules()
+    setAgentProvider("minimax")
   })
 
   it("mentions devtunnel relay buffering (microsoft/dev-tunnels#518)", async () => {
@@ -623,6 +653,7 @@ describe("flagsSection rationale", () => {
 describe("contextSection", () => {
   beforeEach(() => {
     vi.resetModules()
+    setAgentProvider("minimax")
   })
 
   it("returns empty string when context is undefined", async () => {
@@ -1133,6 +1164,7 @@ describe("contextSection", () => {
 describe("buildSystem with context", () => {
   beforeEach(() => {
     vi.resetModules()
+    setAgentProvider("minimax")
   })
 
   it("includes context section when context is provided", async () => {

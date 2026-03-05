@@ -121,6 +121,7 @@ describe("loadAgentConfig", () => {
     const agentJson = {
       name: "ouroboros",
       configPath: "~/.agentsecrets/ouroboros/secrets.json",
+      provider: "minimax",
       phrases: {
         thinking: ["thinking hard"],
         tool: ["doing stuff"],
@@ -145,6 +146,7 @@ describe("loadAgentConfig", () => {
     const agentJson = {
       name: "ouroboros",
       configPath: "~/.agentsecrets/ouroboros/secrets.json",
+    provider: "minimax",
     }
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(agentJson))
 
@@ -165,6 +167,7 @@ describe("loadAgentConfig", () => {
     const agentJson = {
       name: "ouroboros",
       configPath: "~/.agentsecrets/ouroboros/secrets.json",
+    provider: "minimax",
     }
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(agentJson))
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
@@ -183,6 +186,7 @@ describe("loadAgentConfig", () => {
     const agentJson = {
       name: "ouroboros",
       configPath: "~/.agentsecrets/ouroboros/secrets.json",
+      provider: "minimax",
       phrases: {
         thinking: ["thinking hard"],
         tool: ["doing stuff"],
@@ -244,6 +248,7 @@ describe("loadAgentConfig", () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
       name: "ouroboros",
       configPath: "   ",
+      provider: "minimax",
       phrases: {
         thinking: ["thinking"],
         tool: ["tool"],
@@ -261,6 +266,7 @@ describe("loadAgentConfig", () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
       name: "ouroboros",
       configPath: "~/.agentconfigs/ouroboros/config.json",
+      provider: "minimax",
       phrases: {
         thinking: ["thinking"],
         tool: ["tool"],
@@ -271,6 +277,41 @@ describe("loadAgentConfig", () => {
     const { loadAgentConfig, resetIdentity } = await import("../identity")
     resetIdentity()
     expect(() => loadAgentConfig()).toThrow(/\.agentsecrets.*secrets\.json/)
+  })
+
+  it("throws when agent.json is missing provider", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      name: "ouroboros",
+      configPath: "~/.agentsecrets/ouroboros/secrets.json",
+      phrases: {
+        thinking: ["thinking"],
+        tool: ["tool"],
+        followup: ["followup"],
+      },
+    }))
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/must include provider/)
+  })
+
+  it("throws when agent.json provider is invalid", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      name: "ouroboros",
+      configPath: "~/.agentsecrets/ouroboros/secrets.json",
+      provider: "unknown",
+      phrases: {
+        thinking: ["thinking"],
+        tool: ["tool"],
+        followup: ["followup"],
+      },
+    }))
+
+    const { loadAgentConfig, resetIdentity } = await import("../identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/must include provider/)
   })
 
   it("handles non-Error read failures when loading agent.json", async () => {
@@ -302,6 +343,7 @@ describe("loadAgentConfig", () => {
     const agentJson = {
       name: "ouroboros",
       configPath: "~/.agentsecrets/ouroboros/secrets.json",
+    provider: "minimax",
     }
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(agentJson))
 
@@ -319,6 +361,7 @@ describe("loadAgentConfig", () => {
     const agentJson = {
       name: "ouroboros",
       configPath: "~/.agentsecrets/ouroboros/secrets.json",
+      provider: "minimax",
       phrases: {
         thinking: ["thinking"],
         tool: ["tool"],
@@ -365,6 +408,7 @@ describe("resetIdentity", () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
       name: "ouroboros",
       configPath: "~/.agentsecrets/ouroboros/secrets.json",
+    provider: "minimax",
     }))
 
     const { loadAgentConfig, resetIdentity } = await import("../identity")
@@ -376,6 +420,7 @@ describe("resetIdentity", () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
       name: "ouroboros",
       configPath: "/new/path/secrets.json",
+    provider: "minimax",
     }))
     const config = loadAgentConfig()
     expect(config.configPath).toBe("/new/path/secrets.json")
