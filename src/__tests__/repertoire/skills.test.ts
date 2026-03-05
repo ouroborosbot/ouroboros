@@ -6,6 +6,7 @@ vi.mock("fs", () => ({
   existsSync: vi.fn(),
   readFileSync: vi.fn(),
   readdirSync: vi.fn(),
+  statSync: vi.fn(),
   writeFileSync: vi.fn(),
 }))
 
@@ -33,6 +34,7 @@ describe("skills - listSkills", () => {
     vi.mocked(fs.existsSync).mockReset()
     vi.mocked(fs.readdirSync).mockReset()
     vi.mocked(fs.readFileSync).mockReset()
+    vi.mocked(fs.statSync).mockReset()
   })
 
   it("returns empty array when skills directory does not exist", async () => {
@@ -85,6 +87,7 @@ describe("skills - loadSkill", () => {
     vi.mocked(fs.existsSync).mockReset()
     vi.mocked(fs.readdirSync).mockReset()
     vi.mocked(fs.readFileSync).mockReset()
+    vi.mocked(fs.statSync).mockReset()
   })
 
   it("returns skill content when skill file exists", async () => {
@@ -127,6 +130,59 @@ describe("skills - loadSkill", () => {
     const expectedPath = path.join("/mock/repo/testagent", "skills", "my-skill.md")
     expect(fs.existsSync).toHaveBeenCalledWith(expectedPath)
   })
+
+  it("caches skill content when mtimeMs is unchanged", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: 123 } as any)
+    vi.mocked(fs.readFileSync).mockReturnValue("v1")
+
+    const { loadSkill } = await import("../../repertoire/skills")
+
+    expect(loadSkill("my-skill")).toBe("v1")
+    expect(loadSkill("my-skill")).toBe("v1")
+
+    expect(fs.readFileSync).toHaveBeenCalledTimes(1)
+    expect(fs.statSync).toHaveBeenCalledTimes(2)
+  })
+
+  it("invalidates cache when mtimeMs changes", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.statSync)
+      .mockReturnValueOnce({ mtimeMs: 123 } as any)
+      .mockReturnValueOnce({ mtimeMs: 456 } as any)
+    vi.mocked(fs.readFileSync).mockReturnValueOnce("v1").mockReturnValueOnce("v2")
+
+    const { loadSkill } = await import("../../repertoire/skills")
+
+    expect(loadSkill("my-skill")).toBe("v1")
+    expect(loadSkill("my-skill")).toBe("v2")
+
+    expect(fs.readFileSync).toHaveBeenCalledTimes(2)
+  })
+
+  it("still emits observability events on a cache hit", async () => {
+    vi.resetModules()
+
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({
+      emitNervesEvent,
+    }))
+
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: 123 } as any)
+    vi.mocked(fs.readFileSync).mockReturnValue("v1")
+
+    const { loadSkill } = await import("../../repertoire/skills")
+
+    loadSkill("my-skill")
+    loadSkill("my-skill")
+
+    const loadStarts = emitNervesEvent.mock.calls.filter((c) => c[0]?.event === "repertoire.load_start")
+    const loadEnds = emitNervesEvent.mock.calls.filter((c) => c[0]?.event === "repertoire.load_end")
+
+    expect(loadStarts).toHaveLength(2)
+    expect(loadEnds).toHaveLength(2)
+  })
 })
 
 describe("skills - getLoadedSkills", () => {
@@ -134,6 +190,7 @@ describe("skills - getLoadedSkills", () => {
     vi.resetModules()
     vi.mocked(fs.existsSync).mockReset()
     vi.mocked(fs.readFileSync).mockReset()
+    vi.mocked(fs.statSync).mockReset()
   })
 
   it("returns empty array when no skills have been loaded", async () => {
@@ -158,6 +215,7 @@ describe("skills - clearLoadedSkills", () => {
     vi.resetModules()
     vi.mocked(fs.existsSync).mockReset()
     vi.mocked(fs.readFileSync).mockReset()
+    vi.mocked(fs.statSync).mockReset()
   })
 
   it("clears all loaded skills", async () => {
