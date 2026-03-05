@@ -13,6 +13,17 @@ describe("formatToolResult", () => {
   it("formats failed tool with summary", () => {
     expect(formatToolResult("read_file", "missing.txt", false)).toBe("✗ read_file: missing.txt")
   })
+
+  it("compacts multiline summary to a single line", () => {
+    expect(formatToolResult("save_friend_note", "type=name\ncontent=Ari", true)).toBe(
+      "✓ save_friend_note (type=name content=Ari)",
+    )
+  })
+
+  it("truncates long summaries", () => {
+    const long = "x".repeat(130)
+    expect(formatToolResult("shell", long, true)).toBe(`✓ shell (${"x".repeat(120)}...)`)
+  })
 })
 
 describe("formatKick", () => {

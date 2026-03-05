@@ -337,7 +337,7 @@ describe("summarizeArgs", () => {
   })
 
   it("returns path for read_file", () => {
-    expect(summarizeArgs("read_file", { path: "/tmp/test.txt" })).toBe("/tmp/test.txt")
+    expect(summarizeArgs("read_file", { path: "/tmp/test.txt" })).toBe("path=/tmp/test.txt")
   })
 
   it("returns empty string for read_file with no path", () => {
@@ -345,16 +345,16 @@ describe("summarizeArgs", () => {
   })
 
   it("returns path for write_file", () => {
-    expect(summarizeArgs("write_file", { path: "/tmp/out.txt", content: "x" })).toBe("/tmp/out.txt")
+    expect(summarizeArgs("write_file", { path: "/tmp/out.txt", content: "x" })).toBe("path=/tmp/out.txt")
   })
 
   it("returns short command for shell", () => {
-    expect(summarizeArgs("shell", { command: "echo hi" })).toBe("echo hi")
+    expect(summarizeArgs("shell", { command: "echo hi" })).toBe("command=echo hi")
   })
 
-  it("returns truncated command for shell when > 50 chars", () => {
-    const longCmd = "a".repeat(60)
-    expect(summarizeArgs("shell", { command: longCmd })).toBe("a".repeat(50) + "...")
+  it("returns truncated command for shell when > 60 chars", () => {
+    const longCmd = "a".repeat(70)
+    expect(summarizeArgs("shell", { command: longCmd })).toBe("command=" + "a".repeat(60) + "...")
   })
 
   it("returns empty string for shell with no command", () => {
@@ -362,7 +362,7 @@ describe("summarizeArgs", () => {
   })
 
   it("returns path for list_directory", () => {
-    expect(summarizeArgs("list_directory", { path: "/tmp" })).toBe("/tmp")
+    expect(summarizeArgs("list_directory", { path: "/tmp" })).toBe("path=/tmp")
   })
 
   it("returns empty string for list_directory with no path", () => {
@@ -370,8 +370,8 @@ describe("summarizeArgs", () => {
   })
 
   it("returns truncated message for git_commit", () => {
-    const msg = "a".repeat(50)
-    expect(summarizeArgs("git_commit", { message: msg })).toBe("a".repeat(40))
+    const msg = "a".repeat(70)
+    expect(summarizeArgs("git_commit", { message: msg })).toBe("message=" + "a".repeat(60) + "...")
   })
 
   it("returns empty string for git_commit with no message", () => {
@@ -379,8 +379,8 @@ describe("summarizeArgs", () => {
   })
 
   it("returns truncated command for gh_cli", () => {
-    const cmd = "a".repeat(50)
-    expect(summarizeArgs("gh_cli", { command: cmd })).toBe("a".repeat(40))
+    const cmd = "a".repeat(70)
+    expect(summarizeArgs("gh_cli", { command: cmd })).toBe("command=" + "a".repeat(60) + "...")
   })
 
   it("returns empty string for gh_cli with no command", () => {
@@ -388,7 +388,7 @@ describe("summarizeArgs", () => {
   })
 
   it("returns name for load_skill", () => {
-    expect(summarizeArgs("load_skill", { name: "my-skill" })).toBe("my-skill")
+    expect(summarizeArgs("load_skill", { name: "my-skill" })).toBe("name=my-skill")
   })
 
   it("returns empty string for load_skill with no name", () => {
@@ -396,8 +396,8 @@ describe("summarizeArgs", () => {
   })
 
   it("returns truncated prompt for claude", () => {
-    const prompt = "a".repeat(50)
-    expect(summarizeArgs("claude", { prompt })).toBe("a".repeat(40))
+    const prompt = "a".repeat(70)
+    expect(summarizeArgs("claude", { prompt })).toBe("prompt=" + "a".repeat(60) + "...")
   })
 
   it("returns empty string for claude with no prompt", () => {
@@ -405,8 +405,8 @@ describe("summarizeArgs", () => {
   })
 
   it("returns truncated query for web_search", () => {
-    const query = "a".repeat(50)
-    expect(summarizeArgs("web_search", { query })).toBe("a".repeat(40))
+    const query = "a".repeat(70)
+    expect(summarizeArgs("web_search", { query })).toBe("query=" + "a".repeat(60) + "...")
   })
 
   it("returns empty string for web_search with no query", () => {
@@ -1180,7 +1180,7 @@ describe("summarizeArgs for graph/ado tools", () => {
   })
 
   it("returns organization for ado_work_items", () => {
-    expect(summarizeArgs("ado_work_items", { organization: "myorg", query: "some query" })).toBe("myorg")
+    expect(summarizeArgs("ado_work_items", { organization: "myorg", query: "some query" })).toBe("organization=myorg query=some query")
   })
 
   it("returns empty string for ado_work_items with no organization", () => {
@@ -1188,7 +1188,7 @@ describe("summarizeArgs for graph/ado tools", () => {
   })
 
   it("returns path for graph_query", () => {
-    expect(summarizeArgs("graph_query", { path: "/me/messages" })).toBe("/me/messages")
+    expect(summarizeArgs("graph_query", { path: "/me/messages" })).toBe("path=/me/messages")
   })
 
   it("returns empty string for graph_query with no path", () => {
@@ -1196,27 +1196,27 @@ describe("summarizeArgs for graph/ado tools", () => {
   })
 
   it("returns method + path for graph_mutate", () => {
-    expect(summarizeArgs("graph_mutate", { method: "POST", path: "/me/messages" })).toBe("POST /me/messages")
+    expect(summarizeArgs("graph_mutate", { method: "POST", path: "/me/messages" })).toBe("method=POST path=/me/messages")
   })
 
   it("returns empty string for graph_mutate with no method/path", () => {
-    expect(summarizeArgs("graph_mutate", {})).toBe(" ")
+    expect(summarizeArgs("graph_mutate", {})).toBe("")
   })
 
   it("returns org + path for ado_query", () => {
-    expect(summarizeArgs("ado_query", { organization: "myorg", path: "/_apis/git/repos" })).toBe("myorg /_apis/git/repos")
+    expect(summarizeArgs("ado_query", { organization: "myorg", path: "/_apis/git/repos" })).toBe("organization=myorg path=/_apis/git/repos")
   })
 
   it("returns empty string parts for ado_query with no args", () => {
-    expect(summarizeArgs("ado_query", {})).toBe(" ")
+    expect(summarizeArgs("ado_query", {})).toBe("")
   })
 
   it("returns method + org + path for ado_mutate", () => {
-    expect(summarizeArgs("ado_mutate", { method: "PATCH", organization: "myorg", path: "/_apis/wit/workitems/1" })).toBe("PATCH myorg /_apis/wit/workitems/1")
+    expect(summarizeArgs("ado_mutate", { method: "PATCH", organization: "myorg", path: "/_apis/wit/workitems/1" })).toBe("method=PATCH organization=myorg path=/_apis/wit/workitems/1")
   })
 
   it("returns empty string parts for ado_mutate with no args", () => {
-    expect(summarizeArgs("ado_mutate", {})).toBe("  ")
+    expect(summarizeArgs("ado_mutate", {})).toBe("")
   })
 })
 
@@ -1640,7 +1640,7 @@ describe("summarizeArgs for docs tools", () => {
   })
 
   it("returns query for graph_docs", () => {
-    expect(summarizeArgs("graph_docs", { query: "send email" })).toBe("send email")
+    expect(summarizeArgs("graph_docs", { query: "send email" })).toBe("query=send email")
   })
 
   it("returns empty string for graph_docs with no query", () => {
@@ -1648,7 +1648,7 @@ describe("summarizeArgs for docs tools", () => {
   })
 
   it("returns query for ado_docs", () => {
-    expect(summarizeArgs("ado_docs", { query: "work items" })).toBe("work items")
+    expect(summarizeArgs("ado_docs", { query: "work items" })).toBe("query=work items")
   })
 
   it("returns empty string for ado_docs with no query", () => {
@@ -1656,15 +1656,15 @@ describe("summarizeArgs for docs tools", () => {
   })
 
   it("returns type+key summary for save_friend_note", () => {
-    expect(summarizeArgs("save_friend_note", { type: "tool_preference", key: "ado", content: "flat backlog" })).toBe("ado")
+    expect(summarizeArgs("save_friend_note", { type: "tool_preference", key: "ado", content: "flat backlog" })).toBe("type=tool_preference key=ado content=flat backlog")
   })
 
   it("returns type for save_friend_note name type (no key)", () => {
-    expect(summarizeArgs("save_friend_note", { type: "name", content: "Jordan" })).toBe("")
+    expect(summarizeArgs("save_friend_note", { type: "name", content: "Jordan" })).toBe("type=name content=Jordan")
   })
 
   it("returns org + project for ado_backlog_list", () => {
-    expect(summarizeArgs("ado_backlog_list", { organization: "myorg", project: "myproj" })).toBe("myorg myproj")
+    expect(summarizeArgs("ado_backlog_list", { organization: "myorg", project: "myproj" })).toBe("organization=myorg project=myproj")
   })
 
   it("returns empty string for ado_backlog_list with no org/project", () => {
