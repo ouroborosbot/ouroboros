@@ -1,6 +1,6 @@
 // FileFriendStore -- filesystem adapter for FriendStore.
 // Splits friend records across two backends by PII boundary:
-// - Agent knowledge (agentKnowledgePath): id, displayName, toolPreferences, notes, createdAt, updatedAt, schemaVersion
+// - Agent knowledge (agentKnowledgePath): id, name, toolPreferences, notes, createdAt, updatedAt, schemaVersion
 // - PII bridge (piiBridgePath): id, externalIds, tenantMemberships, schemaVersion
 
 import * as fs from "fs"
@@ -12,9 +12,9 @@ import type { FriendRecord } from "./types"
 // Agent knowledge fields written to {agentKnowledgePath}/{id}.json
 interface AgentKnowledgeData {
   id: string
-  displayName: string
+  name: string
   toolPreferences: Record<string, string>
-  notes: Record<string, string>
+  notes: Record<string, { value: string, savedAt: string }>
   totalTokens: number
   createdAt: string
   updatedAt: string
@@ -60,7 +60,7 @@ export class FileFriendStore implements FriendStore {
     // Split into agent knowledge and PII bridge
     const agentData: AgentKnowledgeData = {
       id: record.id,
-      displayName: record.displayName,
+      name: record.name,
       toolPreferences: record.toolPreferences,
       notes: record.notes,
       totalTokens: record.totalTokens,
@@ -136,7 +136,7 @@ export class FileFriendStore implements FriendStore {
   ): FriendRecord {
     return {
       id: agentData.id,
-      displayName: agentData.displayName,
+      name: agentData.name,
       toolPreferences: agentData.toolPreferences,
       notes: agentData.notes,
       totalTokens: agentData.totalTokens ?? 0,
