@@ -280,17 +280,17 @@ The coverage gate runs on PR checks (`.github/workflows/coverage.yml` runs `npm 
 
 ## Phase C: Full Nerves Coverage -- Mind Domain
 
-### ⬜ Unit 16a: mind (first-impressions, channel, store, tokens) -- tests
-**What**: Write failing tests that expect nerves events from first-impressions.ts, channel.ts, store.ts (factory), and tokens.ts. These are small files (13-38 lines each).
+### ⬜ Unit 16a: mind small files -- tests
+**What**: Write failing tests that expect nerves events from `src/mind/first-impressions.ts`, `src/mind/friends/channel.ts`, `src/mind/friends/store.ts` (factory), and `src/mind/friends/tokens.ts`. These are small files (13-38 lines each).
 **Output**: New/updated test expectations for the 4 mind files
 **Acceptance**: Tests FAIL (red)
 
-### ⬜ Unit 16b: mind (first-impressions, channel, store, tokens) -- implementation
+### ⬜ Unit 16b: mind small files -- implementation
 **What**: Add `emitNervesEvent` calls to all observable code paths in these 4 files.
 **Output**: Updated first-impressions.ts, channel.ts, store.ts, tokens.ts with emitNervesEvent calls
 **Acceptance**: Tests from 16a PASS (green)
 
-### ⬜ Unit 16c: mind (first-impressions, channel, store, tokens) -- coverage & refactor
+### ⬜ Unit 16c: mind small files -- coverage & refactor
 **What**: Verify coverage, refactor.
 **Output**: Coverage report showing 100% on new mind code
 **Acceptance**: 100% coverage on new code, tests green
