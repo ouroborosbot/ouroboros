@@ -1061,6 +1061,186 @@ describe("contextSection", () => {
     // Should include instruction about checking for stale notes
     expect(result.toLowerCase()).toContain("stale")
   })
+
+  // --- Unit 4a tests: friend context instructions rewrite ---
+
+  it("new-friend instruction interpolates displayName when known", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // New-friend block should interpolate the displayName
+    expect(result).toContain("Jordan")
+    // The new-friend instruction should mention the displayName in context of what we know
+    expect(result).toMatch(/new friend.*Jordan|Jordan.*new friend/i)
+  })
+
+  it("new-friend instruction says name is unknown when displayName is 'Unknown'", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        displayName: "Unknown",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // When displayName is "Unknown", the instruction should say we don't know the name
+    expect(result.toLowerCase()).toMatch(/don't know.*name|do not know.*name/)
+    // Should also mention asking what they'd like to be called
+    expect(result.toLowerCase()).toMatch(/ask/)
+  })
+
+  it("new-friend instruction is directive with action verbs, not aspirational", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // New-friend instruction should use directive language: "i save" not "i should learn"
+    expect(result).not.toMatch(/should learn/)
+    // Should contain directive action -- saving immediately
+    expect(result.toLowerCase()).toMatch(/save.*immediately|immediately.*save|i save what i learn/)
+  })
+
+  it("priority guidance mentions both helping AND getting to know them", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: { role: "engineer" },
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // Priority guidance should clarify: help first AND get to know them
+    expect(result.toLowerCase()).toMatch(/get to know/)
+  })
+
+  it("memory instruction lowers the bar -- saves anything learned, not just important things", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: { role: "engineer" },
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "teams" as const,
+        availableIntegrations: ["ado" as const, "graph" as const],
+        supportsMarkdown: true,
+        supportsStreaming: true,
+        supportsRichCards: true,
+        maxMessageLength: 28000,
+      },
+    }
+    const result = contextSection(ctx)
+    // Memory instruction should NOT say "something important" -- bar is too high
+    expect(result).not.toContain("something important")
+    // Should lower the bar to "anything i learn"
+    expect(result.toLowerCase()).toMatch(/anything i learn/)
+  })
+
+  it("name quality instruction is directive -- save immediately, not aspirational prefer", async () => {
+    const { contextSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: {
+        id: "uuid-1",
+        displayName: "Jordan",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: { name: "Jordan" },
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "cli" as const,
+        availableIntegrations: [] as any[],
+        supportsMarkdown: false,
+        supportsStreaming: true,
+        supportsRichCards: false,
+        maxMessageLength: Infinity,
+      },
+    }
+    const result = contextSection(ctx)
+    // Name quality instruction should be directive, not aspirational
+    expect(result).not.toMatch(/i prefer to use/)
+    // Should say something about saving immediately when learning a name
+    expect(result.toLowerCase()).toMatch(/learn.*name.*save.*immediately|when i learn a name.*save/)
+  })
 })
 
 describe("buildSystem with context", () => {
