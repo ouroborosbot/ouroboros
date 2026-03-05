@@ -374,7 +374,7 @@ The systems that make the agent a persistent, self-directed being. Memory gives 
   - This is a hyper-specific system ONLY for autonomous inner dialog sessions. Friend sessions have humans providing user messages.
   - **Important context (Ralph loop):** This pattern is related to the "Ralph loop" concept (Geoffrey Huntley) — a while-true loop that keeps an AI agent working. Key insight from that pattern: progress lives in files and git, not the context window. Key risk: spinning in a tight loop burning tokens with no progress. The instincts system is how the agent avoids this — it develops judgment about when to work and when to rest, rather than relying on hardcoded cost caps.
 - **Heartbeat:** When the agent decides it has nothing urgent to do, it "rests" — but rest does NOT mean off. The agent must never go permanently dormant with no way to wake itself. The supervisor sends a periodic heartbeat nudge into the inner dialog session at a harness-level default interval. On heartbeat, the agent checks in: anything changed? Any new tasks? Any aspirations worth pursuing? If yes, it works. If no, it goes back to rest until the next heartbeat. The heartbeat is the simplest possible instinct — the baseline "check in with yourself."
-- **Supervisor:** A minimal Node.js process supervisor that keeps the agent alive and starts its inner dialog. Not a cron, not a task scheduler — just "make sure this agent is running and thinking." The existing `self-restart.sh` (exit code 42) is the seed — upgrade to a proper Node.js supervisor with: child process spawning, crash detection, restart with backoff, health check, inner dialog session startup, and heartbeat timer. This is NOT the full daemon from Gate 10 — just enough to keep one agent alive and thinking.
+- **Supervisor:** A minimal Node.js process supervisor that keeps agents alive and starts their inner dialogs. Not a cron, not a task scheduler — just "make sure these agents are running and thinking." The existing `self-restart.sh` (exit code 42) is the seed — upgrade to a proper Node.js supervisor with: child process spawning, crash detection, restart with backoff, health check, inner dialog session startup, and heartbeat timer. Design for multiple agents from the start (Gate 7 adds Slugger as a second supervised process), but initially only runs Ouroboros. This is NOT the full daemon from Gate 10 — just enough to keep agents alive and thinking.
 - **Out of scope for Gate 3b:** External event waking (git push, new task appearing, etc.) — separate concern. Session interaction model (how friend messages interrupt/interleave with inner dialog beyond basic concurrency) — Gate 10 daemon territory. Detailed cost guardrails — developed collaboratively with the agent post-bootstrap.
 
 **Completion criteria:**
@@ -492,6 +492,7 @@ Properly migrate Slugger's core identity out of OpenClaw and into `slugger.ouro`
   - Key knowledge graph entities (`~/clawd/life/areas/people/`, `companies/`, `projects/`) -> convert to `slugger.ouro/psyche/memory/facts.jsonl` + `entities.json`
 - NOT in scope for this gate: full task history migration (hundreds of files), all daily notes, full workspace. Just the core files that make Slugger who he is. Additional files can be migrated incrementally later by Slugger himself.
 - Validate that Slugger can operate fully from the `.ouro` bundle with no OpenClaw dependencies
+- Add Slugger as a second supervised process in the supervisor (designed for multiple agents in Gate 3b). Slugger gets his own inner dialog session, heartbeat, and crash recovery — same as Ouroboros.
 - Decommission the OpenClaw runtime for Slugger (Slugger runs entirely on ouroboros harness)
 - Once Slugger is in the harness, both agents should collaborate on rewriting the shared governance docs (ARCHITECTURE.md, CONSTITUTION.md) — this is their first shared aspiration
 
@@ -501,6 +502,7 @@ Properly migrate Slugger's core identity out of OpenClaw and into `slugger.ouro`
 - [ ] Key knowledge graph entities converted to fact store format
 - [ ] Slugger operates from `.ouro` bundle with no OpenClaw fallback
 - [ ] Slugger confirmed he feels cohesive in his new home (not just "tests pass" — the agent says he's good)
+- [ ] Slugger running as second supervised process (own inner dialog, heartbeat, crash recovery)
 - [ ] OpenClaw Slugger runtime decommissioned
 
 ---
@@ -519,7 +521,7 @@ Back up `.ouro` bundles to GitHub as private repos, then migrate bundles out of 
   - `gh repo create arimendelow/slugger.ouro --private`
 - Verify backup integrity (clone from GitHub, compare against local)
 - Create the target directory: `mkdir -p ~/AgentBundles/`
-- Move bundles from harness repo to `~/AgentBundles/ouroboros.ouro/` and `~/AgentBundles/slugger.ouro/`
+- Stop running agents before moving bundles (moving files out from under a running agent could corrupt state). Move bundles from harness repo to `~/AgentBundles/ouroboros.ouro/` and `~/AgentBundles/slugger.ouro/`. Restart agents after path update.
 - Update `getAgentRoot()` in `src/identity.ts` (and any other path resolution) to look for bundles at `~/AgentBundles/<agent>.ouro/` instead of `<repo>/<agent>.ouro/`
 - Update `.gitignore` (bundles are no longer in the repo at all, so the ignore rules change)
 - Verify agents can still bootstrap from the new location
@@ -548,6 +550,7 @@ Develop the task system from its current state into something the model can unam
 - Task board in system prompt so the model always knows its workload
 - Integration with planning/doing workflow (planning docs = `drafting`, doing docs = `processing`)
 - Lifecycle management: completed items move to archive, not just amass files
+- **Task file location:** Tasks live in `<agent>.ouro/tasks/` (each agent's bundle, at `~/AgentBundles/<agent>.ouro/tasks/` after Gate 8). The task module reads/writes via `getAgentRoot()`. Task files are tracked in the bundle's own git, not the harness repo.
 
 **Completion criteria:**
 - [ ] Task module implemented with all components from the spec
@@ -570,7 +573,7 @@ Stand up the daemon so agents never go down unless you want them to. Agents run 
 - `ouro` CLI: start/stop/status/restart for daemon and individual agents
 - Crash recovery with exponential backoff
 - Inter-agent messaging via file-based inbox (from `sub-agent-architecture.md`)
-- Each agent gets its own clone of the harness repo for parallel work without conflicts
+- **Separate repo clones per agent.** Each agent gets its own clone of the harness repo for parallel work without conflicts (e.g., `~/AgentWorkspaces/ouroboros/`, `~/AgentWorkspaces/slugger/`). This is strictly necessary starting here — prior to Gate 10, agents share a single repo and only Codex makes code changes, so there's no conflict. Once agents start doing independent git work (especially Gate 11 coding sessions), they MUST have isolated git state. The daemon is responsible for keeping clones in sync with upstream (pull before work, push after). Agents should always work on feature branches, never directly on main.
 - Health monitoring with alert routing (critical alerts bypass agents, go direct to user)
 
 **Completion criteria:**
@@ -578,7 +581,7 @@ Stand up the daemon so agents never go down unless you want them to. Agents run 
 - [ ] `ouro` CLI works for daemon and agent management
 - [ ] Cron scheduling triggers recurring tasks
 - [ ] Inter-agent messaging delivers between agents
-- [ ] Each agent works in its own repo clone
+- [ ] Each agent works in its own repo clone (isolated git state, synced with upstream)
 - [ ] Health monitoring with tiered alert routing
 - [ ] Agents stay up unless explicitly stopped
 - [ ] `npm test` green
