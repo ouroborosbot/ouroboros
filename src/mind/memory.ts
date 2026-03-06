@@ -23,8 +23,17 @@ export interface MemoryWriteResult {
   skipped: number;
 }
 
+export interface EntityIndexEntry {
+  count: number;
+  factIds: string[];
+  lastSeenAt: string;
+}
+
+export type EntityIndex = Record<string, EntityIndexEntry>;
+
 const HIGHLIGHT_PREFIX = /^\s*(?:remember|learned)\s*:\s*(.+)\s*$/i;
 const DEDUP_THRESHOLD = 0.6;
+const ENTITY_TOKEN = /[a-z0-9]+/g;
 
 export function ensureMemoryStorePaths(rootDir: string): MemoryStorePaths {
   const factsPath = path.join(rootDir, "facts.jsonl");
@@ -96,6 +105,53 @@ function readExistingFacts(factsPath: string): MemoryFact[] {
     .map((line) => JSON.parse(line) as MemoryFact);
 }
 
+function readEntityIndex(entitiesPath: string): EntityIndex {
+  if (!fs.existsSync(entitiesPath)) return {};
+  try {
+    const raw = fs.readFileSync(entitiesPath, "utf8").trim();
+    if (!raw) return {};
+    return JSON.parse(raw) as EntityIndex;
+  } catch {
+    return {};
+  }
+}
+
+function writeEntityIndex(entitiesPath: string, index: EntityIndex): void {
+  fs.writeFileSync(entitiesPath, JSON.stringify(index, null, 2) + "\n", "utf8");
+}
+
+function extractEntityTokens(text: string): string[] {
+  const matches = text.toLowerCase().match(ENTITY_TOKEN) ?? [];
+  return [...new Set(matches.filter((token) => token.length >= 3))];
+}
+
+function updateEntityIndex(entitiesPath: string, fact: MemoryFact): void {
+  const index = readEntityIndex(entitiesPath);
+  const tokens = extractEntityTokens(fact.text);
+  for (const token of tokens) {
+    const existing = index[token];
+    if (existing) {
+      existing.count += 1;
+      if (!existing.factIds.includes(fact.id)) existing.factIds.push(fact.id);
+      existing.lastSeenAt = fact.createdAt;
+      continue;
+    }
+    index[token] = {
+      count: 1,
+      factIds: [fact.id],
+      lastSeenAt: fact.createdAt,
+    };
+  }
+  writeEntityIndex(entitiesPath, index);
+}
+
+function appendDailyFact(dailyDir: string, fact: MemoryFact): void {
+  fs.mkdirSync(dailyDir, { recursive: true });
+  const day = fact.createdAt.slice(0, 10) || "unknown";
+  const dayPath = path.join(dailyDir, `${day}.jsonl`);
+  fs.appendFileSync(dayPath, `${JSON.stringify(fact)}\n`, "utf8");
+}
+
 export function appendFactsWithDedup(stores: MemoryStorePaths, incoming: MemoryFact[]): MemoryWriteResult {
   const existing = readExistingFacts(stores.factsPath);
   const all = [...existing];
@@ -111,6 +167,8 @@ export function appendFactsWithDedup(stores: MemoryStorePaths, incoming: MemoryF
     all.push(fact);
     added++;
     fs.appendFileSync(stores.factsPath, `${JSON.stringify(fact)}\n`, "utf8");
+    updateEntityIndex(stores.entitiesPath, fact);
+    appendDailyFact(stores.dailyDir, fact);
   }
 
   emitNervesEvent({
