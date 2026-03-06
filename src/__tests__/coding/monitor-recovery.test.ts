@@ -83,6 +83,22 @@ describe("coding monitor + recovery", () => {
     )
   })
 
+  it("uses Date.now by default when no custom clock is provided", () => {
+    const manager: ManagerLike = {
+      checkStalls: vi.fn(() => 0),
+      listSessions: vi.fn(() => []),
+    }
+
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-03-05T23:30:00.000Z"))
+    try {
+      const monitor = new CodingSessionMonitor({ manager })
+      const report = monitor.tick()
+      expect(report.at).toBe("2026-03-05T23:30:00.000Z")
+    } finally {
+      nowSpy.mockRestore()
+    }
+  })
+
   it("formats a monitor report with blockers and recovery guidance", () => {
     const text = formatCodingMonitorReport({
       at: "2026-03-05T23:13:00.000Z",
@@ -123,5 +139,28 @@ describe("coding monitor + recovery", () => {
     })
 
     expect(text).toContain("no active coding sessions")
+  })
+
+  it("formats active report without section lines when section arrays are empty", () => {
+    const text = formatCodingMonitorReport({
+      at: "2026-03-05T23:40:00.000Z",
+      summary: {
+        active: 1,
+        completed: 0,
+        blocked: 0,
+        stalled: 0,
+        failed: 0,
+        restarts: 0,
+      },
+      blockedSessionIds: [],
+      stalledSessionIds: [],
+      completedSessionIds: [],
+      recoveryActions: [],
+    })
+
+    expect(text).toContain("active=1")
+    expect(text).not.toContain("blocked:")
+    expect(text).not.toContain("stalled:")
+    expect(text).not.toContain("completed:")
   })
 })
