@@ -22,7 +22,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - [x] Shared governance loader stub committed
 - [x] Kill list / migration checklist committed in-repo
 - [x] Subagent protocol loading convention defined and documented
-- [ ] Bundle backup + `~/AgentBundles/` migration path documented
+- [x] Bundle backup + `~/AgentBundles/` migration path documented
 - [x] `npx tsc` compiles clean with the new interfaces
 - [ ] `npm test` green
 - [x] 100% test coverage on all new code
@@ -112,7 +112,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 **Output**: `docs/gate-1-subagent-protocol-loading.md`.
 **Acceptance**: Convention includes path mapping, sync expectations, and fallback behavior.
 
-### ⬜ Unit 4c: Bundle Backup + `~/AgentBundles/` Migration Path
+### ✅ Unit 4c: Bundle Backup + `~/AgentBundles/` Migration Path
 **What**: Document bundle backup flow (git init + private repo push) and staged migration path to `~/AgentBundles/`.
 **Output**: `docs/gate-1-bundle-backup-migration.md`.
 **Acceptance**: Strategy is concrete, ordered, and references real repo/runtime paths.
@@ -148,3 +148,4 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - 2026-03-05 16:57 Unit 3c complete: raised governance/harness coverage to 100% and revalidated full coverage + `npx tsc`
 - 2026-03-05 16:57 Unit 4a complete: committed path-accurate kill list and migration checklist at `docs/gate-1-kill-list.md`
 - 2026-03-05 16:58 Unit 4b complete: documented bundle-first subagent protocol loading with canonical fallback behavior
+- 2026-03-05 16:59 Unit 4c complete: documented bundle backup process and staged migration to `~/AgentBundles`
