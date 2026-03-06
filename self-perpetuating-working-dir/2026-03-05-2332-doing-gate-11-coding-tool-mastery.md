@@ -1,6 +1,6 @@
 # Doing: Gate 11 Coding Tool Mastery
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-03-05 23:32
 **Planning**: ./self-perpetuating-working-dir/2026-03-05-0911-planning-ouroboros-self-perpetuating-realignment.md
@@ -16,14 +16,14 @@
 Teach agents to use external coding tools (Claude Code/Codex) by implementing coding session orchestration, runtime tools, monitoring/recovery, and an end-to-end pipeline proving the agent can run work-planner → work-doer → work-merger through spawned coding sessions.
 
 ## Completion Criteria
-- [ ] Coding session orchestration implemented (spawn, monitor, manage)
-- [ ] Coding tools exposed and callable by the model
-- [ ] Sessions monitored for progress, stalls, completion, and blockers
-- [ ] Agent manages spawned session context effectively (scoped tasks, state files)
-- [ ] Failure recovery works (crash restart, stall detection, resume)
-- [ ] Agent successfully completes a real coding task end-to-end: work-planner → work-doer → work-merger pipeline orchestrated through external coding tools (Claude Code/Codex)
-- [ ] `npm test` green
-- [ ] 100% coverage on new code
+- [x] Coding session orchestration implemented (spawn, monitor, manage)
+- [x] Coding tools exposed and callable by the model
+- [x] Sessions monitored for progress, stalls, completion, and blockers
+- [x] Agent manages spawned session context effectively (scoped tasks, state files)
+- [x] Failure recovery works (crash restart, stall detection, resume)
+- [x] Agent successfully completes a real coding task end-to-end: work-planner → work-doer → work-merger pipeline orchestrated through external coding tools (Claude Code/Codex)
+- [x] `npm test` green
+- [x] 100% coverage on new code
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -124,7 +124,7 @@ Expected target files:
 **Output**: `unit-4b-green.log` + `unit-4b-npm-test.log` + `unit-4b-tsc.log`.
 **Acceptance**: End-to-end pipeline passes and global verification commands are green.
 
-### ⬜ Unit 4c: Final coverage + checklist sync
+### ✅ Unit 4c: Final coverage + checklist sync
 **What**: Run final coverage gate and sync Gate 11 completion checklists in doing/planning docs.
 **Output**: `unit-4c-coverage.log` + doc updates.
 **Acceptance**: 100% coverage on all new Gate 11 code with traceable artifacts.
@@ -155,3 +155,4 @@ Expected target files:
 - 2026-03-05 23:56 Unit 3c complete: added default-clock and reporter branch tests, then captured 100% coverage for Unit 3 modules (`manager.ts`, `monitor.ts`, `reporter.ts`)
 - 2026-03-05 23:57 Unit 4a complete: added failing integration tests for planner → doer → merger orchestration plus blocked-session guidance, with red log proving missing `coding/pipeline` glue
 - 2026-03-06 00:01 Unit 4b complete: implemented `src/coding/pipeline.ts` orchestration glue, exported pipeline surfaces, refreshed tool-registry snapshot, and captured targeted green test + full `npm test` + clean `tsc` artifacts
+- 2026-03-06 00:03 Unit 4c complete: closed uncovered pipeline branch for no-`taskRef` recovery guidance and captured final Gate 11 coverage report at 100% for all executable new code paths
