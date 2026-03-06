@@ -53,7 +53,7 @@ Teach agents to use external coding tools (Claude Code/Codex) by implementing co
 **Output**: `unit-0-baseline.md`.
 **Acceptance**: Artifact lists concrete implementation/test files and integration seams for coding tool orchestration.
 
-### ⬜ Unit 1a: Coding session lifecycle tests (Red)
+### ✅ Unit 1a: Coding session lifecycle tests (Red)
 **What**: Add failing tests for session spawn/register/kill, status transitions, and branch-aware workdir constraints.
 **Output**: Red tests + `unit-1a-red.log`.
 **Acceptance**: Tests fail before implementation and encode the core session manager contract.
@@ -144,3 +144,4 @@ Expected target files:
 - 2026-03-05 23:33 Validation pass: confirmed existing wiring seams (`src/repertoire/tools-base.ts`, `src/repertoire/tools.ts`, `src/tasks/index.ts`) and target new `src/coding/` module surfaces
 - 2026-03-05 23:33 Quality pass: verified checklist/testability completeness and emoji status headers across all units
 - 2026-03-05 23:34 Unit 0 complete: captured Gate 11 orchestration baseline and concrete target file/test surfaces
+- 2026-03-05 23:36 Unit 1a complete: added failing coding session lifecycle tests and captured red log for missing manager implementation
