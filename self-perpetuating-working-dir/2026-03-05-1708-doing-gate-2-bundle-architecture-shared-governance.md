@@ -54,7 +54,7 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Baseline + Migration Plan Snapshot
+### ✅ Unit 0: Baseline + Migration Plan Snapshot
 **What**: Capture current state of `ouroboros/`, `ouroboros.ouro/`, `slugger/`, and `slugger.ouro/` plus repo-root governance files to drive deterministic migration choices.
 **Output**: `baseline-migration-snapshot.md` artifact.
 **Acceptance**: Snapshot documents source/destination mapping, confirms `.ouro` pre-existence from Gate 1, and identifies required move/merge actions.
@@ -133,3 +133,4 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 - 2026-03-05 17:09 Granularity pass: split migration, governance, and backup work into atomic red/green/refactor units
 - 2026-03-05 17:10 Validation pass: confirmed current gaps (`getAgentRoot` still points to `<repo>/<agent>`, root governance files missing, `.gitignore` missing `*.ouro/`, nested git not initialized)
 - 2026-03-05 17:10 Quality pass: verified emoji-prefixed units, acceptance completeness, and checklist hygiene; marked READY_FOR_EXECUTION
+- 2026-03-05 17:11 Unit 0 complete: baseline migration snapshot captured with explicit source->target mapping
