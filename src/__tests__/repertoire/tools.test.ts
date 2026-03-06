@@ -417,6 +417,14 @@ describe("summarizeArgs", () => {
     expect(summarizeArgs("load_skill", {})).toBe("")
   })
 
+  it("returns query for governance_convention", () => {
+    expect(summarizeArgs("governance_convention", { query: "classification" })).toBe("query=classification")
+  })
+
+  it("returns empty string for governance_convention with no query", () => {
+    expect(summarizeArgs("governance_convention", {})).toBe("")
+  })
+
   it("returns truncated prompt for claude", () => {
     const prompt = "a".repeat(70)
     expect(summarizeArgs("claude", { prompt })).toBe("prompt=" + "a".repeat(60) + "...")
