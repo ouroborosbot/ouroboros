@@ -20,6 +20,10 @@ describe("ouro CLI parsing", () => {
       kind: "agent.start",
       agent: "slugger",
     })
+    expect(parseOuroCommand(["agent", "stop", "slugger"])).toEqual({
+      kind: "agent.stop",
+      agent: "slugger",
+    })
     expect(parseOuroCommand(["agent", "restart", "ouroboros"])).toEqual({
       kind: "agent.restart",
       agent: "ouroboros",
@@ -35,8 +39,10 @@ describe("ouro CLI parsing", () => {
   })
 
   it("throws on unknown command shapes", () => {
+    expect(() => parseOuroCommand([])).toThrow("Usage")
     expect(() => parseOuroCommand(["agent", "start"])).toThrow("Usage")
     expect(() => parseOuroCommand(["cron", "trigger"])).toThrow("Usage")
+    expect(() => parseOuroCommand(["agent", "dance", "slugger"])).toThrow("Unknown command")
     expect(() => parseOuroCommand(["mystery"])).toThrow("Unknown command")
   })
 })

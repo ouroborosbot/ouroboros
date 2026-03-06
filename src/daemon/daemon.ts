@@ -142,23 +142,28 @@ export class OuroDaemon {
 
     this.server = net.createServer((connection) => {
       let raw = ""
+      let responded = false
+
+      const flushResponse = async () => {
+        if (responded) return
+        responded = true
+        const response = await this.handleRawPayload(raw)
+        connection.end(response)
+      }
+
       connection.on("data", (chunk) => {
         raw += chunk.toString("utf-8")
+        void flushResponse()
       })
-      connection.on("end", async () => {
-        const response = await this.handleRawPayload(raw)
-        connection.write(response)
-        connection.end()
+      connection.on("end", () => {
+        void flushResponse()
       })
     })
 
+    const server = this.server
     await new Promise<void>((resolve, reject) => {
-      if (!this.server) {
-        reject(new Error("Daemon server was not initialized."))
-        return
-      }
-      this.server.once("error", reject)
-      this.server.listen(this.socketPath, () => resolve())
+      server.once("error", reject)
+      server.listen(this.socketPath, () => resolve())
     })
   }
 

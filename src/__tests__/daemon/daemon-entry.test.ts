@@ -1,0 +1,193 @@
+import { afterEach, describe, expect, it, vi } from "vitest"
+
+describe("daemon entrypoint", () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it("boots daemon with default socket and wires signal handlers", async () => {
+    vi.resetModules()
+
+    const start = vi.fn(async () => undefined)
+    const stop = vi.fn(async () => undefined)
+    const emitNervesEvent = vi.fn()
+    const daemonCtor = vi.fn()
+    const processManagerCtor = vi.fn()
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => code as never) as any)
+    const onHandlers: Record<string, () => void> = {}
+    const onSpy = vi.spyOn(process, "on").mockImplementation(((event: string, cb: () => void) => {
+      onHandlers[event] = cb
+      return process
+    }) as any)
+
+    class MockOuroDaemon {
+      constructor(_opts: unknown) {
+        daemonCtor(_opts)
+      }
+      start = start
+      stop = stop
+    }
+
+    class MockProcessManager {
+      constructor(_opts: unknown) {
+        processManagerCtor(_opts)
+      }
+    }
+
+    vi.doMock("../../daemon/daemon", () => ({
+      OuroDaemon: MockOuroDaemon,
+    }))
+    vi.doMock("../../daemon/process-manager", () => ({
+      DaemonProcessManager: MockProcessManager,
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
+
+    const argvSpy = vi.spyOn(process, "argv", "get").mockReturnValue(["node", "daemon-entry.js"])
+
+    await import("../../daemon/daemon-entry")
+    await Promise.resolve()
+
+    expect(start).toHaveBeenCalledTimes(1)
+    expect(processManagerCtor).toHaveBeenCalledTimes(1)
+    expect(daemonCtor).toHaveBeenCalledTimes(1)
+
+    const daemonOptions = daemonCtor.mock.calls[0]?.[0] as {
+      scheduler: { listJobs: () => unknown[]; triggerJob: (jobId: string) => Promise<{ ok: boolean; message: string }> }
+      healthMonitor: { runChecks: () => Promise<unknown[]> }
+      router: { send: () => Promise<{ id: string; queuedAt: string }>; pollInbox: () => unknown[] }
+    }
+    expect(daemonOptions.scheduler.listJobs()).toEqual([])
+    await expect(daemonOptions.scheduler.triggerJob("nightly")).resolves.toEqual({
+      ok: true,
+      message: "triggered nightly",
+    })
+    await expect(daemonOptions.healthMonitor.runChecks()).resolves.toEqual([
+      { name: "agent-processes", status: "ok", message: "checks passing" },
+    ])
+    await expect(daemonOptions.router.send()).resolves.toEqual(
+      expect.objectContaining({ id: expect.stringContaining("msg-") }),
+    )
+    expect(daemonOptions.router.pollInbox()).toEqual([])
+
+    expect(emitNervesEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "daemon.entry_start", meta: { socketPath: "/tmp/ouroboros-daemon.sock" } }),
+    )
+    expect(onSpy).toHaveBeenCalledWith("SIGINT", expect.any(Function))
+    expect(onSpy).toHaveBeenCalledWith("SIGTERM", expect.any(Function))
+
+    onHandlers.SIGINT?.()
+    await Promise.resolve()
+    expect(stop).toHaveBeenCalled()
+    expect(exitSpy).toHaveBeenCalledWith(0)
+
+    onHandlers.SIGTERM?.()
+    await Promise.resolve()
+    expect(exitSpy).toHaveBeenCalledWith(0)
+
+    argvSpy.mockRestore()
+  })
+
+  it("emits error and exits when daemon start fails", async () => {
+    vi.resetModules()
+
+    const start = vi.fn(async () => {
+      throw new Error("boom")
+    })
+    const stop = vi.fn(async () => undefined)
+    const emitNervesEvent = vi.fn()
+    const daemonCtor = vi.fn()
+    const processManagerCtor = vi.fn()
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => code as never) as any)
+    vi.spyOn(process, "on").mockImplementation(((
+      _event: string,
+      _cb: () => void,
+    ) => process) as any)
+
+    class MockOuroDaemon {
+      constructor(_opts: unknown) {
+        daemonCtor(_opts)
+      }
+      start = start
+      stop = stop
+    }
+
+    class MockProcessManager {
+      constructor(_opts: unknown) {
+        processManagerCtor(_opts)
+      }
+    }
+
+    vi.doMock("../../daemon/daemon", () => ({
+      OuroDaemon: MockOuroDaemon,
+    }))
+    vi.doMock("../../daemon/process-manager", () => ({
+      DaemonProcessManager: MockProcessManager,
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
+
+    const argvSpy = vi.spyOn(process, "argv", "get").mockReturnValue([
+      "node",
+      "daemon-entry.js",
+      "--socket",
+      "/tmp/custom.sock",
+    ])
+
+    await import("../../daemon/daemon-entry")
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(emitNervesEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "daemon.entry_error" }),
+    )
+    expect(processManagerCtor).toHaveBeenCalledTimes(1)
+    expect(daemonCtor).toHaveBeenCalledTimes(1)
+    expect(stop).toHaveBeenCalled()
+    expect(exitSpy).toHaveBeenCalledWith(1)
+
+    argvSpy.mockRestore()
+  })
+
+  it("falls back to default socket when --socket value is blank", async () => {
+    vi.resetModules()
+
+    const start = vi.fn(async () => undefined)
+    const stop = vi.fn(async () => undefined)
+    const emitNervesEvent = vi.fn()
+    vi.spyOn(process, "on").mockImplementation(((
+      _event: string,
+      _cb: () => void,
+    ) => process) as any)
+
+    class MockOuroDaemon {
+      start = start
+      stop = stop
+    }
+
+    class MockProcessManager {}
+
+    vi.doMock("../../daemon/daemon", () => ({
+      OuroDaemon: MockOuroDaemon,
+    }))
+    vi.doMock("../../daemon/process-manager", () => ({
+      DaemonProcessManager: MockProcessManager,
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
+
+    const argvSpy = vi.spyOn(process, "argv", "get").mockReturnValue([
+      "node",
+      "daemon-entry.js",
+      "--socket",
+      "   ",
+    ])
+
+    await import("../../daemon/daemon-entry")
+    await Promise.resolve()
+
+    expect(emitNervesEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "daemon.entry_start", meta: { socketPath: "/tmp/ouroboros-daemon.sock" } }),
+    )
+
+    argvSpy.mockRestore()
+  })
+})
