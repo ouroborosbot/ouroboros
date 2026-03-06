@@ -232,6 +232,84 @@
   What happened: Daemon socket disappearance was a side effect of switching runtime mode during testing (`supervisor` flow vs daemon-managed flow), which made `ouro` control commands fail until daemon was restarted.
   Pain level (1-5): 4
   Suggested fix (if any): Make runtime mode explicit and mutually clear in CLI output/help (current mode, what commands are valid now, and one-step command to switch modes safely).
+- Time: 2026-03-06 14:11 PST
+  Step: Slugger provider switch verification
+  What you expected: Slugger should run successfully on OpenAI Codex while Anthropic is rate-limited.
+  What happened: Interactive CLI turn succeeded; runtime log `engine.turn_start` entries show `meta.provider = "openai-codex"` with no Anthropic 429 on this validation pass.
+  Pain level (1-5): 1
+  Suggested fix (if any): No blocker here; keep this as the temporary provider path until Anthropic quota/session resets.
+- Time: 2026-03-06 14:18 PST
+  Step: Inner-dialog runtime semantics in daemon mode
+  What you expected: Inner-dialog should behave consistently across runtime modes (periodic heartbeat-driven continuation, not repeated cold boot semantics).
+  What happened: Trace review suggests daemon-managed workers repeatedly run `boot` turns after restarts while heartbeat turns are observed in supervisor mode; behavior divergence contributes to confusion about autonomy state.
+  Pain level (1-5): 4
+  Suggested fix (if any): Unify inner-dialog scheduling contract across daemon/supervisor modes (single heartbeat source), and expose mode + inner-dialog cycle reason clearly in operator status/log output.
+- Time: 2026-03-06 14:21 PST
+  Step: Inner-dialog purpose/value clarity
+  What you expected: Inner-dialog should be the agent's autonomous workspace to do meaningful self-directed work, not merely periodic "check-in" chatter.
+  What happened: Current framing/default instinct ("heartbeat checkin") makes the value proposition unclear and reads as maintenance noise rather than productive autonomous execution.
+  Pain level (1-5): 5
+  Suggested fix (if any): Redefine inner-dialog contract around concrete autonomous work outcomes (task progression, decision updates, explicit next actions/artifacts) with observable operator-visible results.
+- Time: 2026-03-06 14:24 PST
+  Step: Cross-session awareness from inner-dialog to live chat
+  What you expected: During a live conversation, the human should be able to ask the agent what it worked on/thought through during autonomous inner-dialog time.
+  What happened: Current behavior does not provide a clear, queryable continuity layer between autonomous cycles and interactive chat sessions.
+  Pain level (1-5): 5
+  Suggested fix (if any): Use existing on-disk session artifacts as the source of truth and add chat-time retrieval/summary behavior ("what were you doing while I was gone?") with no new journal file type.
+- Time: 2026-03-06 14:29 PST
+  Step: Inner-dialog session path ergonomics
+  What you expected: Session paths should be easy to discover and remember during manual debugging.
+  What happened: Session paths follow an existing convention (`~/.agentstate/<agent>/sessions/<subject>/<channel>/<file>`), where inner-dialog is `sessions/self/inner/dialog.json`; structurally consistent, but still hard to discover/remember in CLI workflows.
+  Pain level (1-5): 3
+  Suggested fix (if any): Keep current canonical layout, but add operator-facing aliases/commands and docs so humans don't need to memorize deep paths.
+- Time: 2026-03-06 14:33 PST
+  Step: Product comprehension gap (inner-dialog + overnight build)
+  What you expected: Clear understanding of what was built overnight and why inner-dialog matters.
+  What happened: Even after live testing, value remains unclear beyond basic daemon/status/coding smoke flows; inner-dialog behavior especially feels under-explained and purpose-ambiguous.
+  Pain level (1-5): 5
+  Suggested fix (if any): Provide a capability map that ties each subsystem to user-visible value and a concrete "try it yourself" workflow; prioritize UX affordances that make autonomous work outcomes legible.
+- Time: 2026-03-06 14:38 PST
+  Step: Inner-dialog model-call frequency / cost clarity
+  What you expected: Clear answer to whether autonomous loop is continuously calling providers.
+  What happened: Runtime had multiple daemon processes active simultaneously, which can multiply autonomous workers and create confusing repeated model turns (including mixed-provider traces from stale processes).
+  Pain level (1-5): 5
+  Suggested fix (if any): Enforce single-daemon lock (no orphan takeover), expose active autonomous loop cadence in status, and make model-call sources explicit (interactive turn vs inner-dialog cycle).
+- Time: 2026-03-06 14:43 PST
+  Step: Confirmed gap -- live chat awareness of inner-dialog work
+  What you expected: Asking an agent in chat about inner-dialog activity should work naturally.
+  What happened: CLI channel loads only the friend session (`sessions/<friend>/cli/session.json`) and does not ingest the inner-dialog session file (`sessions/self/inner/dialog.json`) directly; continuity currently depends on memory capture/recall, not explicit session bridging.
+  Pain level (1-5): 5
+  Suggested fix (if any): Add a direct bridge so chat can explicitly query/recap recent inner-dialog turns from existing session artifacts (no new storage type).
+- Time: 2026-03-06 14:46 PST
+  Step: Requirement lock -- inner-dialog must be agent-known in conversation
+  What you expected: Agent should inherently know and discuss its own inner-dialog work during normal conversation.
+  What happened: Requirement confirmed: this is not optional and should not depend on incidental memory extraction behavior.
+  Pain level (1-5): 5
+  Suggested fix (if any): Make inner-dialog continuity a core runtime contract for interactive turns (explicitly available context), with deterministic behavior under test.
+- Time: 2026-03-06 14:49 PST
+  Step: Inner-dialog cadence sanity
+  What you expected: Inner-dialog should not run continuously; autonomy should be intentional and bounded.
+  What happened: Current behavior/cost model is unclear in operator UX, and duplicated daemons can make autonomous calls appear excessive.
+  Pain level (1-5): 5
+  Suggested fix (if any): Define explicit inner-dialog scheduling policy (event- or window-based, pause/quiet states, max frequency) and expose current cadence/state in status output.
+- Time: 2026-03-06 14:54 PST
+  Step: Stale docs block understanding of shipped system
+  What you expected: Top-level docs should explain the current architecture and command model after gates 0-11.
+  What happened: `README.md` still describes pre-migration structure/flows (legacy agent directory assumptions and outdated run guidance), which makes the completed overnight work hard to discover and reason about.
+  Pain level (1-5): 5
+  Suggested fix (if any): Publish an up-to-date operator-facing architecture + "how to drive it" guide aligned with current bundle roots, daemon model, inner-dialog behavior, task system, and coding orchestration.
+- Time: 2026-03-06 14:59 PST
+  Step: Hands-on guidance quality
+  What you expected: A guided exploration should feel like one coherent walkthrough, not repeated setup/status loops.
+  What happened: Session felt repetitive ("same thing over and over"), reducing confidence that the deep capabilities are being surfaced efficiently.
+  Pain level (1-5): 5
+  Suggested fix (if any): Use a single storyline walkthrough where each step exercises a distinct capability exactly once, with setup handled once up front and no repeated plumbing checks.
+- Time: 2026-03-06 15:03 PST
+  Step: Explicit inner-dialog continuity failure in chat response
+  What you expected: Agent should acknowledge and reason over its own background inner-dialog work when asked in conversation.
+  What happened: Agent responded that it does not have a background inner-dialog loop running in this chat, confirming the continuity contract is currently broken from user perspective.
+  Pain level (1-5): 5
+  Suggested fix (if any): Interactive chat must have deterministic awareness of inner-dialog runtime state/history (and explicitly distinguish "not running" vs "running but no recent work").
 
 ## Fix Round Backlog (to fill during session)
 - [ ] Improve CLI/readability of nerves output during local verification (signal > noise).
@@ -278,3 +356,16 @@
 - [ ] Enforce “no stuck agents” policy in coding orchestration and operator UX.
 - [ ] Finish advanced functional validation pass (multi-agent/autonomy loop behavior) before implementing fixes.
 - [ ] Improve transient retry messaging so provider rate-limit/auth failures are not mislabeled as generic network errors.
+- [ ] Unify inner-dialog turn scheduling across daemon and supervisor so periodic heartbeat behavior is consistent (no unintended boot-only loops).
+- [ ] Reframe inner-dialog as autonomous work lane (not check-in loop): require each cycle to produce or update concrete work artifacts/tasks/decisions with visible progress signals.
+- [ ] Add cross-session continuity contract using existing session files (no new journal artifact): agent can answer “what have you been working on?” from persisted inner-dialog turns/checkpoints.
+- [ ] Document current session path convention (`sessions/<subject>/<channel>/<file>`) and add operator-facing aliases for fast lookup.
+- [ ] Improve session-path ergonomics/discoverability (short aliases + clearer canonical directory layout for operator workflows).
+- [ ] Add a user-facing capability map ("what exists / why care / how to try") for daemon, task system, coding orchestration, memory, and inner-dialog.
+- [ ] Enforce strict single-daemon lock and prevent socket takeover/orphan-daemon states that can duplicate autonomous loops and provider usage.
+- [ ] Add operator-visible call-source telemetry (interactive vs inner-dialog, per-agent cadence) to make model usage understandable.
+- [ ] Bridge interactive chat to inner-dialog session history so "what were you working on?" works reliably without relying on incidental memory extraction.
+- [ ] Promote inner-dialog continuity to a hard runtime contract (deterministic, test-covered, always available in interactive chat context).
+- [ ] Define and enforce inner-dialog scheduling policy (not continuous): explicit cadence triggers, quiet/paused states, and operator-visible current mode.
+- [ ] Refresh top-level docs (README/architecture usage guide) to match post-gate reality; include operator mental model and hands-on walkthroughs.
+- [ ] Redesign validation walkthrough into a single narrative "tour mode" that covers major capabilities without repetitive setup churn.
