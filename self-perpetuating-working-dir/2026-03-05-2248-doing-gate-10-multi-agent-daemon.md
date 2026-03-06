@@ -50,7 +50,7 @@ Stand up a multi-agent daemon that keeps agents alive with crash recovery, expos
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Baseline + daemon surface mapping
+### ✅ Unit 0: Baseline + daemon surface mapping
 **What**: Map current supervisor/entrypoint/runtime touchpoints and define Gate 10 target file surfaces for daemon, CLI, scheduler, routing, and workspace isolation.
 **Output**: `unit-0-baseline.md`.
 **Acceptance**: Artifact names concrete implementation/test files and command surfaces used for Gate 10.
@@ -149,3 +149,4 @@ Expected target files:
 - 2026-03-05 22:49 Granularity pass: added concrete baseline touchpoints and command-plane branch expectations
 - 2026-03-05 22:50 Validation pass: pinned Gate 10 target implementation and test files to existing repo conventions
 - 2026-03-05 22:50 Quality pass: confirmed emoji headers, testable acceptance criteria, and coverage requirements for every unit
+- 2026-03-05 22:53 Unit 0 complete: captured supervisor baseline and concrete daemon module/test target map
