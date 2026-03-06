@@ -1,6 +1,6 @@
 {
   "name": "ouroboros",
-  "provider": "openai-codex",
+  "provider": "azure",
   "configPath": "~/.agentsecrets/ouroboros/secrets.json",
   "context": {
     "maxTokens": 80000,
