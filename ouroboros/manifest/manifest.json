@@ -1,0 +1,72 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.25/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.25",
+  "version": "1.0.3",
+  "id": "7467201b-d9b4-4792-9b46-ce84494f9d09",
+  "developer": {
+    "name": "Ouroboros (with help from Ari)",
+    "websiteUrl": "https://microsoft.com",
+    "privacyUrl": "https://go.microsoft.com/fwlink/?LinkId=521839",
+    "termsOfUseUrl": "https://go.microsoft.com/fwlink/?LinkID=206977"
+  },
+  "name": {
+    "short": "Ouroboros",
+    "full": "Ouroboros Coding Agent"
+  },
+  "description": {
+    "short": "Self-modifying coding agent",
+    "full": "Ouroboros is a witty, competent coding assistant that can read files, write code, run shell commands, and modify its own source. It embraces chaos and delivers quality."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#4464ee",
+  "bots": [
+    {
+      "botId": "7467201b-d9b4-4792-9b46-ce84494f9d09",
+      "scopes": ["personal", "copilot"],
+      "commandLists": [
+        {
+          "scopes": ["personal"],
+          "commands": [
+            {
+              "title": "/new",
+              "description": "Clear conversation and start fresh"
+            },
+            {
+              "title": "/commands",
+              "description": "List available slash commands"
+            }
+          ]
+        },
+        {
+          "scopes": ["copilot"],
+          "commands": [
+            {
+              "title": "Review my code",
+              "description": "Read and review code in the repo"
+            },
+            {
+              "title": "What can you do?",
+              "description": "List your capabilities"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "copilotAgents": {
+    "customEngineAgents": [
+      {
+        "type": "bot",
+        "id": "7467201b-d9b4-4792-9b46-ce84494f9d09"
+      }
+    ]
+  },
+  "webApplicationInfo": {
+    "id": "7467201b-d9b4-4792-9b46-ce84494f9d09",
+    "resource": "api://botid-7467201b-d9b4-4792-9b46-ce84494f9d09"
+  },
+  "validDomains": ["xcbc4jjj-3978.usw2.devtunnels.ms", "token.botframework.com"]
+}
