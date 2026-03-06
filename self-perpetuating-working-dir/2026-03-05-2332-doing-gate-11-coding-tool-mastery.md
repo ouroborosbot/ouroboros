@@ -114,7 +114,7 @@ Expected target files:
 **Output**: `unit-3c-coverage.log`.
 **Acceptance**: 100% coverage for Unit 3 modules.
 
-### ⬜ Unit 4a: End-to-end coding pipeline test (Red)
+### ✅ Unit 4a: End-to-end coding pipeline test (Red)
 **What**: Add failing integration test that drives a simulated coding session through planner → doer → merger orchestration flow and verifies progress reporting.
 **Output**: Red tests + `unit-4a-red.log`.
 **Acceptance**: End-to-end orchestration test fails before final integration.
@@ -153,3 +153,4 @@ Expected target files:
 - 2026-03-05 23:54 Unit 3a complete: added failing monitor/recovery contract tests (`monitor-recovery.test.ts`) with red log proving missing `coding/monitor` + `coding/reporter` modules
 - 2026-03-05 23:55 Unit 3b complete: implemented monitor/reporter modules with blocked/stalled/completed/failed summaries + recovery actions and captured green test + compile logs
 - 2026-03-05 23:56 Unit 3c complete: added default-clock and reporter branch tests, then captured 100% coverage for Unit 3 modules (`manager.ts`, `monitor.ts`, `reporter.ts`)
+- 2026-03-05 23:57 Unit 4a complete: added failing integration tests for planner → doer → merger orchestration plus blocked-session guidance, with red log proving missing `coding/pipeline` glue
