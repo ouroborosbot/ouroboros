@@ -100,7 +100,7 @@ Expected target files:
 **Output**: `unit-2c-coverage.log`.
 **Acceptance**: 100% coverage for daemon command plane code.
 
-### ⬜ Unit 3a: Cron/router/health tests (Red)
+### ✅ Unit 3a: Cron/router/health tests (Red)
 **What**: Add failing tests for cron trigger execution, inter-agent inbox delivery, and tiered health alert routing.
 **Output**: Red tests + `unit-3a-red.log`.
 **Acceptance**: Tests fail before implementation and encode recurring-task and alert-routing behavior.
@@ -156,3 +156,4 @@ Expected target files:
 - 2026-03-05 23:00 Unit 2a complete: added failing daemon command-plane/CLI protocol tests and captured red log
 - 2026-03-05 23:03 Unit 2b complete: implemented daemon command server + `ouro` CLI entry/scripts with green tests and clean compile
 - 2026-03-05 23:12 Unit 2c complete: expanded command-plane branch tests and reached 100% coverage for daemon/CLI modules
+- 2026-03-05 23:13 Unit 3a complete: added failing cron scheduler/message router/health monitor tests and captured red log
