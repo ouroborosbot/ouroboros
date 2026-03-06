@@ -1,4 +1,5 @@
 import * as fs from "fs"
+import * as os from "os"
 import * as path from "path"
 import { emitNervesEvent } from "./nerves/runtime"
 
@@ -88,10 +89,17 @@ export function getRepoRoot(): string {
 }
 
 /**
- * Returns the agent-specific bundle directory: `<repoRoot>/<agentName>.ouro/`
+ * Returns the shared bundle root directory: `~/AgentBundles/`
+ */
+export function getAgentBundlesRoot(): string {
+  return path.join(os.homedir(), "AgentBundles")
+}
+
+/**
+ * Returns the agent-specific bundle directory: `~/AgentBundles/<agentName>.ouro/`
  */
 export function getAgentRoot(): string {
-  return path.join(getRepoRoot(), `${getAgentName()}.ouro`)
+  return path.join(getAgentBundlesRoot(), `${getAgentName()}.ouro`)
 }
 
 /**
