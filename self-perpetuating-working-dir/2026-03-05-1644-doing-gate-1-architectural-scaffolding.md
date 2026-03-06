@@ -57,25 +57,65 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 **Output**: `prior-art-review.md` artifact with proposal-to-scaffold mapping.
 **Acceptance**: Artifact references archive-branch files and maps at least the HIGH-priority themes to concrete Gate 1 deliverables.
 
-### ⬜ Unit 1: `.ouro` Bundle Skeleton
-**What**: Commit skeleton directories/files for `.ouro` bundle layout (structure-only placeholders), including `teams-app/`, `psyche/`, `skills/`, `tasks/`, and `psyche/memory/` substructure.
-**Output**: Committed skeleton directories/files for both agents.
-**Acceptance**: Layout matches planning-doc target tree and remains structure-only (no Gate 2 population work).
+### ⬜ Unit 1a: Bundle Skeleton Contract Test (Red)
+**What**: Add a failing test that asserts required `.ouro` skeleton paths for both `ouroboros.ouro/` and `slugger.ouro/` exist.
+**Output**: New failing test file under `src/__tests__/`.
+**Acceptance**: Test fails because skeleton paths do not exist yet.
 
-### ⬜ Unit 2: Harness Primitive Interfaces
+### ⬜ Unit 1b: `.ouro` Bundle Skeleton Implementation (Green)
+**What**: Create structure-only `.ouro` directories/files for both agents, including `teams-app/`, `psyche/`, `skills/`, `tasks/`, and `psyche/memory/` substructure.
+**Output**: Committed skeleton tree with placeholder files only.
+**Acceptance**: Bundle contract test passes and layout matches planning-doc target tree.
+
+### ⬜ Unit 1c: Bundle Skeleton Refactor/Coverage
+**What**: Normalize placeholder conventions and confirm new test coverage remains complete.
+**Output**: Clean skeleton structure and passing targeted/full tests.
+**Acceptance**: No extra population work leaked from Gate 2 and tests remain green.
+
+### ⬜ Unit 2a: Harness Interface Contract Test (Red)
+**What**: Add failing TypeScript contract tests (or compile assertions) for expected harness primitive interface exports.
+**Output**: New failing test file referencing planned interface symbols.
+**Acceptance**: Test/compile step fails before interfaces exist.
+
+### ⬜ Unit 2b: Harness Primitive Interfaces (Green)
 **What**: Add TypeScript scaffolding interfaces for model tool surface, bootstrap sequencing, and governance checks.
-**Output**: New importable TypeScript interface module(s) with barrel exports as needed.
-**Acceptance**: Interfaces compile, are importable from runtime code, and remain scaffolding-level (no over-specification).
+**Output**: New importable interface module(s) with stable export paths.
+**Acceptance**: Contract tests pass and interfaces remain scaffolding-level (no over-specification).
 
-### ⬜ Unit 3: Governance Loader Stub
-**What**: Add a shared governance loader stub at the target location used by future gates.
-**Output**: Loader module with minimal API plus tests covering success and missing-file behavior.
-**Acceptance**: Tests are red before implementation and green after implementation; loader behavior is deterministic.
+### ⬜ Unit 2c: Interfaces Refactor/Compile Validation
+**What**: Refine naming/organization and run `npx tsc` to verify clean integration.
+**Output**: Finalized interface layout and compile evidence in artifacts.
+**Acceptance**: `npx tsc` is green with new interface modules imported successfully.
 
-### ⬜ Unit 4: Migration/Protocol/Backup Documentation
-**What**: Commit in-repo docs for kill/refactor list, subagent protocol loading convention, and bundle backup + `~/AgentBundles/` migration path.
-**Output**: Three committed markdown artifacts in a stable docs location.
-**Acceptance**: Each artifact is specific, references real repo paths, and is ready for Gate 2/3 implementation follow-through.
+### ⬜ Unit 3a: Governance Loader Tests (Red)
+**What**: Add failing tests for governance loader stub behavior (happy path + missing-file path).
+**Output**: New failing tests for loader API expectations.
+**Acceptance**: Tests fail before loader implementation exists.
+
+### ⬜ Unit 3b: Governance Loader Stub (Green)
+**What**: Implement shared governance loader stub at the agreed target location with deterministic return/error behavior.
+**Output**: Loader module plus minimal fixture data if needed.
+**Acceptance**: Loader tests pass and API shape is ready for Gate 2/3 expansion.
+
+### ⬜ Unit 3c: Governance Loader Refactor/Coverage
+**What**: Tighten loader implementation and verify 100% coverage on new runtime code.
+**Output**: Coverage evidence and any small cleanup commits.
+**Acceptance**: Loader path has full coverage and no warnings.
+
+### ⬜ Unit 4a: Kill List / Migration Checklist
+**What**: Commit in-repo checklist documenting kill/refactor targets (`autonomous-loop.ts`, `loop-entry.ts`, orchestration in `trigger.ts`, and survivors/refactors).
+**Output**: Markdown checklist artifact in `docs/`.
+**Acceptance**: Checklist is specific, path-accurate, and actionable for Gates 2-3.
+
+### ⬜ Unit 4b: Subagent Protocol Loading Convention
+**What**: Document how agents load planner/doer/merger protocols from bundle context while shared source-of-truth stays in repo-root `subagents/`.
+**Output**: Markdown convention doc in `docs/`.
+**Acceptance**: Convention includes path mapping, sync expectations, and fallback behavior.
+
+### ⬜ Unit 4c: Bundle Backup + `~/AgentBundles/` Migration Path
+**What**: Document bundle backup flow (git init + private repo push) and staged migration path to `~/AgentBundles/`.
+**Output**: Markdown migration strategy doc in `docs/`.
+**Acceptance**: Strategy is concrete, ordered, and references real repo/runtime paths.
 
 ### ⬜ Unit 5: Gate Verification
 **What**: Run `npm test` and `npx tsc`, then update this doing doc checklist based on verified evidence.
@@ -93,3 +133,4 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 
 ## Progress Log
 - 2026-03-05 16:44 Created from planning doc
+- 2026-03-05 16:45 Granularity pass: split major deliverables into atomic test/implement/refactor units
