@@ -1,8 +1,10 @@
 import OpenAI from "openai"
 import { App } from "@microsoft/teams.apps"
 import { DevtoolsPlugin } from "@microsoft/teams.dev"
-import { runAgent, ChannelCallbacks, RunAgentOptions, createSummarize } from "../heart/core"
+import { runAgent, ChannelCallbacks, RunAgentOptions, createSummarize, repairOrphanedToolCalls } from "../heart/core"
 import type { ToolContext } from "../repertoire/tools"
+import { getToolsForChannel } from "../repertoire/tools"
+import { getChannelCapabilities } from "../mind/friends/channel"
 import { getOAuthConfig, resolveOAuthForTenant, getTeamsSecondaryConfig } from "../heart/config"
 import { buildSystem } from "../mind/prompt"
 import { pickPhrase, getPhrases } from "../mind/phrases"
@@ -505,6 +507,9 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
     ? existing.messages
     : [{ role: "system", content: await buildSystem("teams", undefined, toolContext?.context) }]
 
+  // Repair any orphaned tool calls from a previous aborted turn
+  repairOrphanedToolCalls(messages)
+
   // Push user message
   messages.push({ role: "user", content: text })
 
@@ -757,7 +762,10 @@ export function startTeamsApp(): void {
 
   const port = process.env.PORT ? Number(process.env.PORT) : getTeamsChannelConfig().port
   app.start(port)
-  emitNervesEvent({ level: "info", event: "channel.app_started", component: "channels", message: `Teams bot started on port ${port} with ${mode} (chunked streaming)`, meta: { port, mode } })
+  // Diagnostic: log tool count at startup to verify deploy
+  const startupTools = getToolsForChannel(getChannelCapabilities("teams"))
+  const toolNames = startupTools.map((t) => t.function.name)
+  emitNervesEvent({ level: "info", event: "channel.app_started", component: "channels", message: `Teams bot started on port ${port} with ${mode} (chunked streaming)`, meta: { port, mode, toolCount: toolNames.length, hasProactive: toolNames.includes("teams_send_message") } })
 
   // --- Secondary bot (dual-bot support) ---
   // If teamsSecondary has a clientId, start a second App on an internal port

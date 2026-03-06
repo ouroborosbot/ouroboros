@@ -486,6 +486,7 @@ describe("Teams adapter - message handling", () => {
       createSummarize: vi.fn(() => vi.fn()),
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-test-session.json"),
@@ -726,6 +727,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
@@ -762,6 +764,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
 
     const teams = await import("../../senses/teams")
@@ -798,6 +801,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
 
     vi.spyOn(console, "log").mockImplementation(() => {})
@@ -830,6 +834,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
@@ -878,6 +883,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../mind/prompt", () => ({
       buildSystem: vi.fn().mockResolvedValue("system prompt"),
@@ -944,6 +950,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../mind/prompt", () => ({
       buildSystem: vi.fn().mockResolvedValue("system prompt"),
@@ -1030,6 +1037,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../mind/prompt", () => ({
       buildSystem: vi.fn().mockResolvedValue("system prompt"),
@@ -1114,6 +1122,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../mind/prompt", () => ({
       buildSystem: vi.fn().mockResolvedValue("system prompt"),
@@ -1172,6 +1181,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       runAgent: vi.fn().mockRejectedValue(new Error("agent crashed")),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
 
     const teams = await import("../../senses/teams")
@@ -1217,6 +1227,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       runAgent: vi.fn().mockRejectedValue("string-crash"),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
 
     const teams = await import("../../senses/teams")
@@ -1264,6 +1275,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../mind/prompt", () => ({
       buildSystem: vi.fn().mockResolvedValue("system prompt"),
@@ -1335,6 +1347,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../mind/prompt", () => ({
       buildSystem: vi.fn().mockResolvedValue("system prompt"),
@@ -1405,6 +1418,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../mind/prompt", () => ({
       buildSystem: vi.fn().mockResolvedValue("system prompt"),
@@ -1473,6 +1487,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
 
     const teams = await import("../../senses/teams")
@@ -1538,6 +1553,7 @@ describe("Teams adapter - startTeamsApp signin.verify-state handler", () => {
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
 
     return { handlers, emitNervesEventMock }
@@ -1761,6 +1777,7 @@ describe("Teams adapter - startTeamsApp AAD extraction (Bug 1)", () => {
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../mind/prompt", () => ({
       buildSystem: vi.fn().mockResolvedValue("system prompt"),
@@ -1843,6 +1860,7 @@ describe("Teams adapter - startTeamsApp AAD extraction (Bug 1)", () => {
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../mind/prompt", () => ({
       buildSystem: vi.fn().mockResolvedValue("system prompt"),
@@ -1943,6 +1961,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
 
     const teams = await import("../../senses/teams")
@@ -1993,6 +2012,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
 
     vi.spyOn(console, "log").mockImplementation(() => {})
@@ -2046,6 +2066,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     mockBotConfig("test-client-id", "test-secret", "test-tenant-id")
 
@@ -2079,6 +2100,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     mockBotConfig("my-app-id", "my-secret", "my-tenant")
 
@@ -2113,6 +2135,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     mockBotConfig("test-id", "test-secret", "test-tenant")
 
@@ -2146,6 +2169,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     mockBotConfig("test-id", "test-secret", "test-tenant")
 
@@ -2181,6 +2205,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     mockBotConfig("test-id", "test-secret", "test-tenant")
 
@@ -2389,6 +2414,7 @@ describe("Teams adapter - session persistence", () => {
       createSummarize: vi.fn(() => vi.fn()),
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
@@ -2801,6 +2827,7 @@ describe("Teams adapter - session persistence", () => {
       createSummarize: vi.fn(() => vi.fn()),
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
@@ -3351,6 +3378,7 @@ describe("Teams adapter - handleTeamsMessage unified chunked streaming", () => {
       createSummarize: vi.fn(() => vi.fn()),
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
@@ -3502,6 +3530,7 @@ describe("Teams adapter - startTeamsApp no --disable-streaming flag", () => {
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
 
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {})
@@ -3537,6 +3566,7 @@ describe("Teams adapter - startTeamsApp no --disable-streaming flag", () => {
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
@@ -3582,6 +3612,7 @@ describe("Teams adapter - confirmation callback", () => {
       createSummarize: vi.fn(() => vi.fn()),
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
@@ -3910,6 +3941,7 @@ describe("Teams adapter - confirmation callback", () => {
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
@@ -3998,6 +4030,7 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
       createSummarize: vi.fn(() => vi.fn()),
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
@@ -4136,6 +4169,7 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
@@ -4195,6 +4229,7 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
       createSummarize: vi.fn(() => vi.fn()),
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
@@ -4709,6 +4744,7 @@ describe("Teams adapter - GitHub token handling", () => {
       createSummarize: vi.fn(() => vi.fn()),
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
+      repairOrphanedToolCalls: vi.fn(),
     }))
     vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),

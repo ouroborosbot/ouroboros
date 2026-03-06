@@ -214,6 +214,46 @@ export function stripLastToolCalls(
   }
 }
 
+// Repair orphaned tool_calls anywhere in the message history.
+// If an assistant message has tool_calls but the following messages don't include
+// a tool result for every call, inject synthetic error results for the missing ones.
+// This prevents 400 errors from the API after an aborted turn.
+export function repairOrphanedToolCalls(
+  messages: OpenAI.ChatCompletionMessageParam[],
+): void {
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg.role !== "assistant") continue;
+    const asst = msg as OpenAI.ChatCompletionAssistantMessageParam;
+    if (!asst.tool_calls || asst.tool_calls.length === 0) continue;
+
+    // Collect tool result IDs that follow this assistant message
+    const resultIds = new Set<string>();
+    for (let j = i + 1; j < messages.length; j++) {
+      const following = messages[j];
+      if (following.role === "tool") {
+        resultIds.add((following as OpenAI.ChatCompletionToolMessageParam).tool_call_id);
+      } else if (following.role === "assistant" || following.role === "user") {
+        break; // stop at next non-tool message
+      }
+    }
+
+    // Find missing results and insert them right after the assistant message
+    const missing = asst.tool_calls.filter((tc) => !resultIds.has(tc.id));
+    if (missing.length > 0) {
+      const syntheticResults: OpenAI.ChatCompletionToolMessageParam[] = missing.map((tc) => ({
+        role: "tool" as const,
+        tool_call_id: tc.id,
+        content: "error: tool call was interrupted (previous turn timed out or was aborted)",
+      }));
+      // Insert after the last existing tool result for this assistant message, or right after the assistant message
+      let insertAt = i + 1;
+      while (insertAt < messages.length && messages[insertAt].role === "tool") insertAt++;
+      messages.splice(insertAt, 0, ...syntheticResults);
+    }
+  }
+}
+
 // Detect context overflow errors from Azure or MiniMax
 function isContextOverflow(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
