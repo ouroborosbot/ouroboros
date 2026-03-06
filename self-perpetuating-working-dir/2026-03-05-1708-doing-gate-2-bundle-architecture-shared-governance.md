@@ -1,6 +1,6 @@
 # Doing: Gate 2 Bundle Architecture + Shared Governance
 
-**Status**: READY_FOR_EXECUTION
+**Status**: COMPLETED
 **Execution Mode**: direct
 **Created**: 2026-03-05 17:08
 **Planning**: ./self-perpetuating-working-dir/2026-03-05-0911-planning-ouroboros-self-perpetuating-realignment.md
@@ -26,10 +26,10 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 - [x] Bundles pushed to private GitHub repos (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`)
 - [x] `psyche/memory/` directory structure scaffolded in bundles
 - [x] Agent preflight loads governance docs (tested)
-- [ ] `npm test` green
-- [ ] 100% coverage on new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] `npm test` green
+- [x] 100% coverage on new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -114,7 +114,7 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 **Output**: Directory and git-state verification artifact.
 **Acceptance**: Memory scaffold and nested backup criteria are both satisfied.
 
-### ⬜ Unit 5: Gate Verification
+### ✅ Unit 5: Gate Verification
 **What**: Run `npm test`, `npm run test:coverage:vitest`, and `npx tsc`, then update checklist status from verified evidence.
 **Output**: Verification logs in artifacts and synced planning/doing checkboxes.
 **Acceptance**: All Gate 2 completion criteria are satisfied and both docs reflect completion state.
@@ -145,3 +145,4 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 - 2026-03-05 17:33 Unit 4a complete: enforced `*.ouro/` gitignore contract with red/green tests, added `.gitignore` rule, initialized nested git repos in both bundles, and reconfirmed `npm test` + `npx tsc`
 - 2026-03-05 17:34 Unit 4b complete: committed initial nested bundle histories, created private GitHub repos (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`), configured origins, and pushed `main` for both bundles
 - 2026-03-05 17:35 Unit 4c complete: verified required `psyche/memory/` scaffold paths in both bundles and confirmed local/remote main HEAD parity for nested backup repos
+- 2026-03-05 17:36 Unit 5 complete: captured final gate verification (`npm test`, `npm run test:coverage:vitest`, `npx tsc`) with 100% coverage report and synced completion checklists

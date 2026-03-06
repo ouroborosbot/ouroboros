@@ -311,18 +311,18 @@ Implement the `.ouro` bundle structure and relocate shared governance docs. This
 - Enforce agent preflight: agents must load governance docs before starting work
 
 **Completion criteria:**
-- [ ] `ouroboros.ouro/` bundle exists following the spec
-- [ ] `slugger.ouro/` bundle exists following the spec
-- [ ] Governance docs relocated to repo root
-- [ ] `getAgentRoot()` resolves to `.ouro` bundle path
-- [ ] All code/tests referencing old `ouroboros/` path updated
-- [ ] `.gitignore` excludes entire `*.ouro/` directories from harness repo
-- [ ] Bundle git init works for self-backup (nested inside gitignored directory)
-- [ ] Bundles pushed to private GitHub repos (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`)
-- [ ] `psyche/memory/` directory structure scaffolded in bundles
-- [ ] Agent preflight loads governance docs (tested)
-- [ ] `npm test` green
-- [ ] 100% coverage on new code
+- [x] `ouroboros.ouro/` bundle exists following the spec
+- [x] `slugger.ouro/` bundle exists following the spec
+- [x] Governance docs relocated to repo root
+- [x] `getAgentRoot()` resolves to `.ouro` bundle path
+- [x] All code/tests referencing old `ouroboros/` path updated
+- [x] `.gitignore` excludes entire `*.ouro/` directories from harness repo
+- [x] Bundle git init works for self-backup (nested inside gitignored directory)
+- [x] Bundles pushed to private GitHub repos (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`)
+- [x] `psyche/memory/` directory structure scaffolded in bundles
+- [x] Agent preflight loads governance docs (tested)
+- [x] `npm test` green
+- [x] 100% coverage on new code
 
 ---
 
@@ -732,3 +732,4 @@ Phase 2 gates may run in parallel where dependencies allow. Gate 9 (task system)
 - 2026-03-05 17:30 Critical review pass (with Claude Opus 4.6). GitHub push moved from Gate 8 to Gate 2 (bundles need remote backup immediately, not 6 gates later). TF-IDF replaced with embeddings for memory retrieval (provider-agnostic interface, vectors in JSONL, cosine similarity — quality improvement over lexical matching is massive). OpenClaw Slugger decommission removed from Gate 7 (both runtimes coexist indefinitely). Gate 7 Slugger communication failure handling added (debug, retry, fallback to Ouroboros knowledge). Inner dialog documented as brand new entry point (nothing exists today). Aspirations reframed as directional (not prime directive, no strict ordering, governance rewrite is "when ready" not "first thing"). Supervisor/process test guidance added (real child processes, not mocks). Phase 2 rollback plans added to all gates. Gate 10 multi-agent git confirmed covered by standard work-merger PR process. Open question added: embeddings API key provider choice for Gate 3b.
 - 2026-03-05 17:45 Embeddings API key resolved — OpenAI text-embedding-3-small, placeholder added to src/config.ts, key added to secrets.json. Slugger secrets copy noted in Gate 7. Status → APPROVED. Handing off to Codex.
 - 2026-03-05 17:00 Gate 1 completed on `slugger/gate-1-architectural-scaffolding`: `.ouro` skeletons, harness interfaces, governance loader stub, and migration conventions landed with `npm test`, `npx tsc`, and 100% coverage green.
+- 2026-03-05 18:10 Gate 2 completed on `slugger/gate-2-bundle-architecture-shared-governance`: `.ouro` bundle migration + slugger stub alignment, root governance preflight enforcement, nested bundle git initialization, private backup push (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`), and final verification (`npm test`, `npm run test:coverage:vitest`, `npx tsc`) all green.
