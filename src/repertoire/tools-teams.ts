@@ -198,6 +198,54 @@ export const teamsToolDefinitions: ToolDefinition[] = [
     },
     integration: "ado",
   },
+  // -- Proactive messaging --
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "teams_send_message",
+        description:
+          "send a proactive 1:1 Teams message to a user. requires their AAD object ID (use graph_query /users to find it). the message appears as coming from the bot.",
+        parameters: {
+          type: "object",
+          properties: {
+            user_id: { type: "string", description: "AAD object ID of the user to message" },
+            user_name: { type: "string", description: "display name of the user (for logging)" },
+            message: { type: "string", description: "message text to send" },
+            tenant_id: { type: "string", description: "tenant ID (optional, defaults to current conversation tenant)" },
+          },
+          required: ["user_id", "message"],
+        },
+      },
+    },
+    handler: async (args, ctx) => {
+      if (!ctx?.botApi) {
+        return "proactive messaging is not available -- no bot API context (this tool only works in the Teams channel)";
+      }
+      try {
+        const tenantId = args.tenant_id || ctx.tenantId;
+        // Cast to the SDK's ConversationClient shape (kept as `unknown` in ToolContext to avoid type coupling)
+        const conversations = ctx.botApi.conversations as {
+          create(params: Record<string, unknown>): Promise<{ id: string }>;
+          activities(conversationId: string): { create(params: Record<string, unknown>): Promise<unknown> };
+        };
+        const conversation = await conversations.create({
+          bot: { id: ctx.botApi.id },
+          members: [{ id: args.user_id, role: "user", name: args.user_name || args.user_id }],
+          tenantId,
+          isGroup: false,
+        });
+        await conversations.activities(conversation.id).create({
+          type: "message",
+          text: args.message,
+        });
+        return `message sent to ${args.user_name || args.user_id}`;
+      } catch (e) {
+        return `failed to send proactive message: ${e instanceof Error ? e.message : String(e)}`;
+      }
+    },
+    confirmationRequired: true,
+  },
   // -- Documentation tools --
   {
     tool: {
@@ -309,5 +357,6 @@ export function summarizeTeamsArgs(name: string, args: Record<string, string>): 
   if (name === "ado_mutate") return summarizeKeyValues(["method", "organization", "path"]);
   if (name === "graph_docs") return summarizeKeyValues(["query"]);
   if (name === "ado_docs") return summarizeKeyValues(["query"]);
+  if (name === "teams_send_message") return summarizeKeyValues(["user_name", "user_id"]);
   return undefined;
 }

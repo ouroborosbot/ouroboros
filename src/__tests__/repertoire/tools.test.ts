@@ -801,9 +801,11 @@ describe("ToolDefinition type and registry", () => {
       expect(def.tool.type).toBe("function")
       expect(def.tool.function.name).toBeDefined()
       expect(typeof def.handler).toBe("function")
-      // All teams tools have an integration
-      expect(def.integration).toBeDefined()
-      expect(["ado", "graph"]).toContain(def.integration)
+      // All teams tools have an integration, except teams_send_message (uses botApi, not OAuth)
+      if (def.tool.function.name !== "teams_send_message") {
+        expect(def.integration).toBeDefined()
+        expect(["ado", "graph"]).toContain(def.integration)
+      }
     }
   })
 
@@ -824,7 +826,7 @@ describe("ToolDefinition type and registry", () => {
     vi.resetModules()
     const toolsTeams = await import("../../repertoire/tools-teams")
     const nonMutate = toolsTeams.teamsToolDefinitions.filter(
-      (d: any) => !["graph_mutate", "ado_mutate"].includes(d.tool.function.name)
+      (d: any) => !["graph_mutate", "ado_mutate", "teams_send_message"].includes(d.tool.function.name)
     )
     for (const def of nonMutate) {
       expect(def.confirmationRequired).toBeFalsy()
