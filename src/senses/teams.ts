@@ -398,10 +398,14 @@ export async function withConversationLock(convId: string, fn: () => Promise<voi
 // Create a fresh friend store per request so mkdirSync re-runs if directories
 // are deleted while the process is alive.
 function getFriendStore(): InstanceType<typeof FileFriendStore> {
-  const agentKnowledgePath = path.join(getAgentRoot(), "friends")
   // On Azure App Service, os.homedir() returns /root which is ephemeral.
   // Use /home (persistent storage) when WEBSITE_SITE_NAME is set (Azure indicator).
+  // Both agent knowledge and PII bridge must use persistent storage so friend
+  // records survive deploys (--clean true wipes /home/site/wwwroot/).
   const homeBase = process.env.WEBSITE_SITE_NAME ? "/home" : os.homedir()
+  const agentKnowledgePath = process.env.WEBSITE_SITE_NAME
+    ? path.join(homeBase, ".agentstate", getAgentName(), "friends-knowledge")
+    : path.join(getAgentRoot(), "friends")
   const piiBridgePath = path.join(homeBase, ".agentstate", getAgentName(), "friends")
   return new FileFriendStore(agentKnowledgePath, piiBridgePath)
 }
