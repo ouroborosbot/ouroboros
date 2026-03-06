@@ -19,8 +19,8 @@ Implement Gate 3b foundations that make the agent persistent and self-directed: 
 - [ ] Agent memory: fact extraction runs after each engine turn (regex highlight detector)
 - [ ] Agent memory: extract-before-trim hook prevents fact loss on context window trim
 - [ ] Agent memory: `memory_search` tool callable by the model
-- [ ] Agent memory: associative recall injects relevant facts into system prompt before model calls (embedding-based similarity)
-- [ ] Agent memory: provider-agnostic embedding interface implemented (swappable between OpenAI, Anthropic, etc.)
+- [x] Agent memory: associative recall injects relevant facts into system prompt before model calls (embedding-based similarity)
+- [x] Agent memory: provider-agnostic embedding interface implemented (swappable between OpenAI, Anthropic, etc.)
 - [ ] Agent memory: fact store (with vectors), entity index, and daily log data structures working
 - [ ] Agent memory: dedup prevents duplicate fact storage (word-overlap >60% = skip)
 - [ ] Agent memory complements (not replaces) per-friend `save_friend_note` system
@@ -112,17 +112,17 @@ Implement Gate 3b foundations that make the agent persistent and self-directed: 
 **Output**: Coverage evidence + contract updates.
 **Acceptance**: New memory search code 100% covered.
 
-### ⬜ Unit 4a: Associative Recall + Embedding Interface Tests (Red)
+### ✅ Unit 4a: Associative Recall + Embedding Interface Tests (Red)
 **What**: Add failing tests for provider-agnostic embedding interface and recalled-context prompt injection.
 **Output**: Red tests for recall retrieval and prompt integration.
 **Acceptance**: Tests fail before embedding/retrieval implementation.
 
-### ⬜ Unit 4b: Associative Recall + Embedding Interface Implementation (Green)
+### ✅ Unit 4b: Associative Recall + Embedding Interface Implementation (Green)
 **What**: Implement pluggable embeddings + cosine recall and inject recalled facts pre-model-call.
 **Output**: Embedding interface + recall integration.
 **Acceptance**: Relevant facts appear in prompt recalled-context section.
 
-### ⬜ Unit 4c: Recall Coverage + Refactor
+### ✅ Unit 4c: Recall Coverage + Refactor
 **What**: Cover retrieval thresholds/fallbacks and refactor interface boundaries.
 **Output**: Coverage evidence for recall path.
 **Acceptance**: New recall code 100% covered.
@@ -211,3 +211,6 @@ Implement Gate 3b foundations that make the agent persistent and self-directed: 
 - 2026-03-05 18:33 Unit 3a complete: added red `memory_search` tests for query success, empty query, and read-failure error handling
 - 2026-03-05 18:34 Unit 3b complete: implemented `memory_search` base tool and summarizeArgs wiring in `repertoire/tools*`
 - 2026-03-05 18:36 Unit 3c complete: updated registry snapshot and closed branch-coverage gaps; full verification green (`npm test`, `npm run test:coverage:vitest`, `npx tsc --noEmit`)
+- 2026-03-05 18:38 Unit 4a complete: added red tests proving associative recall module import/integration failure before implementation existed
+- 2026-03-05 18:40 Unit 4b complete: implemented `src/mind/associative-recall.ts` (provider-agnostic embeddings + cosine recall) and integrated pre-call injection in `runAgent`
+- 2026-03-05 18:46 Unit 4c complete: expanded branch/error-path coverage for default provider, fallback branches, and telemetry; full verification green (`npm test`, `npm run test:coverage:vitest`, `npx tsc --noEmit`)
