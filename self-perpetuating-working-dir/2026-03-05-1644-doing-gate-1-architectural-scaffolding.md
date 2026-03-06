@@ -23,7 +23,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - [ ] Kill list / migration checklist committed in-repo
 - [ ] Subagent protocol loading convention defined and documented
 - [ ] Bundle backup + `~/AgentBundles/` migration path documented
-- [ ] `npx tsc` compiles clean with the new interfaces
+- [x] `npx tsc` compiles clean with the new interfaces
 - [ ] `npm test` green
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
@@ -82,7 +82,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 **Output**: Importable interface module(s) with stable exports at `src/harness/`.
 **Acceptance**: Contract tests pass and interfaces remain scaffolding-level (no over-specification).
 
-### ⬜ Unit 2c: Interfaces Refactor/Compile Validation
+### ✅ Unit 2c: Interfaces Refactor/Compile Validation
 **What**: Refine naming/organization and run `npx tsc` to verify clean integration.
 **Output**: Finalized interface layout and compile evidence in artifacts.
 **Acceptance**: `npx tsc` is green with new interface modules imported successfully.
@@ -142,3 +142,4 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - 2026-03-05 16:50 Unit 1c complete: verified 100% coverage and clean TypeScript compile with skeleton contract in place
 - 2026-03-05 16:52 Unit 2a complete: added failing harness interface contract test targeting `src/harness` exports
 - 2026-03-05 16:53 Unit 2b complete: implemented importable `src/harness` primitive interfaces and governance result guard
+- 2026-03-05 16:54 Unit 2c complete: revalidated harness contract tests and clean `npx tsc` compile
