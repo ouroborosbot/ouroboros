@@ -58,3 +58,21 @@ describe("governance loader", () => {
     }
   })
 })
+
+describe("governance preflight", () => {
+  it("exposes startup preflight helper", async () => {
+    const governance = await import("../../governance/loader")
+    expect(typeof (governance as { runGovernancePreflight?: unknown }).runGovernancePreflight).toBe("function")
+  })
+
+  it("requires root ARCHITECTURE.md and CONSTITUTION.md before startup", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "governance-preflight-"))
+    tmpDirs.push(root)
+    fs.writeFileSync(path.join(root, "CONSTITUTION.md"), "# constitution\n", "utf8")
+
+    const governance = await import("../../governance/loader")
+    const runGovernancePreflight = (governance as { runGovernancePreflight?: (repoRoot: string) => unknown }).runGovernancePreflight
+
+    expect(() => runGovernancePreflight!(root)).toThrow(/ARCHITECTURE\.md/)
+  })
+})
