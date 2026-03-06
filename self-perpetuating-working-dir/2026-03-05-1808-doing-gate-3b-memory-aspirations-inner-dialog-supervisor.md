@@ -67,17 +67,17 @@ Implement Gate 3b foundations that make the agent persistent and self-directed: 
 **Output**: `baseline-gate-3b-inventory.md` artifact.
 **Acceptance**: Inventory identifies current gaps for memory, inner dialog, instincts, and supervisor.
 
-### ⬜ Unit 1a: Memory Write Path Tests (Red)
+### ✅ Unit 1a: Memory Write Path Tests (Red)
 **What**: Add failing tests for post-turn regex highlight extraction, fact persistence, and dedup (>60% overlap skip).
 **Output**: Failing tests for memory write pipeline behavior.
 **Acceptance**: Tests fail before memory write implementation exists.
 
-### ⬜ Unit 1b: Memory Write Path Implementation (Green)
+### ✅ Unit 1b: Memory Write Path Implementation (Green)
 **What**: Implement fact extraction/persistence and dedup pipeline.
 **Output**: Memory write pipeline code + passing tests.
 **Acceptance**: Facts are captured once per novel highlight and stored in bundle memory paths.
 
-### ⬜ Unit 1c: Memory Write Coverage + Refactor
+### ✅ Unit 1c: Memory Write Coverage + Refactor
 **What**: Close branch/error-path coverage for write pipeline and refactor for clarity.
 **Output**: Coverage evidence for memory write path.
 **Acceptance**: New write-path code 100% covered.
@@ -202,3 +202,6 @@ Implement Gate 3b foundations that make the agent persistent and self-directed: 
 - 2026-03-05 18:08 Validation pass: aligned units to all Gate 3b completion criteria and real-process supervisor test guidance
 - 2026-03-05 18:08 Quality pass: verified strict TDD sequencing, coverage gates, and execution readiness
 - 2026-03-05 18:09 Unit 0 complete: captured baseline inventory for memory scaffolds and identified missing Gate 3b runtime/tooling capabilities
+- 2026-03-05 18:13 Unit 1a complete: added red memory write-path tests for highlight extraction, path scaffolding, and dedup persistence contracts
+- 2026-03-05 18:14 Unit 1b complete: implemented `src/mind/memory.ts` write-path primitives (`extractMemoryHighlights`, `ensureMemoryStorePaths`, `appendFactsWithDedup`)
+- 2026-03-05 18:15 Unit 1c complete: raised `src/mind/memory.ts` focused coverage to 100% and reconfirmed full `npm test` + `npx tsc --noEmit`
