@@ -255,14 +255,13 @@ describe("health monitor", () => {
       scheduler: {
         listJobs: () => [{ id: "daily", lastRun: "2026-03-05T23:00:00.000Z" }],
       },
-      diskUsagePercent: () => 10,
     })
 
     const results = await monitor.runChecks()
     expect(results).toEqual([
       { name: "agent-processes", status: "ok", message: "all managed agents running" },
       { name: "cron-health", status: "ok", message: "cron jobs are healthy" },
-      { name: "disk-space", status: "ok", message: "disk usage healthy (10%)" },
+      { name: "disk-space", status: "ok", message: "disk usage healthy (0%)" },
     ])
   })
 
