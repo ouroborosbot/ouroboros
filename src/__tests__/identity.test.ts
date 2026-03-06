@@ -94,7 +94,7 @@ describe("getAgentRoot", () => {
     vi.resetModules()
   })
 
-  it("returns path.join(repoRoot, agentName)", async () => {
+  it("returns path.join(repoRoot, `${agentName}.ouro`)", async () => {
     process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
     const { getAgentRoot, getRepoRoot, resetIdentity } = await import("../identity")
     resetIdentity()
