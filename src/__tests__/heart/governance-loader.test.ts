@@ -43,4 +43,18 @@ describe("governance loader", () => {
     expect(result.documents[0]?.relativePath).toBe("CONSTITUTION.md")
     expect(result.missing).toEqual(["MISSING.md"])
   })
+
+  it("rethrows non-ENOENT read failures", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "governance-loader-"))
+    tmpDirs.push(root)
+    fs.mkdirSync(path.join(root, "CONSTITUTION.md"))
+
+    try {
+      loadGovernanceDocs(root, ["CONSTITUTION.md"])
+      expect.fail("expected non-ENOENT read failure to be rethrown")
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException
+      expect(err.code).toBe("EISDIR")
+    }
+  })
 })
