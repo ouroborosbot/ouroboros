@@ -2,32 +2,24 @@ import { DaemonProcessManager } from "./process-manager"
 import { OuroDaemon, type DaemonCronJobSummary, type DaemonHealthResult, type DaemonMessageReceipt } from "./daemon"
 import { emitNervesEvent } from "../nerves/runtime"
 
-class InMemoryScheduler {
-  private readonly jobs: DaemonCronJobSummary[] = []
-
-  listJobs(): DaemonCronJobSummary[] {
-    return [...this.jobs]
-  }
-
-  async triggerJob(jobId: string): Promise<{ ok: boolean; message: string }> {
-    return { ok: true, message: `triggered ${jobId}` }
-  }
+const inMemoryScheduler: {
+  listJobs: () => DaemonCronJobSummary[]
+  triggerJob: (jobId: string) => Promise<{ ok: boolean; message: string }>
+} = {
+  listJobs: () => [],
+  triggerJob: async (jobId) => ({ ok: true, message: `triggered ${jobId}` }),
 }
 
-class InMemoryHealthMonitor {
-  async runChecks(): Promise<DaemonHealthResult[]> {
-    return [{ name: "agent-processes", status: "ok", message: "checks passing" }]
-  }
+const inMemoryHealthMonitor: { runChecks: () => Promise<DaemonHealthResult[]> } = {
+  runChecks: async () => [{ name: "agent-processes", status: "ok", message: "checks passing" }],
 }
 
-class InMemoryRouter {
-  async send(): Promise<DaemonMessageReceipt> {
-    return { id: `msg-${Date.now()}`, queuedAt: new Date().toISOString() }
-  }
-
-  pollInbox(): Array<{ id: string; from: string; content: string; queuedAt: string; priority: string }> {
-    return []
-  }
+const inMemoryRouter: {
+  send: () => Promise<DaemonMessageReceipt>
+  pollInbox: () => Array<{ id: string; from: string; content: string; queuedAt: string; priority: string }>
+} = {
+  send: async () => ({ id: `msg-${Date.now()}`, queuedAt: new Date().toISOString() }),
+  pollInbox: () => [],
 }
 
 function parseSocketPath(argv: string[]): string {
@@ -58,9 +50,9 @@ const processManager = new DaemonProcessManager({
 const daemon = new OuroDaemon({
   socketPath,
   processManager,
-  scheduler: new InMemoryScheduler(),
-  healthMonitor: new InMemoryHealthMonitor(),
-  router: new InMemoryRouter(),
+  scheduler: inMemoryScheduler,
+  healthMonitor: inMemoryHealthMonitor,
+  router: inMemoryRouter,
 })
 
 void daemon.start().catch(async () => {

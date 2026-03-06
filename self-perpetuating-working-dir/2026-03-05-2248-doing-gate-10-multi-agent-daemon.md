@@ -95,7 +95,7 @@ Expected target files:
 - `src/__tests__/daemon/daemon-cli.test.ts`
 - `package.json` (`ouro` script)
 
-### ⬜ Unit 2c: Command plane coverage + refactor
+### ✅ Unit 2c: Command plane coverage + refactor
 **What**: Close daemon/CLI coverage gaps (including malformed command and socket edge branches) and simplify command handling internals.
 **Output**: `unit-2c-coverage.log`.
 **Acceptance**: 100% coverage for daemon command plane code.
@@ -155,3 +155,4 @@ Expected target files:
 - 2026-03-05 22:59 Unit 1c complete: added branch/error/default-dependency tests and reached 100% coverage for Unit 1 daemon modules
 - 2026-03-05 23:00 Unit 2a complete: added failing daemon command-plane/CLI protocol tests and captured red log
 - 2026-03-05 23:03 Unit 2b complete: implemented daemon command server + `ouro` CLI entry/scripts with green tests and clean compile
+- 2026-03-05 23:12 Unit 2c complete: expanded command-plane branch tests and reached 100% coverage for daemon/CLI modules
