@@ -1,3 +1,4 @@
+import { emitNervesEvent } from "../nerves/runtime"
 import type { CodingMonitorReport } from "./monitor"
 
 export function formatCodingMonitorReport(report: CodingMonitorReport): string {
@@ -16,6 +17,12 @@ export function formatCodingMonitorReport(report: CodingMonitorReport): string {
 
   if (report.summary.active === 0) {
     lines.push("no active coding sessions")
+    emitNervesEvent({
+      component: "repertoire",
+      event: "repertoire.coding_monitor_report",
+      message: "formatted coding monitor report",
+      meta: { active: report.summary.active, lineCount: lines.length },
+    })
     return lines.join("\n")
   }
 
@@ -32,6 +39,13 @@ export function formatCodingMonitorReport(report: CodingMonitorReport): string {
   for (const action of report.recoveryActions) {
     lines.push(`recovery: ${action.sessionId} -> ${action.action} (${action.reason})`)
   }
+
+  emitNervesEvent({
+    component: "repertoire",
+    event: "repertoire.coding_monitor_report",
+    message: "formatted coding monitor report",
+    meta: { active: report.summary.active, lineCount: lines.length },
+  })
 
   return lines.join("\n")
 }

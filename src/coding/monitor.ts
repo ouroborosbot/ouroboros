@@ -1,3 +1,4 @@
+import { emitNervesEvent } from "../nerves/runtime"
 import type { CodingSession } from "./types"
 
 export type CodingRecoveryActionType = "send_guidance" | "manual_intervention_required"
@@ -67,7 +68,7 @@ export class CodingSessionMonitor {
       recoveryActions.push({ sessionId, action: "manual_intervention_required", reason: "failed" })
     }
 
-    return {
+    const report: CodingMonitorReport = {
       at: new Date(now).toISOString(),
       summary: {
         active: sessions.length,
@@ -82,5 +83,19 @@ export class CodingSessionMonitor {
       completedSessionIds,
       recoveryActions,
     }
+
+    emitNervesEvent({
+      component: "repertoire",
+      event: "repertoire.coding_monitor_tick",
+      message: "coding monitor tick completed",
+      meta: {
+        active: report.summary.active,
+        blocked: report.summary.blocked,
+        stalled: report.summary.stalled,
+        failed: report.summary.failed,
+      },
+    })
+
+    return report
   }
 }

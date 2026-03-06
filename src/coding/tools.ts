@@ -1,6 +1,7 @@
 import type OpenAI from "openai"
 
 import { getCodingSessionManager } from "./index"
+import { emitNervesEvent } from "../nerves/runtime"
 import type { CodingRunner, CodingSessionRequest, CodingSubagent } from "./types"
 
 const RUNNERS: CodingRunner[] = ["claude", "codex"]
@@ -27,6 +28,15 @@ function optionalArg(args: Record<string, string>, key: "taskRef" | "scopeFile" 
   if (!raw) return undefined
   const trimmed = raw.trim()
   return trimmed.length > 0 ? trimmed : undefined
+}
+
+function emitCodingToolEvent(toolName: string): void {
+  emitNervesEvent({
+    component: "repertoire",
+    event: "repertoire.coding_tool_call",
+    message: "coding tool handler invoked",
+    meta: { toolName },
+  })
 }
 
 const codingSpawnTool: OpenAI.ChatCompletionTool = {
@@ -99,6 +109,7 @@ export const codingToolDefinitions = [
   {
     tool: codingSpawnTool,
     handler: async (args: Record<string, string>): Promise<string> => {
+      emitCodingToolEvent("coding_spawn")
       const rawRunner = requireArg(args, "runner")
       if (!rawRunner) return "runner is required"
       const runner = parseRunner(rawRunner)
@@ -136,6 +147,7 @@ export const codingToolDefinitions = [
   {
     tool: codingStatusTool,
     handler: (args: Record<string, string>): string => {
+      emitCodingToolEvent("coding_status")
       const manager = getCodingSessionManager()
       const sessionId = requireArg(args, "sessionId")
       if (!sessionId) {
@@ -150,6 +162,7 @@ export const codingToolDefinitions = [
   {
     tool: codingSendInputTool,
     handler: (args: Record<string, string>): string => {
+      emitCodingToolEvent("coding_send_input")
       const sessionId = requireArg(args, "sessionId")
       if (!sessionId) return "sessionId is required"
 
@@ -162,6 +175,7 @@ export const codingToolDefinitions = [
   {
     tool: codingKillTool,
     handler: (args: Record<string, string>): string => {
+      emitCodingToolEvent("coding_kill")
       const sessionId = requireArg(args, "sessionId")
       if (!sessionId) return "sessionId is required"
 

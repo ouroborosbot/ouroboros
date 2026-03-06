@@ -1,6 +1,7 @@
 import type { CodingMonitorReport } from "./monitor"
 import { formatCodingMonitorReport } from "./reporter"
 import type { CodingRunner } from "./types"
+import { emitNervesEvent } from "../nerves/runtime"
 
 type PipelineSubagent = "planner" | "doer" | "merger"
 
@@ -52,6 +53,17 @@ function emitReport(
   const text = formatCodingMonitorReport(snapshot)
   onReport?.(text, snapshot)
 
+  emitNervesEvent({
+    component: "repertoire",
+    event: "repertoire.coding_pipeline_report",
+    message: "coding pipeline monitor report emitted",
+    meta: {
+      blockedCount: snapshot.blockedSessionIds.length,
+      stalledCount: snapshot.stalledSessionIds.length,
+      completedCount: snapshot.completedSessionIds.length,
+    },
+  })
+
   for (const blockedSessionId of snapshot.blockedSessionIds) {
     manager.sendInput(blockedSessionId, guidanceMessage(taskRef))
   }
@@ -76,6 +88,13 @@ async function spawnStage(
 }
 
 export async function runCodingPipeline(options: RunCodingPipelineOptions): Promise<RunCodingPipelineResult> {
+  emitNervesEvent({
+    component: "repertoire",
+    event: "repertoire.coding_pipeline_start",
+    message: "coding pipeline orchestration started",
+    meta: { runner: options.runner, workdir: options.workdir, taskRef: options.taskRef ?? null },
+  })
+
   const plannerSessionId = await spawnStage(
     options.manager,
     options.runner,
@@ -106,9 +125,18 @@ export async function runCodingPipeline(options: RunCodingPipelineOptions): Prom
   )
   emitReport(options.monitor, options.manager, options.onReport, options.taskRef)
 
-  return {
+  const result = {
     plannerSessionId,
     doerSessionId,
     mergerSessionId,
   }
+
+  emitNervesEvent({
+    component: "repertoire",
+    event: "repertoire.coding_pipeline_end",
+    message: "coding pipeline orchestration completed",
+    meta: result,
+  })
+
+  return result
 }
