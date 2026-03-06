@@ -20,7 +20,7 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 - [ ] `slugger.ouro/` bundle exists following the spec
 - [ ] Governance docs relocated to repo root
 - [x] `getAgentRoot()` resolves to `.ouro` bundle path
-- [ ] All code/tests referencing old `ouroboros/` path updated
+- [x] All code/tests referencing old `ouroboros/` path updated
 - [ ] `.gitignore` excludes entire `*.ouro/` directories from harness repo
 - [ ] Bundle git init works for self-backup (nested inside gitignored directory)
 - [ ] Bundles pushed to private GitHub repos (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`)
@@ -69,7 +69,7 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 **Output**: Updated runtime path resolution and fixture paths.
 **Acceptance**: `.ouro` root tests pass and no active runtime references depend on old `ouroboros/` root.
 
-### ⬜ Unit 1c: Path Migration Refactor/Coverage
+### ✅ Unit 1c: Path Migration Refactor/Coverage
 **What**: Verify coverage and compile after path migration; clean up any stale assumptions discovered by grep/tests.
 **Output**: Coverage + compile evidence in artifacts.
 **Acceptance**: New/modified code has 100% coverage and `npx tsc` stays green.
@@ -136,3 +136,4 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 - 2026-03-05 17:11 Unit 0 complete: baseline migration snapshot captured with explicit source->target mapping
 - 2026-03-05 17:11 Unit 1a complete: added failing tests requiring `<repo>/<agent>.ouro` root resolution
 - 2026-03-05 17:13 Unit 1b complete: updated `getAgentRoot()` to resolve `<repo>/<agent>.ouro` and captured green test/tsc/coverage evidence
+- 2026-03-05 17:15 Unit 1c complete: cleaned stale root-path wording, reconfirmed 100% coverage for `src/identity.ts`, and revalidated `npm test` + `npx tsc`
