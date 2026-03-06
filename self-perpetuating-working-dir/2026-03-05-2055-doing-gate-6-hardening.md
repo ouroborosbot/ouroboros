@@ -17,7 +17,7 @@ Implement Gate 6 hardening by adding explicit interruption/resume checkpoint awa
 
 ## Completion Criteria
 - [x] Resume state: agent recovers cleanly from interruption, orienting faster than cold start (tested with simulated interruption)
-- [ ] Classification calibrated and validated against representative proposals (at least 5 test cases: 3 within-bounds, 2 requires-review)
+- [x] Classification calibrated and validated against representative proposals (at least 5 test cases: 3 within-bounds, 2 requires-review)
 - [ ] `npm test` green
 - [ ] 100% coverage on new code
 - [ ] No warnings
@@ -86,7 +86,7 @@ Representative proposals:
 **Output**: Updated governance classification code + `unit-2b-green-test.log` + `unit-2b-tsc.log`.
 **Acceptance**: Calibration tests pass, defaults remain additive→`within-bounds`, structural cases return `requires-review`, and `npx tsc --noEmit` stays clean.
 
-### ⬜ Unit 2c: Classification coverage + refactor
+### ✅ Unit 2c: Classification coverage + refactor
 **What**: Refactor classification heuristics and close branch coverage gaps.
 **Output**: `unit-2c-coverage.log`.
 **Acceptance**: 100% coverage on new classification logic and all relevant tests green.
@@ -116,3 +116,4 @@ Representative proposals:
 - 2026-03-05 21:04 Unit 1c complete: closed checkpoint-logic coverage to 100% with full `test:coverage:vitest` and clean `npx tsc --noEmit`
 - 2026-03-05 21:05 Unit 2a complete: added five representative classification red tests proving calibrated classifier is required
 - 2026-03-05 21:06 Unit 2b complete: shipped calibrated governance proposal classifier with green tests and clean `npx tsc --noEmit`
+- 2026-03-05 21:07 Unit 2c complete: verified full coverage/compile green with classification calibration in place
