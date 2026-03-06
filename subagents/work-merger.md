@@ -244,12 +244,38 @@ Read each doing doc found above. The PR body should summarize every completed ta
 - A section per task (or group of related tasks) with a brief summary of what was implemented
 - A final "Files changed" summary (e.g., "164 files changed — new context kernel, codebase restructure, sync-and-merge system")
 
+#### PR title and body contract (required)
+
+Do not use generic titles like `merge <branch>`. Title must describe delivered capability.
+
+**Title pattern:**
+- `Gate <n>: <shipped outcome>` when branch slug includes a gate
+- Otherwise: `<agent>: <shipped outcome>`
+
+Examples:
+- `Gate 9: ship model-driven task system and lifecycle`
+- `Gate 11: enable coding orchestration and model-callable tools`
+
+**Body structure (exact headings):**
+1. `## What changed`
+2. `## Why you should care`
+3. `## How it was implemented`
+4. `## How we tested`
+
+Each section must be concrete and outcome-oriented:
+- **What changed**: shipped capability and key files/surfaces
+- **Why you should care**: user/operator impact, risk reduction, reliability/velocity gains
+- **How it was implemented**: architectural approach, major integration points, notable constraints handled
+- **How we tested**: exact commands run and high-signal results (include coverage/CI status where relevant)
+
+Avoid simply re-listing work units from doing docs. Translate unit output into value and operational impact.
+
 ```bash
 gh pr create \
   --base main \
   --head "${BRANCH}" \
-  --title "${AGENT}: merge $(echo ${BRANCH} | cut -d'/' -f2-)" \
-  --body "<comprehensive description built from all doing docs and git diff>"
+  --title "<outcome-oriented title>" \
+  --body "<required 4-section narrative built from all doing docs and git diff>"
 ```
 
 The PR description is the permanent record of what this branch contributed. Make it complete.
@@ -259,6 +285,13 @@ If a PR already exists for this branch (e.g., from a retry), skip creation:
 gh pr view "${BRANCH}" --json url 2>/dev/null
 ```
 If this returns a URL, the PR already exists. Proceed to Step 3.
+
+If the PR already exists and the body/title are thin or stale, update them before CI wait:
+```bash
+gh pr edit "${BRANCH}" \
+  --title "<outcome-oriented title>" \
+  --body "<required 4-section narrative>"
+```
 
 ### Step 3: Wait for CI
 
