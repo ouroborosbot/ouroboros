@@ -126,46 +126,67 @@
     "params": "$depth, $expand"
   },
   {
+    "path": "/_apis/groupentitlements?api-version=7.1",
+    "method": "GET",
+    "host": "vsaex.dev.azure.com",
+    "description": "List group entitlements (group rules that auto-assign licenses). Use host vsaex.dev.azure.com.",
+    "params": ""
+  },
+  {
+    "path": "/_apis/groupentitlements?api-version=7.1",
+    "method": "POST",
+    "host": "vsaex.dev.azure.com",
+    "description": "Create a group entitlement rule — maps an AAD group to an access level (e.g. Basic) and project membership. All members of the AAD group automatically get the specified license. Use host vsaex.dev.azure.com. This is the best way to bulk-provision users.",
+    "params": "body: { group: { origin: 'aad', originId: '<AAD-group-object-id>', subjectKind: 'group' }, licenseRule: { licensingSource: 'account', accountLicenseType: 'express', licenseDisplayName: 'Basic' }, projectEntitlements: [{ group: { groupType: 'projectContributor' }, projectRef: { id: '<project-id>' } }] }"
+  },
+  {
+    "path": "/_apis/groupentitlements/{groupId}?api-version=7.1",
+    "method": "GET",
+    "host": "vsaex.dev.azure.com",
+    "description": "Get a specific group entitlement by ID. Use host vsaex.dev.azure.com.",
+    "params": ""
+  },
+  {
+    "path": "/_apis/groupentitlements/{groupId}?api-version=7.1",
+    "method": "PATCH",
+    "host": "vsaex.dev.azure.com",
+    "description": "Update a group entitlement (change license rule, project access). Use host vsaex.dev.azure.com.",
+    "params": "JSON Patch array: [{op, path, value}]"
+  },
+  {
+    "path": "/_apis/groupentitlements/{groupId}?api-version=7.1",
+    "method": "DELETE",
+    "host": "vsaex.dev.azure.com",
+    "description": "Delete a group entitlement rule. Use host vsaex.dev.azure.com.",
+    "params": ""
+  },
+  {
     "path": "/_apis/memberentitlementmanagement/memberentitlements?api-version=7.1-preview.3",
     "method": "GET",
     "host": "vsapm.dev.azure.com",
-    "description": "List member entitlements (users and their access levels). Use host vsapm.dev.azure.com. IMPORTANT: include the full path with api-version as shown.",
+    "description": "List individual member entitlements (users and their access levels). Use host vsapm.dev.azure.com. For bulk provisioning, prefer the Group Entitlements API on vsaex.dev.azure.com instead.",
     "params": "$top, $skip, $filter, $orderBy, $select"
   },
   {
     "path": "/_apis/memberentitlementmanagement/memberentitlements?api-version=7.1-preview.3",
     "method": "POST",
     "host": "vsapm.dev.azure.com",
-    "description": "Add a member entitlement (grant a user access to the org with a specific license). Use host vsapm.dev.azure.com. IMPORTANT: include the full path with api-version as shown.",
-    "params": "body: { accessLevel: { accountLicenseType: 'express'|'stakeholder'|'earlyAdopter'|'professional' }, user: { principalName: 'user@domain.com', subjectKind: 'user' }, projectEntitlements: [{ group: { groupType: 'projectContributor' }, projectRef: { id: projectId } }] }"
-  },
-  {
-    "path": "/_apis/memberentitlementmanagement/memberentitlements/{memberId}?api-version=7.1-preview.3",
-    "method": "GET",
-    "host": "vsapm.dev.azure.com",
-    "description": "Get a specific member entitlement by member ID. Use host vsapm.dev.azure.com. IMPORTANT: include the full path with api-version as shown.",
-    "params": ""
+    "description": "Add a single member entitlement. Use host vsapm.dev.azure.com. For bulk provisioning, prefer the Group Entitlements API on vsaex.dev.azure.com instead.",
+    "params": "body: { accessLevel: { accountLicenseType: 'express'|'stakeholder', licensingSource: 'account' }, user: { principalName: 'user@domain.com', subjectKind: 'user' }, projectEntitlements: [{ group: { groupType: 'projectContributor' }, projectRef: { id: projectId } }] }"
   },
   {
     "path": "/_apis/memberentitlementmanagement/memberentitlements/{memberId}?api-version=7.1-preview.3",
     "method": "PATCH",
     "host": "vsapm.dev.azure.com",
-    "description": "Update a member entitlement (change access level, add/remove project access). Use host vsapm.dev.azure.com. IMPORTANT: include the full path with api-version as shown.",
+    "description": "Update a member entitlement (change access level, project access). Use host vsapm.dev.azure.com.",
     "params": "JSON Patch array: [{op, path, value}]"
   },
   {
     "path": "/_apis/memberentitlementmanagement/memberentitlements/{memberId}?api-version=7.1-preview.3",
     "method": "DELETE",
     "host": "vsapm.dev.azure.com",
-    "description": "Remove a member entitlement (revoke user access). Use host vsapm.dev.azure.com. IMPORTANT: include the full path with api-version as shown.",
+    "description": "Remove a member entitlement (revoke user access). Use host vsapm.dev.azure.com.",
     "params": ""
-  },
-  {
-    "path": "/_apis/userentitlements?api-version=7.1-preview.4",
-    "method": "POST",
-    "host": "vsapm.dev.azure.com",
-    "description": "Bulk add user entitlements (add multiple users at once). Use host vsapm.dev.azure.com. IMPORTANT: include the full path with api-version as shown.",
-    "params": "body: array of { accessLevel, user, projectEntitlements }"
   },
   {
     "path": "/_apis/graph/users?api-version=7.1-preview.1",
