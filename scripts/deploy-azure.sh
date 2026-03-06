@@ -6,7 +6,7 @@ set -euo pipefail
 
 SUB="4c2988ee-571a-4995-9ab0-cc68f38aaf2b"
 RG="rg-arimendelow-fhl26"
-LOCATION="eastus2"
+LOCATION="westcentralus"
 PLAN_NAME="ouroboros-plan"
 APP_NAME="ouroboros-bot"
 BOT_NAME="OuroborosBot"
@@ -21,7 +21,7 @@ az appservice plan create \
   --name "$PLAN_NAME" \
   --resource-group "$RG" \
   --location "$LOCATION" \
-  --sku B1 \
+  --sku S1 \
   --is-linux
 
 echo "==> Creating Web App (Node $NODE_VERSION)"

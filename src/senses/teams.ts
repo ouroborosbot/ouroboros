@@ -706,7 +706,7 @@ export function startTeamsApp(): void {
     emitNervesEvent({ level: "error", event: "channel.app_error", component: "channels", message: msg, meta: {} })
   })
 
-  const port = getTeamsChannelConfig().port
+  const port = process.env.PORT ? Number(process.env.PORT) : getTeamsChannelConfig().port
   app.start(port)
   emitNervesEvent({ level: "info", event: "channel.app_started", component: "channels", message: `Teams bot started on port ${port} with ${mode} (chunked streaming)`, meta: { port, mode } })
 }
