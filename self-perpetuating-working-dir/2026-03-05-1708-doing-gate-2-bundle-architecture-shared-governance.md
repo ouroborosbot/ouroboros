@@ -16,8 +16,8 @@
 Implement Gate 2 bundle architecture and governance relocation: migrate active agent roots onto `.ouro`, update path resolution/runtime references, initialize bundle self-backup repos, and enforce governance preflight.
 
 ## Completion Criteria
-- [ ] `ouroboros.ouro/` bundle exists following the spec
-- [ ] `slugger.ouro/` bundle exists following the spec
+- [x] `ouroboros.ouro/` bundle exists following the spec
+- [x] `slugger.ouro/` bundle exists following the spec
 - [x] Governance docs relocated to repo root
 - [x] `getAgentRoot()` resolves to `.ouro` bundle path
 - [x] All code/tests referencing old `ouroboros/` path updated
@@ -89,12 +89,12 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 **Output**: Additional tests/logs as needed for full branch/error coverage.
 **Acceptance**: Governance preflight code paths have 100% coverage and compile cleanly.
 
-### ⬜ Unit 3a: Bundle Content Migration (`ouroboros` -> `ouroboros.ouro`)
+### ✅ Unit 3a: Bundle Content Migration (`ouroboros` -> `ouroboros.ouro`)
 **What**: Perform in-place conversion of active `ouroboros/` content into `ouroboros.ouro/` (including `manifest` -> `teams-app` and `SELF-KNOWLEDGE` -> `TACIT` alignment) while preserving Gate 1 scaffolding additions.
 **Output**: Updated `ouroboros.ouro/` with migrated runtime content.
 **Acceptance**: Runtime-required bundle assets exist under `ouroboros.ouro/` and legacy layout dependencies are removed/updated.
 
-### ⬜ Unit 3b: Slugger Bundle Alignment
+### ✅ Unit 3b: Slugger Bundle Alignment
 **What**: Ensure `slugger.ouro/` matches Gate 2 requirements (skeleton + stub `agent.json`, no unintended psyche population beyond scope).
 **Output**: `slugger.ouro/` adjusted to scope-compliant baseline.
 **Acceptance**: Slugger bundle is recognized by harness without importing Gate 7 migration content.
@@ -140,3 +140,5 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 - 2026-03-05 17:17 Unit 2a complete: added failing governance preflight tests requiring root `ARCHITECTURE.md` and `CONSTITUTION.md` before startup
 - 2026-03-05 17:20 Unit 2b complete: added root governance docs, implemented `runGovernancePreflight`, and enforced governance loading before `runAgent` turn execution
 - 2026-03-05 17:22 Unit 2c complete: expanded governance preflight tests to cover success + error paths and verified 100% coverage for `src/governance/loader.ts`
+- 2026-03-05 17:26 Unit 3a complete: migrated active `ouroboros/` runtime assets into `ouroboros.ouro/`, aligned `manifest`->`teams-app` and `SELF-KNOWLEDGE`->`TACIT`, and captured green test/tsc evidence
+- 2026-03-05 17:30 Unit 3b complete: added Slugger bundle contract checks, replaced empty `slugger.ouro/agent.json` with a scope-safe stub based on Ouroboros config shape, and reconfirmed `npm test` + `npx tsc`
