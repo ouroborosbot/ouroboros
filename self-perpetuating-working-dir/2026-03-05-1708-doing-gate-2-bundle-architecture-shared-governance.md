@@ -74,7 +74,7 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 **Output**: Coverage + compile evidence in artifacts.
 **Acceptance**: New/modified code has 100% coverage and `npx tsc` stays green.
 
-### ⬜ Unit 2a: Governance Preflight Tests (Red)
+### ✅ Unit 2a: Governance Preflight Tests (Red)
 **What**: Add failing tests for governance preflight requirement (must load root `ARCHITECTURE.md` and `CONSTITUTION.md` before startup).
 **Output**: Failing test coverage for governance preflight behavior.
 **Acceptance**: Tests fail before governance relocation/enforcement implementation.
@@ -137,3 +137,4 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 - 2026-03-05 17:11 Unit 1a complete: added failing tests requiring `<repo>/<agent>.ouro` root resolution
 - 2026-03-05 17:13 Unit 1b complete: updated `getAgentRoot()` to resolve `<repo>/<agent>.ouro` and captured green test/tsc/coverage evidence
 - 2026-03-05 17:15 Unit 1c complete: cleaned stale root-path wording, reconfirmed 100% coverage for `src/identity.ts`, and revalidated `npm test` + `npx tsc`
+- 2026-03-05 17:17 Unit 2a complete: added failing governance preflight tests requiring root `ARCHITECTURE.md` and `CONSTITUTION.md` before startup
