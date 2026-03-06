@@ -25,7 +25,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - [ ] Bundle backup + `~/AgentBundles/` migration path documented
 - [x] `npx tsc` compiles clean with the new interfaces
 - [ ] `npm test` green
-- [ ] 100% test coverage on all new code
+- [x] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
 
@@ -97,7 +97,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 **Output**: `src/governance/loader.ts` plus minimal fixture data if needed.
 **Acceptance**: Loader tests pass and API shape is ready for Gate 2/3 expansion.
 
-### ⬜ Unit 3c: Governance Loader Refactor/Coverage
+### ✅ Unit 3c: Governance Loader Refactor/Coverage
 **What**: Tighten loader implementation and verify 100% coverage on new runtime code.
 **Output**: Coverage evidence and any small cleanup commits.
 **Acceptance**: Loader path has full coverage and no warnings.
@@ -145,3 +145,4 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - 2026-03-05 16:54 Unit 2c complete: revalidated harness contract tests and clean `npx tsc` compile
 - 2026-03-05 16:54 Unit 3a complete: added failing governance loader tests for existing + missing doc behavior
 - 2026-03-05 16:55 Unit 3b complete: implemented `src/governance/loader.ts` shared loader stub with deterministic missing-file handling
+- 2026-03-05 16:57 Unit 3c complete: raised governance/harness coverage to 100% and revalidated full coverage + `npx tsc`

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   GOVERNANCE_CHECK_RESULTS,
+  HARNESS_PRIMITIVES_ENTRYPOINT,
   HARNESS_BOOTSTRAP_PHASES,
   isGovernanceCheckResult,
 } from "../../harness"
@@ -9,6 +10,7 @@ import type { HarnessToolCall } from "../../harness"
 
 describe("harness primitives contract", () => {
   it("exports bootstrap and governance scaffolding constants", () => {
+    expect(HARNESS_PRIMITIVES_ENTRYPOINT).toBe("harness/primitives")
     expect(HARNESS_BOOTSTRAP_PHASES).toEqual(["bundle", "governance", "psyche", "inner-dialog"])
     expect(GOVERNANCE_CHECK_RESULTS).toEqual(["within-bounds", "requires-review"])
   })
