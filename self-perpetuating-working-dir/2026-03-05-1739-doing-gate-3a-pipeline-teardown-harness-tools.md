@@ -68,7 +68,7 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 **Output**: Updated `src/repertoire/skills.ts` (and any supporting code) passing the new protocol-loading tests.
 **Acceptance**: `list_skills`/`load_skill` support shared subagent protocols and bundle-local mirrors per Gate 1 convention.
 
-### ⬜ Unit 1c: Protocol Loader Coverage + Refactor
+### ✅ Unit 1c: Protocol Loader Coverage + Refactor
 **What**: Add branch/error-path coverage for loader edge cases (missing mirror, missing canonical, read failures, deterministic ordering) and refactor for clarity.
 **Output**: Coverage evidence for protocol loader changes.
 **Acceptance**: 100% coverage on new/modified loader code and compile clean.
@@ -115,3 +115,4 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 - 2026-03-05 17:43 Unit 0 complete: captured teardown/tooling baseline in `baseline-gate-3a-inventory.md` and confirmed Gate 3a implementation gaps
 - 2026-03-05 17:44 Unit 1a complete: added failing tests for protocol mirror-first loading, canonical `subagents/` fallback, and explicit dual-path missing errors
 - 2026-03-05 17:46 Unit 1b complete: implemented mirror-first + canonical fallback protocol loading in `src/repertoire/skills.ts` and reconfirmed green targeted/full test + `npx tsc`
+- 2026-03-05 17:48 Unit 1c complete: captured 100% focused coverage evidence for `src/repertoire/skills.ts` and reconfirmed compile-clean with `npx tsc --noEmit`
