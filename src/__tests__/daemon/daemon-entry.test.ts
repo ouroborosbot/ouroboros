@@ -30,7 +30,7 @@ describe("daemon entrypoint", () => {
     }
 
     class MockProcessManager {
-      listAgentSnapshots = vi.fn(() => [])
+      listAgentSnapshots = vi.fn(() => [{ name: "slugger", status: "crashed" }])
       constructor(_opts: unknown) {
         processManagerCtor(_opts)
       }
@@ -88,7 +88,7 @@ describe("daemon entrypoint", () => {
       message: "triggered nightly",
     })
     await expect(daemonOptions.healthMonitor.runChecks()).resolves.toEqual([
-      { name: "agent-processes", status: "ok", message: "all managed agents running" },
+      { name: "agent-processes", status: "critical", message: "non-running agents: slugger" },
       { name: "cron-health", status: "ok", message: "cron jobs are healthy" },
       { name: "disk-space", status: "ok", message: "disk usage healthy (0%)" },
     ])
@@ -107,6 +107,9 @@ describe("daemon entrypoint", () => {
 
     expect(emitNervesEvent).toHaveBeenCalledWith(
       expect.objectContaining({ event: "daemon.entry_start", meta: { socketPath: "/tmp/ouroboros-daemon.sock" } }),
+    )
+    expect(emitNervesEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "daemon.health_alert" }),
     )
     expect(onSpy).toHaveBeenCalledWith("SIGINT", expect.any(Function))
     expect(onSpy).toHaveBeenCalledWith("SIGTERM", expect.any(Function))

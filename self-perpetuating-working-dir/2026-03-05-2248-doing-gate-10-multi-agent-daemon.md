@@ -1,6 +1,6 @@
 # Doing: Gate 10 Multi-Agent Daemon
 
-**Status**: READY_FOR_EXECUTION
+**Status**: COMPLETED
 **Execution Mode**: direct
 **Created**: 2026-03-05 22:48
 **Planning**: ./self-perpetuating-working-dir/2026-03-05-0911-planning-ouroboros-self-perpetuating-realignment.md
@@ -16,15 +16,15 @@
 Stand up a multi-agent daemon that keeps agents alive with crash recovery, exposes `ouro` CLI controls, runs recurring cron jobs, routes inter-agent messages, maintains isolated per-agent repo workspaces, and emits tiered health alerts.
 
 ## Completion Criteria
-- [ ] Daemon supervises agent processes with crash recovery
-- [ ] `ouro` CLI works for daemon and agent management
-- [ ] Cron scheduling triggers recurring tasks
-- [ ] Inter-agent messaging delivers between agents
-- [ ] Each agent works in its own repo clone (isolated git state, synced with upstream)
-- [ ] Health monitoring with tiered alert routing
-- [ ] Agents stay up unless explicitly stopped
-- [ ] `npm test` green
-- [ ] 100% coverage on new code
+- [x] Daemon supervises agent processes with crash recovery
+- [x] `ouro` CLI works for daemon and agent management
+- [x] Cron scheduling triggers recurring tasks
+- [x] Inter-agent messaging delivers between agents
+- [x] Each agent works in its own repo clone (isolated git state, synced with upstream)
+- [x] Health monitoring with tiered alert routing
+- [x] Agents stay up unless explicitly stopped
+- [x] `npm test` green
+- [x] 100% coverage on new code
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -120,17 +120,17 @@ Expected target files:
 **Output**: `unit-3c-coverage.log`.
 **Acceptance**: 100% coverage on Unit 3 code and full suite remains green.
 
-### ⬜ Unit 4a: End-to-end daemon lifecycle tests (Red)
+### ✅ Unit 4a: End-to-end daemon lifecycle tests (Red)
 **What**: Add failing end-to-end tests covering daemon startup, agent restart behavior, command interactions, cron trigger path, and message flow.
 **Output**: Red tests + `unit-4a-red.log`.
 **Acceptance**: E2E tests fail before final integration completion.
 
-### ⬜ Unit 4b: End-to-end lifecycle implementation + verification (Green)
+### ✅ Unit 4b: End-to-end lifecycle implementation + verification (Green)
 **What**: Implement any remaining integration glue, verify completion criteria behavior, and run gate-level verification.
 **Output**: `unit-4b-green.log` + `unit-4b-npm-test.log` + `unit-4b-tsc.log`.
 **Acceptance**: E2E lifecycle passes with `npm test` green and `npx tsc --noEmit` clean.
 
-### ⬜ Unit 4c: Final coverage + checklist sync
+### ✅ Unit 4c: Final coverage + checklist sync
 **What**: Run coverage gate, capture artifacts, and sync Gate 10 completion checklists in doing/planning docs.
 **Output**: `unit-4c-coverage.log` + doc updates.
 **Acceptance**: 100% coverage on new code with traceable completion evidence.
@@ -159,3 +159,6 @@ Expected target files:
 - 2026-03-05 23:13 Unit 3a complete: added failing cron scheduler/message router/health monitor tests and captured red log
 - 2026-03-05 23:20 Unit 3b complete: implemented cron scheduler, file message routing, health monitor wiring in daemon entry, and captured green + compile artifacts
 - 2026-03-05 23:20 Unit 3c complete: closed default-fallback coverage branch in health monitor and reached 100% coverage across Unit 3 modules
+- 2026-03-05 23:24 Unit 4a complete: added failing daemon lifecycle e2e test proving scheduler did not run under daemon lifecycle control
+- 2026-03-05 23:25 Unit 4b complete: wired daemon start/stop to scheduler lifecycle, verified daemon suite + `npm test` + `npx tsc --noEmit`
+- 2026-03-05 23:26 Unit 4c complete: achieved 100% coverage across all new daemon modules and synced completion checklists
