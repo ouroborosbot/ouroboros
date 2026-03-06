@@ -16,7 +16,7 @@
 Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces, governance loader stub, migration checklist, and protocol/backup conventions) that Gate 2 and Gate 3 can build on directly.
 
 ## Completion Criteria
-- [ ] Overnight proposals reviewed -- high-merit ideas incorporated into scaffolding decisions
+- [x] Overnight proposals reviewed -- high-merit ideas incorporated into scaffolding decisions
 - [ ] `.ouro` bundle skeleton directory committed (structure only, Gate 2 populates)
 - [ ] TypeScript interfaces for harness primitives committed (compilable, importable)
 - [ ] Shared governance loader stub committed
@@ -52,7 +52,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Prior-Art Review Snapshot
+### ✅ Unit 0: Prior-Art Review Snapshot
 **What**: Review overnight proposal inventory from archive branch files under `ouroboros/tasks/` and capture which high-merit items are explicitly reflected in Gate 1 scaffolding outputs.
 **Output**: `self-perpetuating-working-dir/2026-03-05-1644-doing-gate-1-architectural-scaffolding/prior-art-review.md` with proposal-to-scaffold mapping.
 **Acceptance**: Artifact references archive-branch files and maps HIGH-priority themes to concrete Gate 1 deliverables.
@@ -136,3 +136,4 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - 2026-03-05 16:45 Granularity pass: split major deliverables into atomic test/implement/refactor units
 - 2026-03-05 16:46 Validation pass: aligned units with current repo paths (`src/reflection` absent, docs dir empty, target module locations explicit)
 - 2026-03-05 16:46 Quality pass: verified emoji-prefixed units, acceptance coverage, and checklist hygiene; marked READY_FOR_EXECUTION
+- 2026-03-05 16:47 Unit 0 complete: archived prior-art themes mapped to Gate 1 scaffolding deliverables
