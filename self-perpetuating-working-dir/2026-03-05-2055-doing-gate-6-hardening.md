@@ -81,7 +81,7 @@ Representative proposals:
 4. Rewrite governance ownership workflow for all agents (`requires-review`)
 5. Replace bundle root/location strategy across the harness (`requires-review`)
 
-### ⬜ Unit 2b: Classification calibration implementation (Green)
+### ✅ Unit 2b: Classification calibration implementation (Green)
 **What**: Implement calibrated constitution classification logic for representative proposal summaries while preserving existing convention query behavior.
 **Output**: Updated governance classification code + `unit-2b-green-test.log` + `unit-2b-tsc.log`.
 **Acceptance**: Calibration tests pass, defaults remain additive→`within-bounds`, structural cases return `requires-review`, and `npx tsc --noEmit` stays clean.
@@ -115,3 +115,4 @@ Representative proposals:
 - 2026-03-05 21:00 Unit 1b complete: implemented checkpoint-aware instinct prompts and validated with green tests + clean `npx tsc --noEmit`
 - 2026-03-05 21:04 Unit 1c complete: closed checkpoint-logic coverage to 100% with full `test:coverage:vitest` and clean `npx tsc --noEmit`
 - 2026-03-05 21:05 Unit 2a complete: added five representative classification red tests proving calibrated classifier is required
+- 2026-03-05 21:06 Unit 2b complete: shipped calibrated governance proposal classifier with green tests and clean `npx tsc --noEmit`
