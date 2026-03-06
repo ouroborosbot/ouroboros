@@ -16,7 +16,7 @@
 Implement Gate 6 hardening by adding explicit interruption/resume checkpoint awareness to inner dialog turns and calibrating constitution classification so additive hardening defaults to `within-bounds` while structural changes remain `requires-review`.
 
 ## Completion Criteria
-- [ ] Resume state: agent recovers cleanly from interruption, orienting faster than cold start (tested with simulated interruption)
+- [x] Resume state: agent recovers cleanly from interruption, orienting faster than cold start (tested with simulated interruption)
 - [ ] Classification calibrated and validated against representative proposals (at least 5 test cases: 3 within-bounds, 2 requires-review)
 - [ ] `npm test` green
 - [ ] 100% coverage on new code
@@ -65,7 +65,7 @@ Validated target touchpoints:
 **Output**: Updated runtime code + `unit-1b-green-test.log` + `unit-1b-tsc.log`.
 **Acceptance**: Unit 1a tests pass, `npx tsc --noEmit` is clean, and checkpoint context persists through session history.
 
-### ⬜ Unit 1c: Resume checkpoint coverage + refactor
+### ✅ Unit 1c: Resume checkpoint coverage + refactor
 **What**: Refine checkpoint parsing/formatting and close any uncovered branches.
 **Output**: `unit-1c-coverage.log`.
 **Acceptance**: 100% coverage on new checkpoint logic; tests remain green.
@@ -113,3 +113,4 @@ Representative proposals:
 - 2026-03-05 20:58 Unit 0 complete: captured baseline behavior and verified Gate 6 target files
 - 2026-03-05 20:59 Unit 1a complete: added failing resume-checkpoint test proving missing checkpoint context on resumed turns
 - 2026-03-05 21:00 Unit 1b complete: implemented checkpoint-aware instinct prompts and validated with green tests + clean `npx tsc --noEmit`
+- 2026-03-05 21:04 Unit 1c complete: closed checkpoint-logic coverage to 100% with full `test:coverage:vitest` and clean `npx tsc --noEmit`
