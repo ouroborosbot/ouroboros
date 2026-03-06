@@ -16,8 +16,8 @@
 Move `ouroboros.ouro` and `slugger.ouro` out of the harness repo into `~/AgentBundles/`, keep GitHub bundle backups verifiably current, and update harness path resolution/bootstrap behavior so both agents run from `~/AgentBundles/<agent>.ouro/` with zero regressions.
 
 ## Completion Criteria
-- [ ] GitHub repos up-to-date with latest bundle content (repos created in Gate 2)
-- [ ] Backup integrity verified (clone + diff)
+- [x] GitHub repos up-to-date with latest bundle content (repos created in Gate 2)
+- [x] Backup integrity verified (clone + diff)
 - [ ] Bundles moved to `~/AgentBundles/`
 - [ ] Harness code updated to reference new bundle location
 - [ ] Agents bootstrap correctly from `~/AgentBundles/`
@@ -58,7 +58,7 @@ Validated target touchpoints:
 - `package.json` (`manifest:package` script)
 - `.gitignore`
 
-### ⬜ Unit 1: Bundle backup integrity verification
+### ✅ Unit 1: Bundle backup integrity verification
 **What**: Ensure both bundle repos are current on GitHub, then clone each remote to a temp location and diff against local bundles.
 **Output**: `unit-1-bundle-remote-sync.log` + `unit-1-backup-integrity.md`.
 **Acceptance**: Evidence shows remotes contain latest commits and clone-vs-local diffs are clean (or explained and resolved).
@@ -113,3 +113,4 @@ Validated target touchpoints:
 - 2026-03-05 21:49 Validation pass: confirmed Gate 8 touchpoints for path resolution, bundle contracts, and packaging script assumptions
 - 2026-03-05 21:49 Quality pass: confirmed unit acceptance criteria, emoji headers, and execution readiness
 - 2026-03-05 21:51 Unit 0 complete: captured pre-move bundle, remote, and process baseline for Gate 8 migration
+- 2026-03-05 21:53 Unit 1 complete: synced both bundle repos to GitHub and verified clone-vs-local integrity
