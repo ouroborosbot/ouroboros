@@ -73,7 +73,7 @@ Validated target touchpoints:
 **Output**: Updated implementation + `unit-2b-green.log` + `unit-2b-tsc.log`.
 **Acceptance**: Unit 2a tests pass, build/typecheck clean, and harness path expectations no longer depend on in-repo bundles.
 
-### ⬜ Unit 2c: Coverage hardening for path migration
+### ✅ Unit 2c: Coverage hardening for path migration
 **What**: Close coverage gaps and refactor path-resolution changes for maintainability.
 **Output**: `unit-2c-coverage.log`.
 **Acceptance**: 100% coverage for newly added/changed logic and test suite remains green.
@@ -116,3 +116,4 @@ Validated target touchpoints:
 - 2026-03-05 21:53 Unit 1 complete: synced both bundle repos to GitHub and verified clone-vs-local integrity
 - 2026-03-05 21:54 Unit 2a complete: added failing identity path tests requiring `~/AgentBundles/<agent>.ouro`
 - 2026-03-05 21:55 Unit 2b complete: switched identity path resolution to `~/AgentBundles` with green tests and clean compile
+- 2026-03-05 21:56 Unit 2c complete: verified 100% coverage for `identity.ts` under the Gate 8 path migration
