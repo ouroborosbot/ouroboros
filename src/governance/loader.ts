@@ -13,6 +13,8 @@ export interface GovernanceLoadResult {
   missing: string[]
 }
 
+export const REQUIRED_GOVERNANCE_DOCS = ["ARCHITECTURE.md", "CONSTITUTION.md"] as const
+
 export function loadGovernanceDocs(agentRoot: string, relativePaths: string[]): GovernanceLoadResult {
   emitNervesEvent({
     component: "governance",
@@ -42,6 +44,17 @@ export function loadGovernanceDocs(agentRoot: string, relativePaths: string[]): 
   }
 
   return { documents, missing }
+}
+
+export function runGovernancePreflight(repoRoot: string): GovernanceLoadResult {
+  const result = loadGovernanceDocs(repoRoot, [...REQUIRED_GOVERNANCE_DOCS])
+  if (result.missing.length > 0) {
+    const missingList = result.missing.join(", ")
+    throw new Error(
+      `Governance preflight failed: missing required docs at repo root ${repoRoot}: ${missingList}`,
+    )
+  }
+  return result
 }
 
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {

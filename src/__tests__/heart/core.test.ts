@@ -1065,8 +1065,11 @@ describe("runAgent", () => {
   })
 
   it("fires onToolEnd with success=false when tool throws", async () => {
-    vi.mocked(fs.readFileSync).mockImplementation(() => {
-      throw new Error("file not found")
+    vi.mocked(fs.readFileSync).mockImplementation((filePath) => {
+      if (String(filePath).includes("missing.txt")) {
+        throw new Error("file not found")
+      }
+      return defaultReadFileSync(filePath)
     })
 
     let callCount = 0
