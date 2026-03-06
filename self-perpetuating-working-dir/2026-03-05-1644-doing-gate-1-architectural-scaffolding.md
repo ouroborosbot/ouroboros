@@ -1,6 +1,6 @@
 # Doing: Gate 1 Architectural Scaffolding
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-03-05 16:44
 **Planning**: ./self-perpetuating-working-dir/2026-03-05-0911-planning-ouroboros-self-perpetuating-realignment.md
@@ -24,9 +24,9 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - [x] Subagent protocol loading convention defined and documented
 - [x] Bundle backup + `~/AgentBundles/` migration path documented
 - [x] `npx tsc` compiles clean with the new interfaces
-- [ ] `npm test` green
+- [x] `npm test` green
 - [x] 100% test coverage on all new code
-- [ ] All tests pass
+- [x] All tests pass
 - [ ] No warnings
 
 ## Code Coverage Requirements
@@ -117,7 +117,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 **Output**: `docs/gate-1-bundle-backup-migration.md`.
 **Acceptance**: Strategy is concrete, ordered, and references real repo/runtime paths.
 
-### ⬜ Unit 5: Gate Verification
+### ✅ Unit 5: Gate Verification
 **What**: Run `npm test` and `npx tsc`, then update this doing doc checklist based on verified evidence.
 **Output**: `npm-test.log` and `tsc.log` in artifacts directory plus updated completion checklist state.
 **Acceptance**: Both commands pass and all Gate 1 completion criteria are satisfiable.
@@ -149,3 +149,4 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - 2026-03-05 16:57 Unit 4a complete: committed path-accurate kill list and migration checklist at `docs/gate-1-kill-list.md`
 - 2026-03-05 16:58 Unit 4b complete: documented bundle-first subagent protocol loading with canonical fallback behavior
 - 2026-03-05 16:59 Unit 4c complete: documented bundle backup process and staged migration to `~/AgentBundles`
+- 2026-03-05 17:00 Unit 5 complete: full `npm test` and `npx tsc` verification logs captured; Gate 1 doer units complete
