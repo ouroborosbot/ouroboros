@@ -10,7 +10,7 @@ import { emitNervesEvent } from "../nerves/runtime";
 import { getFirstImpressions } from "./first-impressions";
 
 // Lazy-loaded psyche text cache
-let _psycheCache: { soul: string; identity: string; lore: string; friends: string; selfKnowledge: string } | null = null;
+let _psycheCache: { soul: string; identity: string; lore: string; friends: string } | null = null;
 
 function loadPsycheFile(name: string): string {
   try {
@@ -21,14 +21,13 @@ function loadPsycheFile(name: string): string {
   }
 }
 
-function loadPsyche(): { soul: string; identity: string; lore: string; friends: string; selfKnowledge: string } {
+function loadPsyche(): { soul: string; identity: string; lore: string; friends: string } {
   if (_psycheCache) return _psycheCache;
   _psycheCache = {
     soul: loadPsycheFile("SOUL.md"),
     identity: loadPsycheFile("IDENTITY.md"),
     lore: loadPsycheFile("LORE.md"),
     friends: loadPsycheFile("FRIENDS.md"),
-    selfKnowledge: loadPsycheFile("SELF-KNOWLEDGE.md"),
   };
   return _psycheCache;
 }
@@ -57,12 +56,6 @@ function friendsSection(): string {
   const text = loadPsyche().friends;
   if (!text) return "";
   return `## my friends\n${text}`;
-}
-
-function selfKnowledgeSection(): string {
-  const text = loadPsyche().selfKnowledge;
-  if (!text) return "";
-  return `## self-knowledge\n${text}`;
 }
 
 export function runtimeInfoSection(channel: Channel): string {
@@ -191,7 +184,6 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     identitySection(),
     loreSection(),
     friendsSection(),
-    selfKnowledgeSection(),
     runtimeInfoSection(channel),
     providerSection(),
     dateSection(),
