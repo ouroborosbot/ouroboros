@@ -3,6 +3,7 @@ import { getContextConfig } from "../config"
 import { emitNervesEvent } from "../nerves/runtime"
 import * as fs from "fs"
 import * as path from "path"
+import { estimateTokensForMessages } from "./token-estimate"
 
 export interface UsageData {
   input_tokens: number
@@ -15,55 +16,159 @@ export interface PostTurnHooks {
   beforeTrim?: (messages: OpenAI.ChatCompletionMessageParam[]) => void
 }
 
+type MessageBlock = {
+  indices: number[]
+  estimatedTokens: number
+}
+
+function buildTrimmableBlocks(messages: OpenAI.ChatCompletionMessageParam[]): MessageBlock[] {
+  const blocks: MessageBlock[] = []
+
+  let i = 0
+  while (i < messages.length) {
+    const msg: any = messages[i]
+
+    if (msg?.role === "system") {
+      i++
+      continue
+    }
+
+    // Tool coherence block: assistant message with tool_calls + immediately following tool results
+    if (msg?.role === "assistant" && Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0) {
+      const indices = [i]
+      i++
+      while (i < messages.length) {
+        const next: any = messages[i]
+        if (next?.role !== "tool") break
+        indices.push(i)
+        i++
+      }
+
+      const blockMsgs = indices.map((idx) => messages[idx])
+      blocks.push({ indices, estimatedTokens: estimateTokensForMessages(blockMsgs) })
+      continue
+    }
+
+    // Default: one message per block
+    blocks.push({ indices: [i], estimatedTokens: estimateTokensForMessages([messages[i]]) })
+    i++
+  }
+
+  return blocks
+}
+
+function getSystemMessageIndices(messages: OpenAI.ChatCompletionMessageParam[]): number[] {
+  const indices: number[] = []
+  for (let i = 0; i < messages.length; i++) {
+    if ((messages[i] as any)?.role === "system") indices.push(i)
+  }
+  return indices
+}
+
+function buildTrimmedMessages(messages: OpenAI.ChatCompletionMessageParam[], kept: Set<number>): OpenAI.ChatCompletionMessageParam[] {
+  return messages.filter((m: any, idx) => m?.role === "system" || kept.has(idx))
+}
+
 export function trimMessages(
   messages: OpenAI.ChatCompletionMessageParam[],
   maxTokens: number,
   contextMargin: number,
   actualTokenCount?: number,
 ): OpenAI.ChatCompletionMessageParam[] {
+  const targetTokens = Math.floor(maxTokens * (1 - contextMargin / 100))
+  const estimatedBefore = estimateTokensForMessages(messages)
+
   emitNervesEvent({
     event: "mind.step_start",
     component: "mind",
     message: "trimMessages started",
-    meta: { maxTokens, contextMargin, messageCount: messages.length, actualTokenCount: actualTokenCount ?? null },
+    meta: {
+      maxTokens,
+      contextMargin,
+      targetTokens,
+      messageCount: messages.length,
+      actualTokenCount: actualTokenCount ?? null,
+      estimated_before: estimatedBefore,
+    },
   })
-  const overTokens = actualTokenCount ? actualTokenCount > maxTokens : false
 
-  if (!overTokens) {
+  const coldStart = actualTokenCount == null || actualTokenCount === 0
+  const overTokens = actualTokenCount != null && actualTokenCount > maxTokens
+
+  // We only trim when the provider reported that we overflowed the model context.
+  // If actualTokenCount is missing/0, we treat it as a cold start and do not trim.
+  if (coldStart || !overTokens) {
     emitNervesEvent({
       event: "mind.step_end",
       component: "mind",
       message: "trimMessages completed without trimming",
-      meta: { trimmed: false, messageCount: messages.length },
+      meta: {
+        trimmed: false,
+        messageCount: messages.length,
+        targetTokens,
+        actualTokenCount: actualTokenCount ?? null,
+        estimated_before: estimatedBefore,
+        estimated_after: estimatedBefore,
+      },
     })
     return [...messages]
   }
 
-  const trimTarget = maxTokens * (1 - contextMargin / 100)
+  const systemIndices = getSystemMessageIndices(messages)
+  const systemMsgs = systemIndices.map((i) => messages[i])
+  const estimatedSystem = estimateTokensForMessages(systemMsgs)
 
-  // actualTokenCount is guaranteed > maxTokens here (overTokens is true)
-  const perMessageCost = actualTokenCount! / messages.length
+  const blocks = buildTrimmableBlocks(messages)
 
-  let droppedTokens = 0
-  let cutIndex = 1 // start after system prompt (index 0)
+  // Approximate token contribution uniformly across messages, per contract tests.
+  // Note: this is intentionally simple and does not attempt token-accurate attribution.
+  const perMessageCost = actualTokenCount / Math.max(1, messages.length)
+  let remaining = actualTokenCount
 
-  // Drop oldest messages (after system prompt) until under budget
-  while (cutIndex < messages.length) {
-    const remainingTokens = actualTokenCount! - droppedTokens
-    if (remainingTokens <= trimTarget) break
-    droppedTokens += perMessageCost
-    cutIndex++
+  const kept = new Set<number>()
+  for (let i = 0; i < messages.length; i++) {
+    if ((messages[i] as any)?.role !== "system") kept.add(i)
   }
 
-  const trimmed = [messages[0], ...messages.slice(cutIndex)]
+  // Drop oldest blocks until we fall under target.
+  for (let b = 0; b < blocks.length && remaining > targetTokens; b++) {
+    const block = blocks[b]
+    for (const idx of block.indices) {
+      kept.delete(idx)
+      remaining -= perMessageCost
+    }
+  }
+
+  let trimmed = buildTrimmedMessages(messages, kept)
+
+  // If we're still above budget after dropping everything trimmable, preserve system only.
+  if (remaining > targetTokens) {
+    trimmed = messages.filter((m: any) => m?.role === "system")
+  }
+
+  const estimatedAfter = estimateTokensForMessages(trimmed)
+
   emitNervesEvent({
     event: "mind.step_end",
     component: "mind",
     message: "trimMessages completed with trimming",
-    meta: { trimmed: true, originalCount: messages.length, finalCount: trimmed.length },
+    meta: {
+      trimmed: true,
+      originalCount: messages.length,
+      finalCount: trimmed.length,
+      targetTokens,
+      actualTokenCount,
+      estimated_before: estimatedBefore,
+      estimated_after: estimatedAfter,
+      estimated_system: estimatedSystem,
+      blockCount: blocks.length,
+      forcedDrop: true,
+    },
   })
+
   return trimmed
 }
+
 
 export function saveSession(filePath: string, messages: OpenAI.ChatCompletionMessageParam[], lastUsage?: UsageData): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true })

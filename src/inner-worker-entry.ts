@@ -7,10 +7,12 @@ if (!process.argv.includes("--agent")) {
 }
 
 import { startInnerDialogWorker } from "./senses/inner-dialog-worker"
+import { configureCliRuntimeLogger } from "./senses/cli-logging"
+
+configureCliRuntimeLogger("self")
 
 startInnerDialogWorker().catch((error) => {
   // eslint-disable-next-line no-console -- fatal startup guard for worker process
   console.error(error instanceof Error ? error.message : String(error))
   process.exit(1)
 })
-
