@@ -1,26 +1,9 @@
 import { DaemonProcessManager } from "./process-manager"
-import { OuroDaemon, type DaemonCronJobSummary, type DaemonHealthResult, type DaemonMessageReceipt } from "./daemon"
+import { OuroDaemon } from "./daemon"
 import { emitNervesEvent } from "../nerves/runtime"
-
-const inMemoryScheduler: {
-  listJobs: () => DaemonCronJobSummary[]
-  triggerJob: (jobId: string) => Promise<{ ok: boolean; message: string }>
-} = {
-  listJobs: () => [],
-  triggerJob: async (jobId) => ({ ok: true, message: `triggered ${jobId}` }),
-}
-
-const inMemoryHealthMonitor: { runChecks: () => Promise<DaemonHealthResult[]> } = {
-  runChecks: async () => [{ name: "agent-processes", status: "ok", message: "checks passing" }],
-}
-
-const inMemoryRouter: {
-  send: () => Promise<DaemonMessageReceipt>
-  pollInbox: () => Array<{ id: string; from: string; content: string; queuedAt: string; priority: string }>
-} = {
-  send: async () => ({ id: `msg-${Date.now()}`, queuedAt: new Date().toISOString() }),
-  pollInbox: () => [],
-}
+import { CronScheduler } from "./cron-scheduler"
+import { FileMessageRouter } from "./message-router"
+import { HealthMonitor } from "./health-monitor"
 
 function parseSocketPath(argv: string[]): string {
   const socketIndex = argv.indexOf("--socket")
@@ -47,13 +30,36 @@ const processManager = new DaemonProcessManager({
   ],
 })
 
+const scheduler = new CronScheduler({
+  jobs: [],
+  runJob: async (job) => ({ ok: true, message: `triggered ${job.id}` }),
+})
+
+const router = new FileMessageRouter()
+
+const healthMonitor = new HealthMonitor({
+  processManager,
+  scheduler,
+  alertSink: (message) => {
+    emitNervesEvent({
+      level: "error",
+      component: "daemon",
+      event: "daemon.health_alert",
+      message: "health monitor produced critical alert",
+      meta: { message },
+    })
+  },
+})
+
 const daemon = new OuroDaemon({
   socketPath,
   processManager,
-  scheduler: inMemoryScheduler,
-  healthMonitor: inMemoryHealthMonitor,
-  router: inMemoryRouter,
+  scheduler,
+  healthMonitor,
+  router,
 })
+
+scheduler.start()
 
 void daemon.start().catch(async () => {
   emitNervesEvent({
@@ -63,14 +69,17 @@ void daemon.start().catch(async () => {
     message: "daemon entrypoint failed",
     meta: {},
   })
+  scheduler.stop()
   await daemon.stop()
   process.exit(1)
 })
 
 process.on("SIGINT", () => {
+  scheduler.stop()
   void daemon.stop().then(() => process.exit(0))
 })
 
 process.on("SIGTERM", () => {
+  scheduler.stop()
   void daemon.stop().then(() => process.exit(0))
 })

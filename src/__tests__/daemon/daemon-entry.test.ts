@@ -30,6 +30,7 @@ describe("daemon entrypoint", () => {
     }
 
     class MockProcessManager {
+      listAgentSnapshots = vi.fn(() => [])
       constructor(_opts: unknown) {
         processManagerCtor(_opts)
       }
@@ -53,22 +54,56 @@ describe("daemon entrypoint", () => {
     expect(daemonCtor).toHaveBeenCalledTimes(1)
 
     const daemonOptions = daemonCtor.mock.calls[0]?.[0] as {
-      scheduler: { listJobs: () => unknown[]; triggerJob: (jobId: string) => Promise<{ ok: boolean; message: string }> }
+      scheduler: {
+        listJobs: () => unknown[]
+        triggerJob: (jobId: string) => Promise<{ ok: boolean; message: string }>
+        addJob: (job: {
+          id: string
+          schedule: string
+          agent: string
+          taskFile: string
+          instruction: string
+          lastRun: string | null
+          lastResult: null
+        }) => void
+      }
       healthMonitor: { runChecks: () => Promise<unknown[]> }
-      router: { send: () => Promise<{ id: string; queuedAt: string }>; pollInbox: () => unknown[] }
+      router: {
+        send: (message: { from: string; to: string; content: string; priority?: string }) => Promise<{ id: string; queuedAt: string }>
+        pollInbox: (agent: string) => unknown[]
+      }
     }
     expect(daemonOptions.scheduler.listJobs()).toEqual([])
+    daemonOptions.scheduler.addJob({
+      id: "nightly",
+      schedule: "*/5 * * * *",
+      agent: "ouroboros",
+      taskFile: "/tmp/nightly.md",
+      instruction: "Run",
+      lastRun: null,
+      lastResult: null,
+    })
     await expect(daemonOptions.scheduler.triggerJob("nightly")).resolves.toEqual({
       ok: true,
       message: "triggered nightly",
     })
     await expect(daemonOptions.healthMonitor.runChecks()).resolves.toEqual([
-      { name: "agent-processes", status: "ok", message: "checks passing" },
+      { name: "agent-processes", status: "ok", message: "all managed agents running" },
+      { name: "cron-health", status: "ok", message: "cron jobs are healthy" },
+      { name: "disk-space", status: "ok", message: "disk usage healthy (0%)" },
     ])
-    await expect(daemonOptions.router.send()).resolves.toEqual(
+    await expect(daemonOptions.router.send({
+      from: "slugger",
+      to: "ouroboros",
+      content: "hi",
+    })).resolves.toEqual(
       expect.objectContaining({ id: expect.stringContaining("msg-") }),
     )
-    expect(daemonOptions.router.pollInbox()).toEqual([])
+    expect(daemonOptions.router.pollInbox("ouroboros")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ from: "slugger", to: "ouroboros", content: "hi" }),
+      ]),
+    )
 
     expect(emitNervesEvent).toHaveBeenCalledWith(
       expect.objectContaining({ event: "daemon.entry_start", meta: { socketPath: "/tmp/ouroboros-daemon.sock" } }),
@@ -113,6 +148,7 @@ describe("daemon entrypoint", () => {
     }
 
     class MockProcessManager {
+      listAgentSnapshots = vi.fn(() => [])
       constructor(_opts: unknown) {
         processManagerCtor(_opts)
       }
@@ -164,7 +200,9 @@ describe("daemon entrypoint", () => {
       stop = stop
     }
 
-    class MockProcessManager {}
+    class MockProcessManager {
+      listAgentSnapshots = vi.fn(() => [])
+    }
 
     vi.doMock("../../daemon/daemon", () => ({
       OuroDaemon: MockOuroDaemon,
