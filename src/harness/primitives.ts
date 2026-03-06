@@ -1,3 +1,5 @@
+import { emitNervesEvent } from "../nerves/runtime"
+
 export const HARNESS_BOOTSTRAP_PHASES = ["bundle", "governance", "psyche", "inner-dialog"] as const
 
 export const GOVERNANCE_CHECK_RESULTS = ["within-bounds", "requires-review"] as const
@@ -46,5 +48,11 @@ export interface GovernanceEvaluation {
 }
 
 export function isGovernanceCheckResult(value: string): value is GovernanceCheckResult {
+  emitNervesEvent({
+    component: "harness",
+    event: "harness.governance_result_check",
+    message: "evaluating governance result",
+    meta: { value },
+  })
   return GOVERNANCE_CHECK_RESULTS.includes(value as GovernanceCheckResult)
 }
