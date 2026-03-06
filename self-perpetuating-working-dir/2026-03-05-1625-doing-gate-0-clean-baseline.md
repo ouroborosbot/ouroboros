@@ -53,7 +53,12 @@ Restore `main` to a healthy state by reverting commits `e3ecc1c..448cfcd`, prese
 **Output**: Artifacts with git logs/stats in the gate artifacts directory.
 **Acceptance**: Archive branch presence and commit-range metadata are captured.
 
-### ⬜ Unit 1: Commit Map for Salvage
+### ⬜ Unit 1a: Commit Inventory
+**What**: Enumerate every commit in `e3ecc1c..448cfcd` with hash, summary, and touched files.
+**Output**: Structured inventory artifact in the gate artifacts directory.
+**Acceptance**: Inventory includes every commit in the target range with no gaps.
+
+### ⬜ Unit 1b: Commit Map for Salvage
 **What**: Build `self-perpetuating-working-dir/gate-0-commit-map.md` listing each reverted commit with summary and salvageability classification.
 **Output**: Commit map markdown file with per-commit decisions and rationale.
 **Acceptance**: All commits in range are mapped and classified.
@@ -79,3 +84,4 @@ Restore `main` to a healthy state by reverting commits `e3ecc1c..448cfcd`, prese
 
 ## Progress Log
 - 2026-03-05 16:25 Created from planning doc
+- 2026-03-05 16:26 Granularity pass: split commit-map work into inventory + classification units
