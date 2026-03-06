@@ -61,7 +61,7 @@ const MOCK_SOUL = "i am a witty, funny, competent chaos monkey coding assistant.
 const MOCK_IDENTITY = "i am Ouroboros.\ni use lowercase in my responses to the user except for proper nouns. no periods unless necessary. i never apply lowercase to code, file paths, environment variables, or tool arguments -- only to natural language output."
 const MOCK_LORE = "i am named after the ouroboros -- the ancient symbol of a serpent eating its own tail."
 const MOCK_FRIENDS = "my creator works at microsoft and talks to me through the CLI and Teams."
-const MOCK_SELF_KNOWLEDGE = "i learned that structured logging is better than console.log."
+const MOCK_TACIT_KNOWLEDGE = "i learned that structured logging is better than console.log."
 
 function makeOpenAICodexAccessToken(accountId = "acct_test"): string {
   const header = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url")
@@ -96,7 +96,7 @@ function setupReadFileSync() {
     if (p.endsWith("IDENTITY.md")) return MOCK_IDENTITY
     if (p.endsWith("LORE.md")) return MOCK_LORE
     if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
-    if (p.endsWith("SELF-KNOWLEDGE.md")) return MOCK_SELF_KNOWLEDGE
+    if (p.endsWith("TACIT.md")) return MOCK_TACIT_KNOWLEDGE
     if (p.endsWith("secrets.json")) return JSON.stringify({})
     return ""
   })
@@ -156,7 +156,7 @@ describe("buildSystem", () => {
     expect(result).toContain("microsoft")
   })
 
-  it("includes self-knowledge section", async () => {
+  it("includes tacit knowledge section", async () => {
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
@@ -164,7 +164,7 @@ describe("buildSystem", () => {
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
-    expect(result).toContain("## self-knowledge")
+    expect(result).toContain("## tacit knowledge")
     expect(result).toContain("structured logging")
   })
 
