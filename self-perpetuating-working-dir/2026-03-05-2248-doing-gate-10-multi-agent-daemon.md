@@ -105,7 +105,7 @@ Expected target files:
 **Output**: Red tests + `unit-3a-red.log`.
 **Acceptance**: Tests fail before implementation and encode recurring-task and alert-routing behavior.
 
-### ⬜ Unit 3b: Cron/router/health implementation (Green)
+### ✅ Unit 3b: Cron/router/health implementation (Green)
 **What**: Implement cron scheduler, file-based message router, and health monitor integration with warn/critical routing semantics.
 **Output**: Implementation + `unit-3b-green.log` + `unit-3b-tsc.log`.
 **Acceptance**: Unit 3a tests pass and modules integrate with daemon runtime.
@@ -157,3 +157,4 @@ Expected target files:
 - 2026-03-05 23:03 Unit 2b complete: implemented daemon command server + `ouro` CLI entry/scripts with green tests and clean compile
 - 2026-03-05 23:12 Unit 2c complete: expanded command-plane branch tests and reached 100% coverage for daemon/CLI modules
 - 2026-03-05 23:13 Unit 3a complete: added failing cron scheduler/message router/health monitor tests and captured red log
+- 2026-03-05 23:20 Unit 3b complete: implemented cron scheduler, file message routing, health monitor wiring in daemon entry, and captured green + compile artifacts

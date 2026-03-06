@@ -63,6 +63,70 @@ describe("cron scheduler", () => {
     expect(triggered.ok).toBe(true)
     expect(runJob).toHaveBeenCalled()
   })
+
+  it("falls back to default 60s interval for non-step and invalid step schedules", () => {
+    const setIntervalFn = vi.fn(() => 1)
+    const clearIntervalFn = vi.fn()
+
+    const scheduler = new CronScheduler({
+      jobs: [
+        {
+          id: "daily",
+          schedule: "0 8 * * *",
+          agent: "slugger",
+          taskFile: "/tmp/daily.md",
+          instruction: "daily",
+          lastRun: null,
+          lastResult: null,
+        },
+        {
+          id: "bad-step",
+          schedule: "*/0 * * * *",
+          agent: "slugger",
+          taskFile: "/tmp/bad.md",
+          instruction: "bad",
+          lastRun: null,
+          lastResult: null,
+        },
+      ],
+      runJob: async () => ({ ok: true, message: "ok" }),
+      setIntervalFn,
+      clearIntervalFn,
+    })
+
+    scheduler.start()
+
+    expect(setIntervalFn).toHaveBeenCalledWith(expect.any(Function), 60_000)
+    expect(setIntervalFn).toHaveBeenCalledTimes(2)
+    scheduler.stop()
+  })
+
+  it("records error results when a cron job execution fails", async () => {
+    const runJob = vi.fn(async () => ({ ok: false, message: "failed" }))
+    const scheduler = new CronScheduler({
+      jobs: [
+        {
+          id: "failing",
+          schedule: "*/5 * * * *",
+          agent: "slugger",
+          taskFile: "/tmp/fail.md",
+          instruction: "fail",
+          lastRun: null,
+          lastResult: null,
+        },
+      ],
+      runJob,
+      now: () => "2026-03-05T23:10:00.000Z",
+    })
+
+    const result = await scheduler.triggerJob("failing")
+    expect(result.ok).toBe(false)
+    expect(scheduler.listJobs()[0]).toMatchObject({
+      id: "failing",
+      lastRun: "2026-03-05T23:10:00.000Z",
+      lastResult: "error",
+    })
+  })
 })
 
 describe("file message router", () => {
@@ -92,6 +156,43 @@ describe("file message router", () => {
     })
 
     expect(router.pollInbox("ouroboros")).toHaveLength(0)
+  })
+
+  it("returns empty list for missing inbox files", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "daemon-router-empty-"))
+    const router = new FileMessageRouter({ baseDir: tmpDir })
+
+    expect(router.pollInbox("missing-agent")).toEqual([])
+  })
+
+  it("uses normal priority when none is provided", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "daemon-router-normal-"))
+    const router = new FileMessageRouter({
+      baseDir: tmpDir,
+      now: () => "2026-03-05T23:20:00.000Z",
+    })
+
+    await router.send({
+      from: "ouroboros",
+      to: "slugger",
+      content: "default-priority",
+    })
+
+    const inbox = router.pollInbox("slugger")
+    expect(inbox[0]?.priority).toBe("normal")
+  })
+
+  it("can initialize using default base directory behavior", async () => {
+    const router = new FileMessageRouter()
+    const receipt = await router.send({
+      from: "ouroboros",
+      to: "self-check",
+      content: "default-dir",
+    })
+
+    expect(receipt.id).toContain("msg-")
+    const polled = router.pollInbox("self-check")
+    expect(polled).toHaveLength(1)
   })
 })
 
@@ -141,5 +242,58 @@ describe("health monitor", () => {
     expect(results.some((result) => result.status === "warn")).toBe(true)
     expect(results.some((result) => result.status === "critical")).toBe(true)
     expect(alertSink).toHaveBeenCalled()
+  })
+
+  it("reports all-ok state and uses default alert sink", async () => {
+    const monitor = new HealthMonitor({
+      processManager: {
+        listAgentSnapshots: () => [
+          { name: "ouroboros", status: "running" },
+          { name: "slugger", status: "running" },
+        ],
+      },
+      scheduler: {
+        listJobs: () => [{ id: "daily", lastRun: "2026-03-05T23:00:00.000Z" }],
+      },
+      diskUsagePercent: () => 10,
+    })
+
+    const results = await monitor.runChecks()
+    expect(results).toEqual([
+      { name: "agent-processes", status: "ok", message: "all managed agents running" },
+      { name: "cron-health", status: "ok", message: "cron jobs are healthy" },
+      { name: "disk-space", status: "ok", message: "disk usage healthy (10%)" },
+    ])
+  })
+
+  it("reports high-disk warn path", async () => {
+    const monitor = new HealthMonitor({
+      processManager: {
+        listAgentSnapshots: () => [{ name: "ouroboros", status: "running" }],
+      },
+      scheduler: {
+        listJobs: () => [{ id: "daily", lastRun: "2026-03-05T23:00:00.000Z" }],
+      },
+      alertSink: vi.fn(async () => undefined),
+      diskUsagePercent: () => 85,
+    })
+
+    const results = await monitor.runChecks()
+    expect(results.some((result) => result.name === "disk-space" && result.status === "warn")).toBe(true)
+  })
+
+  it("handles critical results without a custom alert sink", async () => {
+    const monitor = new HealthMonitor({
+      processManager: {
+        listAgentSnapshots: () => [{ name: "slugger", status: "crashed" }],
+      },
+      scheduler: {
+        listJobs: () => [{ id: "daily", lastRun: null }],
+      },
+      diskUsagePercent: () => 95,
+    })
+
+    const results = await monitor.runChecks()
+    expect(results.some((result) => result.status === "critical")).toBe(true)
   })
 })
