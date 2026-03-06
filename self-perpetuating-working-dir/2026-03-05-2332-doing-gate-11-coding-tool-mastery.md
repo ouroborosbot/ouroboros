@@ -99,7 +99,7 @@ Expected target files:
 **Output**: Red tests + `unit-3a-red.log`.
 **Acceptance**: Tests fail before implementation and capture monitoring + recovery expectations.
 
-### ⬜ Unit 3b: Monitor/reporter/recovery implementation (Green)
+### ✅ Unit 3b: Monitor/reporter/recovery implementation (Green)
 **What**: Implement monitor/reporter/recovery logic, including resumable state for restarted coding sessions.
 **Output**: Implementation + `unit-3b-green.log` + `unit-3b-tsc.log`.
 **Acceptance**: Unit 3a tests pass and monitoring/recovery behavior is observable in tests.
@@ -151,3 +151,4 @@ Expected target files:
 - 2026-03-05 23:50 Unit 2b complete: implemented `src/coding/tools.ts`, wired coding tools into base registry + arg summaries, and captured green test + compile logs
 - 2026-03-05 23:52 Unit 2c complete: closed coding tools validation/optional-arg/summary/error-path coverage gaps and captured 100% coverage across Unit 2 modules
 - 2026-03-05 23:54 Unit 3a complete: added failing monitor/recovery contract tests (`monitor-recovery.test.ts`) with red log proving missing `coding/monitor` + `coding/reporter` modules
+- 2026-03-05 23:55 Unit 3b complete: implemented monitor/reporter modules with blocked/stalled/completed/failed summaries + recovery actions and captured green test + compile logs
