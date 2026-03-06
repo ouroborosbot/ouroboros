@@ -98,7 +98,7 @@ Execute Gate 5 by re-landing valuable salvageable code from the reverted overnig
 **Output**: Updated backlog docs/index with `priority` and `status rationale` tags.
 **Acceptance**: Security items visibly marked high priority; obsoleted items explicitly reference inversion rationale.
 
-### ⬜ Unit 6: Artifact cleanup and preservation audit
+### ✅ Unit 6: Artifact cleanup and preservation audit
 **What**: Clean duplicate raw overnight artifacts, archive originals, and verify valid historical docs in `ouroboros.ouro/tasks/` remain untouched.
 **Output**: `unit-6-cleanup-audit.md` artifact.
 **Acceptance**: Duplicates removed, originals archived, and preservation audit shows no unintended edits to valid historical task docs.
@@ -127,3 +127,4 @@ Execute Gate 5 by re-landing valuable salvageable code from the reverted overnig
 - 2026-03-05 20:05 Units 2a/2b/2c complete: no small re-land-now code candidates; recorded explicit conditional no-op evidence artifacts
 - 2026-03-05 20:05 Unit 3 complete: no substantial re-land-now code candidates, recorded no-op salvage flow outcome
 - 2026-03-05 20:08 Units 4a/4b/4c and 5 complete: triaged canonical 31 proposals, created 24 backlog planning docs, tagged priorities, and recorded non-backlog rationales with source references
+- 2026-03-05 20:44 Unit 6 complete: archived 45 remaining raw overnight reflection artifacts into gate-5 archive and verified zero matching artifacts remain in `ouroboros.ouro/tasks/` with no non-target historical doc edits
