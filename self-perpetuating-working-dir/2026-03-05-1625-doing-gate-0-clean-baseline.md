@@ -17,7 +17,7 @@ Restore `main` to a healthy state by reverting commits `e3ecc1c..448cfcd`, prese
 
 ## Completion Criteria
 - [x] Archive branch `archive/self-perpetuating-run-2026-03-05` exists and contains overnight proposals
-- [ ] Commit map documented at `self-perpetuating-working-dir/gate-0-commit-map.md` (reverted vs salvageable)
+- [x] Commit map documented at `self-perpetuating-working-dir/gate-0-commit-map.md` (reverted vs salvageable)
 - [ ] `main` reverted via explicit revert commits
 - [ ] `npm test` green on `main` post-revert
 - [ ] No force-push, no history rewrite
@@ -58,7 +58,7 @@ Restore `main` to a healthy state by reverting commits `e3ecc1c..448cfcd`, prese
 **Output**: Structured inventory artifact in the gate artifacts directory.
 **Acceptance**: Inventory includes every commit in the target range with no gaps.
 
-### ⬜ Unit 1b: Commit Map for Salvage
+### ✅ Unit 1b: Commit Map for Salvage
 **What**: Build `self-perpetuating-working-dir/gate-0-commit-map.md` listing each reverted commit with summary and salvageability classification.
 **Output**: Commit map markdown file with per-commit decisions and rationale.
 **Acceptance**: All commits in range are mapped and classified.
@@ -89,3 +89,4 @@ Restore `main` to a healthy state by reverting commits `e3ecc1c..448cfcd`, prese
 - 2026-03-05 16:28 Quality pass: unit format and checklist completeness verified
 - 2026-03-05 16:28 Unit 0 complete: archived-branch evidence and commit-range baseline captured
 - 2026-03-05 16:28 Unit 1a complete: full commit inventory generated with hash/summary/file-count data
+- 2026-03-05 16:29 Unit 1b complete: gate-0 commit map written with per-commit salvage decisions
