@@ -72,7 +72,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 **Output**: Clean skeleton structure and passing targeted/full tests.
 **Acceptance**: No extra population work leaked from Gate 2 and tests remain green.
 
-### ⬜ Unit 2a: Harness Interface Contract Test (Red)
+### ✅ Unit 2a: Harness Interface Contract Test (Red)
 **What**: Add failing TypeScript contract tests (or compile assertions) for expected harness primitive interface exports.
 **Output**: New failing test file referencing planned interface symbols.
 **Acceptance**: Test/compile step fails before interfaces exist.
@@ -140,3 +140,4 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - 2026-03-05 16:49 Unit 1a complete: added failing contract test for required `*.ouro` skeleton paths
 - 2026-03-05 16:50 Unit 1b complete: created structure-only `ouroboros.ouro/` and `slugger.ouro/` bundle trees
 - 2026-03-05 16:50 Unit 1c complete: verified 100% coverage and clean TypeScript compile with skeleton contract in place
+- 2026-03-05 16:52 Unit 2a complete: added failing harness interface contract test targeting `src/harness` exports
