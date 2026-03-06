@@ -7,7 +7,7 @@
     "dev": "tsc && node dist/cli-entry.js --agent ouroboros",
     "dev:slugger": "tsc && node dist/cli-entry.js --agent slugger",
     "inner": "tsc && node dist/inner-worker-entry.js --agent ouroboros",
-    "supervisor": "tsc && node dist/supervisor-entry.js --agent ouroboros",
+    "supervisor": "tsc && node dist/supervisor-entry.js --agents ouroboros,slugger",
     "auth:openai-codex": "node scripts/auth-openai-codex.cjs --agent ouroboros",
     "auth:claude-setup-token": "node scripts/auth-claude-setup-token.cjs --agent ouroboros",
     "test": "vitest run",
