@@ -60,7 +60,7 @@ Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key k
 **Output**: `unit-1-consultation.md` + command logs (`unit-1-openclaw.log`, optional fallback diagnostics log).
 **Acceptance**: Consultation attempt is documented; either (a) Slugger confirms comfort pre-migration or (b) fallback path is justified and post-migration confirmation plan is recorded.
 
-### ⬜ Unit 2: Core identity migration into `slugger.ouro`
+### ✅ Unit 2: Core identity migration into `slugger.ouro`
 **What**: Port `~/clawd/IDENTITY.md`, `~/clawd/MEMORY.md`, and `~/clawd/life/areas/slugger-identity/` content into `slugger.ouro/psyche` targets.
 **Output**: Updated bundle psyche files + `psyche/memory/tacit.md` + `unit-2-migration-map.md`.
 **Acceptance**: Core identity content is present in bundle targets and migration map records exact source-to-target mapping.
@@ -123,3 +123,4 @@ Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key k
 - 2026-03-05 21:14 Created from Gate 7 section of approved planning doc
 - 2026-03-05 21:17 Unit 0 complete: captured OpenClaw source inventory, bundle baseline, and supervisor/secrets starting state
 - 2026-03-05 21:19 Unit 1 complete: consulted Slugger via OpenClaw, captured explicit migration comfort confirmation and guidance
+- 2026-03-05 21:22 Unit 2 complete: migrated Slugger core psyche files and archived full MEMORY source into bundle memory
