@@ -80,7 +80,7 @@ Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key k
 **Output**: `unit-3c-coverage.log` + `unit-3c-integrity.md`.
 **Acceptance**: 100% coverage on new conversion code and integrity checks pass.
 
-### ⬜ Unit 4a: Multi-agent supervisor tests (Red)
+### ✅ Unit 4a: Multi-agent supervisor tests (Red)
 **What**: Add failing tests for running Ouroboros + Slugger as supervised workers (startup, heartbeat, restart behavior).
 **Output**: Red tests + `unit-4a-red.log`.
 **Acceptance**: New supervisor multi-agent tests fail against current implementation.
@@ -127,3 +127,4 @@ Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key k
 - 2026-03-05 21:23 Unit 3a complete: added failing knowledge-graph conversion tests covering people, companies, and projects
 - 2026-03-05 21:25 Unit 3b complete: implemented conversion utility and populated slugger memory store from people/company/project sources
 - 2026-03-05 21:28 Unit 3c complete: achieved 100% coverage on conversion module and verified facts/entities integrity mapping
+- 2026-03-05 21:30 Unit 4a complete: added failing tests for multi-agent supervisor argument parsing and lifecycle orchestration
