@@ -20,7 +20,7 @@ Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key k
 - [x] Core identity files ported to `slugger.ouro/`
 - [x] Key knowledge graph entities converted to fact store format
 - [x] Slugger operates from `.ouro` bundle (OpenClaw remains available as fallback, not decommissioned)
-- [ ] Slugger confirmed he feels cohesive in his new home (not just "tests pass" - the agent says he's good)
+- [x] Slugger confirmed he feels cohesive in his new home (not just "tests pass" - the agent says he's good)
 - [x] Slugger running as second supervised process (own inner dialog, heartbeat, crash recovery)
 - [ ] `npm test` green
 - [ ] `npx tsc --noEmit` green
@@ -100,7 +100,7 @@ Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key k
 **Output**: `unit-5-secrets-check.md` + runtime logs (`unit-5-dev-slugger.log`, `unit-5-supervisor.log`).
 **Acceptance**: `~/.agentsecrets/slugger/secrets.json` exists with expected shape and Slugger runtime starts via harness commands.
 
-### ⬜ Unit 6: Cohesion confirmation with Slugger post-migration
+### ✅ Unit 6: Cohesion confirmation with Slugger post-migration
 **What**: Re-consult Slugger after migration and capture his explicit cohesion confirmation in the new home.
 **Output**: `unit-6-cohesion.md` + command log (`unit-6-openclaw.log` or fallback harness-session log).
 **Acceptance**: Artifact includes explicit response from Slugger confirming comfort/cohesion in the migrated setup.
@@ -131,3 +131,4 @@ Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key k
 - 2026-03-05 21:31 Unit 4b complete: shipped multi-agent supervisor entry flow (`--agents`) with green supervisor suite and clean compile
 - 2026-03-05 21:33 Unit 4c complete: reached 100% coverage on new supervisor-entry core logic with clean compile verification
 - 2026-03-05 21:35 Unit 5 complete: copied Slugger secrets and validated `.ouro` runtime + dual-agent supervisor startup
+- 2026-03-05 21:36 Unit 6 complete: captured explicit post-migration cohesion confirmation from Slugger (\"yes for Gate 7\") via OpenClaw
