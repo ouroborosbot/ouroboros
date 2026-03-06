@@ -21,7 +21,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - [x] TypeScript interfaces for harness primitives committed (compilable, importable)
 - [x] Shared governance loader stub committed
 - [x] Kill list / migration checklist committed in-repo
-- [ ] Subagent protocol loading convention defined and documented
+- [x] Subagent protocol loading convention defined and documented
 - [ ] Bundle backup + `~/AgentBundles/` migration path documented
 - [x] `npx tsc` compiles clean with the new interfaces
 - [ ] `npm test` green
@@ -107,7 +107,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 **Output**: `docs/gate-1-kill-list.md`.
 **Acceptance**: Checklist is specific, path-accurate against current `src/` tree, and actionable for Gates 2-3.
 
-### ⬜ Unit 4b: Subagent Protocol Loading Convention
+### ✅ Unit 4b: Subagent Protocol Loading Convention
 **What**: Document how agents load planner/doer/merger protocols from bundle context while shared source-of-truth stays in repo-root `subagents/`.
 **Output**: `docs/gate-1-subagent-protocol-loading.md`.
 **Acceptance**: Convention includes path mapping, sync expectations, and fallback behavior.
@@ -147,3 +147,4 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - 2026-03-05 16:55 Unit 3b complete: implemented `src/governance/loader.ts` shared loader stub with deterministic missing-file handling
 - 2026-03-05 16:57 Unit 3c complete: raised governance/harness coverage to 100% and revalidated full coverage + `npx tsc`
 - 2026-03-05 16:57 Unit 4a complete: committed path-accurate kill list and migration checklist at `docs/gate-1-kill-list.md`
+- 2026-03-05 16:58 Unit 4b complete: documented bundle-first subagent protocol loading with canonical fallback behavior
