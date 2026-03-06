@@ -60,7 +60,7 @@ Validated touchpoints:
 - `src/identity.ts` (`~/AgentBundles` source of truth + agent identity resolution)
 - `package.json` scripts (`supervisor` baseline and new `ouro` command surface)
 
-### ⬜ Unit 1a: Process manager + workspace isolation tests (Red)
+### ✅ Unit 1a: Process manager + workspace isolation tests (Red)
 **What**: Add failing tests for daemon process lifecycle (start/stop/restart/backoff) and per-agent workspace clone/sync behavior.
 **Output**: Red tests + `unit-1a-red.log`.
 **Acceptance**: Tests fail before implementation and encode crash recovery + isolated workspace requirements.
@@ -150,3 +150,4 @@ Expected target files:
 - 2026-03-05 22:50 Validation pass: pinned Gate 10 target implementation and test files to existing repo conventions
 - 2026-03-05 22:50 Quality pass: confirmed emoji headers, testable acceptance criteria, and coverage requirements for every unit
 - 2026-03-05 22:53 Unit 0 complete: captured supervisor baseline and concrete daemon module/test target map
+- 2026-03-05 22:53 Unit 1a complete: added failing process-manager/workspace-isolation tests and captured red log
