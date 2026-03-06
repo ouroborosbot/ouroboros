@@ -79,7 +79,7 @@ Expected target files:
 **Output**: Red tests + `unit-2a-red.log`.
 **Acceptance**: Tests fail before implementation and define callable model-facing coding tools.
 
-### ⬜ Unit 2b: Coding tools implementation + registry wiring (Green)
+### ✅ Unit 2b: Coding tools implementation + registry wiring (Green)
 **What**: Implement coding tools and wire them into harness tool registry/runtime entrypoints without breaking existing tools.
 **Output**: Implementation + `unit-2b-green.log` + `unit-2b-tsc.log`.
 **Acceptance**: Unit 2a tests pass and coding tools are callable in tests.
@@ -148,3 +148,4 @@ Expected target files:
 - 2026-03-05 23:38 Unit 1b complete: implemented coding session types/spawner/manager/index with managed-workdir checks and green+compile artifacts
 - 2026-03-05 23:46 Unit 1c complete: added branch/default lifecycle tests, exercised spawner default dependency path, and captured 100% coverage for Unit 1 executable modules
 - 2026-03-05 23:48 Unit 2a complete: added failing coding tool surface tests for `coding_spawn`, `coding_status`, `coding_send_input`, and `coding_kill`, with red log proving missing registry wiring
+- 2026-03-05 23:50 Unit 2b complete: implemented `src/coding/tools.ts`, wired coding tools into base registry + arg summaries, and captured green test + compile logs
