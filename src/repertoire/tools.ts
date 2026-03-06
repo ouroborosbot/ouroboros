@@ -169,6 +169,7 @@ export function summarizeArgs(name: string, args: Record<string, string>): strin
   if (name === "git_commit") return summarizeKeyValues(args, ["message"]);
   if (name === "gh_cli") return summarizeKeyValues(args, ["command"]);
   if (name === "load_skill") return summarizeKeyValues(args, ["name"]);
+  if (name === "governance_convention") return summarizeKeyValues(args, ["query"]);
   if (name === "claude") return summarizeKeyValues(args, ["prompt"]);
   if (name === "web_search") return summarizeKeyValues(args, ["query"]);
   if (name === "save_friend_note") {

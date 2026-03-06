@@ -6,6 +6,7 @@ import { getIntegrationsConfig } from "../config";
 import type { Integration, ResolvedContext, FriendRecord } from "../mind/friends/types";
 import type { FriendStore } from "../mind/friends/store";
 import { emitNervesEvent } from "../nerves/runtime";
+import { GOVERNANCE_CHECK_RESULTS } from "../harness/primitives";
 
 export interface ToolContext {
   graphToken?: string;
@@ -26,6 +27,24 @@ export interface ToolDefinition {
 }
 
 const postIt = (msg: string) => `post-it from past you:\n${msg}`;
+
+const GOVERNANCE_CONVENTION_ID = "constitution-classification";
+const GOVERNANCE_DEFAULT_RESULT = "within-bounds";
+const GOVERNANCE_GUIDANCE = {
+  withinBounds:
+    "additive hardening and local feature work default to within-bounds when architecture boundaries stay intact",
+  requiresReview:
+    "structural boundary shifts, ownership/workflow rewrites, and broad cross-cutting changes require review before execution",
+} as const;
+
+function serializeGovernanceConvention() {
+  return JSON.stringify({
+    convention: GOVERNANCE_CONVENTION_ID,
+    defaultResult: GOVERNANCE_DEFAULT_RESULT,
+    results: [...GOVERNANCE_CHECK_RESULTS],
+    guidance: GOVERNANCE_GUIDANCE,
+  });
+}
 
 export const baseToolDefinitions: ToolDefinition[] = [
   {
@@ -183,6 +202,30 @@ export const baseToolDefinitions: ToolDefinition[] = [
       } catch (e) {
         return `error: ${e}`;
       }
+    },
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "governance_convention",
+        description: "query constitution/governance classification conventions used by the harness",
+        parameters: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "optional convention query; supports 'classification' (default)",
+            },
+          },
+        },
+      },
+    },
+    handler: (a) => {
+      if (!a.query || a.query.trim().length === 0 || a.query === "classification") {
+        return serializeGovernanceConvention();
+      }
+      return `error: unsupported governance_convention query '${a.query}'. supported queries: classification`;
     },
   },
   {
