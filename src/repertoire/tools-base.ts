@@ -10,6 +10,7 @@ import { emitNervesEvent } from "../nerves/runtime";
 import { queryGovernanceConvention } from "../governance/convention";
 import { getAgentRoot } from "../identity";
 import { getTaskModule } from "../tasks";
+import { codingToolDefinitions } from "../coding/tools";
 
 export interface ToolContext {
   graphToken?: string;
@@ -560,6 +561,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       }
     },
   },
+  ...codingToolDefinitions,
 ];
 
 // Backward-compat: extract just the OpenAI tool schemas
