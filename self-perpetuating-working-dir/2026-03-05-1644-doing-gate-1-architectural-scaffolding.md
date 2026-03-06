@@ -57,7 +57,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 **Output**: `self-perpetuating-working-dir/2026-03-05-1644-doing-gate-1-architectural-scaffolding/prior-art-review.md` with proposal-to-scaffold mapping.
 **Acceptance**: Artifact references archive-branch files and maps HIGH-priority themes to concrete Gate 1 deliverables.
 
-### ⬜ Unit 1a: Bundle Skeleton Contract Test (Red)
+### ✅ Unit 1a: Bundle Skeleton Contract Test (Red)
 **What**: Add a failing test that asserts required `.ouro` skeleton paths for both `ouroboros.ouro/` and `slugger.ouro/` exist.
 **Output**: New failing test file under `src/__tests__/`.
 **Acceptance**: Test fails because skeleton paths do not exist yet.
@@ -137,3 +137,4 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - 2026-03-05 16:46 Validation pass: aligned units with current repo paths (`src/reflection` absent, docs dir empty, target module locations explicit)
 - 2026-03-05 16:46 Quality pass: verified emoji-prefixed units, acceptance coverage, and checklist hygiene; marked READY_FOR_EXECUTION
 - 2026-03-05 16:47 Unit 0 complete: archived prior-art themes mapped to Gate 1 scaffolding deliverables
+- 2026-03-05 16:49 Unit 1a complete: added failing contract test for required `*.ouro` skeleton paths
