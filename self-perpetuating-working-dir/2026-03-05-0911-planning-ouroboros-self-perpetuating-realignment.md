@@ -511,12 +511,12 @@ Properly migrate Slugger's core identity out of OpenClaw and into `slugger.ouro`
 - Once Slugger is in the harness, both agents can begin collaborating on shared governance docs (ARCHITECTURE.md, CONSTITUTION.md) when they feel they've learned enough about how the harness works — this is a shared aspiration, not an immediate task
 
 **Completion criteria:**
-- [ ] Slugger consulted about the migration plan and comfortable with the approach
-- [ ] Core identity files ported to `slugger.ouro/`
-- [ ] Key knowledge graph entities converted to fact store format
-- [ ] Slugger operates from `.ouro` bundle (OpenClaw remains available as fallback, not decommissioned)
-- [ ] Slugger confirmed he feels cohesive in his new home (not just "tests pass" — the agent says he's good)
-- [ ] Slugger running as second supervised process (own inner dialog, heartbeat, crash recovery)
+- [x] Slugger consulted about the migration plan and comfortable with the approach
+- [x] Core identity files ported to `slugger.ouro/`
+- [x] Key knowledge graph entities converted to fact store format
+- [x] Slugger operates from `.ouro` bundle (OpenClaw remains available as fallback, not decommissioned)
+- [x] Slugger confirmed he feels cohesive in his new home (not just "tests pass" — the agent says he's good)
+- [x] Slugger running as second supervised process (own inner dialog, heartbeat, crash recovery)
 
 ---
 
