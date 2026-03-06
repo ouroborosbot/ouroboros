@@ -18,7 +18,7 @@ Move `ouroboros.ouro` and `slugger.ouro` out of the harness repo into `~/AgentBu
 ## Completion Criteria
 - [x] GitHub repos up-to-date with latest bundle content (repos created in Gate 2)
 - [x] Backup integrity verified (clone + diff)
-- [ ] Bundles moved to `~/AgentBundles/`
+- [x] Bundles moved to `~/AgentBundles/`
 - [ ] Harness code updated to reference new bundle location
 - [ ] Agents bootstrap correctly from `~/AgentBundles/`
 - [ ] `npm test` green
@@ -78,7 +78,7 @@ Validated target touchpoints:
 **Output**: `unit-2c-coverage.log`.
 **Acceptance**: 100% coverage for newly added/changed logic and test suite remains green.
 
-### ⬜ Unit 3a: Bundle relocation execution
+### ✅ Unit 3a: Bundle relocation execution
 **What**: Stop active agent processes, create `~/AgentBundles`, and move both bundles out of the repo while preserving nested bundle git history/remotes.
 **Output**: `unit-3a-relocation.log` + `unit-3a-post-move-layout.md`.
 **Acceptance**: Bundles exist at `~/AgentBundles/<agent>.ouro` with intact nested git metadata and no data loss.
@@ -117,3 +117,4 @@ Validated target touchpoints:
 - 2026-03-05 21:54 Unit 2a complete: added failing identity path tests requiring `~/AgentBundles/<agent>.ouro`
 - 2026-03-05 21:55 Unit 2b complete: switched identity path resolution to `~/AgentBundles` with green tests and clean compile
 - 2026-03-05 21:56 Unit 2c complete: verified 100% coverage for `identity.ts` under the Gate 8 path migration
+- 2026-03-05 21:57 Unit 3a complete: moved both bundles to `~/AgentBundles` and preserved nested git remotes/state
