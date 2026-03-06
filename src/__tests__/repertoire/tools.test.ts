@@ -332,6 +332,65 @@ describe("execTool", () => {
     vi.unstubAllGlobals()
   })
 
+  // ── memory_search ──
+  it("memory_search returns relevant memory facts for a query", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      [
+        JSON.stringify({
+          id: "fact-1",
+          text: "Ari likes mushroom pizza",
+          source: "cli",
+          createdAt: "2026-03-06T00:00:00.000Z",
+          embedding: [],
+        }),
+        JSON.stringify({
+          id: "fact-2",
+          text: "Ari prefers strict TypeScript checks",
+          source: "teams",
+          createdAt: "2026-03-06T00:01:00.000Z",
+          embedding: [],
+        }),
+      ].join("\n"),
+    )
+
+    const result = await execTool("memory_search", { query: "pizza" })
+    expect(result).toContain("Ari likes mushroom pizza")
+    expect(result).not.toContain("strict TypeScript")
+  })
+
+  it("memory_search returns a query-required error when query is empty", async () => {
+    const result = await execTool("memory_search", { query: "   " })
+    expect(result).toContain("query is required")
+  })
+
+  it("memory_search returns a query-required error when query is omitted", async () => {
+    const result = await execTool("memory_search", {})
+    expect(result).toContain("query is required")
+  })
+
+  it("memory_search returns error text when reading memory facts fails", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw new Error("disk read failed")
+    })
+
+    const result = await execTool("memory_search", { query: "pizza" })
+    expect(result).toContain("error:")
+    expect(result).toContain("disk read failed")
+  })
+
+  it("memory_search stringifies non-Error read failures", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw "disk failed as string"
+    })
+
+    const result = await execTool("memory_search", { query: "pizza" })
+    expect(result).toContain("error:")
+    expect(result).toContain("disk failed as string")
+  })
+
   it("governance_convention returns constitution convention metadata", async () => {
     const result = await execTool("governance_convention", { query: "classification" })
     const parsed = JSON.parse(result)
@@ -441,6 +500,15 @@ describe("summarizeArgs", () => {
 
   it("returns empty string for web_search with no query", () => {
     expect(summarizeArgs("web_search", {})).toBe("")
+  })
+
+  it("returns truncated query for memory_search", () => {
+    const query = "a".repeat(70)
+    expect(summarizeArgs("memory_search", { query })).toBe("query=" + "a".repeat(60) + "...")
+  })
+
+  it("returns empty string for memory_search with no query", () => {
+    expect(summarizeArgs("memory_search", {})).toBe("")
   })
 
   it("returns key=value summary for unknown tool", () => {

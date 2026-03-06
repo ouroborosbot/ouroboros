@@ -172,6 +172,7 @@ export function summarizeArgs(name: string, args: Record<string, string>): strin
   if (name === "governance_convention") return summarizeKeyValues(args, ["query"]);
   if (name === "claude") return summarizeKeyValues(args, ["prompt"]);
   if (name === "web_search") return summarizeKeyValues(args, ["query"]);
+  if (name === "memory_search") return summarizeKeyValues(args, ["query"]);
   if (name === "save_friend_note") {
     return summarizeKeyValues(args, ["type", "key", "content"]);
   }
