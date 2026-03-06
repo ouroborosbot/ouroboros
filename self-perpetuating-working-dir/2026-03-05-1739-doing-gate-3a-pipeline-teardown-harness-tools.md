@@ -58,7 +58,7 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 **Output**: `baseline-gate-3a-inventory.md` artifact.
 **Acceptance**: Inventory confirms what is already removed/clean and what still needs implementation (dual-source protocol loading + queryable governance convention).
 
-### ⬜ Unit 1a: Dual-Source Protocol Loading Tests (Red)
+### ✅ Unit 1a: Dual-Source Protocol Loading Tests (Red)
 **What**: Add failing tests for protocol loading order and fallback semantics: bundle-local mirror first (`<agent>.ouro/skills/protocols/*.md`) and canonical fallback (`subagents/*.md`) with explicit errors when both are missing.
 **Output**: New failing tests in repertoire skill-loading test suite.
 **Acceptance**: Tests fail against current single-source skills loader.
@@ -113,3 +113,4 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 - 2026-03-05 17:41 Validation pass: confirmed `src/reflection/` is absent, reflect scripts already removed from `package.json`, and current protocol loading is still single-source (`src/repertoire/skills.ts`)
 - 2026-03-05 17:42 Quality pass: verified completion criteria/testability coverage, emoji-prefixed units, and execution readiness
 - 2026-03-05 17:43 Unit 0 complete: captured teardown/tooling baseline in `baseline-gate-3a-inventory.md` and confirmed Gate 3a implementation gaps
+- 2026-03-05 17:44 Unit 1a complete: added failing tests for protocol mirror-first loading, canonical `subagents/` fallback, and explicit dual-path missing errors
