@@ -19,7 +19,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - [x] Overnight proposals reviewed -- high-merit ideas incorporated into scaffolding decisions
 - [x] `.ouro` bundle skeleton directory committed (structure only, Gate 2 populates)
 - [x] TypeScript interfaces for harness primitives committed (compilable, importable)
-- [ ] Shared governance loader stub committed
+- [x] Shared governance loader stub committed
 - [ ] Kill list / migration checklist committed in-repo
 - [ ] Subagent protocol loading convention defined and documented
 - [ ] Bundle backup + `~/AgentBundles/` migration path documented
@@ -92,7 +92,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 **Output**: New failing tests for loader API expectations (targeting `src/governance/loader.ts`).
 **Acceptance**: Tests fail before loader implementation exists.
 
-### ⬜ Unit 3b: Governance Loader Stub (Green)
+### ✅ Unit 3b: Governance Loader Stub (Green)
 **What**: Implement shared governance loader stub at the agreed target location with deterministic return/error behavior.
 **Output**: `src/governance/loader.ts` plus minimal fixture data if needed.
 **Acceptance**: Loader tests pass and API shape is ready for Gate 2/3 expansion.
@@ -144,3 +144,4 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - 2026-03-05 16:53 Unit 2b complete: implemented importable `src/harness` primitive interfaces and governance result guard
 - 2026-03-05 16:54 Unit 2c complete: revalidated harness contract tests and clean `npx tsc` compile
 - 2026-03-05 16:54 Unit 3a complete: added failing governance loader tests for existing + missing doc behavior
+- 2026-03-05 16:55 Unit 3b complete: implemented `src/governance/loader.ts` shared loader stub with deterministic missing-file handling
