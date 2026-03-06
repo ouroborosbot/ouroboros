@@ -53,7 +53,7 @@ Restore `main` to a healthy state by reverting commits `e3ecc1c..448cfcd`, prese
 **Output**: Artifacts with git logs/stats in the gate artifacts directory.
 **Acceptance**: Archive branch presence and commit-range metadata are captured.
 
-### ⬜ Unit 1a: Commit Inventory
+### ✅ Unit 1a: Commit Inventory
 **What**: Enumerate every commit in `e3ecc1c..448cfcd` with hash, summary, and touched files.
 **Output**: Structured inventory artifact in the gate artifacts directory.
 **Acceptance**: Inventory includes every commit in the target range with no gaps.
@@ -88,3 +88,4 @@ Restore `main` to a healthy state by reverting commits `e3ecc1c..448cfcd`, prese
 - 2026-03-05 16:27 Validation pass: confirmed planning path, commit range, and archive branch references
 - 2026-03-05 16:28 Quality pass: unit format and checklist completeness verified
 - 2026-03-05 16:28 Unit 0 complete: archived-branch evidence and commit-range baseline captured
+- 2026-03-05 16:28 Unit 1a complete: full commit inventory generated with hash/summary/file-count data
