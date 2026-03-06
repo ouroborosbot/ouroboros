@@ -246,15 +246,21 @@ Read each doing doc found above. The PR body should summarize every completed ta
 
 #### PR title and body contract (required)
 
-Do not use generic titles like `merge <branch>`. Title must describe delivered capability.
+Do not use generic titles like `merge <branch>`. Title must describe delivered capability and stand on its own with no external context.
 
-**Title pattern:**
-- `Gate <n>: <shipped outcome>` when branch slug includes a gate
-- Otherwise: `<agent>: <shipped outcome>`
+**Title pattern (always):**
+- `<optional-agent-prefix>: <no-context-needed-short-title> — <short detailed description>`
+
+Rules:
+- If an agent is publishing, include agent prefix (example: `slugger:`).
+- The first title segment must be understandable without branch, gate, or planning-doc context.
+- The second segment adds concise detail.
+- Do **not** use gate labels (`Gate 6`, `Gate 11`) in titles.
 
 Examples:
-- `Gate 9: ship model-driven task system and lifecycle`
-- `Gate 11: enable coding orchestration and model-callable tools`
+- `slugger: Ship model-driven task lifecycle — add tools, transitions, and archival flow`
+- `slugger: Enable autonomous coding execution — orchestrate external sessions with recovery`
+- `Improve CI diagnostics — include failure context and retry metadata in logs`
 
 **Body structure (exact headings):**
 1. `## What changed`
