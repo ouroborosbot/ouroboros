@@ -62,7 +62,7 @@ Implement Gate 3b foundations that make the agent persistent and self-directed: 
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Baseline Gate 3b Inventory
+### ✅ Unit 0: Baseline Gate 3b Inventory
 **What**: Capture current memory/runtime/autonomy state so implementation deltas are explicit.
 **Output**: `baseline-gate-3b-inventory.md` artifact.
 **Acceptance**: Inventory identifies current gaps for memory, inner dialog, instincts, and supervisor.
@@ -201,3 +201,4 @@ Implement Gate 3b foundations that make the agent persistent and self-directed: 
 - 2026-03-05 18:08 Granularity pass: split Gate 3b into 8 TDD streams (memory write/hook/tool/recall/store, aspirations, inner dialog/instincts, supervisor/heartbeat)
 - 2026-03-05 18:08 Validation pass: aligned units to all Gate 3b completion criteria and real-process supervisor test guidance
 - 2026-03-05 18:08 Quality pass: verified strict TDD sequencing, coverage gates, and execution readiness
+- 2026-03-05 18:09 Unit 0 complete: captured baseline inventory for memory scaffolds and identified missing Gate 3b runtime/tooling capabilities
