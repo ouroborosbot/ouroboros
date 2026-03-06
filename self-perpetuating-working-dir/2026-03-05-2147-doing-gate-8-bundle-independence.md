@@ -1,6 +1,6 @@
 # Doing: Gate 8 Bundle Independence
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-03-05 21:47
 **Planning**: ./self-perpetuating-working-dir/2026-03-05-0911-planning-ouroboros-self-perpetuating-realignment.md
@@ -21,8 +21,8 @@ Move `ouroboros.ouro` and `slugger.ouro` out of the harness repo into `~/AgentBu
 - [x] Bundles moved to `~/AgentBundles/`
 - [x] Harness code updated to reference new bundle location
 - [x] Agents bootstrap correctly from `~/AgentBundles/`
-- [ ] `npm test` green
-- [ ] 100% coverage on new code
+- [x] `npm test` green
+- [x] 100% coverage on new code
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -93,7 +93,7 @@ Validated target touchpoints:
 **Output**: `unit-4-bootstrap.log` + `unit-4-supervisor.log`.
 **Acceptance**: Both agents bootstrap from `~/AgentBundles` without regressions.
 
-### ⬜ Unit 5: Final verification + Gate 8 checklist sync
+### ✅ Unit 5: Final verification + Gate 8 checklist sync
 **What**: Run final verification suite and sync Gate 8 completion checklists in planning/doing docs.
 **Output**: `unit-5-verification.md` + `unit-5-npm-test.log` + `unit-5-tsc.log` + `unit-5-coverage.log`.
 **Acceptance**: Completion criteria evidenced, `npm test` green, compile clean, and coverage requirements satisfied.
@@ -120,3 +120,4 @@ Validated target touchpoints:
 - 2026-03-05 21:57 Unit 3a complete: moved both bundles to `~/AgentBundles` and preserved nested git remotes/state
 - 2026-03-05 21:59 Unit 3b complete: aligned contracts, manifest packaging, and repo hygiene with external bundle paths
 - 2026-03-05 22:00 Unit 4 complete: validated Ouroboros/Slugger bootstrap and multi-agent supervisor startup from `~/AgentBundles`
+- 2026-03-05 22:02 Unit 5 complete: full verification suite passed and Gate 8 completion checklists synced
