@@ -63,7 +63,7 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 **Output**: New failing tests in repertoire skill-loading test suite.
 **Acceptance**: Tests fail against current single-source skills loader.
 
-### ⬜ Unit 1b: Dual-Source Protocol Loading Implementation (Green)
+### ✅ Unit 1b: Dual-Source Protocol Loading Implementation (Green)
 **What**: Implement protocol discovery/loading from both sources while preserving existing agent-skill behavior and observability events.
 **Output**: Updated `src/repertoire/skills.ts` (and any supporting code) passing the new protocol-loading tests.
 **Acceptance**: `list_skills`/`load_skill` support shared subagent protocols and bundle-local mirrors per Gate 1 convention.
@@ -114,3 +114,4 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 - 2026-03-05 17:42 Quality pass: verified completion criteria/testability coverage, emoji-prefixed units, and execution readiness
 - 2026-03-05 17:43 Unit 0 complete: captured teardown/tooling baseline in `baseline-gate-3a-inventory.md` and confirmed Gate 3a implementation gaps
 - 2026-03-05 17:44 Unit 1a complete: added failing tests for protocol mirror-first loading, canonical `subagents/` fallback, and explicit dual-path missing errors
+- 2026-03-05 17:46 Unit 1b complete: implemented mirror-first + canonical fallback protocol loading in `src/repertoire/skills.ts` and reconfirmed green targeted/full test + `npx tsc`
