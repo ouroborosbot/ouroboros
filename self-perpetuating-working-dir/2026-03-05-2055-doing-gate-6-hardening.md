@@ -1,6 +1,6 @@
 # Doing: Gate 6 Hardening
 
-**Status**: READY_FOR_EXECUTION
+**Status**: in-progress
 **Execution Mode**: direct
 **Created**: 2026-03-05 20:55
 **Planning**: ./self-perpetuating-working-dir/2026-03-05-0911-planning-ouroboros-self-perpetuating-realignment.md
@@ -45,7 +45,7 @@ Implement Gate 6 hardening by adding explicit interruption/resume checkpoint awa
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Baseline + target verification
+### ✅ Unit 0: Baseline + target verification
 **What**: Confirm Gate 6 target files and existing behavior for inner dialog resume/state and governance classification APIs.
 **Output**: `unit-0-baseline.md` artifact with verified file paths and behavior notes.
 **Acceptance**: Artifact captures current behavior and validated target touchpoints.
@@ -110,3 +110,4 @@ Representative proposals:
 - 2026-03-05 20:58 Granularity pass: clarified representative proposal set for calibration tests
 - 2026-03-05 20:58 Validation pass: verified Gate 6 target files and existing convention/session interfaces
 - 2026-03-05 20:59 Quality pass: confirmed emoji unit headers, acceptance criteria, and execution readiness
+- 2026-03-05 20:58 Unit 0 complete: captured baseline behavior and verified Gate 6 target files
