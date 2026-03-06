@@ -52,6 +52,12 @@ Implement a model-usable task system under bundle-backed task storage so agents 
 **What**: Map existing task-related code paths, prompt assembly integration points, and bundle task directory expectations after Gate 8 path migration.
 **Output**: `unit-0-baseline.md`.
 **Acceptance**: Artifact identifies concrete files/functions for module, tooling, prompt board injection, and lifecycle archive flow.
+Validated touchpoints:
+- `src/identity.ts` (`getAgentRoot()` -> bundle task root)
+- `src/mind/prompt.ts` (`buildSystem()` composition for board injection)
+- `src/repertoire/tools-base.ts` (tool schemas/handlers)
+- `src/repertoire/tools.ts` (tool registry + summaries)
+- `src/__tests__/mind/prompt.test.ts` and `src/__tests__/repertoire/tools*.test.ts` for integration expectations
 
 ### ⬜ Unit 1a: Task module contracts and status model tests (Red)
 **What**: Add failing tests for canonical task schema, parser/scanner behavior, 8-status transition model, and filename/type normalization.
@@ -59,7 +65,7 @@ Implement a model-usable task system under bundle-backed task storage so agents 
 **Acceptance**: New tests fail against current implementation baseline and encode Gate 9 status/transition expectations.
 
 ### ⬜ Unit 1b: Task module core implementation (Green)
-**What**: Implement core task module primitives (types, parser, scanner, transitions, board view model, lifecycle hooks, middleware seam) backed by `getAgentRoot()/tasks`.
+**What**: Implement core task module primitives (types, parser, scanner, transitions, board view model, lifecycle hooks, middleware seam) backed by `getAgentRoot()/tasks` in new `src/tasks/` modules.
 **Output**: Module implementation + `unit-1b-green.log` + `unit-1b-tsc.log`.
 **Acceptance**: Unit 1a tests pass and task module surfaces compile cleanly.
 
@@ -74,7 +80,7 @@ Implement a model-usable task system under bundle-backed task storage so agents 
 **Acceptance**: Tests fail before implementation and demonstrate required enforcement behavior.
 
 ### ⬜ Unit 2b: Task tools + enforcement implementation (Green)
-**What**: Implement task tools in the tool registry and wire write-time gate validation paths.
+**What**: Implement task tools in `src/repertoire/tools-base.ts`/`src/repertoire/tools.ts` and wire write-time gate validation paths into task-module calls.
 **Output**: Tool implementation + `unit-2b-green.log` + `unit-2b-tsc.log`.
 **Acceptance**: Task tools callable by model-facing registry; Unit 2a tests pass with enforced gates.
 
@@ -89,7 +95,7 @@ Implement a model-usable task system under bundle-backed task storage so agents 
 **Acceptance**: Tests fail before integration work and capture expected prompt payload shape.
 
 ### ⬜ Unit 3b: Prompt integration + lifecycle/archive implementation (Green)
-**What**: Integrate task board into prompt assembly and implement lifecycle archival flow for completed tasks.
+**What**: Integrate task board into `src/mind/prompt.ts` system assembly and implement lifecycle archival flow for completed tasks under bundle task paths.
 **Output**: Implementation + `unit-3b-green.log` + `unit-3b-tsc.log`.
 **Acceptance**: Prompt includes task board snapshot; completed tasks move to archive via deterministic lifecycle behavior.
 
@@ -125,3 +131,4 @@ Implement a model-usable task system under bundle-backed task storage so agents 
 ## Progress Log
 - 2026-03-05 22:11 Created from Gate 9 section of approved planning doc
 - 2026-03-05 22:12 Granularity pass: split end-to-end work into Units 4a/4b/4c and corrected artifact paths
+- 2026-03-05 22:15 Validation pass: confirmed concrete touchpoints in prompt/tool registries and pinned new task-module target paths
