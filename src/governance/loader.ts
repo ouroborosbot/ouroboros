@@ -1,5 +1,6 @@
 import * as fs from "fs"
 import * as path from "path"
+import { emitNervesEvent } from "../nerves/runtime"
 
 export interface GovernanceDocument {
   relativePath: string
@@ -13,6 +14,16 @@ export interface GovernanceLoadResult {
 }
 
 export function loadGovernanceDocs(agentRoot: string, relativePaths: string[]): GovernanceLoadResult {
+  emitNervesEvent({
+    component: "governance",
+    event: "governance.loader_call",
+    message: "loading governance docs",
+    meta: {
+      root: agentRoot,
+      count: relativePaths.length,
+    },
+  })
+
   const documents: GovernanceDocument[] = []
   const missing: string[] = []
 
