@@ -10,7 +10,14 @@ import { emitNervesEvent } from "../nerves/runtime";
 import { getFirstImpressions } from "./first-impressions";
 
 // Lazy-loaded psyche text cache
-let _psycheCache: { soul: string; identity: string; lore: string; friends: string; tacitKnowledge: string } | null = null;
+let _psycheCache: {
+  soul: string;
+  identity: string;
+  lore: string;
+  friends: string;
+  tacitKnowledge: string;
+  aspirations: string;
+} | null = null;
 
 function loadPsycheFile(name: string): string {
   try {
@@ -21,7 +28,14 @@ function loadPsycheFile(name: string): string {
   }
 }
 
-function loadPsyche(): { soul: string; identity: string; lore: string; friends: string; tacitKnowledge: string } {
+function loadPsyche(): {
+  soul: string;
+  identity: string;
+  lore: string;
+  friends: string;
+  tacitKnowledge: string;
+  aspirations: string;
+} {
   if (_psycheCache) return _psycheCache;
   _psycheCache = {
     soul: loadPsycheFile("SOUL.md"),
@@ -29,6 +43,7 @@ function loadPsyche(): { soul: string; identity: string; lore: string; friends: 
     lore: loadPsycheFile("LORE.md"),
     friends: loadPsycheFile("FRIENDS.md"),
     tacitKnowledge: loadPsycheFile("TACIT.md"),
+    aspirations: loadPsycheFile("ASPIRATIONS.md"),
   };
   return _psycheCache;
 }
@@ -63,6 +78,12 @@ function tacitKnowledgeSection(): string {
   const text = loadPsyche().tacitKnowledge;
   if (!text) return "";
   return `## tacit knowledge\n${text}`;
+}
+
+function aspirationsSection(): string {
+  const text = loadPsyche().aspirations;
+  if (!text) return "";
+  return `## my aspirations\n${text}`;
 }
 
 export function runtimeInfoSection(channel: Channel): string {
@@ -192,6 +213,7 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     loreSection(),
     friendsSection(),
     tacitKnowledgeSection(),
+    aspirationsSection(),
     runtimeInfoSection(channel),
     providerSection(),
     dateSection(),
