@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import * as os from "os"
 import * as path from "path"
 
 // Mock fs before importing identity
@@ -94,20 +95,18 @@ describe("getAgentRoot", () => {
     vi.resetModules()
   })
 
-  it("returns path.join(repoRoot, `${agentName}.ouro`)", async () => {
+  it("returns path.join(os.homedir(), 'AgentBundles', `${agentName}.ouro`)", async () => {
     process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
-    const { getAgentRoot, getRepoRoot, resetIdentity } = await import("../identity")
+    const { getAgentRoot, resetIdentity } = await import("../identity")
     resetIdentity()
-    const root = getRepoRoot()
-    expect(getAgentRoot()).toBe(path.join(root, "ouroboros.ouro"))
+    expect(getAgentRoot()).toBe(path.join(os.homedir(), "AgentBundles", "ouroboros.ouro"))
   })
 
   it("uses a different name for a different agent", async () => {
     process.argv = ["node", "cli-entry.js", "--agent", "slugger"]
-    const { getAgentRoot, getRepoRoot, resetIdentity } = await import("../identity")
+    const { getAgentRoot, resetIdentity } = await import("../identity")
     resetIdentity()
-    const root = getRepoRoot()
-    expect(getAgentRoot()).toBe(path.join(root, "slugger.ouro"))
+    expect(getAgentRoot()).toBe(path.join(os.homedir(), "AgentBundles", "slugger.ouro"))
   })
 })
 

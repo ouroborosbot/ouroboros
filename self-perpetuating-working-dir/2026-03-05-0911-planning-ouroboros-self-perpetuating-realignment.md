@@ -539,13 +539,13 @@ Migrate bundles out of the harness directory to `~/AgentBundles/`. This is the g
 - **Note on session data:** Sessions live at `~/.agentstate/<agent>/sessions/` — separate from the bundle, intentionally ephemeral. Moving bundles does NOT affect session paths. Sessions are runtime state (like short-term memory), not identity.
 
 **Completion criteria:**
-- [ ] GitHub repos up-to-date with latest bundle content (repos created in Gate 2)
-- [ ] Backup integrity verified (clone + diff)
-- [ ] Bundles moved to `~/AgentBundles/`
-- [ ] Harness code updated to reference new bundle location
-- [ ] Agents bootstrap correctly from `~/AgentBundles/`
-- [ ] `npm test` green
-- [ ] 100% coverage on new code
+- [x] GitHub repos up-to-date with latest bundle content (repos created in Gate 2)
+- [x] Backup integrity verified (clone + diff)
+- [x] Bundles moved to `~/AgentBundles/`
+- [x] Harness code updated to reference new bundle location
+- [x] Agents bootstrap correctly from `~/AgentBundles/`
+- [x] `npm test` green
+- [x] 100% coverage on new code
 
 **Rollback:** If agents fail to bootstrap from `~/AgentBundles/`, move bundles back to `<repo>/<agent>.ouro/` and revert `getAgentRoot()`. GitHub repos remain as backup regardless.
 
