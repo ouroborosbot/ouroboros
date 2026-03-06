@@ -65,6 +65,23 @@ describe("governance preflight", () => {
     expect(typeof (governance as { runGovernancePreflight?: unknown }).runGovernancePreflight).toBe("function")
   })
 
+  it("returns loaded governance docs when required root docs exist", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "governance-preflight-"))
+    tmpDirs.push(root)
+    fs.writeFileSync(path.join(root, "CONSTITUTION.md"), "# constitution\n", "utf8")
+    fs.writeFileSync(path.join(root, "ARCHITECTURE.md"), "# architecture\n", "utf8")
+
+    const governance = await import("../../governance/loader")
+    const runGovernancePreflight = (governance as { runGovernancePreflight?: (repoRoot: string) => { missing: string[]; documents: Array<{ relativePath: string }> } }).runGovernancePreflight
+
+    const result = runGovernancePreflight!(root)
+    expect(result.missing).toEqual([])
+    expect(result.documents.map((doc) => doc.relativePath)).toEqual([
+      "ARCHITECTURE.md",
+      "CONSTITUTION.md",
+    ])
+  })
+
   it("requires root ARCHITECTURE.md and CONSTITUTION.md before startup", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "governance-preflight-"))
     tmpDirs.push(root)
