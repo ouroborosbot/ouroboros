@@ -4,10 +4,23 @@ import { join } from "path"
 
 import { describe, expect, it } from "vitest"
 
+/**
+ * This contract test is intended to be deterministic in a typical dev checkout.
+ *
+ * By default, it only checks for repo-local bundles (which should not exist in the harness repo).
+ * If you want to validate bundles installed in ~/AgentBundles, opt in explicitly:
+ *
+ *   OURO_TEST_SCAN_HOME_BUNDLES=1 npm test
+ */
 function candidateBundleRoots(agent: string): string[] {
+  const scanHomeBundles = process.env.OURO_TEST_SCAN_HOME_BUNDLES === "1"
+
+  const repoLocal = join(process.cwd(), `${agent}.ouro`)
+  if (!scanHomeBundles) return [repoLocal]
+
   return [
     join(os.homedir(), "AgentBundles", `${agent}.ouro`),
-    join(process.cwd(), `${agent}.ouro`),
+    repoLocal,
   ]
 }
 
