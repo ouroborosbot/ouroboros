@@ -6,6 +6,7 @@ if (!process.argv.includes("--agent")) {
 }
 
 import { AgentSupervisor } from "./supervisor"
+import { emitNervesEvent } from "./nerves/runtime"
 
 function parseAgentArg(argv: string[]): string {
   const index = argv.indexOf("--agent")
@@ -15,16 +16,50 @@ function parseAgentArg(argv: string[]): string {
   return argv[index + 1]
 }
 
-const agent = parseAgentArg(process.argv)
+let agent = "unknown"
+try {
+  agent = parseAgentArg(process.argv)
+} catch (error) {
+  emitNervesEvent({
+    level: "error",
+    component: "supervisor",
+    event: "supervisor.entry_error",
+    message: "failed to parse --agent argument",
+    meta: { error: error instanceof Error ? error.message : String(error) },
+  })
+  throw error
+}
+
+emitNervesEvent({
+  component: "supervisor",
+  event: "supervisor.entry_start",
+  message: "starting supervisor entrypoint",
+  meta: { agent },
+})
+
 const supervisor = new AgentSupervisor({ agent })
 
-async function shutdown(): Promise<void> {
+async function shutdown(signal: "SIGINT" | "SIGTERM"): Promise<void> {
+  emitNervesEvent({
+    component: "supervisor",
+    event: "supervisor.entry_shutdown",
+    message: "received shutdown signal",
+    meta: { agent, signal },
+  })
   await supervisor.stop()
   process.exit(0)
 }
 
-process.on("SIGINT", () => { void shutdown() })
-process.on("SIGTERM", () => { void shutdown() })
+process.on("SIGINT", () => { void shutdown("SIGINT") })
+process.on("SIGTERM", () => { void shutdown("SIGTERM") })
 
-void supervisor.start()
-
+void supervisor.start().catch((error) => {
+  emitNervesEvent({
+    level: "error",
+    component: "supervisor",
+    event: "supervisor.entry_error",
+    message: "supervisor startup failed",
+    meta: { agent, error: error instanceof Error ? error.message : String(error) },
+  })
+  process.exit(1)
+})
