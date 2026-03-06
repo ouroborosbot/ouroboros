@@ -18,14 +18,14 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 ## Completion Criteria
 - [ ] `ouroboros.ouro/` bundle exists following the spec
 - [ ] `slugger.ouro/` bundle exists following the spec
-- [ ] Governance docs relocated to repo root
+- [x] Governance docs relocated to repo root
 - [x] `getAgentRoot()` resolves to `.ouro` bundle path
 - [x] All code/tests referencing old `ouroboros/` path updated
 - [ ] `.gitignore` excludes entire `*.ouro/` directories from harness repo
 - [ ] Bundle git init works for self-backup (nested inside gitignored directory)
 - [ ] Bundles pushed to private GitHub repos (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`)
 - [ ] `psyche/memory/` directory structure scaffolded in bundles
-- [ ] Agent preflight loads governance docs (tested)
+- [x] Agent preflight loads governance docs (tested)
 - [ ] `npm test` green
 - [ ] 100% coverage on new code
 - [ ] All tests pass
@@ -79,7 +79,7 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 **Output**: Failing test coverage for governance preflight behavior.
 **Acceptance**: Tests fail before governance relocation/enforcement implementation.
 
-### ⬜ Unit 2b: Governance Relocation + Enforcement (Green)
+### ✅ Unit 2b: Governance Relocation + Enforcement (Green)
 **What**: Relocate governance docs to repo root and implement preflight loading enforcement (restoring content from preserved history if needed because root governance files are currently absent).
 **Output**: Root `ARCHITECTURE.md` and `CONSTITUTION.md` plus runtime enforcement code.
 **Acceptance**: Preflight tests pass and root governance files are the canonical load target.
@@ -138,3 +138,4 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 - 2026-03-05 17:13 Unit 1b complete: updated `getAgentRoot()` to resolve `<repo>/<agent>.ouro` and captured green test/tsc/coverage evidence
 - 2026-03-05 17:15 Unit 1c complete: cleaned stale root-path wording, reconfirmed 100% coverage for `src/identity.ts`, and revalidated `npm test` + `npx tsc`
 - 2026-03-05 17:17 Unit 2a complete: added failing governance preflight tests requiring root `ARCHITECTURE.md` and `CONSTITUTION.md` before startup
+- 2026-03-05 17:20 Unit 2b complete: added root governance docs, implemented `runGovernancePreflight`, and enforced governance loading before `runAgent` turn execution
