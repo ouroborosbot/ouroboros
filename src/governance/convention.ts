@@ -10,6 +10,34 @@ export const GOVERNANCE_GUIDANCE = {
     "structural boundary shifts, ownership/workflow rewrites, and broad cross-cutting changes require review before execution",
 } as const;
 
+const REQUIRES_REVIEW_PATTERNS = [
+  "rewrite",
+  "replace",
+  "architecture",
+  "ownership",
+  "workflow",
+  "bundle root",
+  "agent root",
+  "constitution",
+  "governance model",
+] as const
+
+export function classifyGovernanceProposal(summary: string): (typeof GOVERNANCE_CHECK_RESULTS)[number] {
+  const normalized = summary.trim().toLowerCase()
+  const requiresReview = REQUIRES_REVIEW_PATTERNS.some((pattern) => normalized.includes(pattern))
+  const result = requiresReview ? "requires-review" : GOVERNANCE_DEFAULT_RESULT
+  emitNervesEvent({
+    component: "governance",
+    event: "governance.convention_classify",
+    message: "classifying proposal against governance convention",
+    meta: {
+      result,
+      summary: normalized.slice(0, 200),
+    },
+  })
+  return result
+}
+
 export function queryGovernanceConvention(query?: string): string {
   const normalized = query?.trim();
   emitNervesEvent({
