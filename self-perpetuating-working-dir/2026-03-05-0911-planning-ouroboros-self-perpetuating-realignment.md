@@ -566,14 +566,14 @@ Develop the task system from its current state into something the model can unam
 - **Task file location:** Tasks live in `<agent>.ouro/tasks/` (each agent's bundle, at `~/AgentBundles/<agent>.ouro/tasks/` after Gate 8). The task module reads/writes via `getAgentRoot()`. Task files are tracked in the bundle's own git, not the harness repo.
 
 **Completion criteria:**
-- [ ] Task module implemented with all components from the spec
-- [ ] Task tools exposed and callable by the model
-- [ ] Write-time enforcement gates working (template, transitions, spawn)
-- [ ] Task board injected into system prompt
-- [ ] Model can autonomously create, track, and complete tasks through the full lifecycle
-- [ ] Completed tasks archive correctly
-- [ ] `npm test` green
-- [ ] 100% coverage on new code
+- [x] Task module implemented with all components from the spec
+- [x] Task tools exposed and callable by the model
+- [x] Write-time enforcement gates working (template, transitions, spawn)
+- [x] Task board injected into system prompt
+- [x] Model can autonomously create, track, and complete tasks through the full lifecycle
+- [x] Completed tasks archive correctly
+- [x] `npm test` green
+- [x] 100% coverage on new code
 
 **Rollback:** Task module is additive — revert the harness code changes via git. Task files in bundles are bundle-git-tracked and unaffected by harness rollback.
 
@@ -736,3 +736,4 @@ Phase 2 gates may run in parallel where dependencies allow. Gate 9 (task system)
 - 2026-03-05 18:22 Gate 3a completed on `slugger/gate-3a-pipeline-teardown-harness-tools`: dual-source protocol loading, queryable governance convention tooling, teardown invariants contract checks, and final verification (`npm test`, `npm run test:coverage:vitest`, `npx tsc --noEmit`) all green.
 - 2026-03-05 18:07 Gate 3a CI parity fix: added required `emitNervesEvent` instrumentation in new modules (`src/governance/convention.ts`, `src/harness/teardown-contract.ts`) so `npm run test:coverage` passes the nerves file-completeness audit.
 - 2026-03-05 19:12 Gate 3b completed on `slugger/gate-3b-memory-aspirations-inner-dialog-supervisor`: memory structures + compatibility, aspiration bootstrap loading, autonomous inner-dialog + instincts runtime, supervisor/worker heartbeat crash-restart behavior, and final verification (`npm test`, `npm run test:coverage:vitest`, `npx tsc --noEmit`) all green with 100% coverage.
+- 2026-03-05 22:41 Gate 9 completed on `slugger/gate-9-task-system`: task module + parser/scanner/transitions/board/lifecycle middleware, task tools (`task_board`, `task_create`, `task_update_status`) and prompt integration landed with final verification (`npm test`, `npx tsc --noEmit`, `npm run test:coverage`) all green at 100% coverage.

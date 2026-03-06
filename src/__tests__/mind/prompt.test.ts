@@ -20,6 +20,13 @@ vi.mock("../../repertoire/skills", () => ({
   loadSkill: vi.fn(),
 }))
 
+const mockGetBoard = vi.fn()
+vi.mock("../../tasks", () => ({
+  getTaskModule: () => ({
+    getBoard: mockGetBoard,
+  }),
+}))
+
 vi.mock("../../identity", () => {
   const DEFAULT_AGENT_CONTEXT = {
     maxTokens: 80000,
@@ -108,6 +115,23 @@ describe("buildSystem", () => {
   beforeEach(() => {
     vi.resetModules()
     setAgentProvider("minimax")
+    mockGetBoard.mockReset().mockReturnValue({
+      compact: "",
+      full: "",
+      byStatus: {
+        drafting: [],
+        processing: [],
+        "validating:slugger": [],
+        "validating:ari": [],
+        collaborating: [],
+        paused: [],
+        blocked: [],
+        done: [],
+      },
+      actionRequired: [],
+      unresolvedDependencies: [],
+      activeSessions: [],
+    })
   })
 
   it("includes soul section with personality", async () => {
@@ -243,6 +267,49 @@ describe("buildSystem", () => {
     expect(result).toContain("- read_file:")
     expect(result).toContain("- shell:")
     expect(result).toContain("- web_search:")
+  })
+
+  it("includes task board section when compact board text exists", async () => {
+    setupReadFileSync()
+    mockGetBoard.mockReturnValueOnce({
+      compact: "[Tasks] processing:1 drafting:0",
+      full: "full",
+      byStatus: {
+        drafting: [],
+        processing: ["sample-task"],
+        "validating:slugger": [],
+        "validating:ari": [],
+        collaborating: [],
+        paused: [],
+        blocked: [],
+        done: [],
+      },
+      actionRequired: [],
+      unresolvedDependencies: [],
+      activeSessions: [],
+    })
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = await buildSystem()
+    expect(result).toContain("## task board")
+    expect(result).toContain("[Tasks] processing:1 drafting:0")
+  })
+
+  it("omits task board section when board lookup throws", async () => {
+    setupReadFileSync()
+    mockGetBoard.mockImplementationOnce(() => {
+      throw new Error("board unavailable")
+    })
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = await buildSystem()
+    expect(result).not.toContain("## task board")
   })
 
   it("includes skills section from listSkills", async () => {
