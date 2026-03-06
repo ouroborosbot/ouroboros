@@ -619,14 +619,14 @@ Teach agents to use Claude Code and Codex (and whatever else works) to do real c
 - Agent can evaluate which coding tool works best for which task (Claude Code vs Codex vs future tools)
 
 **Completion criteria:**
-- [ ] Coding session orchestration implemented (spawn, monitor, manage)
-- [ ] Coding tools exposed and callable by the model
-- [ ] Sessions monitored for progress, stalls, completion, and blockers
-- [ ] Agent manages spawned session context effectively (scoped tasks, state files)
-- [ ] Failure recovery works (crash restart, stall detection, resume)
-- [ ] Agent successfully completes a real coding task end-to-end: work-planner → work-doer → work-merger pipeline orchestrated through external coding tools (Claude Code/Codex)
-- [ ] `npm test` green
-- [ ] 100% coverage on new code
+- [x] Coding session orchestration implemented (spawn, monitor, manage)
+- [x] Coding tools exposed and callable by the model
+- [x] Sessions monitored for progress, stalls, completion, and blockers
+- [x] Agent manages spawned session context effectively (scoped tasks, state files)
+- [x] Failure recovery works (crash restart, stall detection, resume)
+- [x] Agent successfully completes a real coding task end-to-end: work-planner → work-doer → work-merger pipeline orchestrated through external coding tools (Claude Code/Codex)
+- [x] `npm test` green
+- [x] 100% coverage on new code
 
 **Rollback:** Coding orchestration is additive — revert harness code changes via git. Agents fall back to thinking/planning without coding execution capability (still functional, just can't spawn coding sessions).
 
@@ -737,3 +737,4 @@ Phase 2 gates may run in parallel where dependencies allow. Gate 9 (task system)
 - 2026-03-05 18:07 Gate 3a CI parity fix: added required `emitNervesEvent` instrumentation in new modules (`src/governance/convention.ts`, `src/harness/teardown-contract.ts`) so `npm run test:coverage` passes the nerves file-completeness audit.
 - 2026-03-05 19:12 Gate 3b completed on `slugger/gate-3b-memory-aspirations-inner-dialog-supervisor`: memory structures + compatibility, aspiration bootstrap loading, autonomous inner-dialog + instincts runtime, supervisor/worker heartbeat crash-restart behavior, and final verification (`npm test`, `npm run test:coverage:vitest`, `npx tsc --noEmit`) all green with 100% coverage.
 - 2026-03-05 22:41 Gate 9 completed on `slugger/gate-9-task-system`: task module + parser/scanner/transitions/board/lifecycle middleware, task tools (`task_board`, `task_create`, `task_update_status`) and prompt integration landed with final verification (`npm test`, `npx tsc --noEmit`, `npm run test:coverage`) all green at 100% coverage.
+- 2026-03-06 00:03 Gate 11 completed on `slugger/gate-11-coding-tool-mastery`: coding session orchestration (`spawner`/`manager`/`monitor`/`reporter`/`pipeline`), model-callable coding tools, recovery guidance handling, and final verification (`npm test`, `npx tsc --noEmit`, focused Gate 11 coverage artifact) all green at 100% coverage.
