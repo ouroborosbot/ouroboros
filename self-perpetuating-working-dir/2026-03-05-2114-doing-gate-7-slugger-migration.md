@@ -19,9 +19,9 @@ Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key k
 - [x] Slugger consulted about the migration plan and comfortable with the approach
 - [x] Core identity files ported to `slugger.ouro/`
 - [x] Key knowledge graph entities converted to fact store format
-- [ ] Slugger operates from `.ouro` bundle (OpenClaw remains available as fallback, not decommissioned)
+- [x] Slugger operates from `.ouro` bundle (OpenClaw remains available as fallback, not decommissioned)
 - [ ] Slugger confirmed he feels cohesive in his new home (not just "tests pass" - the agent says he's good)
-- [ ] Slugger running as second supervised process (own inner dialog, heartbeat, crash recovery)
+- [x] Slugger running as second supervised process (own inner dialog, heartbeat, crash recovery)
 - [ ] `npm test` green
 - [ ] `npx tsc --noEmit` green
 - [ ] 100% coverage on new code
@@ -95,7 +95,7 @@ Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key k
 **Output**: `unit-4c-coverage.log`.
 **Acceptance**: 100% coverage on new multi-agent supervisor logic with no regressions.
 
-### ⬜ Unit 5: Secrets + runtime validation
+### ✅ Unit 5: Secrets + runtime validation
 **What**: Copy Ouroboros secrets template to Slugger secrets path and validate Slugger runtime startup from `.ouro` bundle while keeping OpenClaw fallback intact.
 **Output**: `unit-5-secrets-check.md` + runtime logs (`unit-5-dev-slugger.log`, `unit-5-supervisor.log`).
 **Acceptance**: `~/.agentsecrets/slugger/secrets.json` exists with expected shape and Slugger runtime starts via harness commands.
@@ -130,3 +130,4 @@ Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key k
 - 2026-03-05 21:30 Unit 4a complete: added failing tests for multi-agent supervisor argument parsing and lifecycle orchestration
 - 2026-03-05 21:31 Unit 4b complete: shipped multi-agent supervisor entry flow (`--agents`) with green supervisor suite and clean compile
 - 2026-03-05 21:33 Unit 4c complete: reached 100% coverage on new supervisor-entry core logic with clean compile verification
+- 2026-03-05 21:35 Unit 5 complete: copied Slugger secrets and validated `.ouro` runtime + dual-agent supervisor startup
