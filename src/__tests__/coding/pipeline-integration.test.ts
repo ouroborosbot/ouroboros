@@ -120,4 +120,50 @@ describe("coding pipeline integration", () => {
 
     expect(manager.sendInput).toHaveBeenCalledWith("coding-011", expect.stringContaining("status: NEEDS_REVIEW"))
   })
+
+  it("sends generic recovery guidance when task ref is not provided", async () => {
+    const manager = {
+      spawnSession: vi
+        .fn()
+        .mockResolvedValueOnce({ id: "coding-021", status: "running" })
+        .mockResolvedValueOnce({ id: "coding-022", status: "running" })
+        .mockResolvedValueOnce({ id: "coding-023", status: "running" }),
+      sendInput: vi.fn(),
+    }
+
+    const monitor = {
+      tick: vi
+        .fn()
+        .mockReturnValueOnce(
+          report({
+            summary: {
+              active: 1,
+              completed: 0,
+              blocked: 1,
+              stalled: 0,
+              failed: 0,
+              restarts: 0,
+            },
+            blockedSessionIds: ["coding-021"],
+          }),
+        )
+        .mockReturnValueOnce(report({ blockedSessionIds: [], summary: { active: 1, completed: 1, blocked: 0, stalled: 0, failed: 0, restarts: 0 } }))
+        .mockReturnValueOnce(report({ blockedSessionIds: [], summary: { active: 0, completed: 3, blocked: 0, stalled: 0, failed: 0, restarts: 0 } })),
+    }
+
+    await runCodingPipeline({
+      runner: "codex",
+      workdir: "/Users/test/AgentWorkspaces/slugger",
+      plannerPrompt: "plan",
+      doerPrompt: "do",
+      mergerPrompt: "merge",
+      manager,
+      monitor,
+    })
+
+    expect(manager.sendInput).toHaveBeenCalledWith(
+      "coding-021",
+      expect.stringMatching(/^status: NEEDS_REVIEW/),
+    )
+  })
 })
