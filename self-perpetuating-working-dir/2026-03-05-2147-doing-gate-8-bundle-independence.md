@@ -72,10 +72,15 @@ Move `ouroboros.ouro` and `slugger.ouro` out of the harness repo into `~/AgentBu
 **Output**: `unit-2c-coverage.log`.
 **Acceptance**: 100% coverage for newly added/changed logic and test suite remains green.
 
-### ⬜ Unit 3: Bundle relocation execution + filesystem hygiene
-**What**: Stop active agent processes, create `~/AgentBundles`, move both bundles out of the repo, and update repo hygiene (including `.gitignore` implications).
-**Output**: `unit-3-relocation.log` + `unit-3-post-move-layout.md`.
-**Acceptance**: Bundles exist only under `~/AgentBundles`, nested bundle repos remain intact, and harness workspace reflects post-move layout.
+### ⬜ Unit 3a: Bundle relocation execution
+**What**: Stop active agent processes, create `~/AgentBundles`, and move both bundles out of the repo while preserving nested bundle git history/remotes.
+**Output**: `unit-3a-relocation.log` + `unit-3a-post-move-layout.md`.
+**Acceptance**: Bundles exist at `~/AgentBundles/<agent>.ouro` with intact nested git metadata and no data loss.
+
+### ⬜ Unit 3b: Filesystem hygiene + harness workspace cleanup
+**What**: Update harness workspace assumptions after relocation (including `.gitignore` implications and any path-sensitive scripts/contracts).
+**Output**: `unit-3b-hygiene.log`.
+**Acceptance**: Harness workspace no longer assumes in-repo bundles and path-sensitive checks/scripts are consistent with Gate 8 layout.
 
 ### ⬜ Unit 4: Bootstrap/runtime verification from `~/AgentBundles`
 **What**: Validate Ouroboros + Slugger bootstrap and core runtime commands after relocation.
@@ -98,3 +103,4 @@ Move `ouroboros.ouro` and `slugger.ouro` out of the harness repo into `~/AgentBu
 
 ## Progress Log
 - 2026-03-05 21:47 Created from Gate 8 section of approved planning doc
+- 2026-03-05 21:48 Granularity pass: split relocation/hygiene into Units 3a and 3b for clearer execution boundaries
