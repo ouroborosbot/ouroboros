@@ -219,11 +219,11 @@ Restore `main` to a healthy state by reverting the undesired self-perpetuating-r
 - Verify `npm test` passes on main after revert
 
 **Completion criteria:**
-- [ ] Archive branch `archive/self-perpetuating-run-2026-03-05` exists and contains overnight proposals (created in preflight)
-- [ ] Commit map documented at `self-perpetuating-working-dir/gate-0-commit-map.md` (reverted vs salvageable)
-- [ ] `main` reverted via explicit revert commits
-- [ ] `npm test` green on `main` post-revert
-- [ ] No force-push, no history rewrite
+- [x] Archive branch `archive/self-perpetuating-run-2026-03-05` exists and contains overnight proposals (created in preflight)
+- [x] Commit map documented at `self-perpetuating-working-dir/gate-0-commit-map.md` (reverted vs salvageable)
+- [x] `main` reverted via explicit revert commits
+- [x] `npm test` green on `main` post-revert
+- [x] No force-push, no history rewrite
 
 ---
 
@@ -437,14 +437,14 @@ Start the agent, let it orient itself, and watch it do something meaningful — 
 - No puppet/orchestration code in the code path (verified by code inspection — the execution path from supervisor -> agent bootstrap -> action should have zero `runStage()` or pipeline calls)
 
 **Completion criteria:**
-- [ ] Agent starts, bootstraps from bundle, and acts without prescriptive instruction
-- [ ] No puppet/orchestration code in the execution path (verified by code inspection)
-- [ ] Agent log shows at least 3 self-initiated actions not prompted by external input
-- [ ] Supervisor restarted agent after simulated crash within 30 seconds
-- [ ] Agent ran for at least 5 minutes total (across restarts)
-- [ ] Bootstrap-to-action flow documented (commented walkthrough or BOOTSTRAP.md)
-- [ ] `npm test` green
-- [ ] 100% coverage on any new code
+- [x] Agent starts, bootstraps from bundle, and acts without prescriptive instruction
+- [x] No puppet/orchestration code in the execution path (verified by code inspection)
+- [x] Agent log shows at least 3 self-initiated actions not prompted by external input
+- [x] Supervisor restarted agent after simulated crash within 30 seconds
+- [x] Agent ran for at least 5 minutes total (across restarts)
+- [x] Bootstrap-to-action flow documented (commented walkthrough or BOOTSTRAP.md)
+- [x] `npm test` green
+- [x] 100% coverage on any new code
 
 ---
 
