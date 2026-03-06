@@ -52,6 +52,7 @@ const mockResponsesCreate = vi.fn()
 const mockOpenAICtor = vi.fn()
 const mockAnthropicMessagesCreate = vi.fn()
 const mockAnthropicCtor = vi.fn()
+const mockInjectAssociativeRecall = vi.fn().mockResolvedValue(undefined)
 vi.mock("openai", () => {
   class MockOpenAI {
     chat = {
@@ -85,6 +86,10 @@ vi.mock("@anthropic-ai/sdk", () => {
     default: MockAnthropic,
   }
 })
+
+vi.mock("../../mind/associative-recall", () => ({
+  injectAssociativeRecall: (...args: any[]) => mockInjectAssociativeRecall(...args),
+}))
 
 import * as fs from "fs"
 import * as nodeFs from "node:fs"
@@ -277,6 +282,7 @@ describe("runAgent", () => {
     mockCreate.mockReset()
     mockResponsesCreate.mockReset()
     mockOpenAICtor.mockReset()
+    mockInjectAssociativeRecall.mockReset().mockResolvedValue(undefined)
     // Restore default readFileSync so prompt.ts module-level psyche file loads work
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupMinimax()
@@ -2624,6 +2630,28 @@ describe("runAgent", () => {
     // messages[0] should have been refreshed with await buildSystem("cli")
     expect(messages[0].content).not.toBe("stale old prompt")
     expect(messages[0].role).toBe("system")
+  })
+
+  it("runs associative recall injection before model calls when channel is provided", async () => {
+    mockCreate.mockReturnValue(makeStream([makeChunk("hi")]))
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [
+      { role: "system", content: "stale old prompt" },
+      { role: "user", content: "hello" },
+    ]
+    await runAgent(messages, callbacks, "cli")
+
+    expect(mockInjectAssociativeRecall).toHaveBeenCalledWith(messages)
   })
 
   it("refreshes system prompt for teams channel", async () => {

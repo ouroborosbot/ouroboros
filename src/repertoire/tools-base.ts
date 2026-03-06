@@ -1,12 +1,14 @@
 import type OpenAI from "openai";
 import * as fs from "fs";
 import { execSync, spawnSync } from "child_process";
+import * as path from "path";
 import { listSkills, loadSkill } from "./skills";
 import { getIntegrationsConfig } from "../config";
 import type { Integration, ResolvedContext, FriendRecord } from "../mind/friends/types";
 import type { FriendStore } from "../mind/friends/store";
 import { emitNervesEvent } from "../nerves/runtime";
 import { queryGovernanceConvention } from "../governance/convention";
+import { getAgentRoot } from "../identity";
 
 export interface ToolContext {
   graphToken?: string;
@@ -292,6 +294,40 @@ export const baseToolDefinitions: ToolDefinition[] = [
           .join("\n\n");
       } catch (e) {
         return `error: ${e}`;
+      }
+    },
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "memory_search",
+        description:
+          "search remembered facts stored in psyche memory and return relevant matches for a query",
+        parameters: {
+          type: "object",
+          properties: { query: { type: "string" } },
+          required: ["query"],
+        },
+      },
+    },
+    handler: (a) => {
+      try {
+        const query = (a.query || "").trim();
+        if (!query) return "query is required";
+        const queryLower = query.toLowerCase();
+        const factsPath = path.join(getAgentRoot(), "psyche", "memory", "facts.jsonl");
+        const raw = fs.readFileSync(factsPath, "utf-8");
+        const lines = raw.split("\n").map((line) => line.trim()).filter(Boolean);
+        const hits = lines
+          .map((line) => JSON.parse(line) as { text: string; source?: string; createdAt?: string })
+          .filter((fact) => fact.text.toLowerCase().includes(queryLower))
+          .slice(0, 5);
+        return hits
+          .map((fact) => `- ${fact.text} (source=${fact.source}, createdAt=${fact.createdAt})`)
+          .join("\n");
+      } catch (e) {
+        return `error: ${e instanceof Error ? e.message : String(e)}`;
       }
     },
   },

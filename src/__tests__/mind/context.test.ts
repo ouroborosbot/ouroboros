@@ -455,6 +455,93 @@ describe("postTurn", () => {
     expect(messages.length).toBe(1)
     expect(fs.writeFileSync).toHaveBeenCalledTimes(1)
   })
+
+  it("runs extract-before-trim hook with pre-trim messages so dropped context can be captured", async () => {
+    const { getContextConfig } = await import("../../config")
+    vi.mocked(getContextConfig).mockReturnValue({ maxTokens: 100, contextMargin: 20 })
+
+    const { postTurn } = await import("../../mind/context")
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "remember: old memory that will be trimmed" },
+      { role: "assistant", content: "old reply" },
+      { role: "user", content: "new message" },
+    ]
+    const usage = { input_tokens: 10000, output_tokens: 10, reasoning_tokens: 0, total_tokens: 10010 }
+
+    let hookCalled = false
+    let sawOldMessage = false
+
+    ;(postTurn as any)(
+      messages,
+      "/tmp/sess.json",
+      usage,
+      {
+        beforeTrim: (preTrimMessages: any[]) => {
+          hookCalled = true
+          sawOldMessage = preTrimMessages.some((m) =>
+            typeof m.content === "string" && m.content.includes("old memory that will be trimmed"),
+          )
+        },
+      },
+    )
+
+    expect(hookCalled).toBe(true)
+    expect(sawOldMessage).toBe(true)
+    expect(messages.some((m) => typeof m.content === "string" && m.content.includes("old memory that will be trimmed"))).toBe(false)
+  })
+
+  it("continues saving session when extract-before-trim hook throws", async () => {
+    const { getContextConfig } = await import("../../config")
+    vi.mocked(getContextConfig).mockReturnValue({ maxTokens: 80000, contextMargin: 20 })
+
+    const { postTurn } = await import("../../mind/context")
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "hello" },
+    ]
+    const usage = { input_tokens: 1000, output_tokens: 10, reasoning_tokens: 0, total_tokens: 1010 }
+
+    expect(() =>
+      (postTurn as any)(
+        messages,
+        "/tmp/sess.json",
+        usage,
+        {
+          beforeTrim: () => {
+            throw new Error("hook failed")
+          },
+        },
+      ),
+    ).not.toThrow()
+    expect(fs.writeFileSync).toHaveBeenCalledTimes(1)
+  })
+
+  it("continues saving session when extract-before-trim hook throws non-Error values", async () => {
+    const { getContextConfig } = await import("../../config")
+    vi.mocked(getContextConfig).mockReturnValue({ maxTokens: 80000, contextMargin: 20 })
+
+    const { postTurn } = await import("../../mind/context")
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "hello" },
+    ]
+    const usage = { input_tokens: 1000, output_tokens: 10, reasoning_tokens: 0, total_tokens: 1010 }
+
+    expect(() =>
+      (postTurn as any)(
+        messages,
+        "/tmp/sess.json",
+        usage,
+        {
+          beforeTrim: () => {
+            throw "hook failed as string"
+          },
+        },
+      ),
+    ).not.toThrow()
+    expect(fs.writeFileSync).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe("mind observability instrumentation", () => {

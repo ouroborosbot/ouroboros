@@ -11,6 +11,10 @@ export interface UsageData {
   total_tokens: number
 }
 
+export interface PostTurnHooks {
+  beforeTrim?: (messages: OpenAI.ChatCompletionMessageParam[]) => void
+}
+
 export function trimMessages(
   messages: OpenAI.ChatCompletionMessageParam[],
   maxTokens: number,
@@ -83,7 +87,23 @@ export function postTurn(
   messages: OpenAI.ChatCompletionMessageParam[],
   sessPath: string,
   usage?: UsageData,
+  hooks?: PostTurnHooks,
 ): void {
+  if (hooks?.beforeTrim) {
+    try {
+      hooks.beforeTrim([...messages])
+    } catch (error) {
+      emitNervesEvent({
+        level: "warn",
+        event: "mind.post_turn_hook_error",
+        component: "mind",
+        message: "postTurn beforeTrim hook failed",
+        meta: {
+          reason: error instanceof Error ? error.message : String(error),
+        },
+      })
+    }
+  }
   const { maxTokens, contextMargin } = getContextConfig()
   const trimmed = trimMessages(messages, maxTokens, contextMargin, usage?.input_tokens)
   messages.splice(0, messages.length, ...trimmed)

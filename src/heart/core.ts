@@ -17,6 +17,7 @@ import type { UsageData } from "../mind/context";
 import { trimMessages } from "../mind/context";
 import { buildSystem } from "../mind/prompt";
 import type { Channel } from "../mind/prompt";
+import { injectAssociativeRecall } from "../mind/associative-recall";
 import { createAnthropicProviderRuntime } from "./providers/anthropic";
 import { createAzureProviderRuntime } from "./providers/azure";
 import { createMinimaxProviderRuntime } from "./providers/minimax";
@@ -293,6 +294,8 @@ export async function runAgent(
       });
     }
   }
+
+  await injectAssociativeRecall(messages);
 
   // kickCount and lastKickReason preserved but unused while kick detection is disabled.
   // let kickCount = 0;
