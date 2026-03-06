@@ -52,6 +52,7 @@ export interface TeamsChannelConfig {
 
 export interface IntegrationsConfig {
   perplexityApiKey: string
+  openaiEmbeddingsApiKey: string
 }
 
 export interface OuroborosConfig {
@@ -108,6 +109,7 @@ const DEFAULT_SECRETS_TEMPLATE: Omit<OuroborosConfig, "context"> = {
   },
   integrations: {
     perplexityApiKey: "",
+    openaiEmbeddingsApiKey: "",
   },
 }
 
@@ -337,6 +339,10 @@ export function getTeamsChannelConfig(): TeamsChannelConfig {
 export function getIntegrationsConfig(): IntegrationsConfig {
   const config = loadConfig()
   return { ...config.integrations }
+}
+
+export function getOpenAIEmbeddingsApiKey(): string {
+  return getIntegrationsConfig().openaiEmbeddingsApiKey
 }
 
 export function getLogsDir(): string {
