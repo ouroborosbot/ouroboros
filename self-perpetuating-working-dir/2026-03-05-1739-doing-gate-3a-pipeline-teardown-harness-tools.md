@@ -110,3 +110,4 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 ## Progress Log
 - 2026-03-05 17:39 Created from planning doc
 - 2026-03-05 17:40 Granularity pass: confirmed atomic TDD unit split (red/green/refactor + teardown verification units)
+- 2026-03-05 17:41 Validation pass: confirmed `src/reflection/` is absent, reflect scripts already removed from `package.json`, and current protocol loading is still single-source (`src/repertoire/skills.ts`)
