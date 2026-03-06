@@ -16,7 +16,7 @@
     "test:coverage": "node scripts/run-coverage-gate.cjs",
     "teams": "tsc && node dist/teams-entry.js --agent ouroboros",
     "lint": "eslint src/",
-    "manifest:package": "cd ouroboros.ouro/teams-app && zip -r ../../manifest.zip manifest.json icon-color.png icon-outline.png"
+    "manifest:package": "ROOT=$(pwd) && cd \"$HOME/AgentBundles/ouroboros.ouro/teams-app\" && zip -r \"$ROOT/manifest.zip\" manifest.json icon-color.png icon-outline.png"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
