@@ -58,17 +58,17 @@ Execute Gate 5 by re-landing valuable salvageable code from the reverted overnig
 **Output**: `unit-1-salvage-decision-matrix.md` artifact.
 **Acceptance**: Every candidate is classified with rationale; no unresolved entries remain.
 
-### ⬜ Unit 2a: Small salvage code tests (Red, conditional)
+### ✅ Unit 2a: Small salvage code tests (Red, conditional)
 **What**: For each `re-land-now` small/self-contained code candidate, write failing tests that capture intended behavior before re-landing code.
 **Output**: Red tests + `unit-2a-red-test-log.txt` artifact.
 **Acceptance**: Added/updated tests fail before implementation; if no small candidates exist, artifact records explicit no-op rationale.
 
-### ⬜ Unit 2b: Small salvage code implementation (Green, conditional)
+### ✅ Unit 2b: Small salvage code implementation (Green, conditional)
 **What**: Re-land small candidates via minimal cherry-pick or manual port so Unit 2a tests pass.
 **Output**: Implementation commits + `unit-2b-green-test-log.txt` and `unit-2b-tsc-log.txt` artifacts.
 **Acceptance**: All Unit 2a tests pass; `npx tsc --noEmit` is clean.
 
-### ⬜ Unit 2c: Small salvage coverage/refactor (conditional)
+### ✅ Unit 2c: Small salvage coverage/refactor (conditional)
 **What**: Refactor as needed and close coverage on any new/re-landed code from Unit 2b.
 **Output**: `unit-2c-coverage-log.txt` artifact.
 **Acceptance**: 100% coverage on new/re-landed code; `npm test` green.
@@ -124,3 +124,4 @@ Execute Gate 5 by re-landing valuable salvageable code from the reverted overnig
 - 2026-03-05 20:00 Quality pass: confirmed emoji-prefixed unit headers, explicit acceptance criteria, no TBD placeholders, and completion checklist alignment
 - 2026-03-05 20:02 Unit 0 complete: generated salvage classification baseline and canonical 31-proposal index with archive source paths
 - 2026-03-05 20:04 Unit 1 complete: classified all 38 reverted commits into re-land-now/later/not-applicable/archive-only with rationale
+- 2026-03-05 20:05 Units 2a/2b/2c complete: no small re-land-now code candidates; recorded explicit conditional no-op evidence artifacts
