@@ -89,7 +89,7 @@ Expected target files:
 - `src/repertoire/tools.ts`
 - `src/__tests__/coding/tools-coding.test.ts`
 
-### ⬜ Unit 2c: Coding tools coverage hardening
+### ✅ Unit 2c: Coding tools coverage hardening
 **What**: Close remaining validation/error-path coverage in coding tools and registry integration.
 **Output**: `unit-2c-coverage.log`.
 **Acceptance**: 100% coverage for Unit 2 modules.
@@ -149,3 +149,4 @@ Expected target files:
 - 2026-03-05 23:46 Unit 1c complete: added branch/default lifecycle tests, exercised spawner default dependency path, and captured 100% coverage for Unit 1 executable modules
 - 2026-03-05 23:48 Unit 2a complete: added failing coding tool surface tests for `coding_spawn`, `coding_status`, `coding_send_input`, and `coding_kill`, with red log proving missing registry wiring
 - 2026-03-05 23:50 Unit 2b complete: implemented `src/coding/tools.ts`, wired coding tools into base registry + arg summaries, and captured green test + compile logs
+- 2026-03-05 23:52 Unit 2c complete: closed coding tools validation/optional-arg/summary/error-path coverage gaps and captured 100% coverage across Unit 2 modules
