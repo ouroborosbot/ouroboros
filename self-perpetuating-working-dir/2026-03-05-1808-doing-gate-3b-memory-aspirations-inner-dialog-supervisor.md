@@ -97,17 +97,17 @@ Implement Gate 3b foundations that make the agent persistent and self-directed: 
 **Output**: Coverage evidence for hook behavior.
 **Acceptance**: Hook-related code 100% covered.
 
-### ⬜ Unit 3a: `memory_search` Tool Tests (Red)
+### ✅ Unit 3a: `memory_search` Tool Tests (Red)
 **What**: Add failing tests for model-callable memory search tool behavior.
 **Output**: Red tool tests for query, empty, and error paths.
 **Acceptance**: Tests fail before tool implementation/registration.
 
-### ⬜ Unit 3b: `memory_search` Tool Implementation (Green)
+### ✅ Unit 3b: `memory_search` Tool Implementation (Green)
 **What**: Implement and register `memory_search` in repertoire tools.
 **Output**: Tool implementation + registry wiring.
 **Acceptance**: Tool callable and returns relevant memory hits.
 
-### ⬜ Unit 3c: `memory_search` Coverage + Contract Refactor
+### ✅ Unit 3c: `memory_search` Coverage + Contract Refactor
 **What**: Raise tool coverage and tighten contracts/summaries.
 **Output**: Coverage evidence + contract updates.
 **Acceptance**: New memory search code 100% covered.
@@ -208,3 +208,6 @@ Implement Gate 3b foundations that make the agent persistent and self-directed: 
 - 2026-03-05 18:24 Unit 2a complete: added red `postTurn` ordering test proving extract-before-trim hook sees messages before trim drops old context
 - 2026-03-05 18:31 Unit 2b complete: implemented `postTurn(..., hooks)` before-trim integration and wired CLI/Teams lifecycle memory capture via `captureTurnMemories`
 - 2026-03-05 18:31 Unit 2c complete: added non-Error fallback branch tests; full verification green (`npm test`, `npm run test:coverage:vitest`, `npx tsc --noEmit`)
+- 2026-03-05 18:33 Unit 3a complete: added red `memory_search` tests for query success, empty query, and read-failure error handling
+- 2026-03-05 18:34 Unit 3b complete: implemented `memory_search` base tool and summarizeArgs wiring in `repertoire/tools*`
+- 2026-03-05 18:36 Unit 3c complete: updated registry snapshot and closed branch-coverage gaps; full verification green (`npm test`, `npm run test:coverage:vitest`, `npx tsc --noEmit`)
