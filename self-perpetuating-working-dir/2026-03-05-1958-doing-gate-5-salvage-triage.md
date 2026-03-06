@@ -73,7 +73,7 @@ Execute Gate 5 by re-landing valuable salvageable code from the reverted overnig
 **Output**: `unit-2c-coverage-log.txt` artifact.
 **Acceptance**: 100% coverage on new/re-landed code; `npm test` green.
 
-### ⬜ Unit 3: Substantial salvage flow (conditional)
+### ✅ Unit 3: Substantial salvage flow (conditional)
 **What**: For any `re-land-now` substantial candidate, create focused planning/doing docs in `self-perpetuating-working-dir/` and execute them before returning to Gate 5.
 **Output**: Per-candidate planning/doing docs and execution artifacts, or explicit no-op artifact if none.
 **Acceptance**: All substantial `re-land-now` candidates are either completed or explicitly reclassified with rationale.
@@ -125,3 +125,4 @@ Execute Gate 5 by re-landing valuable salvageable code from the reverted overnig
 - 2026-03-05 20:02 Unit 0 complete: generated salvage classification baseline and canonical 31-proposal index with archive source paths
 - 2026-03-05 20:04 Unit 1 complete: classified all 38 reverted commits into re-land-now/later/not-applicable/archive-only with rationale
 - 2026-03-05 20:05 Units 2a/2b/2c complete: no small re-land-now code candidates; recorded explicit conditional no-op evidence artifacts
+- 2026-03-05 20:05 Unit 3 complete: no substantial re-land-now code candidates, recorded no-op salvage flow outcome
