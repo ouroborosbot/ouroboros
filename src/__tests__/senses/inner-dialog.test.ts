@@ -199,6 +199,33 @@ describe("inner dialog runtime", () => {
     expect(String(lastUser!.content).toLowerCase()).not.toBe("continue")
   })
 
+  it("adds checkpoint-oriented context when resuming after interruption", async () => {
+    mockLoadSession.mockReturnValue({
+      messages: [
+        { role: "system", content: "system prompt" },
+        {
+          role: "assistant",
+          content:
+            "checkpoint: Unit 2b editing src/governance/convention.ts and src/__tests__/governance/convention.test.ts",
+        },
+      ],
+    })
+
+    await runInnerDialogTurn({
+      reason: "heartbeat",
+      instincts: [{ id: "resume", prompt: "Instinct: resume interrupted work.", enabled: true }],
+      now: () => new Date("2026-03-06T12:06:00.000Z"),
+    })
+
+    const [messages] = mockRunAgent.mock.calls[0]
+    const lastUser = [...messages].reverse().find((message: OpenAI.ChatCompletionMessageParam) => message.role === "user")
+    expect(lastUser).toBeDefined()
+    const content = String(lastUser!.content)
+    expect(content).toContain("Instinct: resume interrupted work.")
+    expect(content).toContain("checkpoint:")
+    expect(content).toContain("Unit 2b editing src/governance/convention.ts")
+  })
+
   it("uses default reason/clock/instinct loading when options are omitted", async () => {
     fs.writeFileSync(
       path.join(agentRoot, "psyche", "inner-dialog-instincts.json"),
