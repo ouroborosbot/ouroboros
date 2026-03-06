@@ -58,7 +58,7 @@ Teach agents to use external coding tools (Claude Code/Codex) by implementing co
 **Output**: Red tests + `unit-1a-red.log`.
 **Acceptance**: Tests fail before implementation and encode the core session manager contract.
 
-### ⬜ Unit 1b: Spawner + manager implementation (Green)
+### ✅ Unit 1b: Spawner + manager implementation (Green)
 **What**: Implement coding session types/spawner/manager with process registry, lifecycle state, and non-env-var runtime defaults.
 **Output**: Implementation + `unit-1b-green.log` + `unit-1b-tsc.log`.
 **Acceptance**: Unit 1a tests pass and coding session lifecycle compiles cleanly.
@@ -145,3 +145,4 @@ Expected target files:
 - 2026-03-05 23:33 Quality pass: verified checklist/testability completeness and emoji status headers across all units
 - 2026-03-05 23:34 Unit 0 complete: captured Gate 11 orchestration baseline and concrete target file/test surfaces
 - 2026-03-05 23:36 Unit 1a complete: added failing coding session lifecycle tests and captured red log for missing manager implementation
+- 2026-03-05 23:38 Unit 1b complete: implemented coding session types/spawner/manager/index with managed-workdir checks and green+compile artifacts
