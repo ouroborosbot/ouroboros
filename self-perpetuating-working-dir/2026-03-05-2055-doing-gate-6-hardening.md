@@ -49,6 +49,11 @@ Implement Gate 6 hardening by adding explicit interruption/resume checkpoint awa
 **What**: Confirm Gate 6 target files and existing behavior for inner dialog resume/state and governance classification APIs.
 **Output**: `unit-0-baseline.md` artifact with verified file paths and behavior notes.
 **Acceptance**: Artifact captures current behavior and validated target touchpoints.
+Validated target touchpoints:
+- `src/senses/inner-dialog.ts`
+- `src/__tests__/senses/inner-dialog.test.ts`
+- `src/governance/convention.ts`
+- `src/__tests__/governance/convention.test.ts`
 
 ### ⬜ Unit 1a: Resume checkpoint awareness tests (Red)
 **What**: Add failing tests proving resumed inner-dialog turns include checkpoint-orientation context derived from prior autonomous work.
@@ -103,3 +108,4 @@ Representative proposals:
 ## Progress Log
 - 2026-03-05 20:55 Created from Gate 6 section of approved planning doc
 - 2026-03-05 20:58 Granularity pass: clarified representative proposal set for calibration tests
+- 2026-03-05 20:58 Validation pass: verified Gate 6 target files and existing convention/session interfaces
