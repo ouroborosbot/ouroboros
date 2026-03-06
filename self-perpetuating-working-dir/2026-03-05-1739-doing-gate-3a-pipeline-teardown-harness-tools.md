@@ -83,7 +83,7 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 **Output**: Tool implementation + registry wiring + passing tests.
 **Acceptance**: Governance/constitution check can be queried as capability/tool convention.
 
-### ⬜ Unit 2c: Governance Tool Coverage + Contract Refactor
+### ✅ Unit 2c: Governance Tool Coverage + Contract Refactor
 **What**: Close coverage gaps and refactor tool surface/contracts while preserving existing behavior.
 **Output**: Coverage + regression evidence for new governance query surface.
 **Acceptance**: New governance tool code has 100% coverage and no regressions.
@@ -118,3 +118,4 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 - 2026-03-05 17:48 Unit 1c complete: captured 100% focused coverage evidence for `src/repertoire/skills.ts` and reconfirmed compile-clean with `npx tsc --noEmit`
 - 2026-03-05 17:50 Unit 2a complete: added governance convention query tool red tests and captured expected failures (unknown tool + missing registry entries)
 - 2026-03-05 17:53 Unit 2b complete: implemented `governance_convention` tool surface, updated registry contract snapshot, and reconfirmed full `npm test` + `npx tsc --noEmit`
+- 2026-03-05 17:55 Unit 2c complete: refactored governance convention logic into `src/governance/convention.ts` with dedicated tests and 100% focused coverage evidence
