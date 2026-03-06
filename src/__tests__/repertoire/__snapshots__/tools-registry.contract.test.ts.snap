@@ -3,6 +3,10 @@
 exports[`tool registry contract > tool surface area snapshot 1`] = `
 [
   "claude",
+  "coding_kill",
+  "coding_send_input",
+  "coding_spawn",
+  "coding_status",
   "get_current_time",
   "gh_cli",
   "git_commit",

@@ -119,7 +119,7 @@ Expected target files:
 **Output**: Red tests + `unit-4a-red.log`.
 **Acceptance**: End-to-end orchestration test fails before final integration.
 
-### ⬜ Unit 4b: End-to-end orchestration implementation + verification (Green)
+### ✅ Unit 4b: End-to-end orchestration implementation + verification (Green)
 **What**: Implement remaining integration glue for full coding pipeline orchestration and recovery semantics.
 **Output**: `unit-4b-green.log` + `unit-4b-npm-test.log` + `unit-4b-tsc.log`.
 **Acceptance**: End-to-end pipeline passes and global verification commands are green.
@@ -154,3 +154,4 @@ Expected target files:
 - 2026-03-05 23:55 Unit 3b complete: implemented monitor/reporter modules with blocked/stalled/completed/failed summaries + recovery actions and captured green test + compile logs
 - 2026-03-05 23:56 Unit 3c complete: added default-clock and reporter branch tests, then captured 100% coverage for Unit 3 modules (`manager.ts`, `monitor.ts`, `reporter.ts`)
 - 2026-03-05 23:57 Unit 4a complete: added failing integration tests for planner → doer → merger orchestration plus blocked-session guidance, with red log proving missing `coding/pipeline` glue
+- 2026-03-06 00:01 Unit 4b complete: implemented `src/coding/pipeline.ts` orchestration glue, exported pipeline surfaces, refreshed tool-registry snapshot, and captured targeted green test + full `npm test` + clean `tsc` artifacts
