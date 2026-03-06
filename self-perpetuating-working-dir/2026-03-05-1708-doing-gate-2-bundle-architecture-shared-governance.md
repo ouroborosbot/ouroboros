@@ -21,8 +21,8 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 - [x] Governance docs relocated to repo root
 - [x] `getAgentRoot()` resolves to `.ouro` bundle path
 - [x] All code/tests referencing old `ouroboros/` path updated
-- [ ] `.gitignore` excludes entire `*.ouro/` directories from harness repo
-- [ ] Bundle git init works for self-backup (nested inside gitignored directory)
+- [x] `.gitignore` excludes entire `*.ouro/` directories from harness repo
+- [x] Bundle git init works for self-backup (nested inside gitignored directory)
 - [ ] Bundles pushed to private GitHub repos (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`)
 - [ ] `psyche/memory/` directory structure scaffolded in bundles
 - [x] Agent preflight loads governance docs (tested)
@@ -99,7 +99,7 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 **Output**: `slugger.ouro/` adjusted to scope-compliant baseline.
 **Acceptance**: Slugger bundle is recognized by harness without importing Gate 7 migration content.
 
-### ⬜ Unit 4a: Gitignore Ordering + Nested Git Init
+### ✅ Unit 4a: Gitignore Ordering + Nested Git Init
 **What**: Add `*.ouro/` ignore rule (currently missing) before nested git setup, then initialize bundle-local git repos.
 **Output**: `.gitignore` update and nested repo init evidence.
 **Acceptance**: Bundle directories are ignored by harness git while nested git repos initialize correctly.
@@ -142,3 +142,4 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 - 2026-03-05 17:22 Unit 2c complete: expanded governance preflight tests to cover success + error paths and verified 100% coverage for `src/governance/loader.ts`
 - 2026-03-05 17:26 Unit 3a complete: migrated active `ouroboros/` runtime assets into `ouroboros.ouro/`, aligned `manifest`->`teams-app` and `SELF-KNOWLEDGE`->`TACIT`, and captured green test/tsc evidence
 - 2026-03-05 17:30 Unit 3b complete: added Slugger bundle contract checks, replaced empty `slugger.ouro/agent.json` with a scope-safe stub based on Ouroboros config shape, and reconfirmed `npm test` + `npx tsc`
+- 2026-03-05 17:33 Unit 4a complete: enforced `*.ouro/` gitignore contract with red/green tests, added `.gitignore` rule, initialized nested git repos in both bundles, and reconfirmed `npm test` + `npx tsc`
