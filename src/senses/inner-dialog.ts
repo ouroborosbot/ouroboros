@@ -20,6 +20,7 @@ export interface InnerDialogState {
   cycleCount: number
   resting?: boolean
   lastHeartbeatAt?: string
+  checkpoint?: string
 }
 
 export interface RunInnerDialogTurnOptions {
@@ -91,12 +92,54 @@ export function buildInstinctUserMessage(
   state: InnerDialogState,
 ): string {
   const active = instincts.find((instinct) => instinct.enabled !== false) ?? DEFAULT_INNER_DIALOG_INSTINCTS[0]
+  const checkpoint = state.checkpoint?.trim() || "no prior checkpoint recorded"
   return [
     active.prompt,
     `reason: ${reason}`,
     `cycle: ${state.cycleCount}`,
     `resting: ${state.resting ? "yes" : "no"}`,
+    `checkpoint: ${checkpoint}`,
+    "resume_instruction: continue from the checkpoint if still valid; otherwise revise and proceed.",
   ].join("\n")
+}
+
+function contentToText(content: unknown): string {
+  if (typeof content === "string") return content.trim()
+  if (!Array.isArray(content)) return ""
+  const text = content
+    .map((part) => {
+      if (typeof part === "string") return part
+      if (!part || typeof part !== "object") return ""
+      if ("text" in part && typeof (part as { text?: unknown }).text === "string") {
+        return (part as { text: string }).text
+      }
+      return ""
+    })
+    .join("\n")
+  return text.trim()
+}
+
+export function deriveResumeCheckpoint(messages: OpenAI.ChatCompletionMessageParam[]): string {
+  const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant")
+  if (!lastAssistant) return "no prior checkpoint recorded"
+  const assistantText = contentToText(lastAssistant.content)
+  if (!assistantText) return "no prior checkpoint recorded"
+
+  const explicitCheckpoint = assistantText
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => /^checkpoint\s*:/i.test(line))
+  if (explicitCheckpoint) {
+    const parsed = explicitCheckpoint.replace(/^checkpoint\s*:\s*/i, "").trim()
+    return parsed || "no prior checkpoint recorded"
+  }
+
+  const firstLine = assistantText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)[0] as string
+  if (firstLine.length <= 220) return firstLine
+  return `${firstLine.slice(0, 217)}...`
 }
 
 function createInnerDialogCallbacks(): ChannelCallbacks {
@@ -137,6 +180,7 @@ export async function runInnerDialogTurn(options?: RunInnerDialogTurnOptions): P
   } else {
     const assistantTurns = messages.filter((message) => message.role === "assistant").length
     state.cycleCount = assistantTurns + 1
+    state.checkpoint = deriveResumeCheckpoint(messages)
     const instinctPrompt = buildInstinctUserMessage(instincts, reason, state)
     messages.push({ role: "user", content: instinctPrompt })
   }
@@ -166,4 +210,3 @@ export async function runInnerDialogTurn(options?: RunInnerDialogTurnOptions): P
     sessionPath: sessionFilePath,
   }
 }
-
