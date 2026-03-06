@@ -263,25 +263,27 @@ Examples:
 - `Improve CI diagnostics — include failure context and retry metadata in logs`
 
 **Body structure (exact headings):**
-1. `## What changed`
-2. `## Why you should care`
-3. `## How it was implemented`
-4. `## How we tested`
+1. `## What shipped`
+2. `## Why this matters`
+3. `## How to try it yourself`
+4. `## Verification`
+5. `## Live agent validation`
 
 Each section must be concrete and outcome-oriented:
-- **What changed**: shipped capability and key files/surfaces
-- **Why you should care**: user/operator impact, risk reduction, reliability/velocity gains
-- **How it was implemented**: architectural approach, major integration points, notable constraints handled
-- **How we tested**: exact commands run and high-signal results (include coverage/CI status where relevant)
+- **What shipped**: capabilities delivered, key surfaces/files, and behavior changes
+- **Why this matters**: user/operator value, risk reduction, and practical impact
+- **How to try it yourself**: reproducible steps/commands/prompts someone can run immediately
+- **Verification**: exact commands + high-signal results (tests, types, coverage, CI)
+- **Live agent validation**: if live-run evidence exists, include it and cite artifacts/logs; otherwise explicitly state it was not part of this PR
 
-Avoid simply re-listing work units from doing docs. Translate unit output into value and operational impact.
+Avoid re-listing work units from doing docs. Translate implementation detail into user value and operational confidence.
 
 ```bash
 gh pr create \
   --base main \
   --head "${BRANCH}" \
   --title "<outcome-oriented title>" \
-  --body "<required 4-section narrative built from all doing docs and git diff>"
+  --body "<required 5-section narrative built from all doing docs and git diff>"
 ```
 
 The PR description is the permanent record of what this branch contributed. Make it complete.
@@ -296,7 +298,7 @@ If the PR already exists and the body/title are thin or stale, update them befor
 ```bash
 gh pr edit "${BRANCH}" \
   --title "<outcome-oriented title>" \
-  --body "<required 4-section narrative>"
+  --body "<required 5-section narrative>"
 ```
 
 ### Step 3: Wait for CI
