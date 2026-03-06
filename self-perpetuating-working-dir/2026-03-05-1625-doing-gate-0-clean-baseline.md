@@ -16,7 +16,7 @@
 Restore `main` to a healthy state by reverting commits `e3ecc1c..448cfcd`, preserving the archive branch, and producing a commit map for Gate 5 salvage.
 
 ## Completion Criteria
-- [ ] Archive branch `archive/self-perpetuating-run-2026-03-05` exists and contains overnight proposals
+- [x] Archive branch `archive/self-perpetuating-run-2026-03-05` exists and contains overnight proposals
 - [ ] Commit map documented at `self-perpetuating-working-dir/gate-0-commit-map.md` (reverted vs salvageable)
 - [ ] `main` reverted via explicit revert commits
 - [ ] `npm test` green on `main` post-revert
@@ -48,7 +48,7 @@ Restore `main` to a healthy state by reverting commits `e3ecc1c..448cfcd`, prese
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Setup and Verification Baseline
+### ✅ Unit 0: Setup and Verification Baseline
 **What**: Confirm archive branch exists on origin and collect commit metadata for `e3ecc1c..448cfcd`.
 **Output**: Artifacts with git logs/stats in the gate artifacts directory.
 **Acceptance**: Archive branch presence and commit-range metadata are captured.
@@ -87,3 +87,4 @@ Restore `main` to a healthy state by reverting commits `e3ecc1c..448cfcd`, prese
 - 2026-03-05 16:26 Granularity pass: split commit-map work into inventory + classification units
 - 2026-03-05 16:27 Validation pass: confirmed planning path, commit range, and archive branch references
 - 2026-03-05 16:28 Quality pass: unit format and checklist completeness verified
+- 2026-03-05 16:28 Unit 0 complete: archived-branch evidence and commit-range baseline captured
