@@ -279,15 +279,15 @@ Unified thinking before Gates 2-3 start building, but expressed as committed cod
 - **Low priority:** FriendStore O(N) lookup optimization
 
 **Completion criteria:**
-- [ ] Overnight proposals reviewed — high-merit ideas incorporated into scaffolding decisions
-- [ ] `.ouro` bundle skeleton directory committed (structure only, Gate 2 populates)
-- [ ] TypeScript interfaces for harness primitives committed (compilable, importable)
-- [ ] Shared governance loader stub committed
-- [ ] Kill list / migration checklist committed in-repo
-- [ ] Subagent protocol loading convention defined and documented
-- [ ] Bundle backup + `~/AgentBundles/` migration path documented
-- [ ] `npx tsc` compiles clean with the new interfaces
-- [ ] `npm test` green
+- [x] Overnight proposals reviewed — high-merit ideas incorporated into scaffolding decisions
+- [x] `.ouro` bundle skeleton directory committed (structure only, Gate 2 populates)
+- [x] TypeScript interfaces for harness primitives committed (compilable, importable)
+- [x] Shared governance loader stub committed
+- [x] Kill list / migration checklist committed in-repo
+- [x] Subagent protocol loading convention defined and documented
+- [x] Bundle backup + `~/AgentBundles/` migration path documented
+- [x] `npx tsc` compiles clean with the new interfaces
+- [x] `npm test` green
 
 ---
 
@@ -731,3 +731,4 @@ Phase 2 gates may run in parallel where dependencies allow. Gate 9 (task system)
 - 2026-03-05 15:30 Full gate review complete (all 13 gates). Gate 3 split into 3a (teardown) and 3b (build up). Gate 7/8 swapped (Slugger Migration now Phase 1, Bundle Independence now Phase 2). Supervisor designed for multi-agent from start. Gate 4 marked observational (skip work-planner). Gate 9 task location specified. Gate 10 separate repo clones per agent. Gate 11 end-to-end pipeline criterion. Moved all working files to self-perpetuating-working-dir/ at repo root.
 - 2026-03-05 17:30 Critical review pass (with Claude Opus 4.6). GitHub push moved from Gate 8 to Gate 2 (bundles need remote backup immediately, not 6 gates later). TF-IDF replaced with embeddings for memory retrieval (provider-agnostic interface, vectors in JSONL, cosine similarity — quality improvement over lexical matching is massive). OpenClaw Slugger decommission removed from Gate 7 (both runtimes coexist indefinitely). Gate 7 Slugger communication failure handling added (debug, retry, fallback to Ouroboros knowledge). Inner dialog documented as brand new entry point (nothing exists today). Aspirations reframed as directional (not prime directive, no strict ordering, governance rewrite is "when ready" not "first thing"). Supervisor/process test guidance added (real child processes, not mocks). Phase 2 rollback plans added to all gates. Gate 10 multi-agent git confirmed covered by standard work-merger PR process. Open question added: embeddings API key provider choice for Gate 3b.
 - 2026-03-05 17:45 Embeddings API key resolved — OpenAI text-embedding-3-small, placeholder added to src/config.ts, key added to secrets.json. Slugger secrets copy noted in Gate 7. Status → APPROVED. Handing off to Codex.
+- 2026-03-05 17:00 Gate 1 completed on `slugger/gate-1-architectural-scaffolding`: `.ouro` skeletons, harness interfaces, governance loader stub, and migration conventions landed with `npm test`, `npx tsc`, and 100% coverage green.
