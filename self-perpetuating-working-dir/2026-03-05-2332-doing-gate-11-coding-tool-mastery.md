@@ -48,7 +48,7 @@ Teach agents to use external coding tools (Claude Code/Codex) by implementing co
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Baseline + orchestration contract map
+### ✅ Unit 0: Baseline + orchestration contract map
 **What**: Map existing tool/runtime seams and define the Gate 11 target surfaces for coding session orchestration and tool exposure.
 **Output**: `unit-0-baseline.md`.
 **Acceptance**: Artifact lists concrete implementation/test files and integration seams for coding tool orchestration.
@@ -143,3 +143,4 @@ Expected target files:
 - 2026-03-05 23:33 Granularity pass: verified each unit is atomic, testable, and scoped to a single session
 - 2026-03-05 23:33 Validation pass: confirmed existing wiring seams (`src/repertoire/tools-base.ts`, `src/repertoire/tools.ts`, `src/tasks/index.ts`) and target new `src/coding/` module surfaces
 - 2026-03-05 23:33 Quality pass: verified checklist/testability completeness and emoji status headers across all units
+- 2026-03-05 23:34 Unit 0 complete: captured Gate 11 orchestration baseline and concrete target file/test surfaces
