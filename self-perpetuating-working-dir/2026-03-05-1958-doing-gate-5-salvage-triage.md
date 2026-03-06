@@ -78,22 +78,22 @@ Execute Gate 5 by re-landing valuable salvageable code from the reverted overnig
 **Output**: Per-candidate planning/doing docs and execution artifacts, or explicit no-op artifact if none.
 **Acceptance**: All substantial `re-land-now` candidates are either completed or explicitly reclassified with rationale.
 
-### ⬜ Unit 4a: Proposal normalization and dedupe index
+### ✅ Unit 4a: Proposal normalization and dedupe index
 **What**: Build a canonical list of all 31 overnight proposals, detect duplicates, and assign stable proposal IDs for downstream triage.
 **Output**: `gate-5-backlog/proposal-catalog.md` with one row per original proposal and dedupe links.
 **Acceptance**: All 31 proposals are represented and duplicates are explicitly linked to a canonical proposal ID.
 
-### ⬜ Unit 4b: Backlog doc authoring for applicable proposals
+### ✅ Unit 4b: Backlog doc authoring for applicable proposals
 **What**: For each applicable canonical proposal, write backlog task docs under `self-perpetuating-working-dir/gate-5-backlog/` using the existing planning-doc format.
 **Output**: Backlog markdown docs + `gate-5-backlog/index.md` summary for applicable items.
 **Acceptance**: Every applicable proposal has a corresponding backlog doc with scope and rationale.
 
-### ⬜ Unit 4c: Not-applicable/archive rationale for remaining proposals
+### ✅ Unit 4c: Not-applicable/archive rationale for remaining proposals
 **What**: For each proposal not moved into backlog, record whether it is inversion-obsoleted or archive-only with explicit reasoning.
 **Output**: `gate-5-backlog/triage-rationales.md`.
 **Acceptance**: Every non-backlog proposal is accounted for with explicit rationale and source reference.
 
-### ⬜ Unit 5: Priority + obsolescence tagging
+### ✅ Unit 5: Priority + obsolescence tagging
 **What**: Flag high-merit security items as high priority and explicitly mark inversion-obsoleted proposals.
 **Output**: Updated backlog docs/index with `priority` and `status rationale` tags.
 **Acceptance**: Security items visibly marked high priority; obsoleted items explicitly reference inversion rationale.
@@ -126,3 +126,4 @@ Execute Gate 5 by re-landing valuable salvageable code from the reverted overnig
 - 2026-03-05 20:04 Unit 1 complete: classified all 38 reverted commits into re-land-now/later/not-applicable/archive-only with rationale
 - 2026-03-05 20:05 Units 2a/2b/2c complete: no small re-land-now code candidates; recorded explicit conditional no-op evidence artifacts
 - 2026-03-05 20:05 Unit 3 complete: no substantial re-land-now code candidates, recorded no-op salvage flow outcome
+- 2026-03-05 20:08 Units 4a/4b/4c and 5 complete: triaged canonical 31 proposals, created 24 backlog planning docs, tagged priorities, and recorded non-backlog rationales with source references
