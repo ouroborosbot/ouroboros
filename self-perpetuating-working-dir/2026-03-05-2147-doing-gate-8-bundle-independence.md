@@ -63,7 +63,7 @@ Validated target touchpoints:
 **Output**: `unit-1-bundle-remote-sync.log` + `unit-1-backup-integrity.md`.
 **Acceptance**: Evidence shows remotes contain latest commits and clone-vs-local diffs are clean (or explained and resolved).
 
-### ⬜ Unit 2a: Agent-bundle path migration tests (Red)
+### ✅ Unit 2a: Agent-bundle path migration tests (Red)
 **What**: Add failing tests for identity/path/bootstrap behavior that require bundle resolution from `~/AgentBundles/<agent>.ouro/`.
 **Output**: Red tests + `unit-2a-red.log`.
 **Acceptance**: New tests fail against current repo-root bundle assumptions.
@@ -114,3 +114,4 @@ Validated target touchpoints:
 - 2026-03-05 21:49 Quality pass: confirmed unit acceptance criteria, emoji headers, and execution readiness
 - 2026-03-05 21:51 Unit 0 complete: captured pre-move bundle, remote, and process baseline for Gate 8 migration
 - 2026-03-05 21:53 Unit 1 complete: synced both bundle repos to GitHub and verified clone-vs-local integrity
+- 2026-03-05 21:54 Unit 2a complete: added failing identity path tests requiring `~/AgentBundles/<agent>.ouro`
