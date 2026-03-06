@@ -30,4 +30,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-gate-artifacts
-          path: ${{ env.HOME }}/.agentconfigs/test-runs/ouroboros-agent-harness
+          path: ${{ env.HOME }}/.agentstate/test-runs/ouroboros-agent-harness
