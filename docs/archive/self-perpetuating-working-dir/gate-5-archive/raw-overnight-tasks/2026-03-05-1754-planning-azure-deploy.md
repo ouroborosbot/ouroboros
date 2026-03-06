@@ -28,10 +28,12 @@ Deploy Ouroboros Teams bot to Azure App Service in `rg-arimendelow-fhl26`, confi
 - [x] App Service provisioned and running (S1 Linux, Node 22, West Central US)
 - [x] Managed identity attached, bot endpoint updated
 - [x] App secrets configured (provider config + OAuth connection names)
-- [ ] OAuth connections created on Bot Registration (Graph + ADO)
+- [x] OAuth connections created on Bot Registration (Graph + ADO)
 - [x] Deployed manifest sideloaded in Copilot
 - [x] Basic chat works (no OAuth needed)
-- [ ] OAuth flows work (Graph + ADO)
+- [~] OAuth flows — Graph User.Read works; broader scopes + ADO blocked by tenant consent policy
+- [ ] Set up CDX demo tenant with full Graph + ADO scopes
+- [ ] ADO PAT workaround for MSFT tenant
 - [ ] Branch merged to main
 
 ## Code Coverage Requirements
@@ -66,3 +68,7 @@ Steps 1-3 (create manifest, add managed identity support, write deploy scripts) 
 - 2026-03-05 Fixed PORT env var (Azure probes 8080, app was on 3978)
 - 2026-03-05 Fixed MODULE_NOT_FOUND (enabled SCM_DO_BUILD_DURING_DEPLOYMENT)
 - 2026-03-05 Bot live and responding via Copilot
+- 2026-03-05 OAuth: FIC auth working (no secret/cert needed). Graph User.Read works.
+  Broader Graph scopes + ADO user_impersonation blocked by tenant consent policy
+  (users cannot consent to any non-pre-consented scopes without admin approval).
+  Known limitation — needs admin "Grant consent" click or CDX demo tenant.
