@@ -341,18 +341,18 @@ Remove the puppet pipeline and build the toolkit layer — the tools and convent
 - Reflection becomes a capability the model can invoke, not a stage in a pipeline
 
 **Completion criteria:**
-- [ ] Harness tools implemented per Gate 1 design, with tests
-- [ ] Protocols loadable from both sources: shared subagent protocols (`subagents/`) and agent-specific skills (`<agent>.ouro/skills/`)
-- [ ] `autonomous-loop.ts` removed
-- [ ] `loop-entry.ts` removed
-- [ ] `autonomous-loop.test.ts` removed
-- [ ] `package.json` scripts cleaned up (no references to removed files)
-- [ ] Pipeline orchestration removed from `trigger.ts`
-- [ ] Context-loading utilities preserved and tested
-- [ ] Constitution compliance queryable as a tool/convention
-- [ ] `npm test` green
-- [ ] 100% coverage on new code
-- [ ] No warnings
+- [x] Harness tools implemented per Gate 1 design, with tests
+- [x] Protocols loadable from both sources: shared subagent protocols (`subagents/`) and agent-specific skills (`<agent>.ouro/skills/`)
+- [x] `autonomous-loop.ts` removed
+- [x] `loop-entry.ts` removed
+- [x] `autonomous-loop.test.ts` removed
+- [x] `package.json` scripts cleaned up (no references to removed files)
+- [x] Pipeline orchestration removed from `trigger.ts`
+- [x] Context-loading utilities preserved and tested
+- [x] Constitution compliance queryable as a tool/convention
+- [x] `npm test` green
+- [x] 100% coverage on new code
+- [x] No warnings
 
 ---
 
@@ -733,3 +733,4 @@ Phase 2 gates may run in parallel where dependencies allow. Gate 9 (task system)
 - 2026-03-05 17:45 Embeddings API key resolved — OpenAI text-embedding-3-small, placeholder added to src/config.ts, key added to secrets.json. Slugger secrets copy noted in Gate 7. Status → APPROVED. Handing off to Codex.
 - 2026-03-05 17:00 Gate 1 completed on `slugger/gate-1-architectural-scaffolding`: `.ouro` skeletons, harness interfaces, governance loader stub, and migration conventions landed with `npm test`, `npx tsc`, and 100% coverage green.
 - 2026-03-05 18:10 Gate 2 completed on `slugger/gate-2-bundle-architecture-shared-governance`: `.ouro` bundle migration + slugger stub alignment, root governance preflight enforcement, nested bundle git initialization, private backup push (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`), and final verification (`npm test`, `npm run test:coverage:vitest`, `npx tsc`) all green.
+- 2026-03-05 18:22 Gate 3a completed on `slugger/gate-3a-pipeline-teardown-harness-tools`: dual-source protocol loading, queryable governance convention tooling, teardown invariants contract checks, and final verification (`npm test`, `npm run test:coverage:vitest`, `npx tsc --noEmit`) all green.

@@ -16,19 +16,19 @@
 Remove any remaining puppet-pipeline assumptions and complete the harness-tool inversion for Gate 3a: dual-source protocol loading, teardown invariants, and constitution/gov checks as queryable conventions.
 
 ## Completion Criteria
-- [ ] Harness tools implemented per Gate 1 design, with tests
-- [ ] Protocols loadable from both sources: shared subagent protocols (`subagents/`) and agent-specific skills (`<agent>.ouro/skills/`)
-- [ ] `autonomous-loop.ts` removed
-- [ ] `loop-entry.ts` removed
-- [ ] `autonomous-loop.test.ts` removed
-- [ ] `package.json` scripts cleaned up (no references to removed files)
-- [ ] Pipeline orchestration removed from `trigger.ts`
-- [ ] Context-loading utilities preserved and tested
-- [ ] Constitution compliance queryable as a tool/convention
-- [ ] `npm test` green
-- [ ] 100% coverage on new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] Harness tools implemented per Gate 1 design, with tests
+- [x] Protocols loadable from both sources: shared subagent protocols (`subagents/`) and agent-specific skills (`<agent>.ouro/skills/`)
+- [x] `autonomous-loop.ts` removed
+- [x] `loop-entry.ts` removed
+- [x] `autonomous-loop.test.ts` removed
+- [x] `package.json` scripts cleaned up (no references to removed files)
+- [x] Pipeline orchestration removed from `trigger.ts`
+- [x] Context-loading utilities preserved and tested
+- [x] Constitution compliance queryable as a tool/convention
+- [x] `npm test` green
+- [x] 100% coverage on new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -93,7 +93,7 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 **Output**: Contract test updates and/or audit checks with explicit assertions.
 **Acceptance**: Gate 3a teardown criteria are machine-verified.
 
-### ⬜ Unit 3b: Gate Verification
+### ✅ Unit 3b: Gate Verification
 **What**: Run `npm test`, `npm run test:coverage:vitest`, and `npx tsc`, then sync Gate 3a checklist state in planning/doing docs.
 **Output**: Verification logs in artifacts and checklist updates.
 **Acceptance**: All Gate 3a completion criteria are satisfied and documented.
@@ -120,3 +120,4 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 - 2026-03-05 17:53 Unit 2b complete: implemented `governance_convention` tool surface, updated registry contract snapshot, and reconfirmed full `npm test` + `npx tsc --noEmit`
 - 2026-03-05 17:55 Unit 2c complete: refactored governance convention logic into `src/governance/convention.ts` with dedicated tests and 100% focused coverage evidence
 - 2026-03-05 17:58 Unit 3a complete: added machine-verifiable Gate 3a teardown contract checks (`src/harness/teardown-contract.ts`) with full test/coverage evidence
+- 2026-03-05 18:01 Unit 3b complete: gate verification passed (`npm test`, `npm run test:coverage:vitest`, `npx tsc --noEmit`) and Gate 3a completion criteria synced
