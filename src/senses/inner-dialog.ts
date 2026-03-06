@@ -137,8 +137,7 @@ export function deriveResumeCheckpoint(messages: OpenAI.ChatCompletionMessagePar
   const firstLine = assistantText
     .split("\n")
     .map((line) => line.trim())
-    .find(Boolean)
-  if (!firstLine) return "no prior checkpoint recorded"
+    .filter((line) => line.length > 0)[0] as string
   if (firstLine.length <= 220) return firstLine
   return `${firstLine.slice(0, 217)}...`
 }

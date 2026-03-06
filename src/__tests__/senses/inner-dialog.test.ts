@@ -44,6 +44,7 @@ vi.mock("../../nerves/runtime", () => ({
 import {
   buildInnerDialogBootstrapMessage,
   buildInstinctUserMessage,
+  deriveResumeCheckpoint,
   loadInnerDialogInstincts,
   runInnerDialogTurn,
 } from "../../senses/inner-dialog"
@@ -246,5 +247,56 @@ describe("inner dialog runtime", () => {
     expect(lastUser).toBeDefined()
     expect(String(lastUser!.content)).toContain("Instinct from file.")
     expect(String(lastUser!.content)).toContain("reason: heartbeat")
+  })
+
+  it("returns fallback checkpoint when assistant content is non-text object", () => {
+    const checkpoint = deriveResumeCheckpoint([
+      {
+        role: "assistant",
+        content: { kind: "object-content" } as unknown as OpenAI.ChatCompletionMessageParam["content"],
+      },
+    ])
+    expect(checkpoint).toBe("no prior checkpoint recorded")
+  })
+
+  it("returns fallback checkpoint when there is no assistant message", () => {
+    expect(deriveResumeCheckpoint([])).toBe("no prior checkpoint recorded")
+  })
+
+  it("accepts string segments inside structured assistant content arrays", () => {
+    const checkpoint = deriveResumeCheckpoint([
+      {
+        role: "assistant",
+        content: ["checkpoint: Unit 4 coverage hardening"] as unknown as OpenAI.ChatCompletionMessageParam["content"],
+      },
+    ])
+    expect(checkpoint).toBe("Unit 4 coverage hardening")
+  })
+
+  it("falls back when explicit checkpoint marker has no payload", () => {
+    const checkpoint = deriveResumeCheckpoint([{ role: "assistant", content: "checkpoint:   " }])
+    expect(checkpoint).toBe("no prior checkpoint recorded")
+  })
+
+  it("derives and truncates checkpoint text from structured assistant content arrays", () => {
+    const longLine = "A".repeat(250)
+    const checkpoint = deriveResumeCheckpoint([
+      {
+        role: "assistant",
+        content: [42, { text: longLine }] as unknown as OpenAI.ChatCompletionMessageParam["content"],
+      },
+    ])
+    expect(checkpoint.endsWith("...")).toBe(true)
+    expect(checkpoint.length).toBe(220)
+  })
+
+  it("skips structured content parts that do not contain text", () => {
+    const checkpoint = deriveResumeCheckpoint([
+      {
+        role: "assistant",
+        content: [{ kind: "noop" }, { text: "checkpoint: Unit 3 refactor pass" }] as unknown as OpenAI.ChatCompletionMessageParam["content"],
+      },
+    ])
+    expect(checkpoint).toBe("Unit 3 refactor pass")
   })
 })
