@@ -121,3 +121,4 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 - 2026-03-05 17:55 Unit 2c complete: refactored governance convention logic into `src/governance/convention.ts` with dedicated tests and 100% focused coverage evidence
 - 2026-03-05 17:58 Unit 3a complete: added machine-verifiable Gate 3a teardown contract checks (`src/harness/teardown-contract.ts`) with full test/coverage evidence
 - 2026-03-05 18:01 Unit 3b complete: gate verification passed (`npm test`, `npm run test:coverage:vitest`, `npx tsc --noEmit`) and Gate 3a completion criteria synced
+- 2026-03-05 18:07 Unit 3b CI parity fix: added missing `emitNervesEvent` instrumentation to new Gate 3a modules and reconfirmed full `npm run test:coverage` gate passes
