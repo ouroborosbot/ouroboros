@@ -394,8 +394,12 @@ export async function withConversationLock(convId: string, fn: () => Promise<voi
 // Create a fresh friend store per request so mkdirSync re-runs if directories
 // are deleted while the process is alive.
 function getFriendStore(): InstanceType<typeof FileFriendStore> {
-  const friendsPath = path.join(getAgentRoot(), "friends")
-  return new FileFriendStore(friendsPath)
+  const agentKnowledgePath = path.join(getAgentRoot(), "friends")
+  // On Azure App Service, os.homedir() returns /root which is ephemeral.
+  // Use /home (persistent storage) when WEBSITE_SITE_NAME is set (Azure indicator).
+  const homeBase = process.env.WEBSITE_SITE_NAME ? "/home" : os.homedir()
+  const piiBridgePath = path.join(homeBase, ".agentstate", getAgentName(), "friends")
+  return new FileFriendStore(agentKnowledgePath, piiBridgePath)
 }
 
 // Context from the Teams activity that carries OAuth tokens and signin ability

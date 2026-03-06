@@ -400,7 +400,10 @@ function sanitizeKey(key: string): string {
 }
 
 export function sessionPath(friendId: string, channel: string, key: string): string {
-  const dir = path.join(os.homedir(), ".agentstate", getAgentName(), "sessions", friendId, channel)
+  // On Azure App Service, os.homedir() returns /root which is ephemeral.
+  // Use /home (persistent storage) when WEBSITE_SITE_NAME is set.
+  const homeBase = process.env.WEBSITE_SITE_NAME ? "/home" : os.homedir()
+  const dir = path.join(homeBase, ".agentstate", getAgentName(), "sessions", friendId, channel)
   fs.mkdirSync(dir, { recursive: true })
   return path.join(dir, sanitizeKey(key) + ".json")
 }
