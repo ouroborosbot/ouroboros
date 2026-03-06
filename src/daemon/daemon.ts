@@ -40,6 +40,8 @@ export interface DaemonProcessManagerLike {
 export interface DaemonSchedulerLike {
   listJobs(): DaemonCronJobSummary[]
   triggerJob(jobId: string): Promise<{ ok: boolean; message: string }>
+  start?: () => void
+  stop?: () => void
 }
 
 export interface DaemonHealthMonitorLike {
@@ -135,6 +137,7 @@ export class OuroDaemon {
       meta: { socketPath: this.socketPath },
     })
     await this.processManager.startAutoStartAgents()
+    this.scheduler.start?.()
 
     if (fs.existsSync(this.socketPath)) {
       fs.unlinkSync(this.socketPath)
@@ -175,6 +178,7 @@ export class OuroDaemon {
       meta: { socketPath: this.socketPath },
     })
 
+    this.scheduler.stop?.()
     await this.processManager.stopAll()
 
     if (this.server) {

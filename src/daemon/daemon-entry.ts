@@ -59,8 +59,6 @@ const daemon = new OuroDaemon({
   router,
 })
 
-scheduler.start()
-
 void daemon.start().catch(async () => {
   emitNervesEvent({
     level: "error",
@@ -69,17 +67,14 @@ void daemon.start().catch(async () => {
     message: "daemon entrypoint failed",
     meta: {},
   })
-  scheduler.stop()
   await daemon.stop()
   process.exit(1)
 })
 
 process.on("SIGINT", () => {
-  scheduler.stop()
   void daemon.stop().then(() => process.exit(0))
 })
 
 process.on("SIGTERM", () => {
-  scheduler.stop()
   void daemon.stop().then(() => process.exit(0))
 })
