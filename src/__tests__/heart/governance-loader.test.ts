@@ -1,0 +1,46 @@
+import * as fs from "fs"
+import * as os from "os"
+import * as path from "path"
+
+import { afterEach, describe, expect, it } from "vitest"
+
+import { loadGovernanceDocs } from "../../governance/loader"
+
+const tmpDirs: string[] = []
+
+afterEach(() => {
+  for (const dir of tmpDirs) {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+  tmpDirs.length = 0
+})
+
+describe("governance loader", () => {
+  it("loads existing governance docs from an agent root", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "governance-loader-"))
+    tmpDirs.push(root)
+    fs.writeFileSync(path.join(root, "CONSTITUTION.md"), "# constitution\n", "utf8")
+    fs.writeFileSync(path.join(root, "ARCHITECTURE.md"), "# architecture\n", "utf8")
+
+    const result = loadGovernanceDocs(root, ["CONSTITUTION.md", "ARCHITECTURE.md"])
+
+    expect(result.missing).toEqual([])
+    expect(result.documents).toHaveLength(2)
+    expect(result.documents.map((doc) => doc.relativePath)).toEqual([
+      "CONSTITUTION.md",
+      "ARCHITECTURE.md",
+    ])
+  })
+
+  it("collects missing files without throwing", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "governance-loader-"))
+    tmpDirs.push(root)
+    fs.writeFileSync(path.join(root, "CONSTITUTION.md"), "# constitution\n", "utf8")
+
+    const result = loadGovernanceDocs(root, ["CONSTITUTION.md", "MISSING.md"])
+
+    expect(result.documents).toHaveLength(1)
+    expect(result.documents[0]?.relativePath).toBe("CONSTITUTION.md")
+    expect(result.missing).toEqual(["MISSING.md"])
+  })
+})
