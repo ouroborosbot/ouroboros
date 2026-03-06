@@ -2,7 +2,7 @@ import OpenAI from "openai"
 import * as readline from "readline"
 import * as os from "os"
 import * as path from "path"
-import { runAgent, ChannelCallbacks } from "../heart/core"
+import { runAgent, ChannelCallbacks, getProvider } from "../heart/core"
 import { buildSystem } from "../mind/prompt"
 import { pickPhrase, getPhrases } from "../wardrobe/phrases"
 import { formatToolResult, formatKick, formatError } from "../wardrobe/format"
@@ -341,6 +341,9 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
 }
 
 export async function main() {
+  // Fail fast if provider is misconfigured (triggers human-readable error + exit)
+  getProvider()
+
   const registry = createCommandRegistry()
   registerDefaultCommands(registry)
 
