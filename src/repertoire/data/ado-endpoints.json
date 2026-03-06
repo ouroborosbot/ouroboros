@@ -126,80 +126,80 @@
     "params": "$depth, $expand"
   },
   {
-    "path": "/_apis/memberentitlementmanagement/memberentitlements",
+    "path": "/_apis/memberentitlementmanagement/memberentitlements?api-version=7.1-preview.3",
     "method": "GET",
     "host": "vsapm.dev.azure.com",
-    "description": "List member entitlements (users and their access levels). Use host vsapm.dev.azure.com.",
+    "description": "List member entitlements (users and their access levels). Use host vsapm.dev.azure.com. IMPORTANT: include the full path with api-version as shown.",
     "params": "$top, $skip, $filter, $orderBy, $select"
   },
   {
-    "path": "/_apis/memberentitlementmanagement/memberentitlements",
+    "path": "/_apis/memberentitlementmanagement/memberentitlements?api-version=7.1-preview.3",
     "method": "POST",
     "host": "vsapm.dev.azure.com",
-    "description": "Add a member entitlement (grant a user access to the org with a specific license). Use host vsapm.dev.azure.com.",
+    "description": "Add a member entitlement (grant a user access to the org with a specific license). Use host vsapm.dev.azure.com. IMPORTANT: include the full path with api-version as shown.",
     "params": "body: { accessLevel: { accountLicenseType: 'express'|'stakeholder'|'earlyAdopter'|'professional' }, user: { principalName: 'user@domain.com', subjectKind: 'user' }, projectEntitlements: [{ group: { groupType: 'projectContributor' }, projectRef: { id: projectId } }] }"
   },
   {
-    "path": "/_apis/memberentitlementmanagement/memberentitlements/{memberId}",
+    "path": "/_apis/memberentitlementmanagement/memberentitlements/{memberId}?api-version=7.1-preview.3",
     "method": "GET",
     "host": "vsapm.dev.azure.com",
-    "description": "Get a specific member entitlement by member ID. Use host vsapm.dev.azure.com.",
+    "description": "Get a specific member entitlement by member ID. Use host vsapm.dev.azure.com. IMPORTANT: include the full path with api-version as shown.",
     "params": ""
   },
   {
-    "path": "/_apis/memberentitlementmanagement/memberentitlements/{memberId}",
+    "path": "/_apis/memberentitlementmanagement/memberentitlements/{memberId}?api-version=7.1-preview.3",
     "method": "PATCH",
     "host": "vsapm.dev.azure.com",
-    "description": "Update a member entitlement (change access level, add/remove project access). Use host vsapm.dev.azure.com.",
+    "description": "Update a member entitlement (change access level, add/remove project access). Use host vsapm.dev.azure.com. IMPORTANT: include the full path with api-version as shown.",
     "params": "JSON Patch array: [{op, path, value}]"
   },
   {
-    "path": "/_apis/memberentitlementmanagement/memberentitlements/{memberId}",
+    "path": "/_apis/memberentitlementmanagement/memberentitlements/{memberId}?api-version=7.1-preview.3",
     "method": "DELETE",
     "host": "vsapm.dev.azure.com",
-    "description": "Remove a member entitlement (revoke user access). Use host vsapm.dev.azure.com.",
+    "description": "Remove a member entitlement (revoke user access). Use host vsapm.dev.azure.com. IMPORTANT: include the full path with api-version as shown.",
     "params": ""
   },
   {
-    "path": "/_apis/userentitlements",
+    "path": "/_apis/userentitlements?api-version=7.1-preview.4",
     "method": "POST",
     "host": "vsapm.dev.azure.com",
-    "description": "Bulk add user entitlements (add multiple users at once). Use host vsapm.dev.azure.com.",
+    "description": "Bulk add user entitlements (add multiple users at once). Use host vsapm.dev.azure.com. IMPORTANT: include the full path with api-version as shown.",
     "params": "body: array of { accessLevel, user, projectEntitlements }"
   },
   {
-    "path": "/_apis/graph/users",
+    "path": "/_apis/graph/users?api-version=7.1-preview.1",
     "method": "GET",
     "host": "vssps.dev.azure.com",
-    "description": "List users in the organization (Graph API). Use host vssps.dev.azure.com.",
+    "description": "List users in the organization (Graph API). Use host vssps.dev.azure.com. IMPORTANT: include the full path with api-version as shown.",
     "params": "subjectTypes (aad, msa, etc.), continuationToken"
   },
   {
-    "path": "/_apis/graph/groups",
+    "path": "/_apis/graph/groups?api-version=7.1-preview.1",
     "method": "GET",
     "host": "vssps.dev.azure.com",
-    "description": "List groups in the organization. Use host vssps.dev.azure.com.",
+    "description": "List groups in the organization. Use host vssps.dev.azure.com. IMPORTANT: include the full path with api-version as shown.",
     "params": "subjectTypes, continuationToken"
   },
   {
-    "path": "/_apis/graph/memberships/{subjectDescriptor}",
+    "path": "/_apis/graph/memberships/{subjectDescriptor}?api-version=7.1-preview.1",
     "method": "GET",
     "host": "vssps.dev.azure.com",
-    "description": "List group memberships for a user or group. Use host vssps.dev.azure.com.",
+    "description": "List group memberships for a user or group. Use host vssps.dev.azure.com. IMPORTANT: include the full path with api-version as shown.",
     "params": "direction (up = groups user belongs to, down = members of group)"
   },
   {
-    "path": "/_apis/graph/memberships/{subjectDescriptor}/{containerDescriptor}",
+    "path": "/_apis/graph/memberships/{subjectDescriptor}/{containerDescriptor}?api-version=7.1-preview.1",
     "method": "PUT",
     "host": "vssps.dev.azure.com",
-    "description": "Add a user to a group. Use host vssps.dev.azure.com.",
+    "description": "Add a user to a group. Use host vssps.dev.azure.com. IMPORTANT: include the full path with api-version as shown.",
     "params": ""
   },
   {
-    "path": "/_apis/graph/memberships/{subjectDescriptor}/{containerDescriptor}",
+    "path": "/_apis/graph/memberships/{subjectDescriptor}/{containerDescriptor}?api-version=7.1-preview.1",
     "method": "DELETE",
     "host": "vssps.dev.azure.com",
-    "description": "Remove a user from a group. Use host vssps.dev.azure.com.",
+    "description": "Remove a user from a group. Use host vssps.dev.azure.com. IMPORTANT: include the full path with api-version as shown.",
     "params": ""
   },
   {
