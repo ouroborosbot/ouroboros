@@ -65,7 +65,7 @@ Validated touchpoints:
 **Output**: Red tests + `unit-1a-red.log`.
 **Acceptance**: Tests fail before implementation and encode crash recovery + isolated workspace requirements.
 
-### ⬜ Unit 1b: Process manager + workspace implementation (Green)
+### ✅ Unit 1b: Process manager + workspace implementation (Green)
 **What**: Implement daemon process manager with restart/backoff and workspace clone manager that ensures `~/AgentWorkspaces/<agent>/` exists and syncs from upstream.
 **Output**: Implementation + `unit-1b-green.log` + `unit-1b-tsc.log`.
 **Acceptance**: Unit 1a tests pass and process/workspace modules compile cleanly.
@@ -151,3 +151,4 @@ Expected target files:
 - 2026-03-05 22:50 Quality pass: confirmed emoji headers, testable acceptance criteria, and coverage requirements for every unit
 - 2026-03-05 22:53 Unit 0 complete: captured supervisor baseline and concrete daemon module/test target map
 - 2026-03-05 22:53 Unit 1a complete: added failing process-manager/workspace-isolation tests and captured red log
+- 2026-03-05 22:55 Unit 1b complete: implemented daemon process manager and workspace clone/sync with green tests and clean compile
