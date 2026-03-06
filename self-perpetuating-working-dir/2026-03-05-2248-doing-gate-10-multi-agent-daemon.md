@@ -115,7 +115,7 @@ Expected target files:
 - `src/daemon/health-monitor.ts`
 - `src/__tests__/daemon/cron-router-health.test.ts`
 
-### ⬜ Unit 3c: Cron/router/health coverage hardening
+### ✅ Unit 3c: Cron/router/health coverage hardening
 **What**: Cover all remaining branches and error paths in scheduler/router/health modules and refactor for maintainability.
 **Output**: `unit-3c-coverage.log`.
 **Acceptance**: 100% coverage on Unit 3 code and full suite remains green.
@@ -158,3 +158,4 @@ Expected target files:
 - 2026-03-05 23:12 Unit 2c complete: expanded command-plane branch tests and reached 100% coverage for daemon/CLI modules
 - 2026-03-05 23:13 Unit 3a complete: added failing cron scheduler/message router/health monitor tests and captured red log
 - 2026-03-05 23:20 Unit 3b complete: implemented cron scheduler, file message routing, health monitor wiring in daemon entry, and captured green + compile artifacts
+- 2026-03-05 23:20 Unit 3c complete: closed default-fallback coverage branch in health monitor and reached 100% coverage across Unit 3 modules
