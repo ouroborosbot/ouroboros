@@ -84,7 +84,7 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 **Output**: Root `ARCHITECTURE.md` and `CONSTITUTION.md` plus runtime enforcement code.
 **Acceptance**: Preflight tests pass and root governance files are the canonical load target.
 
-### ⬜ Unit 2c: Governance Refactor/Coverage
+### ✅ Unit 2c: Governance Refactor/Coverage
 **What**: Harden governance preflight behavior (error paths and missing-file handling) and verify full coverage.
 **Output**: Additional tests/logs as needed for full branch/error coverage.
 **Acceptance**: Governance preflight code paths have 100% coverage and compile cleanly.
@@ -139,3 +139,4 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 - 2026-03-05 17:15 Unit 1c complete: cleaned stale root-path wording, reconfirmed 100% coverage for `src/identity.ts`, and revalidated `npm test` + `npx tsc`
 - 2026-03-05 17:17 Unit 2a complete: added failing governance preflight tests requiring root `ARCHITECTURE.md` and `CONSTITUTION.md` before startup
 - 2026-03-05 17:20 Unit 2b complete: added root governance docs, implemented `runGovernancePreflight`, and enforced governance loading before `runAgent` turn execution
+- 2026-03-05 17:22 Unit 2c complete: expanded governance preflight tests to cover success + error paths and verified 100% coverage for `src/governance/loader.ts`
