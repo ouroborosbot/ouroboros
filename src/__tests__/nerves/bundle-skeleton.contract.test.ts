@@ -54,21 +54,23 @@ describe("bundle skeleton contract", () => {
     expect(typeof sluggerConfig.provider).toBe("string")
   })
 
-  it("keeps slugger psyche files as minimal placeholders for later migration", () => {
-    const files: Array<[file: string, header: string]> = [
-      ["IDENTITY.md", "IDENTITY"],
-      ["SOUL.md", "SOUL"],
-      ["ASPIRATIONS.md", "ASPIRATIONS"],
-      ["FRIENDS.md", "FRIENDS"],
-      ["LORE.md", "LORE"],
-      ["TACIT.md", "TACIT"],
-      ["CONTEXT.md", "CONTEXT"],
-    ]
+  it("keeps slugger psyche migration artifacts present and non-placeholder for core files", () => {
+    const readPsyche = (file: string): string =>
+      readFileSync(join(process.cwd(), "slugger.ouro/psyche", file), "utf-8").trim()
 
-    for (const [file, header] of files) {
-      const body = readFileSync(join(process.cwd(), "slugger.ouro/psyche", file), "utf-8").trim()
-      expect(body).toBe(`# ${header}`)
-    }
+    expect(readPsyche("IDENTITY.md")).toContain("Name:")
+    expect(readPsyche("IDENTITY.md")).toContain("Slugger")
+    expect(readPsyche("SOUL.md")).toContain("What I am")
+    expect(readPsyche("FRIENDS.md")).toContain("Ari Mendelow")
+    expect(readPsyche("LORE.md")).toContain("Core narrative")
+    expect(readPsyche("TACIT.md")).toContain("Durable patterns")
+
+    expect(readPsyche("BEHAVIOR-IMPORTS.md").length).toBeGreaterThan(0)
+    expect(readPsyche("INSPIRING-FIGURES.md").length).toBeGreaterThan(0)
+    expect(readFileSync(join(process.cwd(), "slugger.ouro/psyche/memory/tacit.md"), "utf-8").length).toBeGreaterThan(0)
+
+    expect(readPsyche("ASPIRATIONS.md")).toBe("# ASPIRATIONS")
+    expect(readPsyche("CONTEXT.md")).toBe("# CONTEXT")
   })
 
   it("ignores .ouro bundles in harness git tracking", () => {
