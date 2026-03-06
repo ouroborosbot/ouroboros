@@ -69,7 +69,7 @@ Expected target files:
 - `src/coding/index.ts`
 - `src/__tests__/coding/session-manager.test.ts`
 
-### ⬜ Unit 1c: Session lifecycle coverage hardening
+### ✅ Unit 1c: Session lifecycle coverage hardening
 **What**: Cover branch/error/edge cases in lifecycle code (unknown session IDs, spawn failures, duplicate starts) and refactor for determinism.
 **Output**: `unit-1c-coverage.log`.
 **Acceptance**: 100% coverage for Unit 1 modules.
@@ -146,3 +146,4 @@ Expected target files:
 - 2026-03-05 23:34 Unit 0 complete: captured Gate 11 orchestration baseline and concrete target file/test surfaces
 - 2026-03-05 23:36 Unit 1a complete: added failing coding session lifecycle tests and captured red log for missing manager implementation
 - 2026-03-05 23:38 Unit 1b complete: implemented coding session types/spawner/manager/index with managed-workdir checks and green+compile artifacts
+- 2026-03-05 23:46 Unit 1c complete: added branch/default lifecycle tests, exercised spawner default dependency path, and captured 100% coverage for Unit 1 executable modules
