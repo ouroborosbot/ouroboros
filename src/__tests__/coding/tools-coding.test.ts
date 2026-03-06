@@ -16,6 +16,7 @@ describe("coding tool contracts", () => {
   }
 
   let execTool: (name: string, args: Record<string, string>) => Promise<string>
+  let summarizeArgs: (name: string, args: Record<string, string>) => string
 
   beforeEach(async () => {
     vi.resetModules()
@@ -28,6 +29,7 @@ describe("coding tool contracts", () => {
 
     const tools = await import("../../repertoire/tools")
     execTool = tools.execTool
+    summarizeArgs = tools.summarizeArgs
   })
 
   it("coding_spawn validates runner and subagent args", async () => {
@@ -46,6 +48,40 @@ describe("coding tool contracts", () => {
       prompt: "do work",
     })
     expect(invalidSubagent).toContain("invalid subagent")
+  })
+
+  it("coding_spawn validates required fields", async () => {
+    expect(
+      await execTool("coding_spawn", {
+        subagent: "doer",
+        workdir: "/Users/test/AgentWorkspaces/ouroboros",
+        prompt: "go",
+      }),
+    ).toContain("runner is required")
+
+    expect(
+      await execTool("coding_spawn", {
+        runner: "claude",
+        workdir: "/Users/test/AgentWorkspaces/ouroboros",
+        prompt: "go",
+      }),
+    ).toContain("subagent is required")
+
+    expect(
+      await execTool("coding_spawn", {
+        runner: "claude",
+        subagent: "doer",
+        prompt: "go",
+      }),
+    ).toContain("workdir is required")
+
+    expect(
+      await execTool("coding_spawn", {
+        runner: "claude",
+        subagent: "doer",
+        workdir: "/Users/test/AgentWorkspaces/ouroboros",
+      }),
+    ).toContain("prompt is required")
   })
 
   it("coding_spawn delegates to manager and returns a JSON session payload", async () => {
@@ -94,6 +130,39 @@ describe("coding tool contracts", () => {
     })
   })
 
+  it("coding_spawn omits blank optional args", async () => {
+    manager.spawnSession.mockResolvedValue({
+      id: "coding-009",
+      runner: "codex",
+      subagent: "planner",
+      workdir: "/Users/test/AgentWorkspaces/slugger",
+      status: "running",
+      pid: null,
+      startedAt: "2026-03-05T23:50:00.000Z",
+      lastActivityAt: "2026-03-05T23:50:00.000Z",
+      endedAt: null,
+      restartCount: 0,
+      lastExitCode: null,
+      lastSignal: null,
+    })
+
+    await execTool("coding_spawn", {
+      runner: "codex",
+      subagent: "planner",
+      workdir: "/Users/test/AgentWorkspaces/slugger",
+      prompt: "plan",
+      scopeFile: "   ",
+      stateFile: "",
+    })
+
+    expect(manager.spawnSession).toHaveBeenCalledWith({
+      runner: "codex",
+      subagent: "planner",
+      workdir: "/Users/test/AgentWorkspaces/slugger",
+      prompt: "plan",
+    })
+  })
+
   it("coding_status returns single-session JSON when sessionId is provided", async () => {
     manager.getSession.mockReturnValue({
       id: "coding-001",
@@ -116,6 +185,12 @@ describe("coding tool contracts", () => {
       id: "coding-001",
       status: "waiting_input",
     })
+  })
+
+  it("coding_status returns not found message for unknown session", async () => {
+    manager.getSession.mockReturnValue(null)
+    const result = await execTool("coding_status", { sessionId: "coding-missing" })
+    expect(result).toContain("session not found: coding-missing")
   })
 
   it("coding_status returns all sessions when sessionId is omitted", async () => {
@@ -180,5 +255,30 @@ describe("coding tool contracts", () => {
     const result = await execTool("coding_kill", { sessionId: "coding-001" })
     expect(manager.killSession).toHaveBeenCalledWith("coding-001")
     expect(JSON.parse(result)).toEqual({ ok: true, message: "killed coding-001" })
+  })
+
+  it("execTool emits and rethrows Error values from coding handlers", async () => {
+    manager.getSession.mockImplementation(() => {
+      throw new Error("manager exploded")
+    })
+    await expect(execTool("coding_status", { sessionId: "coding-001" })).rejects.toThrow("manager exploded")
+  })
+
+  it("summarizeArgs includes coding tool summaries", () => {
+    expect(
+      summarizeArgs("coding_spawn", {
+        runner: "claude",
+        subagent: "doer",
+        workdir: "/Users/test/AgentWorkspaces/ouroboros",
+        taskRef: "task-9",
+      }),
+    ).toContain("runner=claude")
+    expect(summarizeArgs("coding_status", { sessionId: "coding-001" })).toBe("sessionId=coding-001")
+    expect(summarizeArgs("coding_send_input", { sessionId: "coding-001", input: "continue" })).toContain("input=continue")
+    expect(summarizeArgs("coding_kill", { sessionId: "coding-001" })).toBe("sessionId=coding-001")
+  })
+
+  it("summarizeArgs handles unknown tools with empty args", () => {
+    expect(summarizeArgs("totally_unknown", {})).toBe("")
   })
 })
