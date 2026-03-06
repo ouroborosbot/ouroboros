@@ -74,7 +74,7 @@ Expected target files:
 **Output**: `unit-1c-coverage.log`.
 **Acceptance**: 100% coverage for Unit 1 modules.
 
-### ⬜ Unit 2a: Coding tools surface tests (Red)
+### ✅ Unit 2a: Coding tools surface tests (Red)
 **What**: Add failing tests for `coding_spawn`, `coding_status`, `coding_send_input`, and `coding_kill` tool contracts and argument validation.
 **Output**: Red tests + `unit-2a-red.log`.
 **Acceptance**: Tests fail before implementation and define callable model-facing coding tools.
@@ -147,3 +147,4 @@ Expected target files:
 - 2026-03-05 23:36 Unit 1a complete: added failing coding session lifecycle tests and captured red log for missing manager implementation
 - 2026-03-05 23:38 Unit 1b complete: implemented coding session types/spawner/manager/index with managed-workdir checks and green+compile artifacts
 - 2026-03-05 23:46 Unit 1c complete: added branch/default lifecycle tests, exercised spawner default dependency path, and captured 100% coverage for Unit 1 executable modules
+- 2026-03-05 23:48 Unit 2a complete: added failing coding tool surface tests for `coding_spawn`, `coding_status`, `coding_send_input`, and `coding_kill`, with red log proving missing registry wiring
