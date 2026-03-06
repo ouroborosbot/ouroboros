@@ -70,7 +70,7 @@ Validated target touchpoints:
 **Output**: `unit-1c-coverage.log`.
 **Acceptance**: 100% coverage on new checkpoint logic; tests remain green.
 
-### ⬜ Unit 2a: Classification calibration tests (Red)
+### ✅ Unit 2a: Classification calibration tests (Red)
 **What**: Add failing tests for at least five representative governance proposals (3 `within-bounds`, 2 `requires-review`) against the queryable convention calibration logic.
 **Output**: Red tests + `unit-2a-red-test.log`.
 **Acceptance**: All new calibration tests fail before implementation and cover both classes.
@@ -114,3 +114,4 @@ Representative proposals:
 - 2026-03-05 20:59 Unit 1a complete: added failing resume-checkpoint test proving missing checkpoint context on resumed turns
 - 2026-03-05 21:00 Unit 1b complete: implemented checkpoint-aware instinct prompts and validated with green tests + clean `npx tsc --noEmit`
 - 2026-03-05 21:04 Unit 1c complete: closed checkpoint-logic coverage to 100% with full `test:coverage:vitest` and clean `npx tsc --noEmit`
+- 2026-03-05 21:05 Unit 2a complete: added five representative classification red tests proving calibrated classifier is required
