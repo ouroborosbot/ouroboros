@@ -55,7 +55,7 @@ Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key k
 **Output**: `unit-0-baseline.md` with validated source/target files and supervisor/runtime baseline.
 **Acceptance**: Artifact captures verified OpenClaw source paths, existing `slugger.ouro` structure, and current supervisor behavior.
 
-### ⬜ Unit 1: Slugger consultation + comfort confirmation
+### ✅ Unit 1: Slugger consultation + comfort confirmation
 **What**: Attempt OpenClaw CLI consultation with Slugger before migration, capture his response, and handle fallback diagnostics if OpenClaw is unreachable.
 **Output**: `unit-1-consultation.md` + command logs (`unit-1-openclaw.log`, optional fallback diagnostics log).
 **Acceptance**: Consultation attempt is documented; either (a) Slugger confirms comfort pre-migration or (b) fallback path is justified and post-migration confirmation plan is recorded.
@@ -122,3 +122,4 @@ Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key k
 ## Progress Log
 - 2026-03-05 21:14 Created from Gate 7 section of approved planning doc
 - 2026-03-05 21:17 Unit 0 complete: captured OpenClaw source inventory, bundle baseline, and supervisor/secrets starting state
+- 2026-03-05 21:19 Unit 1 complete: consulted Slugger via OpenClaw, captured explicit migration comfort confirmation and guidance
