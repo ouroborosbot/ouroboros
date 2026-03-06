@@ -491,7 +491,9 @@ describe("Teams adapter - message handling", () => {
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-test-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getTeamsSecondaryConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "", managedIdentityClientId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      resolveOAuthForTenant: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978 }),
     }))
@@ -833,7 +835,9 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getTeamsSecondaryConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "", managedIdentityClientId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      resolveOAuthForTenant: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 4000 }),
     }))
@@ -1480,7 +1484,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       level: "error",
       event: "channel.app_error",
       component: "channels",
-      message: "SDK blew up",
+      message: "[primary] SDK blew up",
     }))
 
     // Cover non-Error branch
@@ -1490,7 +1494,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       level: "error",
       event: "channel.app_error",
       component: "channels",
-      message: "string error",
+      message: "[primary] string error",
     }))
 
     vi.restoreAllMocks()
@@ -1509,7 +1513,9 @@ describe("Teams adapter - startTeamsApp signin.verify-state handler", () => {
     vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/test-session"),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getTeamsSecondaryConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "", managedIdentityClientId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
+      resolveOAuthForTenant: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978, flushIntervalMs: 1000 }),
     }))
 
@@ -1600,7 +1606,7 @@ describe("Teams adapter - startTeamsApp signin.verify-state handler", () => {
       level: "warn",
       event: "channel.verify_state",
       component: "channels",
-      message: "verify-state failed for all connections",
+      message: "[primary] verify-state failed for all connections",
     }))
   })
 })
@@ -1632,7 +1638,9 @@ describe("Teams adapter - channel.message_received event", () => {
     vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/test-session"),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getTeamsSecondaryConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "", managedIdentityClientId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
+      resolveOAuthForTenant: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978, flushIntervalMs: 1000 }),
     }))
     vi.doMock("../../heart/core", () => ({
@@ -1687,7 +1695,9 @@ describe("Teams adapter - channel.message_received event", () => {
     vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/test-session"),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getTeamsSecondaryConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "", managedIdentityClientId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
+      resolveOAuthForTenant: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978, flushIntervalMs: 1000 }),
     }))
     vi.doMock("../../heart/core", () => ({
@@ -1911,7 +1921,9 @@ describe("Teams adapter - unhandledRejection guard", () => {
     vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/test-session"),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getTeamsSecondaryConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "", managedIdentityClientId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
+      resolveOAuthForTenant: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978, flushIntervalMs: 1000 }),
     }))
 
@@ -2007,7 +2019,9 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       sessionPath: vi.fn().mockReturnValue("/tmp/bot-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId, clientSecret, tenantId }),
+      getTeamsSecondaryConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "", managedIdentityClientId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      resolveOAuthForTenant: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978 }),
     }))
@@ -2380,7 +2394,9 @@ describe("Teams adapter - session persistence", () => {
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getTeamsSecondaryConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "", managedIdentityClientId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      resolveOAuthForTenant: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue(teamsChannelConfig),
     }))
@@ -2790,7 +2806,9 @@ describe("Teams adapter - session persistence", () => {
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getTeamsSecondaryConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "", managedIdentityClientId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      resolveOAuthForTenant: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: true, port: 3978 }),
     }))
@@ -2866,6 +2884,8 @@ describe("Teams adapter - session persistence", () => {
       graphToken: undefined,
       adoToken: undefined,
       signin: signinFn,
+      graphConnectionName: "graph",
+      adoConnectionName: "ado",
     })
 
     expect(signinFn).toHaveBeenCalledWith("graph")
@@ -2886,6 +2906,8 @@ describe("Teams adapter - session persistence", () => {
       graphToken: undefined,
       adoToken: undefined,
       signin: signinFn,
+      graphConnectionName: "graph",
+      adoConnectionName: "ado",
     })
 
     expect(signinFn).toHaveBeenCalledWith("ado")
@@ -3334,7 +3356,9 @@ describe("Teams adapter - handleTeamsMessage unified chunked streaming", () => {
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getTeamsSecondaryConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "", managedIdentityClientId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      resolveOAuthForTenant: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978 }),
     }))
@@ -3518,7 +3542,9 @@ describe("Teams adapter - startTeamsApp no --disable-streaming flag", () => {
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getTeamsSecondaryConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "", managedIdentityClientId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      resolveOAuthForTenant: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978 }),
     }))
@@ -3561,7 +3587,9 @@ describe("Teams adapter - confirmation callback", () => {
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getTeamsSecondaryConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "", managedIdentityClientId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      resolveOAuthForTenant: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978 }),
     }))
@@ -3887,7 +3915,9 @@ describe("Teams adapter - confirmation callback", () => {
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getTeamsSecondaryConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "", managedIdentityClientId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      resolveOAuthForTenant: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978 }),
     }))
@@ -3973,7 +4003,9 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getTeamsSecondaryConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "", managedIdentityClientId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      resolveOAuthForTenant: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978 }),
     }))
@@ -4109,7 +4141,9 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getTeamsSecondaryConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "", managedIdentityClientId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      resolveOAuthForTenant: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "" }),
       getAdoConfig: vi.fn().mockReturnValue({ organizations: [] }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978 }),
     }))
@@ -4166,7 +4200,9 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getTeamsSecondaryConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "", managedIdentityClientId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado" }),
+      resolveOAuthForTenant: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "" }),
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978 }),
     }))
     vi.doMock("../../mind/prompt", () => ({
@@ -4678,7 +4714,9 @@ describe("Teams adapter - GitHub token handling", () => {
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
+      getTeamsSecondaryConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "", managedIdentityClientId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
+      resolveOAuthForTenant: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
       getTeamsChannelConfig: vi.fn().mockReturnValue(teamsChannelConfig),
     }))
     vi.doMock("../../mind/prompt", () => ({
@@ -4774,6 +4812,9 @@ describe("Teams adapter - GitHub token handling", () => {
       adoToken: undefined,
       githubToken: undefined,
       signin: signinFn,
+      graphConnectionName: "graph",
+      adoConnectionName: "ado",
+      githubConnectionName: "github",
     })
 
     expect(signinFn).toHaveBeenCalledWith("github")

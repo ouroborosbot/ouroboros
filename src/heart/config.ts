@@ -43,6 +43,7 @@ export interface OAuthConfig {
   graphConnectionName: string
   adoConnectionName: string
   githubConnectionName: string
+  tenantOverrides?: Record<string, { graphConnectionName?: string, adoConnectionName?: string, githubConnectionName?: string }>
 }
 
 export interface ContextConfig {
@@ -81,6 +82,7 @@ export interface OuroborosConfig {
     "openai-codex": OpenAICodexProviderConfig
   }
   teams: TeamsConfig
+  teamsSecondary: TeamsConfig
   oauth: OAuthConfig
   context: ContextConfig
   teamsChannel: TeamsChannelConfig
@@ -124,6 +126,12 @@ const DEFAULT_SECRETS_TEMPLATE: Omit<OuroborosConfig, "context"> = {
     adoConnectionName: "ado",
     githubConnectionName: "",
   },
+  teamsSecondary: {
+    clientId: "",
+    clientSecret: "",
+    tenantId: "",
+    managedIdentityClientId: "",
+  },
   teamsChannel: {
     skipConfirmation: true,
     port: 3978,
@@ -153,6 +161,7 @@ function defaultRuntimeConfig(): OuroborosConfig {
       "openai-codex": { ...DEFAULT_SECRETS_TEMPLATE.providers["openai-codex"] },
     },
     teams: { ...DEFAULT_SECRETS_TEMPLATE.teams },
+    teamsSecondary: { ...DEFAULT_SECRETS_TEMPLATE.teamsSecondary },
     oauth: { ...DEFAULT_SECRETS_TEMPLATE.oauth },
     context: { ...DEFAULT_AGENT_CONTEXT },
     teamsChannel: { ...DEFAULT_SECRETS_TEMPLATE.teamsChannel },
@@ -329,6 +338,11 @@ export function getTeamsConfig(): TeamsConfig {
   return { ...config.teams }
 }
 
+export function getTeamsSecondaryConfig(): TeamsConfig {
+  const config = loadConfig()
+  return { ...config.teamsSecondary }
+}
+
 export function getContextConfig(): ContextConfig {
   if (_testContextOverride) {
     return { ..._testContextOverride }
@@ -349,6 +363,17 @@ export function getContextConfig(): ContextConfig {
 export function getOAuthConfig(): OAuthConfig {
   const config = loadConfig()
   return { ...config.oauth }
+}
+
+/** Resolve OAuth connection names for a specific tenant, falling back to defaults. */
+export function resolveOAuthForTenant(tenantId?: string): Omit<OAuthConfig, "tenantOverrides"> {
+  const base = getOAuthConfig()
+  const overrides = tenantId ? base.tenantOverrides?.[tenantId] : undefined
+  return {
+    graphConnectionName: overrides?.graphConnectionName ?? base.graphConnectionName,
+    adoConnectionName: overrides?.adoConnectionName ?? base.adoConnectionName,
+    githubConnectionName: overrides?.githubConnectionName ?? base.githubConnectionName,
+  }
 }
 
 export function getTeamsChannelConfig(): TeamsChannelConfig {
