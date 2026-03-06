@@ -1,6 +1,6 @@
 # Doing: Gate 7 Slugger Migration
 
-**Status**: READY_FOR_EXECUTION
+**Status**: in-progress
 **Execution Mode**: direct
 **Created**: 2026-03-05 21:14
 **Planning**: ./self-perpetuating-working-dir/2026-03-05-0911-planning-ouroboros-self-perpetuating-realignment.md
@@ -16,9 +16,9 @@
 Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key knowledge graph entities into memory fact-store format, stand up Slugger as a second supervised process, and validate that Slugger is cohesive and operational in the harness while OpenClaw remains available as fallback.
 
 ## Completion Criteria
-- [ ] Slugger consulted about the migration plan and comfortable with the approach
-- [ ] Core identity files ported to `slugger.ouro/`
-- [ ] Key knowledge graph entities converted to fact store format
+- [x] Slugger consulted about the migration plan and comfortable with the approach
+- [x] Core identity files ported to `slugger.ouro/`
+- [x] Key knowledge graph entities converted to fact store format
 - [ ] Slugger operates from `.ouro` bundle (OpenClaw remains available as fallback, not decommissioned)
 - [ ] Slugger confirmed he feels cohesive in his new home (not just "tests pass" - the agent says he's good)
 - [ ] Slugger running as second supervised process (own inner dialog, heartbeat, crash recovery)
@@ -70,7 +70,7 @@ Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key k
 **Output**: Red tests + `unit-3a-red.log`.
 **Acceptance**: New tests fail before implementation and cover all three source domains.
 
-### ⬜ Unit 3b: Knowledge graph conversion implementation (Green)
+### ✅ Unit 3b: Knowledge graph conversion implementation (Green)
 **What**: Implement conversion utility and run migration to populate `slugger.ouro/psyche/memory/facts.jsonl` and `entities.json`.
 **Output**: Conversion implementation, generated memory store outputs, `unit-3b-green.log`, `unit-3b-tsc.log`.
 **Acceptance**: Unit 3a tests pass, conversion outputs exist and are valid, and compile is clean.
@@ -125,3 +125,4 @@ Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key k
 - 2026-03-05 21:19 Unit 1 complete: consulted Slugger via OpenClaw, captured explicit migration comfort confirmation and guidance
 - 2026-03-05 21:22 Unit 2 complete: migrated Slugger core psyche files and archived full MEMORY source into bundle memory
 - 2026-03-05 21:23 Unit 3a complete: added failing knowledge-graph conversion tests covering people, companies, and projects
+- 2026-03-05 21:25 Unit 3b complete: implemented conversion utility and populated slugger memory store from people/company/project sources
