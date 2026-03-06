@@ -75,7 +75,7 @@ Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key k
 **Output**: Conversion implementation, generated memory store outputs, `unit-3b-green.log`, `unit-3b-tsc.log`.
 **Acceptance**: Unit 3a tests pass, conversion outputs exist and are valid, and compile is clean.
 
-### ⬜ Unit 3c: Conversion coverage + integrity verification
+### ✅ Unit 3c: Conversion coverage + integrity verification
 **What**: Close coverage gaps and verify resulting memory files are consistent (fact IDs map into entity index).
 **Output**: `unit-3c-coverage.log` + `unit-3c-integrity.md`.
 **Acceptance**: 100% coverage on new conversion code and integrity checks pass.
@@ -126,3 +126,4 @@ Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key k
 - 2026-03-05 21:22 Unit 2 complete: migrated Slugger core psyche files and archived full MEMORY source into bundle memory
 - 2026-03-05 21:23 Unit 3a complete: added failing knowledge-graph conversion tests covering people, companies, and projects
 - 2026-03-05 21:25 Unit 3b complete: implemented conversion utility and populated slugger memory store from people/company/project sources
+- 2026-03-05 21:28 Unit 3c complete: achieved 100% coverage on conversion module and verified facts/entities integrity mapping
