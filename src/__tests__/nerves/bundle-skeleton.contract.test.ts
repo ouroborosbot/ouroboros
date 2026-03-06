@@ -1,51 +1,98 @@
-import { execSync } from "child_process"
 import { existsSync, readFileSync } from "fs"
+import * as os from "os"
 import { join } from "path"
 
 import { describe, expect, it } from "vitest"
 
-function requiredPaths(agent: string): string[] {
-  const root = `${agent}.ouro`
+function candidateBundleRoots(agent: string): string[] {
   return [
-    `${root}/agent.json`,
-    `${root}/teams-app`,
-    `${root}/psyche/IDENTITY.md`,
-    `${root}/psyche/SOUL.md`,
-    `${root}/psyche/ASPIRATIONS.md`,
-    `${root}/psyche/FRIENDS.md`,
-    `${root}/psyche/LORE.md`,
-    `${root}/psyche/TACIT.md`,
-    `${root}/psyche/CONTEXT.md`,
-    `${root}/psyche/memory/facts.jsonl`,
-    `${root}/psyche/memory/entities.json`,
-    `${root}/psyche/memory/daily`,
-    `${root}/psyche/memory/archive`,
-    `${root}/skills/code-review.md`,
-    `${root}/skills/self-edit.md`,
-    `${root}/skills/self-query.md`,
-    `${root}/skills/explain.md`,
-    `${root}/skills/toolmaker.md`,
-    `${root}/tasks`,
+    join(os.homedir(), "AgentBundles", `${agent}.ouro`),
+    join(process.cwd(), `${agent}.ouro`),
+  ]
+}
+
+function resolveBundleRoot(agent: string): string | null {
+  for (const candidate of candidateBundleRoots(agent)) {
+    if (existsSync(candidate)) {
+      return candidate
+    }
+  }
+
+  return null
+}
+
+function resolveRequiredBundleRoots(): { ouroboros: string; slugger: string } | null {
+  const ouroboros = resolveBundleRoot("ouroboros")
+  const slugger = resolveBundleRoot("slugger")
+
+  if (ouroboros && slugger) {
+    return { ouroboros, slugger }
+  }
+
+  if (!ouroboros && !slugger) {
+    return null
+  }
+
+  throw new Error(
+    "Bundle contract requires both bundles to be available together or both absent in CI checkout.",
+  )
+}
+
+function requiredPaths(root: string): string[] {
+  return [
+    join(root, "agent.json"),
+    join(root, "teams-app"),
+    join(root, "psyche", "IDENTITY.md"),
+    join(root, "psyche", "SOUL.md"),
+    join(root, "psyche", "ASPIRATIONS.md"),
+    join(root, "psyche", "FRIENDS.md"),
+    join(root, "psyche", "LORE.md"),
+    join(root, "psyche", "TACIT.md"),
+    join(root, "psyche", "CONTEXT.md"),
+    join(root, "psyche", "memory", "facts.jsonl"),
+    join(root, "psyche", "memory", "entities.json"),
+    join(root, "psyche", "memory", "daily"),
+    join(root, "psyche", "memory", "archive"),
+    join(root, "skills", "code-review.md"),
+    join(root, "skills", "self-edit.md"),
+    join(root, "skills", "self-query.md"),
+    join(root, "skills", "explain.md"),
+    join(root, "skills", "toolmaker.md"),
+    join(root, "tasks"),
   ]
 }
 
 describe("bundle skeleton contract", () => {
-  it("has required structure-only paths for ouroboros and slugger bundles", () => {
+  it("has required structure-only paths when bundles are available", () => {
+    const roots = resolveRequiredBundleRoots()
+    if (!roots) {
+      expect(existsSync(join(process.cwd(), "ouroboros.ouro"))).toBe(false)
+      expect(existsSync(join(process.cwd(), "slugger.ouro"))).toBe(false)
+      return
+    }
+
     const all = [
-      ...requiredPaths("ouroboros"),
-      ...requiredPaths("slugger"),
+      ...requiredPaths(roots.ouroboros),
+      ...requiredPaths(roots.slugger),
     ]
 
-    const missing = all.filter((relativePath) => !existsSync(join(process.cwd(), relativePath)))
+    const missing = all.filter((absolutePath) => !existsSync(absolutePath))
     expect(missing).toEqual([])
   })
 
   it("keeps slugger agent config as a structural stub based on ouroboros template", () => {
+    const roots = resolveRequiredBundleRoots()
+    if (!roots) {
+      expect(existsSync(join(process.cwd(), "ouroboros.ouro"))).toBe(false)
+      expect(existsSync(join(process.cwd(), "slugger.ouro"))).toBe(false)
+      return
+    }
+
     const ouroborosConfig = JSON.parse(
-      readFileSync(join(process.cwd(), "ouroboros.ouro/agent.json"), "utf-8"),
+      readFileSync(join(roots.ouroboros, "agent.json"), "utf-8"),
     ) as Record<string, unknown>
     const sluggerConfig = JSON.parse(
-      readFileSync(join(process.cwd(), "slugger.ouro/agent.json"), "utf-8"),
+      readFileSync(join(roots.slugger, "agent.json"), "utf-8"),
     ) as Record<string, unknown>
 
     expect(Object.keys(sluggerConfig).sort()).toEqual(Object.keys(ouroborosConfig).sort())
@@ -55,8 +102,15 @@ describe("bundle skeleton contract", () => {
   })
 
   it("keeps slugger psyche migration artifacts present and non-placeholder for core files", () => {
+    const roots = resolveRequiredBundleRoots()
+    if (!roots) {
+      expect(existsSync(join(process.cwd(), "ouroboros.ouro"))).toBe(false)
+      expect(existsSync(join(process.cwd(), "slugger.ouro"))).toBe(false)
+      return
+    }
+
     const readPsyche = (file: string): string =>
-      readFileSync(join(process.cwd(), "slugger.ouro/psyche", file), "utf-8").trim()
+      readFileSync(join(roots.slugger, "psyche", file), "utf-8").trim()
 
     expect(readPsyche("IDENTITY.md")).toContain("Name:")
     expect(readPsyche("IDENTITY.md")).toContain("Slugger")
@@ -67,25 +121,21 @@ describe("bundle skeleton contract", () => {
 
     expect(readPsyche("BEHAVIOR-IMPORTS.md").length).toBeGreaterThan(0)
     expect(readPsyche("INSPIRING-FIGURES.md").length).toBeGreaterThan(0)
-    expect(readFileSync(join(process.cwd(), "slugger.ouro/psyche/memory/tacit.md"), "utf-8").length).toBeGreaterThan(0)
+    expect(readFileSync(join(roots.slugger, "psyche", "memory", "tacit.md"), "utf-8").length).toBeGreaterThan(0)
 
     expect(readPsyche("ASPIRATIONS.md")).toBe("# ASPIRATIONS")
     expect(readPsyche("CONTEXT.md")).toBe("# CONTEXT")
   })
 
-  it("ignores .ouro bundles in harness git tracking", () => {
+  it("keeps bundles external to harness repo root", () => {
+    expect(existsSync(join(process.cwd(), "ouroboros.ouro"))).toBe(false)
+    expect(existsSync(join(process.cwd(), "slugger.ouro"))).toBe(false)
+
     const gitignore = readFileSync(join(process.cwd(), ".gitignore"), "utf-8")
       .split(/\r?\n/)
-      .filter((line) => line.trim().length > 0)
+      .map((line) => line.trim())
+      .filter(Boolean)
 
-    expect(gitignore).toContain("*.ouro/")
-
-    expect(() =>
-      execSync("git check-ignore --no-index -q ouroboros.ouro/agent.json", { cwd: process.cwd() }),
-    ).not.toThrow()
-
-    expect(() =>
-      execSync("git check-ignore --no-index -q slugger.ouro/agent.json", { cwd: process.cwd() }),
-    ).not.toThrow()
+    expect(gitignore).not.toContain("*.ouro/")
   })
 })
