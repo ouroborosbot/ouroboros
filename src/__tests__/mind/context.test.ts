@@ -160,6 +160,31 @@ describe("trimMessages", () => {
     expect(result[0].role).toBe("system")
   })
 
+  it("treats assistant tool_calls and following tool results as one trimmable block", async () => {
+    const { trimMessages } = await import("../../mind/context")
+    const msgs: OpenAI.ChatCompletionMessageParam[] = [
+      { role: "system", content: "sys" },
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [
+          {
+            id: "call_1",
+            type: "function",
+            function: { name: "read_file", arguments: "{\"path\":\"README.md\"}" },
+          },
+        ],
+      } as any,
+      { role: "tool", tool_call_id: "call_1", content: "ok" } as any,
+      { role: "tool", tool_call_id: "call_1", content: "more" } as any,
+      { role: "user", content: "latest intent" },
+    ]
+
+    const result = trimMessages(msgs, 100, 20, 500)
+    expect(result[0].role).toBe("system")
+    expect(result.length).toBe(1)
+  })
+
   it("does not mutate input array", async () => {
     const { trimMessages } = await import("../../mind/context")
     const msgs: OpenAI.ChatCompletionMessageParam[] = [
