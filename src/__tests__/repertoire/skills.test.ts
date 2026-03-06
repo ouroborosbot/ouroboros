@@ -12,6 +12,7 @@ vi.mock("fs", () => ({
 // Mock identity -- skills will use getAgentRoot() for skills directory
 vi.mock("../../identity", () => ({
   getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
+  getRepoRoot: vi.fn(() => "/mock/repo"),
 }))
 
 import * as fs from "fs"
@@ -77,6 +78,20 @@ describe("skills - listSkills", () => {
     const expectedDir = path.join("/mock/repo/testagent", "skills")
     expect(fs.existsSync).toHaveBeenCalledWith(expectedDir)
   })
+
+  it("includes canonical subagent protocols when protocol mirrors are absent", async () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) =>
+      p === "/mock/repo/testagent/skills" || p === "/mock/repo/subagents",
+    )
+    vi.mocked(fs.readdirSync).mockImplementation((p) => {
+      if (p === "/mock/repo/testagent/skills") return ["self-edit.md"] as any
+      if (p === "/mock/repo/subagents") return ["work-merger.md", "work-planner.md"] as any
+      return [] as any
+    })
+
+    const { listSkills } = await import("../../repertoire/skills")
+    expect(listSkills()).toEqual(["self-edit", "work-merger", "work-planner"])
+  })
 })
 
 describe("skills - loadSkill", () => {
@@ -126,6 +141,46 @@ describe("skills - loadSkill", () => {
     loadSkill("my-skill")
     const expectedPath = path.join("/mock/repo/testagent", "skills", "my-skill.md")
     expect(fs.existsSync).toHaveBeenCalledWith(expectedPath)
+  })
+
+  it("prefers bundle protocol mirror over canonical subagent protocol", async () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) =>
+      p === "/mock/repo/testagent/skills/protocols/work-planner.md" ||
+      p === "/mock/repo/subagents/work-planner.md",
+    )
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      if (p === "/mock/repo/testagent/skills/protocols/work-planner.md") {
+        return "mirror planner protocol" as any
+      }
+      if (p === "/mock/repo/subagents/work-planner.md") {
+        return "canonical planner protocol" as any
+      }
+      return "" as any
+    })
+
+    const { loadSkill } = await import("../../repertoire/skills")
+    expect(loadSkill("work-planner")).toBe("mirror planner protocol")
+  })
+
+  it("falls back to canonical subagent protocol when mirror is missing", async () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) => p === "/mock/repo/subagents/work-doer.md")
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      if (p === "/mock/repo/subagents/work-doer.md") {
+        return "canonical doer protocol" as any
+      }
+      return "" as any
+    })
+
+    const { loadSkill } = await import("../../repertoire/skills")
+    expect(loadSkill("work-doer")).toBe("canonical doer protocol")
+  })
+
+  it("throws with mirror and canonical paths when protocol is missing in both locations", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+
+    const { loadSkill } = await import("../../repertoire/skills")
+    expect(() => loadSkill("work-merger")).toThrow("/mock/repo/testagent/skills/protocols/work-merger.md")
+    expect(() => loadSkill("work-merger")).toThrow("/mock/repo/subagents/work-merger.md")
   })
 })
 
