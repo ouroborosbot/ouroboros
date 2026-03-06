@@ -55,7 +55,7 @@ Validated target touchpoints:
 - `src/governance/convention.ts`
 - `src/__tests__/governance/convention.test.ts`
 
-### ⬜ Unit 1a: Resume checkpoint awareness tests (Red)
+### ✅ Unit 1a: Resume checkpoint awareness tests (Red)
 **What**: Add failing tests proving resumed inner-dialog turns include checkpoint-orientation context derived from prior autonomous work.
 **Output**: Red tests + `unit-1a-red-test.log`.
 **Acceptance**: New tests fail against current behavior and specifically assert checkpoint awareness during resumed turns.
@@ -111,3 +111,4 @@ Representative proposals:
 - 2026-03-05 20:58 Validation pass: verified Gate 6 target files and existing convention/session interfaces
 - 2026-03-05 20:59 Quality pass: confirmed emoji unit headers, acceptance criteria, and execution readiness
 - 2026-03-05 20:58 Unit 0 complete: captured baseline behavior and verified Gate 6 target files
+- 2026-03-05 20:59 Unit 1a complete: added failing resume-checkpoint test proving missing checkpoint context on resumed turns
