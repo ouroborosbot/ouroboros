@@ -1000,8 +1000,9 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
     expect(names).toContain("ado_restructure_backlog")
     expect(names).toContain("ado_validate_structure")
     expect(names).toContain("ado_preview_changes")
-    // remote-safe base tools + 8 teams tools + 11 semantic ado tools
-    expect(result.length).toBe(remoteBaseCount + 19)
+    // remote-safe base tools + 8 teams tools + 11 semantic ado tools + 1 teams_send_message (no integration gate)
+    expect(names).toContain("teams_send_message")
+    expect(result.length).toBe(remoteBaseCount + 20)
   })
 
   it("returns base + graph-only tools when only graph integration", async () => {
@@ -1029,8 +1030,8 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
     expect(names).not.toContain("ado_mutate")
     expect(names).not.toContain("ado_work_items")
     expect(names).not.toContain("ado_docs")
-    // remote-safe base tools + 4 graph tools
-    expect(result.length).toBe(remoteBaseCount + 4)
+    // remote-safe base tools + 4 graph tools + 1 teams_send_message (no integration gate)
+    expect(result.length).toBe(remoteBaseCount + 5)
   })
 
   it("returns base + ado-only tools when only ado integration", async () => {
@@ -1060,8 +1061,8 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
     expect(names).not.toContain("graph_docs")
     // Should have semantic ado tools
     expect(names).toContain("ado_backlog_list")
-    // remote-safe base tools + 4 ado tools + 11 semantic ado tools
-    expect(result.length).toBe(remoteBaseCount + 15)
+    // remote-safe base tools + 4 ado tools + 11 semantic ado tools + 1 teams_send_message (no integration gate)
+    expect(result.length).toBe(remoteBaseCount + 16)
   })
 })
 
@@ -1959,8 +1960,8 @@ describe("getToolsForChannel includes docs tools", () => {
     expect(names).toContain("ado_backlog_list")
     expect(names).not.toContain("read_file")
     expect(names).not.toContain("shell")
-    // remote-safe base tools + 8 teams tools (4 generic + 2 aliases + 2 docs) + 11 semantic ado tools
-    expect(teamsTools.length).toBe(remoteBaseCount + 19)
+    // remote-safe base tools + 8 teams tools (4 generic + 2 aliases + 2 docs) + 11 semantic ado tools + 1 teams_send_message
+    expect(teamsTools.length).toBe(remoteBaseCount + 20)
   })
 
   it("cli channel does NOT include graph_docs or ado_docs", async () => {

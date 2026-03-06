@@ -47,8 +47,10 @@ export function getToolsForChannel(
     return baseTools;
   }
   const available = new Set(capabilities.availableIntegrations);
-  const integrationDefs = [...teamsToolDefinitions, ...adoSemanticToolDefinitions, ...githubToolDefinitions].filter(
-    (d) => d.integration && available.has(d.integration),
+  const channelDefs = [...teamsToolDefinitions, ...adoSemanticToolDefinitions, ...githubToolDefinitions];
+  // Include tools whose integration is available, plus channel tools with no integration gate (e.g. teams_send_message)
+  const integrationDefs = channelDefs.filter(
+    (d) => d.integration ? available.has(d.integration) : capabilities.channel === "teams",
   );
 
   if (!toolPreferences || Object.keys(toolPreferences).length === 0) {
