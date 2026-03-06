@@ -214,13 +214,35 @@ export function stripLastToolCalls(
   }
 }
 
-// Repair orphaned tool_calls anywhere in the message history.
-// If an assistant message has tool_calls but the following messages don't include
-// a tool result for every call, inject synthetic error results for the missing ones.
+// Repair orphaned tool_calls and tool results anywhere in the message history.
+// 1. If an assistant message has tool_calls but missing tool results, inject synthetic error results.
+// 2. If a tool result's tool_call_id doesn't match any tool_calls in a preceding assistant message, remove it.
 // This prevents 400 errors from the API after an aborted turn.
 export function repairOrphanedToolCalls(
   messages: OpenAI.ChatCompletionMessageParam[],
 ): void {
+  // Pass 1: collect all valid tool_call IDs from assistant messages
+  const validCallIds = new Set<string>();
+  for (const msg of messages) {
+    if (msg.role === "assistant") {
+      const asst = msg as OpenAI.ChatCompletionAssistantMessageParam;
+      if (asst.tool_calls) {
+        for (const tc of asst.tool_calls) validCallIds.add(tc.id);
+      }
+    }
+  }
+
+  // Pass 2: remove orphaned tool results (tool_call_id not in any assistant's tool_calls)
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "tool") {
+      const toolMsg = messages[i] as OpenAI.ChatCompletionToolMessageParam;
+      if (!validCallIds.has(toolMsg.tool_call_id)) {
+        messages.splice(i, 1);
+      }
+    }
+  }
+
+  // Pass 3: inject synthetic results for tool_calls missing their tool results
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
     if (msg.role !== "assistant") continue;
@@ -234,11 +256,10 @@ export function repairOrphanedToolCalls(
       if (following.role === "tool") {
         resultIds.add((following as OpenAI.ChatCompletionToolMessageParam).tool_call_id);
       } else if (following.role === "assistant" || following.role === "user") {
-        break; // stop at next non-tool message
+        break;
       }
     }
 
-    // Find missing results and insert them right after the assistant message
     const missing = asst.tool_calls.filter((tc) => !resultIds.has(tc.id));
     if (missing.length > 0) {
       const syntheticResults: OpenAI.ChatCompletionToolMessageParam[] = missing.map((tc) => ({
@@ -246,7 +267,6 @@ export function repairOrphanedToolCalls(
         tool_call_id: tc.id,
         content: "error: tool call was interrupted (previous turn timed out or was aborted)",
       }));
-      // Insert after the last existing tool result for this assistant message, or right after the assistant message
       let insertAt = i + 1;
       while (insertAt < messages.length && messages[insertAt].role === "tool") insertAt++;
       messages.splice(insertAt, 0, ...syntheticResults);
