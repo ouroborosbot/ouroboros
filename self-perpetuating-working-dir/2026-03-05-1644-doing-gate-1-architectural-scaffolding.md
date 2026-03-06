@@ -17,7 +17,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 
 ## Completion Criteria
 - [x] Overnight proposals reviewed -- high-merit ideas incorporated into scaffolding decisions
-- [ ] `.ouro` bundle skeleton directory committed (structure only, Gate 2 populates)
+- [x] `.ouro` bundle skeleton directory committed (structure only, Gate 2 populates)
 - [ ] TypeScript interfaces for harness primitives committed (compilable, importable)
 - [ ] Shared governance loader stub committed
 - [ ] Kill list / migration checklist committed in-repo
@@ -62,7 +62,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 **Output**: New failing test file under `src/__tests__/`.
 **Acceptance**: Test fails because skeleton paths do not exist yet.
 
-### ⬜ Unit 1b: `.ouro` Bundle Skeleton Implementation (Green)
+### ✅ Unit 1b: `.ouro` Bundle Skeleton Implementation (Green)
 **What**: Create structure-only `.ouro` directories/files for both agents (`ouroboros.ouro/`, `slugger.ouro/`) at repo root, including `teams-app/`, `psyche/`, `skills/`, `tasks/`, and `psyche/memory/` substructure.
 **Output**: Committed skeleton tree with placeholder files only.
 **Acceptance**: Bundle contract test passes and layout matches planning-doc target tree.
@@ -138,3 +138,4 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - 2026-03-05 16:46 Quality pass: verified emoji-prefixed units, acceptance coverage, and checklist hygiene; marked READY_FOR_EXECUTION
 - 2026-03-05 16:47 Unit 0 complete: archived prior-art themes mapped to Gate 1 scaffolding deliverables
 - 2026-03-05 16:49 Unit 1a complete: added failing contract test for required `*.ouro` skeleton paths
+- 2026-03-05 16:50 Unit 1b complete: created structure-only `ouroboros.ouro/` and `slugger.ouro/` bundle trees
