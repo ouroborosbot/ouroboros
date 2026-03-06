@@ -84,7 +84,7 @@ Expected target files:
 **Output**: Red tests + `unit-2a-red.log`.
 **Acceptance**: Tests fail before implementation and capture daemon/CLI command contract.
 
-### ⬜ Unit 2b: Daemon core + `ouro` CLI implementation (Green)
+### ✅ Unit 2b: Daemon core + `ouro` CLI implementation (Green)
 **What**: Implement daemon runtime, command socket handlers, and CLI adapter/entrypoint for daemon and per-agent management.
 **Output**: Implementation + `unit-2b-green.log` + `unit-2b-tsc.log`.
 **Acceptance**: Unit 2a tests pass and `ouro` command surface is operational in tests.
@@ -154,3 +154,4 @@ Expected target files:
 - 2026-03-05 22:55 Unit 1b complete: implemented daemon process manager and workspace clone/sync with green tests and clean compile
 - 2026-03-05 22:59 Unit 1c complete: added branch/error/default-dependency tests and reached 100% coverage for Unit 1 daemon modules
 - 2026-03-05 23:00 Unit 2a complete: added failing daemon command-plane/CLI protocol tests and captured red log
+- 2026-03-05 23:03 Unit 2b complete: implemented daemon command server + `ouro` CLI entry/scripts with green tests and clean compile
