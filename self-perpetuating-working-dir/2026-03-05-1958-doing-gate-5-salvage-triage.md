@@ -53,7 +53,7 @@ Execute Gate 5 by re-landing valuable salvageable code from the reverted overnig
 **Output**: `unit-0-salvage-inventory.md` and `unit-0-proposal-index.json` artifacts.
 **Acceptance**: Inventory includes every reverted commit candidate and all 31 overnight proposals with source paths.
 
-### ⬜ Unit 1: Salvage decision matrix
+### ✅ Unit 1: Salvage decision matrix
 **What**: Classify each salvageable candidate as `re-land-now`, `re-land-later`, `not-applicable`, or `archive-only` with rationale against current inversion architecture.
 **Output**: `unit-1-salvage-decision-matrix.md` artifact.
 **Acceptance**: Every candidate is classified with rationale; no unresolved entries remain.
@@ -123,3 +123,4 @@ Execute Gate 5 by re-landing valuable salvageable code from the reverted overnig
 - 2026-03-05 20:00 Validation pass: verified `gate-0-commit-map.md`, archive branch proposal paths, and `ouroboros.ouro/tasks/` preservation target paths exist as referenced
 - 2026-03-05 20:00 Quality pass: confirmed emoji-prefixed unit headers, explicit acceptance criteria, no TBD placeholders, and completion checklist alignment
 - 2026-03-05 20:02 Unit 0 complete: generated salvage classification baseline and canonical 31-proposal index with archive source paths
+- 2026-03-05 20:04 Unit 1 complete: classified all 38 reverted commits into re-land-now/later/not-applicable/archive-only with rationale
