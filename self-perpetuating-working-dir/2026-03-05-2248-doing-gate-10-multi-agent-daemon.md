@@ -69,6 +69,10 @@ Validated touchpoints:
 **What**: Implement daemon process manager with restart/backoff and workspace clone manager that ensures `~/AgentWorkspaces/<agent>/` exists and syncs from upstream.
 **Output**: Implementation + `unit-1b-green.log` + `unit-1b-tsc.log`.
 **Acceptance**: Unit 1a tests pass and process/workspace modules compile cleanly.
+Expected target files:
+- `src/daemon/process-manager.ts`
+- `src/daemon/workspaces.ts`
+- `src/__tests__/daemon/process-manager.test.ts`
 
 ### ⬜ Unit 1c: Process/workspace coverage hardening
 **What**: Close branch/error-path coverage gaps in process/workspace modules and refactor for deterministic behavior.
@@ -84,6 +88,12 @@ Validated touchpoints:
 **What**: Implement daemon runtime, command socket handlers, and CLI adapter/entrypoint for daemon and per-agent management.
 **Output**: Implementation + `unit-2b-green.log` + `unit-2b-tsc.log`.
 **Acceptance**: Unit 2a tests pass and `ouro` command surface is operational in tests.
+Expected target files:
+- `src/daemon/daemon.ts`
+- `src/daemon/daemon-cli.ts`
+- `src/daemon/daemon-entry.ts`
+- `src/__tests__/daemon/daemon-cli.test.ts`
+- `package.json` (`ouro` script)
 
 ### ⬜ Unit 2c: Command plane coverage + refactor
 **What**: Close daemon/CLI coverage gaps (including malformed command and socket edge branches) and simplify command handling internals.
@@ -99,6 +109,11 @@ Validated touchpoints:
 **What**: Implement cron scheduler, file-based message router, and health monitor integration with warn/critical routing semantics.
 **Output**: Implementation + `unit-3b-green.log` + `unit-3b-tsc.log`.
 **Acceptance**: Unit 3a tests pass and modules integrate with daemon runtime.
+Expected target files:
+- `src/daemon/cron-scheduler.ts`
+- `src/daemon/message-router.ts`
+- `src/daemon/health-monitor.ts`
+- `src/__tests__/daemon/cron-router-health.test.ts`
 
 ### ⬜ Unit 3c: Cron/router/health coverage hardening
 **What**: Cover all remaining branches and error paths in scheduler/router/health modules and refactor for maintainability.
@@ -132,3 +147,4 @@ Validated touchpoints:
 ## Progress Log
 - 2026-03-05 22:48 Created from Gate 10 section of approved planning doc
 - 2026-03-05 22:49 Granularity pass: added concrete baseline touchpoints and command-plane branch expectations
+- 2026-03-05 22:50 Validation pass: pinned Gate 10 target implementation and test files to existing repo conventions
