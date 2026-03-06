@@ -78,7 +78,7 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 **Output**: New failing tests in repertoire tool tests.
 **Acceptance**: Tests fail before tool/convention implementation.
 
-### ⬜ Unit 2b: Queryable Governance Convention Implementation (Green)
+### ✅ Unit 2b: Queryable Governance Convention Implementation (Green)
 **What**: Implement a harness-queryable governance convention tool surface and wire it into existing tool registry/contracts.
 **Output**: Tool implementation + registry wiring + passing tests.
 **Acceptance**: Governance/constitution check can be queried as capability/tool convention.
@@ -117,3 +117,4 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 - 2026-03-05 17:46 Unit 1b complete: implemented mirror-first + canonical fallback protocol loading in `src/repertoire/skills.ts` and reconfirmed green targeted/full test + `npx tsc`
 - 2026-03-05 17:48 Unit 1c complete: captured 100% focused coverage evidence for `src/repertoire/skills.ts` and reconfirmed compile-clean with `npx tsc --noEmit`
 - 2026-03-05 17:50 Unit 2a complete: added governance convention query tool red tests and captured expected failures (unknown tool + missing registry entries)
+- 2026-03-05 17:53 Unit 2b complete: implemented `governance_convention` tool surface, updated registry contract snapshot, and reconfirmed full `npm test` + `npx tsc --noEmit`
