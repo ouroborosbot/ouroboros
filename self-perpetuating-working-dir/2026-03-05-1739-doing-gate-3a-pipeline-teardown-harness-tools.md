@@ -53,7 +53,7 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Baseline Teardown + Harness Tool Inventory
+### ✅ Unit 0: Baseline Teardown + Harness Tool Inventory
 **What**: Capture current state of removed reflection files/scripts and current protocol-loading behavior to drive deterministic Gate 3a changes.
 **Output**: `baseline-gate-3a-inventory.md` artifact.
 **Acceptance**: Inventory confirms what is already removed/clean and what still needs implementation (dual-source protocol loading + queryable governance convention).
@@ -112,3 +112,4 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 - 2026-03-05 17:40 Granularity pass: confirmed atomic TDD unit split (red/green/refactor + teardown verification units)
 - 2026-03-05 17:41 Validation pass: confirmed `src/reflection/` is absent, reflect scripts already removed from `package.json`, and current protocol loading is still single-source (`src/repertoire/skills.ts`)
 - 2026-03-05 17:42 Quality pass: verified completion criteria/testability coverage, emoji-prefixed units, and execution readiness
+- 2026-03-05 17:43 Unit 0 complete: captured teardown/tooling baseline in `baseline-gate-3a-inventory.md` and confirmed Gate 3a implementation gaps
