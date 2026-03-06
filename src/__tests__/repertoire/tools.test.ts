@@ -33,6 +33,20 @@ vi.mock("../../repertoire/github-client", () => ({
   githubRequest: vi.fn(),
 }))
 
+const mockTaskModule = {
+  getBoard: vi.fn(),
+  createTask: vi.fn(),
+  updateStatus: vi.fn(),
+  boardStatus: vi.fn(),
+  boardAction: vi.fn(),
+  boardDeps: vi.fn(),
+  boardSessions: vi.fn(),
+}
+
+vi.mock("../../tasks", () => ({
+  getTaskModule: () => mockTaskModule,
+}))
+
 vi.mock("../../identity", () => {
   const DEFAULT_AGENT_CONTEXT = {
     maxTokens: 80000,
@@ -71,6 +85,29 @@ describe("execTool", () => {
     vi.mocked(spawnSync).mockReset()
     vi.mocked(listSkills).mockReset()
     vi.mocked(loadSkill).mockReset()
+    mockTaskModule.getBoard.mockReset().mockReturnValue({
+      compact: "[Tasks] drafting:0 processing:0 validating:slugger:0 validating:ari:0 collaborating:0 paused:0 blocked:0 done:0",
+      full: "no tasks found",
+      byStatus: {
+        drafting: [],
+        processing: [],
+        "validating:slugger": [],
+        "validating:ari": [],
+        collaborating: [],
+        paused: [],
+        blocked: [],
+        done: [],
+      },
+      actionRequired: [],
+      unresolvedDependencies: [],
+      activeSessions: [],
+    })
+    mockTaskModule.createTask.mockReset().mockReturnValue("/mock/repo/testagent/tasks/one-shots/2026-03-06-1200-test-task.md")
+    mockTaskModule.updateStatus.mockReset().mockReturnValue({ ok: true, from: "drafting", to: "processing", archived: [] })
+    mockTaskModule.boardStatus.mockReset().mockReturnValue([])
+    mockTaskModule.boardAction.mockReset().mockReturnValue([])
+    mockTaskModule.boardDeps.mockReset().mockReturnValue([])
+    mockTaskModule.boardSessions.mockReset().mockReturnValue([])
     const config = await import("../../config")
     config.resetConfigCache()
     setTestConfig = config.setTestConfig
@@ -401,6 +438,190 @@ describe("execTool", () => {
     expect(parsed.guidance.requiresReview).toContain("structural")
   })
 
+  it("task_board returns full board output", async () => {
+    mockTaskModule.getBoard.mockReturnValueOnce({
+      compact: "[Tasks] processing:1",
+      full: "## processing\n- sample-task",
+      byStatus: {
+        drafting: [],
+        processing: ["sample-task"],
+        "validating:slugger": [],
+        "validating:ari": [],
+        collaborating: [],
+        paused: [],
+        blocked: [],
+        done: [],
+      },
+      actionRequired: [],
+      unresolvedDependencies: [],
+      activeSessions: [],
+    })
+
+    const result = await execTool("task_board", {})
+    expect(result).toContain("## processing")
+    expect(result).toContain("sample-task")
+  })
+
+  it("task_board falls back to compact output when full board is empty", async () => {
+    mockTaskModule.getBoard.mockReturnValueOnce({
+      compact: "[Tasks] drafting:1",
+      full: "",
+      byStatus: {
+        drafting: ["sample-task"],
+        processing: [],
+        "validating:slugger": [],
+        "validating:ari": [],
+        collaborating: [],
+        paused: [],
+        blocked: [],
+        done: [],
+      },
+      actionRequired: [],
+      unresolvedDependencies: [],
+      activeSessions: [],
+    })
+
+    const result = await execTool("task_board", {})
+    expect(result).toBe("[Tasks] drafting:1")
+  })
+
+  it("task_board returns a no-tasks fallback when board text is empty", async () => {
+    mockTaskModule.getBoard.mockReturnValueOnce({
+      compact: "",
+      full: "",
+      byStatus: {
+        drafting: [],
+        processing: [],
+        "validating:slugger": [],
+        "validating:ari": [],
+        collaborating: [],
+        paused: [],
+        blocked: [],
+        done: [],
+      },
+      actionRequired: [],
+      unresolvedDependencies: [],
+      activeSessions: [],
+    })
+
+    const result = await execTool("task_board", {})
+    expect(result).toBe("no tasks found")
+  })
+
+  it("task_create delegates to task module", async () => {
+    const result = await execTool("task_create", {
+      title: "Ship task board",
+      type: "one-shot",
+      category: "infrastructure",
+      body: "## scope\nship it",
+    })
+    expect(result).toContain("created:")
+    expect(mockTaskModule.createTask).toHaveBeenCalled()
+  })
+
+  it("task_create surfaces module exceptions", async () => {
+    mockTaskModule.createTask.mockImplementationOnce(() => {
+      throw new Error("create failed")
+    })
+    const result = await execTool("task_create", {
+      title: "Broken create",
+      type: "one-shot",
+      category: "infrastructure",
+      body: "## scope\nbreak",
+    })
+    expect(result).toContain("error: create failed")
+  })
+
+  it("task_create stringifies non-Error thrown values", async () => {
+    mockTaskModule.createTask.mockImplementationOnce(() => {
+      throw "create failed as string"
+    })
+    const result = await execTool("task_create", {
+      title: "Broken create",
+      type: "one-shot",
+      category: "infrastructure",
+      body: "## scope\nbreak",
+    })
+    expect(result).toContain("error: create failed as string")
+  })
+
+  it("task_update_status surfaces module errors", async () => {
+    mockTaskModule.updateStatus.mockReturnValueOnce({
+      ok: false,
+      from: "drafting",
+      to: "done",
+      reason: "invalid transition: drafting -> done",
+    })
+
+    const result = await execTool("task_update_status", { name: "sample-task", status: "done" })
+    expect(result).toContain("error:")
+    expect(result).toContain("invalid transition")
+  })
+
+  it("task_update_status uses default failure reason when module omits one", async () => {
+    mockTaskModule.updateStatus.mockReturnValueOnce({
+      ok: false,
+      from: "drafting",
+      to: "done",
+    })
+    const result = await execTool("task_update_status", { name: "sample-task", status: "done" })
+    expect(result).toContain("error: status update failed")
+  })
+
+  it("task_update_status includes archive details when present", async () => {
+    mockTaskModule.updateStatus.mockReturnValueOnce({
+      ok: true,
+      from: "validating:slugger",
+      to: "done",
+      archived: ["/mock/repo/testagent/tasks/archive/one-shots/2026-03-06-1200-sample-task.md"],
+    })
+
+    const result = await execTool("task_update_status", { name: "sample-task", status: "done" })
+    expect(result).toContain("updated: sample-task -> done")
+    expect(result).toContain("archived:")
+    expect(result).toContain("archive/one-shots")
+  })
+
+  it("task_update_status omits archive suffix when archived is undefined", async () => {
+    mockTaskModule.updateStatus.mockReturnValueOnce({
+      ok: true,
+      from: "processing",
+      to: "validating:slugger",
+    })
+    const result = await execTool("task_update_status", { name: "sample-task", status: "validating:slugger" })
+    expect(result).toBe("updated: sample-task -> validating:slugger")
+  })
+
+  it("task board detail tools return fallback text when empty", async () => {
+    expect(await execTool("task_board_status", { status: "processing" })).toBe("no tasks in that status")
+    expect(await execTool("task_board_action", {})).toBe("no action required")
+    expect(await execTool("task_board_deps", {})).toBe("no unresolved dependencies")
+    expect(await execTool("task_board_sessions", {})).toBe("no active sessions")
+  })
+
+  it("task board detail tools return populated values when present", async () => {
+    mockTaskModule.boardStatus.mockReturnValueOnce(["task-a", "task-b"])
+    mockTaskModule.boardAction.mockReturnValueOnce(["blocked tasks: task-a"])
+    mockTaskModule.boardDeps.mockReturnValueOnce(["task-a -> missing task-z"])
+    mockTaskModule.boardSessions.mockReturnValueOnce(["task-a"])
+
+    expect(await execTool("task_board_status", { status: "processing" })).toBe("task-a\ntask-b")
+    expect(await execTool("task_board_action", {})).toBe("blocked tasks: task-a")
+    expect(await execTool("task_board_deps", {})).toBe("task-a -> missing task-z")
+    expect(await execTool("task_board_sessions", {})).toBe("task-a")
+  })
+
+  it("task_board_action supports scoped filtering and no-match fallback", async () => {
+    mockTaskModule.boardAction.mockReturnValueOnce([
+      "blocked tasks: sample-task",
+      "missing category: another-task",
+    ])
+    expect(await execTool("task_board_action", { scope: "blocked" })).toContain("blocked tasks")
+
+    mockTaskModule.boardAction.mockReturnValueOnce(["blocked tasks: sample-task"])
+    expect(await execTool("task_board_action", { scope: "category" })).toBe("no matching action items")
+  })
+
   // ── unknown tool ──
   it("returns 'unknown' for unrecognized tool name", async () => {
     const result = await execTool("nonexistent_tool", {})
@@ -482,6 +703,32 @@ describe("summarizeArgs", () => {
 
   it("returns empty string for governance_convention with no query", () => {
     expect(summarizeArgs("governance_convention", {})).toBe("")
+  })
+
+  it("returns title/type/category for task_create", () => {
+    expect(
+      summarizeArgs("task_create", {
+        title: "Ship task module",
+        type: "one-shot",
+        category: "infrastructure",
+        body: "ignored",
+      }),
+    ).toBe("title=Ship task module type=one-shot category=infrastructure")
+  })
+
+  it("returns name/status for task_update_status", () => {
+    expect(summarizeArgs("task_update_status", { name: "sample", status: "processing" })).toBe("name=sample status=processing")
+  })
+
+  it("returns status or scope for task board detail tools", () => {
+    expect(summarizeArgs("task_board_status", { status: "blocked" })).toBe("status=blocked")
+    expect(summarizeArgs("task_board_action", { scope: "blocked" })).toBe("scope=blocked")
+  })
+
+  it("returns empty string for task board aggregate tools", () => {
+    expect(summarizeArgs("task_board", {})).toBe("")
+    expect(summarizeArgs("task_board_deps", {})).toBe("")
+    expect(summarizeArgs("task_board_sessions", {})).toBe("")
   })
 
   it("returns truncated prompt for claude", () => {

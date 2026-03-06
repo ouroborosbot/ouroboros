@@ -9,6 +9,7 @@ import type { FriendStore } from "../mind/friends/store";
 import { emitNervesEvent } from "../nerves/runtime";
 import { queryGovernanceConvention } from "../governance/convention";
 import { getAgentRoot } from "../identity";
+import { getTaskModule } from "../tasks";
 
 export interface ToolContext {
   graphToken?: string;
@@ -329,6 +330,150 @@ export const baseToolDefinitions: ToolDefinition[] = [
       } catch (e) {
         return `error: ${e instanceof Error ? e.message : String(e)}`;
       }
+    },
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "task_board",
+        description: "show the task board grouped by status",
+        parameters: { type: "object", properties: {} },
+      },
+    },
+    handler: () => {
+      const board = getTaskModule().getBoard();
+      return board.full || board.compact || "no tasks found";
+    },
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "task_create",
+        description: "create a new task in the bundle task system",
+        parameters: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            type: { type: "string", enum: ["one-shot", "ongoing", "habit"] },
+            category: { type: "string" },
+            body: { type: "string" },
+          },
+          required: ["title", "type", "category", "body"],
+        },
+      },
+    },
+    handler: (a) => {
+      try {
+        const created = getTaskModule().createTask({
+          title: a.title,
+          type: a.type,
+          category: a.category,
+          body: a.body,
+        });
+        return `created: ${created}`;
+      } catch (error) {
+        return `error: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "task_update_status",
+        description: "update a task status using validated transitions",
+        parameters: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            status: { type: "string" },
+          },
+          required: ["name", "status"],
+        },
+      },
+    },
+    handler: (a) => {
+      const result = getTaskModule().updateStatus(a.name, a.status);
+      if (!result.ok) {
+        return `error: ${result.reason ?? "status update failed"}`;
+      }
+      const archivedSuffix = result.archived && result.archived.length > 0
+        ? ` | archived: ${result.archived.join(", ")}`
+        : "";
+      return `updated: ${a.name} -> ${result.to}${archivedSuffix}`;
+    },
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "task_board_status",
+        description: "show board detail for a specific status",
+        parameters: {
+          type: "object",
+          properties: {
+            status: { type: "string" },
+          },
+          required: ["status"],
+        },
+      },
+    },
+    handler: (a) => {
+      const lines = getTaskModule().boardStatus(a.status);
+      return lines.length > 0 ? lines.join("\n") : "no tasks in that status";
+    },
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "task_board_action",
+        description: "show tasks or validation issues that require action",
+        parameters: {
+          type: "object",
+          properties: {
+            scope: { type: "string" },
+          },
+        },
+      },
+    },
+    handler: (a) => {
+      const lines = getTaskModule().boardAction();
+      if (!a.scope) {
+        return lines.length > 0 ? lines.join("\n") : "no action required";
+      }
+      const filtered = lines.filter((line) => line.includes(a.scope));
+      return filtered.length > 0 ? filtered.join("\n") : "no matching action items";
+    },
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "task_board_deps",
+        description: "show unresolved task dependencies",
+        parameters: { type: "object", properties: {} },
+      },
+    },
+    handler: () => {
+      const lines = getTaskModule().boardDeps();
+      return lines.length > 0 ? lines.join("\n") : "no unresolved dependencies";
+    },
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "task_board_sessions",
+        description: "show tasks with active coding or sub-agent sessions",
+        parameters: { type: "object", properties: {} },
+      },
+    },
+    handler: () => {
+      const lines = getTaskModule().boardSessions();
+      return lines.length > 0 ? lines.join("\n") : "no active sessions";
     },
   },
   {
