@@ -94,12 +94,12 @@ describe("getAgentRoot", () => {
     vi.resetModules()
   })
 
-  it("returns path.join(repoRoot, agentName)", async () => {
+  it("returns path.join(repoRoot, `${agentName}.ouro`)", async () => {
     process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
     const { getAgentRoot, getRepoRoot, resetIdentity } = await import("../identity")
     resetIdentity()
     const root = getRepoRoot()
-    expect(getAgentRoot()).toBe(path.join(root, "ouroboros"))
+    expect(getAgentRoot()).toBe(path.join(root, "ouroboros.ouro"))
   })
 
   it("uses a different name for a different agent", async () => {
@@ -107,7 +107,7 @@ describe("getAgentRoot", () => {
     const { getAgentRoot, getRepoRoot, resetIdentity } = await import("../identity")
     resetIdentity()
     const root = getRepoRoot()
-    expect(getAgentRoot()).toBe(path.join(root, "slugger"))
+    expect(getAgentRoot()).toBe(path.join(root, "slugger.ouro"))
   })
 })
 
