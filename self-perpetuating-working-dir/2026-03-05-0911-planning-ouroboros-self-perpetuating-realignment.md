@@ -463,14 +463,14 @@ Triage the overnight run's output into actionable work. The run produced 31 dist
 - Clean up the raw overnight artifacts once triaged (remove duplicates, archive originals)
 
 **Completion criteria:**
-- [ ] All salvageable code from revert set evaluated and re-landed where valuable
-- [ ] All 31 overnight proposals triaged: each one filed as a backlog task doc, marked not-applicable, or archived with rationale
-- [ ] High-merit items flagged as high priority in the backlog
-- [ ] Proposals obsoleted by the inversion explicitly marked as such
-- [ ] Raw overnight artifacts cleaned up (duplicates removed, originals archived)
-- [ ] Valid historical task docs in `ouroboros.ouro/tasks/` untouched
-- [ ] `npm test` green
-- [ ] 100% coverage on any new/re-landed code
+- [x] All salvageable code from revert set evaluated and re-landed where valuable
+- [x] All 31 overnight proposals triaged: each one filed as a backlog task doc, marked not-applicable, or archived with rationale
+- [x] High-merit items flagged as high priority in the backlog
+- [x] Proposals obsoleted by the inversion explicitly marked as such
+- [x] Raw overnight artifacts cleaned up (duplicates removed, originals archived)
+- [x] Valid historical task docs in `ouroboros.ouro/tasks/` untouched
+- [x] `npm test` green
+- [x] 100% coverage on any new/re-landed code
 
 ---
 
