@@ -67,7 +67,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 **Output**: Committed skeleton tree with placeholder files only.
 **Acceptance**: Bundle contract test passes and layout matches planning-doc target tree.
 
-### ⬜ Unit 1c: Bundle Skeleton Refactor/Coverage
+### ✅ Unit 1c: Bundle Skeleton Refactor/Coverage
 **What**: Normalize placeholder conventions and confirm new test coverage remains complete.
 **Output**: Clean skeleton structure and passing targeted/full tests.
 **Acceptance**: No extra population work leaked from Gate 2 and tests remain green.
@@ -139,3 +139,4 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - 2026-03-05 16:47 Unit 0 complete: archived prior-art themes mapped to Gate 1 scaffolding deliverables
 - 2026-03-05 16:49 Unit 1a complete: added failing contract test for required `*.ouro` skeleton paths
 - 2026-03-05 16:50 Unit 1b complete: created structure-only `ouroboros.ouro/` and `slugger.ouro/` bundle trees
+- 2026-03-05 16:50 Unit 1c complete: verified 100% coverage and clean TypeScript compile with skeleton contract in place
