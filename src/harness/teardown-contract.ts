@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import { emitNervesEvent } from "../nerves/runtime";
 
 const REMOVED_PATHS = [
   "src/reflection",
@@ -28,6 +29,12 @@ function readScripts(repoRoot: string): Record<string, unknown> {
 }
 
 export function checkGate3aTeardown(repoRoot: string): Gate3aTeardownReport {
+  emitNervesEvent({
+    component: "harness",
+    event: "harness.teardown_contract_check",
+    message: "running gate 3a teardown contract checks",
+    meta: { repoRoot },
+  });
   const violations: string[] = [];
 
   for (const relativePath of REMOVED_PATHS) {
@@ -56,8 +63,15 @@ export function checkGate3aTeardown(repoRoot: string): Gate3aTeardownReport {
     }
   }
 
-  return {
+  const report = {
     ok: violations.length === 0,
     violations,
   };
+  emitNervesEvent({
+    component: "harness",
+    event: "harness.teardown_contract_result",
+    message: "completed gate 3a teardown contract checks",
+    meta: { violations: report.violations.length },
+  });
+  return report;
 }
