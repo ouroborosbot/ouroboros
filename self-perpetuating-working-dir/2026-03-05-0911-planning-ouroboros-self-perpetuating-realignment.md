@@ -389,28 +389,28 @@ The systems that make the agent a persistent, self-directed being. Memory gives 
 - **Out of scope for Gate 3b:** External event waking (git push, new task appearing, etc.) — separate concern. Session interaction model (how friend messages interrupt/interleave with inner dialog beyond basic concurrency) — Gate 10 daemon territory. Detailed cost guardrails — developed collaboratively with the agent post-bootstrap.
 
 **Completion criteria:**
-- [ ] Agent memory: fact extraction runs after each engine turn (regex highlight detector)
-- [ ] Agent memory: extract-before-trim hook prevents fact loss on context window trim
-- [ ] Agent memory: `memory_search` tool callable by the model
-- [ ] Agent memory: associative recall injects relevant facts into system prompt before model calls (embedding-based similarity)
-- [ ] Agent memory: provider-agnostic embedding interface implemented (swappable between OpenAI, Anthropic, etc.)
-- [ ] Agent memory: fact store (with vectors), entity index, and daily log data structures working
-- [ ] Agent memory: dedup prevents duplicate fact storage (word-overlap >60% = skip)
-- [ ] Agent memory complements (not replaces) per-friend `save_friend_note` system
-- [ ] Aspiration layer exists in bundle and is loaded on bootstrap
-- [ ] Inner dialog session starts on supervisor boot (self-initiated, no friend message needed)
-- [ ] Inner dialog uses CLI-like tool access (local tools yes, Teams/OAuth tools no)
-- [ ] Inner dialog bootstrap message provides full context (psyche, aspirations, current state)
-- [ ] Inner dialog persists to disk and survives crash/restart
-- [ ] Inner dialog instincts framework exists — agent can configure instinct definitions in its bundle
-- [ ] Instincts produce user-role messages during autonomous inner dialog (not hardcoded "continue")
-- [ ] Heartbeat fires at configurable interval when agent is resting, nudging inner dialog to check in
-- [ ] Agent can rest (not burning tokens) without going permanently dormant (heartbeat wakes it)
-- [ ] Supervisor keeps agent process alive (tested with simulated crash)
-- [ ] Supervisor starts inner dialog session on boot and maintains heartbeat
-- [ ] `npm test` green
-- [ ] 100% coverage on new code
-- [ ] No warnings
+- [x] Agent memory: fact extraction runs after each engine turn (regex highlight detector)
+- [x] Agent memory: extract-before-trim hook prevents fact loss on context window trim
+- [x] Agent memory: `memory_search` tool callable by the model
+- [x] Agent memory: associative recall injects relevant facts into system prompt before model calls (embedding-based similarity)
+- [x] Agent memory: provider-agnostic embedding interface implemented (swappable between OpenAI, Anthropic, etc.)
+- [x] Agent memory: fact store (with vectors), entity index, and daily log data structures working
+- [x] Agent memory: dedup prevents duplicate fact storage (word-overlap >60% = skip)
+- [x] Agent memory complements (not replaces) per-friend `save_friend_note` system
+- [x] Aspiration layer exists in bundle and is loaded on bootstrap
+- [x] Inner dialog session starts on supervisor boot (self-initiated, no friend message needed)
+- [x] Inner dialog uses CLI-like tool access (local tools yes, Teams/OAuth tools no)
+- [x] Inner dialog bootstrap message provides full context (psyche, aspirations, current state)
+- [x] Inner dialog persists to disk and survives crash/restart
+- [x] Inner dialog instincts framework exists — agent can configure instinct definitions in its bundle
+- [x] Instincts produce user-role messages during autonomous inner dialog (not hardcoded "continue")
+- [x] Heartbeat fires at configurable interval when agent is resting, nudging inner dialog to check in
+- [x] Agent can rest (not burning tokens) without going permanently dormant (heartbeat wakes it)
+- [x] Supervisor keeps agent process alive (tested with simulated crash)
+- [x] Supervisor starts inner dialog session on boot and maintains heartbeat
+- [x] `npm test` green
+- [x] 100% coverage on new code
+- [x] No warnings
 
 ---
 
@@ -735,3 +735,4 @@ Phase 2 gates may run in parallel where dependencies allow. Gate 9 (task system)
 - 2026-03-05 18:10 Gate 2 completed on `slugger/gate-2-bundle-architecture-shared-governance`: `.ouro` bundle migration + slugger stub alignment, root governance preflight enforcement, nested bundle git initialization, private backup push (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`), and final verification (`npm test`, `npm run test:coverage:vitest`, `npx tsc`) all green.
 - 2026-03-05 18:22 Gate 3a completed on `slugger/gate-3a-pipeline-teardown-harness-tools`: dual-source protocol loading, queryable governance convention tooling, teardown invariants contract checks, and final verification (`npm test`, `npm run test:coverage:vitest`, `npx tsc --noEmit`) all green.
 - 2026-03-05 18:07 Gate 3a CI parity fix: added required `emitNervesEvent` instrumentation in new modules (`src/governance/convention.ts`, `src/harness/teardown-contract.ts`) so `npm run test:coverage` passes the nerves file-completeness audit.
+- 2026-03-05 19:12 Gate 3b completed on `slugger/gate-3b-memory-aspirations-inner-dialog-supervisor`: memory structures + compatibility, aspiration bootstrap loading, autonomous inner-dialog + instincts runtime, supervisor/worker heartbeat crash-restart behavior, and final verification (`npm test`, `npm run test:coverage:vitest`, `npx tsc --noEmit`) all green with 100% coverage.

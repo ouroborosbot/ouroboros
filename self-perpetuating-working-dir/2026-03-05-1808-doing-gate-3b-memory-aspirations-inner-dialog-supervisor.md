@@ -1,6 +1,6 @@
 # Doing: Gate 3b Memory, Aspirations, Inner Dialog + Supervisor
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-03-05 18:08
 **Planning**: ./self-perpetuating-working-dir/2026-03-05-0911-planning-ouroboros-self-perpetuating-realignment.md
@@ -16,28 +16,28 @@
 Implement Gate 3b foundations that make the agent persistent and self-directed: memory write/read paths, aspiration bootstrap loading, autonomous inner dialog session, instincts framework, and a supervisor with heartbeat/restart behavior.
 
 ## Completion Criteria
-- [ ] Agent memory: fact extraction runs after each engine turn (regex highlight detector)
-- [ ] Agent memory: extract-before-trim hook prevents fact loss on context window trim
-- [ ] Agent memory: `memory_search` tool callable by the model
+- [x] Agent memory: fact extraction runs after each engine turn (regex highlight detector)
+- [x] Agent memory: extract-before-trim hook prevents fact loss on context window trim
+- [x] Agent memory: `memory_search` tool callable by the model
 - [x] Agent memory: associative recall injects relevant facts into system prompt before model calls (embedding-based similarity)
 - [x] Agent memory: provider-agnostic embedding interface implemented (swappable between OpenAI, Anthropic, etc.)
-- [ ] Agent memory: fact store (with vectors), entity index, and daily log data structures working
-- [ ] Agent memory: dedup prevents duplicate fact storage (word-overlap >60% = skip)
-- [ ] Agent memory complements (not replaces) per-friend `save_friend_note` system
-- [ ] Aspiration layer exists in bundle and is loaded on bootstrap
-- [ ] Inner dialog session starts on supervisor boot (self-initiated, no friend message needed)
-- [ ] Inner dialog uses CLI-like tool access (local tools yes, Teams/OAuth tools no)
-- [ ] Inner dialog bootstrap message provides full context (psyche, aspirations, current state)
-- [ ] Inner dialog persists to disk and survives crash/restart
-- [ ] Inner dialog instincts framework exists — agent can configure instinct definitions in its bundle
-- [ ] Instincts produce user-role messages during autonomous inner dialog (not hardcoded "continue")
-- [ ] Heartbeat fires at configurable interval when agent is resting, nudging inner dialog to check in
-- [ ] Agent can rest (not burning tokens) without going permanently dormant (heartbeat wakes it)
-- [ ] Supervisor keeps agent process alive (tested with simulated crash)
-- [ ] Supervisor starts inner dialog session on boot and maintains heartbeat
-- [ ] `npm test` green
-- [ ] 100% coverage on new code
-- [ ] No warnings
+- [x] Agent memory: fact store (with vectors), entity index, and daily log data structures working
+- [x] Agent memory: dedup prevents duplicate fact storage (word-overlap >60% = skip)
+- [x] Agent memory complements (not replaces) per-friend `save_friend_note` system
+- [x] Aspiration layer exists in bundle and is loaded on bootstrap
+- [x] Inner dialog session starts on supervisor boot (self-initiated, no friend message needed)
+- [x] Inner dialog uses CLI-like tool access (local tools yes, Teams/OAuth tools no)
+- [x] Inner dialog bootstrap message provides full context (psyche, aspirations, current state)
+- [x] Inner dialog persists to disk and survives crash/restart
+- [x] Inner dialog instincts framework exists — agent can configure instinct definitions in its bundle
+- [x] Instincts produce user-role messages during autonomous inner dialog (not hardcoded "continue")
+- [x] Heartbeat fires at configurable interval when agent is resting, nudging inner dialog to check in
+- [x] Agent can rest (not burning tokens) without going permanently dormant (heartbeat wakes it)
+- [x] Supervisor keeps agent process alive (tested with simulated crash)
+- [x] Supervisor starts inner dialog session on boot and maintains heartbeat
+- [x] `npm test` green
+- [x] 100% coverage on new code
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -127,62 +127,62 @@ Implement Gate 3b foundations that make the agent persistent and self-directed: 
 **Output**: Coverage evidence for recall path.
 **Acceptance**: New recall code 100% covered.
 
-### ⬜ Unit 5a: Memory Data Structures + Compatibility Tests (Red)
+### ✅ Unit 5a: Memory Data Structures + Compatibility Tests (Red)
 **What**: Add failing tests for facts-with-vectors, entity index, daily logs, and non-replacement of friend memory.
 **Output**: Red structural/compatibility tests.
 **Acceptance**: Tests fail before structure/policy implementation.
 
-### ⬜ Unit 5b: Memory Data Structures + Compatibility Implementation (Green)
+### ✅ Unit 5b: Memory Data Structures + Compatibility Implementation (Green)
 **What**: Implement data schemas/stores and explicit compatibility behavior with `save_friend_note`.
 **Output**: Memory structure implementation.
 **Acceptance**: Data files and compatibility policy validated by tests.
 
-### ⬜ Unit 5c: Data Structure Coverage + Refactor
+### ✅ Unit 5c: Data Structure Coverage + Refactor
 **What**: Close structure edge-case coverage and refactor persistence helpers.
 **Output**: Coverage evidence for data store code.
 **Acceptance**: New store/schema code 100% covered.
 
-### ⬜ Unit 6a: Aspiration Bootstrap Loading Tests (Red)
+### ✅ Unit 6a: Aspiration Bootstrap Loading Tests (Red)
 **What**: Add failing tests for loading `psyche/ASPIRATIONS.md` during bootstrap.
 **Output**: Red bootstrap tests.
 **Acceptance**: Tests fail before aspiration integration.
 
-### ⬜ Unit 6b: Aspiration Bootstrap Loading Implementation (Green)
+### ✅ Unit 6b: Aspiration Bootstrap Loading Implementation (Green)
 **What**: Implement aspiration loading and include in startup context.
 **Output**: Bootstrap integration code.
 **Acceptance**: Aspirations present in bootstrap context and persisted paths.
 
-### ⬜ Unit 6c: Aspiration Coverage + Refactor
+### ✅ Unit 6c: Aspiration Coverage + Refactor
 **What**: Cover missing-file/default/error paths and refactor loader.
 **Output**: Coverage evidence for aspiration loader.
 **Acceptance**: New aspiration code 100% covered.
 
-### ⬜ Unit 7a: Inner Dialog Session + Instincts Tests (Red)
+### ✅ Unit 7a: Inner Dialog Session + Instincts Tests (Red)
 **What**: Add failing tests for autonomous inner-dialog entrypoint, session path, instinct-config loading, and user-role instinct messages.
 **Output**: Red tests for inner dialog/instinct runtime behavior.
 **Acceptance**: Tests fail before new session/instinct implementation.
 
-### ⬜ Unit 7b: Inner Dialog Session + Instincts Implementation (Green)
+### ✅ Unit 7b: Inner Dialog Session + Instincts Implementation (Green)
 **What**: Implement inner-dialog runtime entrypoint and configurable instincts pipeline.
 **Output**: Inner dialog session code + instinct engine.
 **Acceptance**: Autonomous session runs with CLI-safe tools and instinct-driven user-role turns.
 
-### ⬜ Unit 7c: Inner Dialog Coverage + Refactor
+### ✅ Unit 7c: Inner Dialog Coverage + Refactor
 **What**: Cover rest/continue, missing-instinct-config, and persistence/restart edges.
 **Output**: Coverage evidence for inner-dialog + instincts code.
 **Acceptance**: New runtime code 100% covered.
 
-### ⬜ Unit 8a: Supervisor + Heartbeat + Crash Recovery Tests (Red)
+### ✅ Unit 8a: Supervisor + Heartbeat + Crash Recovery Tests (Red)
 **What**: Add failing integration-style tests using real child processes for spawn/restart/backoff/heartbeat.
 **Output**: Red process-lifecycle tests.
 **Acceptance**: Tests fail before supervisor implementation.
 
-### ⬜ Unit 8b: Supervisor + Heartbeat + Crash Recovery Implementation (Green)
+### ✅ Unit 8b: Supervisor + Heartbeat + Crash Recovery Implementation (Green)
 **What**: Implement Node supervisor that starts inner dialog, heartbeat nudges, and crash-restarts with backoff.
 **Output**: Supervisor runtime code + scripts/entry wiring.
 **Acceptance**: Real-process tests pass; restart + heartbeat behavior verified.
 
-### ⬜ Unit 8c: Supervisor Coverage + Gate Verification
+### ✅ Unit 8c: Supervisor Coverage + Gate Verification
 **What**: Run full verification (`npm test`, `npm run test:coverage:vitest`, `npx tsc`) and sync Gate 3b checklists in planning/doing docs.
 **Output**: Verification logs + checklist sync.
 **Acceptance**: Gate 3b criteria satisfied with green verification evidence.
@@ -214,3 +214,8 @@ Implement Gate 3b foundations that make the agent persistent and self-directed: 
 - 2026-03-05 18:38 Unit 4a complete: added red tests proving associative recall module import/integration failure before implementation existed
 - 2026-03-05 18:40 Unit 4b complete: implemented `src/mind/associative-recall.ts` (provider-agnostic embeddings + cosine recall) and integrated pre-call injection in `runAgent`
 - 2026-03-05 18:46 Unit 4c complete: expanded branch/error-path coverage for default provider, fallback branches, and telemetry; full verification green (`npm test`, `npm run test:coverage:vitest`, `npx tsc --noEmit`)
+- 2026-03-05 19:10 Unit 5a/5b/5c complete: implemented memory fact-store structures (vectors + entity index + daily logs), compatibility checks with `save_friend_note`, and closed edge branches (`src/mind/memory.ts`, `src/__tests__/mind/memory.test.ts`)
+- 2026-03-05 19:10 Unit 6a/6b/6c complete: loaded `psyche/ASPIRATIONS.md` into bootstrap prompt assembly with aspiration section coverage (`src/mind/prompt.ts`, `src/__tests__/mind/prompt.test.ts`)
+- 2026-03-05 19:11 Unit 7a/7b/7c complete: added autonomous inner-dialog runtime, instincts config loading, session persistence hooks, and full inner-dialog coverage (`src/senses/inner-dialog.ts`, `src/__tests__/senses/inner-dialog.test.ts`, `*.ouro/psyche/inner-dialog-instincts.json`)
+- 2026-03-05 19:11 Unit 8a/8b complete: added supervisor + worker runtime with heartbeat, crash-restart backoff, shutdown handling, and real-process lifecycle tests (`src/supervisor.ts`, `src/senses/inner-dialog-worker.ts`, `src/__tests__/supervisor/*`, `src/__tests__/senses/inner-dialog-worker.test.ts`)
+- 2026-03-05 19:12 Unit 8c complete: final verification green with artifacts (`logs/unit-8c-npm-test.log`, `logs/unit-8c-coverage.log`, `logs/unit-8c-tsc.log`) and focused unit logs (`logs/unit-5c-memory-focused.log`, `logs/unit-6c-aspirations-focused.log`, `logs/unit-7c-inner-dialog-focused.log`, `logs/unit-8b-supervisor-focused.log`)
