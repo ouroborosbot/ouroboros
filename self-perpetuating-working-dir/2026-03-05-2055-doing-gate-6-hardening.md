@@ -1,6 +1,6 @@
 # Doing: Gate 6 Hardening
 
-**Status**: in-progress
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-03-05 20:55
 **Planning**: ./self-perpetuating-working-dir/2026-03-05-0911-planning-ouroboros-self-perpetuating-realignment.md
@@ -18,9 +18,9 @@ Implement Gate 6 hardening by adding explicit interruption/resume checkpoint awa
 ## Completion Criteria
 - [x] Resume state: agent recovers cleanly from interruption, orienting faster than cold start (tested with simulated interruption)
 - [x] Classification calibrated and validated against representative proposals (at least 5 test cases: 3 within-bounds, 2 requires-review)
-- [ ] `npm test` green
-- [ ] 100% coverage on new code
-- [ ] No warnings
+- [x] `npm test` green
+- [x] 100% coverage on new code
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -91,9 +91,9 @@ Representative proposals:
 **Output**: `unit-2c-coverage.log`.
 **Acceptance**: 100% coverage on new classification logic and all relevant tests green.
 
-### ⬜ Unit 3: Final verification + Gate 6 checklist sync
+### ✅ Unit 3: Final verification + Gate 6 checklist sync
 **What**: Run full verification suite and sync Gate 6 completion checklists in planning/doing docs.
-**Output**: `unit-3-verification.md` + verification logs.
+**Output**: `unit-3-verification.md` + `unit-3-npm-test.log` + `unit-3-tsc.log` + `unit-3-lint.log`.
 **Acceptance**: `npm test` green, `npx tsc --noEmit` green, completion criteria evidence captured.
 
 ## Execution
@@ -117,3 +117,4 @@ Representative proposals:
 - 2026-03-05 21:05 Unit 2a complete: added five representative classification red tests proving calibrated classifier is required
 - 2026-03-05 21:06 Unit 2b complete: shipped calibrated governance proposal classifier with green tests and clean `npx tsc --noEmit`
 - 2026-03-05 21:07 Unit 2c complete: verified full coverage/compile green with classification calibration in place
+- 2026-03-05 21:10 Unit 3 complete: full verification suite green (`npm test`, `npx tsc --noEmit`, `npm run lint`) and Gate 6 checklists synced
