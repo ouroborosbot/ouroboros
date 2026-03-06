@@ -65,7 +65,7 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 **Acceptance**: Tests fail before path migration is implemented.
 
 ### ⬜ Unit 1b: `.ouro` Root Resolution Implementation (Green)
-**What**: Update `getAgentRoot()` and impacted runtime/test fixtures to resolve `.ouro` roots.
+**What**: Update `getAgentRoot()` (currently `path.join(getRepoRoot(), getAgentName())`) and impacted runtime/test fixtures to resolve `.ouro` roots.
 **Output**: Updated runtime path resolution and fixture paths.
 **Acceptance**: `.ouro` root tests pass and no active runtime references depend on old `ouroboros/` root.
 
@@ -80,8 +80,8 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 **Acceptance**: Tests fail before governance relocation/enforcement implementation.
 
 ### ⬜ Unit 2b: Governance Relocation + Enforcement (Green)
-**What**: Relocate governance docs to repo root and implement preflight loading enforcement.
-**Output**: Root governance docs plus runtime enforcement code.
+**What**: Relocate governance docs to repo root and implement preflight loading enforcement (restoring content from preserved history if needed because root governance files are currently absent).
+**Output**: Root `ARCHITECTURE.md` and `CONSTITUTION.md` plus runtime enforcement code.
 **Acceptance**: Preflight tests pass and root governance files are the canonical load target.
 
 ### ⬜ Unit 2c: Governance Refactor/Coverage
@@ -90,7 +90,7 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 **Acceptance**: Governance preflight code paths have 100% coverage and compile cleanly.
 
 ### ⬜ Unit 3a: Bundle Content Migration (`ouroboros` -> `ouroboros.ouro`)
-**What**: Perform in-place conversion of active `ouroboros/` content into `ouroboros.ouro/` (including `manifest` -> `teams-app` and `SELF-KNOWLEDGE` -> `TACIT` alignment).
+**What**: Perform in-place conversion of active `ouroboros/` content into `ouroboros.ouro/` (including `manifest` -> `teams-app` and `SELF-KNOWLEDGE` -> `TACIT` alignment) while preserving Gate 1 scaffolding additions.
 **Output**: Updated `ouroboros.ouro/` with migrated runtime content.
 **Acceptance**: Runtime-required bundle assets exist under `ouroboros.ouro/` and legacy layout dependencies are removed/updated.
 
@@ -100,7 +100,7 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 **Acceptance**: Slugger bundle is recognized by harness without importing Gate 7 migration content.
 
 ### ⬜ Unit 4a: Gitignore Ordering + Nested Git Init
-**What**: Add `*.ouro/` ignore rule before nested git setup, then initialize bundle-local git repos.
+**What**: Add `*.ouro/` ignore rule (currently missing) before nested git setup, then initialize bundle-local git repos.
 **Output**: `.gitignore` update and nested repo init evidence.
 **Acceptance**: Bundle directories are ignored by harness git while nested git repos initialize correctly.
 
@@ -131,3 +131,4 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 ## Progress Log
 - 2026-03-05 17:08 Created from planning doc
 - 2026-03-05 17:09 Granularity pass: split migration, governance, and backup work into atomic red/green/refactor units
+- 2026-03-05 17:10 Validation pass: confirmed current gaps (`getAgentRoot` still points to `<repo>/<agent>`, root governance files missing, `.gitignore` missing `*.ouro/`, nested git not initialized)
