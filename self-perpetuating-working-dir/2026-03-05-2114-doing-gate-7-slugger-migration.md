@@ -85,7 +85,7 @@ Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key k
 **Output**: Red tests + `unit-4a-red.log`.
 **Acceptance**: New supervisor multi-agent tests fail against current implementation.
 
-### ⬜ Unit 4b: Multi-agent supervisor implementation (Green)
+### ✅ Unit 4b: Multi-agent supervisor implementation (Green)
 **What**: Implement support for supervising both agents in one supervisor entrypoint, preserving existing single-agent behavior.
 **Output**: Updated supervisor runtime/entrypoint + `unit-4b-green.log` + `unit-4b-tsc.log`.
 **Acceptance**: Unit 4a tests pass and existing supervisor tests remain green.
@@ -128,3 +128,4 @@ Migrate Slugger's core identity from OpenClaw into `slugger.ouro`, convert key k
 - 2026-03-05 21:25 Unit 3b complete: implemented conversion utility and populated slugger memory store from people/company/project sources
 - 2026-03-05 21:28 Unit 3c complete: achieved 100% coverage on conversion module and verified facts/entities integrity mapping
 - 2026-03-05 21:30 Unit 4a complete: added failing tests for multi-agent supervisor argument parsing and lifecycle orchestration
+- 2026-03-05 21:31 Unit 4b complete: shipped multi-agent supervisor entry flow (`--agents`) with green supervisor suite and clean compile
