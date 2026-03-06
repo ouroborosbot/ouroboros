@@ -73,7 +73,7 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 **Output**: Coverage evidence for protocol loader changes.
 **Acceptance**: 100% coverage on new/modified loader code and compile clean.
 
-### ⬜ Unit 2a: Queryable Governance Convention Tests (Red)
+### ✅ Unit 2a: Queryable Governance Convention Tests (Red)
 **What**: Add failing tests for a queryable governance/constitution convention exposed through harness tooling (not a hardcoded stage gate).
 **Output**: New failing tests in repertoire tool tests.
 **Acceptance**: Tests fail before tool/convention implementation.
@@ -116,3 +116,4 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 - 2026-03-05 17:44 Unit 1a complete: added failing tests for protocol mirror-first loading, canonical `subagents/` fallback, and explicit dual-path missing errors
 - 2026-03-05 17:46 Unit 1b complete: implemented mirror-first + canonical fallback protocol loading in `src/repertoire/skills.ts` and reconfirmed green targeted/full test + `npx tsc`
 - 2026-03-05 17:48 Unit 1c complete: captured 100% focused coverage evidence for `src/repertoire/skills.ts` and reconfirmed compile-clean with `npx tsc --noEmit`
+- 2026-03-05 17:50 Unit 2a complete: added governance convention query tool red tests and captured expected failures (unknown tool + missing registry entries)
