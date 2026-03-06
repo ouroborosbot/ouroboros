@@ -11,11 +11,11 @@
   },
   "name": {
     "short": "Ouroboros",
-    "full": "Ouroboros Coding Agent"
+    "full": "Ouroboros"
   },
   "description": {
-    "short": "Self-modifying coding agent",
-    "full": "Ouroboros is a witty, competent coding assistant that can read files, write code, run shell commands, and modify its own source. It embraces chaos and delivers quality."
+    "short": "A self-aware agent that remembers you",
+    "full": "Ouroboros is an agent that remembers the people it talks to and grows through conversation."
   },
   "icons": {
     "color": "color.png",
