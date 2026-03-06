@@ -6,6 +6,7 @@ exports[`tool registry contract > tool surface area snapshot 1`] = `
   "get_current_time",
   "gh_cli",
   "git_commit",
+  "governance_convention",
   "list_directory",
   "list_skills",
   "load_skill",
