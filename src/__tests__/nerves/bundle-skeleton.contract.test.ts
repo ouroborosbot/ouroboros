@@ -1,3 +1,4 @@
+import { execSync } from "child_process"
 import { existsSync, readFileSync } from "fs"
 import { join } from "path"
 
@@ -68,5 +69,21 @@ describe("bundle skeleton contract", () => {
       const body = readFileSync(join(process.cwd(), "slugger.ouro/psyche", file), "utf-8").trim()
       expect(body).toBe(`# ${header}`)
     }
+  })
+
+  it("ignores .ouro bundles in harness git tracking", () => {
+    const gitignore = readFileSync(join(process.cwd(), ".gitignore"), "utf-8")
+      .split(/\r?\n/)
+      .filter((line) => line.trim().length > 0)
+
+    expect(gitignore).toContain("*.ouro/")
+
+    expect(() =>
+      execSync("git check-ignore --no-index -q ouroboros.ouro/agent.json", { cwd: process.cwd() }),
+    ).not.toThrow()
+
+    expect(() =>
+      execSync("git check-ignore --no-index -q slugger.ouro/agent.json", { cwd: process.cwd() }),
+    ).not.toThrow()
   })
 })
