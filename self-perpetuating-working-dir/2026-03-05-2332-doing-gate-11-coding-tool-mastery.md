@@ -109,7 +109,7 @@ Expected target files:
 - `src/coding/manager.ts`
 - `src/__tests__/coding/monitor-recovery.test.ts`
 
-### ⬜ Unit 3c: Monitoring/recovery coverage hardening
+### ✅ Unit 3c: Monitoring/recovery coverage hardening
 **What**: Cover all monitor/recovery branches (idle, blocked, stalled, crash restart, exhausted retries).
 **Output**: `unit-3c-coverage.log`.
 **Acceptance**: 100% coverage for Unit 3 modules.
@@ -152,3 +152,4 @@ Expected target files:
 - 2026-03-05 23:52 Unit 2c complete: closed coding tools validation/optional-arg/summary/error-path coverage gaps and captured 100% coverage across Unit 2 modules
 - 2026-03-05 23:54 Unit 3a complete: added failing monitor/recovery contract tests (`monitor-recovery.test.ts`) with red log proving missing `coding/monitor` + `coding/reporter` modules
 - 2026-03-05 23:55 Unit 3b complete: implemented monitor/reporter modules with blocked/stalled/completed/failed summaries + recovery actions and captured green test + compile logs
+- 2026-03-05 23:56 Unit 3c complete: added default-clock and reporter branch tests, then captured 100% coverage for Unit 3 modules (`manager.ts`, `monitor.ts`, `reporter.ts`)
