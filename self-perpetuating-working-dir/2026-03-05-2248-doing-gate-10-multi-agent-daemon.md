@@ -79,7 +79,7 @@ Expected target files:
 **Output**: `unit-1c-coverage.log`.
 **Acceptance**: 100% coverage on Unit 1 modules with suite green.
 
-### ⬜ Unit 2a: Daemon command plane tests (Red)
+### ✅ Unit 2a: Daemon command plane tests (Red)
 **What**: Add failing tests for daemon command socket protocol and `ouro` CLI commands (`start`, `stop`, `status`, `agent start/stop/restart`, `cron list/trigger`, `health`), including invalid-command and malformed-payload branches.
 **Output**: Red tests + `unit-2a-red.log`.
 **Acceptance**: Tests fail before implementation and capture daemon/CLI command contract.
@@ -153,3 +153,4 @@ Expected target files:
 - 2026-03-05 22:53 Unit 1a complete: added failing process-manager/workspace-isolation tests and captured red log
 - 2026-03-05 22:55 Unit 1b complete: implemented daemon process manager and workspace clone/sync with green tests and clean compile
 - 2026-03-05 22:59 Unit 1c complete: added branch/error/default-dependency tests and reached 100% coverage for Unit 1 daemon modules
+- 2026-03-05 23:00 Unit 2a complete: added failing daemon command-plane/CLI protocol tests and captured red log
