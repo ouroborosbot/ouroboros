@@ -19,7 +19,7 @@ Move `ouroboros.ouro` and `slugger.ouro` out of the harness repo into `~/AgentBu
 - [x] GitHub repos up-to-date with latest bundle content (repos created in Gate 2)
 - [x] Backup integrity verified (clone + diff)
 - [x] Bundles moved to `~/AgentBundles/`
-- [ ] Harness code updated to reference new bundle location
+- [x] Harness code updated to reference new bundle location
 - [ ] Agents bootstrap correctly from `~/AgentBundles/`
 - [ ] `npm test` green
 - [ ] 100% coverage on new code
@@ -83,7 +83,7 @@ Validated target touchpoints:
 **Output**: `unit-3a-relocation.log` + `unit-3a-post-move-layout.md`.
 **Acceptance**: Bundles exist at `~/AgentBundles/<agent>.ouro` with intact nested git metadata and no data loss.
 
-### ⬜ Unit 3b: Filesystem hygiene + harness workspace cleanup
+### ✅ Unit 3b: Filesystem hygiene + harness workspace cleanup
 **What**: Update harness workspace assumptions after relocation (including `.gitignore` implications and any path-sensitive scripts/contracts).
 **Output**: `unit-3b-hygiene.log`.
 **Acceptance**: Harness workspace no longer assumes in-repo bundles and path-sensitive checks/scripts are consistent with Gate 8 layout.
@@ -118,3 +118,4 @@ Validated target touchpoints:
 - 2026-03-05 21:55 Unit 2b complete: switched identity path resolution to `~/AgentBundles` with green tests and clean compile
 - 2026-03-05 21:56 Unit 2c complete: verified 100% coverage for `identity.ts` under the Gate 8 path migration
 - 2026-03-05 21:57 Unit 3a complete: moved both bundles to `~/AgentBundles` and preserved nested git remotes/state
+- 2026-03-05 21:59 Unit 3b complete: aligned contracts, manifest packaging, and repo hygiene with external bundle paths
