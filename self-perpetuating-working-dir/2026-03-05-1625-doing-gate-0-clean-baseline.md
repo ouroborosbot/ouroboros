@@ -92,3 +92,4 @@ Restore `main` to a healthy state by reverting commits `e3ecc1c..448cfcd`, prese
 - 2026-03-05 16:29 Unit 1b complete: gate-0 commit map written with per-commit salvage decisions
 - 2026-03-05 16:33 Unit 2 complete: explicit revert commits landed for the target range, with conflict-handling log captured
 - 2026-03-05 16:35 Unit 3 complete: `npm test` and `npx tsc` both green after compatibility hotfixes
+- 2026-03-05 16:42 Post-PR hotfix: added config coverage for `getOpenAIEmbeddingsApiKey()`, reran `npm run test:coverage:vitest`, `npm test`, and `npx tsc` (all green)
