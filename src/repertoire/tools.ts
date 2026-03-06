@@ -170,6 +170,11 @@ export function summarizeArgs(name: string, args: Record<string, string>): strin
   if (name === "gh_cli") return summarizeKeyValues(args, ["command"]);
   if (name === "load_skill") return summarizeKeyValues(args, ["name"]);
   if (name === "governance_convention") return summarizeKeyValues(args, ["query"]);
+  if (name === "task_create") return summarizeKeyValues(args, ["title", "type", "category"]);
+  if (name === "task_update_status") return summarizeKeyValues(args, ["name", "status"]);
+  if (name === "task_board_status") return summarizeKeyValues(args, ["status"]);
+  if (name === "task_board_action") return summarizeKeyValues(args, ["scope"]);
+  if (name === "task_board" || name === "task_board_deps" || name === "task_board_sessions") return "";
   if (name === "claude") return summarizeKeyValues(args, ["prompt"]);
   if (name === "web_search") return summarizeKeyValues(args, ["query"]);
   if (name === "memory_search") return summarizeKeyValues(args, ["query"]);

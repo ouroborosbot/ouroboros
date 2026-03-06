@@ -8,6 +8,7 @@ import type { ResolvedContext } from "./friends/types";
 import { getChannelCapabilities } from "./friends/channel";
 import { emitNervesEvent } from "../nerves/runtime";
 import { getFirstImpressions } from "./first-impressions";
+import { getTaskModule } from "../tasks";
 
 // Lazy-loaded psyche text cache
 let _psycheCache: {
@@ -131,6 +132,16 @@ function skillsSection(): string {
   return `## my skills (use load_skill to activate)\n${names.join(", ")}`;
 }
 
+function taskBoardSection(): string {
+  try {
+    const board = getTaskModule().getBoard().compact.trim();
+    if (!board) return "";
+    return `## task board\n${board}`;
+  } catch {
+    return "";
+  }
+}
+
 export interface BuildSystemOptions {
   toolChoiceRequired?: boolean;
 }
@@ -219,6 +230,7 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     dateSection(),
     toolsSection(channel, options),
     skillsSection(),
+    taskBoardSection(),
     toolBehaviorSection(options),
     contextSection(context),
   ]
