@@ -541,8 +541,8 @@ export function startTeamsApp(): void {
 
   const oauthConfig = getOAuthConfig()
 
-  if (teamsConfig.clientId) {
-    // Bot Service mode -- real Teams connection with SingleTenant credentials
+  if (teamsConfig.clientId && teamsConfig.clientSecret) {
+    // Bot Service mode -- client secret auth
     app = new App({
       clientId: teamsConfig.clientId,
       clientSecret: teamsConfig.clientSecret,
@@ -550,7 +550,17 @@ export function startTeamsApp(): void {
       oauth: { defaultConnectionName: oauthConfig.graphConnectionName },
       ...mentionStripping,
     })
-    mode = "Bot Service"
+    mode = "Bot Service (client secret)"
+  } else if (teamsConfig.clientId) {
+    // Bot Service mode -- managed identity auth (no client secret)
+    app = new App({
+      clientId: teamsConfig.clientId,
+      tenantId: teamsConfig.tenantId,
+      ...(teamsConfig.managedIdentityClientId ? { managedIdentityClientId: teamsConfig.managedIdentityClientId } : {}),
+      oauth: { defaultConnectionName: oauthConfig.graphConnectionName },
+      ...mentionStripping,
+    })
+    mode = "Bot Service (managed identity)"
   } else {
     // DevtoolsPlugin mode -- local development with Teams DevtoolsPlugin UI
     app = new App({

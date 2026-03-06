@@ -36,6 +36,7 @@ export interface TeamsConfig {
   clientId: string
   clientSecret: string
   tenantId: string
+  managedIdentityClientId: string
 }
 
 export interface OAuthConfig {
@@ -116,6 +117,7 @@ const DEFAULT_SECRETS_TEMPLATE: Omit<OuroborosConfig, "context"> = {
     clientId: "",
     clientSecret: "",
     tenantId: "",
+    managedIdentityClientId: "",
   },
   oauth: {
     graphConnectionName: "graph",

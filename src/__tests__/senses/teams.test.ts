@@ -2142,7 +2142,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       level: "info",
       event: "channel.app_started",
       component: "channels",
-      meta: expect.objectContaining({ mode: "Bot Service" }),
+      meta: expect.objectContaining({ mode: "Bot Service (client secret)" }),
     }))
 
     vi.restoreAllMocks()
