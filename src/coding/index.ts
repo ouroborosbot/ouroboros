@@ -29,3 +29,6 @@ export function resetCodingSessionManager(): void {
 
 export { CodingSessionManager } from "./manager"
 export type { CodingActionResult, CodingRunner, CodingSession, CodingSessionRequest, CodingSessionStatus, CodingSubagent } from "./types"
+export { CodingSessionMonitor } from "./monitor"
+export type { CodingMonitorReport, CodingMonitorSummary, CodingRecoveryAction, CodingRecoveryActionType } from "./monitor"
+export { formatCodingMonitorReport } from "./reporter"
