@@ -2,15 +2,25 @@
 set -euo pipefail
 
 # Build a minimal secrets.json from local config and push it to the App Service.
-# Only includes: azure provider, teams config, and oauth connection names.
+# Only includes: provider config, teams config, and oauth connection names.
 # The startup.sh script writes this to disk before the bot starts.
+#
+# Required env vars (or edit defaults below):
+#   AZURE_SUBSCRIPTION, AZURE_RG, AZURE_APP_NAME
+#   TEAMS_CLIENT_ID, TEAMS_TENANT_ID
+#   Optional: TEAMS_CLIENT_SECRET (for client-secret auth), TEAMS_MI_CLIENT_ID (for managed identity)
 #
 # Usage: bash scripts/set-app-secrets.sh
 
-SUB="4c2988ee-571a-4995-9ab0-cc68f38aaf2b"
-RG="rg-arimendelow-fhl26"
-APP_NAME="ouroboros-bot"
-SECRETS_FILE="$HOME/.agentsecrets/ouroboros/secrets.json"
+SUB="${AZURE_SUBSCRIPTION:?Set AZURE_SUBSCRIPTION}"
+RG="${AZURE_RG:?Set AZURE_RG}"
+APP_NAME="${AZURE_APP_NAME:-ouroboros-bot}"
+SECRETS_FILE="${SECRETS_FILE:-$HOME/.agentsecrets/ouroboros/secrets.json}"
+
+TEAMS_CLIENT_ID="${TEAMS_CLIENT_ID:?Set TEAMS_CLIENT_ID}"
+TEAMS_TENANT_ID="${TEAMS_TENANT_ID:?Set TEAMS_TENANT_ID}"
+TEAMS_CLIENT_SECRET="${TEAMS_CLIENT_SECRET:-}"
+TEAMS_MI_CLIENT_ID="${TEAMS_MI_CLIENT_ID:-}"
 
 if [ ! -f "$SECRETS_FILE" ]; then
   echo "Error: $SECRETS_FILE not found"
@@ -21,7 +31,7 @@ echo "==> Building minimal secrets from $SECRETS_FILE"
 
 # Extract only the fields needed for deployed bot
 SECRETS_JSON=$(python3 -c "
-import json, sys
+import json, os, sys
 with open('$SECRETS_FILE') as f:
     full = json.load(f)
 minimal = {
@@ -29,10 +39,10 @@ minimal = {
         'azure': full.get('providers', {}).get('azure', {})
     },
     'teams': {
-        'clientId': '93b3681b-1565-4ff7-bf1f-1d370e247604',
-        'clientSecret': '',
-        'tenantId': '72f988bf-86f1-41af-91ab-2d7cd011db47',
-        'managedIdentityClientId': 'c404d5a9-10ae-4b06-afd5-18964f3d857e'
+        'clientId': '$TEAMS_CLIENT_ID',
+        'clientSecret': '$TEAMS_CLIENT_SECRET',
+        'tenantId': '$TEAMS_TENANT_ID',
+        'managedIdentityClientId': '$TEAMS_MI_CLIENT_ID'
     },
     'oauth': {
         'graphConnectionName': full.get('oauth', {}).get('graphConnectionName', 'graph'),
@@ -61,4 +71,4 @@ az webapp restart \
   --resource-group "$RG" \
   --subscription "$SUB"
 
-echo "Done. Deployed secrets (azure provider + teams + oauth connections only)."
+echo "Done. Deployed secrets (provider + teams + oauth connections only)."

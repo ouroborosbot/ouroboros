@@ -3,20 +3,23 @@ set -euo pipefail
 
 # Deploy Ouroboros to Azure App Service
 # Usage: bash scripts/deploy-azure.sh
+#
+# Required env vars (or edit defaults below):
+#   AZURE_SUBSCRIPTION, AZURE_RG, AZURE_LOCATION, APP_NAME, BOT_NAME, MI_NAME
 
-SUB="4c2988ee-571a-4995-9ab0-cc68f38aaf2b"
-RG="rg-arimendelow-fhl26"
-LOCATION="westcentralus"
-PLAN_NAME="ouroboros-plan"
-APP_NAME="ouroboros-bot"
-BOT_NAME="OuroborosBot"
-MI_NAME="ouroboros-mid"
+SUB="${AZURE_SUBSCRIPTION:?Set AZURE_SUBSCRIPTION}"
+RG="${AZURE_RG:?Set AZURE_RG}"
+LOCATION="${AZURE_LOCATION:-westcentralus}"
+PLAN_NAME="${AZURE_PLAN_NAME:-ouroboros-plan}"
+APP_NAME="${AZURE_APP_NAME:-ouroboros-bot}"
+BOT_NAME="${AZURE_BOT_NAME:?Set AZURE_BOT_NAME}"
+MI_NAME="${AZURE_MI_NAME:?Set AZURE_MI_NAME}"
 NODE_VERSION="22-lts"
 
 echo "==> Setting subscription"
 az account set --subscription "$SUB"
 
-echo "==> Creating App Service Plan (B1, Linux)"
+echo "==> Creating App Service Plan (S1, Linux)"
 az appservice plan create \
   --name "$PLAN_NAME" \
   --resource-group "$RG" \
@@ -71,5 +74,5 @@ echo "Messaging endpoint: https://${APP_NAME}.azurewebsites.net/api/messages"
 echo ""
 echo "Remaining steps:"
 echo "  1. Set secrets: bash scripts/set-app-secrets.sh"
-echo "  2. Upload manifest.ouroboros.deployed.zip to Teams Admin Center"
+echo "  2. Upload manifest zip to Teams Admin Center"
 echo "  3. Message @Ouroboros in Teams"

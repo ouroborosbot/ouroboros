@@ -159,8 +159,8 @@ The manifest already includes `webApplicationInfo` (committed separately):
 ```json
 {
   "webApplicationInfo": {
-    "id": "93b3681b-1565-4ff7-bf1f-1d370e247604",
-    "resource": "api://botid-93b3681b-1565-4ff7-bf1f-1d370e247604"
+    "id": "{your-bot-app-id}",
+    "resource": "api://botid-{your-bot-app-id}"
   }
 }
 ```
