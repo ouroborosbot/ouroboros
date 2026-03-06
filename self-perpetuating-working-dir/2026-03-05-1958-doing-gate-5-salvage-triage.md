@@ -1,6 +1,6 @@
 # Doing: Gate 5 Salvage + Triage
 
-**Status**: READY_FOR_EXECUTION
+**Status**: COMPLETED
 **Execution Mode**: direct
 **Created**: 2026-03-05 19:58
 **Planning**: ./self-perpetuating-working-dir/2026-03-05-0911-planning-ouroboros-self-perpetuating-realignment.md
@@ -16,14 +16,14 @@
 Execute Gate 5 by re-landing valuable salvageable code from the reverted overnight run and triaging all 31 overnight proposals into an actionable, de-duplicated backlog aligned to the post-inversion architecture.
 
 ## Completion Criteria
-- [ ] All salvageable code from revert set evaluated and re-landed where valuable
-- [ ] All 31 overnight proposals triaged: each one filed as a backlog task doc, marked not-applicable, or archived with rationale
-- [ ] High-merit items flagged as high priority in the backlog
-- [ ] Proposals obsoleted by the inversion explicitly marked as such
-- [ ] Raw overnight artifacts cleaned up (duplicates removed, originals archived)
-- [ ] Valid historical task docs in `ouroboros.ouro/tasks/` untouched
-- [ ] `npm test` green
-- [ ] 100% coverage on any new/re-landed code
+- [x] All salvageable code from revert set evaluated and re-landed where valuable
+- [x] All 31 overnight proposals triaged: each one filed as a backlog task doc, marked not-applicable, or archived with rationale
+- [x] High-merit items flagged as high priority in the backlog
+- [x] Proposals obsoleted by the inversion explicitly marked as such
+- [x] Raw overnight artifacts cleaned up (duplicates removed, originals archived)
+- [x] Valid historical task docs in `ouroboros.ouro/tasks/` untouched
+- [x] `npm test` green
+- [x] 100% coverage on any new/re-landed code
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -103,7 +103,7 @@ Execute Gate 5 by re-landing valuable salvageable code from the reverted overnig
 **Output**: `unit-6-cleanup-audit.md` artifact.
 **Acceptance**: Duplicates removed, originals archived, and preservation audit shows no unintended edits to valid historical task docs.
 
-### ⬜ Unit 7: Final verification and checklist sync
+### ✅ Unit 7: Final verification and checklist sync
 **What**: Run required verification (`npm test`, `npx tsc --noEmit`, and coverage if code changed), then sync Gate 5 completion checklists in doing/planning docs.
 **Output**: `unit-7-verification.md` artifact.
 **Acceptance**: Gate 5 completion criteria are evidence-backed and all required checks are green.
@@ -128,3 +128,4 @@ Execute Gate 5 by re-landing valuable salvageable code from the reverted overnig
 - 2026-03-05 20:05 Unit 3 complete: no substantial re-land-now code candidates, recorded no-op salvage flow outcome
 - 2026-03-05 20:08 Units 4a/4b/4c and 5 complete: triaged canonical 31 proposals, created 24 backlog planning docs, tagged priorities, and recorded non-backlog rationales with source references
 - 2026-03-05 20:44 Unit 6 complete: archived 45 remaining raw overnight reflection artifacts into gate-5 archive and verified zero matching artifacts remain in `ouroboros.ouro/tasks/` with no non-target historical doc edits
+- 2026-03-05 20:46 Unit 7 complete: executed final verification (`npm test`, `npx tsc --noEmit`) and synced Gate 5 completion criteria in doing/planning docs
