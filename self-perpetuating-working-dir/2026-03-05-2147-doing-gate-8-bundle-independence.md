@@ -47,7 +47,7 @@ Move `ouroboros.ouro` and `slugger.ouro` out of the harness repo into `~/AgentBu
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Baseline + migration preflight
+### ✅ Unit 0: Baseline + migration preflight
 **What**: Capture current bundle locations, nested git remotes, path-resolution behavior, and running-process state before relocation.
 **Output**: `unit-0-baseline.md`.
 **Acceptance**: Artifact records verified current state and identified Gate 8 touchpoints.
@@ -112,3 +112,4 @@ Validated target touchpoints:
 - 2026-03-05 21:48 Granularity pass: split relocation/hygiene into Units 3a and 3b for clearer execution boundaries
 - 2026-03-05 21:49 Validation pass: confirmed Gate 8 touchpoints for path resolution, bundle contracts, and packaging script assumptions
 - 2026-03-05 21:49 Quality pass: confirmed unit acceptance criteria, emoji headers, and execution readiness
+- 2026-03-05 21:51 Unit 0 complete: captured pre-move bundle, remote, and process baseline for Gate 8 migration
