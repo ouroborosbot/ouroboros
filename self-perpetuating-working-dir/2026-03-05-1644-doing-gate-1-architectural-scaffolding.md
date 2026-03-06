@@ -18,7 +18,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 ## Completion Criteria
 - [x] Overnight proposals reviewed -- high-merit ideas incorporated into scaffolding decisions
 - [x] `.ouro` bundle skeleton directory committed (structure only, Gate 2 populates)
-- [ ] TypeScript interfaces for harness primitives committed (compilable, importable)
+- [x] TypeScript interfaces for harness primitives committed (compilable, importable)
 - [ ] Shared governance loader stub committed
 - [ ] Kill list / migration checklist committed in-repo
 - [ ] Subagent protocol loading convention defined and documented
@@ -77,7 +77,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 **Output**: New failing test file referencing planned interface symbols.
 **Acceptance**: Test/compile step fails before interfaces exist.
 
-### ⬜ Unit 2b: Harness Primitive Interfaces (Green)
+### ✅ Unit 2b: Harness Primitive Interfaces (Green)
 **What**: Add TypeScript scaffolding interfaces for model tool surface, bootstrap sequencing, and governance checks in a new `src/harness/` module.
 **Output**: Importable interface module(s) with stable exports at `src/harness/`.
 **Acceptance**: Contract tests pass and interfaces remain scaffolding-level (no over-specification).
@@ -141,3 +141,4 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - 2026-03-05 16:50 Unit 1b complete: created structure-only `ouroboros.ouro/` and `slugger.ouro/` bundle trees
 - 2026-03-05 16:50 Unit 1c complete: verified 100% coverage and clean TypeScript compile with skeleton contract in place
 - 2026-03-05 16:52 Unit 2a complete: added failing harness interface contract test targeting `src/harness` exports
+- 2026-03-05 16:53 Unit 2b complete: implemented importable `src/harness` primitive interfaces and governance result guard
