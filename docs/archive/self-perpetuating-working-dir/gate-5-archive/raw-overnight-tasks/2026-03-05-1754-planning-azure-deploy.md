@@ -1,6 +1,6 @@
 # Planning: Deploy Ouroboros to Azure App Service
 
-**Status**: NEEDS_REVIEW
+**Status**: IN_PROGRESS
 **Created**: 2026-03-05
 
 ## Goal
@@ -25,12 +25,12 @@ Deploy Ouroboros Teams bot to Azure App Service in `rg-arimendelow-fhl26`, confi
 - Custom domain or SSL configuration
 
 ## Completion Criteria
-- [ ] App Service provisioned and running (B1 Linux, Node 22)
-- [ ] Managed identity attached, bot endpoint updated
-- [ ] App secrets configured (provider config + OAuth connection names)
+- [x] App Service provisioned and running (S1 Linux, Node 22, West Central US)
+- [x] Managed identity attached, bot endpoint updated
+- [x] App secrets configured (provider config + OAuth connection names)
 - [ ] OAuth connections created on Bot Registration (Graph + ADO)
-- [ ] Deployed manifest uploaded to Teams Admin Center
-- [ ] Basic chat works (no OAuth needed)
+- [x] Deployed manifest sideloaded in Copilot
+- [x] Basic chat works (no OAuth needed)
 - [ ] OAuth flows work (Graph + ADO)
 - [ ] Branch merged to main
 
@@ -62,3 +62,7 @@ Steps 1-3 (create manifest, add managed identity support, write deploy scripts) 
 
 ## Progress Log
 - 2026-03-05 Created
+- 2026-03-05 App Service deployed (S1, West Central US — B1 had zero quota)
+- 2026-03-05 Fixed PORT env var (Azure probes 8080, app was on 3978)
+- 2026-03-05 Fixed MODULE_NOT_FOUND (enabled SCM_DO_BUILD_DURING_DEPLOYMENT)
+- 2026-03-05 Bot live and responding via Copilot
