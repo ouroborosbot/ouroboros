@@ -592,15 +592,15 @@ Stand up the daemon so agents never go down unless you want them to. Agents run 
 - Health monitoring with alert routing (critical alerts bypass agents, go direct to user)
 
 **Completion criteria:**
-- [ ] Daemon supervises agent processes with crash recovery
-- [ ] `ouro` CLI works for daemon and agent management
-- [ ] Cron scheduling triggers recurring tasks
-- [ ] Inter-agent messaging delivers between agents
-- [ ] Each agent works in its own repo clone (isolated git state, synced with upstream)
-- [ ] Health monitoring with tiered alert routing
-- [ ] Agents stay up unless explicitly stopped
-- [ ] `npm test` green
-- [ ] 100% coverage on new code
+- [x] Daemon supervises agent processes with crash recovery
+- [x] `ouro` CLI works for daemon and agent management
+- [x] Cron scheduling triggers recurring tasks
+- [x] Inter-agent messaging delivers between agents
+- [x] Each agent works in its own repo clone (isolated git state, synced with upstream)
+- [x] Health monitoring with tiered alert routing
+- [x] Agents stay up unless explicitly stopped
+- [x] `npm test` green
+- [x] 100% coverage on new code
 
 **Rollback:** Stop daemon, revert to Gate 3b supervisor (single-repo, simpler process management). Agent repo clones at `~/AgentWorkspaces/` can be deleted — they're clones, not source of truth.
 

@@ -1,0 +1,204 @@
+import { afterEach, describe, expect, it, vi } from "vitest"
+import * as fs from "fs"
+import * as net from "net"
+import * as os from "os"
+import * as path from "path"
+
+import { OuroDaemon } from "../../daemon/daemon"
+
+function tmpSocketPath(name: string): string {
+  return path.join(os.tmpdir(), `${name}-${Date.now()}-${Math.random().toString(16).slice(2)}.sock`)
+}
+
+function sendRaw(socketPath: string, payload: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const client = net.createConnection(socketPath)
+    let raw = ""
+    client.on("connect", () => {
+      client.write(payload)
+      client.end()
+    })
+    client.on("data", (chunk) => {
+      raw += chunk.toString("utf-8")
+    })
+    client.on("error", reject)
+    client.on("end", () => resolve(raw))
+  })
+}
+
+describe("daemon command plane branches", () => {
+  const make = (socketPath: string) => {
+    const processManager = {
+      listAgentSnapshots: vi.fn(() => []),
+      startAutoStartAgents: vi.fn(async () => undefined),
+      stopAll: vi.fn(async () => undefined),
+      startAgent: vi.fn(async () => undefined),
+      stopAgent: vi.fn(async () => undefined),
+      restartAgent: vi.fn(async () => undefined),
+    }
+
+    const scheduler = {
+      listJobs: vi.fn(() => []),
+      triggerJob: vi.fn(async (jobId: string) => ({ ok: true, message: `triggered ${jobId}` })),
+    }
+
+    const healthMonitor = {
+      runChecks: vi.fn(async () => [{ name: "agent-processes", status: "ok" as const, message: "good" }]),
+    }
+
+    const router = {
+      send: vi.fn(async () => ({ id: "msg-1", queuedAt: "2026-03-05T23:00:00.000Z" })),
+      pollInbox: vi.fn(() => [{ id: "m", from: "slugger", content: "hello", queuedAt: "x", priority: "normal" }]),
+    }
+
+    const daemon = new OuroDaemon({ socketPath, processManager, scheduler, healthMonitor, router })
+    return { daemon, processManager, scheduler, healthMonitor, router }
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("handles daemon start/stop and socket lifecycle", async () => {
+    const socketPath = tmpSocketPath("daemon-start-stop")
+    fs.writeFileSync(socketPath, "stale", "utf-8")
+
+    const { daemon, processManager } = make(socketPath)
+
+    const started = await daemon.handleCommand({ kind: "daemon.start" })
+    expect(started).toEqual({ ok: true, message: "daemon started" })
+    expect(processManager.startAutoStartAgents).toHaveBeenCalledTimes(1)
+    expect(fs.existsSync(socketPath)).toBe(true)
+
+    const stopped = await daemon.handleCommand({ kind: "daemon.stop" })
+    expect(stopped).toEqual({ ok: true, message: "daemon stopped" })
+    expect(processManager.stopAll).toHaveBeenCalled()
+    expect(fs.existsSync(socketPath)).toBe(false)
+  })
+
+  it("returns status summary for empty and populated snapshots", async () => {
+    const socketPath = tmpSocketPath("daemon-status")
+    const { daemon, processManager } = make(socketPath)
+
+    const emptyStatus = await daemon.handleCommand({ kind: "daemon.status" })
+    expect(emptyStatus.summary).toBe("no managed agents")
+
+    processManager.listAgentSnapshots.mockReturnValueOnce([
+      {
+        name: "slugger",
+        channel: "cli",
+        status: "running",
+        pid: null,
+        restartCount: 2,
+        startedAt: null,
+        lastCrashAt: null,
+        backoffMs: 1000,
+      },
+    ])
+
+    const populatedStatus = await daemon.handleCommand({ kind: "daemon.status" })
+    expect(populatedStatus.summary).toContain("slugger")
+    expect(populatedStatus.summary).toContain("restarts=2")
+  })
+
+  it("handles health, agent, cron, and message commands", async () => {
+    const socketPath = tmpSocketPath("daemon-command-set")
+    const { daemon, processManager, scheduler, healthMonitor, router } = make(socketPath)
+
+    const health = await daemon.handleCommand({ kind: "daemon.health" })
+    expect(health.summary).toContain("agent-processes:ok:good")
+    expect(healthMonitor.runChecks).toHaveBeenCalled()
+
+    await daemon.handleCommand({ kind: "agent.start", agent: "slugger" })
+    await daemon.handleCommand({ kind: "agent.stop", agent: "slugger" })
+    await daemon.handleCommand({ kind: "agent.restart", agent: "slugger" })
+    expect(processManager.startAgent).toHaveBeenCalledWith("slugger")
+    expect(processManager.stopAgent).toHaveBeenCalledWith("slugger")
+    expect(processManager.restartAgent).toHaveBeenCalledWith("slugger")
+
+    scheduler.listJobs.mockReturnValueOnce([])
+    expect((await daemon.handleCommand({ kind: "cron.list" })).summary).toBe("no cron jobs")
+
+    scheduler.listJobs.mockReturnValueOnce([
+      { id: "nightly", schedule: "0 3 * * *", lastRun: null },
+    ])
+    expect((await daemon.handleCommand({ kind: "cron.list" })).summary).toContain("last=never")
+
+    expect((await daemon.handleCommand({ kind: "cron.trigger", jobId: "nightly" })).message).toContain("triggered")
+
+    const queued = await daemon.handleCommand({
+      kind: "message.send",
+      from: "slugger",
+      to: "ouroboros",
+      content: "hi",
+    })
+    expect(queued.message).toContain("queued message")
+    expect(router.send).toHaveBeenCalled()
+
+    const polled = await daemon.handleCommand({ kind: "message.poll", agent: "ouroboros" })
+    expect(polled.summary).toBe("1 messages")
+    expect(router.pollInbox).toHaveBeenCalledWith("ouroboros")
+  })
+
+  it("returns protocol errors for malformed payloads", async () => {
+    const socketPath = tmpSocketPath("daemon-bad-raw")
+    const { daemon } = make(socketPath)
+
+    const notJson = JSON.parse(await daemon.handleRawPayload("not-json")) as { ok: boolean; error: string }
+    expect(notJson.ok).toBe(false)
+    expect(notJson.error).toContain("expected JSON object")
+
+    const missingKind = JSON.parse(await daemon.handleRawPayload("{}")) as { ok: boolean; error: string }
+    expect(missingKind.error).toContain("missing kind")
+
+    const badKindType = JSON.parse(await daemon.handleRawPayload('{"kind":123}')) as { ok: boolean; error: string }
+    expect(badKindType.error).toContain("kind must be a string")
+  })
+
+  it("stringifies non-Error throw values from command handling", async () => {
+    const socketPath = tmpSocketPath("daemon-non-error-catch")
+    const { daemon } = make(socketPath)
+    vi.spyOn(daemon, "handleCommand").mockRejectedValueOnce("string-failure")
+
+    const raw = await daemon.handleRawPayload('{"kind":"daemon.status"}')
+    const parsed = JSON.parse(raw) as { ok: boolean; error: string }
+
+    expect(parsed.ok).toBe(false)
+    expect(parsed.error).toBe("string-failure")
+  })
+
+  it("serves socket requests and can be started twice safely", async () => {
+    const socketPath = tmpSocketPath("daemon-socket-integration")
+    const { daemon } = make(socketPath)
+
+    await daemon.start()
+    await daemon.start()
+
+    const raw = await sendRaw(socketPath, '{"kind":"daemon.status"}')
+    const parsed = JSON.parse(raw) as { ok: boolean; summary?: string }
+
+    expect(parsed.ok).toBe(true)
+    expect(parsed.summary).toBe("no managed agents")
+
+    await daemon.stop()
+  })
+
+  it("returns unknown-command error for unsupported kinds", async () => {
+    const socketPath = tmpSocketPath("daemon-unknown-command")
+    const { daemon } = make(socketPath)
+
+    const result = await daemon.handleCommand({ kind: "unknown" } as unknown as never)
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain("Unknown daemon command")
+  })
+
+  it("stops cleanly when server was never started", async () => {
+    const socketPath = tmpSocketPath("daemon-stop-no-server")
+    fs.writeFileSync(socketPath, "stale", "utf-8")
+    const { daemon, processManager } = make(socketPath)
+
+    await daemon.stop()
+    expect(processManager.stopAll).toHaveBeenCalledTimes(1)
+    expect(fs.existsSync(socketPath)).toBe(false)
+  })
+})
