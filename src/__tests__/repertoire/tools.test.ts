@@ -332,6 +332,16 @@ describe("execTool", () => {
     vi.unstubAllGlobals()
   })
 
+  it("governance_convention returns constitution convention metadata", async () => {
+    const result = await execTool("governance_convention", { query: "classification" })
+    const parsed = JSON.parse(result)
+    expect(parsed.convention).toBe("constitution-classification")
+    expect(parsed.defaultResult).toBe("within-bounds")
+    expect(parsed.results).toEqual(["within-bounds", "requires-review"])
+    expect(parsed.guidance.withinBounds).toContain("additive")
+    expect(parsed.guidance.requiresReview).toContain("structural")
+  })
+
   // ── unknown tool ──
   it("returns 'unknown' for unrecognized tool name", async () => {
     const result = await execTool("nonexistent_tool", {})
@@ -405,6 +415,14 @@ describe("summarizeArgs", () => {
 
   it("returns empty string for load_skill with no name", () => {
     expect(summarizeArgs("load_skill", {})).toBe("")
+  })
+
+  it("returns query for governance_convention", () => {
+    expect(summarizeArgs("governance_convention", { query: "classification" })).toBe("query=classification")
+  })
+
+  it("returns empty string for governance_convention with no query", () => {
+    expect(summarizeArgs("governance_convention", {})).toBe("")
   })
 
   it("returns truncated prompt for claude", () => {
@@ -533,6 +551,7 @@ describe("ToolDefinition type and registry", () => {
     expect(names).toContain("claude")
     expect(names).toContain("web_search")
     expect(names).toContain("gh_cli")
+    expect(names).toContain("governance_convention")
   })
 
   it("teams tool definitions include expected tool names", async () => {
@@ -581,6 +600,7 @@ describe("tools array export (backward compat)", () => {
     expect(names).toContain("get_current_time")
     expect(names).toContain("claude")
     expect(names).toContain("web_search")
+    expect(names).toContain("governance_convention")
   })
 })
 
