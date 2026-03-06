@@ -23,8 +23,8 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 - [x] All code/tests referencing old `ouroboros/` path updated
 - [x] `.gitignore` excludes entire `*.ouro/` directories from harness repo
 - [x] Bundle git init works for self-backup (nested inside gitignored directory)
-- [ ] Bundles pushed to private GitHub repos (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`)
-- [ ] `psyche/memory/` directory structure scaffolded in bundles
+- [x] Bundles pushed to private GitHub repos (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`)
+- [x] `psyche/memory/` directory structure scaffolded in bundles
 - [x] Agent preflight loads governance docs (tested)
 - [ ] `npm test` green
 - [ ] 100% coverage on new code
@@ -104,12 +104,12 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 **Output**: `.gitignore` update and nested repo init evidence.
 **Acceptance**: Bundle directories are ignored by harness git while nested git repos initialize correctly.
 
-### ⬜ Unit 4b: Private GitHub Backup Push
+### ✅ Unit 4b: Private GitHub Backup Push
 **What**: Create or reuse private repos (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`) and push nested bundle histories.
 **Output**: Remote URLs and push outcomes captured in artifacts.
 **Acceptance**: Both bundle repos have successful push state (idempotent handling if repos already exist).
 
-### ⬜ Unit 4c: Memory Scaffold + Backup Verification
+### ✅ Unit 4c: Memory Scaffold + Backup Verification
 **What**: Verify required `psyche/memory/` scaffolding in both bundles and validate nested git state after push.
 **Output**: Directory and git-state verification artifact.
 **Acceptance**: Memory scaffold and nested backup criteria are both satisfied.
@@ -143,3 +143,5 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 - 2026-03-05 17:26 Unit 3a complete: migrated active `ouroboros/` runtime assets into `ouroboros.ouro/`, aligned `manifest`->`teams-app` and `SELF-KNOWLEDGE`->`TACIT`, and captured green test/tsc evidence
 - 2026-03-05 17:30 Unit 3b complete: added Slugger bundle contract checks, replaced empty `slugger.ouro/agent.json` with a scope-safe stub based on Ouroboros config shape, and reconfirmed `npm test` + `npx tsc`
 - 2026-03-05 17:33 Unit 4a complete: enforced `*.ouro/` gitignore contract with red/green tests, added `.gitignore` rule, initialized nested git repos in both bundles, and reconfirmed `npm test` + `npx tsc`
+- 2026-03-05 17:34 Unit 4b complete: committed initial nested bundle histories, created private GitHub repos (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`), configured origins, and pushed `main` for both bundles
+- 2026-03-05 17:35 Unit 4c complete: verified required `psyche/memory/` scaffold paths in both bundles and confirmed local/remote main HEAD parity for nested backup repos
