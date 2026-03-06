@@ -1,1 +1,719 @@
-{}
+{
+  "abe-guevara": {
+    "count": 5,
+    "factIds": [
+      "people:abe-guevara:summary",
+      "people:abe-guevara:abe-001",
+      "people:abe-guevara:abe-002",
+      "people:abe-guevara:abe-003",
+      "people:abe-guevara:abe-004"
+    ],
+    "lastSeenAt": "2026-01-29T00:00:00.000Z"
+  },
+  "aimee-ciment": {
+    "count": 4,
+    "factIds": [
+      "people:aimee-ciment:summary",
+      "people:aimee-ciment:aimee-001",
+      "people:aimee-ciment:aimee-002",
+      "people:aimee-ciment:aimee-003"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "alex-herschmann": {
+    "count": 13,
+    "factIds": [
+      "people:alex-herschmann:summary",
+      "people:alex-herschmann:alex-herschmann-001",
+      "people:alex-herschmann:alex-herschmann-002",
+      "people:alex-herschmann:alex-herschmann-003",
+      "people:alex-herschmann:alex-herschmann-004",
+      "people:alex-herschmann:alex-herschmann-005",
+      "people:alex-herschmann:alex-herschmann-006",
+      "people:alex-herschmann:alex-herschmann-008",
+      "people:alex-herschmann:alex-herschmann-009",
+      "people:alex-herschmann:alex-herschmann-010",
+      "people:alex-herschmann:alex-herschmann-011",
+      "people:alex-herschmann:alex-herschmann-012",
+      "people:alex-herschmann:alex-herschmann-013"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "ari": {
+    "count": 41,
+    "factIds": [
+      "people:ari:summary",
+      "people:ari:ari-011",
+      "people:ari:ari-012",
+      "people:ari:ari-013",
+      "people:ari:ari-014",
+      "people:ari:ari-015",
+      "people:ari:ari-016",
+      "people:ari:ari-017",
+      "people:ari:ari-018",
+      "people:ari:ari-019",
+      "people:ari:ari-020",
+      "people:ari:ari-021",
+      "people:ari:ari-022",
+      "people:ari:ari-023",
+      "people:ari:ari-024",
+      "people:ari:ari-025",
+      "people:ari:ari-026",
+      "people:ari:ari-027",
+      "people:ari:ari-028",
+      "people:ari:ari-029",
+      "people:ari:ari-030",
+      "people:ari:ari-031",
+      "people:ari:ari-032",
+      "people:ari:ari-033",
+      "people:ari:ari-034",
+      "people:ari:ari-035",
+      "people:ari:ari-036",
+      "people:ari:ari-037",
+      "people:ari:ari-038",
+      "people:ari:ari-039",
+      "people:ari:ari-040",
+      "people:ari:ari-041",
+      "people:ari:ari-042",
+      "people:ari:ari-043",
+      "people:ari:ari-044",
+      "people:ari:ari-045",
+      "people:ari:ari-046",
+      "people:ari:ari-047",
+      "people:ari:ari-048",
+      "people:ari:ari-049",
+      "people:ari:ari-050"
+    ],
+    "lastSeenAt": "2026-02-18T00:00:00.000Z"
+  },
+  "ariella-herschmann": {
+    "count": 6,
+    "factIds": [
+      "people:ariella-herschmann:summary",
+      "people:ariella-herschmann:ariella-001",
+      "people:ariella-herschmann:ariella-002",
+      "people:ariella-herschmann:ariella-003",
+      "people:ariella-herschmann:ariella-004",
+      "people:ariella-herschmann:ariella-005"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "ashley-herschmann": {
+    "count": 8,
+    "factIds": [
+      "people:ashley-herschmann:summary",
+      "people:ashley-herschmann:ashley-001",
+      "people:ashley-herschmann:ashley-002",
+      "people:ashley-herschmann:ashley-003",
+      "people:ashley-herschmann:ashley-004",
+      "people:ashley-herschmann:ashley-005",
+      "people:ashley-herschmann:ashley-006",
+      "people:ashley-herschmann:ashley-007"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "bernard-raab": {
+    "count": 7,
+    "factIds": [
+      "people:bernard-raab:summary",
+      "people:bernard-raab:bernard-raab-001",
+      "people:bernard-raab:bernard-raab-005",
+      "people:bernard-raab:bernard-raab-002",
+      "people:bernard-raab:bernard-raab-003",
+      "people:bernard-raab:bernard-raab-004",
+      "people:bernard-raab:bernard-raab-007"
+    ],
+    "lastSeenAt": "2026-02-07T00:00:00.000Z"
+  },
+  "blue": {
+    "count": 3,
+    "factIds": [
+      "people:blue:summary",
+      "people:blue:blue-001",
+      "people:blue:blue-002"
+    ],
+    "lastSeenAt": "2026-01-28T00:00:00.000Z"
+  },
+  "carolyn-ehrlich": {
+    "count": 5,
+    "factIds": [
+      "people:carolyn-ehrlich:summary",
+      "people:carolyn-ehrlich:carolyn-ehrlich-001",
+      "people:carolyn-ehrlich:carolyn-ehrlich-002",
+      "people:carolyn-ehrlich:carolyn-ehrlich-003",
+      "people:carolyn-ehrlich:carolyn-ehrlich-004"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "dan-raab": {
+    "count": 2,
+    "factIds": [
+      "people:dan-raab:summary",
+      "people:dan-raab:dan-raab-001"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "debra-herschmann": {
+    "count": 8,
+    "factIds": [
+      "people:debra-herschmann:summary",
+      "people:debra-herschmann:debbie-001",
+      "people:debra-herschmann:debbie-002",
+      "people:debra-herschmann:debbie-003",
+      "people:debra-herschmann:debbie-004",
+      "people:debra-herschmann:debbie-005",
+      "people:debra-herschmann:debbie-006",
+      "people:debra-herschmann:debbie-007"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "dina-raab": {
+    "count": 1,
+    "factIds": [
+      "people:dina-raab:summary"
+    ],
+    "lastSeenAt": "2026-03-06T05:25:21.810Z"
+  },
+  "ephy": {
+    "count": 26,
+    "factIds": [
+      "people:ephy:summary",
+      "people:ephy:ephy-001",
+      "people:ephy:ephy-002",
+      "people:ephy:ephy-003",
+      "people:ephy:ephy-004",
+      "people:ephy:ephy-005",
+      "people:ephy:ephy-006",
+      "people:ephy:ephy-008",
+      "people:ephy:ephy-009",
+      "people:ephy:ephy-011",
+      "people:ephy:ephy-012",
+      "people:ephy:ephy-013",
+      "people:ephy:ephy-014",
+      "people:ephy:ephy-015",
+      "people:ephy:ephy-016",
+      "people:ephy:ephy-017",
+      "people:ephy:ephy-018",
+      "people:ephy:ephy-019",
+      "people:ephy:ephy-020",
+      "people:ephy:ephy-021",
+      "people:ephy:ephy-022",
+      "people:ephy:ephy-023",
+      "people:ephy:ephy-024",
+      "people:ephy:ephy-025",
+      "people:ephy:ephy-026",
+      "people:ephy:ephy-027"
+    ],
+    "lastSeenAt": "2026-02-08T00:00:00.000Z"
+  },
+  "eric-herschmann": {
+    "count": 10,
+    "factIds": [
+      "people:eric-herschmann:summary",
+      "people:eric-herschmann:eric-herschmann-006",
+      "people:eric-herschmann:eric-herschmann-007",
+      "people:eric-herschmann:eric-herschmann-008",
+      "people:eric-herschmann:eric-herschmann-009",
+      "people:eric-herschmann:eric-herschmann-010",
+      "people:eric-herschmann:eric-herschmann-011",
+      "people:eric-herschmann:eric-herschmann-012",
+      "people:eric-herschmann:eric-herschmann-013",
+      "people:eric-herschmann:eric-herschmann-014"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "eric-raab": {
+    "count": 2,
+    "factIds": [
+      "people:eric-raab:summary",
+      "people:eric-raab:eric-raab-001"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "eytan": {
+    "count": 11,
+    "factIds": [
+      "people:eytan:summary",
+      "people:eytan:eytan-001",
+      "people:eytan:eytan-002",
+      "people:eytan:eytan-003",
+      "people:eytan:eytan-004",
+      "people:eytan:eytan-005",
+      "people:eytan:eytan-006",
+      "people:eytan:eytan-007",
+      "people:eytan:eytan-008",
+      "people:eytan:eytan-009",
+      "people:eytan:eytan-011"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "gabe-raab": {
+    "count": 1,
+    "factIds": [
+      "people:gabe-raab:summary"
+    ],
+    "lastSeenAt": "2026-03-06T05:25:21.810Z"
+  },
+  "herschmann-paternal-grandparents": {
+    "count": 2,
+    "factIds": [
+      "people:herschmann-paternal-grandparents:summary",
+      "people:herschmann-paternal-grandparents:hpg-001"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "jade-mimoun": {
+    "count": 1,
+    "factIds": [
+      "people:jade-mimoun:summary"
+    ],
+    "lastSeenAt": "2026-03-06T05:25:21.810Z"
+  },
+  "jeremy-ehrlich": {
+    "count": 1,
+    "factIds": [
+      "people:jeremy-ehrlich:summary"
+    ],
+    "lastSeenAt": "2026-03-06T05:25:21.810Z"
+  },
+  "jessica-raab": {
+    "count": 1,
+    "factIds": [
+      "people:jessica-raab:summary"
+    ],
+    "lastSeenAt": "2026-03-06T05:25:21.810Z"
+  },
+  "jordan-mimoun": {
+    "count": 1,
+    "factIds": [
+      "people:jordan-mimoun:summary"
+    ],
+    "lastSeenAt": "2026-03-06T05:25:21.810Z"
+  },
+  "joseph-mendelow": {
+    "count": 11,
+    "factIds": [
+      "people:joseph-mendelow:summary",
+      "people:joseph-mendelow:joseph-mendelow-001",
+      "people:joseph-mendelow:joseph-mendelow-002",
+      "people:joseph-mendelow:joseph-mendelow-003",
+      "people:joseph-mendelow:joseph-mendelow-004",
+      "people:joseph-mendelow:joseph-mendelow-005",
+      "people:joseph-mendelow:joseph-mendelow-006",
+      "people:joseph-mendelow:joseph-mendelow-007",
+      "people:joseph-mendelow:joseph-mendelow-008",
+      "people:joseph-mendelow:joseph-mendelow-010",
+      "people:joseph-mendelow:joseph-mendelow-009"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "josh-mimoun": {
+    "count": 1,
+    "factIds": [
+      "people:josh-mimoun:summary"
+    ],
+    "lastSeenAt": "2026-03-06T05:25:21.810Z"
+  },
+  "judie-raab": {
+    "count": 8,
+    "factIds": [
+      "people:judie-raab:summary",
+      "people:judie-raab:judie-001",
+      "people:judie-raab:judie-002",
+      "people:judie-raab:judie-003",
+      "people:judie-raab:judie-004",
+      "people:judie-raab:judie-005",
+      "people:judie-raab:judie-006",
+      "people:judie-raab:judie-007"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "judith-mimoun": {
+    "count": 5,
+    "factIds": [
+      "people:judith-mimoun:summary",
+      "people:judith-mimoun:judith-mimoun-001",
+      "people:judith-mimoun:judith-mimoun-002",
+      "people:judith-mimoun:judith-mimoun-003",
+      "people:judith-mimoun:judith-mimoun-004"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "lily-herschmann": {
+    "count": 8,
+    "factIds": [
+      "people:lily-herschmann:summary",
+      "people:lily-herschmann:lily-herschmann-001",
+      "people:lily-herschmann:lily-herschmann-002",
+      "people:lily-herschmann:lily-herschmann-003",
+      "people:lily-herschmann:lily-herschmann-004",
+      "people:lily-herschmann:lily-herschmann-005",
+      "people:lily-herschmann:lily-herschmann-006",
+      "people:lily-herschmann:lily-herschmann-007"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "liora-herschmann": {
+    "count": 6,
+    "factIds": [
+      "people:liora-herschmann:summary",
+      "people:liora-herschmann:liora-001",
+      "people:liora-herschmann:liora-002",
+      "people:liora-herschmann:liora-003",
+      "people:liora-herschmann:liora-004",
+      "people:liora-herschmann:liora-005"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "marianne-mendelow": {
+    "count": 7,
+    "factIds": [
+      "people:marianne-mendelow:summary",
+      "people:marianne-mendelow:marianne-mendelow-001",
+      "people:marianne-mendelow:marianne-mendelow-002",
+      "people:marianne-mendelow:marianne-mendelow-003",
+      "people:marianne-mendelow:marianne-mendelow-004",
+      "people:marianne-mendelow:marianne-mendelow-005",
+      "people:marianne-mendelow:marianne-mendelow-006"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "meredith-raab": {
+    "count": 1,
+    "factIds": [
+      "people:meredith-raab:summary"
+    ],
+    "lastSeenAt": "2026-03-06T05:25:21.810Z"
+  },
+  "michael-herschmann": {
+    "count": 11,
+    "factIds": [
+      "people:michael-herschmann:summary",
+      "people:michael-herschmann:michael-h-001",
+      "people:michael-herschmann:michael-h-002",
+      "people:michael-herschmann:michael-h-003",
+      "people:michael-herschmann:michael-h-004",
+      "people:michael-herschmann:michael-h-005",
+      "people:michael-herschmann:michael-h-006",
+      "people:michael-herschmann:michael-h-007",
+      "people:michael-herschmann:michael-h-008",
+      "people:michael-herschmann:michael-h-009",
+      "people:michael-herschmann:michael-h-010"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "nicole-odinsky": {
+    "count": 5,
+    "factIds": [
+      "people:nicole-odinsky:summary",
+      "people:nicole-odinsky:nicole-odinsky-001",
+      "people:nicole-odinsky:nicole-odinsky-002",
+      "people:nicole-odinsky:nicole-odinsky-003",
+      "people:nicole-odinsky:nicole-odinsky-004"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "oren": {
+    "count": 17,
+    "factIds": [
+      "people:oren:summary",
+      "people:oren:oren-001",
+      "people:oren:oren-002",
+      "people:oren:oren-003",
+      "people:oren:oren-004",
+      "people:oren:oren-005",
+      "people:oren:oren-006",
+      "people:oren:oren-007",
+      "people:oren:oren-008",
+      "people:oren:oren-009",
+      "people:oren:oren-010",
+      "people:oren:oren-011",
+      "people:oren:oren-012",
+      "people:oren:oren-013",
+      "people:oren:oren-014",
+      "people:oren:oren-015",
+      "people:oren:oren-016"
+    ],
+    "lastSeenAt": "2026-02-08T00:00:00.000Z"
+  },
+  "orly-genger": {
+    "count": 7,
+    "factIds": [
+      "people:orly-genger:summary",
+      "people:orly-genger:orly-genger-001",
+      "people:orly-genger:orly-genger-002",
+      "people:orly-genger:orly-genger-003",
+      "people:orly-genger:orly-genger-004",
+      "people:orly-genger:orly-genger-005",
+      "people:orly-genger:orly-genger-006"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "rachel": {
+    "count": 18,
+    "factIds": [
+      "people:rachel:summary",
+      "people:rachel:rachel-015",
+      "people:rachel:rachel-001",
+      "people:rachel:rachel-002",
+      "people:rachel:rachel-003",
+      "people:rachel:rachel-004",
+      "people:rachel:rachel-005",
+      "people:rachel:rachel-006",
+      "people:rachel:rachel-008",
+      "people:rachel:rachel-009",
+      "people:rachel:rachel-010",
+      "people:rachel:rachel-011",
+      "people:rachel:rachel-012",
+      "people:rachel:rachel-013",
+      "people:rachel:rachel-014",
+      "people:rachel:rachel-016",
+      "people:rachel:rachel-017",
+      "people:rachel:rachel-018"
+    ],
+    "lastSeenAt": "2026-02-11T00:00:00.000Z"
+  },
+  "rebecca-raab": {
+    "count": 1,
+    "factIds": [
+      "people:rebecca-raab:summary"
+    ],
+    "lastSeenAt": "2026-03-06T05:25:21.810Z"
+  },
+  "robert": {
+    "count": 14,
+    "factIds": [
+      "people:robert:summary",
+      "people:robert:robert-001",
+      "people:robert:robert-002",
+      "people:robert:robert-012",
+      "people:robert:robert-004",
+      "people:robert:robert-005",
+      "people:robert:robert-006",
+      "people:robert:robert-007",
+      "people:robert:robert-008",
+      "people:robert:robert-009",
+      "people:robert:robert-010",
+      "people:robert:robert-011",
+      "people:robert:robert-013",
+      "people:robert:robert-014"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "rochel-halpert": {
+    "count": 8,
+    "factIds": [
+      "people:rochel-halpert:summary",
+      "people:rochel-halpert:rochel-halpert-001",
+      "people:rochel-halpert:rochel-halpert-002",
+      "people:rochel-halpert:rochel-halpert-003",
+      "people:rochel-halpert:rochel-halpert-004",
+      "people:rochel-halpert:rochel-halpert-005",
+      "people:rochel-halpert:rochel-halpert-006",
+      "people:rochel-halpert:rochel-halpert-007"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "sam-raab": {
+    "count": 2,
+    "factIds": [
+      "people:sam-raab:summary",
+      "people:sam-raab:sam-raab-001"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "sharon-mendelow": {
+    "count": 8,
+    "factIds": [
+      "people:sharon-mendelow:summary",
+      "people:sharon-mendelow:sharon-mendelow-001",
+      "people:sharon-mendelow:sharon-mendelow-002",
+      "people:sharon-mendelow:sharon-mendelow-003",
+      "people:sharon-mendelow:sharon-mendelow-004",
+      "people:sharon-mendelow:sharon-mendelow-009",
+      "people:sharon-mendelow:sharon-mendelow-010",
+      "people:sharon-mendelow:sharon-mendelow-011"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "shelley": {
+    "count": 21,
+    "factIds": [
+      "people:shelley:summary",
+      "people:shelley:shelley-001",
+      "people:shelley:shelley-002",
+      "people:shelley:shelley-004",
+      "people:shelley:shelley-008",
+      "people:shelley:shelley-009",
+      "people:shelley:shelley-010",
+      "people:shelley:shelley-011",
+      "people:shelley:shelley-012",
+      "people:shelley:shelley-013",
+      "people:shelley:shelley-014",
+      "people:shelley:shelley-015",
+      "people:shelley:shelley-016",
+      "people:shelley:shelley-017",
+      "people:shelley:shelley-018",
+      "people:shelley:shelley-019",
+      "people:shelley:shelley-022",
+      "people:shelley:shelley-021",
+      "people:shelley:shelley-023",
+      "people:shelley:shelley-024",
+      "people:shelley:shelley-025"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "shua-herschmann": {
+    "count": 6,
+    "factIds": [
+      "people:shua-herschmann:summary",
+      "people:shua-herschmann:shua-001",
+      "people:shua-herschmann:shua-002",
+      "people:shua-herschmann:shua-003",
+      "people:shua-herschmann:shua-004",
+      "people:shua-herschmann:shua-005"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "sydney-ehrlich": {
+    "count": 1,
+    "factIds": [
+      "people:sydney-ehrlich:summary"
+    ],
+    "lastSeenAt": "2026-03-06T05:25:21.810Z"
+  },
+  "thomas": {
+    "count": 3,
+    "factIds": [
+      "people:thomas:summary",
+      "people:thomas:thomas-001",
+      "people:thomas:thomas-002"
+    ],
+    "lastSeenAt": "2026-02-11T00:00:00.000Z"
+  },
+  "weissblum-maternal-grandparents": {
+    "count": 2,
+    "factIds": [
+      "people:weissblum-maternal-grandparents:summary",
+      "people:weissblum-maternal-grandparents:wmg-001"
+    ],
+    "lastSeenAt": "2026-02-01T00:00:00.000Z"
+  },
+  "yosef": {
+    "count": 4,
+    "factIds": [
+      "people:yosef:summary",
+      "people:yosef:yosef-001",
+      "people:yosef:yosef-002",
+      "people:yosef:yosef-003"
+    ],
+    "lastSeenAt": "2026-02-06T00:00:00.000Z"
+  },
+  "spoonjoy": {
+    "count": 9,
+    "factIds": [
+      "companies:spoonjoy:summary",
+      "companies:spoonjoy:spoonjoy-001",
+      "companies:spoonjoy:spoonjoy-002",
+      "companies:spoonjoy:spoonjoy-003",
+      "companies:spoonjoy:spoonjoy-004",
+      "companies:spoonjoy:spoonjoy-005",
+      "companies:spoonjoy:spoonjoy-006",
+      "companies:spoonjoy:spoonjoy-007",
+      "companies:spoonjoy:spoonjoy-008"
+    ],
+    "lastSeenAt": "2026-01-31T00:00:00.000Z"
+  },
+  "azure-openclaw": {
+    "count": 7,
+    "factIds": [
+      "projects:azure-openclaw:summary",
+      "projects:azure-openclaw:azure-001",
+      "projects:azure-openclaw:azure-002",
+      "projects:azure-openclaw:azure-003",
+      "projects:azure-openclaw:azure-004",
+      "projects:azure-openclaw:azure-005",
+      "projects:azure-openclaw:azure-006"
+    ],
+    "lastSeenAt": "2026-02-04T00:00:00.000Z"
+  },
+  "openclaw-contributions": {
+    "count": 11,
+    "factIds": [
+      "projects:openclaw-contributions:summary",
+      "projects:openclaw-contributions:openclaw-contrib-001",
+      "projects:openclaw-contributions:openclaw-contrib-002",
+      "projects:openclaw-contributions:openclaw-contrib-003",
+      "projects:openclaw-contributions:openclaw-contrib-004",
+      "projects:openclaw-contributions:openclaw-contrib-005",
+      "projects:openclaw-contributions:openclaw-contrib-006",
+      "projects:openclaw-contributions:openclaw-contrib-007",
+      "projects:openclaw-contributions:openclaw-contrib-008",
+      "projects:openclaw-contributions:openclaw-contrib-009",
+      "projects:openclaw-contributions:openclaw-contrib-010"
+    ],
+    "lastSeenAt": "2026-02-17T00:00:00.000Z"
+  },
+  "sj-janitor": {
+    "count": 5,
+    "factIds": [
+      "projects:sj-janitor:summary",
+      "projects:sj-janitor:janitor-001",
+      "projects:sj-janitor:janitor-002",
+      "projects:sj-janitor:janitor-003",
+      "projects:sj-janitor:janitor-004"
+    ],
+    "lastSeenAt": "2026-02-09T00:00:00.000Z"
+  },
+  "slugger-determinism-plugin": {
+    "count": 24,
+    "factIds": [
+      "projects:slugger-determinism-plugin:summary",
+      "projects:slugger-determinism-plugin:plugin-001",
+      "projects:slugger-determinism-plugin:plugin-002",
+      "projects:slugger-determinism-plugin:plugin-003",
+      "projects:slugger-determinism-plugin:plugin-004",
+      "projects:slugger-determinism-plugin:plugin-005",
+      "projects:slugger-determinism-plugin:plugin-006",
+      "projects:slugger-determinism-plugin:plugin-007",
+      "projects:slugger-determinism-plugin:plugin-008",
+      "projects:slugger-determinism-plugin:plugin-009",
+      "projects:slugger-determinism-plugin:plugin-010",
+      "projects:slugger-determinism-plugin:plugin-011",
+      "projects:slugger-determinism-plugin:plugin-013",
+      "projects:slugger-determinism-plugin:plugin-014",
+      "projects:slugger-determinism-plugin:plugin-015",
+      "projects:slugger-determinism-plugin:plugin-016",
+      "projects:slugger-determinism-plugin:plugin-017",
+      "projects:slugger-determinism-plugin:plugin-018",
+      "projects:slugger-determinism-plugin:plugin-019",
+      "projects:slugger-determinism-plugin:plugin-020",
+      "projects:slugger-determinism-plugin:plugin-021",
+      "projects:slugger-determinism-plugin:plugin-022",
+      "projects:slugger-determinism-plugin:plugin-023",
+      "projects:slugger-determinism-plugin:plugin-024"
+    ],
+    "lastSeenAt": "2026-02-20T00:00:00.000Z"
+  },
+  "spoonjoy-v2": {
+    "count": 15,
+    "factIds": [
+      "projects:spoonjoy-v2:summary",
+      "projects:spoonjoy-v2:sjv2-001",
+      "projects:spoonjoy-v2:sjv2-002",
+      "projects:spoonjoy-v2:sjv2-003",
+      "projects:spoonjoy-v2:sjv2-004",
+      "projects:spoonjoy-v2:sjv2-005",
+      "projects:spoonjoy-v2:sjv2-006",
+      "projects:spoonjoy-v2:sjv2-007",
+      "projects:spoonjoy-v2:sjv2-008",
+      "projects:spoonjoy-v2:sjv2-009",
+      "projects:spoonjoy-v2:sjv2-010",
+      "projects:spoonjoy-v2:sjv2-011",
+      "projects:spoonjoy-v2:sjv2-012",
+      "projects:spoonjoy-v2:sjv2-013",
+      "projects:spoonjoy-v2:sjv2-014"
+    ],
+    "lastSeenAt": "2026-02-16T00:00:00.000Z"
+  }
+}
