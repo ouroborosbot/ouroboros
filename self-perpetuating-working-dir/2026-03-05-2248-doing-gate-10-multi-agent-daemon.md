@@ -74,7 +74,7 @@ Expected target files:
 - `src/daemon/workspaces.ts`
 - `src/__tests__/daemon/process-manager.test.ts`
 
-### ⬜ Unit 1c: Process/workspace coverage hardening
+### ✅ Unit 1c: Process/workspace coverage hardening
 **What**: Close branch/error-path coverage gaps in process/workspace modules and refactor for deterministic behavior.
 **Output**: `unit-1c-coverage.log`.
 **Acceptance**: 100% coverage on Unit 1 modules with suite green.
@@ -152,3 +152,4 @@ Expected target files:
 - 2026-03-05 22:53 Unit 0 complete: captured supervisor baseline and concrete daemon module/test target map
 - 2026-03-05 22:53 Unit 1a complete: added failing process-manager/workspace-isolation tests and captured red log
 - 2026-03-05 22:55 Unit 1b complete: implemented daemon process manager and workspace clone/sync with green tests and clean compile
+- 2026-03-05 22:59 Unit 1c complete: added branch/error/default-dependency tests and reached 100% coverage for Unit 1 daemon modules
