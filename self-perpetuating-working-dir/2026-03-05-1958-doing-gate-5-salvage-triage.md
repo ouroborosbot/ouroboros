@@ -48,7 +48,7 @@ Execute Gate 5 by re-landing valuable salvageable code from the reverted overnig
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Baseline salvage inventory
+### ✅ Unit 0: Baseline salvage inventory
 **What**: Read `self-perpetuating-working-dir/gate-0-commit-map.md` and the archived overnight proposal files from `archive/self-perpetuating-run-2026-03-05` to build the canonical Gate 5 input set.
 **Output**: `unit-0-salvage-inventory.md` and `unit-0-proposal-index.json` artifacts.
 **Acceptance**: Inventory includes every reverted commit candidate and all 31 overnight proposals with source paths.
@@ -122,3 +122,4 @@ Execute Gate 5 by re-landing valuable salvageable code from the reverted overnig
 - 2026-03-05 19:59 Granularity pass: split proposal triage into Unit 4a/4b/4c for deterministic accounting and execution
 - 2026-03-05 20:00 Validation pass: verified `gate-0-commit-map.md`, archive branch proposal paths, and `ouroboros.ouro/tasks/` preservation target paths exist as referenced
 - 2026-03-05 20:00 Quality pass: confirmed emoji-prefixed unit headers, explicit acceptance criteria, no TBD placeholders, and completion checklist alignment
+- 2026-03-05 20:02 Unit 0 complete: generated salvage classification baseline and canonical 31-proposal index with archive source paths
