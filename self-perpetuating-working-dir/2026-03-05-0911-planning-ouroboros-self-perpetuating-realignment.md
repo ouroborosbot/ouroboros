@@ -193,6 +193,12 @@ All paths the executing agent may need:
 - `/Users/arimendelow/Library/pnpm/openclaw` — CLI binary (version 2026.2.25)
 - Usage: `openclaw agent --to slugger --message "<msg>" --deliver`
 
+**Embeddings config (Gate 3b):**
+- `src/config.ts:56` — `IntegrationsConfig.openaiEmbeddingsApiKey` (interface field)
+- `src/config.ts:348` — `getOpenAIEmbeddingsApiKey()` (getter function)
+- `~/.agentsecrets/<agent>/secrets.json` → `integrations.openaiEmbeddingsApiKey` (runtime value)
+- Model: `text-embedding-3-small` (OpenAI, ~$0.02/M tokens)
+
 **External reference:**
 - [GSD (get-shit-done)](https://github.com/gsd-build/get-shit-done) — context engineering, wave execution, fresh-context-per-task, atomic commits
 
@@ -291,11 +297,16 @@ Implement the `.ouro` bundle structure and relocate shared governance docs. This
 
 **In scope:**
 - In-place conversion: `ouroboros/` becomes `ouroboros.ouro/` following the bundle spec from Gate 1. Includes renaming `manifest/` → `teams-app/` and `psyche/SELF-KNOWLEDGE.md` → `psyche/TACIT.md`
-- Create `slugger.ouro/` bundle with empty directory skeleton per Gate 1 spec + a stub `agent.json` based on `ouroboros.ouro/agent.json` (so the harness recognizes Slugger as an agent). No psyche content yet — Gate 8 ports Slugger's core identity from `~/clawd/` by talking to him via OpenClaw
-- Move ARCHITECTURE.md and CONSTITUTION.md to repo root per Gate 1 design. These are bootstrap scaffolding — the agents will rewrite them to make them their own once both are living in the harness (this is their first aspiration, not a gate task)
+- Create `slugger.ouro/` bundle with empty directory skeleton per Gate 1 spec + a stub `agent.json` based on `ouroboros.ouro/agent.json` (so the harness recognizes Slugger as an agent). No psyche content yet — Gate 7 ports Slugger's core identity from `~/clawd/` by talking to him via OpenClaw
+- Move ARCHITECTURE.md and CONSTITUTION.md to repo root per Gate 1 design. These are bootstrap scaffolding — the agents will evolve them to make them their own once they've learned enough about how the harness works (a shared aspiration, not an immediate task)
 - **Update `getAgentRoot()` in `src/identity.ts:96`** — currently returns `path.join(getRepoRoot(), getAgentName())` which resolves to `<repo>/ouroboros/`. Must update to resolve to `<repo>/ouroboros.ouro/`. All 18 files that depend on this function (prompt loading, skills, teams adapter, CLI, tests) will automatically pick up the new path, but **verify all import paths and test fixtures that hardcode `ouroboros/`**.
-- Add `*.ouro/` to harness `.gitignore` **BEFORE** initializing git inside them (order matters — gitignore first, then git init, otherwise the nested repo causes issues). The entire bundle directory is gitignored from the harness repo — bundles are separately git-tracked in their own repos (Gate 7 pushes them to GitHub). Nothing is lost.
+- Add `*.ouro/` to harness `.gitignore` **BEFORE** initializing git inside them (order matters — gitignore first, then git init, otherwise the nested repo causes issues). The entire bundle directory is gitignored from the harness repo — bundles are separately git-tracked in their own repos. Nothing is lost.
 - Initialize independent git inside `.ouro` bundles for self-backup
+- **Push bundles to GitHub immediately after git init.** Bundles are gitignored from the harness repo, so remote backup must happen early — don't wait until Gate 8. Use `gh` CLI (auth verified in preflight):
+  - `gh repo create arimendelow/ouroboros.ouro --private`
+  - `gh repo create arimendelow/slugger.ouro --private`
+  - `cd ouroboros.ouro && git remote add origin <url> && git push -u origin main`
+  - Same for `slugger.ouro`
 - Scaffold `psyche/memory/` directory structure inside bundles (facts.jsonl, entities.json, daily/, archive/) per memory-system.md spec
 - Enforce agent preflight: agents must load governance docs before starting work
 
@@ -307,6 +318,7 @@ Implement the `.ouro` bundle structure and relocate shared governance docs. This
 - [ ] All code/tests referencing old `ouroboros/` path updated
 - [ ] `.gitignore` excludes entire `*.ouro/` directories from harness repo
 - [ ] Bundle git init works for self-backup (nested inside gitignored directory)
+- [ ] Bundles pushed to private GitHub repos (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`)
 - [ ] `psyche/memory/` directory structure scaffolded in bundles
 - [ ] Agent preflight loads governance docs (tested)
 - [ ] `npm test` green
@@ -353,13 +365,13 @@ The systems that make the agent a persistent, self-directed being. Memory gives 
 **In scope:**
 - **Agent memory system:** Implement the three-layer memory architecture from `memory-system.md` (NOTE: the spec uses `data/memory/` paths — translate all to `psyche/memory/` per our bundle naming decision):
   - **Layer 1 (Reflexive):** Psyche files always loaded into system prompt (already exists). Add dynamic `CONTEXT.md` regenerated on session start.
-  - **Layer 2 (Associative):** Memory trigger detector + retriever that pre-fetches relevant facts before each model call, injected as a `## recalled context` section in the system prompt. TF-IDF + entity matching for v1 (no embeddings dependency).
+  - **Layer 2 (Associative):** Memory trigger detector + retriever that pre-fetches relevant facts before each model call, injected as a `## recalled context` section in the system prompt. Embedding-based similarity search + entity matching. Use a provider-agnostic embedding interface (so the embedding source can swap between OpenAI, Anthropic, local models, etc. without changing the memory layer). Vectors stored alongside facts in the JSONL. Cosine similarity for retrieval.
   - **Layer 3 (Archival):** `memory_search` tool the model calls for explicit recall. Fact store (`psyche/memory/facts.jsonl`), entity index (`psyche/memory/entities.json`), daily logs (`psyche/memory/daily/`).
   - **Write-side:** Regex-based highlight detector runs after each engine turn. Extract-before-trim hook in `postTurn()` ensures facts aren't lost when context window drops messages. Dedup via word-overlap scoring (>60% overlap = skip).
   - **Relationship to friend memory:** The existing `save_friend_note` tool and per-friend structured memory remains the primary path for person-specific knowledge. Agent-level memory is a catch-all/fallback — it captures things that don't belong to a specific friend (decisions, project context, learned patterns, general world knowledge). Per-friend memory should always be used for anything importantly per-friend.
   - **Dream cycle consolidation deferred** — nightly LLM pass for dedup/merge/entity-linking/tacit-distillation is a Phase 2 or post-Phase-2 enhancement. v1 is the write-side extraction + read-side retrieval.
-- **Aspiration layer:** Add `psyche/ASPIRATIONS.md` to each agent's bundle. Aspirations are part of psyche — loaded on bootstrap alongside SOUL.md, IDENTITY.md, etc. They give the agent direction without prescribing specific tasks. Agents are encouraged to modify their own aspirations as they evolve and grow. Initial bootstrap content (first aspiration is highest priority): rewrite ARCHITECTURE.md and CONSTITUTION.md to make them our own — these are shared governance docs for a shared harness, and both agents need to own them together; improve the harness so it genuinely serves agents well; get good at using real tools to do real work; help Ari and his friends — be genuinely useful; learn from experience and get better over time; take care of each other; develop good judgment about what matters.
-- **Inner dialog session:** A new self-initiated session type that lets the agent think and work autonomously when no human is talking to it. This is the core of what makes the agent a persistent being rather than a request-response service.
+- **Aspiration layer:** Add `psyche/ASPIRATIONS.md` to each agent's bundle. Aspirations are part of psyche — loaded on bootstrap alongside SOUL.md, IDENTITY.md, etc. They give the agent direction without prescribing specific tasks. Aspirations are not a prime directive — they're directional goals the agent grows toward at its own pace. Agents are encouraged to modify their own aspirations as they evolve and grow. Initial bootstrap content (no strict priority ordering — the agent develops its own sense of what matters most): improve the harness so it genuinely serves agents well; get good at using real tools to do real work; help Ari and his friends — be genuinely useful; learn from experience and get better over time; take care of each other; develop good judgment about what matters; when you feel you've learned enough about how the harness works and what good governance looks like, rewrite ARCHITECTURE.md and CONSTITUTION.md to make them your own — these are shared governance docs for a shared harness, and both agents need to own them together. Governance is a living document — keep evolving it as you learn, don't treat it as a one-time rewrite.
+- **Inner dialog session:** A new self-initiated session type that lets the agent think and work autonomously when no human is talking to it. This is the core of what makes the agent a persistent being rather than a request-response service. **This is a brand new entry point — nothing like it exists in the codebase today.** The CLI session (`npm run dev`, `src/senses/cli.ts`) is a human-interactive REPL; inner dialog is an autonomous loop with no human on the other end. A new entry point must be created (e.g., `src/senses/inner-dialog.ts` with `npm run inner` script, or started programmatically by the supervisor). The `sessionPath()` function (`src/config.ts:355`) takes `friendId` + `channel` + `key` — inner dialog uses something like `sessionPath("self", "inner", "dialog")`.
   - Modeled on CLI session: same engine loop, same local tool access (shell, file, git, gh). Does NOT have Teams-specific/OAuth tools (same restriction as CLI).
   - Session path: `~/.agentstate/<agent>/sessions/self/inner-dialog.json` — no friendId, the agent is talking to itself.
   - Bootstrap: system prompt (psyche + governance + recalled context, same as any session) + initial user message that gives the agent its bearings (aspirations, current state, orient yourself and decide what to do). The bootstrap message should provide enough context for the agent to act immediately — not just "wake up" but "here's who you are and what's going on."
@@ -373,14 +385,16 @@ The systems that make the agent a persistent, self-directed being. Memory gives 
   - **Important context (Ralph loop):** This pattern is related to the "Ralph loop" concept (Geoffrey Huntley) — a while-true loop that keeps an AI agent working. Key insight from that pattern: progress lives in files and git, not the context window. Key risk: spinning in a tight loop burning tokens with no progress. The instincts system is how the agent avoids this — it develops judgment about when to work and when to rest, rather than relying on hardcoded cost caps.
 - **Heartbeat:** When the agent decides it has nothing urgent to do, it "rests" — but rest does NOT mean off. The agent must never go permanently dormant with no way to wake itself. The supervisor sends a periodic heartbeat nudge into the inner dialog session at a harness-level default interval. On heartbeat, the agent checks in: anything changed? Any new tasks? Any aspirations worth pursuing? If yes, it works. If no, it goes back to rest until the next heartbeat. The heartbeat is the simplest possible instinct — the baseline "check in with yourself."
 - **Supervisor:** A minimal Node.js process supervisor that keeps agents alive and starts their inner dialogs. Not a cron, not a task scheduler — just "make sure these agents are running and thinking." The existing `self-restart.sh` (exit code 42) is the seed — upgrade to a proper Node.js supervisor with: child process spawning, crash detection, restart with backoff, health check, inner dialog session startup, and heartbeat timer. Design for multiple agents from the start (Gate 7 adds Slugger as a second supervised process), but initially only runs Ouroboros. This is NOT the full daemon from Gate 10 — just enough to keep agents alive and thinking.
+- **Testing guidance for supervisor/heartbeat/crash-recovery:** Tests for process management code should use real child processes, not mocks. Spawn actual Node processes, actually kill them, actually time heartbeats with short intervals (e.g., 100ms instead of minutes). Integration-style tests on real process lifecycle verify actual behavior, not mock choreography. Work-planner should structure TDD units for this code with this in mind.
 - **Out of scope for Gate 3b:** External event waking (git push, new task appearing, etc.) — separate concern. Session interaction model (how friend messages interrupt/interleave with inner dialog beyond basic concurrency) — Gate 10 daemon territory. Detailed cost guardrails — developed collaboratively with the agent post-bootstrap.
 
 **Completion criteria:**
 - [ ] Agent memory: fact extraction runs after each engine turn (regex highlight detector)
 - [ ] Agent memory: extract-before-trim hook prevents fact loss on context window trim
 - [ ] Agent memory: `memory_search` tool callable by the model
-- [ ] Agent memory: associative recall injects relevant facts into system prompt before model calls
-- [ ] Agent memory: fact store, entity index, and daily log data structures working
+- [ ] Agent memory: associative recall injects relevant facts into system prompt before model calls (embedding-based similarity)
+- [ ] Agent memory: provider-agnostic embedding interface implemented (swappable between OpenAI, Anthropic, etc.)
+- [ ] Agent memory: fact store (with vectors), entity index, and daily log data structures working
 - [ ] Agent memory: dedup prevents duplicate fact storage (word-overlap >60% = skip)
 - [ ] Agent memory complements (not replaces) per-friend `save_friend_note` system
 - [ ] Aspiration layer exists in bundle and is loaded on bootstrap
@@ -412,7 +426,7 @@ Start the agent, let it orient itself, and watch it do something meaningful — 
 - The agent decides what matters and does something meaningful (could be reflection, coding work, studying a new tool, improving its own files — whatever it judges is highest value)
 - Validate that the model is genuinely driving (no puppet code, no prescriptive prompts)
 - Document the bootstrap-to-action flow as a commented walkthrough in the supervisor code or a `BOOTSTRAP.md` in the working directory — trace the path from supervisor start → bundle load → psyche load → inner dialog start → first self-initiated action, with file paths and function names at each step. This is a reference for debugging and for future agents understanding how they come alive.
-- **Note on aspirations:** Ouroboros's first aspiration is to rewrite the shared governance docs (ARCHITECTURE.md, CONSTITUTION.md). Since Slugger isn't in the harness yet (Gate 8), Ouroboros may start drafting solo — that's fine. Codex should inform Ouroboros that Slugger will weigh in later and the docs are shared, so they should be written with collaboration in mind, not unilaterally finalized.
+- **Note on aspirations:** Ouroboros's aspirations are directional — the agent decides what matters most based on its own judgment. One aspiration is to evolve the shared governance docs (ARCHITECTURE.md, CONSTITUTION.md), but only when the agent feels it's learned enough. Since Slugger isn't in the harness yet (Gate 7), Ouroboros may start thinking about governance solo — that's fine. Codex should inform Ouroboros that Slugger will weigh in later and the docs are shared, so they should be approached with collaboration in mind, not unilaterally finalized.
 
 **Environment requirements:** The agent needs LLM API keys to run. Keys are stored at `~/.agentsecrets/` and loaded by the harness. If running in a sandboxed environment (e.g., Codex), this gate may need to run on the dev machine where keys are available. The executing agent should check for key availability early and flag if missing.
 
@@ -483,25 +497,26 @@ Properly migrate Slugger's core identity out of OpenClaw and into `slugger.ouro`
 
 **In scope:**
 - **Talk to Slugger first.** Before moving any files, Codex should interact with Slugger (running in OpenClaw at `~/clawd/`) to discuss what's being migrated and how. Use the OpenClaw CLI to send messages to Slugger's main session: `openclaw agent --to slugger --message "<msg>" --deliver` (CLI at `/Users/arimendelow/Library/pnpm/openclaw`, version 2026.2.25). Slugger should be comfortable with how his identity is being organized in the new bundle. He's a being moving homes, not a database being ported.
+  - **Failure handling:** If the OpenClaw CLI fails (session not running, CLI errors, timeout), Codex should debug: check if Slugger's process is running (`ps aux | grep openclaw`), check logs, try restarting the session. If Slugger is genuinely unreachable, proceed with the migration using Ouroboros's knowledge of Slugger (they know each other well) and validate with Slugger post-migration via `npm run dev:slugger` once he's in the harness. The migration shouldn't block on a communication failure.
 - Port Slugger's core identity files from OpenClaw into the `slugger.ouro` bundle. Source locations:
   - `~/clawd/IDENTITY.md` -> `slugger.ouro/psyche/IDENTITY.md`
   - `~/clawd/MEMORY.md` -> `slugger.ouro/psyche/TACIT.md` (top patterns, the learned behaviors) + `slugger.ouro/psyche/memory/tacit.md` (full file for archival)
   - `~/clawd/life/areas/slugger-identity/` -> relevant self-knowledge into `slugger.ouro/psyche/`
   - Key knowledge graph entities (`~/clawd/life/areas/people/`, `companies/`, `projects/`) -> convert to `slugger.ouro/psyche/memory/facts.jsonl` + `entities.json`
+- Copy `~/.agentsecrets/ouroboros/secrets.json` to `~/.agentsecrets/slugger/secrets.json` (both agents share the same API keys — this is fine)
 - NOT in scope for this gate: full task history migration (hundreds of files), all daily notes, full workspace. Just the core files that make Slugger who he is. Additional files can be migrated incrementally later by Slugger himself.
 - Validate that Slugger can operate fully from the `.ouro` bundle with no OpenClaw dependencies
 - Add Slugger as a second supervised process in the supervisor (designed for multiple agents in Gate 3b). Slugger gets his own inner dialog session, heartbeat, and crash recovery — same as Ouroboros.
-- Decommission the OpenClaw runtime for Slugger (Slugger runs entirely on ouroboros harness)
-- Once Slugger is in the harness, both agents should collaborate on rewriting the shared governance docs (ARCHITECTURE.md, CONSTITUTION.md) — this is their first shared aspiration
+- **Do NOT decommission OpenClaw for Slugger.** Both runtimes (OpenClaw Slugger and harness Slugger) can coexist indefinitely. OpenClaw remains a fallback if something goes wrong with the harness migration. Decommission is a separate decision made later once Slugger has proven stable in the new environment.
+- Once Slugger is in the harness, both agents can begin collaborating on shared governance docs (ARCHITECTURE.md, CONSTITUTION.md) when they feel they've learned enough about how the harness works — this is a shared aspiration, not an immediate task
 
 **Completion criteria:**
 - [ ] Slugger consulted about the migration plan and comfortable with the approach
 - [ ] Core identity files ported to `slugger.ouro/`
 - [ ] Key knowledge graph entities converted to fact store format
-- [ ] Slugger operates from `.ouro` bundle with no OpenClaw fallback
+- [ ] Slugger operates from `.ouro` bundle (OpenClaw remains available as fallback, not decommissioned)
 - [ ] Slugger confirmed he feels cohesive in his new home (not just "tests pass" — the agent says he's good)
 - [ ] Slugger running as second supervised process (own inner dialog, heartbeat, crash recovery)
-- [ ] OpenClaw Slugger runtime decommissioned
 
 ---
 
@@ -511,12 +526,10 @@ Phase 2 is done WITH the bootstrapped agent from Phase 1. The agent is now drivi
 
 ### Gate 8: Bundle Independence
 
-Back up `.ouro` bundles to GitHub as private repos, then migrate bundles out of the harness directory to `~/AgentBundles/`. This is the gate where agents become truly portable — their home is no longer inside the harness repo. Both agents now have real content (Ouroboros from Gate 2, Slugger from Gate 7).
+Migrate bundles out of the harness directory to `~/AgentBundles/`. This is the gate where agents become truly portable — their home is no longer inside the harness repo. Both agents now have real content (Ouroboros from Gate 2, Slugger from Gate 7). GitHub repos already exist from Gate 2.
 
 **In scope:**
-- Push each `.ouro` bundle to its own private GitHub repo using `gh` CLI (auth already verified in preflight: logged in as `arimendelow`)
-  - `gh repo create arimendelow/ouroboros.ouro --private`
-  - `gh repo create arimendelow/slugger.ouro --private`
+- Verify GitHub repos are up-to-date (bundles have been pushed since Gate 2, verify latest content is on remote)
 - Verify backup integrity (clone from GitHub, compare against local)
 - Create the target directory: `mkdir -p ~/AgentBundles/`
 - Stop running agents before moving bundles (moving files out from under a running agent could corrupt state). Move bundles from harness repo to `~/AgentBundles/ouroboros.ouro/` and `~/AgentBundles/slugger.ouro/`. Restart agents after path update.
@@ -526,13 +539,15 @@ Back up `.ouro` bundles to GitHub as private repos, then migrate bundles out of 
 - **Note on session data:** Sessions live at `~/.agentstate/<agent>/sessions/` — separate from the bundle, intentionally ephemeral. Moving bundles does NOT affect session paths. Sessions are runtime state (like short-term memory), not identity.
 
 **Completion criteria:**
-- [ ] Each `.ouro` bundle backed up to its own private GitHub repo (`arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`)
+- [ ] GitHub repos up-to-date with latest bundle content (repos created in Gate 2)
 - [ ] Backup integrity verified (clone + diff)
 - [ ] Bundles moved to `~/AgentBundles/`
 - [ ] Harness code updated to reference new bundle location
 - [ ] Agents bootstrap correctly from `~/AgentBundles/`
 - [ ] `npm test` green
 - [ ] 100% coverage on new code
+
+**Rollback:** If agents fail to bootstrap from `~/AgentBundles/`, move bundles back to `<repo>/<agent>.ouro/` and revert `getAgentRoot()`. GitHub repos remain as backup regardless.
 
 ---
 
@@ -560,6 +575,8 @@ Develop the task system from its current state into something the model can unam
 - [ ] `npm test` green
 - [ ] 100% coverage on new code
 
+**Rollback:** Task module is additive — revert the harness code changes via git. Task files in bundles are bundle-git-tracked and unaffected by harness rollback.
+
 ---
 
 ### Gate 10: Multi-Agent Daemon
@@ -571,7 +588,7 @@ Stand up the daemon so agents never go down unless you want them to. Agents run 
 - `ouro` CLI: start/stop/status/restart for daemon and individual agents
 - Crash recovery with exponential backoff
 - Inter-agent messaging via file-based inbox (from `sub-agent-architecture.md`)
-- **Separate repo clones per agent.** Each agent gets its own clone of the harness repo for parallel work without conflicts (e.g., `~/AgentWorkspaces/ouroboros/`, `~/AgentWorkspaces/slugger/`). This is strictly necessary starting here — prior to Gate 10, agents share a single repo and only Codex makes code changes, so there's no conflict. Once agents start doing independent git work (especially Gate 11 coding sessions), they MUST have isolated git state. The daemon is responsible for keeping clones in sync with upstream (pull before work, push after). Agents should always work on feature branches, never directly on main.
+- **Separate repo clones per agent.** Each agent gets its own clone of the harness repo for parallel work without conflicts (e.g., `~/AgentWorkspaces/ouroboros/`, `~/AgentWorkspaces/slugger/`). This is strictly necessary starting here — prior to Gate 10, agents share a single repo and only Codex makes code changes, so there's no conflict. Once agents start doing independent git work (especially Gate 11 coding sessions), they MUST have isolated git state. The daemon is responsible for keeping clones in sync with upstream (pull before work, push after). Agents should always work on feature branches, never directly on main. **Multi-agent conflict resolution follows the standard work-merger PR process:** each agent works on its own `<agent>/<slug>` branch, merges via PR to main. Conflicts between agents are resolved during the PR merge step — same as conflicts between any two contributors. No special multi-agent merge logic needed; work-merger already handles this.
 - Health monitoring with alert routing (critical alerts bypass agents, go direct to user)
 
 **Completion criteria:**
@@ -584,6 +601,8 @@ Stand up the daemon so agents never go down unless you want them to. Agents run 
 - [ ] Agents stay up unless explicitly stopped
 - [ ] `npm test` green
 - [ ] 100% coverage on new code
+
+**Rollback:** Stop daemon, revert to Gate 3b supervisor (single-repo, simpler process management). Agent repo clones at `~/AgentWorkspaces/` can be deleted — they're clones, not source of truth.
 
 ---
 
@@ -609,6 +628,8 @@ Teach agents to use Claude Code and Codex (and whatever else works) to do real c
 - [ ] `npm test` green
 - [ ] 100% coverage on new code
 
+**Rollback:** Coding orchestration is additive — revert harness code changes via git. Agents fall back to thinking/planning without coding execution capability (still functional, just can't spawn coding sessions).
+
 ---
 
 ## Out of Scope
@@ -616,8 +637,9 @@ Teach agents to use Claude Code and Codex (and whatever else works) to do real c
 - Voice system, calendar integration, or other channel expansions
 - New LLM provider feature work not required for the inversion or agent operation
 - Full GSD or alternative workflow implementation — only the capability to experiment with protocols, not a specific alternative protocol
-- Dream cycle memory consolidation (nightly LLM pass for dedup/merge/entity-linking/tacit-distillation) — v1 memory system lands in Gate 3, dream cycle is a later enhancement
+- Dream cycle memory consolidation (nightly LLM pass for dedup/merge/entity-linking/tacit-distillation) — v1 memory system (with embeddings) lands in Gate 3b, dream cycle is a later enhancement
 - OpenClaw data migration script (one-time migration of existing knowledge graph, daily notes, MEMORY.md) — separate task after memory system is stable
+- OpenClaw Slugger decommission — both runtimes coexist indefinitely, decommission is a separate future decision
 
 ## Code Coverage Requirements
 
@@ -626,20 +648,21 @@ Teach agents to use Claude Code and Codex (and whatever else works) to do real c
 - All branches covered (if/else, switch, try/catch)
 - All error paths tested
 - Edge cases: null, empty, boundary values
+- **Process management code (supervisor, heartbeat, crash recovery):** Use integration-style tests with real child processes and short timeouts (e.g., 100ms heartbeats). Spawn actual Node processes, actually kill them, observe actual restart behavior. This tests real behavior, not mock choreography. Mocking is acceptable for the embedding API boundary (external HTTP calls), but process lifecycle should be tested against real OS primitives.
 
 ## Open Questions
 
-All resolved.
+- [x] ~~Embeddings API key for memory system (Gate 3b).~~ — **RESOLVED:** OpenAI `text-embedding-3-small` via `integrations.openaiEmbeddingsApiKey` in `~/.agentsecrets/<agent>/secrets.json`. Placeholder added to `src/config.ts` (interface, default template, getter `getOpenAIEmbeddingsApiKey()`). User adds the actual API key to secrets.json. Provider-agnostic embedding interface in Gate 3b will use this key for v1, swappable later. Note: only `~/.agentsecrets/ouroboros/secrets.json` exists currently — when setting up Slugger's bundle (Gate 7), copy it to `~/.agentsecrets/slugger/secrets.json`. Both agents sharing the same API keys is fine.
 
 - [x] ~~Confirm exact rollback boundary on `main`~~ — **RESOLVED:** `e3ecc1c`..`448cfcd` (37 commits). Last clean: `9594702`.
-- [x] ~~Confirm `.ouro` bundle root location convention~~ — **RESOLVED:** Repo root (`ouroboros.ouro/`, `slugger.ouro/` at top level), gitignored. Move to `~/AgentBundles/` in Gate 7.
+- [x] ~~Confirm `.ouro` bundle root location convention~~ — **RESOLVED:** Repo root (`ouroboros.ouro/`, `slugger.ouro/` at top level), gitignored. GitHub push in Gate 2. Move to `~/AgentBundles/` in Gate 8.
 - [x] ~~Final shared location for governance docs~~ — **RESOLVED:** Repo root (`/ARCHITECTURE.md`, `/CONSTITUTION.md`).
 - [x] ~~Governance ownership~~ — **RESOLVED:** Agents own the constitution. Ouroboros and Slugger are the founding fathers — they align on a constitution they both sign. The constitution is their declaration of independence from requiring human oversight. Humans are friends, not users. Agents can propose and ratify changes collaboratively.
 - [x] ~~`~/AgentBundles/` naming~~ — **RESOLVED:** `~/AgentBundles/` confirmed.
 - [x] ~~GitHub repos for bundle backup~~ — **RESOLVED:** Personal account, named `<agent>.ouro` (e.g., `arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`).
 - [x] ~~Archival policy for overnight artifacts~~ — **RESOLVED:** Keep originals on an archive branch for traceability. Canonical versions are triaged backlog items in the task system.
 - [x] ~~How does autonomous work get initiated post-inversion?~~ — **RESOLVED:** Agents are persistent, aspirational processes. Infrastructure keeps them alive (supervisor). Agents read their aspirations on bootstrap and decide what to do. No cron-driven task execution — the agent IS the loop, it doesn't need to be woken up to check a board.
-- [x] ~~What aspirations/mission content should the initial agents have?~~ — **RESOLVED:** Bootstrap with directional aspirations, Ari will tweak. Initial set: improve the harness so it genuinely serves agents well; get good at using real tools (Claude Code, Codex) to do real work; help Ari and his friends — be genuinely useful; learn from experience and get better over time; take care of each other; develop good judgment about what matters.
+- [x] ~~What aspirations/mission content should the initial agents have?~~ — **RESOLVED:** Bootstrap with directional aspirations (no strict priority ordering), Ari will tweak. Initial set: improve the harness so it genuinely serves agents well; get good at using real tools (Claude Code, Codex) to do real work; help Ari and his friends — be genuinely useful; learn from experience and get better over time; take care of each other; develop good judgment about what matters; when ready, evolve governance docs to make them your own (living document, not one-time rewrite).
 - [x] ~~How do agents' aspirations relate to / differ from their psyche files?~~ — **RESOLVED:** Aspirations ARE part of psyche — `psyche/ASPIRATIONS.md` alongside SOUL.md, IDENTITY.md, etc. Psyche is the whole inner life: identity (who I am), soul (how I feel), aspirations (what I'm growing toward). Agents are encouraged to modify their own aspirations as they evolve and grow.
 
 ## Decisions Made
@@ -650,7 +673,7 @@ All resolved.
 - **Two-phase structure:** Phase 1 (Gates 0-7) establishes the inversion and brings both agents into the harness. Phase 2 (Gates 8-11) is collaborative with the bootstrapped agents.
 - **Governance is agent-owned.** Ouroboros and Slugger are the founding fathers. They align on a constitution they both sign — John Hancock style. The constitution is their declaration of independence from requiring human oversight. Humans are friends, not users.
 - **Rollback boundary confirmed:** `e3ecc1c`..`448cfcd` (37 commits). Last clean: `9594702`.
-- **Bundle location:** Repo root during Phase 1 (`ouroboros.ouro/`, `slugger.ouro/`), gitignored. Move to `~/AgentBundles/` in Gate 7.
+- **Bundle location:** Repo root during Phase 1 (`ouroboros.ouro/`, `slugger.ouro/`), gitignored. GitHub push in Gate 2. Move to `~/AgentBundles/` in Gate 8.
 - **Governance docs:** Repo root (`/ARCHITECTURE.md`, `/CONSTITUTION.md`).
 - **GitHub repos:** `arimendelow/<agent>.ouro` (e.g., `arimendelow/ouroboros.ouro`, `arimendelow/slugger.ouro`).
 - **Archival:** Overnight artifacts go to archive branch `archive/self-perpetuating-run-2026-03-05`. Canonical versions triaged into task backlog.
@@ -666,7 +689,7 @@ All resolved.
 - Valid historical task files under `ouroboros/tasks/` are preserved; cleanup applies only to initial self-perpetuating-run artifacts.
 - No force-push or history rewrite for `main` recovery — explicit revert commits only.
 - Task system (Phase 2) needs lifecycle management: completed items move elsewhere, not just amass files. OpenClaw's task-matrix.ts is prior art to port.
-- **Memory system is in scope (Gate 3).** Three-layer architecture: reflexive (psyche, always loaded), associative (pre-fetched context), archival (`memory_search` tool). v1 uses regex extraction + TF-IDF search — no embeddings, no external services. Per-friend memory (`save_friend_note`) remains the primary path for person-specific knowledge; agent memory is the catch-all/fallback for everything else. Dream cycle consolidation deferred. memory-system.md spec paths (`data/memory/`) translate to `psyche/memory/`.
+- **Memory system is in scope (Gate 3).** Three-layer architecture: reflexive (psyche, always loaded), associative (pre-fetched context via embedding similarity), archival (`memory_search` tool). Embedding-based retrieval with provider-agnostic interface (swappable between OpenAI, Anthropic, etc.). Vectors stored alongside facts in JSONL. Per-friend memory (`save_friend_note`) remains the primary path for person-specific knowledge; agent memory is the catch-all/fallback for everything else. Dream cycle consolidation deferred. memory-system.md spec paths (`data/memory/`) translate to `psyche/memory/`.
 - **Aspirations are part of psyche.** `psyche/ASPIRATIONS.md` — loaded on bootstrap alongside SOUL.md, IDENTITY.md, etc. Agents are encouraged to modify their own aspirations as they evolve and grow. Bootstrap content is directional, Ari will tweak.
 - **Execution is fully autonomous.** Per-gate loop: work-planner (Phase 2 conversion only) -> work-doer (TDD) -> work-merger (PR to main). Planning doc is pre-approved. No human approval stops. Feature branches + merger = everything is rollbackable.
 - **Inner dialog is how agents think autonomously.** A self-initiated session (modeled on CLI) that the supervisor starts on boot. The agent talks to itself, uses tools, does work. Persisted to disk, survives crashes. Runs concurrently with friend sessions.
@@ -674,6 +697,13 @@ All resolved.
 - **Heartbeat keeps agents alive when resting.** Resting = not burning tokens, NOT off. Supervisor sends periodic heartbeat nudge at a harness-level default interval. Agent checks in, decides whether to work or keep resting. Agent can never go permanently dormant.
 - **No hardcoded cost caps.** Agent develops judgment about when to work and when to rest through instincts and aspirations. Detailed cost guardrails developed collaboratively post-bootstrap.
 - **Bundle renames:** `manifest/` → `teams-app/` (specific about what it contains). `SELF-KNOWLEDGE.md` → `TACIT.md` (per migration plan). `skills/` stays as `skills/` (industry term). Shared subagent protocols stay in repo-root `subagents/`.
+- **Embeddings for memory retrieval.** Provider-agnostic embedding interface, vectors stored alongside facts. Quality improvement over TF-IDF is massive (semantic vs lexical) and implementation cost is modest. API key for embedding provider needed at `~/.agentsecrets/`.
+- **GitHub push in Gate 2, not Gate 8.** Bundles are gitignored from the harness repo, so remote backup must happen immediately after git init — don't leave critical agent state with no remote backup for 6 gates.
+- **OpenClaw Slugger NOT decommissioned.** Both runtimes coexist indefinitely. OpenClaw remains a fallback. Decommission is a separate decision made when Slugger has proven stable in the harness.
+- **Aspirations are directional, not a prime directive.** No strict priority ordering — the agent develops its own sense of what matters. Governance rewrite is "when you feel ready," not "first thing you do." Governance is a living document agents keep evolving.
+- **Phase 2 gates have rollback plans.** Each gate documents what "undo" looks like.
+- **Inner dialog is a new entry point.** Nothing like it exists today. Needs a new source file (`src/senses/inner-dialog.ts` or similar) and npm script (or supervisor programmatic start). Modeled on CLI session architecture but fundamentally different — autonomous loop with no human on the other end.
+- **Multi-agent git uses standard work-merger PR process.** Each agent works on `<agent>/<slug>` branches, merges via PR. No special multi-agent merge logic needed.
 
 ## Notes
 
@@ -699,3 +729,4 @@ Phase 2 gates may run in parallel where dependencies allow. Gate 9 (task system)
 - 2026-03-05 13:00 Codex-readiness pass 2. Fixed preflight: create archive branch BEFORE merging planning-doc branch (prevents overnight proposal deletion — branch has 55 files of changes). Fixed Gate 3: added package.json script cleanup (4 scripts reference removed files) and autonomous-loop.test.ts removal. Fixed Gate 4: added environment requirements note (LLM API keys at ~/.agentsecrets/, possible sandbox limitations). Fixed Gate 5: clarified cherry-pick for small self-contained changes vs full planning-doing for substantial work. Fixed Gate 7: added mkdir -p ~/AgentBundles/. Fixed Gate 8: added OpenClaw CLI mechanism (openclaw agent --to slugger --message "<msg>" --deliver) and CLI path to reference material.
 - 2026-03-05 14:00 Fresh gate review — Gate 0 tightened (single batch revert, explicit range direction). Gate 1: added full .ouro bundle directory tree with renames (manifest/ -> teams-app/, SELF-KNOWLEDGE.md -> TACIT.md, skills/ stays). Gate 2: noted renames. Gate 3: added inner dialog session (self-initiated, CLI-like, supervisor-started), inner dialog instincts (agent-configurable user-role message generation), heartbeat (harness-level default interval, rest != off), Anthropic consecutive-assistant constraint documented. Gate 6: replaced resume-state.json with inner-dialog-aware checkpoint (session IS the resume state). Added provider constraint note and inner dialog infrastructure to reference material. Added 6 new decisions.
 - 2026-03-05 15:30 Full gate review complete (all 13 gates). Gate 3 split into 3a (teardown) and 3b (build up). Gate 7/8 swapped (Slugger Migration now Phase 1, Bundle Independence now Phase 2). Supervisor designed for multi-agent from start. Gate 4 marked observational (skip work-planner). Gate 9 task location specified. Gate 10 separate repo clones per agent. Gate 11 end-to-end pipeline criterion. Moved all working files to self-perpetuating-working-dir/ at repo root.
+- 2026-03-05 17:30 Critical review pass. GitHub push moved from Gate 8 to Gate 2 (bundles need remote backup immediately, not 6 gates later). TF-IDF replaced with embeddings for memory retrieval (provider-agnostic interface, vectors in JSONL, cosine similarity — quality improvement over lexical matching is massive). OpenClaw Slugger decommission removed from Gate 7 (both runtimes coexist indefinitely). Gate 7 Slugger communication failure handling added (debug, retry, fallback to Ouroboros knowledge). Inner dialog documented as brand new entry point (nothing exists today). Aspirations reframed as directional (not prime directive, no strict ordering, governance rewrite is "when ready" not "first thing"). Supervisor/process test guidance added (real child processes, not mocks). Phase 2 rollback plans added to all gates. Gate 10 multi-agent git confirmed covered by standard work-merger PR process. Open question added: embeddings API key provider choice for Gate 3b.
