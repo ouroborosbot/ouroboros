@@ -1,4 +1,5 @@
 import { AgentSupervisor } from "./supervisor"
+import { emitNervesEvent } from "./nerves/runtime"
 
 export interface SupervisorLike {
   start(): Promise<void>
@@ -29,6 +30,13 @@ export function parseSupervisorAgents(argv: string[]): string[] {
 }
 
 export function createAgentSupervisors(agents: readonly string[]): AgentSupervisor[] {
+  emitNervesEvent({
+    level: "info",
+    component: "supervisor",
+    event: "supervisor.entry_start",
+    message: "creating agent supervisors",
+    meta: { agentCount: agents.length },
+  })
   return agents.map((agent) => new AgentSupervisor({ agent }))
 }
 
