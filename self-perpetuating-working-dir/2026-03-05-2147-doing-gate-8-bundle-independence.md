@@ -51,6 +51,12 @@ Move `ouroboros.ouro` and `slugger.ouro` out of the harness repo into `~/AgentBu
 **What**: Capture current bundle locations, nested git remotes, path-resolution behavior, and running-process state before relocation.
 **Output**: `unit-0-baseline.md`.
 **Acceptance**: Artifact records verified current state and identified Gate 8 touchpoints.
+Validated target touchpoints:
+- `src/identity.ts` (`getAgentRoot`)
+- `src/__tests__/identity.test.ts`
+- `src/__tests__/nerves/bundle-skeleton.contract.test.ts`
+- `package.json` (`manifest:package` script)
+- `.gitignore`
 
 ### ⬜ Unit 1: Bundle backup integrity verification
 **What**: Ensure both bundle repos are current on GitHub, then clone each remote to a temp location and diff against local bundles.
@@ -104,3 +110,4 @@ Move `ouroboros.ouro` and `slugger.ouro` out of the harness repo into `~/AgentBu
 ## Progress Log
 - 2026-03-05 21:47 Created from Gate 8 section of approved planning doc
 - 2026-03-05 21:48 Granularity pass: split relocation/hygiene into Units 3a and 3b for clearer execution boundaries
+- 2026-03-05 21:49 Validation pass: confirmed Gate 8 touchpoints for path resolution, bundle contracts, and packaging script assumptions
