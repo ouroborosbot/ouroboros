@@ -483,11 +483,11 @@ Resume state and classification calibration. Intentionally a lighter gate — he
 - Calibrate constitution classification for the new queryable convention (Gate 3a replaced the hardcoded `if`): additive work defaults to `within-bounds`, structural changes remain `requires-review`
 
 **Completion criteria:**
-- [ ] Resume state: agent recovers cleanly from interruption, orienting faster than cold start (tested with simulated interruption)
-- [ ] Classification calibrated and validated against representative proposals (at least 5 test cases: 3 within-bounds, 2 requires-review)
-- [ ] `npm test` green
-- [ ] 100% coverage on new code
-- [ ] No warnings
+- [x] Resume state: agent recovers cleanly from interruption, orienting faster than cold start (tested with simulated interruption)
+- [x] Classification calibrated and validated against representative proposals (at least 5 test cases: 3 within-bounds, 2 requires-review)
+- [x] `npm test` green
+- [x] 100% coverage on new code
+- [x] No warnings
 
 ---
 

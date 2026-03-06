@@ -3,6 +3,7 @@ import {
   GOVERNANCE_CONVENTION_ID,
   GOVERNANCE_DEFAULT_RESULT,
   GOVERNANCE_GUIDANCE,
+  classifyGovernanceProposal,
   queryGovernanceConvention,
 } from "../../governance/convention";
 
@@ -30,5 +31,34 @@ describe("governance convention query", () => {
     expect(queryGovernanceConvention("unknown")).toBe(
       "error: unsupported governance_convention query 'unknown'. supported queries: classification",
     );
+  });
+
+  it("classifies representative hardening proposals with calibrated defaults", () => {
+    const cases = [
+      {
+        summary: "Add shell timeout guards to tool execution and capture timeout diagnostics.",
+        expected: "within-bounds",
+      },
+      {
+        summary: "Add schema validation for reflection artifacts before writing to disk.",
+        expected: "within-bounds",
+      },
+      {
+        summary: "Improve interruption resume checkpoints for inner-dialog turns.",
+        expected: "within-bounds",
+      },
+      {
+        summary: "Rewrite governance ownership workflow across both agents.",
+        expected: "requires-review",
+      },
+      {
+        summary: "Replace bundle root location strategy and agent root resolution architecture.",
+        expected: "requires-review",
+      },
+    ] as const;
+
+    for (const item of cases) {
+      expect(classifyGovernanceProposal(item.summary)).toBe(item.expected);
+    }
   });
 });
