@@ -88,10 +88,10 @@ export function getRepoRoot(): string {
 }
 
 /**
- * Returns the agent-specific directory: `<repoRoot>/<agentName>/`
+ * Returns the agent-specific bundle directory: `<repoRoot>/<agentName>.ouro/`
  */
 export function getAgentRoot(): string {
-  return path.join(getRepoRoot(), getAgentName())
+  return path.join(getRepoRoot(), `${getAgentName()}.ouro`)
 }
 
 /**
