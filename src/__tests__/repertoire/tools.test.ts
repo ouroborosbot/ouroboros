@@ -1706,7 +1706,7 @@ describe("execTool for generic ADO tools", () => {
 
     const result = await execTool("ado_query", { organization: "myorg", path: "/_apis/git/repositories" }, ctx)
     expect(result).toBe('{"value": []}')
-    expect(adoRequest).toHaveBeenCalledWith("test-token", "GET", "myorg", "/_apis/git/repositories", undefined)
+    expect(adoRequest).toHaveBeenCalledWith("test-token", "GET", "myorg", "/_apis/git/repositories", undefined, undefined)
   })
 
   it("ado_query calls adoRequest with POST for WIQL", async () => {
@@ -1724,7 +1724,7 @@ describe("execTool for generic ADO tools", () => {
     const body = '{"query": "SELECT [System.Id] FROM WorkItems"}'
     const result = await execTool("ado_query", { organization: "myorg", path: "/_apis/wit/wiql", method: "POST", body }, ctx)
     expect(result).toBe('{"workItems": []}')
-    expect(adoRequest).toHaveBeenCalledWith("test-token", "POST", "myorg", "/_apis/wit/wiql", body)
+    expect(adoRequest).toHaveBeenCalledWith("test-token", "POST", "myorg", "/_apis/wit/wiql", body, undefined)
   })
 
   it("ado_query returns AUTH_REQUIRED when adoToken missing", async () => {
@@ -1763,7 +1763,7 @@ describe("execTool for generic ADO tools", () => {
     const body = '[{"op": "replace", "path": "/fields/System.Title", "value": "Updated"}]'
     const result = await execTool("ado_mutate", { method: "PATCH", organization: "myorg", path: "/_apis/wit/workitems/456", body }, ctx)
     expect(result).toBe('{"id": 456}')
-    expect(adoRequest).toHaveBeenCalledWith("test-token", "PATCH", "myorg", "/_apis/wit/workitems/456", body)
+    expect(adoRequest).toHaveBeenCalledWith("test-token", "PATCH", "myorg", "/_apis/wit/workitems/456", body, undefined)
   })
 
   it("ado_mutate rejects invalid method", async () => {

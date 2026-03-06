@@ -81,7 +81,7 @@ export const teamsToolDefinitions: ToolDefinition[] = [
       type: "function",
       function: {
         name: "ado_query",
-        description: "GET or POST (for WIQL read queries) any Azure DevOps API endpoint. Use ado_docs first to look up the correct path.",
+        description: "GET or POST (for WIQL read queries) any Azure DevOps API endpoint. Use ado_docs first to look up the correct path and host.",
         parameters: {
           type: "object",
           properties: {
@@ -89,6 +89,7 @@ export const teamsToolDefinitions: ToolDefinition[] = [
             path: { type: "string", description: "ADO API path after /{org}, e.g. /_apis/wit/wiql" },
             method: { type: "string", enum: ["GET", "POST"], description: "HTTP method (defaults to GET)" },
             body: { type: "string", description: "JSON request body (optional, used with POST for WIQL)" },
+            host: { type: "string", description: "API host override for non-standard APIs (e.g. 'vsapm.dev.azure.com' for entitlements, 'vssps.dev.azure.com' for users). Omit for standard dev.azure.com." },
           },
           required: ["organization", "path"],
         },
@@ -99,7 +100,7 @@ export const teamsToolDefinitions: ToolDefinition[] = [
         return "AUTH_REQUIRED:ado -- I need access to Azure DevOps. Please sign in when prompted.";
       }
       const method = args.method || "GET";
-      const result = await adoRequest(ctx.adoToken, method, args.organization, args.path, args.body);
+      const result = await adoRequest(ctx.adoToken, method, args.organization, args.path, args.body, args.host);
       checkAndRecord403(result, "ado", args.organization, method, ctx);
       return result;
     },
@@ -110,7 +111,7 @@ export const teamsToolDefinitions: ToolDefinition[] = [
       type: "function",
       function: {
         name: "ado_mutate",
-        description: "POST/PATCH/DELETE any Azure DevOps API endpoint for actual mutations. Use ado_docs first to look up the correct path.",
+        description: "POST/PATCH/DELETE any Azure DevOps API endpoint for actual mutations. Use ado_docs first to look up the correct path and host.",
         parameters: {
           type: "object",
           properties: {
@@ -118,6 +119,7 @@ export const teamsToolDefinitions: ToolDefinition[] = [
             organization: { type: "string", description: "Azure DevOps organization name" },
             path: { type: "string", description: "ADO API path after /{org}" },
             body: { type: "string", description: "JSON request body (optional)" },
+            host: { type: "string", description: "API host override for non-standard APIs (e.g. 'vsapm.dev.azure.com' for entitlements, 'vssps.dev.azure.com' for users). Omit for standard dev.azure.com." },
           },
           required: ["method", "organization", "path"],
         },
@@ -132,7 +134,7 @@ export const teamsToolDefinitions: ToolDefinition[] = [
       }
       /* v8 ignore next -- fallback unreachable: method is validated against MUTATE_METHODS above @preserve */
       const action = METHOD_TO_ACTION[args.method] || args.method;
-      const result = await adoRequest(ctx.adoToken, args.method, args.organization, args.path, args.body);
+      const result = await adoRequest(ctx.adoToken, args.method, args.organization, args.path, args.body, args.host);
       checkAndRecord403(result, "ado", args.organization, action, ctx);
       return result;
     },
@@ -305,6 +307,7 @@ interface EndpointEntry {
   description: string;
   params: string;
   scopes?: string;
+  host?: string;
 }
 
 function searchEndpoints(entries: EndpointEntry[], query: string): string {
@@ -330,6 +333,7 @@ function searchEndpoints(entries: EndpointEntry[], query: string): string {
       `  ${e.description}`,
       `  Params: ${e.params || "none"}`,
     ];
+    if (e.host) lines.push(`  Host: ${e.host}`);
     if (e.scopes) lines.push(`  Scopes: ${e.scopes}`);
     return lines.join("\n");
   }).join("\n\n");
