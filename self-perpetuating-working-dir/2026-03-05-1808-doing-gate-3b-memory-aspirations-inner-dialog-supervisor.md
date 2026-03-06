@@ -82,17 +82,17 @@ Implement Gate 3b foundations that make the agent persistent and self-directed: 
 **Output**: Coverage evidence for memory write path.
 **Acceptance**: New write-path code 100% covered.
 
-### ⬜ Unit 2a: Extract-Before-Trim Hook Tests (Red)
+### ✅ Unit 2a: Extract-Before-Trim Hook Tests (Red)
 **What**: Add failing tests that verify extraction runs before context trim drops messages.
 **Output**: Red tests around post-turn ordering.
 **Acceptance**: Ordering tests fail before hook integration.
 
-### ⬜ Unit 2b: Extract-Before-Trim Hook Implementation (Green)
+### ✅ Unit 2b: Extract-Before-Trim Hook Implementation (Green)
 **What**: Integrate extraction-before-trim hook in turn lifecycle.
 **Output**: Lifecycle integration code + passing tests.
 **Acceptance**: Facts preserved even when trim removes original messages.
 
-### ⬜ Unit 2c: Hook Coverage + Refactor
+### ✅ Unit 2c: Hook Coverage + Refactor
 **What**: Cover ordering/error paths and refactor lifecycle integration.
 **Output**: Coverage evidence for hook behavior.
 **Acceptance**: Hook-related code 100% covered.
@@ -205,3 +205,6 @@ Implement Gate 3b foundations that make the agent persistent and self-directed: 
 - 2026-03-05 18:13 Unit 1a complete: added red memory write-path tests for highlight extraction, path scaffolding, and dedup persistence contracts
 - 2026-03-05 18:14 Unit 1b complete: implemented `src/mind/memory.ts` write-path primitives (`extractMemoryHighlights`, `ensureMemoryStorePaths`, `appendFactsWithDedup`)
 - 2026-03-05 18:15 Unit 1c complete: raised `src/mind/memory.ts` focused coverage to 100% and reconfirmed full `npm test` + `npx tsc --noEmit`
+- 2026-03-05 18:24 Unit 2a complete: added red `postTurn` ordering test proving extract-before-trim hook sees messages before trim drops old context
+- 2026-03-05 18:31 Unit 2b complete: implemented `postTurn(..., hooks)` before-trim integration and wired CLI/Teams lifecycle memory capture via `captureTurnMemories`
+- 2026-03-05 18:31 Unit 2c complete: added non-Error fallback branch tests; full verification green (`npm test`, `npm run test:coverage:vitest`, `npx tsc --noEmit`)
