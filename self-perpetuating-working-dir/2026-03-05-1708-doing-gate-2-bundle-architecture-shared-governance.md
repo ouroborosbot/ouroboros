@@ -59,7 +59,7 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 **Output**: `baseline-migration-snapshot.md` artifact.
 **Acceptance**: Snapshot documents source/destination mapping, confirms `.ouro` pre-existence from Gate 1, and identifies required move/merge actions.
 
-### ⬜ Unit 1a: `.ouro` Root Resolution Tests (Red)
+### ✅ Unit 1a: `.ouro` Root Resolution Tests (Red)
 **What**: Add failing tests for `getAgentRoot()` and any hardcoded path assumptions that must now resolve to `<agent>.ouro`.
 **Output**: New/updated failing tests capturing `.ouro` root expectation.
 **Acceptance**: Tests fail before path migration is implemented.
@@ -134,3 +134,4 @@ Implement Gate 2 bundle architecture and governance relocation: migrate active a
 - 2026-03-05 17:10 Validation pass: confirmed current gaps (`getAgentRoot` still points to `<repo>/<agent>`, root governance files missing, `.gitignore` missing `*.ouro/`, nested git not initialized)
 - 2026-03-05 17:10 Quality pass: verified emoji-prefixed units, acceptance completeness, and checklist hygiene; marked READY_FOR_EXECUTION
 - 2026-03-05 17:11 Unit 0 complete: baseline migration snapshot captured with explicit source->target mapping
+- 2026-03-05 17:11 Unit 1a complete: added failing tests requiring `<repo>/<agent>.ouro` root resolution
