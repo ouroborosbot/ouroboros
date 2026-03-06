@@ -87,7 +87,7 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 **Output**: Finalized interface layout and compile evidence in artifacts.
 **Acceptance**: `npx tsc` is green with new interface modules imported successfully.
 
-### ⬜ Unit 3a: Governance Loader Tests (Red)
+### ✅ Unit 3a: Governance Loader Tests (Red)
 **What**: Add failing tests for governance loader stub behavior (happy path + missing-file path).
 **Output**: New failing tests for loader API expectations (targeting `src/governance/loader.ts`).
 **Acceptance**: Tests fail before loader implementation exists.
@@ -143,3 +143,4 @@ Produce Gate 1 architectural scaffolding artifacts (bundle skeleton, interfaces,
 - 2026-03-05 16:52 Unit 2a complete: added failing harness interface contract test targeting `src/harness` exports
 - 2026-03-05 16:53 Unit 2b complete: implemented importable `src/harness` primitive interfaces and governance result guard
 - 2026-03-05 16:54 Unit 2c complete: revalidated harness contract tests and clean `npx tsc` compile
+- 2026-03-05 16:54 Unit 3a complete: added failing governance loader tests for existing + missing doc behavior
