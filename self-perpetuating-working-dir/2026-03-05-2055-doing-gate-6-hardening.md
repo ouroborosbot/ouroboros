@@ -69,6 +69,12 @@ Implement Gate 6 hardening by adding explicit interruption/resume checkpoint awa
 **What**: Add failing tests for at least five representative governance proposals (3 `within-bounds`, 2 `requires-review`) against the queryable convention calibration logic.
 **Output**: Red tests + `unit-2a-red-test.log`.
 **Acceptance**: All new calibration tests fail before implementation and cover both classes.
+Representative proposals:
+1. Add shell timeout guards to tool execution (`within-bounds`)
+2. Add schema validation for reflection artifacts (`within-bounds`)
+3. Improve checkpoint resume prompts for inner dialog (`within-bounds`)
+4. Rewrite governance ownership workflow for all agents (`requires-review`)
+5. Replace bundle root/location strategy across the harness (`requires-review`)
 
 ### ⬜ Unit 2b: Classification calibration implementation (Green)
 **What**: Implement calibrated constitution classification logic for representative proposal summaries while preserving existing convention query behavior.
@@ -96,3 +102,4 @@ Implement Gate 6 hardening by adding explicit interruption/resume checkpoint awa
 
 ## Progress Log
 - 2026-03-05 20:55 Created from Gate 6 section of approved planning doc
+- 2026-03-05 20:58 Granularity pass: clarified representative proposal set for calibration tests
