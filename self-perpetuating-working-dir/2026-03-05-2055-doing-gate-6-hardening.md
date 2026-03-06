@@ -60,7 +60,7 @@ Validated target touchpoints:
 **Output**: Red tests + `unit-1a-red-test.log`.
 **Acceptance**: New tests fail against current behavior and specifically assert checkpoint awareness during resumed turns.
 
-### ⬜ Unit 1b: Resume checkpoint awareness implementation (Green)
+### ✅ Unit 1b: Resume checkpoint awareness implementation (Green)
 **What**: Implement checkpoint-aware resume state in inner-dialog runtime/instinct flow so restart orientation is faster than cold start.
 **Output**: Updated runtime code + `unit-1b-green-test.log` + `unit-1b-tsc.log`.
 **Acceptance**: Unit 1a tests pass, `npx tsc --noEmit` is clean, and checkpoint context persists through session history.
@@ -112,3 +112,4 @@ Representative proposals:
 - 2026-03-05 20:59 Quality pass: confirmed emoji unit headers, acceptance criteria, and execution readiness
 - 2026-03-05 20:58 Unit 0 complete: captured baseline behavior and verified Gate 6 target files
 - 2026-03-05 20:59 Unit 1a complete: added failing resume-checkpoint test proving missing checkpoint context on resumed turns
+- 2026-03-05 21:00 Unit 1b complete: implemented checkpoint-aware instinct prompts and validated with green tests + clean `npx tsc --noEmit`
