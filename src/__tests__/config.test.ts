@@ -548,6 +548,26 @@ describe("getContextConfig", () => {
 
 })
 
+describe("getOpenAIEmbeddingsApiKey", () => {
+  beforeEach(async () => {
+    vi.resetModules()
+  })
+
+  it("returns integrations.openaiEmbeddingsApiKey from secrets config", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      integrations: {
+        openaiEmbeddingsApiKey: "emb-key-123",
+      },
+    }))
+
+    const { getOpenAIEmbeddingsApiKey, resetConfigCache } = await import("../config")
+    resetConfigCache()
+    const key = getOpenAIEmbeddingsApiKey()
+
+    expect(key).toBe("emb-key-123")
+  })
+})
+
 describe("sessionPath", () => {
   beforeEach(async () => {
     vi.resetModules()
