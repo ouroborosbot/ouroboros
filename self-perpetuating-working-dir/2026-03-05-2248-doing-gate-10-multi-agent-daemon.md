@@ -54,6 +54,11 @@ Stand up a multi-agent daemon that keeps agents alive with crash recovery, expos
 **What**: Map current supervisor/entrypoint/runtime touchpoints and define Gate 10 target file surfaces for daemon, CLI, scheduler, routing, and workspace isolation.
 **Output**: `unit-0-baseline.md`.
 **Acceptance**: Artifact names concrete implementation/test files and command surfaces used for Gate 10.
+Validated touchpoints:
+- `src/supervisor.ts` + `src/supervisor-entry-core.ts` (existing restart/lifecycle baseline)
+- `src/repertoire/tools-base.ts` (possible daemon/coding tool exposure seam)
+- `src/identity.ts` (`~/AgentBundles` source of truth + agent identity resolution)
+- `package.json` scripts (`supervisor` baseline and new `ouro` command surface)
 
 ### ⬜ Unit 1a: Process manager + workspace isolation tests (Red)
 **What**: Add failing tests for daemon process lifecycle (start/stop/restart/backoff) and per-agent workspace clone/sync behavior.
@@ -71,7 +76,7 @@ Stand up a multi-agent daemon that keeps agents alive with crash recovery, expos
 **Acceptance**: 100% coverage on Unit 1 modules with suite green.
 
 ### ⬜ Unit 2a: Daemon command plane tests (Red)
-**What**: Add failing tests for daemon command socket protocol and `ouro` CLI commands (`start`, `stop`, `status`, `agent start/stop/restart`, `cron list/trigger`, `health`).
+**What**: Add failing tests for daemon command socket protocol and `ouro` CLI commands (`start`, `stop`, `status`, `agent start/stop/restart`, `cron list/trigger`, `health`), including invalid-command and malformed-payload branches.
 **Output**: Red tests + `unit-2a-red.log`.
 **Acceptance**: Tests fail before implementation and capture daemon/CLI command contract.
 
@@ -126,3 +131,4 @@ Stand up a multi-agent daemon that keeps agents alive with crash recovery, expos
 
 ## Progress Log
 - 2026-03-05 22:48 Created from Gate 10 section of approved planning doc
+- 2026-03-05 22:49 Granularity pass: added concrete baseline touchpoints and command-plane branch expectations
