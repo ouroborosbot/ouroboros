@@ -88,7 +88,7 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 **Output**: Coverage + regression evidence for new governance query surface.
 **Acceptance**: New governance tool code has 100% coverage and no regressions.
 
-### ⬜ Unit 3a: Teardown Invariants Contract
+### ✅ Unit 3a: Teardown Invariants Contract
 **What**: Add/refresh automated contract checks for teardown invariants (`src/reflection/*` removed, stale reflect scripts removed, trigger orchestration absent, context utilities still covered by tests).
 **Output**: Contract test updates and/or audit checks with explicit assertions.
 **Acceptance**: Gate 3a teardown criteria are machine-verified.
@@ -119,3 +119,4 @@ Remove any remaining puppet-pipeline assumptions and complete the harness-tool i
 - 2026-03-05 17:50 Unit 2a complete: added governance convention query tool red tests and captured expected failures (unknown tool + missing registry entries)
 - 2026-03-05 17:53 Unit 2b complete: implemented `governance_convention` tool surface, updated registry contract snapshot, and reconfirmed full `npm test` + `npx tsc --noEmit`
 - 2026-03-05 17:55 Unit 2c complete: refactored governance convention logic into `src/governance/convention.ts` with dedicated tests and 100% focused coverage evidence
+- 2026-03-05 17:58 Unit 3a complete: added machine-verifiable Gate 3a teardown contract checks (`src/harness/teardown-contract.ts`) with full test/coverage evidence
