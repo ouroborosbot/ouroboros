@@ -85,3 +85,4 @@ Restore `main` to a healthy state by reverting commits `e3ecc1c..448cfcd`, prese
 ## Progress Log
 - 2026-03-05 16:25 Created from planning doc
 - 2026-03-05 16:26 Granularity pass: split commit-map work into inventory + classification units
+- 2026-03-05 16:27 Validation pass: confirmed planning path, commit range, and archive branch references
