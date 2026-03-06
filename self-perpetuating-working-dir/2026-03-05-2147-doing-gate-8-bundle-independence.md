@@ -20,7 +20,7 @@ Move `ouroboros.ouro` and `slugger.ouro` out of the harness repo into `~/AgentBu
 - [x] Backup integrity verified (clone + diff)
 - [x] Bundles moved to `~/AgentBundles/`
 - [x] Harness code updated to reference new bundle location
-- [ ] Agents bootstrap correctly from `~/AgentBundles/`
+- [x] Agents bootstrap correctly from `~/AgentBundles/`
 - [ ] `npm test` green
 - [ ] 100% coverage on new code
 
@@ -88,7 +88,7 @@ Validated target touchpoints:
 **Output**: `unit-3b-hygiene.log`.
 **Acceptance**: Harness workspace no longer assumes in-repo bundles and path-sensitive checks/scripts are consistent with Gate 8 layout.
 
-### ⬜ Unit 4: Bootstrap/runtime verification from `~/AgentBundles`
+### ✅ Unit 4: Bootstrap/runtime verification from `~/AgentBundles`
 **What**: Validate Ouroboros + Slugger bootstrap and core runtime commands after relocation.
 **Output**: `unit-4-bootstrap.log` + `unit-4-supervisor.log`.
 **Acceptance**: Both agents bootstrap from `~/AgentBundles` without regressions.
@@ -119,3 +119,4 @@ Validated target touchpoints:
 - 2026-03-05 21:56 Unit 2c complete: verified 100% coverage for `identity.ts` under the Gate 8 path migration
 - 2026-03-05 21:57 Unit 3a complete: moved both bundles to `~/AgentBundles` and preserved nested git remotes/state
 - 2026-03-05 21:59 Unit 3b complete: aligned contracts, manifest packaging, and repo hygiene with external bundle paths
+- 2026-03-05 22:00 Unit 4 complete: validated Ouroboros/Slugger bootstrap and multi-agent supervisor startup from `~/AgentBundles`
