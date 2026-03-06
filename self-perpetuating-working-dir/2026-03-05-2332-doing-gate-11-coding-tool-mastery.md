@@ -94,7 +94,7 @@ Expected target files:
 **Output**: `unit-2c-coverage.log`.
 **Acceptance**: 100% coverage for Unit 2 modules.
 
-### ⬜ Unit 3a: Monitoring + recovery tests (Red)
+### ✅ Unit 3a: Monitoring + recovery tests (Red)
 **What**: Add failing tests for output/activity monitoring, stall detection, completion markers, and crash/stall recovery triggers.
 **Output**: Red tests + `unit-3a-red.log`.
 **Acceptance**: Tests fail before implementation and capture monitoring + recovery expectations.
@@ -150,3 +150,4 @@ Expected target files:
 - 2026-03-05 23:48 Unit 2a complete: added failing coding tool surface tests for `coding_spawn`, `coding_status`, `coding_send_input`, and `coding_kill`, with red log proving missing registry wiring
 - 2026-03-05 23:50 Unit 2b complete: implemented `src/coding/tools.ts`, wired coding tools into base registry + arg summaries, and captured green test + compile logs
 - 2026-03-05 23:52 Unit 2c complete: closed coding tools validation/optional-arg/summary/error-path coverage gaps and captured 100% coverage across Unit 2 modules
+- 2026-03-05 23:54 Unit 3a complete: added failing monitor/recovery contract tests (`monitor-recovery.test.ts`) with red log proving missing `coding/monitor` + `coding/reporter` modules
