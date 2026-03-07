@@ -16,7 +16,7 @@
 Implement Gate 2 schema and data-model contracts end-to-end: task lifecycle/frontmatter simplification, `agent.json` schema changes, unified friend store data model, psyche canonical cuts, and bundle-manifest detection primitives with updated contract tests.
 
 ## Completion Criteria
-- [ ] Task schema updates complete (statuses, transitions, frontmatter)
+- [x] Task schema updates complete (statuses, transitions, frontmatter)
 - [ ] Agent config/identity schema updates complete
 - [ ] Friend store unified file contract complete
 - [ ] Psyche canonical cuts reflected in prompt and tests
@@ -54,7 +54,7 @@ Implement Gate 2 schema and data-model contracts end-to-end: task lifecycle/fron
 **Output**: Baseline artifact files under artifacts directory.
 **Acceptance**: Artifact set exists and maps every Gate 2 target surface.
 
-### ⬜ Unit 1: Task Schema Simplification
+### ✅ Unit 1: Task Schema Simplification
 **What**: Apply task status/transition/frontmatter changes (`validating`, `validator`, `requester`, `cadence`, `scheduledAt`, `lastRun`) across task modules and tests.
 **Output**: Updated tasks runtime + passing task/repertoire/prompt tests.
 **Acceptance**: No `validating:slugger` or `validating:ari` references remain in source/tests.
@@ -95,3 +95,4 @@ Implement Gate 2 schema and data-model contracts end-to-end: task lifecycle/fron
 ## Progress Log
 - 2026-03-06 23:47 Created from planning doc.
 - 2026-03-06 23:49 Unit 0 complete: Captured baseline task/config/friend/bundle contract reference snapshots.
+- 2026-03-06 23:51 Unit 1 complete: Simplified task validation statuses and added validator/requester/scheduling frontmatter fields with updated task/prompt/tool tests.

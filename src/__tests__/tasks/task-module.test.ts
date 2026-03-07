@@ -86,7 +86,8 @@ describe("task module", () => {
     const parsed = parser.parseTaskFile(fs.readFileSync(habitPath, "utf-8"), habitPath)
     expect(parsed.collection).toBe("habits")
     expect(parsed.category).toBe("infrastructure")
-    expect(parsed.frontmatter.schedule).toEqual([])
+    expect(parsed.frontmatter.cadence).toBeNull()
+    expect(parsed.frontmatter.lastRun).toBeNull()
   })
 
   it("reuses singleton module instance and returns empty results for unknown board status", async () => {
@@ -123,7 +124,7 @@ describe("task module", () => {
     expect(invalid.reason).toContain("invalid transition")
 
     expect(module.updateStatus(stem, "processing").ok).toBe(true)
-    expect(module.updateStatus(stem, "validating:slugger").ok).toBe(true)
+    expect(module.updateStatus(stem, "validating").ok).toBe(true)
 
     const done = module.updateStatus(stem, "done")
     expect(done.ok).toBe(true)
@@ -690,7 +691,7 @@ describe("task module", () => {
     fs.writeFileSync(path.join(artifactDir, "result.txt"), "artifact", "utf-8")
 
     expect(module.updateStatus(stem, "processing").ok).toBe(true)
-    expect(module.updateStatus(stem, "validating:slugger").ok).toBe(true)
+    expect(module.updateStatus(stem, "validating").ok).toBe(true)
     const done = module.updateStatus(stem, "done")
     expect(done.ok).toBe(true)
     expect(done.archived && done.archived.length).toBeGreaterThan(0)
