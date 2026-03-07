@@ -56,7 +56,7 @@ See planning doc for full list (30+ items). Key gates:
 **Tests**: Mock session file + LLM call. Test: loads correct session, passes trust level to summarization prompt, self-query is transparent, handles missing session file.
 **Acceptance**: Tests pass, tool registered in definitions.
 
-### Unit 5: send_message Tool + Pending Queue (Layer 3: Action)
+### Unit 5: send_message Tool + Pending Queue (Layer 3: Action) ✅
 **What**: Add `send_message` tool. Schema: `{ to, channel, thread?, content, context }`. Validates friend exists, resolves channel, writes pending file to `~/.agentstate/<agent>/pending/<friendId>/<channel>/<key>/<timestamp>-<uuid>.json`. Rejects self-send to current session. No daemon routing.
 **Tests**: Mock friend store + fs. Test: writes pending file, rejects self-send, validates friend exists, handles missing friend.
 **Acceptance**: Tests pass, tool registered, pending files written correctly.
