@@ -1,0 +1,142 @@
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+[36m11:21:51 INFO [friends] identity provider validation[0m
+[36m11:21:51 INFO [friends] identity provider validation[0m
+[36m11:21:51 INFO [friends] identity provider validation[0m
+[36m11:21:51 INFO [friends] identity provider validation[0m
+[36m11:21:51 INFO [daemon] ouro CLI command invoked {"kind":"daemon.up"}[0m
+[36m11:21:51 INFO [daemon] ouro CLI command invoked {"kind":"daemon.up"}[0m
+[36m11:21:51 INFO [daemon] ouro CLI command invoked {"kind":"daemon.up"}[0m
+[36m11:21:51 INFO [daemon] ouro CLI command invoked {"kind":"daemon.up"}[0m
+[33m11:21:51 WARN [daemon] failed .ouro UTI registration from CLI flow {"error":"registration failed"}[0m
+[36m11:21:51 INFO [daemon] ouro CLI command invoked {"kind":"daemon.status"}[0m
+[36m11:21:51 INFO [daemon] routed bare ouro command from discovered agents {"target":"hatch.start","count":0}[0m
+[36m11:21:51 INFO [daemon] ouro CLI command invoked {"kind":"hatch.start"}[0m
+[36m11:21:51 INFO [daemon] routed bare ouro command from discovered agents {"target":"chat.connect","count":1}[0m
+[36m11:21:51 INFO [daemon] ouro CLI command invoked {"kind":"chat.connect"}[0m
+[36m11:21:51 INFO [daemon] ouro CLI command invoked {"kind":"daemon.up"}[0m
+[33m11:21:51 WARN [daemon] subagent auto-install failed {"error":"install exploded"}[0m
+[36m11:21:51 INFO [daemon] ouro CLI command invoked {"kind":"daemon.up"}[0m
+[33m11:21:51 WARN [daemon] subagent auto-install failed {"error":"install exploded string"}[0m
+[36m11:21:51 INFO [daemon] ouro CLI command invoked {"kind":"message.send"}[0m
+[36m11:21:51 INFO [friends] identity provider validation[0m
+[36m11:21:51 INFO [daemon] ouro CLI command invoked {"kind":"friend.link"}[0m
+[36m11:21:51 INFO [daemon] ouro CLI command invoked {"kind":"message.send"}[0m
+[36m11:21:51 INFO [daemon] ouro CLI command invoked {"kind":"hatch.start"}[0m
+[36m11:21:51 INFO [daemon] handling daemon command {"kind":"daemon.status"}[0m
+ ✓ src/__tests__/daemon/daemon-cli.test.ts (20 tests) 12ms
+[36m11:21:51 INFO [daemon] skipped .ouro UTI registration on non-macOS platform {"platform":"linux"}[0m
+[36m11:21:51 INFO [daemon] registering .ouro UTI on macOS {"appBundlePath":"/tmp/home/Library/Application Support/ouro/uti/OuroBundleRegistry.app"}[0m
+[36m11:21:51 INFO [daemon] icon source image missing; continuing without custom icon {"iconSourcePath":"/tmp/ouroboros-website/public/images/ouroboros.png"}[0m
+[36m11:21:51 INFO [daemon] registered .ouro UTI on macOS {"iconInstalled":false}[0m
+[36m11:21:51 INFO [daemon] registering .ouro UTI on macOS {"appBundlePath":"/tmp/home/Library/Application Support/ouro/uti/OuroBundleRegistry.app"}[0m
+[36m11:21:51 INFO [daemon] registered .ouro UTI on macOS {"iconInstalled":true}[0m
+[36m11:21:51 INFO [daemon] registering .ouro UTI on macOS {"appBundlePath":"/tmp/home/Library/Application Support/ouro/uti/OuroBundleRegistry.app"}[0m
+[36m11:21:51 INFO [daemon] icon source image missing; continuing without custom icon {"iconSourcePath":"/tmp/ouroboros-website/public/images/ouroboros.png"}[0m
+[33m11:21:51 WARN [daemon] failed .ouro UTI registration; continuing non-blocking {"reason":"lsregister failed"}[0m
+ ❯ src/__tests__/daemon/ouro-uti.test.ts (4 tests | 1 failed) 9ms
+     ✓ skips registration outside macOS 3ms
+     × registers UTI on macOS and skips icon conversion when source image is missing 4ms
+     ✓ builds icns icon and registers UTI on macOS when source image exists 1ms
+     ✓ returns non-blocking failure result when registration command errors 1ms
+ ✓ src/__tests__/daemon/ouro-bot-entry.test.ts (2 tests) 18ms
+[36m11:21:51 INFO [daemon] starting ouro.bot wrapper delegation {"args":["hatch"]}[0m
+[36m11:21:51 INFO [daemon] completed ouro.bot wrapper delegation {"delegatedTo":"@ouro.bot/cli"}[0m
+[36m11:21:51 INFO [daemon] starting ouro.bot wrapper delegation {"args":["status"]}[0m
+[33m11:21:51 WARN [daemon] canonical ouro.bot package unavailable; falling back to local CLI {"error":"module not found"}[0m
+[36m11:21:51 INFO [daemon] completed ouro.bot wrapper delegation {"delegatedTo":"local-fallback"}[0m
+[36m11:21:51 INFO [daemon] starting ouro.bot wrapper delegation {"args":[]}[0m
+[36m11:21:51 INFO [daemon] completed ouro.bot wrapper delegation {"delegatedTo":"@ouro.bot/cli"}[0m
+ ✓ src/__tests__/daemon/ouro-bot-wrapper.test.ts (3 tests) 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/daemon/ouro-uti.test.ts > .ouro UTI registration > registers UTI on macOS and skips icon conversion when source image is missing
+AssertionError: expected "vi.fn()" to be called with arguments: [ …(3) ]
+
+Received: 
+
+  1st vi.fn() call:
+
+@@ -2,7 +2,6 @@
+    "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
+    [
+      "-f",
+      "/tmp/home/Library/Application Support/ouro/uti/OuroBundleRegistry.app",
+    ],
+-   undefined,
+  ]
+
+
+Number of calls: 1
+
+ ❯ src/__tests__/daemon/ouro-uti.test.ts:41:26
+     39|     expect(result.registered).toBe(true)
+     40|     expect(result.iconInstalled).toBe(false)
+     41|     expect(execFileSync).toHaveBeenCalledWith(
+       |                          ^
+     42|       "/System/Library/Frameworks/CoreServices.framework/Frameworks/La…
+     43|       ["-f", "/tmp/home/Library/Application Support/ouro/uti/OuroBundl…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  1 failed | 28 passed (29)
+   Start at  03:21:50
+   Duration  731ms (transform 123ms, setup 74ms, import 117ms, tests 45ms, environment 0ms)
+
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+[36m11:22:03 INFO [daemon] skipped .ouro UTI registration on non-macOS platform {"platform":"linux"}[0m
+[36m11:22:03 INFO [daemon] registering .ouro UTI on macOS {"appBundlePath":"/tmp/home/Library/Application Support/ouro/uti/OuroBundleRegistry.app"}[0m
+[36m11:22:03 INFO [daemon] icon source image missing; continuing without custom icon {"iconSourcePath":"/tmp/ouroboros-website/public/images/ouroboros.png"}[0m
+[36m11:22:03 INFO [daemon] registered .ouro UTI on macOS {"iconInstalled":false}[0m
+[36m11:22:03 INFO [daemon] registering .ouro UTI on macOS {"appBundlePath":"/tmp/home/Library/Application Support/ouro/uti/OuroBundleRegistry.app"}[0m
+[36m11:22:03 INFO [daemon] registered .ouro UTI on macOS {"iconInstalled":true}[0m
+[36m11:22:03 INFO [daemon] registering .ouro UTI on macOS {"appBundlePath":"/tmp/home/Library/Application Support/ouro/uti/OuroBundleRegistry.app"}[0m
+[36m11:22:03 INFO [daemon] icon source image missing; continuing without custom icon {"iconSourcePath":"/tmp/ouroboros-website/public/images/ouroboros.png"}[0m
+[33m11:22:03 WARN [daemon] failed .ouro UTI registration; continuing non-blocking {"reason":"lsregister failed"}[0m
+ ✓ src/__tests__/daemon/ouro-uti.test.ts (4 tests) 7ms
+ ✓ src/__tests__/daemon/ouro-bot-entry.test.ts (2 tests) 24ms
+[36m11:22:04 INFO [friends] identity provider validation[0m
+[36m11:22:04 INFO [friends] identity provider validation[0m
+[36m11:22:04 INFO [friends] identity provider validation[0m
+[36m11:22:04 INFO [friends] identity provider validation[0m
+[36m11:22:04 INFO [daemon] ouro CLI command invoked {"kind":"daemon.up"}[0m
+[36m11:22:04 INFO [daemon] ouro CLI command invoked {"kind":"daemon.up"}[0m
+[36m11:22:04 INFO [daemon] ouro CLI command invoked {"kind":"daemon.up"}[0m
+[36m11:22:04 INFO [daemon] ouro CLI command invoked {"kind":"daemon.up"}[0m
+[33m11:22:04 WARN [daemon] failed .ouro UTI registration from CLI flow {"error":"registration failed"}[0m
+[36m11:22:04 INFO [daemon] ouro CLI command invoked {"kind":"daemon.status"}[0m
+[36m11:22:04 INFO [daemon] routed bare ouro command from discovered agents {"target":"hatch.start","count":0}[0m
+[36m11:22:04 INFO [daemon] ouro CLI command invoked {"kind":"hatch.start"}[0m
+[36m11:22:04 INFO [daemon] routed bare ouro command from discovered agents {"target":"chat.connect","count":1}[0m
+[36m11:22:04 INFO [daemon] ouro CLI command invoked {"kind":"chat.connect"}[0m
+[36m11:22:04 INFO [daemon] ouro CLI command invoked {"kind":"daemon.up"}[0m
+[33m11:22:04 WARN [daemon] subagent auto-install failed {"error":"install exploded"}[0m
+[36m11:22:04 INFO [daemon] ouro CLI command invoked {"kind":"daemon.up"}[0m
+[33m11:22:04 WARN [daemon] subagent auto-install failed {"error":"install exploded string"}[0m
+[36m11:22:04 INFO [daemon] ouro CLI command invoked {"kind":"message.send"}[0m
+[36m11:22:04 INFO [friends] identity provider validation[0m
+[36m11:22:04 INFO [daemon] ouro CLI command invoked {"kind":"friend.link"}[0m
+[36m11:22:04 INFO [daemon] ouro CLI command invoked {"kind":"message.send"}[0m
+[36m11:22:04 INFO [daemon] ouro CLI command invoked {"kind":"hatch.start"}[0m
+[36m11:22:04 INFO [daemon] handling daemon command {"kind":"daemon.status"}[0m
+ ✓ src/__tests__/daemon/daemon-cli.test.ts (20 tests) 12ms
+[36m11:22:04 INFO [daemon] starting ouro.bot wrapper delegation {"args":["hatch"]}[0m
+[36m11:22:04 INFO [daemon] completed ouro.bot wrapper delegation {"delegatedTo":"@ouro.bot/cli"}[0m
+[36m11:22:04 INFO [daemon] starting ouro.bot wrapper delegation {"args":["status"]}[0m
+[33m11:22:04 WARN [daemon] canonical ouro.bot package unavailable; falling back to local CLI {"error":"module not found"}[0m
+[36m11:22:04 INFO [daemon] completed ouro.bot wrapper delegation {"delegatedTo":"local-fallback"}[0m
+[36m11:22:04 INFO [daemon] starting ouro.bot wrapper delegation {"args":[]}[0m
+[36m11:22:04 INFO [daemon] completed ouro.bot wrapper delegation {"delegatedTo":"@ouro.bot/cli"}[0m
+ ✓ src/__tests__/daemon/ouro-bot-wrapper.test.ts (3 tests) 5ms
+
+ Test Files  4 passed (4)
+      Tests  29 passed (29)
+   Start at  03:22:03
+   Duration  697ms (transform 118ms, setup 70ms, import 113ms, tests 48ms, environment 0ms)
+
