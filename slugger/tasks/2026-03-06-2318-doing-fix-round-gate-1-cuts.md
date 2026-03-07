@@ -1,6 +1,6 @@
 # Doing: Fix Round Gate 1 Cuts And Cleanup
 
-**Status**: READY_FOR_EXECUTION
+**Status**: in-progress
 **Execution Mode**: direct
 **Created**: 2026-03-06 23:18
 **Planning**: ./2026-03-06-2318-planning-fix-round-gate-1-cuts.md
@@ -47,7 +47,7 @@ Delete dead subsystems and stale repository artifacts from Gate 1 so later gates
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Setup And Baseline
+### ✅ Unit 0: Setup And Baseline
 **What**: Verify Gate 1 target files exist, capture baseline references, and prepare artifact logs.
 **Output**: Baseline inventory + reference scan output in artifacts directory.
 **Acceptance**: Artifact files exist and enumerate all Gate 1 removal/move targets.
@@ -83,3 +83,4 @@ Delete dead subsystems and stale repository artifacts from Gate 1 so later gates
 
 ## Progress Log
 - 2026-03-06 23:18 Created from planning doc
+- 2026-03-06 23:20 Unit 0 complete: Captured baseline inventory, reference scans, and script snapshot artifacts.
