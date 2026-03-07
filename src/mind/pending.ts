@@ -1,6 +1,7 @@
 import * as fs from "fs"
 import * as path from "path"
 import * as os from "os"
+import { emitNervesEvent } from "../nerves/runtime"
 
 export interface PendingMessage {
   from: string
@@ -58,6 +59,13 @@ export function drainPending(pendingDir: string): PendingMessage[] {
       try { fs.unlinkSync(processingPath) } catch { /* ignore */ }
     }
   }
+
+  emitNervesEvent({
+    event: "mind.pending_drained",
+    component: "mind",
+    message: "pending queue drained",
+    meta: { pendingDir, count: messages.length, recovered: processingFiles.length },
+  })
 
   return messages
 }

@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import * as path from "path"
 
+vi.mock("../../nerves/runtime", () => ({
+  emitNervesEvent: vi.fn(),
+}))
+
 vi.mock("fs", () => ({
   existsSync: vi.fn(),
   readFileSync: vi.fn(),
