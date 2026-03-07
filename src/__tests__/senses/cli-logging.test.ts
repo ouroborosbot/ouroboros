@@ -44,7 +44,7 @@ describe("CLI logging contract", () => {
     logPath.mockClear()
   })
 
-  it("exports a CLI runtime logger configurator that routes nerves logs to NDJSON sink", async () => {
+  it("exports a CLI runtime logger configurator that routes nerves logs to terminal + NDJSON sinks by default", async () => {
     const cli = await import("../../senses/cli-logging")
     expect(typeof (cli as { configureCliRuntimeLogger?: unknown }).configureCliRuntimeLogger).toBe("function")
     ;(cli as { configureCliRuntimeLogger: (friendId: string) => void }).configureCliRuntimeLogger("friend-123")
@@ -54,9 +54,22 @@ describe("CLI logging contract", () => {
     expect(createLogger).toHaveBeenCalledWith(
       expect.objectContaining({
         level: "info",
-        sinks: [expect.any(Function)],
+        sinks: [expect.any(Function), expect.any(Function)],
       }),
     )
     expect(setRuntimeLogger).toHaveBeenCalledTimes(1)
+  })
+
+  it("supports sink selection override", async () => {
+    const cli = await import("../../senses/cli-logging")
+    ;(cli as any).configureCliRuntimeLogger("friend-123", { sinks: ["terminal"] })
+
+    expect(logPath).not.toHaveBeenCalled()
+    expect(createNdjsonFileSink).not.toHaveBeenCalled()
+    expect(createLogger).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sinks: [expect.any(Function)],
+      }),
+    )
   })
 })

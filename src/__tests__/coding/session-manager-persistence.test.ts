@@ -332,6 +332,83 @@ describe("coding session manager persistence", () => {
     expect(spawned.id).toBe("coding-011")
   })
 
+  it("handles non-standard restored ids and non-Error load failures", async () => {
+    const payload = {
+      sequence: -1,
+      records: [
+        {
+          request: {
+            runner: "claude",
+            workdir: "/tmp/repo",
+            prompt: "restore",
+            taskRef: "task-manual",
+          },
+          session: {
+            id: "manual-session",
+            runner: "claude",
+            workdir: "/tmp/repo",
+            taskRef: "task-manual",
+            status: "completed",
+            pid: null,
+            startedAt: "2026-03-07T00:00:00.000Z",
+            lastActivityAt: "2026-03-07T00:00:00.000Z",
+            endedAt: "2026-03-07T00:01:00.000Z",
+            restartCount: 0,
+            lastExitCode: 0,
+            lastSignal: null,
+            failure: null,
+          },
+        },
+      ],
+    }
+
+    const restored = new CodingSessionManager({
+      spawnProcess: vi.fn(() => new FakeProcess(901)),
+      stateFilePath: "/tmp/coding-manual-id.json",
+      existsSync: () => true,
+      readFileSync: () => JSON.stringify(payload),
+      writeFileSync: vi.fn(),
+      mkdirSync: vi.fn(),
+    })
+    expect(restored.getSession("manual-session")?.status).toBe("completed")
+    const spawned = await restored.spawnSession({
+      runner: "claude",
+      workdir: "/tmp/repo",
+      prompt: "new",
+      taskRef: "task-next",
+    })
+    expect(spawned.id).toBe("coding-001")
+
+    const readFailure = new CodingSessionManager({
+      spawnProcess: vi.fn(() => new FakeProcess(902)),
+      stateFilePath: "/tmp/coding-read-string-error.json",
+      existsSync: () => true,
+      readFileSync: () => {
+        throw "read-failed-string"
+      },
+      writeFileSync: vi.fn(),
+      mkdirSync: vi.fn(),
+    })
+    expect(readFailure.listSessions()).toEqual([])
+
+    const parseSpy = vi.spyOn(JSON, "parse").mockImplementation(() => {
+      throw "parse-failed-string"
+    })
+    try {
+      const parseFailure = new CodingSessionManager({
+        spawnProcess: vi.fn(() => new FakeProcess(903)),
+        stateFilePath: "/tmp/coding-parse-string-error.json",
+        existsSync: () => true,
+        readFileSync: () => "{\"sequence\":1,\"records\":[]}",
+        writeFileSync: vi.fn(),
+        mkdirSync: vi.fn(),
+      })
+      expect(parseFailure.listSessions()).toEqual([])
+    } finally {
+      parseSpy.mockRestore()
+    }
+  })
+
   it("continues when persisting state fails", async () => {
     const manager = new CodingSessionManager({
       spawnProcess: vi.fn(() => new FakeProcess(77)),

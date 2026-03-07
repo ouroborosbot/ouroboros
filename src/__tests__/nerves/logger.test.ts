@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 
-import { createLogger, registerGlobalLogSink } from "../../nerves"
+import { createLogger, createTerminalSink, formatTerminalEntry, registerGlobalLogSink } from "../../nerves"
 
 describe("observability/logger", () => {
   it("emits required envelope fields", () => {
@@ -121,9 +121,7 @@ describe("observability/logger", () => {
     })
 
     expect(chunks.length).toBeGreaterThan(0)
-    const payload = JSON.parse(chunks[0]!.trim()) as Record<string, unknown>
-    expect(payload.level).toBe("info")
-    expect(payload.event).toBe("turn.start")
+    expect(chunks[0]).toContain("INFO [entrypoints] started")
 
     stderrSpy.mockRestore()
   })
@@ -152,8 +150,7 @@ describe("observability/logger", () => {
     })
 
     expect(chunks).toHaveLength(1)
-    const payload = JSON.parse(chunks[0]!.trim()) as Record<string, unknown>
-    expect(payload.event).toBe("turn.info")
+    expect(chunks[0]).toContain("INFO [entrypoints] info")
 
     stderrSpy.mockRestore()
   })
@@ -207,5 +204,41 @@ describe("observability/logger", () => {
 
     expect(local).toHaveLength(1)
     expect(local[0]?.event).toBe("engine.turn_start")
+  })
+
+  it("formats terminal entries with raw timestamp when ts is invalid", () => {
+    const line = formatTerminalEntry({
+      ts: "not-a-date",
+      level: "info",
+      event: "daemon.test",
+      trace_id: "trace-invalid-ts",
+      component: "daemon",
+      message: "invalid timestamp",
+      meta: {},
+    })
+
+    expect(line).toBe("not-a-date INFO [daemon] invalid timestamp")
+  })
+
+  it("writes non-colorized terminal output when colorize is disabled", () => {
+    const chunks: string[] = []
+    const sink = createTerminalSink((chunk) => {
+      chunks.push(chunk)
+      return true
+    }, false)
+
+    sink({
+      ts: "2026-03-07T09:00:00.000Z",
+      level: "warn",
+      event: "daemon.test",
+      trace_id: "trace-no-color",
+      component: "daemon",
+      message: "plain output",
+      meta: { ok: true },
+    })
+
+    expect(chunks).toHaveLength(1)
+    expect(chunks[0]).toBe("09:00:00 WARN [daemon] plain output {\"ok\":true}\n")
+    expect(chunks[0]).not.toContain("\x1b[")
   })
 })

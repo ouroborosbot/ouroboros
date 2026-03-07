@@ -400,4 +400,33 @@ describe("coding session manager branch coverage", () => {
     ;(manager as any).attachProcessListeners(record)
     ;(manager as any).onExit(record, 1, null)
   })
+
+  it("trims captured output tails when process output exceeds max length", async () => {
+    const proc = new FakeProcess(999)
+    const manager = new CodingSessionManager({
+      ...noPersistence,
+      spawnProcess: vi.fn(() => ({
+        process: proc,
+        command: "claude",
+        args: ["-p"],
+        prompt: "tail",
+      })),
+      nowIso: nowFactory(),
+      maxRestarts: 0,
+    })
+
+    const session = await manager.spawnSession({
+      runner: "claude",
+      workdir: "/Users/test/AgentWorkspaces/ouroboros",
+      prompt: "long output",
+    })
+
+    proc.emitStdout("a".repeat(2105))
+    proc.emitStderr("b".repeat(2200))
+    proc.emitExit(1, null)
+
+    const failed = manager.getSession(session.id)
+    expect(failed?.failure?.stdoutTail.length).toBe(2000)
+    expect(failed?.failure?.stderrTail.length).toBe(2000)
+  })
 })

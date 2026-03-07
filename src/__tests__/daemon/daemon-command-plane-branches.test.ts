@@ -244,4 +244,95 @@ describe("daemon command plane branches", () => {
     expect(processManager.stopAll).toHaveBeenCalledTimes(1)
     expect(fs.existsSync(socketPath)).toBe(false)
   })
+
+  it("handles health, agent lifecycle, and cron commands", async () => {
+    const socketPath = tmpSocketPath("daemon-admin-commands")
+    const { daemon, processManager, scheduler, healthMonitor } = make(socketPath)
+    processManager.stopAgent = vi.fn(async (_agent: string) => undefined)
+    processManager.restartAgent = vi.fn(async (_agent: string) => undefined)
+    scheduler.listJobs.mockReturnValue([
+      { id: "habit-heartbeat", schedule: "daily", lastRun: "2026-03-06T08:00:00.000Z" },
+    ])
+
+    const health = await daemon.handleCommand({ kind: "daemon.health" })
+    expect(health.ok).toBe(true)
+    expect(health.summary).toContain("agent-processes:ok:good")
+    expect(health.data).toEqual(await healthMonitor.runChecks())
+
+    const started = await daemon.handleCommand({ kind: "agent.start", agent: "slugger" })
+    expect(started.message).toBe("started slugger")
+    expect(processManager.startAgent).toHaveBeenCalledWith("slugger")
+
+    const stopped = await daemon.handleCommand({ kind: "agent.stop", agent: "slugger" })
+    expect(stopped.message).toBe("stopped slugger")
+    expect(processManager.stopAgent).toHaveBeenCalledWith("slugger")
+
+    const restarted = await daemon.handleCommand({ kind: "agent.restart", agent: "slugger" })
+    expect(restarted.message).toBe("restarted slugger")
+    expect(processManager.restartAgent).toHaveBeenCalledWith("slugger")
+
+    const cronList = await daemon.handleCommand({ kind: "cron.list" })
+    expect(cronList.summary).toContain("habit-heartbeat")
+
+    scheduler.listJobs.mockReturnValueOnce([
+      { id: "nightly", schedule: "daily", lastRun: null },
+    ])
+    const neverRunCronList = await daemon.handleCommand({ kind: "cron.list" })
+    expect(neverRunCronList.summary).toContain("last=never")
+
+    scheduler.listJobs.mockReturnValueOnce([])
+    const emptyCronList = await daemon.handleCommand({ kind: "cron.list" })
+    expect(emptyCronList.summary).toBe("no cron jobs")
+
+    const cronTrigger = await daemon.handleCommand({ kind: "cron.trigger", jobId: "habit-heartbeat" })
+    expect(cronTrigger).toEqual({ ok: true, message: "triggered habit-heartbeat" })
+  })
+
+  it("retains malformed pending lines and tolerates unreadable bundle roots", async () => {
+    const socketPath = tmpSocketPath("daemon-pending-invalid")
+    const bundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "daemon-bundles-invalid-"))
+    const pendingDir = path.join(bundlesRoot, "slugger.ouro", "inbox")
+    fs.mkdirSync(pendingDir, { recursive: true })
+    const pendingPath = path.join(pendingDir, "pending.jsonl")
+    fs.writeFileSync(
+      pendingPath,
+      [
+        "{\"from\":\"ouro-cli\",\"to\":\"slugger\",\"content\":\"valid\",\"priority\":1,\"sessionId\":2,\"taskRef\":3}",
+        "{\"from\":\"ouro-cli\",\"to\":\"slugger\"}",
+        "{invalid-json",
+      ].join("\n") + "\n",
+      "utf-8",
+    )
+
+    const { daemon, router } = make(socketPath, bundlesRoot)
+    await daemon.start()
+    await daemon.stop()
+
+    expect(router.send).toHaveBeenCalledTimes(1)
+    expect(router.send).toHaveBeenCalledWith({
+      from: "ouro-cli",
+      to: "slugger",
+      content: "valid",
+      priority: undefined,
+      sessionId: undefined,
+      taskRef: undefined,
+    })
+    const retained = fs.readFileSync(pendingPath, "utf-8")
+    expect(retained).toContain("{\"from\":\"ouro-cli\",\"to\":\"slugger\"}")
+    expect(retained).toContain("{invalid-json")
+
+    const unreadableRoot = path.join(os.tmpdir(), `daemon-bundles-file-${Date.now()}`)
+    fs.writeFileSync(unreadableRoot, "not-a-directory", "utf-8")
+    const { daemon: unreadableDaemon } = make(tmpSocketPath("daemon-unreadable-bundles"), unreadableRoot)
+    await expect(unreadableDaemon.start()).resolves.toBeUndefined()
+    await unreadableDaemon.stop()
+
+    const missingRoot = path.join(os.tmpdir(), `daemon-bundles-missing-${Date.now()}`)
+    const { daemon: missingRootDaemon } = make(tmpSocketPath("daemon-missing-bundles"), missingRoot)
+    await expect(missingRootDaemon.start()).resolves.toBeUndefined()
+    await missingRootDaemon.stop()
+
+    fs.rmSync(bundlesRoot, { recursive: true, force: true })
+    fs.rmSync(unreadableRoot, { force: true })
+  })
 })

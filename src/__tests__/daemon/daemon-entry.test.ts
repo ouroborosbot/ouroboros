@@ -12,6 +12,7 @@ describe("daemon entrypoint", () => {
     const start = vi.fn(async () => undefined)
     const stop = vi.fn(async () => undefined)
     const emitNervesEvent = vi.fn()
+    const configureDaemonRuntimeLogger = vi.fn()
     const daemonCtor = vi.fn()
     const processManagerCtor = vi.fn()
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => code as never) as any)
@@ -43,6 +44,7 @@ describe("daemon entrypoint", () => {
       DaemonProcessManager: MockProcessManager,
     }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
+    vi.doMock("../../daemon/runtime-logging", () => ({ configureDaemonRuntimeLogger }))
 
     const argvSpy = vi.spyOn(process, "argv", "get").mockReturnValue(["node", "daemon-entry.js"])
 
@@ -50,6 +52,7 @@ describe("daemon entrypoint", () => {
     await Promise.resolve()
 
     expect(start).toHaveBeenCalledTimes(1)
+    expect(configureDaemonRuntimeLogger).toHaveBeenCalledWith("daemon")
     expect(processManagerCtor).toHaveBeenCalledTimes(1)
     expect(daemonCtor).toHaveBeenCalledTimes(1)
 
@@ -122,6 +125,7 @@ describe("daemon entrypoint", () => {
     })
     const stop = vi.fn(async () => undefined)
     const emitNervesEvent = vi.fn()
+    const configureDaemonRuntimeLogger = vi.fn()
     const daemonCtor = vi.fn()
     const processManagerCtor = vi.fn()
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => code as never) as any)
@@ -152,6 +156,7 @@ describe("daemon entrypoint", () => {
       DaemonProcessManager: MockProcessManager,
     }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
+    vi.doMock("../../daemon/runtime-logging", () => ({ configureDaemonRuntimeLogger }))
 
     const argvSpy = vi.spyOn(process, "argv", "get").mockReturnValue([
       "node",
@@ -167,6 +172,7 @@ describe("daemon entrypoint", () => {
     expect(emitNervesEvent).toHaveBeenCalledWith(
       expect.objectContaining({ event: "daemon.entry_error" }),
     )
+    expect(configureDaemonRuntimeLogger).toHaveBeenCalledWith("daemon")
     expect(processManagerCtor).toHaveBeenCalledTimes(1)
     expect(daemonCtor).toHaveBeenCalledTimes(1)
     expect(stop).toHaveBeenCalled()
@@ -181,6 +187,7 @@ describe("daemon entrypoint", () => {
     const start = vi.fn(async () => undefined)
     const stop = vi.fn(async () => undefined)
     const emitNervesEvent = vi.fn()
+    const configureDaemonRuntimeLogger = vi.fn()
     vi.spyOn(process, "on").mockImplementation(((
       _event: string,
       _cb: () => void,
@@ -202,6 +209,7 @@ describe("daemon entrypoint", () => {
       DaemonProcessManager: MockProcessManager,
     }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
+    vi.doMock("../../daemon/runtime-logging", () => ({ configureDaemonRuntimeLogger }))
 
     const argvSpy = vi.spyOn(process, "argv", "get").mockReturnValue([
       "node",
@@ -216,6 +224,7 @@ describe("daemon entrypoint", () => {
     expect(emitNervesEvent).toHaveBeenCalledWith(
       expect.objectContaining({ event: "daemon.entry_start", meta: { socketPath: "/tmp/ouroboros-daemon.sock" } }),
     )
+    expect(configureDaemonRuntimeLogger).toHaveBeenCalledWith("daemon")
 
     argvSpy.mockRestore()
   })

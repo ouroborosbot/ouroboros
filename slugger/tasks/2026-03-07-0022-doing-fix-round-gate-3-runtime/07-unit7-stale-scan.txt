@@ -1,0 +1,7 @@
+# Gate 3 Unit 7 stale-reference scan
+
+## Removed coding subagent arg references
+
+## Removed --cwd spawn flag references
+
+## Removed old ouro CLI top-level commands (agent/cron)
