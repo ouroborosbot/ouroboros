@@ -4,7 +4,7 @@ import { emitNervesEvent } from "../nerves/runtime"
 export type InnerDialogWorkerReason = "boot" | "heartbeat" | "instinct"
 
 export interface InnerDialogWorkerMessage {
-  type: "heartbeat" | "shutdown" | string
+  type: "heartbeat" | "shutdown" | "poke" | "chat" | "message" | string
 }
 
 export interface InnerDialogWorkerController {
@@ -45,6 +45,14 @@ export function createInnerDialogWorker(
       await run("heartbeat")
       return
     }
+    if (
+      maybeMessage.type === "poke" ||
+      maybeMessage.type === "chat" ||
+      maybeMessage.type === "message"
+    ) {
+      await run("instinct")
+      return
+    }
     if (maybeMessage.type === "shutdown") {
       process.exit(0)
     }
@@ -63,4 +71,3 @@ export async function startInnerDialogWorker(): Promise<void> {
   })
   await worker.run("boot")
 }
-

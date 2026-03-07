@@ -1,8 +1,6 @@
 import { spawn as nodeSpawn, type ChildProcessWithoutNullStreams } from "child_process"
 import * as fs from "fs"
-import * as path from "path"
 
-import { getRepoRoot } from "../identity"
 import { emitNervesEvent } from "../nerves/runtime"
 import type { CodingRunner, CodingSessionRequest } from "./types"
 
@@ -21,34 +19,40 @@ export interface SpawnCodingDeps {
   readFileSync?: (target: string, encoding: "utf-8") => string
 }
 
-function defaultSubagentPath(subagent: CodingSessionRequest["subagent"]): string {
-  return path.join(getRepoRoot(), "subagents", `work-${subagent}.md`)
-}
-
 function buildCommandArgs(runner: CodingRunner, workdir: string): { command: string; args: string[] } {
   if (runner === "claude") {
     return {
       command: "claude",
-      args: ["-p", "--dangerously-skip-permissions", "--add-dir", workdir],
+      args: [
+        "-p",
+        "--dangerously-skip-permissions",
+        "--add-dir",
+        workdir,
+        "--input-format",
+        "stream-json",
+        "--output-format",
+        "stream-json",
+      ],
     }
   }
 
   return {
     command: "codex",
-    args: ["exec", "--skip-git-repo-check", "--cwd", workdir],
+    args: ["exec", "--skip-git-repo-check", "--cd", workdir],
   }
 }
 
 function buildPrompt(request: CodingSessionRequest, deps: Required<Pick<SpawnCodingDeps, "existsSync" | "readFileSync">>): string {
   const sections: string[] = []
 
-  const subagentPath = defaultSubagentPath(request.subagent)
-  if (deps.existsSync(subagentPath)) {
-    const instructions = deps.readFileSync(subagentPath, "utf-8").trim()
-    if (instructions.length > 0) {
-      sections.push(instructions)
-    }
-  }
+  sections.push(
+    [
+      "Coding session metadata:",
+      `sessionId: ${request.sessionId ?? "pending"}`,
+      `parentAgent: ${request.parentAgent ?? "unknown"}`,
+      `taskRef: ${request.taskRef ?? "unassigned"}`,
+    ].join("\n"),
+  )
 
   if (request.stateFile && deps.existsSync(request.stateFile)) {
     const stateContent = deps.readFileSync(request.stateFile, "utf-8").trim()
@@ -73,7 +77,7 @@ export function spawnCodingProcess(request: CodingSessionRequest, deps: SpawnCod
     component: "repertoire",
     event: "repertoire.coding_spawn_start",
     message: "spawning coding session process",
-    meta: { runner: request.runner, subagent: request.subagent, workdir: request.workdir },
+    meta: { runner: request.runner, workdir: request.workdir },
   })
 
   const proc = spawnFn(command, args, {
@@ -87,7 +91,7 @@ export function spawnCodingProcess(request: CodingSessionRequest, deps: SpawnCod
     component: "repertoire",
     event: "repertoire.coding_spawn_end",
     message: "spawned coding session process",
-    meta: { runner: request.runner, subagent: request.subagent, pid: proc.pid ?? null },
+    meta: { runner: request.runner, pid: proc.pid ?? null },
   })
 
   return { process: proc, command, args, prompt }

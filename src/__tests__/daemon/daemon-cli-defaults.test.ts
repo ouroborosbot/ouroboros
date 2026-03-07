@@ -8,7 +8,7 @@ describe("daemon CLI default dependency branches", () => {
     class MockConnection extends EventEmitter {
       write = vi.fn()
       end = vi.fn(() => {
-        this.emit("data", Buffer.from('{"ok":true,"summary":"status-ok"}', "utf-8"))
+        this.emit("data", Buffer.from("{\"ok\":true,\"summary\":\"status-ok\"}", "utf-8"))
         this.emit("end")
       })
     }
@@ -21,8 +21,12 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("net", () => ({ createConnection }))
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
-    vi.doMock("../../identity", () => ({ getRepoRoot: () => "/mock/repo" }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
 
     const { createDefaultOuroCliDeps } = await import("../../daemon/daemon-cli")
     const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
@@ -30,6 +34,41 @@ describe("daemon CLI default dependency branches", () => {
 
     expect(createConnection).toHaveBeenCalledWith("/tmp/daemon.sock")
     expect(response.summary).toBe("status-ok")
+    expect(typeof deps.fallbackPendingMessage).toBe("function")
+  })
+
+  it("returns daemon-stopped response when stop command receives empty payload", async () => {
+    vi.resetModules()
+
+    class MockConnection extends EventEmitter {
+      write = vi.fn()
+      end = vi.fn(() => {
+        this.emit("end")
+      })
+    }
+
+    const createConnection = vi.fn(() => {
+      const conn = new MockConnection()
+      queueMicrotask(() => conn.emit("connect"))
+      return conn
+    })
+
+    vi.doMock("net", () => ({ createConnection }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn() }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
+
+    const { createDefaultOuroCliDeps } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+
+    await expect(deps.sendCommand("/tmp/daemon.sock", { kind: "daemon.stop" })).resolves.toEqual({
+      ok: true,
+      message: "daemon stopped",
+    })
   })
 
   it("rejects when default sendCommand receives non-json payload", async () => {
@@ -51,8 +90,12 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("net", () => ({ createConnection }))
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
-    vi.doMock("../../identity", () => ({ getRepoRoot: () => "/mock/repo" }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
 
     const { createDefaultOuroCliDeps } = await import("../../daemon/daemon-cli")
     const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
@@ -70,8 +113,12 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("child_process", () => ({ spawn }))
     vi.doMock("net", () => ({ createConnection }))
-    vi.doMock("../../identity", () => ({ getRepoRoot: () => "/mock/repo" }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
     vi.stubGlobal("console", { ...console, log: consoleLog })
 
     const { createDefaultOuroCliDeps, runOuroCli } = await import("../../daemon/daemon-cli")
@@ -87,9 +134,83 @@ describe("daemon CLI default dependency branches", () => {
     expect(unref).toHaveBeenCalled()
     expect(started.pid).toBeNull()
 
-    const result = await runOuroCli(["start"], deps)
+    const result = await runOuroCli(["up"], {
+      ...deps,
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+    })
     expect(result).toContain("daemon started")
     expect(consoleLog).toHaveBeenCalled()
+  })
+
+  it("checks socket liveness and cleans stale socket before start", async () => {
+    vi.resetModules()
+
+    const existsSync = vi.fn(() => true)
+    const unlinkSync = vi.fn()
+    const createConnection = vi.fn(() => {
+      const conn = new EventEmitter() as EventEmitter & {
+        write: (chunk: string) => void
+        end: () => void
+      }
+      conn.write = vi.fn()
+      conn.end = vi.fn(() => {
+        conn.emit("error", Object.assign(new Error("refused"), { code: "ECONNREFUSED" }))
+      })
+      queueMicrotask(() => conn.emit("connect"))
+      return conn
+    })
+
+    vi.doMock("net", () => ({ createConnection }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn(() => ({ pid: 1, unref: vi.fn() })) }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync, unlinkSync }))
+
+    const { createDefaultOuroCliDeps } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+
+    await expect(deps.checkSocketAlive("/tmp/daemon.sock")).resolves.toBe(false)
+    deps.cleanupStaleSocket("/tmp/daemon.sock")
+
+    expect(existsSync).toHaveBeenCalledWith("/tmp/daemon.sock")
+    expect(unlinkSync).toHaveBeenCalledWith("/tmp/daemon.sock")
+  })
+
+  it("handles repeated liveness finalize calls without double resolve", async () => {
+    vi.resetModules()
+
+    const createConnection = vi.fn(() => {
+      const conn = new EventEmitter() as EventEmitter & {
+        write: (chunk: string) => void
+        end: () => void
+        setTimeout: (ms: number, cb: () => void) => void
+      }
+      conn.write = vi.fn()
+      conn.end = vi.fn(() => {
+        conn.emit("error", new Error("first failure"))
+        conn.emit("end")
+      })
+      conn.setTimeout = vi.fn()
+      queueMicrotask(() => conn.emit("connect"))
+      return conn
+    })
+
+    vi.doMock("net", () => ({ createConnection }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn(() => ({ pid: 1, unref: vi.fn() })) }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
+
+    const { createDefaultOuroCliDeps } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+    await expect(deps.checkSocketAlive("/tmp/daemon.sock")).resolves.toBe(false)
   })
 
   it("formats fallback command responses from socket results", async () => {
@@ -97,8 +218,12 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("net", () => ({ createConnection: vi.fn() }))
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
-    vi.doMock("../../identity", () => ({ getRepoRoot: () => "/mock/repo" }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
 
     const { runOuroCli } = await import("../../daemon/daemon-cli")
 
@@ -106,6 +231,10 @@ describe("daemon CLI default dependency branches", () => {
       socketPath: "/tmp/daemon.sock",
       startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
       writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
     }
 
     const okOnly = await runOuroCli(["status"], {
@@ -119,5 +248,220 @@ describe("daemon CLI default dependency branches", () => {
       sendCommand: vi.fn(async () => ({ ok: false })),
     })
     expect(unknownError).toContain("unknown error")
+  })
+
+  it("writes pending fallback file under target bundle inbox", async () => {
+    vi.resetModules()
+
+    const appendFileSync = vi.fn()
+    const mkdirSync = vi.fn()
+    const existsSync = vi.fn(() => false)
+    const unlinkSync = vi.fn()
+    vi.doMock("fs", () => ({ appendFileSync, mkdirSync, existsSync, unlinkSync }))
+    vi.doMock("net", () => ({ createConnection: vi.fn() }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn() }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+
+    const { createDefaultOuroCliDeps } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+    const path = deps.fallbackPendingMessage({
+      kind: "message.send",
+      from: "ouro-cli",
+      to: "slugger",
+      content: "hello",
+      sessionId: "s1",
+      taskRef: "t1",
+    })
+
+    expect(path).toBe("/mock/AgentBundles/slugger.ouro/inbox/pending.jsonl")
+    expect(mkdirSync).toHaveBeenCalledWith("/mock/AgentBundles/slugger.ouro/inbox", { recursive: true })
+    expect(appendFileSync).toHaveBeenCalledWith(
+      "/mock/AgentBundles/slugger.ouro/inbox/pending.jsonl",
+      expect.stringContaining("\"taskRef\":\"t1\""),
+      "utf-8",
+    )
+  })
+
+  it("handles missing stale socket and fallback messages without session/task metadata", async () => {
+    vi.resetModules()
+
+    const appendFileSync = vi.fn()
+    const mkdirSync = vi.fn()
+    const existsSync = vi.fn(() => false)
+    const unlinkSync = vi.fn()
+    vi.doMock("fs", () => ({ appendFileSync, mkdirSync, existsSync, unlinkSync }))
+    vi.doMock("net", () => ({ createConnection: vi.fn() }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn() }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+
+    const { createDefaultOuroCliDeps } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+    deps.cleanupStaleSocket("/tmp/daemon.sock")
+    const pendingPath = deps.fallbackPendingMessage({
+      kind: "message.send",
+      from: "ouro-cli",
+      to: "slugger",
+      content: "hello again",
+    })
+
+    expect(pendingPath).toBe("/mock/AgentBundles/slugger.ouro/inbox/pending.jsonl")
+    expect(unlinkSync).not.toHaveBeenCalled()
+    expect(appendFileSync).toHaveBeenCalledWith(
+      "/mock/AgentBundles/slugger.ouro/inbox/pending.jsonl",
+      expect.stringContaining("\"content\":\"hello again\""),
+      "utf-8",
+    )
+  })
+
+  it("wires default subagent installer through repo-root detection", async () => {
+    vi.resetModules()
+
+    const installSubagentsForAvailableCli = vi.fn(async () => ({
+      claudeInstalled: 0,
+      codexInstalled: 0,
+      notes: [],
+    }))
+
+    vi.doMock("net", () => ({ createConnection: vi.fn() }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn() }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
+    vi.doMock("../../daemon/subagent-installer", () => ({ installSubagentsForAvailableCli }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
+
+    const { createDefaultOuroCliDeps } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+    await deps.installSubagents()
+
+    expect(installSubagentsForAvailableCli).toHaveBeenCalledWith({
+      repoRoot: "/mock/repo",
+    })
+  })
+
+  it("rejects empty non-stop responses from default sendCommand", async () => {
+    vi.resetModules()
+
+    class MockConnection extends EventEmitter {
+      write = vi.fn()
+      end = vi.fn(() => {
+        this.emit("end")
+      })
+    }
+
+    const createConnection = vi.fn(() => {
+      const conn = new MockConnection()
+      queueMicrotask(() => conn.emit("connect"))
+      return conn
+    })
+
+    vi.doMock("net", () => ({ createConnection }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn() }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
+
+    const { createDefaultOuroCliDeps } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+
+    await expect(deps.sendCommand("/tmp/daemon.sock", { kind: "daemon.status" })).rejects.toThrow(
+      "Daemon returned empty response.",
+    )
+  })
+
+  it("parses liveness responses for success, invalid json, and empty payload", async () => {
+    vi.resetModules()
+
+    class MockConnection extends EventEmitter {
+      write = vi.fn()
+      end = vi.fn()
+      setTimeout = vi.fn((_ms: number, _cb: () => void) => this)
+    }
+
+    let invocation = 0
+    const createConnection = vi.fn(() => {
+      invocation += 1
+      const conn = new MockConnection()
+      queueMicrotask(() => {
+        conn.emit("connect")
+        if (invocation === 1) {
+          conn.emit("data", Buffer.from("{\"ok\":true}", "utf-8"))
+        } else if (invocation === 2) {
+          conn.emit("data", Buffer.from("not-json", "utf-8"))
+        }
+        conn.emit("end")
+      })
+      return conn
+    })
+
+    vi.doMock("net", () => ({ createConnection }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn() }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
+
+    const { createDefaultOuroCliDeps } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+
+    await expect(deps.checkSocketAlive("/tmp/daemon.sock")).resolves.toBe(true)
+    await expect(deps.checkSocketAlive("/tmp/daemon.sock")).resolves.toBe(false)
+    await expect(deps.checkSocketAlive("/tmp/daemon.sock")).resolves.toBe(false)
+  })
+
+  it("returns false on liveness timeout and rethrows non-message send failures", async () => {
+    vi.resetModules()
+
+    class MockConnection extends EventEmitter {
+      write = vi.fn()
+      end = vi.fn()
+      destroy = vi.fn()
+      setTimeout = vi.fn((_ms: number, callback: () => void) => {
+        queueMicrotask(() => callback())
+        return this
+      })
+    }
+
+    const createConnection = vi.fn(() => new MockConnection())
+    vi.doMock("net", () => ({ createConnection }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn() }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
+
+    const { createDefaultOuroCliDeps, runOuroCli } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+
+    await expect(deps.checkSocketAlive("/tmp/daemon.sock")).resolves.toBe(false)
+    await expect(runOuroCli(["status"], {
+      ...deps,
+      sendCommand: vi.fn(async () => {
+        throw new Error("daemon unreachable")
+      }),
+      writeStdout: vi.fn(),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+    })).rejects.toThrow("daemon unreachable")
   })
 })

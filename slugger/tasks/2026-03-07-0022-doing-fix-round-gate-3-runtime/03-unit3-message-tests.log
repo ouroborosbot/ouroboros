@@ -1,0 +1,17 @@
+
+> ouroboros-agent-harness@1.0.0 test
+> vitest run src/__tests__/daemon/daemon-cli.test.ts src/__tests__/daemon/daemon-cli-defaults.test.ts src/__tests__/daemon/daemon-command-plane-branches.test.ts src/__tests__/daemon/message-router.test.ts
+
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+ ✓ src/__tests__/daemon/daemon-cli-defaults.test.ts (7 tests) 33ms
+ ✓ src/__tests__/daemon/daemon-command-plane-branches.test.ts (9 tests) 18ms
+ ✓ src/__tests__/daemon/daemon-cli.test.ts (11 tests) 8ms
+ ✓ src/__tests__/daemon/message-router.test.ts (2 tests) 7ms
+
+ Test Files  4 passed (4)
+      Tests  29 passed (29)
+   Start at  00:36:49
+   Duration  659ms (transform 83ms, setup 70ms, import 63ms, tests 66ms, environment 0ms)
+

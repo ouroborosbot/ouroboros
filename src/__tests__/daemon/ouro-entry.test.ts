@@ -11,9 +11,11 @@ describe("ouro CLI entrypoint", () => {
 
     const runOuroCli = vi.fn(async () => "ok")
     const emitNervesEvent = vi.fn()
+    const configureDaemonRuntimeLogger = vi.fn()
 
     vi.doMock("../../daemon/daemon-cli", () => ({ runOuroCli }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
+    vi.doMock("../../daemon/runtime-logging", () => ({ configureDaemonRuntimeLogger }))
 
     const argvSpy = vi.spyOn(process, "argv", "get").mockReturnValue([
       "node",
@@ -25,6 +27,7 @@ describe("ouro CLI entrypoint", () => {
     await Promise.resolve()
 
     expect(runOuroCli).toHaveBeenCalledWith(["status"])
+    expect(configureDaemonRuntimeLogger).toHaveBeenCalledWith("ouro")
     expect(emitNervesEvent).toHaveBeenCalledWith(
       expect.objectContaining({ event: "daemon.cli_entry_start" }),
     )
@@ -39,10 +42,12 @@ describe("ouro CLI entrypoint", () => {
       throw new Error("fail")
     })
     const emitNervesEvent = vi.fn()
+    const configureDaemonRuntimeLogger = vi.fn()
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => code as never) as any)
 
     vi.doMock("../../daemon/daemon-cli", () => ({ runOuroCli }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
+    vi.doMock("../../daemon/runtime-logging", () => ({ configureDaemonRuntimeLogger }))
 
     const argvSpy = vi.spyOn(process, "argv", "get").mockReturnValue([
       "node",
@@ -57,6 +62,7 @@ describe("ouro CLI entrypoint", () => {
     expect(emitNervesEvent).toHaveBeenCalledWith(
       expect.objectContaining({ event: "daemon.cli_entry_error" }),
     )
+    expect(configureDaemonRuntimeLogger).toHaveBeenCalledWith("ouro")
     expect(exitSpy).toHaveBeenCalledWith(1)
 
     argvSpy.mockRestore()
@@ -69,10 +75,12 @@ describe("ouro CLI entrypoint", () => {
       throw "string-failure"
     })
     const emitNervesEvent = vi.fn()
+    const configureDaemonRuntimeLogger = vi.fn()
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => code as never) as any)
 
     vi.doMock("../../daemon/daemon-cli", () => ({ runOuroCli }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
+    vi.doMock("../../daemon/runtime-logging", () => ({ configureDaemonRuntimeLogger }))
 
     const argvSpy = vi.spyOn(process, "argv", "get").mockReturnValue([
       "node",
@@ -90,6 +98,7 @@ describe("ouro CLI entrypoint", () => {
         meta: expect.objectContaining({ error: "string-failure" }),
       }),
     )
+    expect(configureDaemonRuntimeLogger).toHaveBeenCalledWith("ouro")
     expect(exitSpy).toHaveBeenCalledWith(1)
 
     argvSpy.mockRestore()

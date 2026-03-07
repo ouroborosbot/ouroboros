@@ -1,0 +1,8 @@
+# Unit 4 stale contract scan
+
+$ rg -n -e "--cwd" -e "subagent" src/coding src/repertoire/tools.ts
+
+$ rg -n "coding_spawn" src/coding/tools.ts src/repertoire/tools.ts
+src/coding/tools.ts:40:    name: "coding_spawn",
+src/coding/tools.ts:106:      emitCodingToolEvent("coding_spawn")
+src/repertoire/tools.ts:177:  if (name === "coding_spawn") return summarizeKeyValues(args, ["runner", "workdir", "taskRef"]);

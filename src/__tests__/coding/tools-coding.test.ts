@@ -32,30 +32,22 @@ describe("coding tool contracts", () => {
     summarizeArgs = tools.summarizeArgs
   })
 
-  it("coding_spawn validates runner and subagent args", async () => {
+  it("coding_spawn validates runner arg", async () => {
     const invalidRunner = await execTool("coding_spawn", {
       runner: "bad-runner",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/ouroboros",
       prompt: "do work",
+      taskRef: "task-1",
     })
     expect(invalidRunner).toContain("invalid runner")
-
-    const invalidSubagent = await execTool("coding_spawn", {
-      runner: "claude",
-      subagent: "bad-subagent",
-      workdir: "/Users/test/AgentWorkspaces/ouroboros",
-      prompt: "do work",
-    })
-    expect(invalidSubagent).toContain("invalid subagent")
   })
 
   it("coding_spawn validates required fields", async () => {
     expect(
       await execTool("coding_spawn", {
-        subagent: "doer",
         workdir: "/Users/test/AgentWorkspaces/ouroboros",
         prompt: "go",
+        taskRef: "task-1",
       }),
     ).toContain("runner is required")
 
@@ -65,21 +57,21 @@ describe("coding tool contracts", () => {
         workdir: "/Users/test/AgentWorkspaces/ouroboros",
         prompt: "go",
       }),
-    ).toContain("subagent is required")
+    ).toContain("taskRef is required")
 
     expect(
       await execTool("coding_spawn", {
         runner: "claude",
-        subagent: "doer",
         prompt: "go",
+        taskRef: "task-1",
       }),
     ).toContain("workdir is required")
 
     expect(
       await execTool("coding_spawn", {
         runner: "claude",
-        subagent: "doer",
         workdir: "/Users/test/AgentWorkspaces/ouroboros",
+        taskRef: "task-1",
       }),
     ).toContain("prompt is required")
   })
@@ -88,7 +80,6 @@ describe("coding tool contracts", () => {
     manager.spawnSession.mockResolvedValue({
       id: "coding-001",
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/ouroboros",
       taskRef: "task-123",
       scopeFile: "/tmp/scope.md",
@@ -105,7 +96,6 @@ describe("coding tool contracts", () => {
 
     const result = await execTool("coding_spawn", {
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/ouroboros",
       prompt: "execute",
       taskRef: "task-123",
@@ -115,7 +105,6 @@ describe("coding tool contracts", () => {
 
     expect(manager.spawnSession).toHaveBeenCalledWith({
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/ouroboros",
       prompt: "execute",
       taskRef: "task-123",
@@ -125,7 +114,6 @@ describe("coding tool contracts", () => {
     expect(JSON.parse(result)).toMatchObject({
       id: "coding-001",
       runner: "claude",
-      subagent: "doer",
       status: "running",
     })
   })
@@ -134,7 +122,6 @@ describe("coding tool contracts", () => {
     manager.spawnSession.mockResolvedValue({
       id: "coding-009",
       runner: "codex",
-      subagent: "planner",
       workdir: "/Users/test/AgentWorkspaces/slugger",
       status: "running",
       pid: null,
@@ -148,18 +135,18 @@ describe("coding tool contracts", () => {
 
     await execTool("coding_spawn", {
       runner: "codex",
-      subagent: "planner",
       workdir: "/Users/test/AgentWorkspaces/slugger",
       prompt: "plan",
+      taskRef: "task-9",
       scopeFile: "   ",
       stateFile: "",
     })
 
     expect(manager.spawnSession).toHaveBeenCalledWith({
       runner: "codex",
-      subagent: "planner",
       workdir: "/Users/test/AgentWorkspaces/slugger",
       prompt: "plan",
+      taskRef: "task-9",
     })
   })
 
@@ -167,7 +154,6 @@ describe("coding tool contracts", () => {
     manager.getSession.mockReturnValue({
       id: "coding-001",
       runner: "claude",
-      subagent: "planner",
       workdir: "/Users/test/AgentWorkspaces/slugger",
       status: "waiting_input",
       pid: 100,
@@ -198,7 +184,6 @@ describe("coding tool contracts", () => {
       {
         id: "coding-001",
         runner: "claude",
-        subagent: "planner",
         workdir: "/Users/test/AgentWorkspaces/slugger",
         status: "running",
         pid: 100,
@@ -212,7 +197,6 @@ describe("coding tool contracts", () => {
       {
         id: "coding-002",
         runner: "codex",
-        subagent: "doer",
         workdir: "/Users/test/AgentWorkspaces/ouroboros",
         status: "running",
         pid: null,
@@ -268,7 +252,6 @@ describe("coding tool contracts", () => {
     expect(
       summarizeArgs("coding_spawn", {
         runner: "claude",
-        subagent: "doer",
         workdir: "/Users/test/AgentWorkspaces/ouroboros",
         taskRef: "task-9",
       }),

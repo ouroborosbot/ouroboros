@@ -2,10 +2,9 @@ import type OpenAI from "openai"
 
 import { getCodingSessionManager } from "./index"
 import { emitNervesEvent } from "../nerves/runtime"
-import type { CodingRunner, CodingSessionRequest, CodingSubagent } from "./types"
+import type { CodingRunner, CodingSessionRequest } from "./types"
 
 const RUNNERS: CodingRunner[] = ["claude", "codex"]
-const SUBAGENTS: CodingSubagent[] = ["planner", "doer", "merger"]
 
 function requireArg(args: Record<string, string>, key: string): string | null {
   const value = args[key]
@@ -17,10 +16,6 @@ function requireArg(args: Record<string, string>, key: string): string | null {
 
 function parseRunner(value: string): CodingRunner | null {
   return RUNNERS.includes(value as CodingRunner) ? (value as CodingRunner) : null
-}
-
-function parseSubagent(value: string): CodingSubagent | null {
-  return SUBAGENTS.includes(value as CodingSubagent) ? (value as CodingSubagent) : null
 }
 
 function optionalArg(args: Record<string, string>, key: "taskRef" | "scopeFile" | "stateFile"): string | undefined {
@@ -43,19 +38,18 @@ const codingSpawnTool: OpenAI.ChatCompletionTool = {
   type: "function",
   function: {
     name: "coding_spawn",
-    description: "spawn a coding session using claude/codex with work-planner, work-doer, or work-merger instructions",
+    description: "spawn a coding session using claude/codex and explicit task-threaded guidance",
     parameters: {
       type: "object",
       properties: {
         runner: { type: "string", enum: ["claude", "codex"] },
-        subagent: { type: "string", enum: ["planner", "doer", "merger"] },
         workdir: { type: "string" },
         prompt: { type: "string" },
         taskRef: { type: "string" },
         scopeFile: { type: "string" },
         stateFile: { type: "string" },
       },
-      required: ["runner", "subagent", "workdir", "prompt"],
+      required: ["runner", "workdir", "prompt", "taskRef"],
     },
   },
 }
@@ -115,26 +109,22 @@ export const codingToolDefinitions = [
       const runner = parseRunner(rawRunner)
       if (!runner) return `invalid runner: ${rawRunner}`
 
-      const rawSubagent = requireArg(args, "subagent")
-      if (!rawSubagent) return "subagent is required"
-      const subagent = parseSubagent(rawSubagent)
-      if (!subagent) return `invalid subagent: ${rawSubagent}`
-
       const workdir = requireArg(args, "workdir")
       if (!workdir) return "workdir is required"
 
       const prompt = requireArg(args, "prompt")
       if (!prompt) return "prompt is required"
 
+      const taskRef = requireArg(args, "taskRef")
+      if (!taskRef) return "taskRef is required"
+
       const request: CodingSessionRequest = {
         runner,
-        subagent,
         workdir,
         prompt,
+        taskRef,
       }
 
-      const taskRef = optionalArg(args, "taskRef")
-      if (taskRef) request.taskRef = taskRef
       const scopeFile = optionalArg(args, "scopeFile")
       if (scopeFile) request.scopeFile = scopeFile
       const stateFile = optionalArg(args, "stateFile")
