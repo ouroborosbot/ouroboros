@@ -3,7 +3,7 @@ import { App } from "@microsoft/teams.apps"
 import { DevtoolsPlugin } from "@microsoft/teams.dev"
 import { runAgent, ChannelCallbacks, RunAgentOptions, createSummarize, repairOrphanedToolCalls } from "../heart/core"
 import type { ToolContext } from "../repertoire/tools"
-import { getToolsForChannel } from "../repertoire/tools"
+import { getToolsForChannel, summarizeArgs } from "../repertoire/tools"
 import { getChannelCapabilities } from "../mind/friends/channel"
 import { getOAuthConfig, resolveOAuthForTenant, getTeamsSecondaryConfig } from "../heart/config"
 import { buildSystem } from "../mind/prompt"
@@ -295,7 +295,12 @@ export function createTeamsCallbacks(
     onToolStart: (name: string, args: Record<string, string>) => {
       stopPhraseRotation()
       flushTextBuffer()
-      const argSummary = Object.values(args).join(", ")
+      // Emit a placeholder to satisfy the 15s Copilot timeout for initial
+      // stream.emit(). Without this, long tool chains (e.g. ADO batch ops)
+      // never emit before the timeout and the user sees "this response was
+      // stopped". The placeholder is replaced by actual content on next emit.
+      if (!streamHasContent) safeEmit("⏳")
+      const argSummary = summarizeArgs(name, args) || Object.keys(args).join(", ")
       safeUpdate(`running ${name} (${argSummary})...`)
       hadToolRun = true
     },
