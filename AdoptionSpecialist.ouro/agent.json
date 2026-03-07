@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "enabled": false,
+  "provider": "anthropic",
+  "context": {
+    "maxTokens": 80000,
+    "contextMargin": 20
+  },
+  "phrases": {
+    "thinking": [
+      "matching hatchlings"
+    ],
+    "tool": [
+      "checking adoption notes"
+    ],
+    "followup": [
+      "finalizing hatch plan"
+    ]
+  }
+}
