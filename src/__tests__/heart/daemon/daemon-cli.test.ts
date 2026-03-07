@@ -1015,6 +1015,82 @@ describe("ouro CLI execution", () => {
   })
 })
 
+describe("single agent → chat via startChat", () => {
+  it("calls ensureDaemonRunning then startChat when single agent discovered", async () => {
+    const startChat = vi.fn(async () => {})
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, message: "unexpected" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 42 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      listDiscoveredAgents: vi.fn(async () => ["slugger"]),
+      startChat,
+    } as OuroCliDeps & {
+      listDiscoveredAgents: () => Promise<string[]>
+      startChat: typeof startChat
+    }
+
+    await runOuroCli([], deps)
+
+    expect(startChat).toHaveBeenCalledWith("slugger")
+    expect(deps.cleanupStaleSocket).toHaveBeenCalled()
+    expect(deps.startDaemonProcess).toHaveBeenCalled()
+    expect(deps.sendCommand).not.toHaveBeenCalled()
+  })
+
+  it("skips daemon start when already running before chat", async () => {
+    const startChat = vi.fn(async () => {})
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, message: "unexpected" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      listDiscoveredAgents: vi.fn(async () => ["slugger"]),
+      startChat,
+    } as OuroCliDeps & {
+      listDiscoveredAgents: () => Promise<string[]>
+      startChat: typeof startChat
+    }
+
+    await runOuroCli([], deps)
+
+    expect(startChat).toHaveBeenCalledWith("slugger")
+    expect(deps.startDaemonProcess).not.toHaveBeenCalled()
+    expect(deps.sendCommand).not.toHaveBeenCalled()
+  })
+
+  it("falls back to chat.connect daemon command when startChat not provided", async () => {
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, message: "connected to slugger" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      listDiscoveredAgents: vi.fn(async () => ["slugger"]),
+    } as OuroCliDeps & {
+      listDiscoveredAgents: () => Promise<string[]>
+    }
+
+    await runOuroCli([], deps)
+
+    expect(deps.sendCommand).toHaveBeenCalledWith(
+      "/tmp/ouro-test.sock",
+      expect.objectContaining({ kind: "chat.connect", agent: "slugger" }),
+    )
+  })
+})
+
 describe("ensureDaemonRunning", () => {
   it("is a no-op when daemon is already running", async () => {
     const { ensureDaemonRunning } = await import("../../../heart/daemon/daemon-cli")
