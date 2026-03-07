@@ -18,7 +18,7 @@ Deliver the full Gate 6 first-run contract: Adoption Specialist integration, `ou
 ## Completion Criteria
 - [x] Adoption Specialist bundle in repo includes copied pre-authored identity files and random identity selection behavior
 - [ ] `ouro hatch` performs provider auth/verification flow and creates canonical hatchling bundle with required defaults
-- [ ] Bare `ouro` routes correctly based on discovered-agent count
+- [x] Bare `ouro` routes correctly based on discovered-agent count
 - [ ] `npx ouro.bot` first-run wrapper delegates correctly to CLI flow
 - [ ] Gate 6 tests cover first-run contracts and pass
 - [ ] 100% test coverage on all new code
@@ -58,7 +58,7 @@ Deliver the full Gate 6 first-run contract: Adoption Specialist integration, `ou
 **Output**: Updated specialist bundle + loader logic + tests.
 **Acceptance**: Tests prove pre-authored identities are loaded/copied as-is; no generated identity content path exists.
 
-### ⬜ Unit 2: Smart Bare `ouro` Routing (TDD)
+### ✅ Unit 2: Smart Bare `ouro` Routing (TDD)
 **What**: Add failing tests for zero/one/multi-agent routing, then implement routing logic in daemon CLI entry path.
 **Output**: Updated CLI routing behavior with coverage.
 **Acceptance**: Zero agents triggers hatch, one triggers chat, many trigger selector behavior.
@@ -98,3 +98,4 @@ Deliver the full Gate 6 first-run contract: Adoption Specialist integration, `ou
 - 2026-03-07 02:56 Quality pass complete (no changes needed).
 - 2026-03-07 02:58 Unit 0 complete: captured daemon CLI/daemon hatch baseline and first-run surface scan artifacts.
 - 2026-03-07 03:03 Unit 1 complete: added specialist identity sync/pick module, repo-shipped AdoptionSpecialist bundle scaffold, and specialist contract tests.
+- 2026-03-07 03:04 Unit 2 complete: implemented bare `ouro` auto-routing by discovered agent count with coverage in daemon CLI tests.

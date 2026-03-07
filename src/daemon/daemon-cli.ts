@@ -30,6 +30,7 @@ export interface OuroCliDeps {
   fallbackPendingMessage: (command: Extract<DaemonCommand, { kind: "message.send" }>) => string
   installSubagents: () => Promise<SubagentInstallResult>
   linkFriendIdentity?: (command: Extract<OuroCliCommand, { kind: "friend.link" }>) => Promise<string>
+  listDiscoveredAgents?: () => Promise<string[]> | string[]
 }
 
 function usage(): string {
@@ -293,6 +294,38 @@ async function defaultInstallSubagents(): Promise<SubagentInstallResult> {
   })
 }
 
+function defaultListDiscoveredAgents(): string[] {
+  const bundlesRoot = getAgentBundlesRoot()
+  let entries: fs.Dirent[]
+  try {
+    entries = fs.readdirSync(bundlesRoot, { withFileTypes: true })
+  } catch {
+    return []
+  }
+
+  const discovered: string[] = []
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.endsWith(".ouro")) continue
+    const agentName = entry.name.slice(0, -5)
+    const configPath = path.join(bundlesRoot, entry.name, "agent.json")
+    let enabled = true
+    try {
+      const raw = fs.readFileSync(configPath, "utf-8")
+      const parsed = JSON.parse(raw) as { enabled?: unknown }
+      if (typeof parsed.enabled === "boolean") {
+        enabled = parsed.enabled
+      }
+    } catch {
+      continue
+    }
+    if (enabled) {
+      discovered.push(agentName)
+    }
+  }
+
+  return discovered.sort((left, right) => left.localeCompare(right))
+}
+
 async function defaultLinkFriendIdentity(command: Extract<OuroCliCommand, { kind: "friend.link" }>): Promise<string> {
   const friendStore = new FileFriendStore(path.join(getAgentBundlesRoot(), `${command.agent}.ouro`, "friends"))
   const current = await friendStore.get(command.friendId)
@@ -335,6 +368,7 @@ export function createDefaultOuroCliDeps(socketPath = "/tmp/ouroboros-daemon.soc
     fallbackPendingMessage: defaultFallbackPendingMessage,
     installSubagents: defaultInstallSubagents,
     linkFriendIdentity: defaultLinkFriendIdentity,
+    listDiscoveredAgents: defaultListDiscoveredAgents,
   }
 }
 
@@ -343,7 +377,27 @@ function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } 
 }
 
 export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefaultOuroCliDeps()): Promise<string> {
-  const command = parseOuroCommand(args)
+  let command = parseOuroCommand(args)
+  if (args.length === 0) {
+    const discovered = await Promise.resolve(
+      deps.listDiscoveredAgents ? deps.listDiscoveredAgents() : defaultListDiscoveredAgents(),
+    )
+    if (discovered.length === 0) {
+      command = { kind: "hatch.start" }
+    } else if (discovered.length === 1) {
+      command = { kind: "chat.connect", agent: discovered[0] }
+    } else {
+      const message = `who do you want to talk to? ${discovered.join(", ")} (use: ouro chat <agent>)`
+      deps.writeStdout(message)
+      return message
+    }
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.cli_auto_route",
+      message: "routed bare ouro command from discovered agents",
+      meta: { target: command.kind, count: discovered.length },
+    })
+  }
   emitNervesEvent({
     component: "daemon",
     event: "daemon.cli_command",
