@@ -204,6 +204,47 @@ describe("ouro CLI execution", () => {
     expect(deps.sendCommand).not.toHaveBeenCalled()
   })
 
+  it("attempts .ouro UTI registration during `up` setup", async () => {
+    const registerOuroBundleType = vi.fn(async () => ({ attempted: true, registered: true }))
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(async () => ({ pid: 4321 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType,
+    }
+
+    await runOuroCli(["up"], deps)
+
+    expect(registerOuroBundleType).toHaveBeenCalledTimes(1)
+  })
+
+  it("continues `up` flow when .ouro UTI registration throws", async () => {
+    const registerOuroBundleType = vi.fn(async () => {
+      throw new Error("registration failed")
+    })
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(async () => ({ pid: 5678 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType,
+    }
+
+    const result = await runOuroCli(["up"], deps)
+
+    expect(registerOuroBundleType).toHaveBeenCalledTimes(1)
+    expect(result).toContain("daemon started")
+  })
+
   it("routes status command through daemon socket", async () => {
     const deps: OuroCliDeps = {
       socketPath: "/tmp/ouro-test.sock",
@@ -435,6 +476,7 @@ describe("ouro CLI execution", () => {
       cleanupStaleSocket: vi.fn(),
       fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
       installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
       runHatchFlow,
     } as OuroCliDeps & {
       runHatchFlow: typeof runHatchFlow
@@ -460,6 +502,7 @@ describe("ouro CLI execution", () => {
         setupToken: "sk-ant-oat01-test-token",
       },
     })
+    expect(deps.registerOuroBundleType).toHaveBeenCalledTimes(1)
     expect(deps.startDaemonProcess).toHaveBeenCalledWith("/tmp/ouro-test.sock")
     expect(result).toContain("hatched Sprout")
     expect(result).toContain("/tmp/AgentBundles/Sprout.ouro")

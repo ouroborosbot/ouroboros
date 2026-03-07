@@ -19,7 +19,7 @@ Deliver the full Gate 6 first-run contract: Adoption Specialist integration, `ou
 - [x] Adoption Specialist bundle in repo includes copied pre-authored identity files and random identity selection behavior
 - [x] `ouro hatch` performs provider auth/verification flow and creates canonical hatchling bundle with required defaults
 - [x] Bare `ouro` routes correctly based on discovered-agent count
-- [ ] `npx ouro.bot` first-run wrapper delegates correctly to CLI flow
+- [x] `npx ouro.bot` first-run wrapper delegates correctly to CLI flow
 - [ ] Gate 6 tests cover first-run contracts and pass
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
@@ -68,12 +68,12 @@ Deliver the full Gate 6 first-run contract: Adoption Specialist integration, `ou
 **Output**: `ouro hatch` flow updates and validated bundle creation output.
 **Acceptance**: Tests verify secrets flow, canonical bundle structure, `enabled: true`, family imprint, heartbeat task creation.
 
-### ⬜ Unit 4: `npx ouro.bot` Wrapper + First-Run Delegation (TDD)
+### ✅ Unit 4: `npx ouro.bot` Wrapper + First-Run Delegation (TDD)
 **What**: Add failing tests for wrapper behavior and implement thin handoff from `ouro.bot` to `@ouro.bot/cli` first-run flow.
 **Output**: Wrapper wiring plus tests.
 **Acceptance**: `npx ouro.bot` path invokes first-run entry contract without bypassing smart routing/auth flow.
 
-### ⬜ Unit 5: `.ouro` UTI Registration (macOS, Non-Blocking) (TDD)
+### ✅ Unit 5: `.ouro` UTI Registration (macOS, Non-Blocking) (TDD)
 **What**: Add failing tests for macOS registration behavior (including non-blocking icon-source-missing path), then implement registration hooks.
 **Output**: UTI registration logic + tests + safe fallback behavior.
 **Acceptance**: Registration is attempted on setup; missing icon source does not block onboarding.
@@ -100,3 +100,5 @@ Deliver the full Gate 6 first-run contract: Adoption Specialist integration, `ou
 - 2026-03-07 03:03 Unit 1 complete: added specialist identity sync/pick module, repo-shipped AdoptionSpecialist bundle scaffold, and specialist contract tests.
 - 2026-03-07 03:04 Unit 2 complete: implemented bare `ouro` auto-routing by discovered agent count with coverage in daemon CLI tests.
 - 2026-03-07 03:14 Unit 3 complete: implemented hatch auth/credential verification, canonical bundle creation, specialist identity selection, and daemon-cli hatch wiring with green tests.
+- 2026-03-07 03:18 Unit 4 complete: added ouro.bot wrapper module + entrypoint and delegation tests covering canonical package handoff and fallback.
+- 2026-03-07 03:22 Unit 5 complete: implemented macOS .ouro UTI registration (non-blocking, icon-optional) and integrated registration attempts into first-run CLI setup paths.

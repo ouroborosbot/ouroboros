@@ -8,6 +8,7 @@ import { emitNervesEvent } from "../nerves/runtime"
 import { FileFriendStore } from "../mind/friends/store-file"
 import { isIdentityProvider, type IdentityProvider } from "../mind/friends/types"
 import type { DaemonCommand, DaemonResponse } from "./daemon"
+import { registerOuroBundleUti as defaultRegisterOuroBundleUti } from "./ouro-uti"
 import { installSubagentsForAvailableCli, type SubagentInstallResult } from "./subagent-installer"
 import {
   runHatchFlow as defaultRunHatchFlow,
@@ -40,6 +41,7 @@ export interface OuroCliDeps {
   listDiscoveredAgents?: () => Promise<string[]> | string[]
   runHatchFlow?: (input: HatchFlowInput) => Promise<HatchFlowResult>
   promptInput?: (question: string) => Promise<string>
+  registerOuroBundleType?: () => Promise<unknown> | unknown
 }
 
 function usage(): string {
@@ -468,6 +470,7 @@ export function createDefaultOuroCliDeps(socketPath = "/tmp/ouroboros-daemon.soc
     listDiscoveredAgents: defaultListDiscoveredAgents,
     runHatchFlow: defaultRunHatchFlow,
     promptInput: defaultPromptInput,
+    registerOuroBundleType: defaultRegisterOuroBundleUti,
   }
 }
 
@@ -507,6 +510,22 @@ async function resolveHatchInput(command: Extract<OuroCliCommand, { kind: "hatch
     provider: providerRaw,
     credentials,
     migrationPath: command.migrationPath,
+  }
+}
+
+async function registerOuroBundleTypeNonBlocking(deps: OuroCliDeps): Promise<void> {
+  const registerOuroBundleType = deps.registerOuroBundleType
+  if (!registerOuroBundleType) return
+  try {
+    await Promise.resolve(registerOuroBundleType())
+  } catch (error) {
+    emitNervesEvent({
+      level: "warn",
+      component: "daemon",
+      event: "daemon.ouro_uti_register_error",
+      message: "failed .ouro UTI registration from CLI flow",
+      meta: { error: error instanceof Error ? error.message : String(error) },
+    })
   }
 }
 
@@ -552,6 +571,8 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       })
     }
 
+    await registerOuroBundleTypeNonBlocking(deps)
+
     const alive = await deps.checkSocketAlive(deps.socketPath)
     if (alive) {
       const message = `daemon already running (${deps.socketPath})`
@@ -596,6 +617,8 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
         meta: { error: error instanceof Error ? error.message : String(error) },
       })
     }
+
+    await registerOuroBundleTypeNonBlocking(deps)
 
     const alive = await deps.checkSocketAlive(deps.socketPath)
     let daemonMessage = `daemon already running (${deps.socketPath})`
