@@ -1,0 +1,144 @@
+  const inboxDir = path.join(getAgentBundlesRoot(), `${command.to}.ouro`, "inbox")
+  const pendingPath = path.join(inboxDir, "pending.jsonl")
+  const queuedAt = new Date().toISOString()
+  const payload = {
+    from: command.from,
+    to: command.to,
+    content: command.content,
+    priority: command.priority ?? "normal",
+    sessionId: command.sessionId,
+    taskRef: command.taskRef,
+    queuedAt,
+  }
+  fs.mkdirSync(inboxDir, { recursive: true })
+  fs.appendFileSync(pendingPath, `${JSON.stringify(payload)}\n`, "utf-8")
+  emitNervesEvent({
+    level: "warn",
+    component: "daemon",
+    event: "daemon.message_fallback_queued",
+    message: "queued message to pending fallback file",
+    meta: {
+      to: command.to,
+      path: pendingPath,
+      sessionId: command.sessionId ?? null,
+      taskRef: command.taskRef ?? null,
+    },
+  })
+  return pendingPath
+}
+
+async function defaultInstallSubagents(): Promise<SubagentInstallResult> {
+  return installSubagentsForAvailableCli({
+    repoRoot: getRepoRoot(),
+  })
+}
+
+async function defaultLinkFriendIdentity(command: Extract<OuroCliCommand, { kind: "friend.link" }>): Promise<string> {
+  const friendStore = new FileFriendStore(path.join(getAgentBundlesRoot(), `${command.agent}.ouro`, "friends"))
+  const current = await friendStore.get(command.friendId)
+  if (!current) {
+    return `friend not found: ${command.friendId}`
+  }
+
+  const alreadyLinked = current.externalIds.some(
+    (ext) => ext.provider === command.provider && ext.externalId === command.externalId,
+  )
+  if (alreadyLinked) {
+    return `identity already linked: ${command.provider}:${command.externalId}`
+  }
+
+  const now = new Date().toISOString()
+  await friendStore.put(command.friendId, {
+    ...current,
+    externalIds: [
+      ...current.externalIds,
+      {
+        provider: command.provider,
+        externalId: command.externalId,
+        linkedAt: now,
+      },
+    ],
+    updatedAt: now,
+  })
+
+  return `linked ${command.provider}:${command.externalId} to ${command.friendId}`
+}
+
+export function createDefaultOuroCliDeps(socketPath = "/tmp/ouroboros-daemon.sock"): OuroCliDeps {
+  return {
+    socketPath,
+    sendCommand: defaultSendCommand,
+    startDaemonProcess: defaultStartDaemonProcess,
+    writeStdout: defaultWriteStdout,
+    checkSocketAlive: defaultCheckSocketAlive,
+    cleanupStaleSocket: defaultCleanupStaleSocket,
+    fallbackPendingMessage: defaultFallbackPendingMessage,
+    installSubagents: defaultInstallSubagents,
+    linkFriendIdentity: defaultLinkFriendIdentity,
+  }
+}
+
+function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "friend.link" }>): DaemonCommand {
+  return command
+}
+
+export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefaultOuroCliDeps()): Promise<string> {
+  const command = parseOuroCommand(args)
+  emitNervesEvent({
+    component: "daemon",
+    event: "daemon.cli_command",
+    message: "ouro CLI command invoked",
+    meta: { kind: command.kind },
+  })
+
+  if (command.kind === "daemon.up") {
+    try {
+      await deps.installSubagents()
+    } catch (error) {
+      emitNervesEvent({
+        level: "warn",
+        component: "daemon",
+        event: "daemon.subagent_install_error",
+        message: "subagent auto-install failed",
+        meta: { error: error instanceof Error ? error.message : String(error) },
+      })
+    }
+
+    const alive = await deps.checkSocketAlive(deps.socketPath)
+    if (alive) {
+      const message = `daemon already running (${deps.socketPath})`
+      deps.writeStdout(message)
+      return message
+    }
+
+    deps.cleanupStaleSocket(deps.socketPath)
+    const started = await deps.startDaemonProcess(deps.socketPath)
+    const message = `daemon started (pid ${started.pid ?? "unknown"})`
+    deps.writeStdout(message)
+    return message
+  }
+
+  if (command.kind === "friend.link") {
+    const linker = deps.linkFriendIdentity ?? defaultLinkFriendIdentity
+    const message = await linker(command)
+    deps.writeStdout(message)
+    return message
+  }
+
+  const daemonCommand = toDaemonCommand(command)
+  let response: DaemonResponse
+  try {
+    response = await deps.sendCommand(deps.socketPath, daemonCommand)
+  } catch (error) {
+    if (command.kind === "message.send") {
+      const pendingPath = deps.fallbackPendingMessage(command)
+      const message = `daemon unavailable; queued message fallback at ${pendingPath}`
+      deps.writeStdout(message)
+      return message
+    }
+    throw error
+  }
+  const message = response.summary ?? response.message ?? (response.ok ? "ok" : `error: ${response.error ?? "unknown error"}`)
+  deps.writeStdout(message)
+  return message
+}
