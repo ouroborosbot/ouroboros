@@ -16,7 +16,7 @@
 Deliver the full Gate 6 first-run contract: Adoption Specialist integration, `ouro hatch` onboarding/auth flow, smart bare `ouro` behavior, and `npx ouro.bot` wrapper execution.
 
 ## Completion Criteria
-- [ ] Adoption Specialist bundle in repo includes copied pre-authored identity files and random identity selection behavior
+- [x] Adoption Specialist bundle in repo includes copied pre-authored identity files and random identity selection behavior
 - [ ] `ouro hatch` performs provider auth/verification flow and creates canonical hatchling bundle with required defaults
 - [ ] Bare `ouro` routes correctly based on discovered-agent count
 - [ ] `npx ouro.bot` first-run wrapper delegates correctly to CLI flow
@@ -53,7 +53,7 @@ Deliver the full Gate 6 first-run contract: Adoption Specialist integration, `ou
 **Output**: Baseline notes/logs under artifacts directory.
 **Acceptance**: Baseline artifacts clearly map existing flow and target Gate 6 deltas.
 
-### ⬜ Unit 1: Adoption Specialist Bundle + Identity Source Wiring (TDD)
+### ✅ Unit 1: Adoption Specialist Bundle + Identity Source Wiring (TDD)
 **What**: Add tests for specialist identity-copy/loading behavior, then implement copying pre-authored identities and random runtime selection contract.
 **Output**: Updated specialist bundle + loader logic + tests.
 **Acceptance**: Tests prove pre-authored identities are loaded/copied as-is; no generated identity content path exists.
@@ -97,3 +97,4 @@ Deliver the full Gate 6 first-run contract: Adoption Specialist integration, `ou
 - 2026-03-07 02:56 Validation pass complete (no changes needed).
 - 2026-03-07 02:56 Quality pass complete (no changes needed).
 - 2026-03-07 02:58 Unit 0 complete: captured daemon CLI/daemon hatch baseline and first-run surface scan artifacts.
+- 2026-03-07 03:03 Unit 1 complete: added specialist identity sync/pick module, repo-shipped AdoptionSpecialist bundle scaffold, and specialist contract tests.
