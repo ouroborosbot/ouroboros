@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { getAnthropicConfig } from "../../config";
-import { loadAgentConfig } from "../../identity";
+import { getAgentName, getAgentSecretsPath } from "../../identity";
 import type { UsageData } from "../../mind/context";
 import { emitNervesEvent } from "../../nerves/runtime";
 import type { ProviderRuntime, ProviderTurnRequest } from "../core";
@@ -19,11 +19,11 @@ interface AnthropicCredential {
 interface HttpError extends Error { status?: number }
 
 function getAnthropicSecretsPathForGuidance(): string {
-  return loadAgentConfig().configPath;
+  return getAgentSecretsPath();
 }
 
 function getAnthropicAgentNameForGuidance(): string {
-  return loadAgentConfig().name;
+  return getAgentName();
 }
 
 function getAnthropicSetupTokenInstructions(): string {

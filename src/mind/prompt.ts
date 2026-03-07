@@ -15,7 +15,6 @@ let _psycheCache: {
   soul: string;
   identity: string;
   lore: string;
-  friends: string;
   tacitKnowledge: string;
   aspirations: string;
 } | null = null;
@@ -33,7 +32,6 @@ function loadPsyche(): {
   soul: string;
   identity: string;
   lore: string;
-  friends: string;
   tacitKnowledge: string;
   aspirations: string;
 } {
@@ -42,7 +40,6 @@ function loadPsyche(): {
     soul: loadPsycheFile("SOUL.md"),
     identity: loadPsycheFile("IDENTITY.md"),
     lore: loadPsycheFile("LORE.md"),
-    friends: loadPsycheFile("FRIENDS.md"),
     tacitKnowledge: loadPsycheFile("TACIT.md"),
     aspirations: loadPsycheFile("ASPIRATIONS.md"),
   };
@@ -67,12 +64,6 @@ function loreSection(): string {
   const text = loadPsyche().lore;
   if (!text) return "";
   return `## my lore\n${text}`;
-}
-
-function friendsSection(): string {
-  const text = loadPsyche().friends;
-  if (!text) return "";
-  return `## my friends\n${text}`;
 }
 
 function tacitKnowledgeSection(): string {
@@ -222,7 +213,6 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     soulSection(),
     identitySection(),
     loreSection(),
-    friendsSection(),
     tacitKnowledgeSection(),
     aspirationsSection(),
     runtimeInfoSection(channel),

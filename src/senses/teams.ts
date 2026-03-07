@@ -16,8 +16,7 @@ import { FileFriendStore } from "../mind/friends/store-file"
 import { FriendResolver } from "../mind/friends/resolver"
 import { accumulateFriendTokens } from "../mind/friends/tokens"
 import { createTurnCoordinator } from "../heart/turn-coordinator"
-import { getAgentRoot, getAgentName } from "../identity"
-import * as os from "os"
+import { getAgentRoot } from "../identity"
 import * as path from "path"
 
 // Stream interface matching IStreamer from @microsoft/teams.apps
@@ -394,9 +393,8 @@ export async function withConversationLock(convId: string, fn: () => Promise<voi
 // Create a fresh friend store per request so mkdirSync re-runs if directories
 // are deleted while the process is alive.
 function getFriendStore(): InstanceType<typeof FileFriendStore> {
-  const agentKnowledgePath = path.join(getAgentRoot(), "friends")
-  const piiBridgePath = path.join(os.homedir(), ".agentstate", getAgentName(), "friends")
-  return new FileFriendStore(agentKnowledgePath, piiBridgePath)
+  const friendsPath = path.join(getAgentRoot(), "friends")
+  return new FileFriendStore(friendsPath)
 }
 
 // Context from the Teams activity that carries OAuth tokens and signin ability

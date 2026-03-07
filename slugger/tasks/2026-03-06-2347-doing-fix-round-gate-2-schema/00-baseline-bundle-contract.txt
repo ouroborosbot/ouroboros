@@ -1,0 +1,27 @@
+# Bundle manifest refs
+src/mind/prompt.ts:5:import { listSkills } from "../repertoire/skills";
+src/mind/prompt.ts:45:    friends: loadPsycheFile("FRIENDS.md"),
+src/mind/prompt.ts:129:function skillsSection(): string {
+src/mind/prompt.ts:132:  return `## my skills (use load_skill to activate)\n${names.join(", ")}`;
+src/mind/prompt.ts:232:    skillsSection(),
+src/__tests__/nerves/bundle-skeleton.contract.test.ts:44:    join(root, "teams-app"),
+src/__tests__/nerves/bundle-skeleton.contract.test.ts:48:    join(root, "psyche", "FRIENDS.md"),
+src/__tests__/nerves/bundle-skeleton.contract.test.ts:51:    join(root, "psyche", "CONTEXT.md"),
+src/__tests__/nerves/bundle-skeleton.contract.test.ts:56:    join(root, "skills", "code-review.md"),
+src/__tests__/nerves/bundle-skeleton.contract.test.ts:57:    join(root, "skills", "self-edit.md"),
+src/__tests__/nerves/bundle-skeleton.contract.test.ts:58:    join(root, "skills", "self-query.md"),
+src/__tests__/nerves/bundle-skeleton.contract.test.ts:59:    join(root, "skills", "explain.md"),
+src/__tests__/nerves/bundle-skeleton.contract.test.ts:60:    join(root, "skills", "toolmaker.md"),
+src/__tests__/nerves/bundle-skeleton.contract.test.ts:65:describe("bundle skeleton contract", () => {
+src/__tests__/nerves/bundle-skeleton.contract.test.ts:118:    expect(readPsyche("FRIENDS.md")).toContain("Ari Mendelow")
+src/__tests__/nerves/bundle-skeleton.contract.test.ts:127:    expect(readPsyche("CONTEXT.md")).toContain("# CONTEXT")
+src/__tests__/mind/prompt.test.ts:18:vi.mock("../../repertoire/skills", () => ({
+src/__tests__/mind/prompt.test.ts:63:import { listSkills } from "../../repertoire/skills"
+src/__tests__/mind/prompt.test.ts:106:    if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
+src/__tests__/mind/prompt.test.ts:315:  it("includes skills section from listSkills", async () => {
+src/__tests__/mind/prompt.test.ts:324:    expect(result).toContain("## my skills (use load_skill to activate)")
+src/__tests__/mind/prompt.test.ts:328:  it("omits skills section when no skills available", async () => {
+src/__tests__/mind/prompt.test.ts:337:    expect(result).not.toContain("## my skills")
+src/__tests__/mind/prompt.test.ts:377:      if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
+src/__tests__/mind/prompt.test.ts:466:      if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS
+src/__tests__/mind/prompt.test.ts:485:      if (p.endsWith("FRIENDS.md")) return MOCK_FRIENDS

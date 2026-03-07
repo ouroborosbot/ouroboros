@@ -41,6 +41,7 @@ vi.mock("../../identity", () => {
       context: { ...DEFAULT_AGENT_CONTEXT },
     })),
     getAgentName: vi.fn(() => "testagent"),
+  getAgentSecretsPath: vi.fn(() => "/tmp/.agentsecrets/testagent/secrets.json"),
     getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
     getRepoRoot: vi.fn(() => "/mock/repo"),
     resetIdentity: vi.fn(),
@@ -121,8 +122,7 @@ describe("buildSystem", () => {
       byStatus: {
         drafting: [],
         processing: [],
-        "validating:slugger": [],
-        "validating:ari": [],
+        "validating": [],
         collaborating: [],
         paused: [],
         blocked: [],
@@ -170,7 +170,7 @@ describe("buildSystem", () => {
     expect(result).toContain("ouroboros")
   })
 
-  it("includes friends section", async () => {
+  it("does not include friends section", async () => {
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../config")
     resetConfigCache()
@@ -178,8 +178,8 @@ describe("buildSystem", () => {
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
-    expect(result).toContain("## my friends")
-    expect(result).toContain("microsoft")
+    expect(result).not.toContain("## my friends")
+    expect(result).not.toContain(MOCK_FRIENDS)
   })
 
   it("includes tacit knowledge section", async () => {
@@ -277,8 +277,7 @@ describe("buildSystem", () => {
       byStatus: {
         drafting: [],
         processing: ["sample-task"],
-        "validating:slugger": [],
-        "validating:ari": [],
+        "validating": [],
         collaborating: [],
         paused: [],
         blocked: [],
@@ -493,6 +492,31 @@ describe("buildSystem", () => {
     resetPsycheCache()
     const result = await buildSystem()
     expect(result).toContain("custom identity content")
+  })
+
+  it("does not read FRIENDS.md as canonical psyche input", async () => {
+    let friendsReadCount = 0
+    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, _encoding?: any) => {
+      const p = String(filePath)
+      if (p.endsWith("SOUL.md")) return MOCK_SOUL
+      if (p.endsWith("IDENTITY.md")) return MOCK_IDENTITY
+      if (p.endsWith("LORE.md")) return MOCK_LORE
+      if (p.endsWith("TACIT.md")) return MOCK_TACIT_KNOWLEDGE
+      if (p.endsWith("ASPIRATIONS.md")) return MOCK_ASPIRATIONS
+      if (p.endsWith("FRIENDS.md")) {
+        friendsReadCount += 1
+        return MOCK_FRIENDS
+      }
+      if (p.endsWith("secrets.json")) return JSON.stringify({})
+      return ""
+    })
+    const { setTestConfig, resetConfigCache } = await import("../../config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    await buildSystem()
+    expect(friendsReadCount).toBe(0)
   })
 
   it("includes tool behavior section when toolChoiceRequired is true", async () => {

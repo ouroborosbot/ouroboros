@@ -348,9 +348,8 @@ export async function main() {
   registerDefaultCommands(registry)
 
   // Resolve context kernel (identity + channel) for CLI
-  const agentKnowledgePath = path.join(getAgentRoot(), "friends")
-  const piiBridgePath = path.join(os.homedir(), ".agentstate", getAgentName(), "friends")
-  const friendStore = new FileFriendStore(agentKnowledgePath, piiBridgePath)
+  const friendsPath = path.join(getAgentRoot(), "friends")
+  const friendStore = new FileFriendStore(friendsPath)
   const username = os.userInfo().username
   const hostname = os.hostname()
   const resolver = new FriendResolver(friendStore, {

@@ -12,6 +12,9 @@ function makeFriend(overrides: Partial<FriendRecord> = {}): FriendRecord {
   return {
     id: "uuid-1",
     name: "Jordan",
+    role: "partner",
+    trustLevel: "friend",
+    connections: [{ name: "Ari", relationship: "teammate" }],
     externalIds: [
       { provider: "aad", externalId: "aad-id-1", tenantId: "t1", linkedAt: "2026-03-02T00:00:00.000Z" },
     ],
@@ -97,6 +100,9 @@ describe("FriendResolver", () => {
       expect(ctx.friend.tenantMemberships).toEqual(["t1"])
       expect(ctx.friend.toolPreferences).toEqual({})
       expect(ctx.friend.notes).toEqual({ name: { value: "New Person", savedAt: expect.any(String) } })
+      expect(ctx.friend.role).toBe("friend")
+      expect(ctx.friend.trustLevel).toBe("friend")
+      expect(ctx.friend.connections).toEqual([])
       expect(ctx.friend.id).toBeTruthy()
       // Should have saved via store.put
       expect(store.put).toHaveBeenCalledTimes(1)
