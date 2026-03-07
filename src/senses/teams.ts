@@ -299,6 +299,7 @@ export function createTeamsCallbacks(
       // stream.emit(). Without this, long tool chains (e.g. ADO batch ops)
       // never emit before the timeout and the user sees "this response was
       // stopped". The placeholder is replaced by actual content on next emit.
+      // https://learn.microsoft.com/en-us/answers/questions/2288017/m365-custom-engine-agents-timeout-message-after-15
       if (!streamHasContent) safeEmit("⏳")
       const argSummary = summarizeArgs(name, args) || Object.keys(args).join(", ")
       safeUpdate(`running ${name} (${argSummary})...`)
