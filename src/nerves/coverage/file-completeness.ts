@@ -14,12 +14,20 @@ export interface FileCompletenessResult {
 
 /**
  * Determines if a source file is type-only (no executable code).
- * A file is type-only if it contains no function, class, or const declarations.
+ * A file is type-only if it contains no function, class, or mutable declarations.
+ * `const ... as const` declarations are treated as type-equivalent (frozen
+ * compile-time values with no side effects).
  */
 export function isTypeOnlyFile(source: string): boolean {
-  // Look for executable code markers: function, class, const/let/var declarations
-  const executablePattern = /\b(function|class|const|let|var)\s/
-  return !executablePattern.test(source)
+  const lines = source.split("\n")
+  for (const line of lines) {
+    const trimmed = line.trim()
+    // Skip lines that are const+as-const (type-equivalent frozen values)
+    if (/\bconst\s/.test(trimmed) && /\bas\s+const\b/.test(trimmed)) continue
+    // Check for executable code markers
+    if (/\b(function|class|const|let|var)\s/.test(trimmed)) return false
+  }
+  return true
 }
 
 /**
