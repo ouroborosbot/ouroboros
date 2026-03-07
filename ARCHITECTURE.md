@@ -1,56 +1,118 @@
 # ARCHITECTURE
 
-This is a shared, living architecture map for the harness and both agents.
+This document describes the post-fix-round architecture for the Ouroboros agent harness.
 
-## Core Principle
+## Core Model
 
-The harness is code the model can use.
+The harness runs as a daemon-centered, event-driven system:
 
-- Before: pipeline code called the model as a function.
-- After: the model is persistent, and the harness provides tools, context, and runtime support.
+- One daemon process manages discovery, lifecycle, routing, and scheduling.
+- Each enabled agent bundle maps to one runtime agent process.
+- Agents process work from chat, `ouro msg`, task board changes, and heartbeat-style task events.
+- Work is task-driven; scheduling is derived from task frontmatter and delivered as `ouro poke` triggers.
 
-## Bootstrap Sequence
+## Runtime Topology
 
-Every agent startup follows this order:
+1. `ouro up` ensures the daemon is running (idempotent startup + stale socket cleanup).
+2. Daemon discovers bundles under `~/AgentBundles/*.ouro`.
+3. Enabled bundles become managed agent processes.
+4. Chat (`ouro chat`), coder/agent messages (`ouro msg`), and pokes (`ouro poke`) are routed to running agents.
+5. Daemon and agents emit structured nerves events for observability and coverage audit.
 
-1. `bundle` - load `<agent>.ouro/` bundle state.
-2. `governance` - load root `ARCHITECTURE.md` and `CONSTITUTION.md`.
-3. `psyche` - load the agent's psyche files from `<agent>.ouro/psyche/`.
-4. `inner-dialog` - start or resume self-directed runtime session.
+Supervisor layering is removed; daemon is the runtime entrypoint.
 
-## Bundle Layout (Repo-Root During Phase 1)
+## Body-Metaphor Subsystems
 
-- `ouroboros.ouro/`
-- `slugger.ouro/`
+- `heart/`: core model loop, provider integration, streaming, tool execution, bootstrap identity/config loading.
+- `mind/`: prompt assembly, memory, friend store, bundle canonical-manifest enforcement.
+- `senses/`: interaction adapters and inner-dialog worker/turn orchestration.
+- `nerves/`: runtime logging/event schema and deterministic coverage audits.
+- `repertoire/`: tools, coding orchestration, and task board/state machinery.
+- `daemon/`: process manager, command plane, message router, task scheduler, hatch flow, first-run UX.
 
-Each bundle contains:
+## Primary CLI Surface
+
+Public operator commands:
+
+- `ouro` / `ouro up`
+- `ouro status`
+- `ouro logs`
+- `ouro stop`
+- `ouro hatch`
+- `ouro chat <agent>`
+- `ouro msg --to <agent> [--session <id>] [--task <ref>] <message>`
+- `ouro poke <agent> --task <task-id>`
+- `ouro link <agent> --friend <id> --provider <provider> --external-id <external-id>`
+
+`npx ouro.bot` is the first-run wrapper that delegates to the canonical CLI runtime.
+
+## Scheduling + Messaging
+
+- Scheduler reads task markdown (`cadence` / `scheduledAt`) and reconciles jobs into `ouro poke` commands.
+- Triggered work updates task `lastRun` metadata.
+- `ouro msg` uses daemon routing for coder<->parent and inter-agent communication.
+- Message fallback persistence exists so messages survive temporary daemon outages.
+
+## Bundle Contract
+
+Agent bundle root: `~/AgentBundles/<Agent>.ouro/`
+
+`agent.json` is the runtime source of truth and includes:
+
+- `version` (integer schema)
+- `enabled` (daemon autostart flag)
+- `provider`
+- `context`
+- `phrases`
+
+Secrets are not stored in bundles:
+
+- Provider credentials: `~/.agentsecrets/<agent>/secrets.json`
+
+Canonical bundle manifest is enforced (`mind/bundle-manifest.ts`), including:
 
 - `agent.json`
-- `teams-app/`
-- `psyche/`
-- `skills/`
+- `psyche/SOUL.md`
+- `psyche/IDENTITY.md`
+- `psyche/LORE.md`
+- `psyche/TACIT.md`
+- `psyche/ASPIRATIONS.md`
+- `psyche/memory/`
+- `friends/`
 - `tasks/`
+- `skills/`
+- `senses/teams/` (under `senses/`)
 
-Bundles are intentionally gitignored in the harness repository and backed up in their own git repositories.
+Non-canonical bundle paths are detected and surfaced for cleanup/distillation.
 
-## Shared Protocols
+## Repository Layout
 
-Shared planning/execution protocols live in `subagents/`:
+Top-level source layout:
 
-- `work-planner`
-- `work-doer`
-- `work-merger`
+- `src/daemon`
+- `src/heart`
+- `src/mind`
+- `src/senses`
+- `src/nerves`
+- `src/repertoire`
+- `src/__tests__` mirroring runtime domains
 
-Agent-specific skills live in each bundle under `skills/`.
+## Removed / Cut Systems
 
-## Runtime Guardrails
+The fix round removed legacy or duplicate systems, including:
 
-- No history rewrites on protected branches.
-- All changes flow through feature branches + PR merge.
-- `npm test` and `npx tsc` must pass for merge.
-- New code requires complete test coverage.
+- standalone supervisor runtime
+- cron scheduler dependency as primary scheduler model
+- governance subsystem directory and other stale pipeline/workspace wiring
+- non-canonical bundle-era assumptions (for example repo-root bundle ownership)
+
+## Quality Gates
+
+- ESLint and TypeScript must pass.
+- Test suite and coverage gate must pass.
+- New code requires full branch/line/function coverage.
+- Nerves coverage audits enforce logging structure and runtime observability contracts.
 
 ## Ownership
 
-This document is a shared governance artifact for Ouroboros and Slugger.
-It should evolve as the agents gain operational experience.
+This document is shared architecture guidance for maintainers and coding agents. Update it whenever runtime contracts or subsystem boundaries materially change.
