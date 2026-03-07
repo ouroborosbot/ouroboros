@@ -1,0 +1,21 @@
+import * as fs from "fs"
+import * as path from "path"
+import { describe, expect, it } from "vitest"
+
+describe("docs/testing-guide contract", () => {
+  it("documents the required end-to-end ouro workflow", () => {
+    const guidePath = path.resolve(process.cwd(), "docs", "testing-guide.md")
+    expect(fs.existsSync(guidePath)).toBe(true)
+
+    const content = fs.readFileSync(guidePath, "utf-8")
+    expect(content).toContain("ouro up")
+    expect(content).toContain("ouro hatch")
+    expect(content).toContain("ouro chat")
+    expect(content).toContain("coding session")
+    expect(content).toContain("ouro msg")
+    expect(content).toContain("heartbeat")
+    expect(content).toContain("ouro stop")
+    expect(content).toContain("Expected output")
+    expect(content).toContain("Troubleshooting")
+  })
+})

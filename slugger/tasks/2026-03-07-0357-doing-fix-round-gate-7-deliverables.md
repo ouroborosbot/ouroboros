@@ -52,7 +52,7 @@ Complete Gate 7 by shipping final docs, auditing all skipped tests called out by
 **Output**: Baseline artifact notes under gate artifacts directory.
 **Acceptance**: Baseline clearly identifies required doc deltas and exact skipped-test set to audit.
 
-### ⬜ Unit 1: Testing Guide Authoring (TDD for doc contract)
+### ✅ Unit 1: Testing Guide Authoring (TDD for doc contract)
 **What**: Add/adjust tests (if needed) asserting testing-guide presence/contract, then write `docs/testing-guide.md` with the required walkthrough, expected outputs, and troubleshooting.
 **Output**: Final `docs/testing-guide.md` and any test updates validating doc contract.
 **Acceptance**: Guide includes all required flow steps (`ouro up` -> `ouro hatch` -> chat -> coding spawn -> `ouro msg` -> heartbeat -> `ouro stop`) with expected output cues and troubleshooting section.
@@ -86,3 +86,4 @@ Complete Gate 7 by shipping final docs, auditing all skipped tests called out by
 - 2026-03-07 03:59 Validation pass complete (paths and target files confirmed).
 - 2026-03-07 03:59 Quality pass complete (no changes needed).
 - 2026-03-07 04:00 Unit 0 complete: baseline doc/test inventory captured in artifacts.
+- 2026-03-07 04:01 Unit 1 complete: added testing-guide contract test and authored docs/testing-guide.md walkthrough with troubleshooting.
