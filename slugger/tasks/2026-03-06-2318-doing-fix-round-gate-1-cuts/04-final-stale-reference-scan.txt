@@ -1,0 +1,4 @@
+Gate 1 Unit 4 Final Stale Reference Scan
+Generated: 2026-03-06 23:35:04 PST
+
+Production + test import/path references to deleted modules:

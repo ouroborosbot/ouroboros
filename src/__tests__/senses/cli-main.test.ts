@@ -50,7 +50,6 @@ const mocks = vi.hoisted(() => ({
     list: vi.fn().mockReturnValue([]),
     dispatch: vi.fn().mockReturnValue({ handled: false }),
   },
-  captureTurnMemories: vi.fn(),
 }))
 
 vi.mock("readline", () => ({
@@ -75,9 +74,6 @@ vi.mock("../../mind/context", () => ({
   deleteSession: (...a: any[]) => mocks.deleteSession(...a),
   trimMessages: (...a: any[]) => mocks.trimMessages(...a),
   postTurn: (...a: any[]) => mocks.postTurn(...a),
-}))
-vi.mock("../../mind/memory-capture", () => ({
-  captureTurnMemories: (...a: any[]) => mocks.captureTurnMemories(...a),
 }))
 vi.mock("../../repertoire/commands", () => ({
   createCommandRegistry: (...a: any[]) => mocks.createCommandRegistry(...a),
@@ -197,7 +193,6 @@ function resetMocks() {
   mocks.trimMessages.mockReset().mockImplementation((msgs: any) => [...msgs])
   mocks.buildSystem.mockReset().mockResolvedValue("system prompt")
   mocks.postTurn.mockReset()
-  mocks.captureTurnMemories.mockReset()
   mocks.registerDefaultCommands.mockReset()
   mocks.parseSlashCommand.mockReset().mockReturnValue(null)
   mocks.getToolChoiceRequired.mockReset().mockReturnValue(false)
@@ -528,22 +523,6 @@ describe("agent.ts main() - session persistence", () => {
     ]))
     expect(postTurnCalls[0][1]).toBe("/tmp/test-session.json")
     expect(postTurnCalls[0][2]).toEqual(usageData)
-  })
-
-  it("passes a beforeTrim hook to postTurn that captures memory highlights", async () => {
-    const postTurnCalls: any[][] = []
-    setupBasic({ inputSequence: ["hello", "/exit"] })
-    mocks.runAgent.mockImplementation(async () => ({ usage: undefined }))
-    mocks.postTurn.mockImplementation((...args: any[]) => { postTurnCalls.push(args) })
-
-    await main()
-
-    expect(postTurnCalls.length).toBe(1)
-    expect(typeof postTurnCalls[0][3]?.beforeTrim).toBe("function")
-
-    const preTrimMessages = [{ role: "user", content: "remember: hook payload" }]
-    postTurnCalls[0][3].beforeTrim(preTrimMessages)
-    expect(mocks.captureTurnMemories).toHaveBeenCalledWith(preTrimMessages, "cli")
   })
 
   it("does not call trimMessages directly (postTurn handles it)", async () => {

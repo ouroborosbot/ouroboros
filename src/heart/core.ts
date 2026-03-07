@@ -3,7 +3,7 @@ import {
   getAzureConfig,
   getContextConfig,
 } from "../config";
-import { getRepoRoot, loadAgentConfig } from "../identity";
+import { loadAgentConfig } from "../identity";
 import { execTool, summarizeArgs, finalAnswerTool, getToolsForChannel, isConfirmationRequired } from "../repertoire/tools";
 import type { ToolContext } from "../repertoire/tools";
 import { getChannelCapabilities } from "../mind/friends/channel";
@@ -22,7 +22,6 @@ import { createAnthropicProviderRuntime } from "./providers/anthropic";
 import { createAzureProviderRuntime } from "./providers/azure";
 import { createMinimaxProviderRuntime } from "./providers/minimax";
 import { createOpenAICodexProviderRuntime } from "./providers/openai-codex";
-import { runGovernancePreflight } from "../governance/loader";
 
 export type ProviderId = "azure" | "anthropic" | "minimax" | "openai-codex";
 
@@ -49,15 +48,6 @@ interface ProviderRegistry {
 }
 
 let _providerRuntime: ProviderRuntime | null = null;
-let _governancePreflightRan = false;
-
-function ensureGovernancePreflight(): void {
-  if (_governancePreflightRan) {
-    return;
-  }
-  runGovernancePreflight(getRepoRoot());
-  _governancePreflightRan = true;
-}
 
 export function createProviderRegistry(): ProviderRegistry {
   const factories: Record<ProviderId, () => ProviderRuntime> = {
@@ -243,7 +233,6 @@ export async function runAgent(
   signal?: AbortSignal,
   options?: RunAgentOptions,
 ): Promise<{ usage?: UsageData }> {
-  ensureGovernancePreflight();
   const providerRuntime = getProviderRuntime();
   const provider = providerRuntime.id;
   const toolChoiceRequired = options?.toolChoiceRequired ?? true;

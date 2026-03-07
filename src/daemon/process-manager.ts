@@ -2,7 +2,6 @@ import { spawn as nodeSpawn, type ChildProcess } from "child_process"
 import * as path from "path"
 import { getRepoRoot } from "../identity"
 import { emitNervesEvent } from "../nerves/runtime"
-import { ensureAgentWorkspace, type WorkspaceEnsureResult } from "./workspaces"
 
 export interface DaemonManagedAgent {
   name: string
@@ -34,7 +33,6 @@ export interface DaemonProcessManagerOptions {
   now?: () => number
   setTimeoutFn?: (cb: () => void, delay: number) => unknown
   clearTimeoutFn?: (timer: unknown) => void
-  ensureWorkspace?: (agent: string) => WorkspaceEnsureResult
 }
 
 interface AgentRuntimeState {
@@ -60,7 +58,6 @@ export class DaemonProcessManager {
   private readonly now: () => number
   private readonly setTimeoutFn: (cb: () => void, delay: number) => unknown
   private readonly clearTimeoutFn: (timer: unknown) => void
-  private readonly ensureWorkspace: (agent: string) => WorkspaceEnsureResult
 
   constructor(options: DaemonProcessManagerOptions) {
     this.maxRestartsPerHour = options.maxRestartsPerHour ?? 10
@@ -71,7 +68,6 @@ export class DaemonProcessManager {
     this.now = options.now ?? (() => Date.now())
     this.setTimeoutFn = options.setTimeoutFn ?? ((cb, delay) => setTimeout(cb, delay))
     this.clearTimeoutFn = options.clearTimeoutFn ?? ((timer) => clearTimeout(timer as NodeJS.Timeout))
-    this.ensureWorkspace = options.ensureWorkspace ?? ((agent) => ensureAgentWorkspace(agent))
 
     for (const agent of options.agents) {
       this.agents.set(agent.name, {
@@ -110,11 +106,11 @@ export class DaemonProcessManager {
     state.stopRequested = false
     state.snapshot.status = "starting"
 
-    const workspace = this.ensureWorkspace(agent)
+    const runCwd = getRepoRoot()
     const entryScript = path.join(getRepoRoot(), "dist", state.config.entry)
     const args = [entryScript, "--agent", agent, ...(state.config.args ?? [])]
     const child = this.spawnFn("node", args, {
-      cwd: workspace.workspacePath,
+      cwd: runCwd,
       env: state.config.env ? { ...process.env, ...state.config.env } : process.env,
       stdio: ["ignore", "ignore", "ignore"],
     })
@@ -128,7 +124,7 @@ export class DaemonProcessManager {
       component: "daemon",
       event: "daemon.agent_started",
       message: "daemon started managed agent process",
-      meta: { agent, pid: child.pid ?? null, workspacePath: workspace.workspacePath },
+      meta: { agent, pid: child.pid ?? null, cwd: runCwd },
     })
 
     child.once("exit", (code, signal) => {
