@@ -282,7 +282,7 @@ function defaultSendCommand(socketPath: string, command: DaemonCommand): Promise
 }
 
 function defaultStartDaemonProcess(socketPath: string): Promise<{ pid: number | null }> {
-  const entry = path.join(getRepoRoot(), "dist", "daemon", "daemon-entry.js")
+  const entry = path.join(getRepoRoot(), "dist", "heart", "daemon", "daemon-entry.js")
   const child = spawn("node", [entry, "--socket", socketPath], {
     detached: true,
     stdio: "ignore",

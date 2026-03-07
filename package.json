@@ -1,7 +1,20 @@
 {
   "name": "@ouro.bot/cli",
-  "version": "1.0.0",
-  "private": true,
+  "version": "0.1.0-alpha.1",
+  "main": "dist/heart/daemon/ouro-entry.js",
+  "bin": {
+    "ouro": "dist/heart/daemon/ouro-entry.js",
+    "ouro.bot": "dist/heart/daemon/ouro-bot-entry.js"
+  },
+  "files": [
+    "dist/",
+    "AdoptionSpecialist.ouro/",
+    "subagents/"
+  ],
+  "exports": {
+    ".": "./dist/heart/daemon/ouro-entry.js",
+    "./runOuroCli": "./dist/heart/daemon/daemon-cli.js"
+  },
   "scripts": {
     "dev": "tsc && node dist/senses/cli-entry.js --agent ouroboros",
     "daemon": "tsc && node dist/heart/daemon/daemon-entry.js",

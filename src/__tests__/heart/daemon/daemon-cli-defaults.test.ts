@@ -131,7 +131,7 @@ describe("daemon CLI default dependency branches", () => {
 
     expect(spawn).toHaveBeenCalledWith(
       "node",
-      ["/mock/repo/dist/daemon/daemon-entry.js", "--socket", "/tmp/daemon.sock"],
+      ["/mock/repo/dist/heart/daemon/daemon-entry.js", "--socket", "/tmp/daemon.sock"],
       expect.objectContaining({ detached: true, stdio: "ignore" }),
     )
     expect(unref).toHaveBeenCalled()

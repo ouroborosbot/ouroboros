@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { emitNervesEvent } from "../../nerves/runtime"
 import { runOuroCli } from "./daemon-cli"
 import { configureDaemonRuntimeLogger } from "./runtime-logging"

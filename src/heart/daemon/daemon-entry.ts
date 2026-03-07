@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { DaemonProcessManager } from "./process-manager"
 import { OuroDaemon } from "./daemon"
 import { emitNervesEvent } from "../../nerves/runtime"
