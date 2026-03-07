@@ -21,7 +21,7 @@ Implement Gate 3 runtime-core architecture: unified agent process entrypoint, da
 - [x] Unified agent entrypoint replaces inner-worker-only startup contract
 - [x] Coding spawner removes `subagent`, uses `--cd` for codex, stream-json flags for claude, and richer failure diagnostics
 - [x] Coding session manager persists and reloads session state
-- [ ] Task-driven schedule reconciliation + `ouro poke` forwarding implemented with tests
+- [x] Task-driven schedule reconciliation + `ouro poke` forwarding implemented with tests
 - [ ] Human-readable terminal logging + configurable sink wiring implemented
 - [ ] Subagent auto-installation on `ouro up` implemented and tested
 - [ ] 100% test coverage on all new code
@@ -76,7 +76,7 @@ Implement Gate 3 runtime-core architecture: unified agent process entrypoint, da
 **Output**: Updated coding types/tools/spawner/manager with tests.
 **Acceptance**: Coding suites validate new request contract, spawn args, and persisted session recovery.
 
-### ⬜ Unit 5: Task-Driven Scheduling + `ouro poke`
+### ✅ Unit 5: Task-Driven Scheduling + `ouro poke`
 **What**: Implement task frontmatter schedule reconciliation hooks and `ouro poke` forwarding from daemon to agent process, including `lastRun` updates.
 **Output**: Scheduling/reconciliation modules and daemon integration tests.
 **Acceptance**: Habit/scheduled task frontmatter drives scheduling actions in tests; poke path is verified.
@@ -106,3 +106,4 @@ Implement Gate 3 runtime-core architecture: unified agent process entrypoint, da
 - 2026-03-07 00:33 Unit 2 complete: Added unified `heart/agent-entry` runtime entrypoint, switched daemon-managed agents to `heart/agent-entry.js`, and extended worker event handling so `poke`/`chat`/`message` inputs trigger active turn cycles.
 - 2026-03-07 00:36 Unit 3 complete: Added `ouro msg` socket-failure fallback to `<bundle>/inbox/pending.jsonl`, extended routed message schema with `sessionId`/`taskRef`, and added daemon startup drain of pending bundle inbox lines back into the live message router.
 - 2026-03-07 00:54 Unit 4 complete: Removed `subagent` from coding schema/tool surface, switched codex spawn args to `--cd`, added Claude stream-json flags, injected session metadata into coding prompts, and rewrote `CodingSessionManager` with persisted state reload + failure diagnostics (command/exit/stderr/stdout tails) plus recovery tests.
+- 2026-03-07 01:09 Unit 5 complete: Added `TaskDrivenScheduler` task-file reconciliation for `cadence`/`scheduledAt` frontmatter, wired daemon `start()` reconcile + `task.poke` run recording, updated daemon entrypoint to real scheduler wiring, and expanded daemon scheduler tests to 100% coverage for new scheduler code paths with passing daemon/full test and build runs.

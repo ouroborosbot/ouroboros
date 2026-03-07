@@ -38,6 +38,8 @@ describe("daemon command plane branches", () => {
     const scheduler = {
       listJobs: vi.fn(() => []),
       triggerJob: vi.fn(async (jobId: string) => ({ ok: true, message: `triggered ${jobId}` })),
+      reconcile: vi.fn(async () => undefined),
+      recordTaskRun: vi.fn(async (_agent: string, _taskId: string) => undefined),
     }
 
     const healthMonitor = {
@@ -101,7 +103,7 @@ describe("daemon command plane branches", () => {
 
   it("handles logs, chat connect, message, task poke, and hatch commands", async () => {
     const socketPath = tmpSocketPath("daemon-command-set")
-    const { daemon, processManager, router } = make(socketPath)
+    const { daemon, processManager, router, scheduler } = make(socketPath)
 
     const logs = await daemon.handleCommand({ kind: "daemon.logs" })
     expect(logs.ok).toBe(true)
@@ -139,6 +141,7 @@ describe("daemon command plane branches", () => {
       to: "slugger",
       taskRef: "habit-heartbeat",
     }))
+    expect(scheduler.recordTaskRun).toHaveBeenCalledWith("slugger", "habit-heartbeat")
 
     const hatch = await daemon.handleCommand({ kind: "hatch.start" })
     expect(hatch.ok).toBe(true)
