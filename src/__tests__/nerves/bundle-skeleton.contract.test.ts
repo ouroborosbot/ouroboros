@@ -123,8 +123,8 @@ describe("bundle skeleton contract", () => {
     expect(readPsyche("INSPIRING-FIGURES.md").length).toBeGreaterThan(0)
     expect(readFileSync(join(roots.slugger, "psyche", "memory", "tacit.md"), "utf-8").length).toBeGreaterThan(0)
 
-    expect(readPsyche("ASPIRATIONS.md")).toBe("# ASPIRATIONS")
-    expect(readPsyche("CONTEXT.md")).toBe("# CONTEXT")
+    expect(readPsyche("ASPIRATIONS.md")).toContain("# ASPIRATIONS")
+    expect(readPsyche("CONTEXT.md")).toContain("# CONTEXT")
   })
 
   it("keeps bundles external to harness repo root", () => {

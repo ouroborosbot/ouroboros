@@ -57,15 +57,6 @@ describe("daemon entrypoint", () => {
       scheduler: {
         listJobs: () => unknown[]
         triggerJob: (jobId: string) => Promise<{ ok: boolean; message: string }>
-        addJob: (job: {
-          id: string
-          schedule: string
-          agent: string
-          taskFile: string
-          instruction: string
-          lastRun: string | null
-          lastResult: null
-        }) => void
       }
       healthMonitor: { runChecks: () => Promise<unknown[]> }
       router: {
@@ -74,18 +65,9 @@ describe("daemon entrypoint", () => {
       }
     }
     expect(daemonOptions.scheduler.listJobs()).toEqual([])
-    daemonOptions.scheduler.addJob({
-      id: "nightly",
-      schedule: "*/5 * * * *",
-      agent: "ouroboros",
-      taskFile: "/tmp/nightly.md",
-      instruction: "Run",
-      lastRun: null,
-      lastResult: null,
-    })
     await expect(daemonOptions.scheduler.triggerJob("nightly")).resolves.toEqual({
-      ok: true,
-      message: "triggered nightly",
+      ok: false,
+      message: "cron scheduler removed: nightly",
     })
     await expect(daemonOptions.healthMonitor.runChecks()).resolves.toEqual([
       { name: "agent-processes", status: "critical", message: "non-running agents: slugger" },
