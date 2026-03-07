@@ -1,6 +1,6 @@
 # Doing: Fix Round Gate 1 Cuts And Cleanup
 
-**Status**: in-progress
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-03-06 23:18
 **Planning**: ./2026-03-06-2318-planning-fix-round-gate-1-cuts.md
@@ -16,13 +16,13 @@
 Delete dead subsystems and stale repository artifacts from Gate 1 so later gates build on a smaller, cleaner codebase with no dangling references.
 
 ## Completion Criteria
-- [ ] All Gate 1 removals and file moves are complete
-- [ ] No production or test references remain to deleted code
+- [x] All Gate 1 removals and file moves are complete
+- [x] No production or test references remain to deleted code
 - [x] `package.json` script surface matches Gate 1 requirements
 - [x] Root cleanup and docs consolidation are complete
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -67,7 +67,7 @@ Delete dead subsystems and stale repository artifacts from Gate 1 so later gates
 **Output**: Root layout and scripts match Gate 1 contract.
 **Acceptance**: Required files moved/deleted and script surface constrained to required commands.
 
-### ⬜ Unit 4: Verification
+### ✅ Unit 4: Verification
 **What**: Run full repo verification (`npm test`, `npm run build`) and targeted scans confirming no references to deleted code remain.
 **Output**: Verification logs in artifacts directory.
 **Acceptance**: Tests pass, build succeeds, no warnings, and scans show no stale references.
@@ -87,3 +87,5 @@ Delete dead subsystems and stale repository artifacts from Gate 1 so later gates
 - 2026-03-06 23:25 Unit 1 complete: Removed dead production modules and updated all production callers/imports.
 - 2026-03-06 23:31 Unit 2 complete: Deleted tests tied to removed modules and updated remaining tests/snapshots to match cuts.
 - 2026-03-06 23:34 Unit 3 complete: Moved archived docs, merged constitution guidance into AGENTS, updated gitignore, and trimmed scripts.
+- 2026-03-06 23:35 Unit 4 complete: Full tests and build passed, and stale-reference scans confirmed no deleted-module imports remain.
+- 2026-03-06 23:35 All units complete. Status set to done.

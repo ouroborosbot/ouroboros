@@ -25,13 +25,13 @@ Delete dead subsystems and stale repository artifacts from Gate 1 so later gates
 - Non-Gate-1 architecture refactors
 
 ## Completion Criteria
-- [ ] All Gate 1 removals and file moves are complete
-- [ ] No production or test references remain to deleted code
-- [ ] `package.json` script surface matches Gate 1 requirements
-- [ ] Root cleanup and docs consolidation are complete
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] All Gate 1 removals and file moves are complete
+- [x] No production or test references remain to deleted code
+- [x] `package.json` script surface matches Gate 1 requirements
+- [x] Root cleanup and docs consolidation are complete
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -41,7 +41,7 @@ Delete dead subsystems and stale repository artifacts from Gate 1 so later gates
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [ ] None
+- [x] None
 
 ## Decisions Made
 - Follow the master planning doc subsystem audit and Gate 1 execution section as source of truth.
@@ -58,3 +58,4 @@ Gate 1 is pure cuts and cleanup intended to reduce complexity before schema/runt
 ## Progress Log
 - 2026-03-06 23:18 Created
 - 2026-03-06 23:18 Approved by human pre-authorization for Gate 1 execution
+- 2026-03-06 23:35 Gate 1 execution complete; completion criteria verified from doing evidence
