@@ -23,8 +23,8 @@ export interface DaemonProcessManagerLike {
   startAutoStartAgents(): Promise<void>
   stopAll(): Promise<void>
   startAgent(agent: string): Promise<void>
-  stopAgent(agent: string): Promise<void>
-  restartAgent(agent: string): Promise<void>
+  stopAgent?(agent: string): Promise<void>
+  restartAgent?(agent: string): Promise<void>
   listAgentSnapshots(): Array<{
     name: string
     channel: string
@@ -49,7 +49,14 @@ export interface DaemonHealthMonitorLike {
 }
 
 export interface DaemonRouterLike {
-  send(message: { from: string; to: string; content: string; priority?: string }): Promise<DaemonMessageReceipt>
+  send(message: {
+    from: string
+    to: string
+    content: string
+    priority?: string
+    sessionId?: string
+    taskRef?: string
+  }): Promise<DaemonMessageReceipt>
   pollInbox(agent: string): Array<{ id: string; from: string; content: string; queuedAt: string; priority: string }>
 }
 
@@ -58,13 +65,17 @@ export type DaemonCommand =
   | { kind: "daemon.stop" }
   | { kind: "daemon.status" }
   | { kind: "daemon.health" }
+  | { kind: "daemon.logs" }
   | { kind: "agent.start"; agent: string }
   | { kind: "agent.stop"; agent: string }
   | { kind: "agent.restart"; agent: string }
   | { kind: "cron.list" }
   | { kind: "cron.trigger"; jobId: string }
-  | { kind: "message.send"; from: string; to: string; content: string; priority?: string }
+  | { kind: "chat.connect"; agent: string }
+  | { kind: "task.poke"; agent: string; taskId: string }
+  | { kind: "message.send"; from: string; to: string; content: string; priority?: string; sessionId?: string; taskRef?: string }
   | { kind: "message.poll"; agent: string }
+  | { kind: "hatch.start" }
 
 export interface DaemonResponse {
   ok: boolean
@@ -234,14 +245,20 @@ export class OuroDaemon {
         const summary = checks.map((check) => `${check.name}:${check.status}:${check.message}`).join("\n")
         return { ok: true, summary, data: checks }
       }
+      case "daemon.logs":
+        return {
+          ok: true,
+          summary: "logs: use `ouro logs` to tail daemon and agent output",
+          message: "log streaming available via ouro logs",
+        }
       case "agent.start":
         await this.processManager.startAgent(command.agent)
         return { ok: true, message: `started ${command.agent}` }
       case "agent.stop":
-        await this.processManager.stopAgent(command.agent)
+        await this.processManager.stopAgent?.(command.agent)
         return { ok: true, message: `stopped ${command.agent}` }
       case "agent.restart":
-        await this.processManager.restartAgent(command.agent)
+        await this.processManager.restartAgent?.(command.agent)
         return { ok: true, message: `restarted ${command.agent}` }
       case "cron.list": {
         const jobs = this.scheduler.listJobs()
@@ -260,6 +277,8 @@ export class OuroDaemon {
           to: command.to,
           content: command.content,
           priority: command.priority,
+          sessionId: command.sessionId,
+          taskRef: command.taskRef,
         })
         return { ok: true, message: `queued message ${receipt.id}`, data: receipt }
       }
@@ -271,6 +290,31 @@ export class OuroDaemon {
           data: messages,
         }
       }
+      case "chat.connect":
+        await this.processManager.startAgent(command.agent)
+        return {
+          ok: true,
+          message: `connected to ${command.agent}`,
+        }
+      case "task.poke": {
+        const receipt = await this.router.send({
+          from: "ouro-poke",
+          to: command.agent,
+          content: `poke ${command.taskId}`,
+          priority: "high",
+          taskRef: command.taskId,
+        })
+        return {
+          ok: true,
+          message: `queued poke ${receipt.id}`,
+          data: receipt,
+        }
+      }
+      case "hatch.start":
+        return {
+          ok: true,
+          message: "hatch flow is stubbed in Gate 3 and completed in Gate 6",
+        }
       default:
         return {
           ok: false,

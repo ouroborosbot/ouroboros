@@ -8,7 +8,7 @@ describe("daemon CLI default dependency branches", () => {
     class MockConnection extends EventEmitter {
       write = vi.fn()
       end = vi.fn(() => {
-        this.emit("data", Buffer.from('{"ok":true,"summary":"status-ok"}', "utf-8"))
+        this.emit("data", Buffer.from("{\"ok\":true,\"summary\":\"status-ok\"}", "utf-8"))
         this.emit("end")
       })
     }
@@ -23,6 +23,7 @@ describe("daemon CLI default dependency branches", () => {
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
     vi.doMock("../../identity", () => ({ getRepoRoot: () => "/mock/repo" }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
 
     const { createDefaultOuroCliDeps } = await import("../../daemon/daemon-cli")
     const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
@@ -30,6 +31,37 @@ describe("daemon CLI default dependency branches", () => {
 
     expect(createConnection).toHaveBeenCalledWith("/tmp/daemon.sock")
     expect(response.summary).toBe("status-ok")
+  })
+
+  it("returns daemon-stopped response when stop command receives empty payload", async () => {
+    vi.resetModules()
+
+    class MockConnection extends EventEmitter {
+      write = vi.fn()
+      end = vi.fn(() => {
+        this.emit("end")
+      })
+    }
+
+    const createConnection = vi.fn(() => {
+      const conn = new MockConnection()
+      queueMicrotask(() => conn.emit("connect"))
+      return conn
+    })
+
+    vi.doMock("net", () => ({ createConnection }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn() }))
+    vi.doMock("../../identity", () => ({ getRepoRoot: () => "/mock/repo" }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
+
+    const { createDefaultOuroCliDeps } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+
+    await expect(deps.sendCommand("/tmp/daemon.sock", { kind: "daemon.stop" })).resolves.toEqual({
+      ok: true,
+      message: "daemon stopped",
+    })
   })
 
   it("rejects when default sendCommand receives non-json payload", async () => {
@@ -53,6 +85,7 @@ describe("daemon CLI default dependency branches", () => {
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
     vi.doMock("../../identity", () => ({ getRepoRoot: () => "/mock/repo" }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
 
     const { createDefaultOuroCliDeps } = await import("../../daemon/daemon-cli")
     const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
@@ -72,6 +105,7 @@ describe("daemon CLI default dependency branches", () => {
     vi.doMock("net", () => ({ createConnection }))
     vi.doMock("../../identity", () => ({ getRepoRoot: () => "/mock/repo" }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
     vi.stubGlobal("console", { ...console, log: consoleLog })
 
     const { createDefaultOuroCliDeps, runOuroCli } = await import("../../daemon/daemon-cli")
@@ -87,9 +121,47 @@ describe("daemon CLI default dependency branches", () => {
     expect(unref).toHaveBeenCalled()
     expect(started.pid).toBeNull()
 
-    const result = await runOuroCli(["start"], deps)
+    const result = await runOuroCli(["up"], {
+      ...deps,
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+    })
     expect(result).toContain("daemon started")
     expect(consoleLog).toHaveBeenCalled()
+  })
+
+  it("checks socket liveness and cleans stale socket before start", async () => {
+    vi.resetModules()
+
+    const existsSync = vi.fn(() => true)
+    const unlinkSync = vi.fn()
+    const createConnection = vi.fn(() => {
+      const conn = new EventEmitter() as EventEmitter & {
+        write: (chunk: string) => void
+        end: () => void
+      }
+      conn.write = vi.fn()
+      conn.end = vi.fn(() => {
+        conn.emit("error", Object.assign(new Error("refused"), { code: "ECONNREFUSED" }))
+      })
+      queueMicrotask(() => conn.emit("connect"))
+      return conn
+    })
+
+    vi.doMock("net", () => ({ createConnection }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn(() => ({ pid: 1, unref: vi.fn() })) }))
+    vi.doMock("../../identity", () => ({ getRepoRoot: () => "/mock/repo" }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync, unlinkSync }))
+
+    const { createDefaultOuroCliDeps } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+
+    await expect(deps.checkSocketAlive("/tmp/daemon.sock")).resolves.toBe(false)
+    deps.cleanupStaleSocket("/tmp/daemon.sock")
+
+    expect(existsSync).toHaveBeenCalledWith("/tmp/daemon.sock")
+    expect(unlinkSync).toHaveBeenCalledWith("/tmp/daemon.sock")
   })
 
   it("formats fallback command responses from socket results", async () => {
@@ -99,6 +171,7 @@ describe("daemon CLI default dependency branches", () => {
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
     vi.doMock("../../identity", () => ({ getRepoRoot: () => "/mock/repo" }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
 
     const { runOuroCli } = await import("../../daemon/daemon-cli")
 
@@ -106,6 +179,8 @@ describe("daemon CLI default dependency branches", () => {
       socketPath: "/tmp/daemon.sock",
       startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
       writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
     }
 
     const okOnly = await runOuroCli(["status"], {

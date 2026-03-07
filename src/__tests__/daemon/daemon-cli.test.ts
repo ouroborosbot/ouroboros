@@ -8,76 +8,134 @@ import {
 import { OuroDaemon } from "../../daemon/daemon"
 
 describe("ouro CLI parsing", () => {
-  it("parses daemon-level commands", () => {
-    expect(parseOuroCommand(["start"])).toEqual({ kind: "daemon.start" })
+  it("parses primary daemon commands", () => {
+    expect(parseOuroCommand([])).toEqual({ kind: "daemon.up" })
+    expect(parseOuroCommand(["up"])).toEqual({ kind: "daemon.up" })
     expect(parseOuroCommand(["stop"])).toEqual({ kind: "daemon.stop" })
     expect(parseOuroCommand(["status"])).toEqual({ kind: "daemon.status" })
-    expect(parseOuroCommand(["health"])).toEqual({ kind: "daemon.health" })
+    expect(parseOuroCommand(["logs"])).toEqual({ kind: "daemon.logs" })
+    expect(parseOuroCommand(["hatch"])).toEqual({ kind: "hatch.start" })
   })
 
-  it("parses agent management commands", () => {
-    expect(parseOuroCommand(["agent", "start", "slugger"])).toEqual({
-      kind: "agent.start",
+  it("parses chat, message, and poke commands", () => {
+    expect(parseOuroCommand(["chat", "slugger"])).toEqual({
+      kind: "chat.connect",
       agent: "slugger",
     })
-    expect(parseOuroCommand(["agent", "stop", "slugger"])).toEqual({
-      kind: "agent.stop",
+
+    expect(parseOuroCommand([
+      "msg",
+      "--session",
+      "session-1",
+      "--to",
+      "slugger",
+      "--task",
+      "habit-heartbeat",
+      "status update",
+    ])).toEqual({
+      kind: "message.send",
+      from: "ouro-cli",
+      to: "slugger",
+      content: "status update",
+      sessionId: "session-1",
+      taskRef: "habit-heartbeat",
+    })
+
+    expect(parseOuroCommand(["poke", "slugger", "--task", "habit-heartbeat"])).toEqual({
+      kind: "task.poke",
       agent: "slugger",
-    })
-    expect(parseOuroCommand(["agent", "restart", "ouroboros"])).toEqual({
-      kind: "agent.restart",
-      agent: "ouroboros",
+      taskId: "habit-heartbeat",
     })
   })
 
-  it("parses cron commands", () => {
-    expect(parseOuroCommand(["cron", "list"])).toEqual({ kind: "cron.list" })
-    expect(parseOuroCommand(["cron", "trigger", "nightly-memory-pass"])).toEqual({
-      kind: "cron.trigger",
-      jobId: "nightly-memory-pass",
-    })
+  it("rejects deprecated command families", () => {
+    expect(() => parseOuroCommand(["agent", "start", "slugger"])).toThrow("Unknown command")
+    expect(() => parseOuroCommand(["cron", "list"])).toThrow("Unknown command")
   })
 
-  it("throws on unknown command shapes", () => {
-    expect(() => parseOuroCommand([])).toThrow("Usage")
-    expect(() => parseOuroCommand(["agent", "start"])).toThrow("Usage")
-    expect(() => parseOuroCommand(["cron", "trigger"])).toThrow("Usage")
-    expect(() => parseOuroCommand(["agent", "dance", "slugger"])).toThrow("Unknown command")
+  it("throws on malformed command shapes", () => {
+    expect(() => parseOuroCommand(["chat"])).toThrow("Usage")
+    expect(() => parseOuroCommand(["msg", "--to", "slugger"])).toThrow("Usage")
+    expect(() => parseOuroCommand(["poke", "slugger"])).toThrow("Usage")
     expect(() => parseOuroCommand(["mystery"])).toThrow("Unknown command")
   })
 })
 
 describe("ouro CLI execution", () => {
-  const sendCommand = vi.fn()
-  const startDaemonProcess = vi.fn()
+  it("starts daemon on `up` when socket is not live", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(async () => ({ pid: 12345 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+    }
 
-  const deps: OuroCliDeps = {
-    socketPath: "/tmp/ouro-test.sock",
-    sendCommand,
-    startDaemonProcess,
-    writeStdout: vi.fn(),
-  }
+    const result = await runOuroCli(["up"], deps)
 
-  it("starts daemon without socket command round-trip", async () => {
-    startDaemonProcess.mockResolvedValueOnce({ pid: 12345 })
+    expect(result).toContain("daemon started")
+    expect(deps.startDaemonProcess).toHaveBeenCalledWith("/tmp/ouro-test.sock")
+    expect(deps.sendCommand).not.toHaveBeenCalled()
+  })
 
-    const result = await runOuroCli(["start"], deps)
+  it("is idempotent for `up` when daemon already running", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+    }
 
-    expect(result).toContain("started")
-    expect(startDaemonProcess).toHaveBeenCalled()
-    expect(sendCommand).not.toHaveBeenCalled()
+    const result = await runOuroCli(["up"], deps)
+
+    expect(result).toContain("already running")
+    expect(deps.startDaemonProcess).not.toHaveBeenCalled()
+    expect(deps.sendCommand).not.toHaveBeenCalled()
   })
 
   it("routes status command through daemon socket", async () => {
-    sendCommand.mockResolvedValueOnce({ ok: true, summary: "running" })
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, summary: "running" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+    }
 
     const result = await runOuroCli(["status"], deps)
 
-    expect(sendCommand).toHaveBeenCalledWith(
+    expect(deps.sendCommand).toHaveBeenCalledWith(
       "/tmp/ouro-test.sock",
       expect.objectContaining({ kind: "daemon.status" }),
     )
     expect(result).toContain("running")
+  })
+
+  it("routes msg command through daemon socket", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, message: "queued" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+    }
+
+    await runOuroCli(["msg", "--to", "slugger", "hi"], deps)
+
+    expect(deps.sendCommand).toHaveBeenCalledWith(
+      "/tmp/ouro-test.sock",
+      expect.objectContaining({
+        kind: "message.send",
+        from: "ouro-cli",
+        to: "slugger",
+        content: "hi",
+      }),
+    )
   })
 })
 
@@ -101,8 +159,6 @@ describe("daemon command protocol", () => {
         startAutoStartAgents: async () => undefined,
         stopAll: async () => undefined,
         startAgent: async () => undefined,
-        stopAgent: async () => undefined,
-        restartAgent: async () => undefined,
       },
       scheduler: {
         listJobs: () => [],
@@ -117,7 +173,7 @@ describe("daemon command protocol", () => {
       },
     })
 
-    const raw = await daemon.handleRawPayload('{"kind":"daemon.status"}')
+    const raw = await daemon.handleRawPayload("{\"kind\":\"daemon.status\"}")
     const parsed = JSON.parse(raw) as { ok: boolean; summary?: string }
 
     expect(parsed.ok).toBe(true)
@@ -132,8 +188,6 @@ describe("daemon command protocol", () => {
         startAutoStartAgents: async () => undefined,
         stopAll: async () => undefined,
         startAgent: async () => undefined,
-        stopAgent: async () => undefined,
-        restartAgent: async () => undefined,
       },
       scheduler: {
         listJobs: () => [],
