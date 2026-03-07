@@ -101,6 +101,9 @@ describe("FriendRecord type", () => {
     const record: FriendRecord = {
       id: "uuid-1",
       name: "Jordan",
+      role: "partner",
+      trustLevel: "friend",
+      connections: [{ name: "Ari", relationship: "teammate" }],
       externalIds: [
         { provider: "aad", externalId: "aad-id", tenantId: "t1", linkedAt: "2026-03-02T00:00:00.000Z" },
       ],
@@ -113,6 +116,9 @@ describe("FriendRecord type", () => {
     }
     expect(record.id).toBe("uuid-1")
     expect(record.name).toBe("Jordan")
+    expect(record.role).toBe("partner")
+    expect(record.trustLevel).toBe("friend")
+    expect(record.connections).toEqual([{ name: "Ari", relationship: "teammate" }])
     expect(record.externalIds).toHaveLength(1)
     expect(record.tenantMemberships).toEqual(["t1"])
     expect(record.toolPreferences.ado).toBe("flat backlog view")
@@ -124,6 +130,9 @@ describe("FriendRecord type", () => {
     const record: FriendRecord = {
       id: "uuid-2",
       name: "Alex",
+      role: "friend",
+      trustLevel: "acquaintance",
+      connections: [],
       externalIds: [],
       tenantMemberships: [],
       toolPreferences: {},

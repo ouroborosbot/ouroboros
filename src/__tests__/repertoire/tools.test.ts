@@ -61,6 +61,7 @@ vi.mock("../../identity", () => {
       context: { ...DEFAULT_AGENT_CONTEXT },
     })),
     getAgentName: vi.fn(() => "testagent"),
+  getAgentSecretsPath: vi.fn(() => "/tmp/.agentsecrets/testagent/secrets.json"),
     getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
     getRepoRoot: vi.fn(() => "/mock/repo"),
     resetIdentity: vi.fn(),
@@ -86,13 +87,12 @@ describe("execTool", () => {
     vi.mocked(listSkills).mockReset()
     vi.mocked(loadSkill).mockReset()
     mockTaskModule.getBoard.mockReset().mockReturnValue({
-      compact: "[Tasks] drafting:0 processing:0 validating:slugger:0 validating:ari:0 collaborating:0 paused:0 blocked:0 done:0",
+      compact: "[Tasks] drafting:0 processing:0 validating:0 collaborating:0 paused:0 blocked:0 done:0",
       full: "no tasks found",
       byStatus: {
         drafting: [],
         processing: [],
-        "validating:slugger": [],
-        "validating:ari": [],
+        "validating": [],
         collaborating: [],
         paused: [],
         blocked: [],
@@ -435,8 +435,7 @@ describe("execTool", () => {
       byStatus: {
         drafting: [],
         processing: ["sample-task"],
-        "validating:slugger": [],
-        "validating:ari": [],
+        "validating": [],
         collaborating: [],
         paused: [],
         blocked: [],
@@ -459,8 +458,7 @@ describe("execTool", () => {
       byStatus: {
         drafting: ["sample-task"],
         processing: [],
-        "validating:slugger": [],
-        "validating:ari": [],
+        "validating": [],
         collaborating: [],
         paused: [],
         blocked: [],
@@ -482,8 +480,7 @@ describe("execTool", () => {
       byStatus: {
         drafting: [],
         processing: [],
-        "validating:slugger": [],
-        "validating:ari": [],
+        "validating": [],
         collaborating: [],
         paused: [],
         blocked: [],
@@ -561,7 +558,7 @@ describe("execTool", () => {
   it("task_update_status includes archive details when present", async () => {
     mockTaskModule.updateStatus.mockReturnValueOnce({
       ok: true,
-      from: "validating:slugger",
+      from: "validating",
       to: "done",
       archived: ["/mock/repo/testagent/tasks/archive/one-shots/2026-03-06-1200-sample-task.md"],
     })
@@ -576,10 +573,10 @@ describe("execTool", () => {
     mockTaskModule.updateStatus.mockReturnValueOnce({
       ok: true,
       from: "processing",
-      to: "validating:slugger",
+      to: "validating",
     })
-    const result = await execTool("task_update_status", { name: "sample-task", status: "validating:slugger" })
-    expect(result).toBe("updated: sample-task -> validating:slugger")
+    const result = await execTool("task_update_status", { name: "sample-task", status: "validating" })
+    expect(result).toBe("updated: sample-task -> validating")
   })
 
   it("task board detail tools return fallback text when empty", async () => {

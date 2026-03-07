@@ -37,11 +37,11 @@ const DEFAULT_SECRETS_TEMPLATE = {
   },
   teamsChannel: {
     skipConfirmation: true,
-    disableStreaming: false,
     port: 3978,
   },
   integrations: {
     perplexityApiKey: "",
+    openaiEmbeddingsApiKey: "",
   },
 }
 
@@ -66,14 +66,6 @@ function deepMerge(defaults, partial) {
   return result
 }
 
-function expandHomePath(rawPath) {
-  if (rawPath === "~") return os.homedir()
-  if (rawPath.startsWith("~/")) {
-    return path.join(os.homedir(), rawPath.slice(2))
-  }
-  return rawPath
-}
-
 function readJsonFile(filePath, label) {
   try {
     const raw = fs.readFileSync(filePath, "utf8")
@@ -85,11 +77,8 @@ function readJsonFile(filePath, label) {
 
 function loadAgentSecrets(agent) {
   const agentConfigPath = path.join(process.cwd(), agent, "agent.json")
-  const agentConfig = readJsonFile(agentConfigPath, "agent config")
-  if (!agentConfig || typeof agentConfig.configPath !== "string" || !agentConfig.configPath.trim()) {
-    throw new Error(`agent.json at ${agentConfigPath} must include configPath.`)
-  }
-  const secretsPath = expandHomePath(agentConfig.configPath)
+  readJsonFile(agentConfigPath, "agent config")
+  const secretsPath = path.join(os.homedir(), ".agentsecrets", agent, "secrets.json")
   const secretsDir = path.dirname(secretsPath)
   fs.mkdirSync(secretsDir, { recursive: true })
 

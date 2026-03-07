@@ -40,9 +40,9 @@ function createAgentWorkspace(agent: string): { workspaceDir: string; homeDir: s
     path.join(workspaceDir, agent, "agent.json"),
     JSON.stringify(
       {
-        name: agent,
+        version: 1,
+        enabled: true,
         provider: "anthropic",
-        configPath: `~/.agentsecrets/${agent}/secrets.json`,
         context: {
           maxTokens: 80000,
           contextMargin: 20,

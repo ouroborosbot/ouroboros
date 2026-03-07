@@ -3,10 +3,12 @@ import * as os from "os"
 import * as path from "path"
 import { emitNervesEvent } from "./nerves/runtime"
 
+export type AgentProvider = "azure" | "minimax" | "anthropic" | "openai-codex"
+
 export interface AgentConfig {
-  name: string
-  configPath: string
-  provider: "azure" | "minimax" | "anthropic" | "openai-codex"
+  version: number
+  enabled: boolean
+  provider: AgentProvider
   context?: {
     maxTokens?: number
     contextMargin?: number
@@ -29,11 +31,11 @@ export const DEFAULT_AGENT_PHRASES: AgentConfig["phrases"] = {
   followup: ["processing"],
 }
 
-export function buildDefaultAgentTemplate(agentName: string): AgentConfig {
+export function buildDefaultAgentTemplate(_agentName: string): AgentConfig {
   return {
-    name: agentName,
+    version: 1,
+    enabled: true,
     provider: "anthropic",
-    configPath: `~/.agentsecrets/${agentName}/secrets.json`,
     context: { ...DEFAULT_AGENT_CONTEXT },
     phrases: {
       thinking: [...DEFAULT_AGENT_PHRASES.thinking],
@@ -100,6 +102,13 @@ export function getAgentBundlesRoot(): string {
  */
 export function getAgentRoot(): string {
   return path.join(getAgentBundlesRoot(), `${getAgentName()}.ouro`)
+}
+
+/**
+ * Returns the conventional secrets path: `~/.agentsecrets/<agentName>/secrets.json`
+ */
+export function getAgentSecretsPath(agentName: string = getAgentName()): string {
+  return path.join(os.homedir(), ".agentsecrets", agentName, "secrets.json")
 }
 
 /**
@@ -182,39 +191,6 @@ export function loadAgentConfig(): AgentConfig {
     fs.writeFileSync(configFile, JSON.stringify(parsed, null, 2) + "\n", "utf-8")
   }
 
-  const rawConfigPath = parsed.configPath
-  if (typeof rawConfigPath !== "string" || rawConfigPath.trim().length === 0) {
-    emitNervesEvent({
-      level: "error",
-      event: "config_identity.error",
-      component: "config/identity",
-      message: "agent config missing configPath",
-      meta: { path: configFile },
-    })
-    throw new Error(
-      `agent.json at ${configFile} must include configPath.`,
-    )
-  }
-
-  if (
-    rawConfigPath.startsWith("~/.agentconfigs/") ||
-    rawConfigPath.includes("/.agentconfigs/")
-  ) {
-    emitNervesEvent({
-      level: "error",
-      event: "config_identity.error",
-      component: "config/identity",
-      message: "legacy configPath is not supported",
-      meta: {
-        path: configFile,
-        configPath: rawConfigPath,
-      },
-    })
-    throw new Error(
-      `Legacy configPath '${rawConfigPath}' is not supported. Use ~/.agentsecrets/<agent>/secrets.json.`,
-    )
-  }
-
   const rawProvider = parsed.provider
   if (
     rawProvider !== "azure" &&
@@ -237,7 +213,53 @@ export function loadAgentConfig(): AgentConfig {
     )
   }
 
-  _cachedAgentConfig = parsed as unknown as AgentConfig
+  const rawVersion = parsed.version
+  const version = rawVersion === undefined ? 1 : rawVersion
+  if (
+    typeof version !== "number" ||
+    !Number.isInteger(version) ||
+    version < 1
+  ) {
+    emitNervesEvent({
+      level: "error",
+      event: "config_identity.error",
+      component: "config/identity",
+      message: "agent config missing or invalid version",
+      meta: {
+        path: configFile,
+        version: rawVersion,
+      },
+    })
+    throw new Error(
+      `agent.json at ${configFile} must include version as integer >= 1.`,
+    )
+  }
+
+  const rawEnabled = parsed.enabled
+  const enabled = rawEnabled === undefined ? true : rawEnabled
+  if (typeof enabled !== "boolean") {
+    emitNervesEvent({
+      level: "error",
+      event: "config_identity.error",
+      component: "config/identity",
+      message: "agent config has invalid enabled flag",
+      meta: {
+        path: configFile,
+        enabled: rawEnabled,
+      },
+    })
+    throw new Error(
+      `agent.json at ${configFile} must include enabled as boolean.`,
+    )
+  }
+
+  _cachedAgentConfig = {
+    version,
+    enabled,
+    provider: rawProvider,
+    context: parsed.context as AgentConfig["context"] | undefined,
+    phrases: parsed.phrases as AgentConfig["phrases"],
+  }
   emitNervesEvent({
     event: "identity.resolve",
     component: "config/identity",

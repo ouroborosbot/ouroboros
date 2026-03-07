@@ -38,13 +38,23 @@ export interface ExternalId {
   linkedAt: string // ISO date
 }
 
+export type TrustLevel = "family" | "friend" | "acquaintance" | "stranger"
+
+export interface FriendConnection {
+  name: string
+  relationship: string
+}
+
 // -- Friend Record --
 // The single merged type for a person the agent interacts with.
 // Combines identity (who they are) and memory (what the agent knows about them).
-// Split across two storage backends by PII boundary.
+// Stored as a unified JSON record in bundle `friends/`.
 export interface FriendRecord {
   id: string                              // stable UUID
   name: string
+  role?: string
+  trustLevel?: TrustLevel
+  connections?: FriendConnection[]
   externalIds: ExternalId[]               // PII
   tenantMemberships: string[]             // PII
   toolPreferences: Record<string, string> // keyed by integration name
