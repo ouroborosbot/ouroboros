@@ -14,7 +14,9 @@ export default defineConfig({
         "src/__tests__/**",
         "src/*-entry.ts",
         "src/reflection/*-entry.ts",
+        "src/coding/types.ts",
         "src/mind/friends/store.ts",
+        "src/tasks/types.ts",
         "src/nerves/coverage/cli-main.ts",
       ],
       thresholds: {
