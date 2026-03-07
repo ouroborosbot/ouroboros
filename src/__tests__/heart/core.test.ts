@@ -30,7 +30,7 @@ vi.mock("../../repertoire/skills", () => ({
   loadSkill: vi.fn(),
 }))
 
-vi.mock("../../identity", () => ({
+vi.mock("../../heart/identity", () => ({
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
     configPath: "~/.agentsecrets/testagent/secrets.json",
@@ -96,7 +96,7 @@ import * as fs from "fs"
 import * as nodeFs from "node:fs"
 import * as path from "path"
 import { execSync, spawnSync } from "child_process"
-import * as identity from "../../identity"
+import * as identity from "../../heart/identity"
 import type { ChannelCallbacks } from "../../heart/core"
 
 // Dynamic config helpers -- must be re-imported after vi.resetModules()
@@ -110,7 +110,7 @@ async function setAgentProvider(provider: "azure" | "minimax" | "anthropic" | "o
 
 async function setupMinimax(apiKey = "test-key", model = "test-model") {
   await setAgentProvider("minimax")
-  const config = await import("../../config")
+  const config = await import("../../heart/config")
   config.resetConfigCache()
   config.setTestConfig({ providers: { minimax: { apiKey, model } } })
 }
@@ -122,7 +122,7 @@ async function setupAzure(
   modelName = "gpt-5.2-chat",
 ) {
   await setAgentProvider("azure")
-  const config = await import("../../config")
+  const config = await import("../../heart/config")
   config.resetConfigCache()
   config.setTestConfig({ providers: { azure: { apiKey, endpoint, deployment, modelName } } })
 }
@@ -157,13 +157,13 @@ async function setupConfig(partial: Record<string, unknown>) {
   else if (providers.anthropic) await setAgentProvider("anthropic")
   else if (providers["openai-codex"]) await setAgentProvider("openai-codex")
   else await setAgentProvider("minimax")
-  const config = await import("../../config")
+  const config = await import("../../heart/config")
   config.resetConfigCache()
   config.setTestConfig(partial as any)
 }
 
 async function resetConfig() {
-  const config = await import("../../config")
+  const config = await import("../../heart/config")
   config.resetConfigCache()
 }
 
@@ -4013,7 +4013,7 @@ describe("anthropic setup-token provider contract", () => {
     await setAgentProvider("anthropic")
     const emitNervesEvent = vi.fn()
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
-    vi.doMock("../../config", () => ({
+    vi.doMock("../../heart/config", () => ({
       getAzureConfig: () => ({
         apiKey: "",
         endpoint: "",
@@ -4048,7 +4048,7 @@ describe("anthropic setup-token provider contract", () => {
       }))
     } finally {
       mockExit.mockRestore()
-      vi.doUnmock("../../config")
+      vi.doUnmock("../../heart/config")
     }
   })
 })

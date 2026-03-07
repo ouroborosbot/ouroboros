@@ -10,7 +10,7 @@ vi.mock("fs", () => ({
 }))
 
 // Mock config for postTurn tests
-vi.mock("../../config", () => ({
+vi.mock("../../heart/config", () => ({
   getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
 }))
 
@@ -372,7 +372,7 @@ describe("postTurn", () => {
   })
 
   it("trims messages when usage.input_tokens exceeds maxTokens and saves with lastUsage", async () => {
-    const { getContextConfig } = await import("../../config")
+    const { getContextConfig } = await import("../../heart/config")
     vi.mocked(getContextConfig).mockReturnValue({ maxTokens: 80000, contextMargin: 20 })
 
     const { postTurn } = await import("../../mind/context")
@@ -396,7 +396,7 @@ describe("postTurn", () => {
   })
 
   it("does not trim when usage is undefined (cold start) but still saves session", async () => {
-    const { getContextConfig } = await import("../../config")
+    const { getContextConfig } = await import("../../heart/config")
     vi.mocked(getContextConfig).mockReturnValue({ maxTokens: 80000, contextMargin: 20 })
 
     const { postTurn } = await import("../../mind/context")
@@ -411,7 +411,7 @@ describe("postTurn", () => {
   })
 
   it("does not trim when usage.input_tokens is under maxTokens, saves with lastUsage", async () => {
-    const { getContextConfig } = await import("../../config")
+    const { getContextConfig } = await import("../../heart/config")
     vi.mocked(getContextConfig).mockReturnValue({ maxTokens: 80000, contextMargin: 20 })
 
     const { postTurn } = await import("../../mind/context")
@@ -428,7 +428,7 @@ describe("postTurn", () => {
   })
 
   it("mutates messages array in place (splice, not copy)", async () => {
-    const { getContextConfig } = await import("../../config")
+    const { getContextConfig } = await import("../../heart/config")
     vi.mocked(getContextConfig).mockReturnValue({ maxTokens: 100, contextMargin: 20 })
 
     const { postTurn } = await import("../../mind/context")
@@ -449,7 +449,7 @@ describe("postTurn", () => {
   })
 
   it("saves with (possibly trimmed) messages and usage", async () => {
-    const { getContextConfig } = await import("../../config")
+    const { getContextConfig } = await import("../../heart/config")
     vi.mocked(getContextConfig).mockReturnValue({ maxTokens: 80000, contextMargin: 20 })
 
     const { postTurn } = await import("../../mind/context")
@@ -467,7 +467,7 @@ describe("postTurn", () => {
   })
 
   it("handles empty messages array (only system prompt)", async () => {
-    const { getContextConfig } = await import("../../config")
+    const { getContextConfig } = await import("../../heart/config")
     vi.mocked(getContextConfig).mockReturnValue({ maxTokens: 80000, contextMargin: 20 })
 
     const { postTurn } = await import("../../mind/context")
@@ -482,7 +482,7 @@ describe("postTurn", () => {
   })
 
   it("runs extract-before-trim hook with pre-trim messages so dropped context can be captured", async () => {
-    const { getContextConfig } = await import("../../config")
+    const { getContextConfig } = await import("../../heart/config")
     vi.mocked(getContextConfig).mockReturnValue({ maxTokens: 100, contextMargin: 20 })
 
     const { postTurn } = await import("../../mind/context")
@@ -517,7 +517,7 @@ describe("postTurn", () => {
   })
 
   it("continues saving session when extract-before-trim hook throws", async () => {
-    const { getContextConfig } = await import("../../config")
+    const { getContextConfig } = await import("../../heart/config")
     vi.mocked(getContextConfig).mockReturnValue({ maxTokens: 80000, contextMargin: 20 })
 
     const { postTurn } = await import("../../mind/context")
@@ -543,7 +543,7 @@ describe("postTurn", () => {
   })
 
   it("continues saving session when extract-before-trim hook throws non-Error values", async () => {
-    const { getContextConfig } = await import("../../config")
+    const { getContextConfig } = await import("../../heart/config")
     vi.mocked(getContextConfig).mockReturnValue({ maxTokens: 80000, contextMargin: 20 })
 
     const { postTurn } = await import("../../mind/context")

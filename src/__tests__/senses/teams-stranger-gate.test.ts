@@ -22,14 +22,14 @@ vi.mock("../../mind/context", () => ({
   deleteSession: vi.fn(),
 }))
 
-vi.mock("../../config", () => ({
+vi.mock("../../heart/config", () => ({
   sessionPath: vi.fn(() => "/tmp/mock-session.json"),
   getTeamsConfig: vi.fn(() => ({ clientId: "", clientSecret: "", tenantId: "" })),
   getTeamsChannelConfig: vi.fn(() => ({ skipConfirmation: true, flushIntervalMs: 1000, port: 3978 })),
   getOAuthConfig: vi.fn(() => ({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" })),
 }))
 
-vi.mock("../../repertoire/commands", () => ({
+vi.mock("../../senses/commands", () => ({
   createCommandRegistry: vi.fn(() => ({
     dispatch: vi.fn(() => ({ handled: false })),
   })),
@@ -70,7 +70,7 @@ vi.mock("../../heart/turn-coordinator", () => ({
   })),
 }))
 
-vi.mock("../../identity", () => ({
+vi.mock("../../heart/identity", () => ({
   getAgentRoot: vi.fn(() => "/tmp/mock-agent"),
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",

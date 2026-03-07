@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import type { ChannelCallbacks } from "../../heart/core"
 
-vi.mock("../../identity", () => ({
+vi.mock("../../heart/identity", () => ({
   getAgentName: vi.fn(() => "testagent"),
   getAgentSecretsPath: vi.fn(() => "/tmp/.agentsecrets/testagent/secrets.json"),
   loadAgentConfig: vi.fn(() => ({
@@ -16,7 +16,7 @@ vi.mock("../../identity", () => ({
   })),
 }))
 
-import { getPhrases } from "../../wardrobe/phrases"
+import { getPhrases } from "../../mind/phrases"
 
 describe("CLI adapter - createCliCallbacks", () => {
   let stdoutChunks: string[]

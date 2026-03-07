@@ -3,7 +3,7 @@ import * as nodeFs from "node:fs"
 import * as path from "path"
 import type { ChannelCallbacks } from "../../heart/core"
 
-vi.mock("../../identity", () => ({
+vi.mock("../../heart/identity", () => ({
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
     configPath: "~/.agentsecrets/testagent/secrets.json",
@@ -26,7 +26,7 @@ describe("toResponsesTools", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    const config = await import("../../config")
+    const config = await import("../../heart/config")
     config.resetConfigCache()
     config.setTestConfig({ providers: { azure: { apiKey: "" }, minimax: { apiKey: "test-key", model: "test-model" } } })
     const streaming = await import("../../heart/streaming")
@@ -129,7 +129,7 @@ describe("toResponsesInput", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    const config = await import("../../config")
+    const config = await import("../../heart/config")
     config.resetConfigCache()
     config.setTestConfig({ providers: { azure: { apiKey: "" }, minimax: { apiKey: "test-key", model: "test-model" } } })
     const core = await import("../../heart/streaming")
@@ -475,7 +475,7 @@ describe("streamChatCompletion", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    const config = await import("../../config")
+    const config = await import("../../heart/config")
     config.resetConfigCache()
     config.setTestConfig({ providers: { azure: { apiKey: "" }, minimax: { apiKey: "test-key", model: "test-model" } } })
     const core = await import("../../heart/streaming")
@@ -661,7 +661,7 @@ describe("streamResponsesApi", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    const config = await import("../../config")
+    const config = await import("../../heart/config")
     config.resetConfigCache()
     config.setTestConfig({ providers: { azure: { apiKey: "" }, minimax: { apiKey: "test-key", model: "test-model" } } })
     const core = await import("../../heart/streaming")
@@ -1010,7 +1010,7 @@ describe("FinalAnswerParser", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    const config = await import("../../config")
+    const config = await import("../../heart/config")
     config.resetConfigCache()
     config.setTestConfig({ providers: { azure: { apiKey: "" }, minimax: { apiKey: "test-key", model: "test-model" } } })
     const streaming = await import("../../heart/streaming")
@@ -1150,7 +1150,7 @@ describe("streamChatCompletion final_answer streaming", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    const config = await import("../../config")
+    const config = await import("../../heart/config")
     config.resetConfigCache()
     config.setTestConfig({ providers: { azure: { apiKey: "" }, minimax: { apiKey: "test-key", model: "test-model" } } })
     const streaming = await import("../../heart/streaming")
@@ -1242,7 +1242,7 @@ describe("streamResponsesApi final_answer streaming", () => {
 
   beforeEach(async () => {
     vi.resetModules()
-    const config = await import("../../config")
+    const config = await import("../../heart/config")
     config.resetConfigCache()
     config.setTestConfig({ providers: { azure: { apiKey: "" }, minimax: { apiKey: "test-key", model: "test-model" } } })
     const streaming = await import("../../heart/streaming")

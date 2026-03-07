@@ -24,7 +24,7 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("net", () => ({ createConnection }))
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
-    vi.doMock("../../identity", () => ({
+    vi.doMock("../../heart/identity", () => ({
       getRepoRoot: () => "/mock/repo",
       getAgentBundlesRoot: () => "/mock/AgentBundles",
     }))
@@ -58,7 +58,7 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("net", () => ({ createConnection }))
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
-    vi.doMock("../../identity", () => ({
+    vi.doMock("../../heart/identity", () => ({
       getRepoRoot: () => "/mock/repo",
       getAgentBundlesRoot: () => "/mock/AgentBundles",
     }))
@@ -93,7 +93,7 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("net", () => ({ createConnection }))
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
-    vi.doMock("../../identity", () => ({
+    vi.doMock("../../heart/identity", () => ({
       getRepoRoot: () => "/mock/repo",
       getAgentBundlesRoot: () => "/mock/AgentBundles",
     }))
@@ -116,7 +116,7 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("child_process", () => ({ spawn }))
     vi.doMock("net", () => ({ createConnection }))
-    vi.doMock("../../identity", () => ({
+    vi.doMock("../../heart/identity", () => ({
       getRepoRoot: () => "/mock/repo",
       getAgentBundlesRoot: () => "/mock/AgentBundles",
     }))
@@ -166,7 +166,7 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("net", () => ({ createConnection }))
     vi.doMock("child_process", () => ({ spawn: vi.fn(() => ({ pid: 1, unref: vi.fn() })) }))
-    vi.doMock("../../identity", () => ({
+    vi.doMock("../../heart/identity", () => ({
       getRepoRoot: () => "/mock/repo",
       getAgentBundlesRoot: () => "/mock/AgentBundles",
     }))
@@ -204,7 +204,7 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("net", () => ({ createConnection }))
     vi.doMock("child_process", () => ({ spawn: vi.fn(() => ({ pid: 1, unref: vi.fn() })) }))
-    vi.doMock("../../identity", () => ({
+    vi.doMock("../../heart/identity", () => ({
       getRepoRoot: () => "/mock/repo",
       getAgentBundlesRoot: () => "/mock/AgentBundles",
     }))
@@ -221,7 +221,7 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("net", () => ({ createConnection: vi.fn() }))
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
-    vi.doMock("../../identity", () => ({
+    vi.doMock("../../heart/identity", () => ({
       getRepoRoot: () => "/mock/repo",
       getAgentBundlesRoot: () => "/mock/AgentBundles",
     }))
@@ -263,7 +263,7 @@ describe("daemon CLI default dependency branches", () => {
     vi.doMock("fs", () => ({ appendFileSync, mkdirSync, existsSync, unlinkSync }))
     vi.doMock("net", () => ({ createConnection: vi.fn() }))
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
-    vi.doMock("../../identity", () => ({
+    vi.doMock("../../heart/identity", () => ({
       getRepoRoot: () => "/mock/repo",
       getAgentBundlesRoot: () => "/mock/AgentBundles",
     }))
@@ -299,7 +299,7 @@ describe("daemon CLI default dependency branches", () => {
     vi.doMock("fs", () => ({ appendFileSync, mkdirSync, existsSync, unlinkSync }))
     vi.doMock("net", () => ({ createConnection: vi.fn() }))
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
-    vi.doMock("../../identity", () => ({
+    vi.doMock("../../heart/identity", () => ({
       getRepoRoot: () => "/mock/repo",
       getAgentBundlesRoot: () => "/mock/AgentBundles",
     }))
@@ -335,7 +335,7 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("net", () => ({ createConnection: vi.fn() }))
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
-    vi.doMock("../../identity", () => ({
+    vi.doMock("../../heart/identity", () => ({
       getRepoRoot: () => "/mock/repo",
       getAgentBundlesRoot: () => "/mock/AgentBundles",
     }))
@@ -370,7 +370,7 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("net", () => ({ createConnection }))
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
-    vi.doMock("../../identity", () => ({
+    vi.doMock("../../heart/identity", () => ({
       getRepoRoot: () => "/mock/repo",
       getAgentBundlesRoot: () => "/mock/AgentBundles",
     }))
@@ -412,7 +412,7 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("net", () => ({ createConnection }))
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
-    vi.doMock("../../identity", () => ({
+    vi.doMock("../../heart/identity", () => ({
       getRepoRoot: () => "/mock/repo",
       getAgentBundlesRoot: () => "/mock/AgentBundles",
     }))
@@ -443,7 +443,7 @@ describe("daemon CLI default dependency branches", () => {
     const createConnection = vi.fn(() => new MockConnection())
     vi.doMock("net", () => ({ createConnection }))
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
-    vi.doMock("../../identity", () => ({
+    vi.doMock("../../heart/identity", () => ({
       getRepoRoot: () => "/mock/repo",
       getAgentBundlesRoot: () => "/mock/AgentBundles",
     }))
@@ -500,7 +500,7 @@ describe("daemon CLI default dependency branches", () => {
       const actual = await vi.importActual<typeof import("fs")>("fs")
       return { ...actual }
     })
-    vi.doMock("../../identity", () => ({
+    vi.doMock("../../heart/identity", () => ({
       getRepoRoot: () => "/mock/repo",
       getAgentBundlesRoot: () => tmpBundlesRoot,
     }))
@@ -547,7 +547,7 @@ describe("daemon CLI default dependency branches", () => {
       const actual = await vi.importActual<typeof import("fs")>("fs")
       return { ...actual }
     })
-    vi.doMock("../../identity", () => ({
+    vi.doMock("../../heart/identity", () => ({
       getRepoRoot: () => "/mock/repo",
       getAgentBundlesRoot: () => tmpBundlesRoot,
     }))
@@ -605,7 +605,7 @@ describe("daemon CLI default dependency branches", () => {
       const actual = await vi.importActual<typeof import("fs")>("fs")
       return { ...actual }
     })
-    vi.doMock("../../identity", () => ({
+    vi.doMock("../../heart/identity", () => ({
       getRepoRoot: () => "/mock/repo",
       getAgentBundlesRoot: () => tmpBundlesRoot,
     }))
@@ -666,7 +666,7 @@ describe("daemon CLI default dependency branches", () => {
       const actual = await vi.importActual<typeof import("fs")>("fs")
       return { ...actual }
     })
-    vi.doMock("../../identity", () => ({
+    vi.doMock("../../heart/identity", () => ({
       getRepoRoot: () => "/mock/repo",
       getAgentBundlesRoot: () => tmpBundlesRoot,
     }))

@@ -3,13 +3,13 @@ import * as fs from "fs";
 import { execSync, spawnSync } from "child_process";
 import * as path from "path";
 import { listSkills, loadSkill } from "./skills";
-import { getIntegrationsConfig } from "../config";
+import { getIntegrationsConfig } from "../heart/config";
 import type { Integration, ResolvedContext, FriendRecord } from "../mind/friends/types";
 import type { FriendStore } from "../mind/friends/store";
 import { emitNervesEvent } from "../nerves/runtime";
-import { getAgentRoot } from "../identity";
-import { getTaskModule } from "../tasks";
-import { codingToolDefinitions } from "../coding/tools";
+import { getAgentRoot } from "../heart/identity";
+import { getTaskModule } from "./tasks";
+import { codingToolDefinitions } from "./coding/tools";
 import { readMemoryFacts, saveMemoryFact, searchMemoryFacts } from "../mind/memory";
 
 export interface ToolContext {

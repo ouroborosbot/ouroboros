@@ -1,5 +1,5 @@
 import type OpenAI from "openai"
-import { getContextConfig } from "../config"
+import { getContextConfig } from "../heart/config"
 import { emitNervesEvent } from "../nerves/runtime"
 import * as fs from "fs"
 import * as path from "path"
