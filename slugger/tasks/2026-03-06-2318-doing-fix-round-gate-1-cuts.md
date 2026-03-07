@@ -57,7 +57,7 @@ Delete dead subsystems and stale repository artifacts from Gate 1 so later gates
 **Output**: Production tree with dead code removed and references fixed.
 **Acceptance**: No compile-time references remain to deleted production code.
 
-### ⬜ Unit 2: Test Suite Pruning
+### ✅ Unit 2: Test Suite Pruning
 **What**: Delete tests that only cover deleted Gate 1 production code and update any test imports impacted by removals.
 **Output**: Test tree aligned with remaining production surfaces.
 **Acceptance**: No test references remain to removed modules.
@@ -85,3 +85,4 @@ Delete dead subsystems and stale repository artifacts from Gate 1 so later gates
 - 2026-03-06 23:18 Created from planning doc
 - 2026-03-06 23:20 Unit 0 complete: Captured baseline inventory, reference scans, and script snapshot artifacts.
 - 2026-03-06 23:25 Unit 1 complete: Removed dead production modules and updated all production callers/imports.
+- 2026-03-06 23:31 Unit 2 complete: Deleted tests tied to removed modules and updated remaining tests/snapshots to match cuts.
