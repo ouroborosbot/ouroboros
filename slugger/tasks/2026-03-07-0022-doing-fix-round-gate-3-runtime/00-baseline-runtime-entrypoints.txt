@@ -1,0 +1,168 @@
+# Baseline runtime entrypoints
+# Timestamp: 2026-03-07T08:24:03Z
+
+     1	// Thin entrypoint for the autonomous inner-dialog worker process.
+     2	// Requires --agent before importing runtime modules that rely on identity.
+     3	if (!process.argv.includes("--agent")) {
+     4	  // eslint-disable-next-line no-console -- pre-boot guard
+     5	  console.error("Missing required --agent <name> argument.\nUsage: node dist/inner-worker-entry.js --agent ouroboros")
+     6	  process.exit(1)
+     7	}
+     8	
+     9	import { startInnerDialogWorker } from "./senses/inner-dialog-worker"
+    10	import { configureCliRuntimeLogger } from "./senses/cli-logging"
+    11	
+    12	configureCliRuntimeLogger("self")
+    13	
+    14	startInnerDialogWorker().catch((error) => {
+    15	  // eslint-disable-next-line no-console -- fatal startup guard for worker process
+    16	  console.error(error instanceof Error ? error.message : String(error))
+    17	  process.exit(1)
+    18	})
+
+     1	import { runInnerDialogTurn } from "./inner-dialog"
+     2	import { emitNervesEvent } from "../nerves/runtime"
+     3	
+     4	export type InnerDialogWorkerReason = "boot" | "heartbeat" | "instinct"
+     5	
+     6	export interface InnerDialogWorkerMessage {
+     7	  type: "heartbeat" | "shutdown" | string
+     8	}
+     9	
+    10	export interface InnerDialogWorkerController {
+    11	  run(reason: InnerDialogWorkerReason): Promise<void>
+    12	  handleMessage(message: unknown): Promise<void>
+    13	}
+    14	
+    15	export function createInnerDialogWorker(
+    16	  runTurn: (options: { reason: InnerDialogWorkerReason }) => Promise<unknown> = (options) => runInnerDialogTurn(options),
+    17	): InnerDialogWorkerController {
+    18	  let running = false
+    19	
+    20	  async function run(reason: InnerDialogWorkerReason): Promise<void> {
+    21	    if (running) return
+    22	    running = true
+    23	    try {
+    24	      await runTurn({ reason })
+    25	    } catch (error) {
+    26	      emitNervesEvent({
+    27	        level: "error",
+    28	        component: "senses",
+    29	        event: "senses.inner_dialog_worker_error",
+    30	        message: "inner dialog worker turn failed",
+    31	        meta: {
+    32	          reason,
+    33	          error: error instanceof Error ? error.message : String(error),
+    34	        },
+    35	      })
+    36	    } finally {
+    37	      running = false
+    38	    }
+    39	  }
+    40	
+    41	  async function handleMessage(message: unknown): Promise<void> {
+    42	    if (!message || typeof message !== "object") return
+    43	    const maybeMessage = message as Partial<InnerDialogWorkerMessage>
+    44	    if (maybeMessage.type === "heartbeat") {
+    45	      await run("heartbeat")
+    46	      return
+    47	    }
+    48	    if (maybeMessage.type === "shutdown") {
+    49	      process.exit(0)
+    50	    }
+    51	  }
+    52	
+    53	  return { run, handleMessage }
+    54	}
+    55	
+    56	export async function startInnerDialogWorker(): Promise<void> {
+    57	  const worker = createInnerDialogWorker()
+    58	  process.on("message", (message) => {
+    59	    void worker.handleMessage(message)
+    60	  })
+    61	  process.on("disconnect", () => {
+    62	    process.exit(0)
+    63	  })
+    64	  await worker.run("boot")
+    65	}
+    66	
+
+     1	import { DaemonProcessManager } from "./process-manager"
+     2	import { OuroDaemon } from "./daemon"
+     3	import { emitNervesEvent } from "../nerves/runtime"
+     4	import { FileMessageRouter } from "./message-router"
+     5	import { HealthMonitor } from "./health-monitor"
+     6	
+     7	function parseSocketPath(argv: string[]): string {
+     8	  const socketIndex = argv.indexOf("--socket")
+     9	  if (socketIndex >= 0) {
+    10	    const value = argv[socketIndex + 1]
+    11	    if (value && value.trim().length > 0) return value
+    12	  }
+    13	  return "/tmp/ouroboros-daemon.sock"
+    14	}
+    15	
+    16	const socketPath = parseSocketPath(process.argv)
+    17	
+    18	emitNervesEvent({
+    19	  component: "daemon",
+    20	  event: "daemon.entry_start",
+    21	  message: "starting daemon entrypoint",
+    22	  meta: { socketPath },
+    23	})
+    24	
+    25	const processManager = new DaemonProcessManager({
+    26	  agents: [
+    27	    { name: "ouroboros", entry: "inner-worker-entry.js", channel: "cli", autoStart: true },
+    28	    { name: "slugger", entry: "inner-worker-entry.js", channel: "cli", autoStart: true },
+    29	  ],
+    30	})
+    31	
+    32	const scheduler = {
+    33	  listJobs: () => [],
+    34	  triggerJob: async (jobId: string) => ({ ok: false, message: `cron scheduler removed: ${jobId}` }),
+    35	}
+    36	
+    37	const router = new FileMessageRouter()
+    38	
+    39	const healthMonitor = new HealthMonitor({
+    40	  processManager,
+    41	  scheduler,
+    42	  alertSink: (message) => {
+    43	    emitNervesEvent({
+    44	      level: "error",
+    45	      component: "daemon",
+    46	      event: "daemon.health_alert",
+    47	      message: "health monitor produced critical alert",
+    48	      meta: { message },
+    49	    })
+    50	  },
+    51	})
+    52	
+    53	const daemon = new OuroDaemon({
+    54	  socketPath,
+    55	  processManager,
+    56	  scheduler,
+    57	  healthMonitor,
+    58	  router,
+    59	})
+    60	
+    61	void daemon.start().catch(async () => {
+    62	  emitNervesEvent({
+    63	    level: "error",
+    64	    component: "daemon",
+    65	    event: "daemon.entry_error",
+    66	    message: "daemon entrypoint failed",
+    67	    meta: {},
+    68	  })
+    69	  await daemon.stop()
+    70	  process.exit(1)
+    71	})
+    72	
+    73	process.on("SIGINT", () => {
+    74	  void daemon.stop().then(() => process.exit(0))
+    75	})
+    76	
+    77	process.on("SIGTERM", () => {
+    78	  void daemon.stop().then(() => process.exit(0))
+    79	})

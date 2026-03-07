@@ -51,7 +51,7 @@ Implement Gate 3 runtime-core architecture: unified agent process entrypoint, da
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Baseline Runtime Snapshot
+### ✅ Unit 0: Baseline Runtime Snapshot
 **What**: Capture Gate 3 baseline snapshots for daemon CLI command parsing, daemon command handlers, coding spawn contract, and agent entrypoint paths.
 **Output**: Baseline artifact files under artifacts directory.
 **Acceptance**: Baseline artifacts clearly map pre-change behavior for each Gate 3 surface.
@@ -101,3 +101,4 @@ Implement Gate 3 runtime-core architecture: unified agent process entrypoint, da
 
 ## Progress Log
 - 2026-03-07 00:22 Created from planning doc.
+- 2026-03-07 00:24 Unit 0 complete: Captured baseline daemon CLI/command-plane, coding spawn contract, and runtime entrypoint snapshots.
