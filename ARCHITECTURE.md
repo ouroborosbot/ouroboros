@@ -89,12 +89,12 @@ Non-canonical bundle paths are detected and surfaced for cleanup/distillation.
 
 Top-level source layout:
 
-- `src/daemon`
-- `src/heart`
-- `src/mind`
-- `src/senses`
-- `src/nerves`
-- `src/repertoire`
+- `src/heart` (core engine, providers, daemon, config, identity, agent entrypoint)
+  - `src/heart/daemon` (daemon process, CLI, hatch flow, scheduling, process management)
+- `src/mind` (prompts, memory, sessions, friends, formatting)
+- `src/senses` (CLI, Teams, inner dialog)
+- `src/nerves` (observability, logging, coverage audit)
+- `src/repertoire` (tools, skills, coding orchestration, tasks)
 - `src/__tests__` mirroring runtime domains
 
 ## Removed / Cut Systems
