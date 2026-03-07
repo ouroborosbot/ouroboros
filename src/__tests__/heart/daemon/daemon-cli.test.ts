@@ -1015,6 +1015,98 @@ describe("ouro CLI execution", () => {
   })
 })
 
+describe("multi-agent prompt, agent-name shortcut, and help", () => {
+  it("prompts for agent selection and starts chat with chosen agent", async () => {
+    const startChat = vi.fn(async () => {})
+    const promptInput = vi.fn(async () => "slugger")
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      listDiscoveredAgents: vi.fn(async () => ["ouroboros", "slugger"]),
+      startChat,
+      promptInput,
+    } as OuroCliDeps & {
+      listDiscoveredAgents: () => Promise<string[]>
+      startChat: typeof startChat
+      promptInput: typeof promptInput
+    }
+
+    await runOuroCli([], deps)
+
+    expect(promptInput).toHaveBeenCalled()
+    expect(startChat).toHaveBeenCalledWith("slugger")
+    expect(deps.sendCommand).not.toHaveBeenCalled()
+  })
+
+  it("routes ouro <agent-name> to startChat when agent is discovered", async () => {
+    const startChat = vi.fn(async () => {})
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      listDiscoveredAgents: vi.fn(async () => ["ouroboros", "slugger"]),
+      startChat,
+    } as OuroCliDeps & {
+      listDiscoveredAgents: () => Promise<string[]>
+      startChat: typeof startChat
+    }
+
+    await runOuroCli(["slugger"], deps)
+
+    expect(startChat).toHaveBeenCalledWith("slugger")
+  })
+
+  it("throws error for ouro <name> when agent is not discovered", async () => {
+    const startChat = vi.fn(async () => {})
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      listDiscoveredAgents: vi.fn(async () => ["ouroboros"]),
+      startChat,
+    } as OuroCliDeps & {
+      listDiscoveredAgents: () => Promise<string[]>
+      startChat: typeof startChat
+    }
+
+    await expect(runOuroCli(["slugger"], deps)).rejects.toThrow("Unknown command")
+  })
+
+  it("returns usage text for --help flag", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+    }
+
+    const result = await runOuroCli(["--help"], deps)
+
+    expect(result).toContain("Usage:")
+    expect(deps.sendCommand).not.toHaveBeenCalled()
+  })
+})
+
 describe("single agent → chat via startChat", () => {
   it("calls ensureDaemonRunning then startChat when single agent discovered", async () => {
     const startChat = vi.fn(async () => {})
