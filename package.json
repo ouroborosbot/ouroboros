@@ -1,5 +1,5 @@
 {
-  "name": "ouroboros-agent-harness",
+  "name": "@ouro.bot/cli",
   "version": "1.0.0",
   "private": true,
   "scripts": {
