@@ -671,6 +671,11 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
     const daemonResult = await ensureDaemonRunning(deps)
 
+    if (deps.startChat) {
+      await deps.startChat(hatchInput.agentName)
+      return ""
+    }
+
     const message = `hatched ${hatchInput.agentName} at ${result.bundleRoot} using specialist identity ${result.selectedIdentity}; ${daemonResult.message}`
     deps.writeStdout(message)
     return message

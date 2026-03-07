@@ -1183,6 +1183,130 @@ describe("single agent → chat via startChat", () => {
   })
 })
 
+describe("hatch → auto-chat", () => {
+  it("calls startChat with hatched agent name after hatch completes", async () => {
+    const startChat = vi.fn(async () => {})
+    const runHatchFlow = vi.fn(async () => ({
+      bundleRoot: "/tmp/AgentBundles/Sprout.ouro",
+      selectedIdentity: "medusa.md",
+      specialistSecretsPath: "/tmp/.agentsecrets/AdoptionSpecialist/secrets.json",
+      hatchlingSecretsPath: "/tmp/.agentsecrets/Sprout/secrets.json",
+    }))
+
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 99 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
+      runHatchFlow,
+      startChat,
+    } as OuroCliDeps & {
+      runHatchFlow: typeof runHatchFlow
+      startChat: typeof startChat
+    }
+
+    await runOuroCli([
+      "hatch",
+      "--agent",
+      "Sprout",
+      "--human",
+      "Ari",
+      "--provider",
+      "anthropic",
+      "--setup-token",
+      "sk-ant-oat01-test-token",
+    ], deps)
+
+    expect(runHatchFlow).toHaveBeenCalled()
+    expect(startChat).toHaveBeenCalledWith("Sprout")
+  })
+
+  it("ensures daemon is running before starting chat after hatch", async () => {
+    const startChat = vi.fn(async () => {})
+    const runHatchFlow = vi.fn(async () => ({
+      bundleRoot: "/tmp/AgentBundles/Sprout.ouro",
+      selectedIdentity: "medusa.md",
+      specialistSecretsPath: "/tmp/.agentsecrets/AdoptionSpecialist/secrets.json",
+      hatchlingSecretsPath: "/tmp/.agentsecrets/Sprout/secrets.json",
+    }))
+
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 99 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
+      runHatchFlow,
+      startChat,
+    } as OuroCliDeps & {
+      runHatchFlow: typeof runHatchFlow
+      startChat: typeof startChat
+    }
+
+    await runOuroCli([
+      "hatch",
+      "--agent",
+      "Sprout",
+      "--human",
+      "Ari",
+      "--provider",
+      "anthropic",
+      "--setup-token",
+      "sk-ant-oat01-test-token",
+    ], deps)
+
+    expect(deps.startDaemonProcess).toHaveBeenCalled()
+    expect(startChat).toHaveBeenCalledWith("Sprout")
+  })
+
+  it("does not call startChat when startChat is not provided", async () => {
+    const runHatchFlow = vi.fn(async () => ({
+      bundleRoot: "/tmp/AgentBundles/Sprout.ouro",
+      selectedIdentity: "medusa.md",
+      specialistSecretsPath: "/tmp/.agentsecrets/AdoptionSpecialist/secrets.json",
+      hatchlingSecretsPath: "/tmp/.agentsecrets/Sprout/secrets.json",
+    }))
+
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 99 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
+      runHatchFlow,
+    } as OuroCliDeps & {
+      runHatchFlow: typeof runHatchFlow
+    }
+
+    const result = await runOuroCli([
+      "hatch",
+      "--agent",
+      "Sprout",
+      "--human",
+      "Ari",
+      "--provider",
+      "anthropic",
+      "--setup-token",
+      "sk-ant-oat01-test-token",
+    ], deps)
+
+    expect(result).toContain("hatched Sprout")
+  })
+})
+
 describe("ensureDaemonRunning", () => {
   it("is a no-op when daemon is already running", async () => {
     const { ensureDaemonRunning } = await import("../../../heart/daemon/daemon-cli")
