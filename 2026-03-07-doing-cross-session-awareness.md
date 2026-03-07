@@ -61,7 +61,7 @@ See planning doc for full list (30+ items). Key gates:
 **Tests**: Mock friend store + fs. Test: writes pending file, rejects self-send, validates friend exists, handles missing friend.
 **Acceptance**: Tests pass, tool registered, pending files written correctly.
 
-### Unit 6: CLI Pending Queue Drain
+### Unit 6: CLI Pending Queue Drain ✅ (drain module; CLI wiring deferred to Unit 8)
 **What**: Add `fs.watch` drain to CLI. Gated: `drainable` flag false during `runAgent()`, true at prompt. On startup: drain offline messages. While idle: drain immediately on watch event. After postTurn: check `pendingDirty`, drain if set. Drain pushes harness-context + assistant-content pairs to in-memory messages array. Crash safety: rename to `.processing` before delivery, delete after. Retry `.processing` on startup.
 **Tests**: Mock fs.watch + readline. Test: startup drain, idle drain, gated drain during runAgent, crash safety rename flow, processing file retry.
 **Acceptance**: Tests pass, CLI drain integrated.
