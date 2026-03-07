@@ -3,6 +3,7 @@ import { OuroDaemon } from "./daemon"
 import { emitNervesEvent } from "../nerves/runtime"
 import { FileMessageRouter } from "./message-router"
 import { HealthMonitor } from "./health-monitor"
+import { TaskDrivenScheduler } from "./task-scheduler"
 
 function parseSocketPath(argv: string[]): string {
   const socketIndex = argv.indexOf("--socket")
@@ -29,10 +30,9 @@ const processManager = new DaemonProcessManager({
   ],
 })
 
-const scheduler = {
-  listJobs: () => [],
-  triggerJob: async (jobId: string) => ({ ok: false, message: `cron scheduler removed: ${jobId}` }),
-}
+const scheduler = new TaskDrivenScheduler({
+  agents: ["ouroboros", "slugger"],
+})
 
 const router = new FileMessageRouter()
 

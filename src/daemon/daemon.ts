@@ -44,6 +44,8 @@ export interface DaemonSchedulerLike {
   triggerJob(jobId: string): Promise<{ ok: boolean; message: string }>
   start?: () => void
   stop?: () => void
+  reconcile?: () => Promise<void> | void
+  recordTaskRun?: (agent: string, taskId: string) => Promise<void> | void
 }
 
 export interface DaemonHealthMonitorLike {
@@ -154,6 +156,7 @@ export class OuroDaemon {
     })
     await this.processManager.startAutoStartAgents()
     this.scheduler.start?.()
+    await this.scheduler.reconcile?.()
     await this.drainPendingBundleMessages()
 
     if (fs.existsSync(this.socketPath)) {
@@ -368,6 +371,7 @@ export class OuroDaemon {
           priority: "high",
           taskRef: command.taskId,
         })
+        await this.scheduler.recordTaskRun?.(command.agent, command.taskId)
         return {
           ok: true,
           message: `queued poke ${receipt.id}`,

@@ -73,7 +73,7 @@ describe("daemon entrypoint", () => {
     expect(daemonOptions.scheduler.listJobs()).toEqual([])
     await expect(daemonOptions.scheduler.triggerJob("nightly")).resolves.toEqual({
       ok: false,
-      message: "cron scheduler removed: nightly",
+      message: "unknown scheduled job: nightly",
     })
     await expect(daemonOptions.healthMonitor.runChecks()).resolves.toEqual([
       { name: "agent-processes", status: "critical", message: "non-running agents: slugger" },
