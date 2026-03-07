@@ -1,0 +1,44 @@
+Gate 1 Unit 3 Root Cleanup Summary
+Generated: 2026-03-06 23:33:50 PST
+
+Root directories:
+AGENTS.md
+ARCHITECTURE.md
+CONTRIBUTING.md
+README.md
+coverage
+dist
+docs
+eslint.config.mjs
+node_modules
+ouroboros
+package-lock.json
+package.json
+scripts
+slugger
+src
+subagents
+tsconfig.json
+vitest.config.ts
+
+Package scripts:
+dev
+daemon
+ouro
+teams
+test
+build
+lint
+audit:nerves
+
+Gitignore:
+node_modules
+dist/
+coverage/
+.DS_Store
+manifest.zip
+
+Cross-agent docs now in docs/:
+OAUTH-SETUP.md
+sync-and-merge-conventions.md
+testing-conventions.md
