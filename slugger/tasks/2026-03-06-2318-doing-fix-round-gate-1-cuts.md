@@ -52,7 +52,7 @@ Delete dead subsystems and stale repository artifacts from Gate 1 so later gates
 **Output**: Baseline inventory + reference scan output in artifacts directory.
 **Acceptance**: Artifact files exist and enumerate all Gate 1 removal/move targets.
 
-### ⬜ Unit 1: Production Code Removals
+### ✅ Unit 1: Production Code Removals
 **What**: Delete Gate 1 production files/directories and update all imports/exports/callers that reference removed code.
 **Output**: Production tree with dead code removed and references fixed.
 **Acceptance**: No compile-time references remain to deleted production code.
@@ -84,3 +84,4 @@ Delete dead subsystems and stale repository artifacts from Gate 1 so later gates
 ## Progress Log
 - 2026-03-06 23:18 Created from planning doc
 - 2026-03-06 23:20 Unit 0 complete: Captured baseline inventory, reference scans, and script snapshot artifacts.
+- 2026-03-06 23:25 Unit 1 complete: Removed dead production modules and updated all production callers/imports.
