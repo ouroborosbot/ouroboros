@@ -1,7 +1,5 @@
 export type CodingRunner = "claude" | "codex"
 
-export type CodingSubagent = "planner" | "doer" | "merger"
-
 export type CodingSessionStatus =
   | "spawning"
   | "running"
@@ -13,10 +11,11 @@ export type CodingSessionStatus =
 
 export interface CodingSessionRequest {
   runner: CodingRunner
-  subagent: CodingSubagent
   workdir: string
   prompt: string
   taskRef?: string
+  sessionId?: string
+  parentAgent?: string
   scopeFile?: string
   stateFile?: string
   autoRestartOnCrash?: boolean
@@ -24,10 +23,18 @@ export interface CodingSessionRequest {
   stallThresholdMs?: number
 }
 
+export interface CodingFailureDiagnostics {
+  command: string
+  args: string[]
+  code: number | null
+  signal: NodeJS.Signals | null
+  stdoutTail: string
+  stderrTail: string
+}
+
 export interface CodingSession {
   id: string
   runner: CodingRunner
-  subagent: CodingSubagent
   workdir: string
   taskRef?: string
   scopeFile?: string
@@ -40,6 +47,7 @@ export interface CodingSession {
   restartCount: number
   lastExitCode: number | null
   lastSignal: NodeJS.Signals | null
+  failure: CodingFailureDiagnostics | null
 }
 
 export interface CodingActionResult {

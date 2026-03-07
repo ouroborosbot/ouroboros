@@ -1,0 +1,119 @@
+# Baseline daemon command handlers (daemon.ts)
+# Timestamp: 2026-03-07T08:24:03Z
+
+199:      const response = await this.handleCommand(command)
+209:  async handleCommand(command: DaemonCommand): Promise<DaemonResponse> {
+218:      case "daemon.start":
+221:      case "daemon.stop":
+224:      case "daemon.status": {
+232:      case "daemon.health": {
+237:      case "agent.start":
+240:      case "agent.stop":
+243:      case "agent.restart":
+246:      case "cron.list": {
+253:      case "cron.trigger": {
+257:      case "message.send": {
+266:      case "message.poll": {
+
+   180	
+   181	    this.scheduler.stop?.()
+   182	    await this.processManager.stopAll()
+   183	
+   184	    if (this.server) {
+   185	      await new Promise<void>((resolve) => {
+   186	        this.server?.close(() => resolve())
+   187	      })
+   188	      this.server = null
+   189	    }
+   190	
+   191	    if (fs.existsSync(this.socketPath)) {
+   192	      fs.unlinkSync(this.socketPath)
+   193	    }
+   194	  }
+   195	
+   196	  async handleRawPayload(raw: string): Promise<string> {
+   197	    try {
+   198	      const command = parseIncomingCommand(raw)
+   199	      const response = await this.handleCommand(command)
+   200	      return JSON.stringify(response)
+   201	    } catch (error) {
+   202	      return JSON.stringify({
+   203	        ok: false,
+   204	        error: error instanceof Error ? error.message : String(error),
+   205	      } satisfies DaemonResponse)
+   206	    }
+   207	  }
+   208	
+   209	  async handleCommand(command: DaemonCommand): Promise<DaemonResponse> {
+   210	    emitNervesEvent({
+   211	      component: "daemon",
+   212	      event: "daemon.command_received",
+   213	      message: "handling daemon command",
+   214	      meta: { kind: command.kind },
+   215	    })
+   216	
+   217	    switch (command.kind) {
+   218	      case "daemon.start":
+   219	        await this.start()
+   220	        return { ok: true, message: "daemon started" }
+   221	      case "daemon.stop":
+   222	        await this.stop()
+   223	        return { ok: true, message: "daemon stopped" }
+   224	      case "daemon.status": {
+   225	        const snapshots = this.processManager.listAgentSnapshots()
+   226	        return {
+   227	          ok: true,
+   228	          summary: formatStatusSummary(snapshots),
+   229	          data: snapshots,
+   230	        }
+   231	      }
+   232	      case "daemon.health": {
+   233	        const checks = await this.healthMonitor.runChecks()
+   234	        const summary = checks.map((check) => `${check.name}:${check.status}:${check.message}`).join("\n")
+   235	        return { ok: true, summary, data: checks }
+   236	      }
+   237	      case "agent.start":
+   238	        await this.processManager.startAgent(command.agent)
+   239	        return { ok: true, message: `started ${command.agent}` }
+   240	      case "agent.stop":
+   241	        await this.processManager.stopAgent(command.agent)
+   242	        return { ok: true, message: `stopped ${command.agent}` }
+   243	      case "agent.restart":
+   244	        await this.processManager.restartAgent(command.agent)
+   245	        return { ok: true, message: `restarted ${command.agent}` }
+   246	      case "cron.list": {
+   247	        const jobs = this.scheduler.listJobs()
+   248	        const summary = jobs.length === 0
+   249	          ? "no cron jobs"
+   250	          : jobs.map((job) => `${job.id}\t${job.schedule}\tlast=${job.lastRun ?? "never"}`).join("\n")
+   251	        return { ok: true, summary, data: jobs }
+   252	      }
+   253	      case "cron.trigger": {
+   254	        const result = await this.scheduler.triggerJob(command.jobId)
+   255	        return { ok: result.ok, message: result.message }
+   256	      }
+   257	      case "message.send": {
+   258	        const receipt = await this.router.send({
+   259	          from: command.from,
+   260	          to: command.to,
+   261	          content: command.content,
+   262	          priority: command.priority,
+   263	        })
+   264	        return { ok: true, message: `queued message ${receipt.id}`, data: receipt }
+   265	      }
+   266	      case "message.poll": {
+   267	        const messages = this.router.pollInbox(command.agent)
+   268	        return {
+   269	          ok: true,
+   270	          summary: `${messages.length} messages`,
+   271	          data: messages,
+   272	        }
+   273	      }
+   274	      default:
+   275	        return {
+   276	          ok: false,
+   277	          error: `Unknown daemon command kind '${(command as { kind: string }).kind}'.`,
+   278	        }
+   279	    }
+   280	  }
+   281	}

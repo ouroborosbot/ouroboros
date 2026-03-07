@@ -1,0 +1,99 @@
+# Unit 5 contract scan
+# generated: 2026-03-07T09:09:03Z
+
+## Scheduler + poke wiring references
+src/daemon/daemon-entry.ts:6:import { TaskDrivenScheduler } from "./task-scheduler"
+src/daemon/daemon-entry.ts:33:const scheduler = new TaskDrivenScheduler({
+src/daemon/daemon-cli.ts:16:  | { kind: "task.poke"; agent: string; taskId: string }
+src/daemon/daemon-cli.ts:36:    "  ouro poke <agent> --task <task-id>",
+src/daemon/daemon-cli.ts:92:  return { kind: "task.poke", agent, taskId }
+src/__tests__/daemon/health-monitor.test.ts:76:        listJobs: () => [{ id: "nightly-reconcile", lastRun: "2026-03-07T00:00:00.000Z" }],
+src/__tests__/daemon/daemon-cli.test.ts:45:      kind: "task.poke",
+src/__tests__/daemon/daemon-command-plane-branches.test.ts:41:      reconcile: vi.fn(async () => undefined),
+src/__tests__/daemon/daemon-command-plane-branches.test.ts:42:      recordTaskRun: vi.fn(async (_agent: string, _taskId: string) => undefined),
+src/__tests__/daemon/daemon-command-plane-branches.test.ts:138:    const poke = await daemon.handleCommand({ kind: "task.poke", agent: "slugger", taskId: "habit-heartbeat" })
+src/__tests__/daemon/daemon-command-plane-branches.test.ts:144:    expect(scheduler.recordTaskRun).toHaveBeenCalledWith("slugger", "habit-heartbeat")
+src/daemon/daemon.ts:47:  reconcile?: () => Promise<void> | void
+src/daemon/daemon.ts:48:  recordTaskRun?: (agent: string, taskId: string) => Promise<void> | void
+src/daemon/daemon.ts:79:  | { kind: "task.poke"; agent: string; taskId: string }
+src/daemon/daemon.ts:159:    await this.scheduler.reconcile?.()
+src/daemon/daemon.ts:366:      case "task.poke": {
+src/daemon/daemon.ts:374:        await this.scheduler.recordTaskRun?.(command.agent, command.taskId)
+src/__tests__/daemon/task-scheduler.test.ts:7:import { TaskDrivenScheduler } from "../../daemon/task-scheduler"
+src/__tests__/daemon/task-scheduler.test.ts:34:  it("reconciles cadence/scheduledAt tasks into ouro poke jobs", async () => {
+src/__tests__/daemon/task-scheduler.test.ts:42:      cadence: "30m",
+src/__tests__/daemon/task-scheduler.test.ts:43:      scheduledAt: null,
+src/__tests__/daemon/task-scheduler.test.ts:54:      cadence: null,
+src/__tests__/daemon/task-scheduler.test.ts:55:      scheduledAt: "2026-03-07T15:45:00.000Z",
+src/__tests__/daemon/task-scheduler.test.ts:64:      title: "Invalid cadence",
+src/__tests__/daemon/task-scheduler.test.ts:66:      cadence: "nonsense",
+src/__tests__/daemon/task-scheduler.test.ts:67:      scheduledAt: null,
+src/__tests__/daemon/task-scheduler.test.ts:78:      cadence: "\"\"",
+src/__tests__/daemon/task-scheduler.test.ts:79:      scheduledAt: "\"\"",
+src/__tests__/daemon/task-scheduler.test.ts:90:      cadence: null,
+src/__tests__/daemon/task-scheduler.test.ts:91:      scheduledAt: "2026-03-07T18:00:00.000Z",
+src/__tests__/daemon/task-scheduler.test.ts:100:    const scheduler = new TaskDrivenScheduler({
+src/__tests__/daemon/task-scheduler.test.ts:109:      "slugger:2026-03-07-0800-heartbeat:cadence",
+src/__tests__/daemon/task-scheduler.test.ts:110:      "slugger:2026-03-07-0815-report:scheduledAt",
+src/__tests__/daemon/task-scheduler.test.ts:111:      "slugger:2026-03-07-0830-null-last-run:scheduledAt",
+src/__tests__/daemon/task-scheduler.test.ts:115:    expect(internalJobs.get("slugger:2026-03-07-0800-heartbeat:cadence")?.command).toBe(
+src/__tests__/daemon/task-scheduler.test.ts:116:      "ouro poke slugger --task 2026-03-07-0800-heartbeat",
+src/__tests__/daemon/task-scheduler.test.ts:128:      cadence: "1h",
+src/__tests__/daemon/task-scheduler.test.ts:129:      scheduledAt: null,
+src/__tests__/daemon/task-scheduler.test.ts:140:      cadence: "1h",
+src/__tests__/daemon/task-scheduler.test.ts:141:      scheduledAt: null,
+src/__tests__/daemon/task-scheduler.test.ts:147:    const scheduler = new TaskDrivenScheduler({
+src/__tests__/daemon/task-scheduler.test.ts:153:    await scheduler.recordTaskRun("slugger", "2026-03-07-0900-checkin")
+src/__tests__/daemon/task-scheduler.test.ts:159:    const job = scheduler.listJobs().find((entry) => entry.id === "slugger:2026-03-07-0900-checkin:cadence")
+src/__tests__/daemon/task-scheduler.test.ts:171:      cadence: "*/15 * * * *",
+src/__tests__/daemon/task-scheduler.test.ts:172:      scheduledAt: null,
+src/__tests__/daemon/task-scheduler.test.ts:178:    const scheduler = new TaskDrivenScheduler({
+src/__tests__/daemon/task-scheduler.test.ts:185:    await expect(scheduler.triggerJob("slugger:2026-03-07-1000-ping:cadence")).resolves.toEqual({
+src/__tests__/daemon/task-scheduler.test.ts:187:      message: "triggered slugger:2026-03-07-1000-ping:cadence",
+src/__tests__/daemon/task-scheduler.test.ts:195:  it("supports day cadence and ignores completed/invalid schedules", async () => {
+src/__tests__/daemon/task-scheduler.test.ts:203:      cadence: "2d",
+src/__tests__/daemon/task-scheduler.test.ts:204:      scheduledAt: "not-a-date",
+src/__tests__/daemon/task-scheduler.test.ts:213:      title: "Zero cadence",
+src/__tests__/daemon/task-scheduler.test.ts:215:      cadence: "0h",
+src/__tests__/daemon/task-scheduler.test.ts:216:      scheduledAt: null,
+src/__tests__/daemon/task-scheduler.test.ts:227:      cadence: "1h",
+src/__tests__/daemon/task-scheduler.test.ts:228:      scheduledAt: null,
+src/__tests__/daemon/task-scheduler.test.ts:234:    const scheduler = new TaskDrivenScheduler({
+src/__tests__/daemon/task-scheduler.test.ts:243:        id: "slugger:2026-03-07-1100-daily:cadence",
+src/__tests__/daemon/task-scheduler.test.ts:250:  it("gracefully returns when recordTaskRun cannot resolve or parse a task", async () => {
+src/__tests__/daemon/task-scheduler.test.ts:253:    const scheduler = new TaskDrivenScheduler({
+src/__tests__/daemon/task-scheduler.test.ts:258:    await expect(scheduler.recordTaskRun("slugger", "missing-task")).resolves.toBeUndefined()
+src/__tests__/daemon/task-scheduler.test.ts:265:      cadence: "1h",
+src/__tests__/daemon/task-scheduler.test.ts:266:      scheduledAt: null,
+src/__tests__/daemon/task-scheduler.test.ts:274:    await expect(scheduler.recordTaskRun("slugger", "2026-03-07-1200-break")).resolves.toBeUndefined()
+src/__tests__/daemon/task-scheduler.test.ts:277:  it("walks nested task directories and skips malformed markdown files during reconcile", async () => {
+src/__tests__/daemon/task-scheduler.test.ts:291:          cadence: "1h",
+src/__tests__/daemon/task-scheduler.test.ts:292:          scheduledAt: null,
+src/__tests__/daemon/task-scheduler.test.ts:306:    const scheduler = new TaskDrivenScheduler({
+src/__tests__/daemon/task-scheduler.test.ts:315:        id: "slugger:2026-03-07-1300-nested:cadence",
+src/__tests__/daemon/task-scheduler.test.ts:323:    const scheduler = new TaskDrivenScheduler({
+src/__tests__/daemon/task-scheduler.test.ts:328:    await expect(scheduler.reconcile()).resolves.toBeUndefined()
+src/daemon/task-scheduler.ts:23:export interface TaskDrivenSchedulerOptions {
+src/daemon/task-scheduler.ts:63:  const cadenceMatch = /^(\d+)(m|h|d)$/.exec(value)
+src/daemon/task-scheduler.ts:64:  if (!cadenceMatch) return null
+src/daemon/task-scheduler.ts:66:  const interval = Number.parseInt(cadenceMatch[1], 10)
+src/daemon/task-scheduler.ts:69:  const unit = cadenceMatch[2]
+src/daemon/task-scheduler.ts:95:export class TaskDrivenScheduler {
+src/daemon/task-scheduler.ts:106:  constructor(options: TaskDrivenSchedulerOptions) {
+src/daemon/task-scheduler.ts:117:    void this.reconcile()
+src/daemon/task-scheduler.ts:136:    await this.recordTaskRun(job.agent, job.taskId)
+src/daemon/task-scheduler.ts:140:  async reconcile(): Promise<void> {
+src/daemon/task-scheduler.ts:165:        const cadence = parseCadence(task.frontmatter.cadence)
+src/daemon/task-scheduler.ts:166:        if (cadence) {
+src/daemon/task-scheduler.ts:167:          const id = `${agent}:${taskId}:cadence`
+src/daemon/task-scheduler.ts:172:            schedule: cadence,
+src/daemon/task-scheduler.ts:174:            command: `ouro poke ${agent} --task ${taskId}`,
+src/daemon/task-scheduler.ts:179:        const scheduledAt = parseScheduledAt(task.frontmatter.scheduledAt)
+src/daemon/task-scheduler.ts:180:        if (scheduledAt) {
+src/daemon/task-scheduler.ts:181:          const id = `${agent}:${taskId}:scheduledAt`
+src/daemon/task-scheduler.ts:186:            schedule: scheduledAt,
+src/daemon/task-scheduler.ts:188:            command: `ouro poke ${agent} --task ${taskId}`,
+src/daemon/task-scheduler.ts:207:      event: "daemon.scheduler_reconciled",
+src/daemon/task-scheduler.ts:208:      message: "reconciled task-driven schedule jobs",
+src/daemon/task-scheduler.ts:213:  async recordTaskRun(agent: string, taskId: string): Promise<void> {
+src/daemon/task-scheduler.ts:218:      await this.reconcile()

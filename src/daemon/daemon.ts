@@ -1,5 +1,7 @@
 import * as fs from "fs"
 import * as net from "net"
+import * as path from "path"
+import { getAgentBundlesRoot } from "../identity"
 import { emitNervesEvent } from "../nerves/runtime"
 
 export interface DaemonCronJobSummary {
@@ -23,8 +25,8 @@ export interface DaemonProcessManagerLike {
   startAutoStartAgents(): Promise<void>
   stopAll(): Promise<void>
   startAgent(agent: string): Promise<void>
-  stopAgent(agent: string): Promise<void>
-  restartAgent(agent: string): Promise<void>
+  stopAgent?(agent: string): Promise<void>
+  restartAgent?(agent: string): Promise<void>
   listAgentSnapshots(): Array<{
     name: string
     channel: string
@@ -42,6 +44,8 @@ export interface DaemonSchedulerLike {
   triggerJob(jobId: string): Promise<{ ok: boolean; message: string }>
   start?: () => void
   stop?: () => void
+  reconcile?: () => Promise<void> | void
+  recordTaskRun?: (agent: string, taskId: string) => Promise<void> | void
 }
 
 export interface DaemonHealthMonitorLike {
@@ -49,7 +53,14 @@ export interface DaemonHealthMonitorLike {
 }
 
 export interface DaemonRouterLike {
-  send(message: { from: string; to: string; content: string; priority?: string }): Promise<DaemonMessageReceipt>
+  send(message: {
+    from: string
+    to: string
+    content: string
+    priority?: string
+    sessionId?: string
+    taskRef?: string
+  }): Promise<DaemonMessageReceipt>
   pollInbox(agent: string): Array<{ id: string; from: string; content: string; queuedAt: string; priority: string }>
 }
 
@@ -58,13 +69,17 @@ export type DaemonCommand =
   | { kind: "daemon.stop" }
   | { kind: "daemon.status" }
   | { kind: "daemon.health" }
+  | { kind: "daemon.logs" }
   | { kind: "agent.start"; agent: string }
   | { kind: "agent.stop"; agent: string }
   | { kind: "agent.restart"; agent: string }
   | { kind: "cron.list" }
   | { kind: "cron.trigger"; jobId: string }
-  | { kind: "message.send"; from: string; to: string; content: string; priority?: string }
+  | { kind: "chat.connect"; agent: string }
+  | { kind: "task.poke"; agent: string; taskId: string }
+  | { kind: "message.send"; from: string; to: string; content: string; priority?: string; sessionId?: string; taskRef?: string }
   | { kind: "message.poll"; agent: string }
+  | { kind: "hatch.start" }
 
 export interface DaemonResponse {
   ok: boolean
@@ -80,6 +95,7 @@ export interface OuroDaemonOptions {
   scheduler: DaemonSchedulerLike
   healthMonitor: DaemonHealthMonitorLike
   router: DaemonRouterLike
+  bundlesRoot?: string
 }
 
 function formatStatusSummary(snapshots: ReturnType<DaemonProcessManagerLike["listAgentSnapshots"]>): string {
@@ -117,6 +133,7 @@ export class OuroDaemon {
   private readonly scheduler: DaemonSchedulerLike
   private readonly healthMonitor: DaemonHealthMonitorLike
   private readonly router: DaemonRouterLike
+  private readonly bundlesRoot: string
   private server: net.Server | null = null
 
   constructor(options: OuroDaemonOptions) {
@@ -125,6 +142,7 @@ export class OuroDaemon {
     this.scheduler = options.scheduler
     this.healthMonitor = options.healthMonitor
     this.router = options.router
+    this.bundlesRoot = options.bundlesRoot ?? getAgentBundlesRoot()
   }
 
   async start(): Promise<void> {
@@ -138,6 +156,8 @@ export class OuroDaemon {
     })
     await this.processManager.startAutoStartAgents()
     this.scheduler.start?.()
+    await this.scheduler.reconcile?.()
+    await this.drainPendingBundleMessages()
 
     if (fs.existsSync(this.socketPath)) {
       fs.unlinkSync(this.socketPath)
@@ -168,6 +188,64 @@ export class OuroDaemon {
       server.once("error", reject)
       server.listen(this.socketPath, () => resolve())
     })
+  }
+
+  private async drainPendingBundleMessages(): Promise<void> {
+    if (!fs.existsSync(this.bundlesRoot)) return
+
+    let bundleDirs: fs.Dirent[]
+    try {
+      bundleDirs = fs.readdirSync(this.bundlesRoot, { withFileTypes: true })
+    } catch {
+      return
+    }
+
+    for (const bundleDir of bundleDirs) {
+      if (!bundleDir.isDirectory() || !bundleDir.name.endsWith(".ouro")) continue
+      const pendingPath = path.join(this.bundlesRoot, bundleDir.name, "inbox", "pending.jsonl")
+      if (!fs.existsSync(pendingPath)) continue
+
+      const raw = fs.readFileSync(pendingPath, "utf-8")
+      const lines = raw
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+
+      const retained: string[] = []
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line) as {
+            from?: unknown
+            to?: unknown
+            content?: unknown
+            priority?: unknown
+            sessionId?: unknown
+            taskRef?: unknown
+          }
+          if (
+            typeof parsed.from !== "string" ||
+            typeof parsed.to !== "string" ||
+            typeof parsed.content !== "string"
+          ) {
+            retained.push(line)
+            continue
+          }
+          await this.router.send({
+            from: parsed.from,
+            to: parsed.to,
+            content: parsed.content,
+            priority: typeof parsed.priority === "string" ? parsed.priority : undefined,
+            sessionId: typeof parsed.sessionId === "string" ? parsed.sessionId : undefined,
+            taskRef: typeof parsed.taskRef === "string" ? parsed.taskRef : undefined,
+          })
+        } catch {
+          retained.push(line)
+        }
+      }
+
+      const next = retained.length > 0 ? `${retained.join("\n")}\n` : ""
+      fs.writeFileSync(pendingPath, next, "utf-8")
+    }
   }
 
   async stop(): Promise<void> {
@@ -234,14 +312,20 @@ export class OuroDaemon {
         const summary = checks.map((check) => `${check.name}:${check.status}:${check.message}`).join("\n")
         return { ok: true, summary, data: checks }
       }
+      case "daemon.logs":
+        return {
+          ok: true,
+          summary: "logs: use `ouro logs` to tail daemon and agent output",
+          message: "log streaming available via ouro logs",
+        }
       case "agent.start":
         await this.processManager.startAgent(command.agent)
         return { ok: true, message: `started ${command.agent}` }
       case "agent.stop":
-        await this.processManager.stopAgent(command.agent)
+        await this.processManager.stopAgent?.(command.agent)
         return { ok: true, message: `stopped ${command.agent}` }
       case "agent.restart":
-        await this.processManager.restartAgent(command.agent)
+        await this.processManager.restartAgent?.(command.agent)
         return { ok: true, message: `restarted ${command.agent}` }
       case "cron.list": {
         const jobs = this.scheduler.listJobs()
@@ -260,6 +344,8 @@ export class OuroDaemon {
           to: command.to,
           content: command.content,
           priority: command.priority,
+          sessionId: command.sessionId,
+          taskRef: command.taskRef,
         })
         return { ok: true, message: `queued message ${receipt.id}`, data: receipt }
       }
@@ -271,6 +357,32 @@ export class OuroDaemon {
           data: messages,
         }
       }
+      case "chat.connect":
+        await this.processManager.startAgent(command.agent)
+        return {
+          ok: true,
+          message: `connected to ${command.agent}`,
+        }
+      case "task.poke": {
+        const receipt = await this.router.send({
+          from: "ouro-poke",
+          to: command.agent,
+          content: `poke ${command.taskId}`,
+          priority: "high",
+          taskRef: command.taskId,
+        })
+        await this.scheduler.recordTaskRun?.(command.agent, command.taskId)
+        return {
+          ok: true,
+          message: `queued poke ${receipt.id}`,
+          data: receipt,
+        }
+      }
+      case "hatch.start":
+        return {
+          ok: true,
+          message: "hatch flow is stubbed in Gate 3 and completed in Gate 6",
+        }
       default:
         return {
           ok: false,

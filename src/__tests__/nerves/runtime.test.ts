@@ -79,10 +79,8 @@ describe("observability/runtime", () => {
     })
 
     expect(chunks.length).toBeGreaterThan(0)
-    const payload = JSON.parse(chunks[0]!.trim()) as Record<string, unknown>
-    expect(payload.event).toBe("runtime.default")
-    expect(payload.level).toBe("info")
-    expect(typeof payload.trace_id).toBe("string")
+    expect(chunks[0]).toContain("INFO [observability] default logger path")
+    expect(chunks[0]).toContain("{\"test\":true}")
 
     stderrSpy.mockRestore()
   })

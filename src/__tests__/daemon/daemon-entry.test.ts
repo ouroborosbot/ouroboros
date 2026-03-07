@@ -12,6 +12,7 @@ describe("daemon entrypoint", () => {
     const start = vi.fn(async () => undefined)
     const stop = vi.fn(async () => undefined)
     const emitNervesEvent = vi.fn()
+    const configureDaemonRuntimeLogger = vi.fn()
     const daemonCtor = vi.fn()
     const processManagerCtor = vi.fn()
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => code as never) as any)
@@ -43,6 +44,7 @@ describe("daemon entrypoint", () => {
       DaemonProcessManager: MockProcessManager,
     }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
+    vi.doMock("../../daemon/runtime-logging", () => ({ configureDaemonRuntimeLogger }))
 
     const argvSpy = vi.spyOn(process, "argv", "get").mockReturnValue(["node", "daemon-entry.js"])
 
@@ -50,8 +52,15 @@ describe("daemon entrypoint", () => {
     await Promise.resolve()
 
     expect(start).toHaveBeenCalledTimes(1)
+    expect(configureDaemonRuntimeLogger).toHaveBeenCalledWith("daemon")
     expect(processManagerCtor).toHaveBeenCalledTimes(1)
     expect(daemonCtor).toHaveBeenCalledTimes(1)
+
+    const processManagerOptions = processManagerCtor.mock.calls[0]?.[0] as {
+      agents: Array<{ entry: string }>
+    }
+    expect(processManagerOptions.agents.length).toBeGreaterThan(0)
+    expect(processManagerOptions.agents.every((agent) => agent.entry === "heart/agent-entry.js")).toBe(true)
 
     const daemonOptions = daemonCtor.mock.calls[0]?.[0] as {
       scheduler: {
@@ -67,7 +76,7 @@ describe("daemon entrypoint", () => {
     expect(daemonOptions.scheduler.listJobs()).toEqual([])
     await expect(daemonOptions.scheduler.triggerJob("nightly")).resolves.toEqual({
       ok: false,
-      message: "cron scheduler removed: nightly",
+      message: "unknown scheduled job: nightly",
     })
     await expect(daemonOptions.healthMonitor.runChecks()).resolves.toEqual([
       { name: "agent-processes", status: "critical", message: "non-running agents: slugger" },
@@ -116,6 +125,7 @@ describe("daemon entrypoint", () => {
     })
     const stop = vi.fn(async () => undefined)
     const emitNervesEvent = vi.fn()
+    const configureDaemonRuntimeLogger = vi.fn()
     const daemonCtor = vi.fn()
     const processManagerCtor = vi.fn()
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => code as never) as any)
@@ -146,6 +156,7 @@ describe("daemon entrypoint", () => {
       DaemonProcessManager: MockProcessManager,
     }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
+    vi.doMock("../../daemon/runtime-logging", () => ({ configureDaemonRuntimeLogger }))
 
     const argvSpy = vi.spyOn(process, "argv", "get").mockReturnValue([
       "node",
@@ -161,6 +172,7 @@ describe("daemon entrypoint", () => {
     expect(emitNervesEvent).toHaveBeenCalledWith(
       expect.objectContaining({ event: "daemon.entry_error" }),
     )
+    expect(configureDaemonRuntimeLogger).toHaveBeenCalledWith("daemon")
     expect(processManagerCtor).toHaveBeenCalledTimes(1)
     expect(daemonCtor).toHaveBeenCalledTimes(1)
     expect(stop).toHaveBeenCalled()
@@ -175,6 +187,7 @@ describe("daemon entrypoint", () => {
     const start = vi.fn(async () => undefined)
     const stop = vi.fn(async () => undefined)
     const emitNervesEvent = vi.fn()
+    const configureDaemonRuntimeLogger = vi.fn()
     vi.spyOn(process, "on").mockImplementation(((
       _event: string,
       _cb: () => void,
@@ -196,6 +209,7 @@ describe("daemon entrypoint", () => {
       DaemonProcessManager: MockProcessManager,
     }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
+    vi.doMock("../../daemon/runtime-logging", () => ({ configureDaemonRuntimeLogger }))
 
     const argvSpy = vi.spyOn(process, "argv", "get").mockReturnValue([
       "node",
@@ -210,6 +224,7 @@ describe("daemon entrypoint", () => {
     expect(emitNervesEvent).toHaveBeenCalledWith(
       expect.objectContaining({ event: "daemon.entry_start", meta: { socketPath: "/tmp/ouroboros-daemon.sock" } }),
     )
+    expect(configureDaemonRuntimeLogger).toHaveBeenCalledWith("daemon")
 
     argvSpy.mockRestore()
   })

@@ -1,0 +1,48 @@
+# Gate 3 Unit 1 command-plane scan
+# Timestamp: 2026-03-07T08:30:01Z
+
+src/daemon/daemon-cli.ts:10:  | { kind: "daemon.up" }
+src/daemon/daemon-cli.ts:13:  | { kind: "daemon.logs" }
+src/daemon/daemon-cli.ts:14:  | { kind: "chat.connect"; agent: string }
+src/daemon/daemon-cli.ts:16:  | { kind: "task.poke"; agent: string; taskId: string }
+src/daemon/daemon-cli.ts:17:  | { kind: "hatch.start" }
+src/daemon/daemon-cli.ts:91:  return { kind: "task.poke", agent, taskId }
+src/daemon/daemon-cli.ts:94:export function parseOuroCommand(args: string[]): OuroCliCommand {
+src/daemon/daemon-cli.ts:96:  if (!head) return { kind: "daemon.up" }
+src/daemon/daemon-cli.ts:98:  if (head === "up") return { kind: "daemon.up" }
+src/daemon/daemon-cli.ts:101:  if (head === "logs") return { kind: "daemon.logs" }
+src/daemon/daemon-cli.ts:102:  if (head === "hatch") return { kind: "hatch.start" }
+src/daemon/daemon-cli.ts:105:    return { kind: "chat.connect", agent: second }
+src/daemon/daemon-cli.ts:220:function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" }>): DaemonCommand {
+src/daemon/daemon-cli.ts:225:  const command = parseOuroCommand(args)
+src/daemon/daemon-cli.ts:233:  if (command.kind === "daemon.up") {
+src/__tests__/daemon/daemon-cli.test.ts:4:  parseOuroCommand,
+src/__tests__/daemon/daemon-cli.test.ts:12:    expect(parseOuroCommand([])).toEqual({ kind: "daemon.up" })
+src/__tests__/daemon/daemon-cli.test.ts:13:    expect(parseOuroCommand(["up"])).toEqual({ kind: "daemon.up" })
+src/__tests__/daemon/daemon-cli.test.ts:14:    expect(parseOuroCommand(["stop"])).toEqual({ kind: "daemon.stop" })
+src/__tests__/daemon/daemon-cli.test.ts:15:    expect(parseOuroCommand(["status"])).toEqual({ kind: "daemon.status" })
+src/__tests__/daemon/daemon-cli.test.ts:16:    expect(parseOuroCommand(["logs"])).toEqual({ kind: "daemon.logs" })
+src/__tests__/daemon/daemon-cli.test.ts:17:    expect(parseOuroCommand(["hatch"])).toEqual({ kind: "hatch.start" })
+src/__tests__/daemon/daemon-cli.test.ts:21:    expect(parseOuroCommand(["chat", "slugger"])).toEqual({
+src/__tests__/daemon/daemon-cli.test.ts:22:      kind: "chat.connect",
+src/__tests__/daemon/daemon-cli.test.ts:26:    expect(parseOuroCommand([
+src/__tests__/daemon/daemon-cli.test.ts:44:    expect(parseOuroCommand(["poke", "slugger", "--task", "habit-heartbeat"])).toEqual({
+src/__tests__/daemon/daemon-cli.test.ts:45:      kind: "task.poke",
+src/__tests__/daemon/daemon-cli.test.ts:52:    expect(() => parseOuroCommand(["agent", "start", "slugger"])).toThrow("Unknown command")
+src/__tests__/daemon/daemon-cli.test.ts:53:    expect(() => parseOuroCommand(["cron", "list"])).toThrow("Unknown command")
+src/__tests__/daemon/daemon-cli.test.ts:57:    expect(() => parseOuroCommand(["chat"])).toThrow("Usage")
+src/__tests__/daemon/daemon-cli.test.ts:58:    expect(() => parseOuroCommand(["msg", "--to", "slugger"])).toThrow("Usage")
+src/__tests__/daemon/daemon-cli.test.ts:59:    expect(() => parseOuroCommand(["poke", "slugger"])).toThrow("Usage")
+src/__tests__/daemon/daemon-cli.test.ts:60:    expect(() => parseOuroCommand(["mystery"])).toThrow("Unknown command")
+src/__tests__/daemon/daemon-command-plane-branches.test.ts:106:    const logs = await daemon.handleCommand({ kind: "daemon.logs" })
+src/__tests__/daemon/daemon-command-plane-branches.test.ts:110:    const chat = await daemon.handleCommand({ kind: "chat.connect", agent: "slugger" })
+src/__tests__/daemon/daemon-command-plane-branches.test.ts:136:    const poke = await daemon.handleCommand({ kind: "task.poke", agent: "slugger", taskId: "habit-heartbeat" })
+src/__tests__/daemon/daemon-command-plane-branches.test.ts:143:    const hatch = await daemon.handleCommand({ kind: "hatch.start" })
+src/daemon/daemon.ts:68:  | { kind: "daemon.logs" }
+src/daemon/daemon.ts:74:  | { kind: "chat.connect"; agent: string }
+src/daemon/daemon.ts:75:  | { kind: "task.poke"; agent: string; taskId: string }
+src/daemon/daemon.ts:78:  | { kind: "hatch.start" }
+src/daemon/daemon.ts:248:      case "daemon.logs":
+src/daemon/daemon.ts:293:      case "chat.connect":
+src/daemon/daemon.ts:299:      case "task.poke": {
+src/daemon/daemon.ts:313:      case "hatch.start":

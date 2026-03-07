@@ -10,6 +10,8 @@ export interface RoutedMessage {
   content: string
   queuedAt: string
   priority: string
+  sessionId?: string
+  taskRef?: string
 }
 
 export interface FileMessageRouterOptions {
@@ -31,7 +33,14 @@ export class FileMessageRouter {
     fs.mkdirSync(this.baseDir, { recursive: true })
   }
 
-  async send(input: { from: string; to: string; content: string; priority?: string }): Promise<{ id: string; queuedAt: string }> {
+  async send(input: {
+    from: string
+    to: string
+    content: string
+    priority?: string
+    sessionId?: string
+    taskRef?: string
+  }): Promise<{ id: string; queuedAt: string }> {
     const queuedAt = this.now()
     const id = messageId(queuedAt)
     const message: RoutedMessage = {
@@ -41,6 +50,8 @@ export class FileMessageRouter {
       content: input.content,
       queuedAt,
       priority: input.priority ?? "normal",
+      sessionId: input.sessionId,
+      taskRef: input.taskRef,
     }
 
     const inboxPath = this.inboxPath(input.to)

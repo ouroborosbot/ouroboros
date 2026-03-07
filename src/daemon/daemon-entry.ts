@@ -3,6 +3,8 @@ import { OuroDaemon } from "./daemon"
 import { emitNervesEvent } from "../nerves/runtime"
 import { FileMessageRouter } from "./message-router"
 import { HealthMonitor } from "./health-monitor"
+import { TaskDrivenScheduler } from "./task-scheduler"
+import { configureDaemonRuntimeLogger } from "./runtime-logging"
 
 function parseSocketPath(argv: string[]): string {
   const socketIndex = argv.indexOf("--socket")
@@ -15,6 +17,8 @@ function parseSocketPath(argv: string[]): string {
 
 const socketPath = parseSocketPath(process.argv)
 
+configureDaemonRuntimeLogger("daemon")
+
 emitNervesEvent({
   component: "daemon",
   event: "daemon.entry_start",
@@ -24,15 +28,14 @@ emitNervesEvent({
 
 const processManager = new DaemonProcessManager({
   agents: [
-    { name: "ouroboros", entry: "inner-worker-entry.js", channel: "cli", autoStart: true },
-    { name: "slugger", entry: "inner-worker-entry.js", channel: "cli", autoStart: true },
+    { name: "ouroboros", entry: "heart/agent-entry.js", channel: "cli", autoStart: true },
+    { name: "slugger", entry: "heart/agent-entry.js", channel: "cli", autoStart: true },
   ],
 })
 
-const scheduler = {
-  listJobs: () => [],
-  triggerJob: async (jobId: string) => ({ ok: false, message: `cron scheduler removed: ${jobId}` }),
-}
+const scheduler = new TaskDrivenScheduler({
+  agents: ["ouroboros", "slugger"],
+})
 
 const router = new FileMessageRouter()
 

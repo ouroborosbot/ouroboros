@@ -13,7 +13,6 @@ function session(overrides: Partial<CodingSession>): CodingSession {
   return {
     id: "coding-001",
     runner: "claude",
-    subagent: "doer",
     workdir: "/Users/test/AgentWorkspaces/ouroboros",
     status: "running",
     pid: 100,
