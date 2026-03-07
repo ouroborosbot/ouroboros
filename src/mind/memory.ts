@@ -1,4 +1,3 @@
-import type OpenAI from "openai";
 import * as fs from "fs";
 import * as path from "path";
 import { randomUUID } from "crypto";
@@ -49,7 +48,6 @@ export interface EntityIndexEntry {
 
 export type EntityIndex = Record<string, EntityIndexEntry>;
 
-const HIGHLIGHT_PREFIX = /^\s*(?:remember|learned)\s*:\s*(.+)\s*$/i;
 const DEDUP_THRESHOLD = 0.6;
 const ENTITY_TOKEN = /[a-z0-9]+/g;
 const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
@@ -102,26 +100,6 @@ export function ensureMemoryStorePaths(rootDir: string): MemoryStorePaths {
   return { rootDir, factsPath, entitiesPath, dailyDir };
 }
 
-export function extractMemoryHighlights(messages: OpenAI.ChatCompletionMessageParam[]): string[] {
-  const highlights: string[] = [];
-  for (const message of messages) {
-    if (message.role !== "user" && message.role !== "assistant") continue;
-    if (typeof message.content !== "string") continue;
-    for (const line of message.content.split("\n")) {
-      const match = line.match(HIGHLIGHT_PREFIX);
-      if (!match) continue;
-      const text = match[1].trim();
-      if (text.length > 0) highlights.push(text);
-    }
-  }
-  emitNervesEvent({
-    component: "mind",
-    event: "mind.memory_extract",
-    message: "extracted memory highlights",
-    meta: { count: highlights.length },
-  });
-  return highlights;
-}
 
 function overlapScore(left: string, right: string): number {
   const leftWords = new Set(
