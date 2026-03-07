@@ -631,6 +631,51 @@ export const baseToolDefinitions: ToolDefinition[] = [
       }
     },
   },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "send_message",
+        description: "send a message to a friend's session. the message is queued as a pending file and delivered when the target session drains its queue.",
+        parameters: {
+          type: "object",
+          properties: {
+            friendId: { type: "string", description: "the friend UUID (or 'self')" },
+            channel: { type: "string", description: "the channel: cli, teams, or inner" },
+            key: { type: "string", description: "session key (defaults to 'session')" },
+            content: { type: "string", description: "the message content to send" },
+          },
+          required: ["friendId", "channel", "content"],
+        },
+      },
+    },
+    handler: async (args) => {
+      const friendId = args.friendId
+      const channel = args.channel
+      const key = args.key || "session"
+      const content = args.content
+      const now = Date.now()
+
+      const pendingDir = path.join(
+        os.homedir(), ".agentstate", getAgentName(), "pending",
+        friendId, channel, key,
+      )
+      fs.mkdirSync(pendingDir, { recursive: true })
+
+      const fileName = `${now}-${Math.random().toString(36).slice(2, 10)}.json`
+      const filePath = path.join(pendingDir, fileName)
+      const envelope = {
+        from: getAgentName(),
+        friendId,
+        channel,
+        key,
+        content,
+        timestamp: now,
+      }
+      fs.writeFileSync(filePath, JSON.stringify(envelope, null, 2))
+      return `message queued for ${friendId}/${channel}/${key}`
+    },
+  },
   ...codingToolDefinitions,
 ];
 
