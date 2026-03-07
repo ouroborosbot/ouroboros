@@ -2,6 +2,7 @@ import type OpenAI from "openai"
 import { buildSystem } from "./prompt"
 import type { BuildSystemOptions, Channel } from "./prompt"
 import type { ResolvedContext } from "./friends/types"
+import { emitNervesEvent } from "../nerves/runtime"
 
 export async function refreshSystemPrompt(
   messages: OpenAI.ChatCompletionMessageParam[],
@@ -16,4 +17,11 @@ export async function refreshSystemPrompt(
   } else {
     messages.unshift({ role: "system", content: newSystem })
   }
+
+  emitNervesEvent({
+    event: "mind.system_prompt_refreshed",
+    component: "mind",
+    message: "system prompt refreshed",
+    meta: { channel },
+  })
 }
