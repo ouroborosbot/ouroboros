@@ -335,4 +335,19 @@ describe("daemon command plane branches", () => {
     fs.rmSync(bundlesRoot, { recursive: true, force: true })
     fs.rmSync(unreadableRoot, { force: true })
   })
+
+  it("skips non-bundle directories and bundle dirs without pending files", async () => {
+    const socketPath = tmpSocketPath("daemon-skip-non-bundles")
+    const bundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "daemon-bundles-skip-"))
+    fs.mkdirSync(path.join(bundlesRoot, "notes"), { recursive: true })
+    fs.mkdirSync(path.join(bundlesRoot, "slugger.ouro", "inbox"), { recursive: true })
+
+    const { daemon, router } = make(socketPath, bundlesRoot)
+    await daemon.start()
+    await daemon.stop()
+
+    expect(router.send).not.toHaveBeenCalled()
+
+    fs.rmSync(bundlesRoot, { recursive: true, force: true })
+  })
 })
