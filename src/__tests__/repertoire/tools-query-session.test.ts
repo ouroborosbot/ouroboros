@@ -204,4 +204,97 @@ describe("query_session tool", () => {
       "utf-8",
     )
   })
+
+  it("calls summarize when ctx.summarize is provided", async () => {
+    const { baseToolDefinitions } = await import("../../repertoire/tools-base")
+    const tool = baseToolDefinitions.find(d => d.tool.function.name === "query_session")!
+
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 1,
+        messages: [
+          { role: "system", content: "sys" },
+          { role: "user", content: "how is the billing fix?" },
+          { role: "assistant", content: "I finished it an hour ago." },
+        ],
+      }),
+    )
+
+    const mockSummarize = vi.fn().mockResolvedValue("Summary: billing fix completed 1h ago.")
+    const ctx = {
+      signin: async () => undefined,
+      summarize: mockSummarize,
+      context: {
+        friend: { trustLevel: "friend" as const },
+        channel: { channel: "cli" as const, supportsMarkdown: true, supportsStreaming: true, supportsRichCards: false },
+      },
+    }
+
+    const result = await tool.handler(
+      { friendId: "friend-uuid-1", channel: "cli", key: "session" },
+      ctx as any,
+    )
+
+    expect(result).toBe("Summary: billing fix completed 1h ago.")
+    expect(mockSummarize).toHaveBeenCalledWith(
+      expect.stringContaining("billing fix"),
+      expect.stringContaining("friend"),
+    )
+  })
+
+  it("uses fully transparent summarization for self-queries", async () => {
+    const { baseToolDefinitions } = await import("../../repertoire/tools-base")
+    const tool = baseToolDefinitions.find(d => d.tool.function.name === "query_session")!
+
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 1,
+        messages: [
+          { role: "system", content: "sys" },
+          { role: "user", content: "inner dialog bootstrap" },
+          { role: "assistant", content: "working on billing fix" },
+        ],
+      }),
+    )
+
+    const mockSummarize = vi.fn().mockResolvedValue("Summary: autonomous work on billing fix.")
+    const ctx = {
+      signin: async () => undefined,
+      summarize: mockSummarize,
+    }
+
+    const result = await tool.handler(
+      { friendId: "self", channel: "inner", key: "dialog" },
+      ctx as any,
+    )
+
+    expect(result).toBe("Summary: autonomous work on billing fix.")
+    expect(mockSummarize).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.stringContaining("inner dialog"),
+    )
+    // Should NOT contain trust level for self-queries
+    expect(mockSummarize.mock.calls[0][1]).not.toContain("trust level")
+  })
+
+  it("falls back to raw transcript when summarize is not available", async () => {
+    const { baseToolDefinitions } = await import("../../repertoire/tools-base")
+    const tool = baseToolDefinitions.find(d => d.tool.function.name === "query_session")!
+
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 1,
+        messages: [
+          { role: "system", content: "sys" },
+          { role: "user", content: "hello" },
+          { role: "assistant", content: "hi there" },
+        ],
+      }),
+    )
+
+    // No ctx.summarize — should return raw transcript
+    const result = await tool.handler({ friendId: "friend-1", channel: "cli" })
+    expect(result).toContain("[user] hello")
+    expect(result).toContain("[assistant] hi there")
+  })
 })
