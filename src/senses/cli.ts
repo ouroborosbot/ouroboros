@@ -10,7 +10,7 @@ import { sessionPath } from "../heart/config"
 import { loadSession, deleteSession, postTurn } from "../mind/context"
 import type { UsageData } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand, getToolChoiceRequired } from "./commands"
-import { getAgentName, getAgentRoot } from "../heart/identity"
+import { getAgentName, setAgentName, getAgentRoot } from "../heart/identity"
 import { createTraceId } from "../nerves"
 import { FileFriendStore } from "../mind/friends/store-file"
 import { FriendResolver } from "../mind/friends/resolver"
@@ -341,7 +341,9 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
   }
 }
 
-export async function main() {
+export async function main(agentName?: string) {
+  if (agentName) setAgentName(agentName)
+
   // Fail fast if provider is misconfigured (triggers human-readable error + exit)
   getProvider()
 
