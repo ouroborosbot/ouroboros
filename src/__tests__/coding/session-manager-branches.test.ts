@@ -64,16 +64,23 @@ function nowFactory(start = "2026-03-05T23:40:00.000Z"): () => string {
   }
 }
 
+const noPersistence = {
+  existsSync: () => false,
+  readFileSync: () => "",
+  writeFileSync: () => undefined,
+  mkdirSync: () => undefined,
+}
+
 describe("coding session manager branch coverage", () => {
   it("normalizes missing pid to null on first spawn", async () => {
     const manager = new CodingSessionManager({
+      ...noPersistence,
       spawnProcess: vi.fn(() => new FakeProcess()),
       nowIso: nowFactory(),
     })
 
     const session = await manager.spawnSession({
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/ouroboros",
       prompt: "no pid",
     })
@@ -88,6 +95,7 @@ describe("coding session manager branch coverage", () => {
     const spawn = vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second).mockReturnValueOnce(third)
 
     const manager = new CodingSessionManager({
+      ...noPersistence,
       spawnProcess: spawn,
       defaultStallThresholdMs: 1,
     })
@@ -96,7 +104,6 @@ describe("coding session manager branch coverage", () => {
 
     const session = await manager.spawnSession({
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/ouroboros",
       prompt: "defaults",
       autoRestartOnCrash: true,
@@ -116,19 +123,18 @@ describe("coding session manager branch coverage", () => {
     const first = new FakeProcess(10)
     const second = new FakeProcess(11)
     const manager = new CodingSessionManager({
+      ...noPersistence,
       spawnProcess: vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second),
       nowIso: nowFactory(),
     })
 
     await manager.spawnSession({
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/ouroboros",
       prompt: "first",
     })
     await manager.spawnSession({
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/ouroboros",
       prompt: "second",
     })
@@ -139,13 +145,13 @@ describe("coding session manager branch coverage", () => {
   it("updates waiting_input/completed statuses from output markers", async () => {
     const proc = new FakeProcess(111)
     const manager = new CodingSessionManager({
+      ...noPersistence,
       spawnProcess: vi.fn(() => proc),
       nowIso: nowFactory(),
     })
 
     const session = await manager.spawnSession({
       runner: "claude",
-      subagent: "planner",
       workdir: "/Users/test/AgentWorkspaces/ouroboros",
       prompt: "plan",
     })
@@ -167,6 +173,7 @@ describe("coding session manager branch coverage", () => {
 
   it("returns not found for kill/send on unknown sessions", () => {
     const manager = new CodingSessionManager({
+      ...noPersistence,
       spawnProcess: vi.fn(() => new FakeProcess(1)),
       nowIso: nowFactory(),
     })
@@ -178,13 +185,13 @@ describe("coding session manager branch coverage", () => {
   it("marks status as running when sending input from waiting_input/stalled", async () => {
     const proc = new FakeProcess(222)
     const manager = new CodingSessionManager({
+      ...noPersistence,
       spawnProcess: vi.fn(() => proc),
       nowIso: nowFactory(),
     })
 
     const session = await manager.spawnSession({
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/slugger",
       prompt: "do",
     })
@@ -204,6 +211,7 @@ describe("coding session manager branch coverage", () => {
     const spawn = vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second)
 
     const manager = new CodingSessionManager({
+      ...noPersistence,
       spawnProcess: spawn,
       nowIso: nowFactory(),
       maxRestarts: 1,
@@ -211,7 +219,6 @@ describe("coding session manager branch coverage", () => {
 
     const session = await manager.spawnSession({
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/ouroboros",
       prompt: "implement",
     })
@@ -236,13 +243,13 @@ describe("coding session manager branch coverage", () => {
     const spawn = vi.fn().mockReturnValueOnce(procA).mockReturnValueOnce(procB).mockReturnValueOnce(procC)
 
     const manager = new CodingSessionManager({
+      ...noPersistence,
       spawnProcess: spawn,
       nowIso: nowFactory(),
     })
 
     const a = await manager.spawnSession({
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/ouroboros",
       prompt: "a",
     })
@@ -251,7 +258,6 @@ describe("coding session manager branch coverage", () => {
 
     const b = await manager.spawnSession({
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/slugger",
       prompt: "b",
     })
@@ -261,7 +267,6 @@ describe("coding session manager branch coverage", () => {
 
     const c = await manager.spawnSession({
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/slugger",
       prompt: "c",
     })
@@ -277,6 +282,7 @@ describe("coding session manager branch coverage", () => {
     const spawn = vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second).mockReturnValueOnce(third)
 
     const manager = new CodingSessionManager({
+      ...noPersistence,
       spawnProcess: spawn,
       nowIso: nowFactory(),
       maxRestarts: 1,
@@ -284,7 +290,6 @@ describe("coding session manager branch coverage", () => {
 
     const restartable = await manager.spawnSession({
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/ouroboros",
       prompt: "r",
       stallThresholdMs: 1,
@@ -292,7 +297,6 @@ describe("coding session manager branch coverage", () => {
     })
     const nonRestartable = await manager.spawnSession({
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/slugger",
       prompt: "n",
       stallThresholdMs: 1,
@@ -319,19 +323,18 @@ describe("coding session manager branch coverage", () => {
     const spawn = vi.fn().mockReturnValueOnce(procA).mockReturnValueOnce(procB)
 
     const manager = new CodingSessionManager({
+      ...noPersistence,
       spawnProcess: spawn,
       nowIso: nowFactory(),
     })
 
     const running = await manager.spawnSession({
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/ouroboros",
       prompt: "run",
     })
     const nullProcess = await manager.spawnSession({
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/slugger",
       prompt: "skip",
     })
@@ -348,13 +351,13 @@ describe("coding session manager branch coverage", () => {
   it("shutdown does not overwrite completed sessions after kill signal", async () => {
     const proc = new FakeProcess(910)
     const manager = new CodingSessionManager({
+      ...noPersistence,
       spawnProcess: vi.fn(() => proc),
       nowIso: nowFactory(),
     })
 
     const session = await manager.spawnSession({
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/ouroboros",
       prompt: "done",
     })
@@ -367,6 +370,7 @@ describe("coding session manager branch coverage", () => {
 
   it("covers private no-op guard branches", () => {
     const manager = new CodingSessionManager({
+      ...noPersistence,
       spawnProcess: vi.fn(() => new FakeProcess(1)),
       nowIso: nowFactory(),
     })
@@ -374,14 +378,12 @@ describe("coding session manager branch coverage", () => {
     const record = {
       request: {
         runner: "claude",
-        subagent: "doer",
         workdir: "/Users/test/AgentWorkspaces/x",
         prompt: "x",
       },
       session: {
         id: "coding-guard",
         runner: "claude",
-        subagent: "doer",
         workdir: "/Users/test/AgentWorkspaces/x",
         status: "running",
         pid: null,

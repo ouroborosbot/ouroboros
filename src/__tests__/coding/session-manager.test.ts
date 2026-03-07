@@ -21,17 +21,24 @@ class FakeProcess {
   }
 }
 
+const noPersistence = {
+  existsSync: () => false,
+  readFileSync: () => "",
+  writeFileSync: () => undefined,
+  mkdirSync: () => undefined,
+}
+
 describe("coding session manager", () => {
   it("spawns and tracks coding sessions", async () => {
     const spawn = vi.fn(() => new FakeProcess(4312))
     const manager = new CodingSessionManager({
+      ...noPersistence,
       spawnProcess: spawn,
       nowIso: () => "2026-03-05T23:40:00.000Z",
     })
 
     const session = await manager.spawnSession({
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/ouroboros",
       prompt: "execute the doing doc",
       taskRef: "task-123",
@@ -46,13 +53,13 @@ describe("coding session manager", () => {
   it("kills tracked sessions and marks them as killed", async () => {
     const proc = new FakeProcess(222)
     const manager = new CodingSessionManager({
+      ...noPersistence,
       spawnProcess: vi.fn(() => proc),
       nowIso: () => "2026-03-05T23:41:00.000Z",
     })
 
     const session = await manager.spawnSession({
       runner: "claude",
-      subagent: "planner",
       workdir: "/Users/test/AgentWorkspaces/slugger",
       prompt: "plan this task",
       taskRef: "task-456",
@@ -66,6 +73,7 @@ describe("coding session manager", () => {
 
   it("returns an error when sending input to an unknown session", () => {
     const manager = new CodingSessionManager({
+      ...noPersistence,
       spawnProcess: vi.fn(() => new FakeProcess(1)),
       nowIso: () => "2026-03-05T23:42:00.000Z",
     })
@@ -75,19 +83,20 @@ describe("coding session manager", () => {
     expect(result.message).toContain("not found")
   })
 
-  it("rejects workdirs outside managed AgentWorkspaces clones", async () => {
+  it("allows workdirs outside AgentWorkspaces clones", async () => {
     const manager = new CodingSessionManager({
+      ...noPersistence,
       spawnProcess: vi.fn(() => new FakeProcess(9)),
       nowIso: () => "2026-03-05T23:43:00.000Z",
     })
 
-    await expect(
-      manager.spawnSession({
-        runner: "codex",
-        subagent: "doer",
-        workdir: "/tmp/unsafe-workdir",
-        prompt: "do work",
-      }),
-    ).rejects.toThrow(/AgentWorkspaces/)
+    const session = await manager.spawnSession({
+      runner: "codex",
+      workdir: "/tmp/unsafe-workdir",
+      prompt: "do work",
+      taskRef: "task-unsafe",
+    })
+
+    expect(session.workdir).toBe("/tmp/unsafe-workdir")
   })
 })

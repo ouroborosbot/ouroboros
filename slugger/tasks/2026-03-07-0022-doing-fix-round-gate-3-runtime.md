@@ -19,8 +19,8 @@ Implement Gate 3 runtime-core architecture: unified agent process entrypoint, da
 - [x] Daemon CLI command surface matches Gate 3 contract (`up`, `stop`, `status`, `logs`, `chat`, `msg`, `hatch`)
 - [x] Daemon command plane supports `chat.connect`, `message.send`, `message.poll`, and `task.poke` paths used by new CLI commands
 - [x] Unified agent entrypoint replaces inner-worker-only startup contract
-- [ ] Coding spawner removes `subagent`, uses `--cd` for codex, stream-json flags for claude, and richer failure diagnostics
-- [ ] Coding session manager persists and reloads session state
+- [x] Coding spawner removes `subagent`, uses `--cd` for codex, stream-json flags for claude, and richer failure diagnostics
+- [x] Coding session manager persists and reloads session state
 - [ ] Task-driven schedule reconciliation + `ouro poke` forwarding implemented with tests
 - [ ] Human-readable terminal logging + configurable sink wiring implemented
 - [ ] Subagent auto-installation on `ouro up` implemented and tested
@@ -71,7 +71,7 @@ Implement Gate 3 runtime-core architecture: unified agent process entrypoint, da
 **Output**: CLI/daemon/message-router updates and tests for success/fallback/drain scenarios.
 **Acceptance**: Message command is deterministic and fallback path is covered by tests.
 
-### ⬜ Unit 4: Coding Spawner + Session Persistence Rewrite
+### ✅ Unit 4: Coding Spawner + Session Persistence Rewrite
 **What**: Update coding request schema/tooling to remove `subagent`, patch runner args (`--cd`, stream-json), include richer failure diagnostics, and persist/reload coding session manager state.
 **Output**: Updated coding types/tools/spawner/manager with tests.
 **Acceptance**: Coding suites validate new request contract, spawn args, and persisted session recovery.
@@ -105,3 +105,4 @@ Implement Gate 3 runtime-core architecture: unified agent process entrypoint, da
 - 2026-03-07 00:30 Unit 1 complete: Rewrote CLI command parsing/execution to Gate 3 primary surface (`up/stop/status/logs/chat/msg/poke/hatch`), added idempotent liveness checks + stale socket cleanup, and added daemon command handlers for `daemon.logs`, `chat.connect`, `task.poke`, and `hatch.start` with passing daemon suites.
 - 2026-03-07 00:33 Unit 2 complete: Added unified `heart/agent-entry` runtime entrypoint, switched daemon-managed agents to `heart/agent-entry.js`, and extended worker event handling so `poke`/`chat`/`message` inputs trigger active turn cycles.
 - 2026-03-07 00:36 Unit 3 complete: Added `ouro msg` socket-failure fallback to `<bundle>/inbox/pending.jsonl`, extended routed message schema with `sessionId`/`taskRef`, and added daemon startup drain of pending bundle inbox lines back into the live message router.
+- 2026-03-07 00:54 Unit 4 complete: Removed `subagent` from coding schema/tool surface, switched codex spawn args to `--cd`, added Claude stream-json flags, injected session metadata into coding prompts, and rewrote `CodingSessionManager` with persisted state reload + failure diagnostics (command/exit/stderr/stdout tails) plus recovery tests.

@@ -2,10 +2,6 @@ import { describe, expect, it, vi } from "vitest"
 
 import { spawnCodingProcess } from "../../coding/spawner"
 
-vi.mock("../../identity", () => ({
-  getRepoRoot: vi.fn(() => "/mock/repo"),
-}))
-
 class FakeProcess {
   readonly pid: number | undefined
   readonly stdin = {
@@ -26,11 +22,10 @@ class FakeProcess {
 }
 
 describe("coding spawner", () => {
-  it("builds claude command and prompt with subagent + state content", () => {
+  it("builds claude command and prompt with metadata + state content", () => {
     const spawnFn = vi.fn(() => new FakeProcess(777))
-    const existsSync = vi.fn((target: string) => target.includes("work-doer.md") || target.endsWith("/state.md"))
+    const existsSync = vi.fn((target: string) => target.endsWith("/state.md"))
     const readFileSync = vi.fn((target: string) => {
-      if (target.includes("work-doer.md")) return "DOER INSTRUCTIONS"
       if (target.endsWith("/state.md")) return "STATE PAYLOAD"
       return ""
     })
@@ -38,23 +33,46 @@ describe("coding spawner", () => {
     const result = spawnCodingProcess(
       {
         runner: "claude",
-        subagent: "doer",
         workdir: "/Users/test/AgentWorkspaces/ouroboros",
         prompt: "execute",
+        sessionId: "coding-777",
+        parentAgent: "slugger",
+        taskRef: "task-123",
         stateFile: "/tmp/state.md",
       },
       { spawnFn, existsSync, readFileSync },
     )
 
     expect(result.command).toBe("claude")
-    expect(result.args).toEqual(["-p", "--dangerously-skip-permissions", "--add-dir", "/Users/test/AgentWorkspaces/ouroboros"])
-    expect(result.prompt).toContain("DOER INSTRUCTIONS")
+    expect(result.args).toEqual([
+      "-p",
+      "--dangerously-skip-permissions",
+      "--add-dir",
+      "/Users/test/AgentWorkspaces/ouroboros",
+      "--input-format",
+      "stream-json",
+      "--output-format",
+      "stream-json",
+    ])
+    expect(result.prompt).toContain("Coding session metadata")
+    expect(result.prompt).toContain("sessionId: coding-777")
+    expect(result.prompt).toContain("parentAgent: slugger")
+    expect(result.prompt).toContain("taskRef: task-123")
     expect(result.prompt).toContain("State file (/tmp/state.md):")
     expect(result.prompt).toContain("STATE PAYLOAD")
     expect(result.prompt).toContain("execute")
     expect(spawnFn).toHaveBeenCalledWith(
       "claude",
-      ["-p", "--dangerously-skip-permissions", "--add-dir", "/Users/test/AgentWorkspaces/ouroboros"],
+      [
+        "-p",
+        "--dangerously-skip-permissions",
+        "--add-dir",
+        "/Users/test/AgentWorkspaces/ouroboros",
+        "--input-format",
+        "stream-json",
+        "--output-format",
+        "stream-json",
+      ],
       { cwd: "/Users/test/AgentWorkspaces/ouroboros", stdio: ["pipe", "pipe", "pipe"] },
     )
     expect((result.process as any).stdin.write).toHaveBeenCalledWith(`${result.prompt}\n`)
@@ -68,20 +86,21 @@ describe("coding spawner", () => {
     const result = spawnCodingProcess(
       {
         runner: "codex",
-        subagent: "planner",
         workdir: "/Users/test/AgentWorkspaces/slugger",
         prompt: "plan",
+        taskRef: "task-456",
       },
       { spawnFn, existsSync, readFileSync },
     )
 
     expect(result.command).toBe("codex")
-    expect(result.args).toEqual(["exec", "--skip-git-repo-check", "--cwd", "/Users/test/AgentWorkspaces/slugger"])
-    expect(result.prompt).toBe("plan")
+    expect(result.args).toEqual(["exec", "--skip-git-repo-check", "--cd", "/Users/test/AgentWorkspaces/slugger"])
+    expect(result.prompt).toContain("taskRef: task-456")
+    expect(result.prompt).toContain("plan")
     expect(readFileSync).not.toHaveBeenCalled()
   })
 
-  it("drops empty instruction/state content from prompt sections", () => {
+  it("drops empty state content from prompt sections", () => {
     const spawnFn = vi.fn(() => new FakeProcess(99))
     const existsSync = vi.fn(() => true)
     const readFileSync = vi.fn(() => "   ")
@@ -89,14 +108,35 @@ describe("coding spawner", () => {
     const result = spawnCodingProcess(
       {
         runner: "claude",
-        subagent: "merger",
         workdir: "/Users/test/AgentWorkspaces/ouroboros",
         prompt: "merge now",
+        taskRef: "task-merge",
         stateFile: "/tmp/blank.md",
       },
       { spawnFn, existsSync, readFileSync },
     )
 
-    expect(result.prompt).toBe("merge now")
+    expect(result.prompt).not.toContain("State file")
+    expect(result.prompt).toContain("taskRef: task-merge")
+    expect(result.prompt).toContain("merge now")
+  })
+
+  it("uses metadata fallbacks when task/session fields are missing", () => {
+    const spawnFn = vi.fn(() => new FakeProcess(303))
+    const existsSync = vi.fn(() => false)
+    const readFileSync = vi.fn(() => "")
+
+    const result = spawnCodingProcess(
+      {
+        runner: "claude",
+        workdir: "/Users/test/AgentWorkspaces/slugger",
+        prompt: "fallback metadata",
+      },
+      { spawnFn, existsSync, readFileSync },
+    )
+
+    expect(result.prompt).toContain("sessionId: pending")
+    expect(result.prompt).toContain("parentAgent: unknown")
+    expect(result.prompt).toContain("taskRef: unassigned")
   })
 })
