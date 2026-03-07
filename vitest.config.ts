@@ -1,6 +1,16 @@
+import path from "path"
 import { defineConfig } from "vitest/config"
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      // Self-referencing package resolution: tests mock @ouro.bot/cli via
+      // vi.doMock, but vitest still needs to resolve the package entry.
+      // In CI, dist/ doesn't exist yet, so point to the source entry.
+      "@ouro.bot/cli/runOuroCli": path.resolve(__dirname, "src/heart/daemon/daemon-cli.ts"),
+      "@ouro.bot/cli": path.resolve(__dirname, "src/heart/daemon/ouro-entry.ts"),
+    },
+  },
   test: {
     globals: true,
     exclude: ["dist/**", "node_modules/**"],
