@@ -1015,6 +1015,73 @@ describe("ouro CLI execution", () => {
   })
 })
 
+describe("ensureDaemonRunning", () => {
+  it("is a no-op when daemon is already running", async () => {
+    const { ensureDaemonRunning } = await import("../../../heart/daemon/daemon-cli")
+
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+    }
+
+    const result = await ensureDaemonRunning(deps)
+
+    expect(result.alreadyRunning).toBe(true)
+    expect(result.message).toContain("already running")
+    expect(deps.startDaemonProcess).not.toHaveBeenCalled()
+    expect(deps.cleanupStaleSocket).not.toHaveBeenCalled()
+  })
+
+  it("cleans up stale socket and starts daemon when not running", async () => {
+    const { ensureDaemonRunning } = await import("../../../heart/daemon/daemon-cli")
+
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(async () => ({ pid: 42 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+    }
+
+    const result = await ensureDaemonRunning(deps)
+
+    expect(result.alreadyRunning).toBe(false)
+    expect(result.message).toContain("daemon started")
+    expect(result.message).toContain("42")
+    expect(deps.cleanupStaleSocket).toHaveBeenCalledWith("/tmp/ouro-test.sock")
+    expect(deps.startDaemonProcess).toHaveBeenCalledWith("/tmp/ouro-test.sock")
+  })
+
+  it("formats unknown pid when startDaemonProcess returns null pid", async () => {
+    const { ensureDaemonRunning } = await import("../../../heart/daemon/daemon-cli")
+
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(async () => ({ pid: null })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+    }
+
+    const result = await ensureDaemonRunning(deps)
+
+    expect(result.alreadyRunning).toBe(false)
+    expect(result.message).toContain("pid unknown")
+  })
+})
+
 describe("daemon command protocol", () => {
   it("handles raw JSON command payloads and returns structured JSON", async () => {
     const daemon = new OuroDaemon({

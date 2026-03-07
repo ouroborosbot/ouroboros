@@ -44,6 +44,28 @@ export interface OuroCliDeps {
   registerOuroBundleType?: () => Promise<unknown> | unknown
 }
 
+export interface EnsureDaemonResult {
+  alreadyRunning: boolean
+  message: string
+}
+
+export async function ensureDaemonRunning(deps: OuroCliDeps): Promise<EnsureDaemonResult> {
+  const alive = await deps.checkSocketAlive(deps.socketPath)
+  if (alive) {
+    return {
+      alreadyRunning: true,
+      message: `daemon already running (${deps.socketPath})`,
+    }
+  }
+
+  deps.cleanupStaleSocket(deps.socketPath)
+  const started = await deps.startDaemonProcess(deps.socketPath)
+  return {
+    alreadyRunning: false,
+    message: `daemon started (pid ${started.pid ?? "unknown"})`,
+  }
+}
+
 function usage(): string {
   return [
     "Usage:",
@@ -574,18 +596,9 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
     await registerOuroBundleTypeNonBlocking(deps)
 
-    const alive = await deps.checkSocketAlive(deps.socketPath)
-    if (alive) {
-      const message = `daemon already running (${deps.socketPath})`
-      deps.writeStdout(message)
-      return message
-    }
-
-    deps.cleanupStaleSocket(deps.socketPath)
-    const started = await deps.startDaemonProcess(deps.socketPath)
-    const message = `daemon started (pid ${started.pid ?? "unknown"})`
-    deps.writeStdout(message)
-    return message
+    const daemonResult = await ensureDaemonRunning(deps)
+    deps.writeStdout(daemonResult.message)
+    return daemonResult.message
   }
 
   if (command.kind === "friend.link") {
@@ -621,15 +634,9 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
     await registerOuroBundleTypeNonBlocking(deps)
 
-    const alive = await deps.checkSocketAlive(deps.socketPath)
-    let daemonMessage = `daemon already running (${deps.socketPath})`
-    if (!alive) {
-      deps.cleanupStaleSocket(deps.socketPath)
-      const started = await deps.startDaemonProcess(deps.socketPath)
-      daemonMessage = `daemon started (pid ${started.pid ?? "unknown"})`
-    }
+    const daemonResult = await ensureDaemonRunning(deps)
 
-    const message = `hatched ${hatchInput.agentName} at ${result.bundleRoot} using specialist identity ${result.selectedIdentity}; ${daemonMessage}`
+    const message = `hatched ${hatchInput.agentName} at ${result.bundleRoot} using specialist identity ${result.selectedIdentity}; ${daemonResult.message}`
     deps.writeStdout(message)
     return message
   }
