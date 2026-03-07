@@ -1,0 +1,16 @@
+
+> ouroboros-agent-harness@1.0.0 test
+> vitest run src/__tests__/senses/inner-dialog-worker.test.ts src/__tests__/heart/agent-entry.test.ts src/__tests__/daemon/daemon-entry.test.ts
+
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+ ✓ src/__tests__/daemon/daemon-entry.test.ts (3 tests) 40ms
+ ✓ src/__tests__/heart/agent-entry.test.ts (2 tests) 14ms
+ ✓ src/__tests__/senses/inner-dialog-worker.test.ts (6 tests) 5ms
+
+ Test Files  3 passed (3)
+      Tests  11 passed (11)
+   Start at  00:33:05
+   Duration  503ms (transform 85ms, setup 56ms, import 41ms, tests 58ms, environment 0ms)
+
