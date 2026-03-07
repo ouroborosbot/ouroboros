@@ -60,6 +60,7 @@ vi.mock("../../heart/core", () => ({
   runAgent: (...a: any[]) => mocks.runAgent(...a),
   buildSystem: (...a: any[]) => mocks.buildSystem(...a),
   getProvider: () => "azure",
+  createSummarize: () => vi.fn(),
 }))
 vi.mock("../../heart/config", () => ({
   sessionPath: (...a: any[]) => mocks.sessionPath(...a),
@@ -75,6 +76,13 @@ vi.mock("../../mind/context", () => ({
   deleteSession: (...a: any[]) => mocks.deleteSession(...a),
   trimMessages: (...a: any[]) => mocks.trimMessages(...a),
   postTurn: (...a: any[]) => mocks.postTurn(...a),
+}))
+vi.mock("../../mind/pending", () => ({
+  getPendingDir: vi.fn(() => "/mock/pending"),
+  drainPending: vi.fn(() => []),
+}))
+vi.mock("../../mind/prompt-refresh", () => ({
+  refreshSystemPrompt: vi.fn(),
 }))
 vi.mock("../../senses/commands", () => ({
   createCommandRegistry: (...a: any[]) => mocks.createCommandRegistry(...a),
@@ -878,6 +886,24 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
 
     // sessionPath should be called with the friend UUID ("mock-uuid"), not "default"
     expect(mocks.sessionPath).toHaveBeenCalledWith("mock-uuid", "cli", "session")
+  })
+
+  it("drains pending messages on startup and saves session", async () => {
+    const { drainPending } = await import("../../mind/pending")
+    vi.mocked(drainPending).mockReturnValueOnce([
+      { from: "friend-agent", content: "hey, build succeeded!", channel: "cli", timestamp: Date.now() },
+    ])
+    setupBasic({ inputSequence: ["/exit"] })
+
+    await main()
+
+    // The drain should inject harness-context + assistant pairs and save
+    expect(mocks.saveSession).toHaveBeenCalled()
+    const savedMessages = mocks.saveSession.mock.calls[0][1]
+    expect(savedMessages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ role: "user", name: "harness", content: expect.stringContaining("friend-agent") }),
+      expect.objectContaining({ role: "assistant", content: "hey, build succeeded!" }),
+    ]))
   })
 
   it("blocks stranger traffic before runAgent and emits one-time auto reply", async () => {

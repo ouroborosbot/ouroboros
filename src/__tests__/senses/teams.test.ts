@@ -483,6 +483,7 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 describe("Teams adapter - message handling", () => {
   function mockHandlingDeps(mockRunAgent: any) {
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -719,6 +720,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -754,6 +756,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -789,6 +792,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -820,6 +824,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -865,6 +870,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
     const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -930,6 +936,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       .mockResolvedValue({ usage: undefined })
 
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -1015,6 +1022,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
     const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -1098,6 +1106,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
     const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -1155,6 +1164,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     }))
 
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn().mockRejectedValue(new Error("agent crashed")),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -1199,6 +1209,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
     }))
 
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn().mockRejectedValue("string-crash"),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -1245,6 +1256,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
     const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -1315,6 +1327,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
     const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -1384,6 +1397,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
 
     const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -1451,6 +1465,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -1513,6 +1528,7 @@ describe("Teams adapter - startTeamsApp signin.verify-state handler", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -1620,6 +1636,7 @@ describe("Teams adapter - channel.message_received event", () => {
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978, flushIntervalMs: 1000 }),
     }))
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn().mockResolvedValue({ usage: undefined }),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -1674,6 +1691,7 @@ describe("Teams adapter - channel.message_received event", () => {
       getTeamsChannelConfig: vi.fn().mockReturnValue({ skipConfirmation: false, port: 3978, flushIntervalMs: 1000 }),
     }))
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn().mockResolvedValue({ usage: undefined }),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -1729,6 +1747,7 @@ describe("Teams adapter - startTeamsApp AAD extraction (Bug 1)", () => {
 
     const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -1810,6 +1829,7 @@ describe("Teams adapter - startTeamsApp AAD extraction (Bug 1)", () => {
 
     const mockRunAgent = vi.fn().mockResolvedValue({ usage: undefined })
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -1907,6 +1927,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -1956,6 +1977,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -2007,6 +2029,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -2039,6 +2062,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -2072,6 +2096,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -2104,6 +2129,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -2138,6 +2164,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -2345,6 +2372,7 @@ describe("Teams adapter - session persistence", () => {
     } = overrides
 
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -2754,6 +2782,7 @@ describe("Teams adapter - session persistence", () => {
     const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     // Use mockTeamsDeps first (sets base config mock), then override getTeamsChannelConfig
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -3297,6 +3326,7 @@ describe("Teams adapter - handleTeamsMessage unified chunked streaming", () => {
     } = overrides
 
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -3444,6 +3474,7 @@ describe("Teams adapter - startTeamsApp no --disable-streaming flag", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -3478,6 +3509,7 @@ describe("Teams adapter - startTeamsApp no --disable-streaming flag", () => {
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: vi.fn(),
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -3521,6 +3553,7 @@ describe("Teams adapter - confirmation callback", () => {
     } = overrides
 
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -3845,6 +3878,7 @@ describe("Teams adapter - confirmation callback", () => {
     })
 
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -3931,6 +3965,7 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
     } = overrides
 
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -4065,6 +4100,7 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
       return { usage: undefined }
     })
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
@@ -4122,6 +4158,7 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
     } = overrides
 
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
@@ -4633,6 +4670,7 @@ describe("Teams adapter - GitHub token handling", () => {
     } = overrides
 
     vi.doMock("../../heart/core", () => ({
+      createSummarize: vi.fn(() => vi.fn()),
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
