@@ -33,8 +33,6 @@ describe("daemon command plane branches", () => {
       startAutoStartAgents: vi.fn(async () => undefined),
       stopAll: vi.fn(async () => undefined),
       startAgent: vi.fn(async () => undefined),
-      stopAgent: vi.fn(async () => undefined),
-      restartAgent: vi.fn(async () => undefined),
     }
 
     const scheduler = {
@@ -101,43 +99,50 @@ describe("daemon command plane branches", () => {
     expect(populatedStatus.summary).toContain("restarts=2")
   })
 
-  it("handles health, agent, cron, and message commands", async () => {
+  it("handles logs, chat connect, message, task poke, and hatch commands", async () => {
     const socketPath = tmpSocketPath("daemon-command-set")
-    const { daemon, processManager, scheduler, healthMonitor, router } = make(socketPath)
+    const { daemon, processManager, router } = make(socketPath)
 
-    const health = await daemon.handleCommand({ kind: "daemon.health" })
-    expect(health.summary).toContain("agent-processes:ok:good")
-    expect(healthMonitor.runChecks).toHaveBeenCalled()
+    const logs = await daemon.handleCommand({ kind: "daemon.logs" })
+    expect(logs.ok).toBe(true)
+    expect(logs.summary).toContain("logs")
 
-    await daemon.handleCommand({ kind: "agent.start", agent: "slugger" })
-    await daemon.handleCommand({ kind: "agent.stop", agent: "slugger" })
-    await daemon.handleCommand({ kind: "agent.restart", agent: "slugger" })
+    const chat = await daemon.handleCommand({ kind: "chat.connect", agent: "slugger" })
+    expect(chat.ok).toBe(true)
+    expect(chat.message).toContain("connected")
     expect(processManager.startAgent).toHaveBeenCalledWith("slugger")
-    expect(processManager.stopAgent).toHaveBeenCalledWith("slugger")
-    expect(processManager.restartAgent).toHaveBeenCalledWith("slugger")
-
-    scheduler.listJobs.mockReturnValueOnce([])
-    expect((await daemon.handleCommand({ kind: "cron.list" })).summary).toBe("no cron jobs")
-
-    scheduler.listJobs.mockReturnValueOnce([
-      { id: "nightly", schedule: "0 3 * * *", lastRun: null },
-    ])
-    expect((await daemon.handleCommand({ kind: "cron.list" })).summary).toContain("last=never")
-
-    expect((await daemon.handleCommand({ kind: "cron.trigger", jobId: "nightly" })).message).toContain("triggered")
 
     const queued = await daemon.handleCommand({
       kind: "message.send",
-      from: "slugger",
+      from: "ouro-cli",
       to: "ouroboros",
       content: "hi",
+      sessionId: "session-1",
+      taskRef: "task-7",
     })
     expect(queued.message).toContain("queued message")
-    expect(router.send).toHaveBeenCalled()
+    expect(router.send).toHaveBeenCalledWith(expect.objectContaining({
+      from: "ouro-cli",
+      to: "ouroboros",
+      content: "hi",
+      sessionId: "session-1",
+      taskRef: "task-7",
+    }))
 
     const polled = await daemon.handleCommand({ kind: "message.poll", agent: "ouroboros" })
     expect(polled.summary).toBe("1 messages")
     expect(router.pollInbox).toHaveBeenCalledWith("ouroboros")
+
+    const poke = await daemon.handleCommand({ kind: "task.poke", agent: "slugger", taskId: "habit-heartbeat" })
+    expect(poke.ok).toBe(true)
+    expect(router.send).toHaveBeenCalledWith(expect.objectContaining({
+      to: "slugger",
+      taskRef: "habit-heartbeat",
+    }))
+
+    const hatch = await daemon.handleCommand({ kind: "hatch.start" })
+    expect(hatch.ok).toBe(true)
+    expect(hatch.message).toContain("Gate 6")
   })
 
   it("returns protocol errors for malformed payloads", async () => {
@@ -151,7 +156,7 @@ describe("daemon command plane branches", () => {
     const missingKind = JSON.parse(await daemon.handleRawPayload("{}")) as { ok: boolean; error: string }
     expect(missingKind.error).toContain("missing kind")
 
-    const badKindType = JSON.parse(await daemon.handleRawPayload('{"kind":123}')) as { ok: boolean; error: string }
+    const badKindType = JSON.parse(await daemon.handleRawPayload("{\"kind\":123}")) as { ok: boolean; error: string }
     expect(badKindType.error).toContain("kind must be a string")
   })
 
@@ -160,7 +165,7 @@ describe("daemon command plane branches", () => {
     const { daemon } = make(socketPath)
     vi.spyOn(daemon, "handleCommand").mockRejectedValueOnce("string-failure")
 
-    const raw = await daemon.handleRawPayload('{"kind":"daemon.status"}')
+    const raw = await daemon.handleRawPayload("{\"kind\":\"daemon.status\"}")
     const parsed = JSON.parse(raw) as { ok: boolean; error: string }
 
     expect(parsed.ok).toBe(false)
@@ -174,7 +179,7 @@ describe("daemon command plane branches", () => {
     await daemon.start()
     await daemon.start()
 
-    const raw = await sendRaw(socketPath, '{"kind":"daemon.status"}')
+    const raw = await sendRaw(socketPath, "{\"kind\":\"daemon.status\"}")
     const parsed = JSON.parse(raw) as { ok: boolean; summary?: string }
 
     expect(parsed.ok).toBe(true)

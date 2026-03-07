@@ -16,8 +16,8 @@
 Implement Gate 3 runtime-core architecture: unified agent process entrypoint, daemon CLI command-plane rewrite, `ouro msg`/`ouro poke` routing, coding spawner + session persistence updates, task-driven scheduler reconciliation, and observability upgrades.
 
 ## Completion Criteria
-- [ ] Daemon CLI command surface matches Gate 3 contract (`up`, `stop`, `status`, `logs`, `chat`, `msg`, `hatch`)
-- [ ] Daemon command plane supports `chat.connect`, `message.send`, `message.poll`, and `task.poke` paths used by new CLI commands
+- [x] Daemon CLI command surface matches Gate 3 contract (`up`, `stop`, `status`, `logs`, `chat`, `msg`, `hatch`)
+- [x] Daemon command plane supports `chat.connect`, `message.send`, `message.poll`, and `task.poke` paths used by new CLI commands
 - [ ] Unified agent entrypoint replaces inner-worker-only startup contract
 - [ ] Coding spawner removes `subagent`, uses `--cd` for codex, stream-json flags for claude, and richer failure diagnostics
 - [ ] Coding session manager persists and reloads session state
@@ -56,7 +56,7 @@ Implement Gate 3 runtime-core architecture: unified agent process entrypoint, da
 **Output**: Baseline artifact files under artifacts directory.
 **Acceptance**: Baseline artifacts clearly map pre-change behavior for each Gate 3 surface.
 
-### ⬜ Unit 1: Daemon CLI And Command Plane Rewrite
+### ✅ Unit 1: Daemon CLI And Command Plane Rewrite
 **What**: Rewrite daemon CLI parsing/default flows and daemon command dispatch to Gate 3 contract (`up/stop/status/logs/chat/msg/hatch`, `chat.connect`, `task.poke`), including idempotent `up` and reliable `stop` response handling.
 **Output**: Updated daemon CLI + daemon command handling with focused tests.
 **Acceptance**: Daemon CLI and daemon command-plane suites pass and enforce new contract.
@@ -102,3 +102,4 @@ Implement Gate 3 runtime-core architecture: unified agent process entrypoint, da
 ## Progress Log
 - 2026-03-07 00:22 Created from planning doc.
 - 2026-03-07 00:24 Unit 0 complete: Captured baseline daemon CLI/command-plane, coding spawn contract, and runtime entrypoint snapshots.
+- 2026-03-07 00:30 Unit 1 complete: Rewrote CLI command parsing/execution to Gate 3 primary surface (`up/stop/status/logs/chat/msg/poke/hatch`), added idempotent liveness checks + stale socket cleanup, and added daemon command handlers for `daemon.logs`, `chat.connect`, `task.poke`, and `hatch.start` with passing daemon suites.
