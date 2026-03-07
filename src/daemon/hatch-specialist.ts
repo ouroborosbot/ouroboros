@@ -1,7 +1,6 @@
 import * as fs from "fs"
 import * as os from "os"
 import * as path from "path"
-import { getRepoRoot } from "../heart/identity"
 import { emitNervesEvent } from "../nerves/runtime"
 
 export interface SyncSpecialistIdentitiesInput {
@@ -24,7 +23,7 @@ export function getSpecialistIdentitySourceDir(): string {
 }
 
 export function getRepoSpecialistIdentitiesDir(): string {
-  return path.join(getRepoRoot(), "AdoptionSpecialist.ouro", "psyche", "identities")
+  return path.join(process.cwd(), "AdoptionSpecialist.ouro", "psyche", "identities")
 }
 
 function listMarkdownIdentityFiles(dir: string): string[] {
