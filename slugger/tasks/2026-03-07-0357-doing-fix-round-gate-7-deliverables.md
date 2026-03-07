@@ -1,6 +1,6 @@
 # Doing: Fix Round Gate 7 Deliverables
 
-**Status**: READY_FOR_EXECUTION
+**Status**: completed
 **Execution Mode**: direct
 **Created**: 2026-03-07 03:57
 **Planning**: ./2026-03-07-0357-planning-fix-round-gate-7-deliverables.md
@@ -16,13 +16,13 @@
 Complete Gate 7 by shipping final docs, auditing all skipped tests called out by the master plan, and finishing with clean full verification artifacts.
 
 ## Completion Criteria
-- [ ] `docs/testing-guide.md` exists and covers the full required walkthrough, expected outputs, and troubleshooting
-- [ ] `ARCHITECTURE.md` reflects post-fix-round system design and command/runtime contracts
-- [ ] All 18 skipped tests in `src/__tests__/heart/core.test.ts` are audited and either unskipped+fixed or explicitly marked with `// skip: kick detection deferred per audit`
-- [ ] Full verification suite passes and logs are captured for Gate 7 artifacts
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] `docs/testing-guide.md` exists and covers the full required walkthrough, expected outputs, and troubleshooting
+- [x] `ARCHITECTURE.md` reflects post-fix-round system design and command/runtime contracts
+- [x] All 18 skipped tests in `src/__tests__/heart/core.test.ts` are audited and either unskipped+fixed or explicitly marked with `// skip: kick detection deferred per audit`
+- [x] Full verification suite passes and logs are captured for Gate 7 artifacts
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -67,7 +67,7 @@ Complete Gate 7 by shipping final docs, auditing all skipped tests called out by
 **Output**: Updated `core.test.ts` with audited skip state and any supporting code/test fixes.
 **Acceptance**: Every previously skipped test has explicit disposition and suite remains green with required audit comments for deferred kick-detection cases.
 
-### ⬜ Unit 4: Final Verification + Gate Artifacts
+### ✅ Unit 4: Final Verification + Gate Artifacts
 **What**: Run full verification (`npm run lint`, `npm run build`, `npm test --silent`, `npm run test:coverage -- --runInBand`) and store logs in artifacts.
 **Output**: `04-lint.log`, `04-build.log`, `04-test.log`, `04-coverage.log` in artifacts directory.
 **Acceptance**: All commands pass with no warnings; coverage gate and nerves audit pass.
@@ -89,3 +89,4 @@ Complete Gate 7 by shipping final docs, auditing all skipped tests called out by
 - 2026-03-07 04:01 Unit 1 complete: added testing-guide contract test and authored docs/testing-guide.md walkthrough with troubleshooting.
 - 2026-03-07 04:03 Unit 2 complete: refreshed ARCHITECTURE.md for unified daemon runtime, subsystem map, command surface, and canonical bundle contract.
 - 2026-03-07 04:04 Unit 3 complete: audited all 18 skipped kick-detection tests and added required defer comments on each skipped case.
+- 2026-03-07 04:05 Unit 4 complete: full verification suite passed and Gate 7 logs captured (lint/build/test/coverage).
