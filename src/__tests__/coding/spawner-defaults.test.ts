@@ -6,10 +6,6 @@ vi.mock("child_process", () => ({
   spawn: (...args: unknown[]) => spawnMock(...args),
 }))
 
-vi.mock("../../identity", () => ({
-  getRepoRoot: vi.fn(() => "/mock/repo"),
-}))
-
 class FakeProcess {
   readonly pid: number | undefined
   readonly stdin = {
@@ -41,17 +37,17 @@ describe("coding spawner defaults", () => {
     const { spawnCodingProcess } = await import("../../coding/spawner")
     const result = spawnCodingProcess({
       runner: "codex",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/ouroboros",
       prompt: "default deps",
+      taskRef: "task-default",
     })
 
     expect(spawnMock).toHaveBeenCalledWith(
       "codex",
-      ["exec", "--skip-git-repo-check", "--cwd", "/Users/test/AgentWorkspaces/ouroboros"],
+      ["exec", "--skip-git-repo-check", "--cd", "/Users/test/AgentWorkspaces/ouroboros"],
       { cwd: "/Users/test/AgentWorkspaces/ouroboros", stdio: ["pipe", "pipe", "pipe"] },
     )
     expect(result.process).toBe(proc)
-    expect(proc.stdin.write).toHaveBeenCalledWith("default deps\n")
+    expect(proc.stdin.write).toHaveBeenCalledWith(expect.stringContaining("taskRef: task-default"))
   })
 })

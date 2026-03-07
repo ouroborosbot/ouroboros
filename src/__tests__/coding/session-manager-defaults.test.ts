@@ -19,6 +19,13 @@ class FakeProcess {
   }
 }
 
+const noPersistence = {
+  existsSync: () => false,
+  readFileSync: () => "",
+  writeFileSync: () => undefined,
+  mkdirSync: () => undefined,
+}
+
 describe("coding session manager defaults", () => {
   it("uses default spawnCodingProcess wiring when spawnProcess override is omitted", async () => {
     vi.resetModules()
@@ -37,19 +44,20 @@ describe("coding session manager defaults", () => {
 
     const { CodingSessionManager } = await import("../../coding/manager")
     const manager = new CodingSessionManager({
+      ...noPersistence,
       nowIso: () => "2026-03-05T23:50:00.000Z",
     })
 
     const session = await manager.spawnSession({
       runner: "claude",
-      subagent: "doer",
       workdir: "/Users/test/AgentWorkspaces/ouroboros",
       prompt: "do it",
+      taskRef: "task-do-it",
     })
 
     expect(session.pid).toBe(123)
     expect(spawnCodingProcess).toHaveBeenCalledWith(
-      expect.objectContaining({ runner: "claude", subagent: "doer" }),
+      expect.objectContaining({ runner: "claude", taskRef: "task-do-it" }),
     )
   })
 })
