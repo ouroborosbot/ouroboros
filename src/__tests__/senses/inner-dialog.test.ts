@@ -9,7 +9,6 @@ const mockRunAgent = vi.fn()
 const mockSessionPath = vi.fn()
 const mockLoadSession = vi.fn()
 const mockPostTurn = vi.fn()
-const mockCaptureTurnMemories = vi.fn()
 const mockGetAgentRoot = vi.fn()
 
 vi.mock("../../mind/prompt", () => ({
@@ -27,10 +26,6 @@ vi.mock("../../config", () => ({
 vi.mock("../../mind/context", () => ({
   loadSession: (...args: any[]) => mockLoadSession(...args),
   postTurn: (...args: any[]) => mockPostTurn(...args),
-}))
-
-vi.mock("../../mind/memory-capture", () => ({
-  captureTurnMemories: (...args: any[]) => mockCaptureTurnMemories(...args),
 }))
 
 vi.mock("../../identity", () => ({
@@ -74,10 +69,7 @@ describe("inner dialog runtime", () => {
     })
     mockSessionPath.mockReset().mockReturnValue(sessionFile)
     mockLoadSession.mockReset().mockReturnValue(null)
-    mockPostTurn.mockReset().mockImplementation((_messages: OpenAI.ChatCompletionMessageParam[], _path: string, _usage: any, hooks: any) => {
-      hooks?.beforeTrim?.([...(Array.isArray(_messages) ? _messages : [])])
-    })
-    mockCaptureTurnMemories.mockReset()
+    mockPostTurn.mockReset().mockImplementation(() => {})
     mockGetAgentRoot.mockReset().mockReturnValue(agentRoot)
   })
 
@@ -163,7 +155,6 @@ describe("inner dialog runtime", () => {
     expect(messages[1]).toMatchObject({ role: "user" })
     expect(String(messages[1].content)).toContain("Keep improving the harness")
     expect(mockPostTurn).toHaveBeenCalledTimes(1)
-    expect(mockCaptureTurnMemories).toHaveBeenCalledTimes(1)
   })
 
   it("uses bootstrap fallback text when aspirations file is missing", async () => {
@@ -207,7 +198,7 @@ describe("inner dialog runtime", () => {
         {
           role: "assistant",
           content:
-            "checkpoint: Unit 2b editing src/governance/convention.ts and src/__tests__/governance/convention.test.ts",
+            "checkpoint: Unit 2b editing src/repertoire/tools.ts and src/__tests__/repertoire/tools.test.ts",
         },
       ],
     })
@@ -224,7 +215,7 @@ describe("inner dialog runtime", () => {
     const content = String(lastUser!.content)
     expect(content).toContain("Instinct: resume interrupted work.")
     expect(content).toContain("checkpoint:")
-    expect(content).toContain("Unit 2b editing src/governance/convention.ts")
+    expect(content).toContain("Unit 2b editing src/repertoire/tools.ts")
   })
 
   it("uses default reason/clock/instinct loading when options are omitted", async () => {

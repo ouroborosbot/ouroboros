@@ -12,20 +12,14 @@ class MockChild extends EventEmitter {
 }
 
 describe("process manager default dependency wiring", () => {
-  it("uses default spawn/ensureWorkspace/identity wiring when optional deps are omitted", async () => {
+  it("uses default spawn/identity wiring when optional deps are omitted", async () => {
     vi.resetModules()
     vi.useFakeTimers()
 
     const spawn = vi.fn(() => new MockChild())
-    const ensureAgentWorkspace = vi.fn(() => ({
-      workspacePath: "/Users/test/AgentWorkspaces/slugger",
-      created: false,
-      updated: true,
-    }))
 
     vi.doMock("child_process", () => ({ spawn }))
     vi.doMock("../../identity", () => ({ getRepoRoot: () => "/mock/repo" }))
-    vi.doMock("../../daemon/workspaces", () => ({ ensureAgentWorkspace }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
 
     const { DaemonProcessManager } = await import("../../daemon/process-manager")
@@ -44,7 +38,7 @@ describe("process manager default dependency wiring", () => {
     expect(spawn).toHaveBeenCalledWith(
       "node",
       ["/mock/repo/dist/inner-worker-entry.js", "--agent", "slugger"],
-      expect.objectContaining({ cwd: "/Users/test/AgentWorkspaces/slugger" }),
+      expect.objectContaining({ cwd: "/mock/repo" }),
     )
 
     const first = spawn.mock.results[0]?.value as MockChild
