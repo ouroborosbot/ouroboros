@@ -10,7 +10,7 @@ vi.mock("fs", () => ({
 }))
 
 // Mock identity -- skills will use getAgentRoot() for skills directory
-vi.mock("../../identity", () => ({
+vi.mock("../../heart/identity", () => ({
   getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
   getRepoRoot: vi.fn(() => "/mock/repo"),
 }))

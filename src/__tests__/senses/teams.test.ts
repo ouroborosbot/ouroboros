@@ -6,7 +6,7 @@ vi.mock("../../nerves/runtime", () => ({
   emitNervesEvent: vi.fn(),
 }))
 
-vi.mock("../../identity", () => ({
+vi.mock("../../heart/identity", () => ({
   getAgentName: vi.fn(() => "testagent"),
   getAgentSecretsPath: vi.fn(() => "/tmp/.agentsecrets/testagent/secrets.json"),
   getAgentRoot: vi.fn(() => "/mock/agent/root"),
@@ -38,7 +38,7 @@ vi.mock("../../mind/friends/resolver", () => ({
   }),
 }))
 
-import { getPhrases } from "../../wardrobe/phrases"
+import { getPhrases } from "../../mind/phrases"
 
 // Tests for src/teams.ts Teams channel adapter.
 
@@ -486,7 +486,7 @@ describe("Teams adapter - message handling", () => {
       runAgent: mockRunAgent,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
-    vi.doMock("../../config", () => ({
+    vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-test-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
@@ -506,7 +506,7 @@ describe("Teams adapter - message handling", () => {
 
       postTurn: vi.fn(),
     }))
-    vi.doMock("../../repertoire/commands", () => ({
+    vi.doMock("../../senses/commands", () => ({
       createCommandRegistry: vi.fn().mockReturnValue({
         register: vi.fn(),
         get: vi.fn(),
@@ -824,7 +824,7 @@ describe("Teams adapter - startTeamsApp (DevtoolsPlugin mode)", () => {
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
-    vi.doMock("../../config", () => ({
+    vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
@@ -1491,7 +1491,7 @@ describe("Teams adapter - startTeamsApp signin.verify-state handler", () => {
     vi.resetModules()
     const emitNervesEventMock = vi.fn()
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: emitNervesEventMock }))
-    vi.doMock("../../config", () => ({
+    vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/test-session"),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
@@ -1613,7 +1613,7 @@ describe("Teams adapter - channel.message_received event", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../../config", () => ({
+    vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/test-session"),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
@@ -1667,7 +1667,7 @@ describe("Teams adapter - channel.message_received event", () => {
     vi.doMock("@microsoft/teams.dev", () => ({
       DevtoolsPlugin: class MockDevtoolsPlugin {},
     }))
-    vi.doMock("../../config", () => ({
+    vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/test-session"),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
@@ -1888,7 +1888,7 @@ describe("Teams adapter - unhandledRejection guard", () => {
     vi.resetModules()
     const emitNervesEventLocal = vi.fn()
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: emitNervesEventLocal }))
-    vi.doMock("../../config", () => ({
+    vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/test-session"),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
       getOAuthConfig: vi.fn().mockReturnValue({ graphConnectionName: "graph", adoConnectionName: "ado", githubConnectionName: "github" }),
@@ -1981,7 +1981,7 @@ describe("Teams adapter - startTeamsApp (Bot mode)", () => {
   })
 
   function mockBotConfig(clientId: string, clientSecret: string, tenantId: string) {
-    vi.doMock("../../config", () => ({
+    vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/bot-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId, clientSecret, tenantId }),
@@ -2348,7 +2348,7 @@ describe("Teams adapter - session persistence", () => {
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
-    vi.doMock("../../config", () => ({
+    vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
@@ -2368,7 +2368,7 @@ describe("Teams adapter - session persistence", () => {
 
       postTurn: vi.fn().mockImplementation((...args: any[]) => { postTurnCalls.push(args) }),
     }))
-    vi.doMock("../../repertoire/commands", () => ({
+    vi.doMock("../../senses/commands", () => ({
       createCommandRegistry: vi.fn().mockReturnValue({
         register: vi.fn(),
         get: vi.fn(),
@@ -2757,7 +2757,7 @@ describe("Teams adapter - session persistence", () => {
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
-    vi.doMock("../../config", () => ({
+    vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
@@ -2777,7 +2777,7 @@ describe("Teams adapter - session persistence", () => {
 
       postTurn: vi.fn(),
     }))
-    vi.doMock("../../repertoire/commands", () => ({
+    vi.doMock("../../senses/commands", () => ({
       createCommandRegistry: vi.fn().mockReturnValue({
         register: vi.fn(),
         get: vi.fn(),
@@ -3300,7 +3300,7 @@ describe("Teams adapter - handleTeamsMessage unified chunked streaming", () => {
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
-    vi.doMock("../../config", () => ({
+    vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
@@ -3320,7 +3320,7 @@ describe("Teams adapter - handleTeamsMessage unified chunked streaming", () => {
 
       postTurn: vi.fn().mockImplementation((...args: any[]) => { postTurnCalls.push(args) }),
     }))
-    vi.doMock("../../repertoire/commands", () => ({
+    vi.doMock("../../senses/commands", () => ({
       createCommandRegistry: vi.fn().mockReturnValue({
         register: vi.fn(),
         get: vi.fn(),
@@ -3482,7 +3482,7 @@ describe("Teams adapter - startTeamsApp no --disable-streaming flag", () => {
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
-    vi.doMock("../../config", () => ({
+    vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
@@ -3524,7 +3524,7 @@ describe("Teams adapter - confirmation callback", () => {
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
-    vi.doMock("../../config", () => ({
+    vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
@@ -3544,7 +3544,7 @@ describe("Teams adapter - confirmation callback", () => {
 
       postTurn: vi.fn(),
     }))
-    vi.doMock("../../repertoire/commands", () => ({
+    vi.doMock("../../senses/commands", () => ({
       createCommandRegistry: vi.fn().mockReturnValue({
         register: vi.fn(),
         get: vi.fn(),
@@ -3849,7 +3849,7 @@ describe("Teams adapter - confirmation callback", () => {
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
-    vi.doMock("../../config", () => ({
+    vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
@@ -3869,7 +3869,7 @@ describe("Teams adapter - confirmation callback", () => {
 
       postTurn: vi.fn(),
     }))
-    vi.doMock("../../repertoire/commands", () => ({
+    vi.doMock("../../senses/commands", () => ({
       createCommandRegistry: vi.fn().mockReturnValue({
         register: vi.fn(),
         get: vi.fn(),
@@ -3934,7 +3934,7 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
-    vi.doMock("../../config", () => ({
+    vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
@@ -3954,7 +3954,7 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
 
       postTurn: vi.fn(),
     }))
-    vi.doMock("../../repertoire/commands", () => ({
+    vi.doMock("../../senses/commands", () => ({
       createCommandRegistry: vi.fn().mockReturnValue({
         register: vi.fn(),
         get: vi.fn(),
@@ -4069,7 +4069,7 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
       buildSystem: vi.fn().mockReturnValue("system prompt"),
       summarizeArgs: vi.fn().mockReturnValue(""),
     }))
-    vi.doMock("../../config", () => ({
+    vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
@@ -4125,7 +4125,7 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
-    vi.doMock("../../config", () => ({
+    vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
@@ -4143,7 +4143,7 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
       postTurn: vi.fn(),
     }))
-    vi.doMock("../../repertoire/commands", () => ({
+    vi.doMock("../../senses/commands", () => ({
       createCommandRegistry: vi.fn().mockReturnValue({
         register: vi.fn(),
         get: vi.fn(),
@@ -4402,7 +4402,7 @@ describe("Teams adapter - context kernel wiring (Unit 1Hc)", () => {
     vi.resetModules()
     const runAgentFn = vi.fn().mockResolvedValue({ usage: undefined })
     mockTeamsDepsForContext({ runAgentFn })
-    const { sessionPath } = await import("../../config")
+    const { sessionPath } = await import("../../heart/config")
     const teams = await import("../../senses/teams")
     const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
 
@@ -4636,7 +4636,7 @@ describe("Teams adapter - GitHub token handling", () => {
       runAgent: runAgentFn,
       buildSystem: vi.fn().mockReturnValue("system prompt"),
     }))
-    vi.doMock("../../config", () => ({
+    vi.doMock("../../heart/config", () => ({
       sessionPath: vi.fn().mockReturnValue("/tmp/teams-session.json"),
       getContextConfig: vi.fn().mockReturnValue({ maxTokens: 80000, contextMargin: 20 }),
       getTeamsConfig: vi.fn().mockReturnValue({ clientId: "", clientSecret: "", tenantId: "" }),
@@ -4654,7 +4654,7 @@ describe("Teams adapter - GitHub token handling", () => {
       trimMessages: vi.fn().mockImplementation((msgs: any) => [...msgs]),
       postTurn: vi.fn(),
     }))
-    vi.doMock("../../repertoire/commands", () => ({
+    vi.doMock("../../senses/commands", () => ({
       createCommandRegistry: vi.fn().mockReturnValue({
         register: vi.fn(),
         get: vi.fn(),

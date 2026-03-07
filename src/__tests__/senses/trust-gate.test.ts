@@ -193,7 +193,7 @@ describe("trust gate error branches (module mocks)", () => {
       mkdirSync: vi.fn(),
       appendFileSync: vi.fn(),
     }))
-    vi.doMock("../../identity", () => ({ getAgentRoot: () => "/mock/bundle" }))
+    vi.doMock("../../heart/identity", () => ({ getAgentRoot: () => "/mock/bundle" }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
 
     const { enforceTrustGate: dynamicGate, STRANGER_AUTO_REPLY: dynamicReply } = await import("../../senses/trust-gate")
@@ -231,7 +231,7 @@ describe("trust gate error branches (module mocks)", () => {
         throw "append failed"
       }),
     }))
-    vi.doMock("../../identity", () => ({ getAgentRoot: () => "/mock/bundle" }))
+    vi.doMock("../../heart/identity", () => ({ getAgentRoot: () => "/mock/bundle" }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
 
     const { enforceTrustGate: dynamicGate, STRANGER_AUTO_REPLY: dynamicReply } = await import("../../senses/trust-gate")

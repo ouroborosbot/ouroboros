@@ -1,5 +1,5 @@
 import OpenAI, { AzureOpenAI } from "openai";
-import { getAzureConfig } from "../../config";
+import { getAzureConfig } from "../config";
 import { emitNervesEvent } from "../../nerves/runtime";
 import type { ProviderRuntime, ProviderTurnRequest } from "../core";
 import type { ResponseItem, TurnResult } from "../streaming";

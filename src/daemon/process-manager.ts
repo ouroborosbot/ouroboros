@@ -1,6 +1,6 @@
 import { spawn as nodeSpawn, type ChildProcess } from "child_process"
 import * as path from "path"
-import { getRepoRoot } from "../identity"
+import { getRepoRoot } from "../heart/identity"
 import { emitNervesEvent } from "../nerves/runtime"
 
 export interface DaemonManagedAgent {

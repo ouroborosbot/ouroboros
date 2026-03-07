@@ -61,7 +61,7 @@ vi.mock("../../heart/core", () => ({
   buildSystem: (...a: any[]) => mocks.buildSystem(...a),
   getProvider: () => "azure",
 }))
-vi.mock("../../config", () => ({
+vi.mock("../../heart/config", () => ({
   sessionPath: (...a: any[]) => mocks.sessionPath(...a),
   logPath: (...a: any[]) => mocks.logPath(...a),
   getContextConfig: (...a: any[]) => mocks.getContextConfig(...a),
@@ -76,13 +76,13 @@ vi.mock("../../mind/context", () => ({
   trimMessages: (...a: any[]) => mocks.trimMessages(...a),
   postTurn: (...a: any[]) => mocks.postTurn(...a),
 }))
-vi.mock("../../repertoire/commands", () => ({
+vi.mock("../../senses/commands", () => ({
   createCommandRegistry: (...a: any[]) => mocks.createCommandRegistry(...a),
   registerDefaultCommands: (...a: any[]) => mocks.registerDefaultCommands(...a),
   parseSlashCommand: (...a: any[]) => mocks.parseSlashCommand(...a),
   getToolChoiceRequired: (...a: any[]) => mocks.getToolChoiceRequired(...a),
 }))
-vi.mock("../../identity", () => ({
+vi.mock("../../heart/identity", () => ({
   getAgentName: vi.fn(() => "testagent"),
   getAgentSecretsPath: vi.fn(() => "/tmp/.agentsecrets/testagent/secrets.json"),
   getAgentRoot: vi.fn(() => "/mock/agent/root"),

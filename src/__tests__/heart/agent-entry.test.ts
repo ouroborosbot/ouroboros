@@ -11,7 +11,7 @@ describe("agent entrypoint", () => {
     const startInnerDialogWorker = vi.fn(async () => undefined)
     const configureCliRuntimeLogger = vi.fn()
     vi.doMock("../../senses/inner-dialog-worker", () => ({ startInnerDialogWorker }))
-    vi.doMock("../../senses/cli-logging", () => ({ configureCliRuntimeLogger }))
+    vi.doMock("../../nerves/cli-logging", () => ({ configureCliRuntimeLogger }))
 
     const argvSpy = vi.spyOn(process, "argv", "get").mockReturnValue([
       "node",
@@ -55,7 +55,7 @@ describe("agent entrypoint", () => {
     })
     const configureCliRuntimeLogger = vi.fn()
     vi.doMock("../../senses/inner-dialog-worker", () => ({ startInnerDialogWorker }))
-    vi.doMock("../../senses/cli-logging", () => ({ configureCliRuntimeLogger }))
+    vi.doMock("../../nerves/cli-logging", () => ({ configureCliRuntimeLogger }))
 
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined)
     const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never)
@@ -84,7 +84,7 @@ describe("agent entrypoint", () => {
     })
     const configureCliRuntimeLogger = vi.fn()
     vi.doMock("../../senses/inner-dialog-worker", () => ({ startInnerDialogWorker }))
-    vi.doMock("../../senses/cli-logging", () => ({ configureCliRuntimeLogger }))
+    vi.doMock("../../nerves/cli-logging", () => ({ configureCliRuntimeLogger }))
 
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined)
     const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never)

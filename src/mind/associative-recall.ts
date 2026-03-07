@@ -1,8 +1,8 @@
 import type OpenAI from "openai"
 import * as fs from "fs"
 import * as path from "path"
-import { getOpenAIEmbeddingsApiKey } from "../config"
-import { getAgentRoot } from "../identity"
+import { getOpenAIEmbeddingsApiKey } from "../heart/config"
+import { getAgentRoot } from "../heart/identity"
 import { emitNervesEvent } from "../nerves/runtime"
 
 export interface EmbeddingProvider {

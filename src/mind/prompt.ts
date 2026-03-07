@@ -3,12 +3,12 @@ import * as path from "path";
 import { getProviderDisplayLabel } from "../heart/core";
 import { finalAnswerTool, getToolsForChannel } from "../repertoire/tools";
 import { listSkills } from "../repertoire/skills";
-import { getAgentRoot, getAgentName } from "../identity";
+import { getAgentRoot, getAgentName } from "../heart/identity";
 import type { ResolvedContext } from "./friends/types";
 import { getChannelCapabilities } from "./friends/channel";
 import { emitNervesEvent } from "../nerves/runtime";
 import { getFirstImpressions } from "./first-impressions";
-import { getTaskModule } from "../tasks";
+import { getTaskModule } from "../repertoire/tasks";
 
 // Lazy-loaded psyche text cache
 let _psycheCache: {

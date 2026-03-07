@@ -5,8 +5,8 @@ import {
   HARNESS_PRIMITIVES_ENTRYPOINT,
   HARNESS_BOOTSTRAP_PHASES,
   isGovernanceCheckResult,
-} from "../../harness"
-import type { HarnessToolCall } from "../../harness"
+} from "../../heart/harness"
+import type { HarnessToolCall } from "../../heart/harness"
 
 describe("harness primitives contract", () => {
   it("exports bootstrap and governance scaffolding constants", () => {

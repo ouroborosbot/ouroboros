@@ -2,8 +2,8 @@ import OpenAI from "openai";
 import {
   getAzureConfig,
   getContextConfig,
-} from "../config";
-import { loadAgentConfig } from "../identity";
+} from "./config";
+import { loadAgentConfig } from "./identity";
 import { execTool, summarizeArgs, finalAnswerTool, getToolsForChannel, isConfirmationRequired } from "../repertoire/tools";
 import type { ToolContext } from "../repertoire/tools";
 import { getChannelCapabilities } from "../mind/friends/channel";
