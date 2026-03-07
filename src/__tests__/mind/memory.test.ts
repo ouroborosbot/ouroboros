@@ -413,8 +413,8 @@ describe("memory write path", () => {
 
   it("searchMemoryFacts falls back when default embedding provider is unavailable", async () => {
     vi.resetModules();
-    vi.doMock("../../config", async () => {
-      const actual = await vi.importActual<typeof import("../../config")>("../../config");
+    vi.doMock("../../heart/config", async () => {
+      const actual = await vi.importActual<typeof import("../../heart/config")>("../../heart/config");
       return { ...actual, getOpenAIEmbeddingsApiKey: () => "   " };
     });
     const { searchMemoryFacts: dynamicSearchMemoryFacts } = await import("../../mind/memory");
@@ -466,8 +466,8 @@ describe("memory write path", () => {
 
   it("searchMemoryFacts uses default OpenAI embedding provider and sorts scored results", async () => {
     vi.resetModules();
-    vi.doMock("../../config", async () => {
-      const actual = await vi.importActual<typeof import("../../config")>("../../config");
+    vi.doMock("../../heart/config", async () => {
+      const actual = await vi.importActual<typeof import("../../heart/config")>("../../heart/config");
       return { ...actual, getOpenAIEmbeddingsApiKey: () => "test-openai-key" };
     });
 
@@ -515,8 +515,8 @@ describe("memory write path", () => {
 
   it("searchMemoryFacts falls back when default OpenAI embedding request is non-OK", async () => {
     vi.resetModules();
-    vi.doMock("../../config", async () => {
-      const actual = await vi.importActual<typeof import("../../config")>("../../config");
+    vi.doMock("../../heart/config", async () => {
+      const actual = await vi.importActual<typeof import("../../heart/config")>("../../heart/config");
       return { ...actual, getOpenAIEmbeddingsApiKey: () => "test-openai-key" };
     });
 
@@ -548,8 +548,8 @@ describe("memory write path", () => {
 
   it("searchMemoryFacts falls back when default OpenAI embedding payload is malformed", async () => {
     vi.resetModules();
-    vi.doMock("../../config", async () => {
-      const actual = await vi.importActual<typeof import("../../config")>("../../config");
+    vi.doMock("../../heart/config", async () => {
+      const actual = await vi.importActual<typeof import("../../heart/config")>("../../heart/config");
       return { ...actual, getOpenAIEmbeddingsApiKey: () => "test-openai-key" };
     });
 

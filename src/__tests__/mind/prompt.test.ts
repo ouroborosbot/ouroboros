@@ -21,13 +21,13 @@ vi.mock("../../repertoire/skills", () => ({
 }))
 
 const mockGetBoard = vi.fn()
-vi.mock("../../tasks", () => ({
+vi.mock("../../repertoire/tasks", () => ({
   getTaskModule: () => ({
     getBoard: mockGetBoard,
   }),
 }))
 
-vi.mock("../../identity", () => {
+vi.mock("../../heart/identity", () => {
   const DEFAULT_AGENT_CONTEXT = {
     maxTokens: 80000,
     contextMargin: 20,
@@ -62,7 +62,7 @@ vi.mock("openai", () => {
 
 import * as fs from "fs"
 import { listSkills } from "../../repertoire/skills"
-import * as identity from "../../identity"
+import * as identity from "../../heart/identity"
 
 // Default psyche file contents used by the mock
 const MOCK_SOUL = "i am a witty, funny, competent chaos monkey coding assistant.\ni get things done, crack jokes, embrace chaos, deliver quality."
@@ -136,7 +136,7 @@ describe("buildSystem", () => {
 
   it("includes soul section with personality", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -148,7 +148,7 @@ describe("buildSystem", () => {
 
   it("includes identity section with Ouroboros name", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -160,7 +160,7 @@ describe("buildSystem", () => {
 
   it("includes lore section", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -172,7 +172,7 @@ describe("buildSystem", () => {
 
   it("does not include friends section", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -184,7 +184,7 @@ describe("buildSystem", () => {
 
   it("includes tacit knowledge section", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -196,7 +196,7 @@ describe("buildSystem", () => {
 
   it("includes aspirations section from psyche/ASPIRATIONS.md", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -208,7 +208,7 @@ describe("buildSystem", () => {
 
   it("includes runtime info section for cli channel", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -221,7 +221,7 @@ describe("buildSystem", () => {
 
   it("includes runtime info section for teams channel", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -234,7 +234,7 @@ describe("buildSystem", () => {
 
   it("defaults to cli channel", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -245,7 +245,7 @@ describe("buildSystem", () => {
 
   it("includes date section with current date", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -257,7 +257,7 @@ describe("buildSystem", () => {
 
   it("includes tools section with tool names", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -287,7 +287,7 @@ describe("buildSystem", () => {
       unresolvedDependencies: [],
       activeSessions: [],
     })
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -302,7 +302,7 @@ describe("buildSystem", () => {
     mockGetBoard.mockImplementationOnce(() => {
       throw new Error("board unavailable")
     })
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -314,7 +314,7 @@ describe("buildSystem", () => {
   it("includes skills section from listSkills", async () => {
     setupReadFileSync()
     vi.mocked(listSkills).mockReturnValue(["code-review", "self-edit", "self-query"])
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -327,7 +327,7 @@ describe("buildSystem", () => {
   it("omits skills section when no skills available", async () => {
     setupReadFileSync()
     vi.mocked(listSkills).mockReturnValue([])
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -338,7 +338,7 @@ describe("buildSystem", () => {
 
   it("does NOT export isOwnCodebase (removed)", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const prompt = await import("../../mind/prompt")
@@ -348,7 +348,7 @@ describe("buildSystem", () => {
   it("includes azure provider string when azure config is set", async () => {
     setAgentProvider("azure")
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({
       providers: {
@@ -377,7 +377,7 @@ describe("buildSystem", () => {
       if (p.endsWith("secrets.json")) return JSON.stringify({})
       return ""
     })
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({
       providers: {
@@ -403,7 +403,7 @@ describe("buildSystem", () => {
   it("includes openai codex provider string when OpenAI Codex OAuth is configured", async () => {
     setAgentProvider("openai-codex")
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({
       providers: {
@@ -429,7 +429,7 @@ describe("buildSystem", () => {
   it("uses 'default' deployment when azure deployment is not set", async () => {
     setAgentProvider("azure")
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({
       providers: {
@@ -466,7 +466,7 @@ describe("buildSystem", () => {
       if (p.endsWith("secrets.json")) return JSON.stringify({})
       return ""
     })
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -485,7 +485,7 @@ describe("buildSystem", () => {
       if (p.endsWith("secrets.json")) return JSON.stringify({})
       return ""
     })
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -510,7 +510,7 @@ describe("buildSystem", () => {
       if (p.endsWith("secrets.json")) return JSON.stringify({})
       return ""
     })
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -521,7 +521,7 @@ describe("buildSystem", () => {
 
   it("includes tool behavior section when toolChoiceRequired is true", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -535,7 +535,7 @@ describe("buildSystem", () => {
 
   it("does NOT include tool behavior section when toolChoiceRequired is false", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -547,7 +547,7 @@ describe("buildSystem", () => {
 
   it("includes tool behavior section when options is undefined (defaults on)", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -558,7 +558,7 @@ describe("buildSystem", () => {
 
   it("tool behavior section contains decision-tree framing", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -571,7 +571,7 @@ describe("buildSystem", () => {
 
   it("tool behavior section contains anti-no-op pattern", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -584,7 +584,7 @@ describe("buildSystem", () => {
 
   it("tool behavior section clarifies final_answer is a tool call", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -596,7 +596,7 @@ describe("buildSystem", () => {
 
   it("toolsSection includes final_answer in tool list when options undefined (defaults on)", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -608,7 +608,7 @@ describe("buildSystem", () => {
 
   it("toolsSection does NOT include final_answer when toolChoiceRequired is false", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -627,7 +627,7 @@ describe("buildSystem", () => {
 
   it("BuildSystemOptions does not accept disableStreaming", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -654,7 +654,7 @@ describe("runtimeInfoSection", () => {
 
   it("always includes agent name and cwd", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
@@ -666,7 +666,7 @@ describe("runtimeInfoSection", () => {
 
   it("includes note about self-modification", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
@@ -677,7 +677,7 @@ describe("runtimeInfoSection", () => {
 
   it("cli channel includes boot greeting", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
@@ -688,7 +688,7 @@ describe("runtimeInfoSection", () => {
 
   it("teams channel includes concise behavior", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
@@ -707,7 +707,7 @@ describe("psyche loading", () => {
 
   it("loads psyche files from agentRoot/psyche/", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -728,7 +728,7 @@ describe("psyche loading", () => {
       if (p.endsWith("secrets.json")) return JSON.stringify({})
       throw new Error("ENOENT: no such file or directory")
     })
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -740,7 +740,7 @@ describe("psyche loading", () => {
 
   it("caches psyche text after first load", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -755,7 +755,7 @@ describe("psyche loading", () => {
 
   it("resetPsycheCache clears cached psyche text", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -1613,7 +1613,7 @@ describe("buildSystem with context", () => {
 
   it("includes context section when context is provided", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -1646,7 +1646,7 @@ describe("buildSystem with context", () => {
 
   it("omits context section when context is undefined", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
@@ -1657,7 +1657,7 @@ describe("buildSystem with context", () => {
 
   it("returns a Promise (async function)", async () => {
     setupReadFileSync()
-    const { setTestConfig, resetConfigCache } = await import("../../config")
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")

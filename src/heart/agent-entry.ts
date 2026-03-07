@@ -7,7 +7,7 @@ if (!process.argv.includes("--agent")) {
 }
 
 import { startInnerDialogWorker } from "../senses/inner-dialog-worker"
-import { configureCliRuntimeLogger } from "../senses/cli-logging"
+import { configureCliRuntimeLogger } from "../nerves/cli-logging"
 
 configureCliRuntimeLogger("self")
 

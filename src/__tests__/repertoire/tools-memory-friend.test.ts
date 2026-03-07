@@ -16,11 +16,11 @@ const mockTaskModule = {
 
 let agentRoot = ""
 
-vi.mock("../../tasks", () => ({
+vi.mock("../../repertoire/tasks", () => ({
   getTaskModule: () => mockTaskModule,
 }))
 
-vi.mock("../../identity", () => {
+vi.mock("../../heart/identity", () => {
   const DEFAULT_AGENT_CONTEXT = {
     maxTokens: 80000,
     contextMargin: 20,

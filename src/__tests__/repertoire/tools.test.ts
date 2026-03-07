@@ -43,11 +43,11 @@ const mockTaskModule = {
   boardSessions: vi.fn(),
 }
 
-vi.mock("../../tasks", () => ({
+vi.mock("../../repertoire/tasks", () => ({
   getTaskModule: () => mockTaskModule,
 }))
 
-vi.mock("../../identity", () => {
+vi.mock("../../heart/identity", () => {
   const DEFAULT_AGENT_CONTEXT = {
     maxTokens: 80000,
     contextMargin: 20,
@@ -108,7 +108,7 @@ describe("execTool", () => {
     mockTaskModule.boardAction.mockReset().mockReturnValue([])
     mockTaskModule.boardDeps.mockReset().mockReturnValue([])
     mockTaskModule.boardSessions.mockReset().mockReturnValue([])
-    const config = await import("../../config")
+    const config = await import("../../heart/config")
     config.resetConfigCache()
     setTestConfig = config.setTestConfig
     const tools = await import("../../repertoire/tools")
@@ -285,7 +285,7 @@ describe("execTool", () => {
   it("web_search calls perplexity API and returns results", async () => {
     setTestConfig({ integrations: { perplexityApiKey: "test-key" } })
     vi.resetModules()
-    const config = await import("../../config")
+    const config = await import("../../heart/config")
     config.resetConfigCache()
     config.setTestConfig({ integrations: { perplexityApiKey: "test-key" } })
 
@@ -308,7 +308,7 @@ describe("execTool", () => {
 
   it("web_search returns error when API key missing", async () => {
     vi.resetModules()
-    const config = await import("../../config")
+    const config = await import("../../heart/config")
     config.resetConfigCache()
     config.setTestConfig({ integrations: {} })
 
@@ -319,7 +319,7 @@ describe("execTool", () => {
 
   it("web_search returns error on non-ok response", async () => {
     vi.resetModules()
-    const config = await import("../../config")
+    const config = await import("../../heart/config")
     config.resetConfigCache()
     config.setTestConfig({ integrations: { perplexityApiKey: "test-key" } })
 
@@ -338,7 +338,7 @@ describe("execTool", () => {
 
   it("web_search returns 'no results' when empty results", async () => {
     vi.resetModules()
-    const config = await import("../../config")
+    const config = await import("../../heart/config")
     config.resetConfigCache()
     config.setTestConfig({ integrations: { perplexityApiKey: "test-key" } })
 
@@ -356,7 +356,7 @@ describe("execTool", () => {
 
   it("web_search returns error on exception", async () => {
     vi.resetModules()
-    const config = await import("../../config")
+    const config = await import("../../heart/config")
     config.resetConfigCache()
     config.setTestConfig({ integrations: { perplexityApiKey: "test-key" } })
 

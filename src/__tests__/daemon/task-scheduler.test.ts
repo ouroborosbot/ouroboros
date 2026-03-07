@@ -3,7 +3,7 @@ import * as os from "os"
 import * as path from "path"
 import { afterEach, describe, expect, it } from "vitest"
 
-import { parseTaskFile, renderTaskFile } from "../../tasks/parser"
+import { parseTaskFile, renderTaskFile } from "../../repertoire/tasks/parser"
 import { TaskDrivenScheduler } from "../../daemon/task-scheduler"
 
 function makeTaskFile(

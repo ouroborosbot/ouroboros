@@ -1,7 +1,7 @@
 import * as fs from "fs"
 import * as net from "net"
 import * as path from "path"
-import { getAgentBundlesRoot } from "../identity"
+import { getAgentBundlesRoot } from "../heart/identity"
 import { emitNervesEvent } from "../nerves/runtime"
 
 export interface DaemonCronJobSummary {

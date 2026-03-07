@@ -13,13 +13,13 @@ vi.mock("../../heart/core", () => ({
 }))
 
 const mockGetBoard = vi.fn()
-vi.mock("../../tasks", () => ({
+vi.mock("../../repertoire/tasks", () => ({
   getTaskModule: () => ({
     getBoard: mockGetBoard,
   }),
 }))
 
-vi.mock("../../identity", () => {
+vi.mock("../../heart/identity", () => {
   const DEFAULT_AGENT_CONTEXT = {
     maxTokens: 80000,
     contextMargin: 20,
