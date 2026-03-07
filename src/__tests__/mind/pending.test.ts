@@ -38,6 +38,15 @@ describe("drainPending", () => {
     vi.resetModules()
   })
 
+  it("returns empty array when readdirSync throws", async () => {
+    const { drainPending } = await import("../../mind/pending")
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readdirSync).mockImplementation(() => { throw new Error("EACCES") })
+
+    const result = drainPending("/mock/pending/friend-1/cli/session")
+    expect(result).toEqual([])
+  })
+
   it("returns empty array when directory does not exist", async () => {
     const { drainPending } = await import("../../mind/pending")
     vi.mocked(fs.existsSync).mockReturnValue(false)

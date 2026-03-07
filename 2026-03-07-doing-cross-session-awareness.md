@@ -1,6 +1,6 @@
 # Doing: Cross-Session Awareness
 
-**Status**: READY_FOR_EXECUTION
+**Status**: COMPLETE
 **Execution Mode**: direct
 **Created**: 2026-03-07
 **Planning**: /Users/arimendelow/AgentBundles/slugger.ouro/tasks/2026-03-07-cross-session-awareness.md
@@ -71,7 +71,7 @@ See planning doc for full list (30+ items). Key gates:
 **Tests**: Verify system prompt is refreshed after postTurn, not stale.
 **Acceptance**: Tests pass, prompt refresh extracted and wired.
 
-### Unit 8: Coverage & Integration
+### Unit 8: Coverage & Integration ✅
 **What**: Run full test suite + coverage. Verify 100% on all new/modified code. Clean up dead code. Verify all completion criteria from planning doc.
 **Acceptance**: 100% coverage on new code, all tests pass, build clean.
 

@@ -139,6 +139,45 @@ describe("query_session tool", () => {
     expect(result).toContain("no session found")
   })
 
+  it("handles session with no messages array", async () => {
+    const { baseToolDefinitions } = await import("../../repertoire/tools-base")
+    const tool = baseToolDefinitions.find(d => d.tool.function.name === "query_session")!
+
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({ version: 1 }),
+    )
+
+    const result = await tool.handler({
+      friendId: "friend-1",
+      channel: "cli",
+      key: "session",
+    })
+
+    expect(result).toContain("no non-system messages")
+  })
+
+  it("returns message when session has only system messages", async () => {
+    const { baseToolDefinitions } = await import("../../repertoire/tools-base")
+    const tool = baseToolDefinitions.find(d => d.tool.function.name === "query_session")!
+
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 1,
+        messages: [
+          { role: "system", content: "sys" },
+        ],
+      }),
+    )
+
+    const result = await tool.handler({
+      friendId: "friend-1",
+      channel: "cli",
+      key: "session",
+    })
+
+    expect(result).toContain("no non-system messages")
+  })
+
   it("defaults key to 'session' when not provided", async () => {
     const { baseToolDefinitions } = await import("../../repertoire/tools-base")
     const tool = baseToolDefinitions.find(d => d.tool.function.name === "query_session")!
