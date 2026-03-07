@@ -48,7 +48,7 @@ Deliver the full Gate 6 first-run contract: Adoption Specialist integration, `ou
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Baseline Gate 6 Surface Scan
+### ✅ Unit 0: Baseline Gate 6 Surface Scan
 **What**: Inventory current first-run CLI paths, hatch commands, bundle skeleton expectations, and specialist bundle sources before edits.
 **Output**: Baseline notes/logs under artifacts directory.
 **Acceptance**: Baseline artifacts clearly map existing flow and target Gate 6 deltas.
@@ -96,3 +96,4 @@ Deliver the full Gate 6 first-run contract: Adoption Specialist integration, `ou
 - 2026-03-07 02:55 Granularity pass complete (no changes needed).
 - 2026-03-07 02:56 Validation pass complete (no changes needed).
 - 2026-03-07 02:56 Quality pass complete (no changes needed).
+- 2026-03-07 02:58 Unit 0 complete: captured daemon CLI/daemon hatch baseline and first-run surface scan artifacts.
