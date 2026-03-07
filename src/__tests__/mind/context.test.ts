@@ -592,3 +592,88 @@ describe("mind observability instrumentation", () => {
     expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "mind.step_end" }))
   })
 })
+
+describe("validateSessionMessages", () => {
+  beforeEach(() => { vi.resetModules() })
+
+  it("returns no violations for valid user/assistant sequence", async () => {
+    const { validateSessionMessages } = await import("../../mind/context")
+    const messages: OpenAI.ChatCompletionMessageParam[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "hello" },
+      { role: "user", content: "how?" },
+      { role: "assistant", content: "fine" },
+    ]
+    expect(validateSessionMessages(messages)).toEqual([])
+  })
+
+  it("returns no violations for assistant with tool calls followed by tool results then user", async () => {
+    const { validateSessionMessages } = await import("../../mind/context")
+    const messages: OpenAI.ChatCompletionMessageParam[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "check" },
+      { role: "assistant", content: null, tool_calls: [{ id: "t1", type: "function" as const, function: { name: "foo", arguments: "{}" } }] },
+      { role: "tool", content: "result", tool_call_id: "t1" },
+      { role: "assistant", content: "done" },
+      { role: "user", content: "ok" },
+    ]
+    expect(validateSessionMessages(messages)).toEqual([])
+  })
+
+  it("detects back-to-back assistant messages", async () => {
+    const { validateSessionMessages } = await import("../../mind/context")
+    const messages: OpenAI.ChatCompletionMessageParam[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "hello" },
+      { role: "assistant", content: "hello again" },
+    ]
+    const violations = validateSessionMessages(messages)
+    expect(violations.length).toBeGreaterThan(0)
+    expect(violations[0]).toContain("back-to-back assistant")
+  })
+
+  it("returns empty for empty message array", async () => {
+    const { validateSessionMessages } = await import("../../mind/context")
+    expect(validateSessionMessages([])).toEqual([])
+  })
+
+  it("returns empty for system-only messages", async () => {
+    const { validateSessionMessages } = await import("../../mind/context")
+    const messages: OpenAI.ChatCompletionMessageParam[] = [
+      { role: "system", content: "sys" },
+    ]
+    expect(validateSessionMessages(messages)).toEqual([])
+  })
+})
+
+describe("repairSessionMessages", () => {
+  beforeEach(() => { vi.resetModules() })
+
+  it("merges back-to-back assistant messages", async () => {
+    const { repairSessionMessages } = await import("../../mind/context")
+    const messages: OpenAI.ChatCompletionMessageParam[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "hello" },
+      { role: "assistant", content: "hello again" },
+    ]
+    const repaired = repairSessionMessages(messages)
+    expect(repaired.length).toBe(3)
+    expect(repaired[2].role).toBe("assistant")
+    expect((repaired[2] as any).content).toContain("hello")
+    expect((repaired[2] as any).content).toContain("hello again")
+  })
+
+  it("returns unchanged for valid messages", async () => {
+    const { repairSessionMessages } = await import("../../mind/context")
+    const messages: OpenAI.ChatCompletionMessageParam[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "hello" },
+    ]
+    const repaired = repairSessionMessages(messages)
+    expect(repaired).toEqual(messages)
+  })
+})
