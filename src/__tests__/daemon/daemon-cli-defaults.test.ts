@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest"
 import { EventEmitter } from "events"
+import * as fs from "fs"
+import * as os from "os"
+import * as path from "path"
 
 describe("daemon CLI default dependency branches", () => {
   it("uses default sendCommand transport and parses JSON responses", async () => {
@@ -463,5 +466,229 @@ describe("daemon CLI default dependency branches", () => {
       fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
       installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
     })).rejects.toThrow("daemon unreachable")
+  })
+
+  it("default link command persists external identity on friend record", async () => {
+    vi.resetModules()
+
+    const tmpBundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ouro-link-defaults-"))
+    const friendPath = path.join(tmpBundlesRoot, "slugger.ouro", "friends")
+    fs.mkdirSync(friendPath, { recursive: true })
+    fs.writeFileSync(
+      path.join(friendPath, "friend-1.json"),
+      JSON.stringify({
+        id: "friend-1",
+        name: "Jordan",
+        role: "primary",
+        trustLevel: "family",
+        connections: [],
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        totalTokens: 0,
+        createdAt: "2026-03-07T00:00:00.000Z",
+        updatedAt: "2026-03-07T00:00:00.000Z",
+        schemaVersion: 1,
+      }, null, 2),
+      "utf-8",
+    )
+
+    vi.doMock("net", () => ({ createConnection: vi.fn() }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn() }))
+    vi.doMock("fs", async () => {
+      const actual = await vi.importActual<typeof import("fs")>("fs")
+      return { ...actual }
+    })
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => tmpBundlesRoot,
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+
+    const { createDefaultOuroCliDeps, runOuroCli } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+    const result = await runOuroCli([
+      "link",
+      "slugger",
+      "--friend",
+      "friend-1",
+      "--provider",
+      "aad",
+      "--external-id",
+      "aad-user-100",
+    ], {
+      ...deps,
+      writeStdout: vi.fn(),
+    })
+
+    expect(result).toContain("linked aad:aad-user-100 to friend-1")
+    const saved = JSON.parse(fs.readFileSync(path.join(friendPath, "friend-1.json"), "utf-8")) as {
+      externalIds: Array<{ provider: string; externalId: string }>
+    }
+    expect(saved.externalIds).toEqual([
+      expect.objectContaining({
+        provider: "aad",
+        externalId: "aad-user-100",
+      }),
+    ])
+  })
+
+  it("default link command reports friend-not-found when record does not exist", async () => {
+    vi.resetModules()
+
+    const tmpBundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ouro-link-missing-"))
+    const friendPath = path.join(tmpBundlesRoot, "slugger.ouro", "friends")
+    fs.mkdirSync(friendPath, { recursive: true })
+
+    vi.doMock("net", () => ({ createConnection: vi.fn() }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn() }))
+    vi.doMock("fs", async () => {
+      const actual = await vi.importActual<typeof import("fs")>("fs")
+      return { ...actual }
+    })
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => tmpBundlesRoot,
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+
+    const { createDefaultOuroCliDeps, runOuroCli } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+    const result = await runOuroCli([
+      "link",
+      "slugger",
+      "--friend",
+      "missing-friend",
+      "--provider",
+      "aad",
+      "--external-id",
+      "aad-user-404",
+    ], {
+      ...deps,
+      writeStdout: vi.fn(),
+    })
+
+    expect(typeof deps.linkFriendIdentity).toBe("function")
+    expect(result).toBe("friend not found: missing-friend")
+  })
+
+  it("default link command is idempotent when identity already linked", async () => {
+    vi.resetModules()
+
+    const tmpBundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ouro-link-duplicate-"))
+    const friendPath = path.join(tmpBundlesRoot, "slugger.ouro", "friends")
+    fs.mkdirSync(friendPath, { recursive: true })
+    fs.writeFileSync(
+      path.join(friendPath, "friend-1.json"),
+      JSON.stringify({
+        id: "friend-1",
+        name: "Jordan",
+        role: "primary",
+        trustLevel: "family",
+        connections: [],
+        externalIds: [{ provider: "aad", externalId: "aad-user-100", linkedAt: "2026-03-07T00:00:00.000Z" }],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        totalTokens: 0,
+        createdAt: "2026-03-07T00:00:00.000Z",
+        updatedAt: "2026-03-07T00:00:00.000Z",
+        schemaVersion: 1,
+      }, null, 2),
+      "utf-8",
+    )
+
+    vi.doMock("net", () => ({ createConnection: vi.fn() }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn() }))
+    vi.doMock("fs", async () => {
+      const actual = await vi.importActual<typeof import("fs")>("fs")
+      return { ...actual }
+    })
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => tmpBundlesRoot,
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+
+    const { createDefaultOuroCliDeps, runOuroCli } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+    const result = await runOuroCli([
+      "link",
+      "slugger",
+      "--friend",
+      "friend-1",
+      "--provider",
+      "aad",
+      "--external-id",
+      "aad-user-100",
+    ], {
+      ...deps,
+      writeStdout: vi.fn(),
+    })
+
+    expect(result).toBe("identity already linked: aad:aad-user-100")
+    const saved = JSON.parse(fs.readFileSync(path.join(friendPath, "friend-1.json"), "utf-8")) as {
+      externalIds: Array<{ provider: string; externalId: string }>
+    }
+    expect(saved.externalIds).toHaveLength(1)
+  })
+
+  it("uses built-in friend linker when deps.linkFriendIdentity is undefined", async () => {
+    vi.resetModules()
+
+    const tmpBundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ouro-link-fallback-linker-"))
+    const friendPath = path.join(tmpBundlesRoot, "slugger.ouro", "friends")
+    fs.mkdirSync(friendPath, { recursive: true })
+    fs.writeFileSync(
+      path.join(friendPath, "friend-1.json"),
+      JSON.stringify({
+        id: "friend-1",
+        name: "Jordan",
+        role: "primary",
+        trustLevel: "family",
+        connections: [],
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        totalTokens: 0,
+        createdAt: "2026-03-07T00:00:00.000Z",
+        updatedAt: "2026-03-07T00:00:00.000Z",
+        schemaVersion: 1,
+      }, null, 2),
+      "utf-8",
+    )
+
+    vi.doMock("net", () => ({ createConnection: vi.fn() }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn() }))
+    vi.doMock("fs", async () => {
+      const actual = await vi.importActual<typeof import("fs")>("fs")
+      return { ...actual }
+    })
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => tmpBundlesRoot,
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+
+    const { createDefaultOuroCliDeps, runOuroCli } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+    const result = await runOuroCli([
+      "link",
+      "slugger",
+      "--friend",
+      "friend-1",
+      "--provider",
+      "aad",
+      "--external-id",
+      "aad-user-222",
+    ], {
+      ...deps,
+      linkFriendIdentity: undefined,
+      writeStdout: vi.fn(),
+    })
+
+    expect(result).toContain("linked aad:aad-user-222 to friend-1")
   })
 })

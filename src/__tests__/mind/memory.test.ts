@@ -1,12 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import type OpenAI from "openai";
 import {
+  __memoryTestUtils,
   appendFactsWithDedup,
   extractMemoryHighlights,
   ensureMemoryStorePaths,
+  saveMemoryFact,
+  searchMemoryFacts,
   type MemoryFact,
 } from "../../mind/memory";
 import { baseToolDefinitions } from "../../repertoire/tools-base";
@@ -84,6 +87,16 @@ describe("memory write path", () => {
 
     const lines = fs.readFileSync(stores.factsPath, "utf8").trim().split("\n");
     expect(lines).toHaveLength(2);
+  });
+
+  it("covers cosineSimilarity edge cases used by semantic scoring", () => {
+    const { cosineSimilarity } = __memoryTestUtils;
+    expect(cosineSimilarity([], [1])).toBe(0);
+    expect(cosineSimilarity([1], [])).toBe(0);
+    expect(cosineSimilarity([1], [1, 2])).toBe(0);
+    expect(cosineSimilarity([0, 0], [1, 0])).toBe(0);
+    expect(cosineSimilarity([1, 0], [0, 0])).toBe(0);
+    expect(cosineSimilarity([1, 0], [1, 0])).toBeCloseTo(1);
   });
 
   it("handles missing facts file and zero-word facts safely", () => {
@@ -220,5 +233,349 @@ describe("memory write path", () => {
     const names = baseToolDefinitions.map((def) => def.tool.function.name);
     expect(names).toContain("save_friend_note");
     expect(names).toContain("memory_search");
+  });
+
+  it("saveMemoryFact writes embedding vectors when provider succeeds", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "memory-save-embedding-"));
+    const fixedNow = "2026-03-06T12:00:00.000Z";
+
+    const result = await saveMemoryFact({
+      memoryRoot: root,
+      text: "Ari prefers crisp progress updates",
+      about: "ari",
+      source: "tool:memory_save",
+      now: () => new Date(fixedNow),
+      idFactory: () => "fact-embedded",
+      embeddingProvider: {
+        embed: async () => [[0.2, 0.4, 0.6]],
+      },
+    });
+
+    expect(result).toEqual({ added: 1, skipped: 0 });
+    const factsPath = path.join(root, "facts.jsonl");
+    const saved = JSON.parse(fs.readFileSync(factsPath, "utf8").trim()) as MemoryFact;
+    expect(saved.id).toBe("fact-embedded");
+    expect(saved.text).toBe("Ari prefers crisp progress updates");
+    expect(saved.source).toBe("tool:memory_save");
+    expect(saved.about).toBe("ari");
+    expect(saved.createdAt).toBe(fixedNow);
+    expect(saved.embedding).toEqual([0.2, 0.4, 0.6]);
+  });
+
+  it("saveMemoryFact degrades gracefully to empty embeddings when provider fails", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "memory-save-fallback-"));
+
+    const result = await saveMemoryFact({
+      memoryRoot: root,
+      text: "Store this even if embedding API is down",
+      source: "tool:memory_save",
+      idFactory: () => "fact-fallback",
+      embeddingProvider: {
+        embed: async () => {
+          throw new Error("embedding service unavailable");
+        },
+      },
+    });
+
+    expect(result).toEqual({ added: 1, skipped: 0 });
+    const factsPath = path.join(root, "facts.jsonl");
+    const saved = JSON.parse(fs.readFileSync(factsPath, "utf8").trim()) as MemoryFact;
+    expect(saved.id).toBe("fact-fallback");
+    expect(saved.embedding).toEqual([]);
+  });
+
+  it("saveMemoryFact degrades gracefully when provider throws non-Error", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "memory-save-fallback-string-"));
+
+    const result = await saveMemoryFact({
+      memoryRoot: root,
+      text: "Store this even if embedding API throws a string",
+      source: "tool:memory_save",
+      idFactory: () => "fact-fallback-string",
+      embeddingProvider: {
+        embed: async () => {
+          throw "embedding string failure";
+        },
+      },
+    });
+
+    expect(result).toEqual({ added: 1, skipped: 0 });
+    const factsPath = path.join(root, "facts.jsonl");
+    const saved = JSON.parse(fs.readFileSync(factsPath, "utf8").trim()) as MemoryFact;
+    expect(saved.id).toBe("fact-fallback-string");
+    expect(saved.embedding).toEqual([]);
+  });
+
+  it("saveMemoryFact falls back to empty embedding when provider returns no vectors", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "memory-save-no-vectors-"));
+
+    const result = await saveMemoryFact({
+      memoryRoot: root,
+      text: "Save even when embedding vector list is empty",
+      source: "tool:memory_save",
+      idFactory: () => "fact-empty-vectors",
+      embeddingProvider: {
+        embed: async () => [],
+      },
+    });
+
+    expect(result).toEqual({ added: 1, skipped: 0 });
+    const factsPath = path.join(root, "facts.jsonl");
+    const saved = JSON.parse(fs.readFileSync(factsPath, "utf8").trim()) as MemoryFact;
+    expect(saved.id).toBe("fact-empty-vectors");
+    expect(saved.embedding).toEqual([]);
+  });
+
+  it("searchMemoryFacts falls back to substring matching for empty-embedding facts", async () => {
+    const facts: MemoryFact[] = [
+      {
+        id: "fallback-hit",
+        text: "Ari likes mushroom pizza",
+        source: "cli",
+        createdAt: "2026-03-06T00:00:00.000Z",
+        embedding: [],
+      },
+      {
+        id: "embedded-hit",
+        text: "Ari tracks strict TypeScript rules",
+        source: "teams",
+        createdAt: "2026-03-06T00:01:00.000Z",
+        embedding: [1, 0],
+      },
+    ];
+
+    const results = await searchMemoryFacts("pizza", facts, {
+      embed: async () => [[1, 0]],
+    });
+
+    expect(results.map((fact) => fact.id)).toContain("fallback-hit");
+  });
+
+  it("searchMemoryFacts falls back to substring when embedding provider throws", async () => {
+    const facts: MemoryFact[] = [
+      {
+        id: "substring-hit",
+        text: "Retry migration after the daemon restarts",
+        source: "cli",
+        createdAt: "2026-03-06T00:00:00.000Z",
+        embedding: [0.2, 0.8],
+      },
+      {
+        id: "substring-miss",
+        text: "unrelated note",
+        source: "cli",
+        createdAt: "2026-03-06T00:00:01.000Z",
+        embedding: [0.8, 0.2],
+      },
+    ];
+
+    const results = await searchMemoryFacts("daemon", facts, {
+      embed: async () => {
+        throw new Error("query embedding failed");
+      },
+    });
+
+    expect(results.map((fact) => fact.id)).toEqual(["substring-hit"]);
+  });
+
+  it("searchMemoryFacts returns empty list for blank queries", async () => {
+    const results = await searchMemoryFacts("   ", [
+      {
+        id: "x",
+        text: "anything",
+        source: "cli",
+        createdAt: "2026-03-06T00:00:00.000Z",
+        embedding: [1, 0],
+      },
+    ]);
+    expect(results).toEqual([]);
+  });
+
+  it("searchMemoryFacts falls back to substring when embedding provider throws non-Error", async () => {
+    const facts: MemoryFact[] = [
+      {
+        id: "substring-hit",
+        text: "Daemon restart fallback note",
+        source: "cli",
+        createdAt: "2026-03-06T00:00:00.000Z",
+        embedding: [0.2, 0.8],
+      },
+    ];
+
+    const results = await searchMemoryFacts("daemon", facts, {
+      embed: async () => {
+        throw "non-error throw";
+      },
+    });
+
+    expect(results.map((fact) => fact.id)).toEqual(["substring-hit"]);
+  });
+
+  it("searchMemoryFacts falls back when default embedding provider is unavailable", async () => {
+    vi.resetModules();
+    vi.doMock("../../config", async () => {
+      const actual = await vi.importActual<typeof import("../../config")>("../../config");
+      return { ...actual, getOpenAIEmbeddingsApiKey: () => "   " };
+    });
+    const { searchMemoryFacts: dynamicSearchMemoryFacts } = await import("../../mind/memory");
+
+    const facts: MemoryFact[] = [
+      {
+        id: "daemon-hit",
+        text: "Daemon keeps retrying this task",
+        source: "cli",
+        createdAt: "2026-03-06T00:00:00.000Z",
+        embedding: [0.1, 0.2],
+      },
+      {
+        id: "other",
+        text: "completely unrelated memory",
+        source: "cli",
+        createdAt: "2026-03-06T00:00:01.000Z",
+        embedding: [0.2, 0.1],
+      },
+    ];
+
+    const results = await dynamicSearchMemoryFacts("daemon", facts);
+    expect(results.map((fact) => fact.id)).toEqual(["daemon-hit"]);
+  });
+
+  it("searchMemoryFacts falls back when query embedding is missing/empty", async () => {
+    const facts: MemoryFact[] = [
+      {
+        id: "fallback-hit",
+        text: "Ari prefers daemon status updates",
+        source: "cli",
+        createdAt: "2026-03-06T00:00:00.000Z",
+        embedding: [0.4, 0.6],
+      },
+      {
+        id: "miss",
+        text: "something else",
+        source: "cli",
+        createdAt: "2026-03-06T00:00:01.000Z",
+        embedding: [0.6, 0.4],
+      },
+    ];
+
+    const results = await searchMemoryFacts("daemon", facts, {
+      embed: async () => [],
+    });
+    expect(results.map((fact) => fact.id)).toEqual(["fallback-hit"]);
+  });
+
+  it("searchMemoryFacts uses default OpenAI embedding provider and sorts scored results", async () => {
+    vi.resetModules();
+    vi.doMock("../../config", async () => {
+      const actual = await vi.importActual<typeof import("../../config")>("../../config");
+      return { ...actual, getOpenAIEmbeddingsApiKey: () => "test-openai-key" };
+    });
+
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => ({ data: [{ embedding: [1, 0] }] }),
+    }));
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    try {
+      const { searchMemoryFacts: dynamicSearchMemoryFacts } = await import("../../mind/memory");
+      const facts: MemoryFact[] = [
+        {
+          id: "best",
+          text: "alpha strongest match",
+          source: "cli",
+          createdAt: "2026-03-06T00:00:00.000Z",
+          embedding: [1, 0],
+        },
+        {
+          id: "weaker",
+          text: "alpha weaker match",
+          source: "cli",
+          createdAt: "2026-03-06T00:00:01.000Z",
+          embedding: [0.6, 0.8],
+        },
+        {
+          id: "fallback",
+          text: "alpha substring fallback",
+          source: "cli",
+          createdAt: "2026-03-06T00:00:02.000Z",
+          embedding: [],
+        },
+      ];
+
+      const results = await dynamicSearchMemoryFacts("alpha", facts);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(results.map((fact) => fact.id)).toEqual(["best", "weaker", "fallback"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("searchMemoryFacts falls back when default OpenAI embedding request is non-OK", async () => {
+    vi.resetModules();
+    vi.doMock("../../config", async () => {
+      const actual = await vi.importActual<typeof import("../../config")>("../../config");
+      return { ...actual, getOpenAIEmbeddingsApiKey: () => "test-openai-key" };
+    });
+
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 503,
+      statusText: "Service Unavailable",
+      json: async () => ({ data: [] }),
+    }));
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    try {
+      const { searchMemoryFacts: dynamicSearchMemoryFacts } = await import("../../mind/memory");
+      const results = await dynamicSearchMemoryFacts("daemon", [
+        {
+          id: "fallback-hit",
+          text: "daemon fallback entry",
+          source: "cli",
+          createdAt: "2026-03-06T00:00:00.000Z",
+          embedding: [1, 0],
+        },
+      ]);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(results.map((fact) => fact.id)).toEqual(["fallback-hit"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("searchMemoryFacts falls back when default OpenAI embedding payload is malformed", async () => {
+    vi.resetModules();
+    vi.doMock("../../config", async () => {
+      const actual = await vi.importActual<typeof import("../../config")>("../../config");
+      return { ...actual, getOpenAIEmbeddingsApiKey: () => "test-openai-key" };
+    });
+
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => ({ data: [] }),
+    }));
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    try {
+      const { searchMemoryFacts: dynamicSearchMemoryFacts } = await import("../../mind/memory");
+      const results = await dynamicSearchMemoryFacts("daemon", [
+        {
+          id: "fallback-hit",
+          text: "daemon fallback entry",
+          source: "cli",
+          createdAt: "2026-03-06T00:00:00.000Z",
+          embedding: [1, 0],
+        },
+      ]);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(results.map((fact) => fact.id)).toEqual(["fallback-hit"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

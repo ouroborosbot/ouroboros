@@ -244,6 +244,25 @@ describe("FileFriendStore", () => {
     })
   })
 
+  describe("hasAnyFriends()", () => {
+    it("returns false when no friend json files exist", async () => {
+      const store = new FileFriendStore(friendsPath)
+      expect(await store.hasAnyFriends()).toBe(false)
+    })
+
+    it("returns true when at least one friend json file exists", async () => {
+      const store = new FileFriendStore(friendsPath)
+      await store.put("uuid-1", makeFriend())
+      expect(await store.hasAnyFriends()).toBe(true)
+    })
+
+    it("returns false when friends directory is missing", async () => {
+      const store = new FileFriendStore(friendsPath)
+      await fs.rm(friendsPath, { recursive: true, force: true })
+      expect(await store.hasAnyFriends()).toBe(false)
+    })
+  })
+
   describe("concurrent operations", () => {
     it("concurrent puts to different IDs do not corrupt each other", async () => {
       const store = new FileFriendStore(friendsPath)
