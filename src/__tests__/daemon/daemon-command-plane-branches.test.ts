@@ -27,7 +27,7 @@ function sendRaw(socketPath: string, payload: string): Promise<string> {
 }
 
 describe("daemon command plane branches", () => {
-  const make = (socketPath: string) => {
+  const make = (socketPath: string, bundlesRoot?: string) => {
     const processManager = {
       listAgentSnapshots: vi.fn(() => []),
       startAutoStartAgents: vi.fn(async () => undefined),
@@ -49,7 +49,7 @@ describe("daemon command plane branches", () => {
       pollInbox: vi.fn(() => [{ id: "m", from: "slugger", content: "hello", queuedAt: "x", priority: "normal" }]),
     }
 
-    const daemon = new OuroDaemon({ socketPath, processManager, scheduler, healthMonitor, router })
+    const daemon = new OuroDaemon({ socketPath, processManager, scheduler, healthMonitor, router, bundlesRoot })
     return { daemon, processManager, scheduler, healthMonitor, router }
   }
 
@@ -186,6 +186,41 @@ describe("daemon command plane branches", () => {
     expect(parsed.summary).toBe("no managed agents")
 
     await daemon.stop()
+  })
+
+  it("drains pending inbox fallback files on daemon start", async () => {
+    const socketPath = tmpSocketPath("daemon-pending-drain")
+    const bundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "daemon-bundles-"))
+    const pendingDir = path.join(bundlesRoot, "slugger.ouro", "inbox")
+    fs.mkdirSync(pendingDir, { recursive: true })
+    const pendingPath = path.join(pendingDir, "pending.jsonl")
+    fs.writeFileSync(
+      pendingPath,
+      `${JSON.stringify({
+        from: "ouro-cli",
+        to: "slugger",
+        content: "queued while daemon was down",
+        priority: "normal",
+        sessionId: "session-1",
+        taskRef: "task-1",
+      })}\n`,
+      "utf-8",
+    )
+
+    const { daemon, router } = make(socketPath, bundlesRoot)
+    await daemon.start()
+    await daemon.stop()
+
+    expect(router.send).toHaveBeenCalledWith(expect.objectContaining({
+      from: "ouro-cli",
+      to: "slugger",
+      content: "queued while daemon was down",
+      sessionId: "session-1",
+      taskRef: "task-1",
+    }))
+    expect(fs.readFileSync(pendingPath, "utf-8")).toBe("")
+
+    fs.rmSync(bundlesRoot, { recursive: true, force: true })
   })
 
   it("returns unknown-command error for unsupported kinds", async () => {

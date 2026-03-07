@@ -21,7 +21,10 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("net", () => ({ createConnection }))
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
-    vi.doMock("../../identity", () => ({ getRepoRoot: () => "/mock/repo" }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
     vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
 
@@ -31,6 +34,7 @@ describe("daemon CLI default dependency branches", () => {
 
     expect(createConnection).toHaveBeenCalledWith("/tmp/daemon.sock")
     expect(response.summary).toBe("status-ok")
+    expect(typeof deps.fallbackPendingMessage).toBe("function")
   })
 
   it("returns daemon-stopped response when stop command receives empty payload", async () => {
@@ -51,7 +55,10 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("net", () => ({ createConnection }))
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
-    vi.doMock("../../identity", () => ({ getRepoRoot: () => "/mock/repo" }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
     vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
 
@@ -83,7 +90,10 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("net", () => ({ createConnection }))
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
-    vi.doMock("../../identity", () => ({ getRepoRoot: () => "/mock/repo" }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
     vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
 
@@ -103,7 +113,10 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("child_process", () => ({ spawn }))
     vi.doMock("net", () => ({ createConnection }))
-    vi.doMock("../../identity", () => ({ getRepoRoot: () => "/mock/repo" }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
     vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
     vi.stubGlobal("console", { ...console, log: consoleLog })
@@ -150,7 +163,10 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("net", () => ({ createConnection }))
     vi.doMock("child_process", () => ({ spawn: vi.fn(() => ({ pid: 1, unref: vi.fn() })) }))
-    vi.doMock("../../identity", () => ({ getRepoRoot: () => "/mock/repo" }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
     vi.doMock("fs", () => ({ existsSync, unlinkSync }))
 
@@ -169,7 +185,10 @@ describe("daemon CLI default dependency branches", () => {
 
     vi.doMock("net", () => ({ createConnection: vi.fn() }))
     vi.doMock("child_process", () => ({ spawn: vi.fn() }))
-    vi.doMock("../../identity", () => ({ getRepoRoot: () => "/mock/repo" }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
     vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
 
@@ -181,6 +200,7 @@ describe("daemon CLI default dependency branches", () => {
       writeStdout: vi.fn(),
       checkSocketAlive: vi.fn(async () => true),
       cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
     }
 
     const okOnly = await runOuroCli(["status"], {
@@ -194,5 +214,41 @@ describe("daemon CLI default dependency branches", () => {
       sendCommand: vi.fn(async () => ({ ok: false })),
     })
     expect(unknownError).toContain("unknown error")
+  })
+
+  it("writes pending fallback file under target bundle inbox", async () => {
+    vi.resetModules()
+
+    const appendFileSync = vi.fn()
+    const mkdirSync = vi.fn()
+    const existsSync = vi.fn(() => false)
+    const unlinkSync = vi.fn()
+    vi.doMock("fs", () => ({ appendFileSync, mkdirSync, existsSync, unlinkSync }))
+    vi.doMock("net", () => ({ createConnection: vi.fn() }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn() }))
+    vi.doMock("../../identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+
+    const { createDefaultOuroCliDeps } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+    const path = deps.fallbackPendingMessage({
+      kind: "message.send",
+      from: "ouro-cli",
+      to: "slugger",
+      content: "hello",
+      sessionId: "s1",
+      taskRef: "t1",
+    })
+
+    expect(path).toBe("/mock/AgentBundles/slugger.ouro/inbox/pending.jsonl")
+    expect(mkdirSync).toHaveBeenCalledWith("/mock/AgentBundles/slugger.ouro/inbox", { recursive: true })
+    expect(appendFileSync).toHaveBeenCalledWith(
+      "/mock/AgentBundles/slugger.ouro/inbox/pending.jsonl",
+      expect.stringContaining("\"taskRef\":\"t1\""),
+      "utf-8",
+    )
   })
 })

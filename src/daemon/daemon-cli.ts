@@ -2,7 +2,7 @@ import { spawn } from "child_process"
 import * as fs from "fs"
 import * as net from "net"
 import * as path from "path"
-import { getRepoRoot } from "../identity"
+import { getAgentBundlesRoot, getRepoRoot } from "../identity"
 import { emitNervesEvent } from "../nerves/runtime"
 import type { DaemonCommand, DaemonResponse } from "./daemon"
 
@@ -23,6 +23,7 @@ export interface OuroCliDeps {
   writeStdout: (text: string) => void
   checkSocketAlive: (socketPath: string) => Promise<boolean>
   cleanupStaleSocket: (socketPath: string) => void
+  fallbackPendingMessage: (command: Extract<DaemonCommand, { kind: "message.send" }>) => string
 }
 
 function usage(): string {
@@ -206,6 +207,36 @@ function defaultCleanupStaleSocket(socketPath: string): void {
   }
 }
 
+function defaultFallbackPendingMessage(command: Extract<DaemonCommand, { kind: "message.send" }>): string {
+  const inboxDir = path.join(getAgentBundlesRoot(), `${command.to}.ouro`, "inbox")
+  const pendingPath = path.join(inboxDir, "pending.jsonl")
+  const queuedAt = new Date().toISOString()
+  const payload = {
+    from: command.from,
+    to: command.to,
+    content: command.content,
+    priority: command.priority ?? "normal",
+    sessionId: command.sessionId,
+    taskRef: command.taskRef,
+    queuedAt,
+  }
+  fs.mkdirSync(inboxDir, { recursive: true })
+  fs.appendFileSync(pendingPath, `${JSON.stringify(payload)}\n`, "utf-8")
+  emitNervesEvent({
+    level: "warn",
+    component: "daemon",
+    event: "daemon.message_fallback_queued",
+    message: "queued message to pending fallback file",
+    meta: {
+      to: command.to,
+      path: pendingPath,
+      sessionId: command.sessionId ?? null,
+      taskRef: command.taskRef ?? null,
+    },
+  })
+  return pendingPath
+}
+
 export function createDefaultOuroCliDeps(socketPath = "/tmp/ouroboros-daemon.sock"): OuroCliDeps {
   return {
     socketPath,
@@ -214,6 +245,7 @@ export function createDefaultOuroCliDeps(socketPath = "/tmp/ouroboros-daemon.soc
     writeStdout: defaultWriteStdout,
     checkSocketAlive: defaultCheckSocketAlive,
     cleanupStaleSocket: defaultCleanupStaleSocket,
+    fallbackPendingMessage: defaultFallbackPendingMessage,
   }
 }
 
@@ -246,7 +278,18 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   }
 
   const daemonCommand = toDaemonCommand(command)
-  const response = await deps.sendCommand(deps.socketPath, daemonCommand)
+  let response: DaemonResponse
+  try {
+    response = await deps.sendCommand(deps.socketPath, daemonCommand)
+  } catch (error) {
+    if (command.kind === "message.send") {
+      const pendingPath = deps.fallbackPendingMessage(command)
+      const message = `daemon unavailable; queued message fallback at ${pendingPath}`
+      deps.writeStdout(message)
+      return message
+    }
+    throw error
+  }
   const message = response.summary ?? response.message ?? (response.ok ? "ok" : `error: ${response.error ?? "unknown error"}`)
   deps.writeStdout(message)
   return message

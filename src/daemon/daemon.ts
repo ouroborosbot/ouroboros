@@ -1,5 +1,7 @@
 import * as fs from "fs"
 import * as net from "net"
+import * as path from "path"
+import { getAgentBundlesRoot } from "../identity"
 import { emitNervesEvent } from "../nerves/runtime"
 
 export interface DaemonCronJobSummary {
@@ -91,6 +93,7 @@ export interface OuroDaemonOptions {
   scheduler: DaemonSchedulerLike
   healthMonitor: DaemonHealthMonitorLike
   router: DaemonRouterLike
+  bundlesRoot?: string
 }
 
 function formatStatusSummary(snapshots: ReturnType<DaemonProcessManagerLike["listAgentSnapshots"]>): string {
@@ -128,6 +131,7 @@ export class OuroDaemon {
   private readonly scheduler: DaemonSchedulerLike
   private readonly healthMonitor: DaemonHealthMonitorLike
   private readonly router: DaemonRouterLike
+  private readonly bundlesRoot: string
   private server: net.Server | null = null
 
   constructor(options: OuroDaemonOptions) {
@@ -136,6 +140,7 @@ export class OuroDaemon {
     this.scheduler = options.scheduler
     this.healthMonitor = options.healthMonitor
     this.router = options.router
+    this.bundlesRoot = options.bundlesRoot ?? getAgentBundlesRoot()
   }
 
   async start(): Promise<void> {
@@ -149,6 +154,7 @@ export class OuroDaemon {
     })
     await this.processManager.startAutoStartAgents()
     this.scheduler.start?.()
+    await this.drainPendingBundleMessages()
 
     if (fs.existsSync(this.socketPath)) {
       fs.unlinkSync(this.socketPath)
@@ -179,6 +185,64 @@ export class OuroDaemon {
       server.once("error", reject)
       server.listen(this.socketPath, () => resolve())
     })
+  }
+
+  private async drainPendingBundleMessages(): Promise<void> {
+    if (!fs.existsSync(this.bundlesRoot)) return
+
+    let bundleDirs: fs.Dirent[]
+    try {
+      bundleDirs = fs.readdirSync(this.bundlesRoot, { withFileTypes: true })
+    } catch {
+      return
+    }
+
+    for (const bundleDir of bundleDirs) {
+      if (!bundleDir.isDirectory() || !bundleDir.name.endsWith(".ouro")) continue
+      const pendingPath = path.join(this.bundlesRoot, bundleDir.name, "inbox", "pending.jsonl")
+      if (!fs.existsSync(pendingPath)) continue
+
+      const raw = fs.readFileSync(pendingPath, "utf-8")
+      const lines = raw
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+
+      const retained: string[] = []
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line) as {
+            from?: unknown
+            to?: unknown
+            content?: unknown
+            priority?: unknown
+            sessionId?: unknown
+            taskRef?: unknown
+          }
+          if (
+            typeof parsed.from !== "string" ||
+            typeof parsed.to !== "string" ||
+            typeof parsed.content !== "string"
+          ) {
+            retained.push(line)
+            continue
+          }
+          await this.router.send({
+            from: parsed.from,
+            to: parsed.to,
+            content: parsed.content,
+            priority: typeof parsed.priority === "string" ? parsed.priority : undefined,
+            sessionId: typeof parsed.sessionId === "string" ? parsed.sessionId : undefined,
+            taskRef: typeof parsed.taskRef === "string" ? parsed.taskRef : undefined,
+          })
+        } catch {
+          retained.push(line)
+        }
+      }
+
+      const next = retained.length > 0 ? `${retained.join("\n")}\n` : ""
+      fs.writeFileSync(pendingPath, next, "utf-8")
+    }
   }
 
   async stop(): Promise<void> {
