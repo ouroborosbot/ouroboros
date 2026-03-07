@@ -184,6 +184,39 @@ describe(".ouro UTI registration", () => {
     expect(result.skippedReason).toContain("mkdir failed")
   })
 
+  it("uses default home/repo/fs dependencies when omitted", async () => {
+    vi.resetModules()
+    const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "ouro-uti-default-home-"))
+    const tempRepo = fs.mkdtempSync(path.join(os.tmpdir(), "ouro-uti-default-repo-"))
+    vi.doMock("os", async () => {
+      const actual = await vi.importActual<typeof import("os")>("os")
+      return { ...actual, homedir: () => tempHome }
+    })
+    vi.doMock("../../heart/identity", async () => {
+      const actual = await vi.importActual<typeof import("../../heart/identity")>("../../heart/identity")
+      return { ...actual, getRepoRoot: () => tempRepo }
+    })
+    const { registerOuroBundleUti: registerWithDefaultDeps } = await import("../../daemon/ouro-uti")
+    const execFileSync = vi.fn()
+
+    const result = registerWithDefaultDeps({
+      platform: "darwin",
+      execFileSync,
+    })
+
+    expect(result.registered).toBe(true)
+    expect(result.registrationBundlePath).toBe(
+      path.join(tempHome, "Library", "Application Support", "ouro", "uti", "OuroBundleRegistry.app"),
+    )
+    expect(execFileSync).toHaveBeenCalledWith(
+      "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
+      ["-f", path.join(tempHome, "Library", "Application Support", "ouro", "uti", "OuroBundleRegistry.app")],
+    )
+
+    fs.rmSync(tempHome, { recursive: true, force: true })
+    fs.rmSync(tempRepo, { recursive: true, force: true })
+  })
+
   it("uses default exec callback when execFileSync dep is omitted", async () => {
     vi.resetModules()
     const execFileSync = vi.fn()
