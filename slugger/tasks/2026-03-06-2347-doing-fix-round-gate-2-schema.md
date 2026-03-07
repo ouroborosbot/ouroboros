@@ -49,7 +49,7 @@ Implement Gate 2 schema and data-model contracts end-to-end: task lifecycle/fron
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Baseline Contract Snapshot
+### ✅ Unit 0: Baseline Contract Snapshot
 **What**: Capture Gate 2 baseline references for status enums, config schema usage, friend-store shape, and bundle contract checks.
 **Output**: Baseline artifact files under artifacts directory.
 **Acceptance**: Artifact set exists and maps every Gate 2 target surface.
@@ -94,3 +94,4 @@ Implement Gate 2 schema and data-model contracts end-to-end: task lifecycle/fron
 
 ## Progress Log
 - 2026-03-06 23:47 Created from planning doc.
+- 2026-03-06 23:49 Unit 0 complete: Captured baseline task/config/friend/bundle contract reference snapshots.
