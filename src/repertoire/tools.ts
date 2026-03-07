@@ -181,6 +181,8 @@ export function summarizeArgs(name: string, args: Record<string, string>): strin
   if (name === "claude") return summarizeKeyValues(args, ["prompt"]);
   if (name === "web_search") return summarizeKeyValues(args, ["query"]);
   if (name === "memory_search") return summarizeKeyValues(args, ["query"]);
+  if (name === "memory_save") return summarizeKeyValues(args, ["text", "about"]);
+  if (name === "get_friend_note") return summarizeKeyValues(args, ["friendId"]);
   if (name === "save_friend_note") {
     return summarizeKeyValues(args, ["type", "key", "content"]);
   }

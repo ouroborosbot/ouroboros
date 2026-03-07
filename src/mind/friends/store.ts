@@ -10,4 +10,5 @@ export interface FriendStore {
   put(id: string, record: FriendRecord): Promise<void>
   delete(id: string): Promise<void>
   findByExternalId(provider: string, externalId: string, tenantId?: string): Promise<FriendRecord | null>
+  hasAnyFriends?(): Promise<boolean>
 }

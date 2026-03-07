@@ -10,6 +10,7 @@ import { emitNervesEvent } from "../nerves/runtime";
 import { getAgentRoot } from "../identity";
 import { getTaskModule } from "../tasks";
 import { codingToolDefinitions } from "../coding/tools";
+import { readMemoryFacts, saveMemoryFact, searchMemoryFacts } from "../mind/memory";
 
 export interface ToolContext {
   graphToken?: string;
@@ -291,24 +292,72 @@ export const baseToolDefinitions: ToolDefinition[] = [
         },
       },
     },
-    handler: (a) => {
+    handler: async (a) => {
       try {
         const query = (a.query || "").trim();
         if (!query) return "query is required";
-        const queryLower = query.toLowerCase();
-        const factsPath = path.join(getAgentRoot(), "psyche", "memory", "facts.jsonl");
-        const raw = fs.readFileSync(factsPath, "utf-8");
-        const lines = raw.split("\n").map((line) => line.trim()).filter(Boolean);
-        const hits = lines
-          .map((line) => JSON.parse(line) as { text: string; source?: string; createdAt?: string })
-          .filter((fact) => fact.text.toLowerCase().includes(queryLower))
-          .slice(0, 5);
+        const memoryRoot = path.join(getAgentRoot(), "psyche", "memory");
+        const hits = await searchMemoryFacts(query, readMemoryFacts(memoryRoot));
         return hits
           .map((fact) => `- ${fact.text} (source=${fact.source}, createdAt=${fact.createdAt})`)
           .join("\n");
       } catch (e) {
         return `error: ${e instanceof Error ? e.message : String(e)}`;
       }
+    },
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "memory_save",
+        description:
+          "save a general memory fact i want to recall later. optional 'about' can tag the fact to a person/topic/context",
+        parameters: {
+          type: "object",
+          properties: {
+            text: { type: "string" },
+            about: { type: "string" },
+          },
+          required: ["text"],
+        },
+      },
+    },
+    handler: async (a) => {
+      const text = (a.text || "").trim();
+      if (!text) return "text is required";
+      const result = await saveMemoryFact({
+        text,
+        source: "tool:memory_save",
+        about: typeof a.about === "string" ? a.about : undefined,
+      });
+      return `saved memory fact (added=${result.added}, skipped=${result.skipped})`;
+    },
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "get_friend_note",
+        description:
+          "read a specific friend record by friend id. use this when i need notes/context about someone not currently active",
+        parameters: {
+          type: "object",
+          properties: {
+            friendId: { type: "string" },
+          },
+          required: ["friendId"],
+        },
+      },
+    },
+    handler: async (a, ctx) => {
+      const friendId = (a.friendId || "").trim();
+      if (!friendId) return "friendId is required";
+      if (!ctx?.friendStore) return "i can't read friend notes -- friend store not available";
+
+      const friend = await ctx.friendStore.get(friendId);
+      if (!friend) return `friend not found: ${friendId}`;
+      return JSON.stringify(friend, null, 2);
     },
   },
   {

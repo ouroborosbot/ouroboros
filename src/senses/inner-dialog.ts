@@ -6,6 +6,7 @@ import { runAgent, type ChannelCallbacks } from "../heart/core"
 import { getAgentRoot } from "../identity"
 import { loadSession, postTurn, type UsageData } from "../mind/context"
 import { buildSystem } from "../mind/prompt"
+import { findNonCanonicalBundlePaths } from "../mind/bundle-manifest"
 import { createTraceId } from "../nerves"
 import { emitNervesEvent } from "../nerves/runtime"
 
@@ -82,6 +83,19 @@ export function buildInnerDialogBootstrapMessage(aspirations: string, stateSumma
     stateSummary,
     "",
     "Orient yourself, decide what to do next, and make meaningful progress.",
+  ].join("\n")
+}
+
+export function buildNonCanonicalCleanupNudge(nonCanonicalPaths: string[]): string {
+  if (nonCanonicalPaths.length === 0) return ""
+  const listed = nonCanonicalPaths.slice(0, 20).map((entry) => `- ${entry}`)
+  if (nonCanonicalPaths.length > 20) {
+    listed.push(`- ... (${nonCanonicalPaths.length - 20} more)`)
+  }
+  return [
+    "## canonical cleanup nudge",
+    "I found non-canonical files in my bundle. I should distill anything valuable into your memory system and remove these files.",
+    ...listed,
   ].join("\n")
 }
 
@@ -174,7 +188,12 @@ export async function runInnerDialogTurn(options?: RunInnerDialogTurnOptions): P
     const systemPrompt = await buildSystem("cli", { toolChoiceRequired: true })
     messages.push({ role: "system", content: systemPrompt })
     const aspirations = readAspirations(getAgentRoot())
-    const bootstrapMessage = buildInnerDialogBootstrapMessage(aspirations, "No prior inner dialog session found.")
+    const nonCanonical = findNonCanonicalBundlePaths(getAgentRoot())
+    const cleanupNudge = buildNonCanonicalCleanupNudge(nonCanonical)
+    const bootstrapMessage = [
+      buildInnerDialogBootstrapMessage(aspirations, "No prior inner dialog session found."),
+      cleanupNudge,
+    ].filter(Boolean).join("\n\n")
     messages.push({ role: "user", content: bootstrapMessage })
   } else {
     const assistantTurns = messages.filter((message) => message.role === "assistant").length
