@@ -41,6 +41,7 @@ vi.mock("../../identity", () => ({
     contextMargin: 20,
   },
   getAgentName: vi.fn(() => "testagent"),
+  getAgentSecretsPath: vi.fn(() => "/tmp/.agentsecrets/testagent/secrets.json"),
   getAgentRoot: vi.fn(() => "/mock/repo/testagent"),
   getRepoRoot: vi.fn(() => "/mock/repo"),
   resetIdentity: vi.fn(),
@@ -3393,7 +3394,7 @@ describe("anthropic setup-token provider contract", () => {
       )?.[0]?.message ?? ""
       expect(msg).toContain("no setup-token credential was found")
       expect(msg).toContain("claude setup-token")
-      expect(msg).toContain("~/.agentsecrets/testagent/secrets.json")
+      expect(msg).toContain("/tmp/.agentsecrets/testagent/secrets.json")
       expect(msg).toContain("providers.anthropic.setupToken")
     } finally {
       mockExit.mockRestore()
@@ -3426,7 +3427,7 @@ describe("anthropic setup-token provider contract", () => {
       )?.[0]?.message ?? ""
       expect(msg).toContain("model/setupToken is incomplete")
       expect(msg).toContain("claude setup-token")
-      expect(msg).toContain("~/.agentsecrets/testagent/secrets.json")
+      expect(msg).toContain("/tmp/.agentsecrets/testagent/secrets.json")
       expect(msg).toContain("providers.anthropic.setupToken")
     } finally {
       mockExit.mockRestore()

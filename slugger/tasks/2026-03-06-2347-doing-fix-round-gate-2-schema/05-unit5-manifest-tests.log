@@ -1,0 +1,19 @@
+
+> ouroboros-agent-harness@1.0.0 test
+> vitest run src/__tests__/mind/bundle-manifest.test.ts src/__tests__/nerves/bundle-skeleton.contract.test.ts
+
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+{"ts":"2026-03-07T08:11:27.885Z","level":"info","event":"mind.bundle_manifest_scan_start","trace_id":"6ed616cf-c22f-4dd7-83b5-699d4289d85e","component":"mind","message":"scanning bundle for non-canonical paths","meta":{"bundle_root":"/var/folders/md/_fkq3wc92_z55cgtlrfrcfh40000gn/T/bundle-manifest-test-QHDM5u"}}
+{"ts":"2026-03-07T08:11:27.895Z","level":"info","event":"mind.bundle_manifest_scan_end","trace_id":"5c1b3919-7999-4c69-897d-89a4a1a7d7b1","component":"mind","message":"bundle non-canonical scan complete","meta":{"bundle_root":"/var/folders/md/_fkq3wc92_z55cgtlrfrcfh40000gn/T/bundle-manifest-test-QHDM5u","non_canonical_count":4}}
+{"ts":"2026-03-07T08:11:27.897Z","level":"info","event":"mind.bundle_manifest_scan_start","trace_id":"104dd19e-9438-484a-80fe-97c408fab239","component":"mind","message":"scanning bundle for non-canonical paths","meta":{"bundle_root":"/var/folders/md/_fkq3wc92_z55cgtlrfrcfh40000gn/T/does-not-exist-bundle-root"}}
+{"ts":"2026-03-07T08:11:27.898Z","level":"info","event":"mind.bundle_manifest_scan_end","trace_id":"f2b07df0-0d66-4de5-8198-7d81c018f9b1","component":"mind","message":"bundle non-canonical scan complete","meta":{"bundle_root":"/var/folders/md/_fkq3wc92_z55cgtlrfrcfh40000gn/T/does-not-exist-bundle-root","non_canonical_count":0}}
+ ✓ src/__tests__/mind/bundle-manifest.test.ts (4 tests) 16ms
+ ✓ src/__tests__/nerves/bundle-skeleton.contract.test.ts (4 tests) 4ms
+
+ Test Files  2 passed (2)
+      Tests  8 passed (8)
+   Start at  00:11:27
+   Duration  316ms (transform 42ms, setup 45ms, import 25ms, tests 20ms, environment 0ms)
+

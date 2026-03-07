@@ -4,7 +4,7 @@
 import type { FriendRecord } from "./types"
 
 // Domain-specific store for friend records.
-// Implementations handle the PII split internally.
+// Implementations store unified friend records.
 export interface FriendStore {
   get(id: string): Promise<FriendRecord | null>
   put(id: string, record: FriendRecord): Promise<void>

@@ -1,7 +1,12 @@
 import * as fs from "fs"
 import * as path from "path"
 import * as os from "os"
-import { loadAgentConfig, getAgentName, DEFAULT_AGENT_CONTEXT } from "./identity"
+import {
+  loadAgentConfig,
+  getAgentName,
+  getAgentSecretsPath,
+  DEFAULT_AGENT_CONTEXT,
+} from "./identity"
 import { emitNervesEvent } from "./nerves/runtime"
 
 export interface AzureProviderConfig {
@@ -133,19 +138,7 @@ let _cachedConfig: OuroborosConfig | null = null
 let _testContextOverride: ContextConfig | null = null
 
 function resolveConfigPath(): string {
-  const raw = loadAgentConfig().configPath
-  if (
-    raw.startsWith("~/.agentconfigs/") ||
-    raw.includes("/.agentconfigs/")
-  ) {
-    throw new Error(
-      `Legacy configPath '${raw}' is not supported. Use ~/.agentsecrets/<agent>/secrets.json.`,
-    )
-  }
-  if (raw.startsWith("~")) {
-    return path.join(os.homedir(), raw.slice(1))
-  }
-  return raw
+  return getAgentSecretsPath()
 }
 
 function deepMerge(defaults: Record<string, unknown>, partial: Record<string, unknown>): Record<string, unknown> {

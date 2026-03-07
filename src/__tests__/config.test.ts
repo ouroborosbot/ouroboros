@@ -13,11 +13,17 @@ vi.mock("fs", () => ({
 // Mock identity module -- config.ts will import from ./identity
 vi.mock("../identity", () => ({
   loadAgentConfig: vi.fn(() => ({
-    name: "testagent",
-    configPath: "~/.agentsecrets/testagent/secrets.json",
-  provider: "minimax",
+    version: 1,
+    enabled: true,
+    provider: "minimax",
+    phrases: {
+      thinking: ["working"],
+      tool: ["running tool"],
+      followup: ["processing"],
+    },
   })),
   getAgentName: vi.fn(() => "testagent"),
+  getAgentSecretsPath: vi.fn(() => path.join(os.homedir(), ".agentsecrets", "testagent", "secrets.json")),
   DEFAULT_AGENT_CONTEXT: {
     maxTokens: 80000,
     contextMargin: 20,
@@ -32,11 +38,19 @@ beforeEach(() => {
   vi.mocked(fs.mkdirSync).mockReset()
   vi.mocked(fs.writeFileSync).mockReset()
   vi.mocked(identity.loadAgentConfig).mockReturnValue({
-    name: "testagent",
-    configPath: "~/.agentsecrets/testagent/secrets.json",
-  provider: "minimax",
+    version: 1,
+    enabled: true,
+    provider: "minimax",
+    phrases: {
+      thinking: ["working"],
+      tool: ["running tool"],
+      followup: ["processing"],
+    },
   })
   vi.mocked(identity.getAgentName).mockReturnValue("testagent")
+  vi.mocked((identity as any).getAgentSecretsPath).mockReturnValue(
+    path.join(os.homedir(), ".agentsecrets", "testagent", "secrets.json"),
+  )
 })
 
 afterEach(() => {
@@ -47,7 +61,7 @@ describe("loadConfig", () => {
     vi.resetModules()
   })
 
-  it("reads config from path specified in agent.json configPath", async () => {
+  it("reads config from the conventional ~/.agentsecrets/<agent>/secrets.json path", async () => {
     const configData = {
       providers: {
         azure: {
@@ -66,7 +80,7 @@ describe("loadConfig", () => {
 
     expect(config.providers.azure.apiKey).toBe("az-key")
     expect(config.providers.azure.endpoint).toBe("https://example.openai.azure.com")
-    // Should resolve ~ to homedir and use configPath from agent.json
+    // Should use conventional secrets path based on agent name.
     const expectedPath = path.join(os.homedir(), ".agentsecrets", "testagent", "secrets.json")
     expect(fs.readFileSync).toHaveBeenCalledWith(expectedPath, "utf-8")
   })
@@ -80,18 +94,6 @@ describe("loadConfig", () => {
 
     const expectedDir = path.join(os.homedir(), ".agentsecrets", "testagent")
     expect(fs.mkdirSync).toHaveBeenCalledWith(expectedDir, { recursive: true })
-  })
-
-  it("throws when agent.json configPath does not use .agentsecrets/<agent>/secrets.json", async () => {
-    vi.mocked(identity.loadAgentConfig).mockReturnValue({
-      name: "testagent",
-      configPath: "~/.agentconfigs/testagent/config.json",
-    provider: "minimax",
-    })
-
-    const { loadConfig, resetConfigCache } = await import("../config")
-    resetConfigCache()
-    expect(() => loadConfig()).toThrow(/\.agentsecrets.*secrets\.json/)
   })
 
   it("returns defaults when file is missing (ENOENT)", async () => {
@@ -258,7 +260,7 @@ describe("loadConfig", () => {
     resetConfigCache()
     loadConfig()
 
-    // Should NOT use the env var -- should use agent.json configPath
+    // Should NOT use the env var -- should use the conventional agent secrets path.
     const expectedPath = path.join(os.homedir(), ".agentsecrets", "testagent", "secrets.json")
     expect(fs.readFileSync).toHaveBeenCalledWith(expectedPath, "utf-8")
     expect(fs.readFileSync).not.toHaveBeenCalledWith("/tmp/should-not-be-used.json", "utf-8")
@@ -266,35 +268,18 @@ describe("loadConfig", () => {
     delete process.env.OUROBOROS_CONFIG_PATH
   })
 
-  it("resolves configPath with ~ to homedir", async () => {
-    vi.mocked(identity.loadAgentConfig).mockReturnValue({
-      name: "myagent",
-      configPath: "~/custom/path/config.json",
-    provider: "minimax",
-    })
+  it("uses resolved secrets path from identity helper", async () => {
+    vi.mocked((identity as any).getAgentSecretsPath).mockReturnValue(
+      path.join(os.homedir(), ".agentsecrets", "myagent", "secrets.json"),
+    )
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
 
     const { loadConfig, resetConfigCache } = await import("../config")
     resetConfigCache()
     loadConfig()
 
-    const expectedPath = path.join(os.homedir(), "custom", "path", "config.json")
+    const expectedPath = path.join(os.homedir(), ".agentsecrets", "myagent", "secrets.json")
     expect(fs.readFileSync).toHaveBeenCalledWith(expectedPath, "utf-8")
-  })
-
-  it("uses absolute configPath as-is", async () => {
-    vi.mocked(identity.loadAgentConfig).mockReturnValue({
-      name: "myagent",
-      configPath: "/absolute/path/config.json",
-    provider: "minimax",
-    })
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
-
-    const { loadConfig, resetConfigCache } = await import("../config")
-    resetConfigCache()
-    loadConfig()
-
-    expect(fs.readFileSync).toHaveBeenCalledWith("/absolute/path/config.json", "utf-8")
   })
 
   it("caches config after first load", async () => {
@@ -470,12 +455,17 @@ describe("getContextConfig", () => {
 
   it("returns context config from agent.json", async () => {
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
-      name: "testagent",
-      configPath: "~/.agentsecrets/testagent/secrets.json",
+      version: 1,
+      enabled: true,
       provider: "minimax",
       context: {
         maxTokens: 100000,
         contextMargin: 25,
+      },
+      phrases: {
+        thinking: ["working"],
+        tool: ["running tool"],
+        followup: ["processing"],
       },
     } as any)
 
@@ -508,12 +498,17 @@ describe("getContextConfig", () => {
 
   it("falls back per-field defaults when agent.json context has invalid types", async () => {
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
-      name: "testagent",
-      configPath: "~/.agentsecrets/testagent/secrets.json",
+      version: 1,
+      enabled: true,
       provider: "minimax",
       context: {
         maxTokens: "bad",
         contextMargin: 12,
+      },
+      phrases: {
+        thinking: ["working"],
+        tool: ["running tool"],
+        followup: ["processing"],
       },
     } as any)
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
@@ -528,12 +523,17 @@ describe("getContextConfig", () => {
 
   it("falls back contextMargin to default when agent.json contextMargin is not numeric", async () => {
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
-      name: "testagent",
-      configPath: "~/.agentsecrets/testagent/secrets.json",
+      version: 1,
+      enabled: true,
       provider: "minimax",
       context: {
         maxTokens: 91000,
         contextMargin: "bad",
+      },
+      phrases: {
+        thinking: ["working"],
+        tool: ["running tool"],
+        followup: ["processing"],
       },
     } as any)
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
