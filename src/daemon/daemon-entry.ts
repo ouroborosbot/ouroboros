@@ -4,6 +4,7 @@ import { emitNervesEvent } from "../nerves/runtime"
 import { FileMessageRouter } from "./message-router"
 import { HealthMonitor } from "./health-monitor"
 import { TaskDrivenScheduler } from "./task-scheduler"
+import { configureDaemonRuntimeLogger } from "./runtime-logging"
 
 function parseSocketPath(argv: string[]): string {
   const socketIndex = argv.indexOf("--socket")
@@ -15,6 +16,8 @@ function parseSocketPath(argv: string[]): string {
 }
 
 const socketPath = parseSocketPath(process.argv)
+
+configureDaemonRuntimeLogger("daemon")
 
 emitNervesEvent({
   component: "daemon",

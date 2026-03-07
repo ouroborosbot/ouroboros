@@ -78,10 +78,48 @@ export function createFanoutSink(sinks: LogSink[]): LogSink {
   }
 }
 
-export function createStderrSink(write: (chunk: string) => unknown = (chunk) => process.stderr.write(chunk)): LogSink {
-  return (entry: LogEvent): void => {
-    write(`${JSON.stringify(entry)}\n`)
+function formatTerminalTime(ts: string): string {
+  const parsed = new Date(ts)
+  if (Number.isNaN(parsed.getTime())) {
+    return ts
   }
+  return parsed.toISOString().slice(11, 19)
+}
+
+function formatTerminalMeta(meta: Record<string, unknown>): string {
+  if (Object.keys(meta).length === 0) return ""
+  return ` ${JSON.stringify(meta)}`
+}
+
+const LEVEL_COLORS: Record<LogLevel, string> = {
+  debug: "\x1b[2m",
+  info: "\x1b[36m",
+  warn: "\x1b[33m",
+  error: "\x1b[31m",
+}
+
+export function formatTerminalEntry(entry: LogEvent): string {
+  const level = entry.level.toUpperCase()
+  return `${formatTerminalTime(entry.ts)} ${level} [${entry.component}] ${entry.message}${formatTerminalMeta(entry.meta)}`
+}
+
+export function createTerminalSink(
+  write: (chunk: string) => unknown = (chunk) => process.stderr.write(chunk),
+  colorize = true,
+): LogSink {
+  return (entry: LogEvent): void => {
+    const line = formatTerminalEntry(entry)
+    if (!colorize) {
+      write(`${line}\n`)
+      return
+    }
+    const prefix = LEVEL_COLORS[entry.level]
+    write(`${prefix}${line}\x1b[0m\n`)
+  }
+}
+
+export function createStderrSink(write: (chunk: string) => unknown = (chunk) => process.stderr.write(chunk)): LogSink {
+  return createTerminalSink(write)
 }
 
 export function createNdjsonFileSink(filePath: string): LogSink {

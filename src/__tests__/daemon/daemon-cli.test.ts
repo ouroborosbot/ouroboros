@@ -56,6 +56,12 @@ describe("ouro CLI parsing", () => {
   it("throws on malformed command shapes", () => {
     expect(() => parseOuroCommand(["chat"])).toThrow("Usage")
     expect(() => parseOuroCommand(["msg", "--to", "slugger"])).toThrow("Usage")
+    expect(() => parseOuroCommand(["poke"])).toThrow("Usage")
+    expect(parseOuroCommand(["poke", "slugger", "extra", "--task", "habit-heartbeat"])).toEqual({
+      kind: "task.poke",
+      agent: "slugger",
+      taskId: "habit-heartbeat",
+    })
     expect(() => parseOuroCommand(["poke", "slugger"])).toThrow("Usage")
     expect(() => parseOuroCommand(["mystery"])).toThrow("Unknown command")
   })
@@ -63,6 +69,11 @@ describe("ouro CLI parsing", () => {
 
 describe("ouro CLI execution", () => {
   it("starts daemon on `up` when socket is not live", async () => {
+    const installSubagents = vi.fn(async () => ({
+      claudeInstalled: 0,
+      codexInstalled: 0,
+      notes: [],
+    }))
     const deps: OuroCliDeps = {
       socketPath: "/tmp/ouro-test.sock",
       sendCommand: vi.fn(),
@@ -71,16 +82,23 @@ describe("ouro CLI execution", () => {
       checkSocketAlive: vi.fn(async () => false),
       cleanupStaleSocket: vi.fn(),
       fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents,
     }
 
     const result = await runOuroCli(["up"], deps)
 
     expect(result).toContain("daemon started")
+    expect(installSubagents).toHaveBeenCalledTimes(1)
     expect(deps.startDaemonProcess).toHaveBeenCalledWith("/tmp/ouro-test.sock")
     expect(deps.sendCommand).not.toHaveBeenCalled()
   })
 
   it("is idempotent for `up` when daemon already running", async () => {
+    const installSubagents = vi.fn(async () => ({
+      claudeInstalled: 0,
+      codexInstalled: 0,
+      notes: [],
+    }))
     const deps: OuroCliDeps = {
       socketPath: "/tmp/ouro-test.sock",
       sendCommand: vi.fn(),
@@ -89,11 +107,13 @@ describe("ouro CLI execution", () => {
       checkSocketAlive: vi.fn(async () => true),
       cleanupStaleSocket: vi.fn(),
       fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents,
     }
 
     const result = await runOuroCli(["up"], deps)
 
     expect(result).toContain("already running")
+    expect(installSubagents).toHaveBeenCalledTimes(1)
     expect(deps.startDaemonProcess).not.toHaveBeenCalled()
     expect(deps.sendCommand).not.toHaveBeenCalled()
   })
@@ -107,6 +127,7 @@ describe("ouro CLI execution", () => {
       checkSocketAlive: vi.fn(async () => true),
       cleanupStaleSocket: vi.fn(),
       fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
     }
 
     const result = await runOuroCli(["status"], deps)
@@ -118,6 +139,46 @@ describe("ouro CLI execution", () => {
     expect(result).toContain("running")
   })
 
+  it("continues `up` flow when subagent install throws", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(async () => ({ pid: 777 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => {
+        throw new Error("install exploded")
+      }),
+    }
+
+    const result = await runOuroCli(["up"], deps)
+
+    expect(result).toContain("daemon started")
+    expect(deps.startDaemonProcess).toHaveBeenCalledTimes(1)
+  })
+
+  it("continues `up` flow when subagent install throws a non-Error value", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(async () => ({ pid: 778 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => {
+        throw "install exploded string"
+      }),
+    }
+
+    const result = await runOuroCli(["up"], deps)
+
+    expect(result).toContain("daemon started")
+    expect(deps.startDaemonProcess).toHaveBeenCalledTimes(1)
+  })
+
   it("routes msg command through daemon socket", async () => {
     const deps: OuroCliDeps = {
       socketPath: "/tmp/ouro-test.sock",
@@ -127,6 +188,7 @@ describe("ouro CLI execution", () => {
       checkSocketAlive: vi.fn(async () => true),
       cleanupStaleSocket: vi.fn(),
       fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
     }
 
     await runOuroCli(["msg", "--to", "slugger", "hi"], deps)
@@ -153,6 +215,7 @@ describe("ouro CLI execution", () => {
       checkSocketAlive: vi.fn(async () => true),
       cleanupStaleSocket: vi.fn(),
       fallbackPendingMessage: vi.fn(() => "/tmp/AgentBundles/slugger.ouro/inbox/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
     }
 
     const result = await runOuroCli(["msg", "--to", "slugger", "hi"], deps)

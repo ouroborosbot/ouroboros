@@ -5,6 +5,7 @@ import * as path from "path"
 import { getAgentBundlesRoot, getRepoRoot } from "../identity"
 import { emitNervesEvent } from "../nerves/runtime"
 import type { DaemonCommand, DaemonResponse } from "./daemon"
+import { installSubagentsForAvailableCli, type SubagentInstallResult } from "./subagent-installer"
 
 export type OuroCliCommand =
   | { kind: "daemon.up" }
@@ -24,6 +25,7 @@ export interface OuroCliDeps {
   checkSocketAlive: (socketPath: string) => Promise<boolean>
   cleanupStaleSocket: (socketPath: string) => void
   fallbackPendingMessage: (command: Extract<DaemonCommand, { kind: "message.send" }>) => string
+  installSubagents: () => Promise<SubagentInstallResult>
 }
 
 function usage(): string {
@@ -237,6 +239,12 @@ function defaultFallbackPendingMessage(command: Extract<DaemonCommand, { kind: "
   return pendingPath
 }
 
+async function defaultInstallSubagents(): Promise<SubagentInstallResult> {
+  return installSubagentsForAvailableCli({
+    repoRoot: getRepoRoot(),
+  })
+}
+
 export function createDefaultOuroCliDeps(socketPath = "/tmp/ouroboros-daemon.sock"): OuroCliDeps {
   return {
     socketPath,
@@ -246,6 +254,7 @@ export function createDefaultOuroCliDeps(socketPath = "/tmp/ouroboros-daemon.soc
     checkSocketAlive: defaultCheckSocketAlive,
     cleanupStaleSocket: defaultCleanupStaleSocket,
     fallbackPendingMessage: defaultFallbackPendingMessage,
+    installSubagents: defaultInstallSubagents,
   }
 }
 
@@ -263,6 +272,18 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   })
 
   if (command.kind === "daemon.up") {
+    try {
+      await deps.installSubagents()
+    } catch (error) {
+      emitNervesEvent({
+        level: "warn",
+        component: "daemon",
+        event: "daemon.subagent_install_error",
+        message: "subagent auto-install failed",
+        meta: { error: error instanceof Error ? error.message : String(error) },
+      })
+    }
+
     const alive = await deps.checkSocketAlive(deps.socketPath)
     if (alive) {
       const message = `daemon already running (${deps.socketPath})`
