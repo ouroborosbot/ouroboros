@@ -57,7 +57,7 @@ Complete Gate 7 by shipping final docs, auditing all skipped tests called out by
 **Output**: Final `docs/testing-guide.md` and any test updates validating doc contract.
 **Acceptance**: Guide includes all required flow steps (`ouro up` -> `ouro hatch` -> chat -> coding spawn -> `ouro msg` -> heartbeat -> `ouro stop`) with expected output cues and troubleshooting section.
 
-### ⬜ Unit 2: ARCHITECTURE.md Post-Fix-Round Refresh
+### ✅ Unit 2: ARCHITECTURE.md Post-Fix-Round Refresh
 **What**: Update `ARCHITECTURE.md` to reflect final architecture decisions from subsystem audit outcomes and post-fix-round runtime behavior.
 **Output**: Updated architecture documentation aligned with current codebase.
 **Acceptance**: Doc covers unified process model, subsystem/body metaphor, removed components, daemon command surface, directory layout, and canonical bundle manifest.
@@ -87,3 +87,4 @@ Complete Gate 7 by shipping final docs, auditing all skipped tests called out by
 - 2026-03-07 03:59 Quality pass complete (no changes needed).
 - 2026-03-07 04:00 Unit 0 complete: baseline doc/test inventory captured in artifacts.
 - 2026-03-07 04:01 Unit 1 complete: added testing-guide contract test and authored docs/testing-guide.md walkthrough with troubleshooting.
+- 2026-03-07 04:03 Unit 2 complete: refreshed ARCHITECTURE.md for unified daemon runtime, subsystem map, command surface, and canonical bundle contract.
