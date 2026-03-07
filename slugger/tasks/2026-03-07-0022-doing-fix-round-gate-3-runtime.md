@@ -66,7 +66,7 @@ Implement Gate 3 runtime-core architecture: unified agent process entrypoint, da
 **Output**: Updated entrypoint/runtime integration with tests covering event-source handling.
 **Acceptance**: Runtime starts through unified entrypoint and can process poke/message triggers in tests.
 
-### ⬜ Unit 3: `ouro msg` Routing + Pending Fallback
+### ✅ Unit 3: `ouro msg` Routing + Pending Fallback
 **What**: Implement `ouro msg` daemon routing with fallback to pending inbox file when socket is unavailable, plus daemon boot-drain behavior.
 **Output**: CLI/daemon/message-router updates and tests for success/fallback/drain scenarios.
 **Acceptance**: Message command is deterministic and fallback path is covered by tests.
@@ -104,3 +104,4 @@ Implement Gate 3 runtime-core architecture: unified agent process entrypoint, da
 - 2026-03-07 00:24 Unit 0 complete: Captured baseline daemon CLI/command-plane, coding spawn contract, and runtime entrypoint snapshots.
 - 2026-03-07 00:30 Unit 1 complete: Rewrote CLI command parsing/execution to Gate 3 primary surface (`up/stop/status/logs/chat/msg/poke/hatch`), added idempotent liveness checks + stale socket cleanup, and added daemon command handlers for `daemon.logs`, `chat.connect`, `task.poke`, and `hatch.start` with passing daemon suites.
 - 2026-03-07 00:33 Unit 2 complete: Added unified `heart/agent-entry` runtime entrypoint, switched daemon-managed agents to `heart/agent-entry.js`, and extended worker event handling so `poke`/`chat`/`message` inputs trigger active turn cycles.
+- 2026-03-07 00:36 Unit 3 complete: Added `ouro msg` socket-failure fallback to `<bundle>/inbox/pending.jsonl`, extended routed message schema with `sessionId`/`taskRef`, and added daemon startup drain of pending bundle inbox lines back into the live message router.

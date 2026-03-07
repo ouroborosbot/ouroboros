@@ -70,6 +70,7 @@ describe("ouro CLI execution", () => {
       writeStdout: vi.fn(),
       checkSocketAlive: vi.fn(async () => false),
       cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
     }
 
     const result = await runOuroCli(["up"], deps)
@@ -87,6 +88,7 @@ describe("ouro CLI execution", () => {
       writeStdout: vi.fn(),
       checkSocketAlive: vi.fn(async () => true),
       cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
     }
 
     const result = await runOuroCli(["up"], deps)
@@ -104,6 +106,7 @@ describe("ouro CLI execution", () => {
       writeStdout: vi.fn(),
       checkSocketAlive: vi.fn(async () => true),
       cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
     }
 
     const result = await runOuroCli(["status"], deps)
@@ -123,6 +126,7 @@ describe("ouro CLI execution", () => {
       writeStdout: vi.fn(),
       checkSocketAlive: vi.fn(async () => true),
       cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
     }
 
     await runOuroCli(["msg", "--to", "slugger", "hi"], deps)
@@ -136,6 +140,29 @@ describe("ouro CLI execution", () => {
         content: "hi",
       }),
     )
+  })
+
+  it("falls back to pending inbox when msg cannot reach daemon", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => {
+        throw new Error("connect ECONNREFUSED")
+      }),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/AgentBundles/slugger.ouro/inbox/pending.jsonl"),
+    }
+
+    const result = await runOuroCli(["msg", "--to", "slugger", "hi"], deps)
+
+    expect(deps.fallbackPendingMessage).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "message.send",
+      to: "slugger",
+      content: "hi",
+    }))
+    expect(result).toContain("queued message fallback")
   })
 })
 
