@@ -8,6 +8,8 @@
     "ouro": "tsc && node dist/daemon/ouro-entry.js",
     "teams": "tsc && node dist/teams-entry.js --agent ouroboros",
     "test": "vitest run",
+    "test:coverage:vitest": "vitest run --coverage",
+    "test:coverage": "node scripts/run-coverage-gate.cjs",
     "build": "tsc",
     "lint": "eslint src/",
     "audit:nerves": "npm run build && node dist/nerves/coverage/cli-main.js"
