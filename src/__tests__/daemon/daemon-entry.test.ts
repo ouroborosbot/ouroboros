@@ -53,6 +53,12 @@ describe("daemon entrypoint", () => {
     expect(processManagerCtor).toHaveBeenCalledTimes(1)
     expect(daemonCtor).toHaveBeenCalledTimes(1)
 
+    const processManagerOptions = processManagerCtor.mock.calls[0]?.[0] as {
+      agents: Array<{ entry: string }>
+    }
+    expect(processManagerOptions.agents.length).toBeGreaterThan(0)
+    expect(processManagerOptions.agents.every((agent) => agent.entry === "heart/agent-entry.js")).toBe(true)
+
     const daemonOptions = daemonCtor.mock.calls[0]?.[0] as {
       scheduler: {
         listJobs: () => unknown[]

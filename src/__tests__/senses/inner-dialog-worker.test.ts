@@ -14,18 +14,24 @@ vi.mock("../../nerves/runtime", () => ({
 import { createInnerDialogWorker, startInnerDialogWorker } from "../../senses/inner-dialog-worker"
 
 describe("inner-dialog-worker", () => {
-  it("runs boot/heartbeat cycles and ignores unknown messages", async () => {
+  it("runs boot/heartbeat/instinct cycles and ignores unknown messages", async () => {
     const runTurn = vi.fn().mockResolvedValue(undefined)
     const worker = createInnerDialogWorker(runTurn)
 
     await worker.run("boot")
     await worker.handleMessage({ type: "heartbeat" })
+    await worker.handleMessage({ type: "poke" })
+    await worker.handleMessage({ type: "chat" })
+    await worker.handleMessage({ type: "message" })
     await worker.handleMessage({ type: "unknown" })
     await worker.handleMessage(null)
 
-    expect(runTurn).toHaveBeenCalledTimes(2)
+    expect(runTurn).toHaveBeenCalledTimes(5)
     expect(runTurn).toHaveBeenNthCalledWith(1, { reason: "boot" })
     expect(runTurn).toHaveBeenNthCalledWith(2, { reason: "heartbeat" })
+    expect(runTurn).toHaveBeenNthCalledWith(3, { reason: "instinct" })
+    expect(runTurn).toHaveBeenNthCalledWith(4, { reason: "instinct" })
+    expect(runTurn).toHaveBeenNthCalledWith(5, { reason: "instinct" })
   })
 
   it("emits an error event when a turn fails", async () => {
@@ -83,7 +89,7 @@ describe("inner-dialog-worker", () => {
     expect(runTurn).toHaveBeenCalledTimes(1)
   })
 
-  it("starts worker listeners and triggers boot + heartbeat cycle", async () => {
+  it("starts worker listeners and triggers boot + event cycles", async () => {
     mockRunInnerDialogTurn.mockReset().mockResolvedValue(undefined)
     const listeners: Record<string, (...args: any[]) => void> = {}
     const onSpy = vi.spyOn(process, "on").mockImplementation(((event: string, handler: (...args: any[]) => void) => {
@@ -101,6 +107,10 @@ describe("inner-dialog-worker", () => {
       listeners.message?.({ type: "heartbeat" })
       await Promise.resolve()
       expect(mockRunInnerDialogTurn).toHaveBeenCalledWith({ reason: "heartbeat" })
+
+      listeners.message?.({ type: "poke" })
+      await Promise.resolve()
+      expect(mockRunInnerDialogTurn).toHaveBeenCalledWith({ reason: "instinct" })
 
       expect(() => listeners.disconnect?.()).toThrow("process.exit called")
     } finally {

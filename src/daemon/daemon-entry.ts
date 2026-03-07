@@ -24,8 +24,8 @@ emitNervesEvent({
 
 const processManager = new DaemonProcessManager({
   agents: [
-    { name: "ouroboros", entry: "inner-worker-entry.js", channel: "cli", autoStart: true },
-    { name: "slugger", entry: "inner-worker-entry.js", channel: "cli", autoStart: true },
+    { name: "ouroboros", entry: "heart/agent-entry.js", channel: "cli", autoStart: true },
+    { name: "slugger", entry: "heart/agent-entry.js", channel: "cli", autoStart: true },
   ],
 })
 

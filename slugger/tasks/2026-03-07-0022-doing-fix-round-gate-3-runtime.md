@@ -18,7 +18,7 @@ Implement Gate 3 runtime-core architecture: unified agent process entrypoint, da
 ## Completion Criteria
 - [x] Daemon CLI command surface matches Gate 3 contract (`up`, `stop`, `status`, `logs`, `chat`, `msg`, `hatch`)
 - [x] Daemon command plane supports `chat.connect`, `message.send`, `message.poll`, and `task.poke` paths used by new CLI commands
-- [ ] Unified agent entrypoint replaces inner-worker-only startup contract
+- [x] Unified agent entrypoint replaces inner-worker-only startup contract
 - [ ] Coding spawner removes `subagent`, uses `--cd` for codex, stream-json flags for claude, and richer failure diagnostics
 - [ ] Coding session manager persists and reloads session state
 - [ ] Task-driven schedule reconciliation + `ouro poke` forwarding implemented with tests
@@ -61,7 +61,7 @@ Implement Gate 3 runtime-core architecture: unified agent process entrypoint, da
 **Output**: Updated daemon CLI + daemon command handling with focused tests.
 **Acceptance**: Daemon CLI and daemon command-plane suites pass and enforce new contract.
 
-### ⬜ Unit 2: Unified Agent Entry And Event Sources
+### ✅ Unit 2: Unified Agent Entry And Event Sources
 **What**: Rework inner-worker entry path into unified agent process entry behavior (chat/messages/task poke/heartbeat wake model), preserving deterministic startup and wiring needed by daemon.
 **Output**: Updated entrypoint/runtime integration with tests covering event-source handling.
 **Acceptance**: Runtime starts through unified entrypoint and can process poke/message triggers in tests.
@@ -103,3 +103,4 @@ Implement Gate 3 runtime-core architecture: unified agent process entrypoint, da
 - 2026-03-07 00:22 Created from planning doc.
 - 2026-03-07 00:24 Unit 0 complete: Captured baseline daemon CLI/command-plane, coding spawn contract, and runtime entrypoint snapshots.
 - 2026-03-07 00:30 Unit 1 complete: Rewrote CLI command parsing/execution to Gate 3 primary surface (`up/stop/status/logs/chat/msg/poke/hatch`), added idempotent liveness checks + stale socket cleanup, and added daemon command handlers for `daemon.logs`, `chat.connect`, `task.poke`, and `hatch.start` with passing daemon suites.
+- 2026-03-07 00:33 Unit 2 complete: Added unified `heart/agent-entry` runtime entrypoint, switched daemon-managed agents to `heart/agent-entry.js`, and extended worker event handling so `poke`/`chat`/`message` inputs trigger active turn cycles.
