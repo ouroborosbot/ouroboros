@@ -46,6 +46,23 @@ describe("ouro CLI parsing", () => {
       agent: "slugger",
       taskId: "habit-heartbeat",
     })
+
+    expect(parseOuroCommand([
+      "link",
+      "slugger",
+      "--friend",
+      "friend-1",
+      "--provider",
+      "aad",
+      "--external-id",
+      "aad-user-123",
+    ])).toEqual({
+      kind: "friend.link",
+      agent: "slugger",
+      friendId: "friend-1",
+      provider: "aad",
+      externalId: "aad-user-123",
+    })
   })
 
   it("rejects deprecated command families", () => {
@@ -57,6 +74,54 @@ describe("ouro CLI parsing", () => {
     expect(() => parseOuroCommand(["chat"])).toThrow("Usage")
     expect(() => parseOuroCommand(["msg", "--to", "slugger"])).toThrow("Usage")
     expect(() => parseOuroCommand(["poke"])).toThrow("Usage")
+    expect(() => parseOuroCommand(["link"])).toThrow("Usage")
+    expect(() => parseOuroCommand(["link", "slugger", "--friend", "friend-1", "--provider", "aad"])).toThrow("Usage")
+    expect(() =>
+      parseOuroCommand([
+        "link",
+        "slugger",
+        "--friend",
+        "friend-1",
+        "--provider",
+        "unknown-provider",
+        "--external-id",
+        "ext-1",
+      ]),
+    ).toThrow("Unknown identity provider")
+    expect(parseOuroCommand([
+      "link",
+      "slugger",
+      "--external-id",
+      "ext-1",
+      "--provider",
+      "aad",
+      "--friend",
+      "friend-1",
+    ])).toEqual({
+      kind: "friend.link",
+      agent: "slugger",
+      friendId: "friend-1",
+      provider: "aad",
+      externalId: "ext-1",
+    })
+    expect(parseOuroCommand([
+      "link",
+      "slugger",
+      "--friend",
+      "friend-1",
+      "--provider",
+      "aad",
+      "--external-id",
+      "ext-1",
+      "--ignored",
+      "value",
+    ])).toEqual({
+      kind: "friend.link",
+      agent: "slugger",
+      friendId: "friend-1",
+      provider: "aad",
+      externalId: "ext-1",
+    })
     expect(parseOuroCommand(["poke", "slugger", "extra", "--task", "habit-heartbeat"])).toEqual({
       kind: "task.poke",
       agent: "slugger",
@@ -202,6 +267,41 @@ describe("ouro CLI execution", () => {
         content: "hi",
       }),
     )
+  })
+
+  it("routes link command through local friend linker instead of daemon socket", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, message: "unexpected daemon call" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      linkFriendIdentity: vi.fn(async () => "linked aad:aad-user-123 to friend-1"),
+    }
+
+    const result = await runOuroCli([
+      "link",
+      "slugger",
+      "--friend",
+      "friend-1",
+      "--provider",
+      "aad",
+      "--external-id",
+      "aad-user-123",
+    ], deps)
+
+    expect(result).toContain("linked aad:aad-user-123 to friend-1")
+    expect(deps.linkFriendIdentity).toHaveBeenCalledWith({
+      kind: "friend.link",
+      agent: "slugger",
+      friendId: "friend-1",
+      provider: "aad",
+      externalId: "aad-user-123",
+    })
+    expect(deps.sendCommand).not.toHaveBeenCalled()
   })
 
   it("falls back to pending inbox when msg cannot reach daemon", async () => {

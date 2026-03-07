@@ -60,11 +60,22 @@ export class FriendResolver {
     const tenantMemberships: string[] =
       this.params.tenantId ? [this.params.tenantId] : []
 
+    let hasAnyFriends = false
+    try {
+      if (typeof this.store.hasAnyFriends === "function") {
+        hasAnyFriends = await this.store.hasAnyFriends()
+      }
+    } catch {
+      hasAnyFriends = false
+    }
+
+    const isFirstImprint = !hasAnyFriends
+
     const friend: FriendRecord = {
       id: randomUUID(),
       name: this.params.displayName,
-      role: "friend",
-      trustLevel: "friend",
+      role: isFirstImprint ? "primary" : "stranger",
+      trustLevel: isFirstImprint ? "family" : "stranger",
       connections: [],
       externalIds: [externalId],
       tenantMemberships,

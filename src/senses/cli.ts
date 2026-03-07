@@ -18,6 +18,7 @@ import { accumulateFriendTokens } from "../mind/friends/tokens"
 import type { ToolContext } from "../repertoire/tools"
 import { configureCliRuntimeLogger } from "./cli-logging"
 import { emitNervesEvent } from "../nerves/runtime"
+import { enforceTrustGate } from "./trust-gate"
 
 // readline.Interface exposes undocumented mutable line/cursor for in-progress input
 type ReadlineInternals = readline.Interface & { line: string; cursor: number }
@@ -352,9 +353,10 @@ export async function main() {
   const friendStore = new FileFriendStore(friendsPath)
   const username = os.userInfo().username
   const hostname = os.hostname()
+  const localExternalId = `${username}@${hostname}`
   const resolver = new FriendResolver(friendStore, {
     provider: "local" as const,
-    externalId: `${username}@${hostname}`,
+    externalId: localExternalId,
     displayName: username,
     channel: "cli",
   })
@@ -415,6 +417,21 @@ export async function main() {
     for await (const input of rl) {
       if (closed) break
       if (!input.trim()) { process.stdout.write("\x1b[36m> \x1b[0m"); continue }
+
+      const trustGate = enforceTrustGate({
+        friend: resolvedContext.friend,
+        provider: "local",
+        externalId: localExternalId,
+        channel: "cli",
+      })
+      if (!trustGate.allowed) {
+        if (trustGate.reason === "stranger_first_reply") {
+          process.stdout.write(`${trustGate.autoReply}\n`)
+        }
+        if (closed) break
+        process.stdout.write("\x1b[36m> \x1b[0m")
+        continue
+      }
 
       // Check for slash commands
       const parsed = parseSlashCommand(input)

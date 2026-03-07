@@ -38,6 +38,7 @@ vi.mock("../../nerves/runtime", () => ({
 
 import {
   buildInnerDialogBootstrapMessage,
+  buildNonCanonicalCleanupNudge,
   buildInstinctUserMessage,
   deriveResumeCheckpoint,
   loadInnerDialogInstincts,
@@ -141,6 +142,18 @@ describe("inner dialog runtime", () => {
     expect(text.toLowerCase()).toContain("heartbeat instinct")
   })
 
+  it("returns empty cleanup nudge when no non-canonical files are found", () => {
+    expect(buildNonCanonicalCleanupNudge([])).toBe("")
+  })
+
+  it("caps cleanup nudge path list and includes overflow count", () => {
+    const paths = Array.from({ length: 21 }, (_value, idx) => `legacy/path-${idx}.txt`)
+    const nudge = buildNonCanonicalCleanupNudge(paths)
+    expect(nudge).toContain("legacy/path-0.txt")
+    expect(nudge).toContain("legacy/path-19.txt")
+    expect(nudge).toContain("... (1 more)")
+  })
+
   it("starts autonomous turn with bootstrap context and runs agent on cli channel", async () => {
     await runInnerDialogTurn({
       reason: "boot",
@@ -168,6 +181,23 @@ describe("inner dialog runtime", () => {
 
     const [messages] = mockRunAgent.mock.calls[0]
     expect(String(messages[1].content)).toContain("No explicit aspirations file found")
+  })
+
+  it("injects non-canonical cleanup nudge on boot when bundle scan finds legacy files", async () => {
+    const legacyDir = path.join(agentRoot, "teams-app")
+    fs.mkdirSync(legacyDir, { recursive: true })
+    fs.writeFileSync(path.join(legacyDir, "manifest.json"), "{}", "utf8")
+
+    await runInnerDialogTurn({
+      reason: "boot",
+      instincts: [{ id: "heartbeat", prompt: "Instinct: check in.", enabled: true }],
+      now: () => new Date("2026-03-06T12:02:00.000Z"),
+    })
+
+    const [messages] = mockRunAgent.mock.calls[0]
+    const bootstrap = String(messages[1].content)
+    expect(bootstrap).toContain("distill anything valuable into your memory system and remove these files")
+    expect(bootstrap).toContain("teams-app/manifest.json")
   })
 
   it("appends instinct-driven user messages on resumed sessions", async () => {

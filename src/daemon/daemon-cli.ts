@@ -4,6 +4,8 @@ import * as net from "net"
 import * as path from "path"
 import { getAgentBundlesRoot, getRepoRoot } from "../identity"
 import { emitNervesEvent } from "../nerves/runtime"
+import { FileFriendStore } from "../mind/friends/store-file"
+import { isIdentityProvider, type IdentityProvider } from "../mind/friends/types"
 import type { DaemonCommand, DaemonResponse } from "./daemon"
 import { installSubagentsForAvailableCli, type SubagentInstallResult } from "./subagent-installer"
 
@@ -15,6 +17,7 @@ export type OuroCliCommand =
   | { kind: "chat.connect"; agent: string }
   | { kind: "message.send"; from: string; to: string; content: string; sessionId?: string; taskRef?: string }
   | { kind: "task.poke"; agent: string; taskId: string }
+  | { kind: "friend.link"; agent: string; friendId: string; provider: IdentityProvider; externalId: string }
   | { kind: "hatch.start" }
 
 export interface OuroCliDeps {
@@ -26,6 +29,7 @@ export interface OuroCliDeps {
   cleanupStaleSocket: (socketPath: string) => void
   fallbackPendingMessage: (command: Extract<DaemonCommand, { kind: "message.send" }>) => string
   installSubagents: () => Promise<SubagentInstallResult>
+  linkFriendIdentity?: (command: Extract<OuroCliCommand, { kind: "friend.link" }>) => Promise<string>
 }
 
 function usage(): string {
@@ -36,6 +40,7 @@ function usage(): string {
     "  ouro chat <agent>",
     "  ouro msg --to <agent> [--session <id>] [--task <ref>] <message>",
     "  ouro poke <agent> --task <task-id>",
+    "  ouro link <agent> --friend <id> --provider <provider> --external-id <external-id>",
   ].join("\n")
 }
 
@@ -94,6 +99,48 @@ function parsePokeCommand(args: string[]): OuroCliCommand {
   return { kind: "task.poke", agent, taskId }
 }
 
+function parseLinkCommand(args: string[]): OuroCliCommand {
+  const agent = args[0]
+  if (!agent) throw new Error(`Usage\n${usage()}`)
+
+  let friendId: string | undefined
+  let providerRaw: string | undefined
+  let externalId: string | undefined
+  for (let i = 1; i < args.length; i += 1) {
+    const token = args[i]
+    if (token === "--friend") {
+      friendId = args[i + 1]
+      i += 1
+      continue
+    }
+    if (token === "--provider") {
+      providerRaw = args[i + 1]
+      i += 1
+      continue
+    }
+    if (token === "--external-id") {
+      externalId = args[i + 1]
+      i += 1
+      continue
+    }
+  }
+
+  if (!friendId || !providerRaw || !externalId) {
+    throw new Error(`Usage\n${usage()}`)
+  }
+  if (!isIdentityProvider(providerRaw)) {
+    throw new Error(`Unknown identity provider '${providerRaw}'. Use aad|local|teams-conversation.`)
+  }
+
+  return {
+    kind: "friend.link",
+    agent,
+    friendId,
+    provider: providerRaw,
+    externalId,
+  }
+}
+
 export function parseOuroCommand(args: string[]): OuroCliCommand {
   const [head, second] = args
   if (!head) return { kind: "daemon.up" }
@@ -109,6 +156,7 @@ export function parseOuroCommand(args: string[]): OuroCliCommand {
   }
   if (head === "msg") return parseMessageCommand(args.slice(1))
   if (head === "poke") return parsePokeCommand(args.slice(1))
+  if (head === "link") return parseLinkCommand(args.slice(1))
 
   throw new Error(`Unknown command '${args.join(" ")}'.\n${usage()}`)
 }
@@ -245,6 +293,37 @@ async function defaultInstallSubagents(): Promise<SubagentInstallResult> {
   })
 }
 
+async function defaultLinkFriendIdentity(command: Extract<OuroCliCommand, { kind: "friend.link" }>): Promise<string> {
+  const friendStore = new FileFriendStore(path.join(getAgentBundlesRoot(), `${command.agent}.ouro`, "friends"))
+  const current = await friendStore.get(command.friendId)
+  if (!current) {
+    return `friend not found: ${command.friendId}`
+  }
+
+  const alreadyLinked = current.externalIds.some(
+    (ext) => ext.provider === command.provider && ext.externalId === command.externalId,
+  )
+  if (alreadyLinked) {
+    return `identity already linked: ${command.provider}:${command.externalId}`
+  }
+
+  const now = new Date().toISOString()
+  await friendStore.put(command.friendId, {
+    ...current,
+    externalIds: [
+      ...current.externalIds,
+      {
+        provider: command.provider,
+        externalId: command.externalId,
+        linkedAt: now,
+      },
+    ],
+    updatedAt: now,
+  })
+
+  return `linked ${command.provider}:${command.externalId} to ${command.friendId}`
+}
+
 export function createDefaultOuroCliDeps(socketPath = "/tmp/ouroboros-daemon.sock"): OuroCliDeps {
   return {
     socketPath,
@@ -255,10 +334,11 @@ export function createDefaultOuroCliDeps(socketPath = "/tmp/ouroboros-daemon.soc
     cleanupStaleSocket: defaultCleanupStaleSocket,
     fallbackPendingMessage: defaultFallbackPendingMessage,
     installSubagents: defaultInstallSubagents,
+    linkFriendIdentity: defaultLinkFriendIdentity,
   }
 }
 
-function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" }>): DaemonCommand {
+function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "friend.link" }>): DaemonCommand {
   return command
 }
 
@@ -294,6 +374,13 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     deps.cleanupStaleSocket(deps.socketPath)
     const started = await deps.startDaemonProcess(deps.socketPath)
     const message = `daemon started (pid ${started.pid ?? "unknown"})`
+    deps.writeStdout(message)
+    return message
+  }
+
+  if (command.kind === "friend.link") {
+    const linker = deps.linkFriendIdentity ?? defaultLinkFriendIdentity
+    const message = await linker(command)
     deps.writeStdout(message)
     return message
   }

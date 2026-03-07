@@ -18,6 +18,7 @@ import { accumulateFriendTokens } from "../mind/friends/tokens"
 import { createTurnCoordinator } from "../heart/turn-coordinator"
 import { getAgentRoot } from "../identity"
 import * as path from "path"
+import { enforceTrustGate } from "./trust-gate"
 
 // Stream interface matching IStreamer from @microsoft/teams.apps
 interface TeamsStream {
@@ -423,6 +424,8 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
 
   // Resolve context kernel (identity + channel) early so we can use the friend UUID for session path
   const store = getFriendStore()
+  const provider = teamsContext?.aadObjectId ? "aad" as const : "teams-conversation" as const
+  const externalId = teamsContext?.aadObjectId || conversationId
   const toolContext: ToolContext | undefined = teamsContext ? {
     graphToken: teamsContext.graphToken,
     adoToken: teamsContext.adoToken,
@@ -432,8 +435,6 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   } : undefined
 
   if (toolContext) {
-    const provider = teamsContext?.aadObjectId ? "aad" as const : "teams-conversation" as const
-    const externalId = teamsContext?.aadObjectId || conversationId
     const resolver = new FriendResolver(store, {
       provider,
       externalId,
@@ -445,6 +446,22 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   }
 
   const friendId = toolContext?.context?.friend?.id || "default"
+
+  if (toolContext?.context?.friend) {
+    const trustGate = enforceTrustGate({
+      friend: toolContext.context.friend,
+      provider,
+      externalId,
+      tenantId: teamsContext?.tenantId,
+      channel: "teams",
+    })
+    if (!trustGate.allowed) {
+      if (trustGate.reason === "stranger_first_reply") {
+        stream.emit(trustGate.autoReply)
+      }
+      return
+    }
+  }
 
   const registry = createCommandRegistry()
   registerDefaultCommands(registry)
