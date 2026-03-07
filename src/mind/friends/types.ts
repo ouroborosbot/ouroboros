@@ -19,6 +19,10 @@ export function isIdentityProvider(value: unknown): value is IdentityProvider {
   return typeof value === "string" && IDENTITY_PROVIDERS.has(value)
 }
 
+// -- Channel --
+// Closed union: which sense/channel a session belongs to
+export type Channel = "cli" | "teams" | "inner"
+
 // -- Integration --
 // Closed union: which external service an action targets
 export type Integration = "ado" | "github" | "graph"
@@ -68,7 +72,7 @@ export interface FriendRecord {
 // -- Channel Capabilities --
 // What a channel supports: integrations, formatting, streaming, message limits
 export interface ChannelCapabilities {
-  channel: "cli" | "teams"
+  channel: Channel
   availableIntegrations: Integration[]
   supportsMarkdown: boolean
   supportsStreaming: boolean
