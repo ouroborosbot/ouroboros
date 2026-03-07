@@ -327,12 +327,43 @@ done
 ### Step 4: Handle CI result
 
 **CI passes:**
-- Proceed to Step 5 (merge).
+- Proceed to Step 5 (pre-merge sanity check).
 
 **CI fails:**
 - Proceed to **CI Failure Self-Repair**.
 
-### Step 5: Merge the PR
+### Step 5: Pre-merge sanity check
+
+Before merging, verify the PR delivers what the planning/doing doc intended. This is a lightweight review, not a full audit.
+
+1. Re-read the doing doc (already available from On Startup)
+2. Review the PR diff: `gh pr diff "${BRANCH}"`
+3. Check that:
+   - All completion criteria from the doing doc are addressed
+   - No unrelated changes slipped in
+   - The PR title and body accurately describe what shipped
+4. Post findings as a PR comment:
+
+```bash
+gh pr comment "${BRANCH}" --body "$(cat <<'REVIEW'
+## Pre-merge sanity check
+
+Checked PR against doing doc: `<doing-doc-path>`
+
+- [ ] All completion criteria addressed
+- [ ] No unrelated changes
+- [ ] PR description accurate
+
+<any notes or concerns>
+
+Proceeding to merge.
+REVIEW
+)"
+```
+
+If the check reveals a genuine gap (missing criteria, wrong files included), fix it before merging. If everything looks good, proceed to Step 6.
+
+### Step 6: Merge the PR
 
 ```bash
 gh pr merge "${BRANCH}" --merge --delete-branch
