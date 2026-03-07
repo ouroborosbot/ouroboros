@@ -270,6 +270,16 @@ export function loadAgentConfig(): AgentConfig {
 }
 
 /**
+ * Prime the agent name cache explicitly.
+ * Used when agent name is known via parameter (e.g., `ouro` CLI routing)
+ * rather than `--agent` argv. All downstream calls to `getAgentName()`
+ * will return this value until `resetIdentity()` is called.
+ */
+export function setAgentName(name: string): void {
+  _cachedAgentName = name
+}
+
+/**
  * Clear all cached identity state.
  * Used in tests and when switching agent context.
  */
