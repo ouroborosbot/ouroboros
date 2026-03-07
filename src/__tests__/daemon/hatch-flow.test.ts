@@ -45,6 +45,7 @@ describe("hatch flow", () => {
         secretsRoot,
         specialistIdentitySourceDir: specialistSource,
         specialistIdentityTargetDir: specialistTarget,
+        now: () => new Date("2026-03-07T00:00:00.000Z"),
         random: () => 0.99,
       },
     )
@@ -90,7 +91,7 @@ describe("hatch flow", () => {
         {
           agentName: "NoKey",
           humanName: "Ari",
-          provider: "minimax",
+          provider: "anthropic",
           credentials: {},
         },
         {
@@ -101,7 +102,7 @@ describe("hatch flow", () => {
           random: () => 0,
         },
       ),
-    ).rejects.toThrow("Missing required credentials for minimax")
+    ).rejects.toThrow("Missing required credentials for anthropic")
   })
 
   it("writes provider-specific secrets for azure hatch flows", async () => {
@@ -143,5 +144,145 @@ describe("hatch flow", () => {
     expect(secrets.providers.azure.deployment).toBe("gpt-4o-mini")
 
     expect(fs.existsSync(path.join(result.bundleRoot, "psyche", "IDENTITY.md"))).toBe(true)
+  })
+
+  it("writes provider-specific secrets for openai-codex hatch flows", async () => {
+    const bundlesRoot = makeTempDir("hatch-bundles-codex")
+    const secretsRoot = makeTempDir("hatch-secrets-codex")
+    const specialistSource = makeTempDir("hatch-specialist-codex")
+    const specialistTarget = makeTempDir("hatch-specialist-target-codex")
+    cleanup.push(bundlesRoot, secretsRoot, specialistSource, specialistTarget)
+    fs.writeFileSync(path.join(specialistSource, "medusa.md"), "# Medusa\n", "utf-8")
+
+    await runHatchFlow(
+      {
+        agentName: "CodexBot",
+        humanName: "Ari",
+        provider: "openai-codex",
+        credentials: {
+          oauthAccessToken: "oauth-token-123",
+        },
+      },
+      {
+        bundlesRoot,
+        secretsRoot,
+        specialistIdentitySourceDir: specialistSource,
+        specialistIdentityTargetDir: specialistTarget,
+        random: () => 0,
+      },
+    )
+
+    const secretsPath = path.join(secretsRoot, "CodexBot", "secrets.json")
+    const secrets = JSON.parse(fs.readFileSync(secretsPath, "utf-8")) as {
+      providers: {
+        "openai-codex": { oauthAccessToken: string }
+      }
+    }
+    expect(secrets.providers["openai-codex"].oauthAccessToken).toBe("oauth-token-123")
+  })
+
+  it("writes provider-specific secrets for minimax hatch flows", async () => {
+    const bundlesRoot = makeTempDir("hatch-bundles-minimax")
+    const secretsRoot = makeTempDir("hatch-secrets-minimax")
+    const specialistSource = makeTempDir("hatch-specialist-minimax")
+    const specialistTarget = makeTempDir("hatch-specialist-target-minimax")
+    cleanup.push(bundlesRoot, secretsRoot, specialistSource, specialistTarget)
+    fs.writeFileSync(path.join(specialistSource, "python.md"), "# Python\n", "utf-8")
+
+    await runHatchFlow(
+      {
+        agentName: "MiniBot",
+        humanName: "Ari",
+        provider: "minimax",
+        credentials: {
+          apiKey: "minimax-key",
+        },
+      },
+      {
+        bundlesRoot,
+        secretsRoot,
+        specialistIdentitySourceDir: specialistSource,
+        specialistIdentityTargetDir: specialistTarget,
+        random: () => 0,
+      },
+    )
+
+    const secretsPath = path.join(secretsRoot, "MiniBot", "secrets.json")
+    const secrets = JSON.parse(fs.readFileSync(secretsPath, "utf-8")) as {
+      providers: {
+        minimax: { apiKey: string }
+      }
+    }
+    expect(secrets.providers.minimax.apiKey).toBe("minimax-key")
+  })
+
+  it("preserves existing README files and falls back to friend slug when human name is blank", async () => {
+    const bundlesRoot = makeTempDir("hatch-bundles-readme")
+    const secretsRoot = makeTempDir("hatch-secrets-readme")
+    const specialistSource = makeTempDir("hatch-specialist-readme")
+    const specialistTarget = makeTempDir("hatch-specialist-target-readme")
+    cleanup.push(bundlesRoot, secretsRoot, specialistSource, specialistTarget)
+    fs.writeFileSync(path.join(specialistSource, "medusa.md"), "# Medusa\n", "utf-8")
+
+    const baseInput = {
+      agentName: "ReadmeBot",
+      humanName: "   ",
+      provider: "minimax" as const,
+      credentials: {
+        apiKey: "minimax-key",
+      },
+    }
+    const deps = {
+      bundlesRoot,
+      secretsRoot,
+      specialistIdentitySourceDir: specialistSource,
+      specialistIdentityTargetDir: specialistTarget,
+      random: () => 0,
+    }
+
+    const first = await runHatchFlow(baseInput, deps)
+    const friendFiles = fs.readdirSync(path.join(first.bundleRoot, "friends"))
+    expect(friendFiles).toContain("friend-friend.json")
+
+    const readmePath = path.join(first.bundleRoot, "skills", "README.md")
+    fs.writeFileSync(readmePath, "# skills\n\ncustom readme\n", "utf-8")
+
+    await runHatchFlow(baseInput, deps)
+
+    expect(fs.readFileSync(readmePath, "utf-8")).toContain("custom readme")
+  })
+
+  it("uses default home, source, and target paths when optional deps are omitted", async () => {
+    const tempCwd = makeTempDir("hatch-default-cwd")
+    cleanup.push(tempCwd)
+
+    const homeDir = os.homedir()
+    const sourceDir = path.join(homeDir, "AgentBundles", "AdoptionSpecialist.ouro", "psyche", "identities")
+    fs.mkdirSync(sourceDir, { recursive: true })
+    fs.writeFileSync(path.join(sourceDir, "python.md"), "# Python\n", "utf-8")
+
+    const agentName = `DefaultsBot-${Date.now()}`
+    const bundleRoot = path.join(homeDir, "AgentBundles", `${agentName}.ouro`)
+    const secretsDir = path.join(homeDir, ".agentsecrets", agentName)
+    cleanup.push(bundleRoot, secretsDir)
+
+    const originalCwd = process.cwd()
+    try {
+      process.chdir(tempCwd)
+      const result = await runHatchFlow({
+        agentName,
+        humanName: "Ari",
+        provider: "anthropic",
+        credentials: {
+          setupToken: `sk-ant-oat01-${"b".repeat(80)}`,
+        },
+      })
+
+      expect(result.bundleRoot).toBe(bundleRoot)
+      expect(fs.existsSync(path.join(tempCwd, "AdoptionSpecialist.ouro", "psyche", "identities", "python.md"))).toBe(true)
+      expect(fs.existsSync(path.join(secretsDir, "secrets.json"))).toBe(true)
+    } finally {
+      process.chdir(originalCwd)
+    }
   })
 })

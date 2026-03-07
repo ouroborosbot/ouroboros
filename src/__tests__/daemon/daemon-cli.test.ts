@@ -36,6 +36,43 @@ describe("ouro CLI parsing", () => {
         setupToken: "sk-ant-oat01-test-token",
       },
     })
+    expect(
+      parseOuroCommand([
+        "hatch",
+        "--agent",
+        "Sprout",
+        "--human",
+        "Ari",
+        "--provider",
+        "openai-codex",
+        "--oauth-token",
+        "oauth-token-1",
+        "--api-key",
+        "api-key-1",
+        "--endpoint",
+        "https://example.openai.azure.com",
+        "--deployment",
+        "gpt-4o-mini",
+        "--migration-path",
+        "/tmp/legacy-agent",
+      ]),
+    ).toEqual({
+      kind: "hatch.start",
+      agentName: "Sprout",
+      humanName: "Ari",
+      provider: "openai-codex",
+      credentials: {
+        oauthAccessToken: "oauth-token-1",
+        apiKey: "api-key-1",
+        endpoint: "https://example.openai.azure.com",
+        deployment: "gpt-4o-mini",
+      },
+      migrationPath: "/tmp/legacy-agent",
+    })
+
+    expect(parseOuroCommand(["hatch", "--unknown-flag", "noop"])).toEqual({
+      kind: "hatch.start",
+    })
   })
 
   it("parses chat, message, and poke commands", () => {
@@ -149,6 +186,9 @@ describe("ouro CLI parsing", () => {
       taskId: "habit-heartbeat",
     })
     expect(() => parseOuroCommand(["poke", "slugger"])).toThrow("Usage")
+    expect(() =>
+      parseOuroCommand(["hatch", "--agent", "Sprout", "--human", "Ari", "--provider", "invalid-provider"]),
+    ).toThrow("Unknown provider")
     expect(() => parseOuroCommand(["mystery"])).toThrow("Unknown command")
   })
 })
@@ -457,6 +497,471 @@ describe("ouro CLI execution", () => {
       content: "hi",
     }))
     expect(result).toContain("queued message fallback")
+  })
+
+  it("prompts for missing minimax credentials in local hatch flow", async () => {
+    const runHatchFlow = vi.fn(async () => ({
+      bundleRoot: "/tmp/AgentBundles/Mini.ouro",
+      selectedIdentity: "python.md",
+      specialistSecretsPath: "/tmp/.agentsecrets/AdoptionSpecialist/secrets.json",
+      hatchlingSecretsPath: "/tmp/.agentsecrets/Mini/secrets.json",
+    }))
+    const promptInput = vi.fn(async (question: string) => {
+      if (question === "MiniMax API key: ") return "minimax-key"
+      return ""
+    })
+
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, message: "unexpected sendCommand call" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 101 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
+      runHatchFlow,
+      promptInput,
+    } as OuroCliDeps & {
+      runHatchFlow: typeof runHatchFlow
+      promptInput: typeof promptInput
+    }
+
+    await runOuroCli([
+      "hatch",
+      "--agent",
+      "Mini",
+      "--human",
+      "Ari",
+      "--provider",
+      "minimax",
+    ], deps)
+
+    expect(promptInput).toHaveBeenCalledWith("MiniMax API key: ")
+    expect(runHatchFlow).toHaveBeenCalledWith({
+      agentName: "Mini",
+      humanName: "Ari",
+      provider: "minimax",
+      credentials: {
+        apiKey: "minimax-key",
+      },
+    })
+  })
+
+  it("prompts for missing anthropic setup token in local hatch flow", async () => {
+    const runHatchFlow = vi.fn(async () => ({
+      bundleRoot: "/tmp/AgentBundles/ClaudeSprout.ouro",
+      selectedIdentity: "medusa.md",
+      specialistSecretsPath: "/tmp/.agentsecrets/AdoptionSpecialist/secrets.json",
+      hatchlingSecretsPath: "/tmp/.agentsecrets/ClaudeSprout/secrets.json",
+    }))
+    const promptInput = vi.fn(async (question: string) => {
+      if (question === "Anthropic setup-token: ") return "sk-ant-oat01-test-token"
+      return ""
+    })
+
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, message: "unexpected sendCommand call" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 111 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
+      runHatchFlow,
+      promptInput,
+    } as OuroCliDeps & {
+      runHatchFlow: typeof runHatchFlow
+      promptInput: typeof promptInput
+    }
+
+    await runOuroCli([
+      "hatch",
+      "--agent",
+      "ClaudeSprout",
+      "--human",
+      "Ari",
+      "--provider",
+      "anthropic",
+    ], deps)
+
+    expect(promptInput).toHaveBeenCalledWith("Anthropic setup-token: ")
+    expect(runHatchFlow).toHaveBeenCalledWith({
+      agentName: "ClaudeSprout",
+      humanName: "Ari",
+      provider: "anthropic",
+      credentials: {
+        setupToken: "sk-ant-oat01-test-token",
+      },
+    })
+  })
+
+  it("prompts for missing openai oauth token in local hatch flow", async () => {
+    const runHatchFlow = vi.fn(async () => ({
+      bundleRoot: "/tmp/AgentBundles/CodexSprout.ouro",
+      selectedIdentity: "python.md",
+      specialistSecretsPath: "/tmp/.agentsecrets/AdoptionSpecialist/secrets.json",
+      hatchlingSecretsPath: "/tmp/.agentsecrets/CodexSprout/secrets.json",
+    }))
+    const promptInput = vi.fn(async (question: string) => {
+      if (question === "OpenAI Codex OAuth token: ") return "oauth-token-abc"
+      return ""
+    })
+
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, message: "unexpected sendCommand call" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 222 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
+      runHatchFlow,
+      promptInput,
+    } as OuroCliDeps & {
+      runHatchFlow: typeof runHatchFlow
+      promptInput: typeof promptInput
+    }
+
+    await runOuroCli([
+      "hatch",
+      "--agent",
+      "CodexSprout",
+      "--human",
+      "Ari",
+      "--provider",
+      "openai-codex",
+    ], deps)
+
+    expect(promptInput).toHaveBeenCalledWith("OpenAI Codex OAuth token: ")
+    expect(runHatchFlow).toHaveBeenCalledWith({
+      agentName: "CodexSprout",
+      humanName: "Ari",
+      provider: "openai-codex",
+      credentials: {
+        oauthAccessToken: "oauth-token-abc",
+      },
+    })
+  })
+
+  it("throws usage when hatch input cannot resolve required values", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
+      runHatchFlow: vi.fn(async () => ({
+        bundleRoot: "/tmp/unused",
+        selectedIdentity: "unused.md",
+        specialistSecretsPath: "/tmp/unused-specialist.json",
+        hatchlingSecretsPath: "/tmp/unused-hatchling.json",
+      })),
+      promptInput: vi.fn(async () => ""),
+    }
+
+    await expect(runOuroCli(["hatch"], deps)).rejects.toThrow("Usage")
+  })
+
+  it("throws usage when hatch input is unresolved and promptInput is unavailable", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
+      runHatchFlow: vi.fn(async () => ({
+        bundleRoot: "/tmp/unused",
+        selectedIdentity: "unused.md",
+        specialistSecretsPath: "/tmp/unused-specialist.json",
+        hatchlingSecretsPath: "/tmp/unused-hatchling.json",
+      })),
+    }
+
+    await expect(runOuroCli(["hatch"], deps)).rejects.toThrow("Usage")
+  })
+
+  it("does not re-prompt azure credentials when they are provided on CLI", async () => {
+    const runHatchFlow = vi.fn(async () => ({
+      bundleRoot: "/tmp/AgentBundles/AzureProvided.ouro",
+      selectedIdentity: "medusa.md",
+      specialistSecretsPath: "/tmp/.agentsecrets/AdoptionSpecialist/secrets.json",
+      hatchlingSecretsPath: "/tmp/.agentsecrets/AzureProvided/secrets.json",
+    }))
+    const promptInput = vi.fn(async () => "unexpected")
+
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, message: "unexpected sendCommand call" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 303 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
+      runHatchFlow,
+      promptInput,
+    } as OuroCliDeps & {
+      runHatchFlow: typeof runHatchFlow
+      promptInput: typeof promptInput
+    }
+
+    await runOuroCli([
+      "hatch",
+      "--agent",
+      "AzureProvided",
+      "--human",
+      "Ari",
+      "--provider",
+      "azure",
+      "--api-key",
+      "provided-key",
+      "--endpoint",
+      "https://provided.endpoint",
+      "--deployment",
+      "provided-deployment",
+    ], deps)
+
+    expect(promptInput).not.toHaveBeenCalledWith("Azure API key: ")
+    expect(promptInput).not.toHaveBeenCalledWith("Azure endpoint: ")
+    expect(promptInput).not.toHaveBeenCalledWith("Azure deployment: ")
+  })
+
+  it("continues `up` flow when UTI registration throws a non-Error value", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(async () => ({ pid: 404 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType: vi.fn(async () => {
+        throw "registration failed string"
+      }),
+    }
+
+    const result = await runOuroCli(["up"], deps)
+    expect(result).toContain("daemon started")
+  })
+
+  it("continues hatch flow when subagent install throws a non-Error value", async () => {
+    const runHatchFlow = vi.fn(async () => ({
+      bundleRoot: "/tmp/AgentBundles/StringInstall.ouro",
+      selectedIdentity: "python.md",
+      specialistSecretsPath: "/tmp/.agentsecrets/AdoptionSpecialist/secrets.json",
+      hatchlingSecretsPath: "/tmp/.agentsecrets/StringInstall/secrets.json",
+    }))
+
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 505 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => {
+        throw "install failed string"
+      }),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
+      runHatchFlow,
+    } as OuroCliDeps & {
+      runHatchFlow: typeof runHatchFlow
+    }
+
+    const result = await runOuroCli([
+      "hatch",
+      "--agent",
+      "StringInstall",
+      "--human",
+      "Ari",
+      "--provider",
+      "anthropic",
+      "--setup-token",
+      "sk-ant-oat01-test-token",
+    ], deps)
+    expect(result).toContain("hatched StringInstall")
+  })
+
+  it("reports daemon already running in local hatch flow when socket is alive", async () => {
+    const runHatchFlow = vi.fn(async () => ({
+      bundleRoot: "/tmp/AgentBundles/Alive.ouro",
+      selectedIdentity: "python.md",
+      specialistSecretsPath: "/tmp/.agentsecrets/AdoptionSpecialist/secrets.json",
+      hatchlingSecretsPath: "/tmp/.agentsecrets/Alive/secrets.json",
+    }))
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 606 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
+      runHatchFlow,
+    } as OuroCliDeps & {
+      runHatchFlow: typeof runHatchFlow
+    }
+
+    const result = await runOuroCli([
+      "hatch",
+      "--agent",
+      "Alive",
+      "--human",
+      "Ari",
+      "--provider",
+      "anthropic",
+      "--setup-token",
+      "sk-ant-oat01-test-token",
+    ], deps)
+
+    expect(deps.startDaemonProcess).not.toHaveBeenCalled()
+    expect(result).toContain("daemon already running")
+  })
+
+  it("formats unknown pid in hatch flow start message when daemon pid is null", async () => {
+    const runHatchFlow = vi.fn(async () => ({
+      bundleRoot: "/tmp/AgentBundles/UnknownPid.ouro",
+      selectedIdentity: "python.md",
+      specialistSecretsPath: "/tmp/.agentsecrets/AdoptionSpecialist/secrets.json",
+      hatchlingSecretsPath: "/tmp/.agentsecrets/UnknownPid/secrets.json",
+    }))
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: null })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
+      runHatchFlow,
+    } as OuroCliDeps & {
+      runHatchFlow: typeof runHatchFlow
+    }
+
+    const result = await runOuroCli([
+      "hatch",
+      "--agent",
+      "UnknownPid",
+      "--human",
+      "Ari",
+      "--provider",
+      "anthropic",
+      "--setup-token",
+      "sk-ant-oat01-test-token",
+    ], deps)
+
+    expect(result).toContain("daemon started (pid unknown)")
+  })
+
+  it("formats hatch daemon-proxy responses across summary/message/ok/error shapes", async () => {
+    const baseDeps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, summary: "summary response" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      runHatchFlow: undefined,
+    }
+
+    const summary = await runOuroCli(["hatch"], {
+      ...baseDeps,
+      sendCommand: vi.fn(async () => ({ ok: true, summary: "summary response" })),
+    })
+    const ok = await runOuroCli(["hatch"], {
+      ...baseDeps,
+      sendCommand: vi.fn(async () => ({ ok: true })),
+    })
+    const error = await runOuroCli(["hatch"], {
+      ...baseDeps,
+      sendCommand: vi.fn(async () => ({ ok: false })),
+    })
+
+    expect(summary).toBe("summary response")
+    expect(ok).toBe("ok")
+    expect(error).toContain("unknown error")
+  })
+
+  it("prompts azure credentials and continues hatch when subagent install throws", async () => {
+    const runHatchFlow = vi.fn(async () => ({
+      bundleRoot: "/tmp/AgentBundles/AzureSprout.ouro",
+      selectedIdentity: "medusa.md",
+      specialistSecretsPath: "/tmp/.agentsecrets/AdoptionSpecialist/secrets.json",
+      hatchlingSecretsPath: "/tmp/.agentsecrets/AzureSprout/secrets.json",
+    }))
+    const promptInput = vi.fn(async (question: string) => {
+      if (question === "Azure API key: ") return "azure-key"
+      if (question === "Azure endpoint: ") return "https://example.openai.azure.com"
+      if (question === "Azure deployment: ") return "gpt-4o-mini"
+      return ""
+    })
+
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, message: "unexpected sendCommand call" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 202 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => {
+        throw new Error("install failed")
+      }),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
+      runHatchFlow,
+      promptInput,
+    } as OuroCliDeps & {
+      runHatchFlow: typeof runHatchFlow
+      promptInput: typeof promptInput
+    }
+
+    const result = await runOuroCli([
+      "hatch",
+      "--agent",
+      "AzureSprout",
+      "--human",
+      "Ari",
+      "--provider",
+      "azure",
+    ], deps)
+
+    expect(promptInput).toHaveBeenCalledWith("Azure API key: ")
+    expect(promptInput).toHaveBeenCalledWith("Azure endpoint: ")
+    expect(promptInput).toHaveBeenCalledWith("Azure deployment: ")
+    expect(runHatchFlow).toHaveBeenCalledWith({
+      agentName: "AzureSprout",
+      humanName: "Ari",
+      provider: "azure",
+      credentials: {
+        apiKey: "azure-key",
+        endpoint: "https://example.openai.azure.com",
+        deployment: "gpt-4o-mini",
+      },
+    })
+    expect(result).toContain("hatched AzureSprout")
   })
 
   it("executes hatch flow locally and starts daemon after auth verification", async () => {

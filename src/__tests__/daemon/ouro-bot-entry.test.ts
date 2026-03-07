@@ -68,4 +68,40 @@ describe("ouro.bot entrypoint", () => {
 
     argvSpy.mockRestore()
   })
+
+  it("handles non-Error rejection values", async () => {
+    vi.resetModules()
+
+    const runOuroBotWrapper = vi.fn(async () => {
+      throw "string-failure"
+    })
+    const emitNervesEvent = vi.fn()
+    const configureDaemonRuntimeLogger = vi.fn()
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => code as never) as any)
+
+    vi.doMock("../../daemon/ouro-bot-wrapper", () => ({ runOuroBotWrapper }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
+    vi.doMock("../../daemon/runtime-logging", () => ({ configureDaemonRuntimeLogger }))
+
+    const argvSpy = vi.spyOn(process, "argv", "get").mockReturnValue([
+      "node",
+      "ouro-bot-entry.js",
+      "status",
+    ])
+
+    await import("../../daemon/ouro-bot-entry")
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(emitNervesEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "daemon.ouro_bot_entry_error",
+        meta: expect.objectContaining({ error: "string-failure" }),
+      }),
+    )
+    expect(configureDaemonRuntimeLogger).toHaveBeenCalledWith("ouro-bot")
+    expect(exitSpy).toHaveBeenCalledWith(1)
+
+    argvSpy.mockRestore()
+  })
 })

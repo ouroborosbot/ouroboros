@@ -216,12 +216,13 @@ function parseHatchCommand(args: string[]): OuroCliCommand {
   if (providerRaw && !isAgentProvider(providerRaw)) {
     throw new Error("Unknown provider. Use azure|anthropic|minimax|openai-codex.")
   }
+  const provider = providerRaw && isAgentProvider(providerRaw) ? providerRaw : undefined
 
   return {
     kind: "hatch.start",
     agentName,
     humanName,
-    provider: providerRaw,
+    provider,
     credentials: Object.keys(credentials).length > 0 ? credentials : undefined,
     migrationPath,
   }
