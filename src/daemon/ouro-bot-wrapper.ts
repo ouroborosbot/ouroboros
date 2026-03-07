@@ -13,7 +13,9 @@ async function defaultLoadCanonicalRunner(): Promise<OuroCliRunner> {
   const packageName = "@ouro.bot/cli"
   const specifier = packageName
   const loaded = await import(specifier) as Record<string, unknown>
-  const candidate = loaded.runOuroCli
+  const candidate = Object.prototype.hasOwnProperty.call(loaded, "runOuroCli")
+    ? loaded["runOuroCli"]
+    : undefined
   if (typeof candidate === "function") {
     return candidate as OuroCliRunner
   }

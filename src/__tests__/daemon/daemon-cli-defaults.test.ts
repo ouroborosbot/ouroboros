@@ -691,4 +691,138 @@ describe("daemon CLI default dependency branches", () => {
 
     expect(result).toContain("linked aad:aad-user-222 to friend-1")
   })
+
+  it("uses default promptInput and trims readline responses", async () => {
+    vi.resetModules()
+
+    const question = vi.fn(async () => "  yes  ")
+    const close = vi.fn()
+    const createInterface = vi.fn(() => ({
+      question,
+      close,
+    }))
+
+    vi.doMock("readline/promises", () => ({ createInterface }))
+    vi.doMock("net", () => ({ createConnection: vi.fn() }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn() }))
+    vi.doMock("../../heart/identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn(), readdirSync: vi.fn(() => []) }))
+
+    const { createDefaultOuroCliDeps } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+
+    const value = await deps.promptInput!("Continue? ")
+    expect(value).toBe("yes")
+    expect(question).toHaveBeenCalledWith("Continue? ")
+    expect(close).toHaveBeenCalledTimes(1)
+  })
+
+  it("default discovery filters disabled/invalid bundles and sorts enabled agents", async () => {
+    vi.resetModules()
+
+    const tmpBundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ouro-discovery-defaults-"))
+    const makeBundle = (name: string, configRaw: string): void => {
+      const dir = path.join(tmpBundlesRoot, `${name}.ouro`)
+      fs.mkdirSync(dir, { recursive: true })
+      fs.writeFileSync(path.join(dir, "agent.json"), configRaw, "utf-8")
+    }
+
+    makeBundle("zeta", JSON.stringify({ enabled: true }))
+    makeBundle("alpha", JSON.stringify({ enabled: true }))
+    makeBundle("disabled", JSON.stringify({ enabled: false }))
+    makeBundle("broken", "{")
+    fs.mkdirSync(path.join(tmpBundlesRoot, "notes"), { recursive: true })
+
+    vi.doMock("net", () => ({ createConnection: vi.fn() }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn() }))
+    vi.doMock("fs", async () => {
+      const actual = await vi.importActual<typeof import("fs")>("fs")
+      return { ...actual }
+    })
+    vi.doMock("../../heart/identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => tmpBundlesRoot,
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+
+    const { createDefaultOuroCliDeps, runOuroCli } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+    const writeStdout = vi.fn()
+    const result = await runOuroCli([], {
+      ...deps,
+      writeStdout,
+    })
+
+    expect(result).toContain("who do you want to talk to?")
+    expect(result).toContain("alpha")
+    expect(result).toContain("zeta")
+    expect(result.indexOf("alpha")).toBeLessThan(result.indexOf("zeta"))
+    expect(writeStdout).toHaveBeenCalledTimes(1)
+  })
+
+  it("default discovery returns empty list when bundle directory read fails", async () => {
+    vi.resetModules()
+
+    vi.doMock("net", () => ({ createConnection: vi.fn() }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn() }))
+    vi.doMock("fs", () => ({
+      existsSync: vi.fn(() => false),
+      unlinkSync: vi.fn(),
+      readdirSync: vi.fn(() => {
+        throw new Error("read failed")
+      }),
+    }))
+    vi.doMock("../../heart/identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+
+    const { createDefaultOuroCliDeps } = await import("../../daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+
+    expect(deps.listDiscoveredAgents!()).toEqual([])
+  })
+
+  it("falls back to internal discovery when deps.listDiscoveredAgents is explicitly undefined", async () => {
+    vi.resetModules()
+
+    vi.doMock("net", () => ({ createConnection: vi.fn() }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn() }))
+    vi.doMock("fs", () => ({
+      existsSync: vi.fn(() => false),
+      unlinkSync: vi.fn(),
+      readdirSync: vi.fn(() => {
+        throw new Error("read failed")
+      }),
+    }))
+    vi.doMock("../../heart/identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+
+    const { runOuroCli } = await import("../../daemon/daemon-cli")
+    const sendCommand = vi.fn(async () => ({ ok: true, message: "hatch started" }))
+    await runOuroCli([], {
+      socketPath: "/tmp/daemon.sock",
+      sendCommand,
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      listDiscoveredAgents: undefined,
+    })
+
+    expect(sendCommand).toHaveBeenCalledWith(
+      "/tmp/daemon.sock",
+      expect.objectContaining({ kind: "hatch.start" }),
+    )
+  })
 })

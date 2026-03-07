@@ -2,9 +2,11 @@ import * as fs from "fs"
 import * as os from "os"
 import * as path from "path"
 
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import {
+  getRepoSpecialistIdentitiesDir,
+  getSpecialistIdentitySourceDir,
   pickRandomSpecialistIdentity,
   syncSpecialistIdentities,
 } from "../../daemon/hatch-specialist"
@@ -70,5 +72,45 @@ describe("hatch specialist identities", () => {
         random: () => 0,
       }),
     ).toThrow("No specialist identities")
+  })
+
+  it("returns canonical specialist identity source and repo target directories", () => {
+    const source = getSpecialistIdentitySourceDir()
+    const target = getRepoSpecialistIdentitiesDir()
+
+    expect(source).toContain(path.join("AgentBundles", "AdoptionSpecialist.ouro", "psyche", "identities"))
+    expect(target).toContain(path.join("AdoptionSpecialist.ouro", "psyche", "identities"))
+  })
+
+  it("returns an empty identity list when source directory is missing", () => {
+    const root = makeTempDir("specialist-missing-root")
+    const source = path.join(root, "does-not-exist")
+    const target = makeTempDir("specialist-target-empty")
+    cleanup.push(root, target)
+
+    const copied = syncSpecialistIdentities({
+      sourceDir: source,
+      targetDir: target,
+    })
+
+    expect(copied).toEqual([])
+    expect(fs.readdirSync(target)).toEqual([])
+  })
+
+  it("uses Math.random when no random provider is injected", () => {
+    const source = makeTempDir("specialist-random-default")
+    cleanup.push(source)
+    fs.writeFileSync(path.join(source, "a.md"), "# A\n", "utf-8")
+    fs.writeFileSync(path.join(source, "b.md"), "# B\n", "utf-8")
+
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0)
+    try {
+      const picked = pickRandomSpecialistIdentity({
+        identitiesDir: source,
+      })
+      expect(picked.fileName).toBe("a.md")
+    } finally {
+      randomSpy.mockRestore()
+    }
   })
 })

@@ -1,6 +1,6 @@
 # Doing: Fix Round Gate 6 First Run
 
-**Status**: READY_FOR_EXECUTION
+**Status**: completed
 **Execution Mode**: direct
 **Created**: 2026-03-07 02:55
 **Planning**: ./2026-03-07-0255-planning-fix-round-gate-6-first-run.md
@@ -20,10 +20,10 @@ Deliver the full Gate 6 first-run contract: Adoption Specialist integration, `ou
 - [x] `ouro hatch` performs provider auth/verification flow and creates canonical hatchling bundle with required defaults
 - [x] Bare `ouro` routes correctly based on discovered-agent count
 - [x] `npx ouro.bot` first-run wrapper delegates correctly to CLI flow
-- [ ] Gate 6 tests cover first-run contracts and pass
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] Gate 6 tests cover first-run contracts and pass
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -78,7 +78,7 @@ Deliver the full Gate 6 first-run contract: Adoption Specialist integration, `ou
 **Output**: UTI registration logic + tests + safe fallback behavior.
 **Acceptance**: Registration is attempted on setup; missing icon source does not block onboarding.
 
-### ⬜ Unit 6: Full Verification + Artifacts
+### ✅ Unit 6: Full Verification + Artifacts
 **What**: Run full validation (`npm run lint`, `npm run build`, `npm test --silent`, `npm run test:coverage -- --runInBand`) and store gate evidence.
 **Output**: Verification artifacts/logs in gate artifacts directory.
 **Acceptance**: Full suite green, no warnings, coverage gate passes.
@@ -102,3 +102,4 @@ Deliver the full Gate 6 first-run contract: Adoption Specialist integration, `ou
 - 2026-03-07 03:14 Unit 3 complete: implemented hatch auth/credential verification, canonical bundle creation, specialist identity selection, and daemon-cli hatch wiring with green tests.
 - 2026-03-07 03:18 Unit 4 complete: added ouro.bot wrapper module + entrypoint and delegation tests covering canonical package handoff and fallback.
 - 2026-03-07 03:22 Unit 5 complete: implemented macOS .ouro UTI registration (non-blocking, icon-optional) and integrated registration attempts into first-run CLI setup paths.
+- 2026-03-07 03:47 Unit 6 complete: full validation suite passed (`lint`, `build`, `test`, `test:coverage`) with logs written under artifacts.

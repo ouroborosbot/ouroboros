@@ -1,8 +1,17 @@
-import { describe, expect, it, vi } from "vitest"
+import * as fs from "fs"
+import * as os from "os"
+import * as path from "path"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { registerOuroBundleUti } from "../../daemon/ouro-uti"
 
 describe(".ouro UTI registration", () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.resetModules()
+    vi.unmock("child_process")
+  })
+
   it("skips registration outside macOS", () => {
     const execFileSync = vi.fn()
 
@@ -99,5 +108,102 @@ describe(".ouro UTI registration", () => {
     expect(result.attempted).toBe(true)
     expect(result.registered).toBe(false)
     expect(result.skippedReason).toContain("lsregister failed")
+  })
+
+  it("continues registration when icon conversion fails", () => {
+    const execFileSync = vi.fn((file: string) => {
+      if (file === "sips") {
+        throw "sips failed"
+      }
+    })
+    const rmSync = vi.fn()
+
+    const result = registerOuroBundleUti({
+      platform: "darwin",
+      homeDir: "/tmp/home",
+      repoRoot: "/tmp/repo",
+      existsSync: vi.fn(() => true),
+      mkdirSync: vi.fn(),
+      writeFileSync: vi.fn(),
+      rmSync,
+      execFileSync,
+    })
+
+    expect(result.attempted).toBe(true)
+    expect(result.registered).toBe(true)
+    expect(result.iconInstalled).toBe(false)
+    expect(execFileSync).toHaveBeenCalledWith(
+      "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
+      ["-f", "/tmp/home/Library/Application Support/ouro/uti/OuroBundleRegistry.app"],
+    )
+    expect(rmSync).toHaveBeenCalledWith("/tmp/home/Library/Application Support/ouro/uti/ouro.iconset", {
+      recursive: true,
+      force: true,
+    })
+  })
+
+  it("continues registration when icon conversion throws an Error instance", () => {
+    const execFileSync = vi.fn((file: string) => {
+      if (file === "sips") {
+        throw new Error("sips error instance")
+      }
+    })
+
+    const result = registerOuroBundleUti({
+      platform: "darwin",
+      homeDir: "/tmp/home",
+      repoRoot: "/tmp/repo",
+      existsSync: vi.fn(() => true),
+      mkdirSync: vi.fn(),
+      writeFileSync: vi.fn(),
+      rmSync: vi.fn(),
+      execFileSync,
+    })
+
+    expect(result.attempted).toBe(true)
+    expect(result.registered).toBe(true)
+    expect(result.iconInstalled).toBe(false)
+  })
+
+  it("uses default fs/exec dependencies and returns non-blocking failure on non-Error setup failure", () => {
+    const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "ouro-uti-defaults-home-"))
+    const tempRepo = fs.mkdtempSync(path.join(os.tmpdir(), "ouro-uti-defaults-repo-"))
+
+    const result = registerOuroBundleUti({
+      platform: "darwin",
+      homeDir: tempHome,
+      repoRoot: tempRepo,
+      existsSync: vi.fn(() => false),
+      mkdirSync: vi.fn(() => {
+        throw "mkdir failed"
+      }),
+    })
+
+    expect(result.attempted).toBe(true)
+    expect(result.registered).toBe(false)
+    expect(result.skippedReason).toContain("mkdir failed")
+  })
+
+  it("uses default exec callback when execFileSync dep is omitted", async () => {
+    vi.resetModules()
+    const execFileSync = vi.fn()
+    vi.doMock("child_process", () => ({ execFileSync }))
+
+    const { registerOuroBundleUti: registerWithDefaultExec } = await import("../../daemon/ouro-uti")
+    const result = registerWithDefaultExec({
+      platform: "darwin",
+      homeDir: "/tmp/home",
+      repoRoot: "/tmp/repo",
+      existsSync: vi.fn(() => false),
+      mkdirSync: vi.fn(),
+      writeFileSync: vi.fn(),
+      rmSync: vi.fn(),
+    })
+
+    expect(result.registered).toBe(true)
+    expect(execFileSync).toHaveBeenCalledWith(
+      "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
+      ["-f", "/tmp/home/Library/Application Support/ouro/uti/OuroBundleRegistry.app"],
+    )
   })
 })

@@ -58,7 +58,7 @@ function resolveRuntimeLoggingConfig(configPath: string): RuntimeLoggingConfig {
 }
 
 export function configureDaemonRuntimeLogger(
-  processName: "daemon" | "ouro",
+  processName: "daemon" | "ouro" | "ouro-bot",
   options: ConfigureDaemonRuntimeLoggerOptions = {},
 ): void {
   const homeDir = options.homeDir ?? os.homedir()
