@@ -1,0 +1,28 @@
+Gate 7 skipped-test audit (heart/core kick detection)
+Date: 2026-03-07 04:04
+
+Disposition: deferred intentionally per subsystem audit; each skip annotated with required comment.
+
+Counts:
+- it.skip tests: 18
+- audit comments: 18
+
+Annotated skipped tests:
+4652:  it.skip("fires onKick when model narrates intent without tool calls, then retries", async () => {
+4689:  it.skip("pushes self-correction message before retry", async () => {
+4721:  it.skip("onKick callback receives no arguments", async () => {
+4753:  it.skip("onKick callback is optional (no crash if not provided)", async () => {
+4782:  it.skip("malformed assistant message is NOT in history after kick", async () => {
+4816:  it.skip("Azure: kick cleans up azureInput output items and forces rebuild on retry", async () => {
+6091:  it.skip("kick fires when toolChoiceRequired is true and model narrates intent", async () => {
+6128:  it.skip("after kick, model returns final_answer -- terminates cleanly", async () => {
+6164:  it.skip("abort during kick attempt -- clean stop, no dangling messages", async () => {
+6205:  it.skip("empty content with no tool_calls -- kicks (empty response is always wrong)", async () => {
+6317:  it.skip("toolChoiceRequired kicks even when content is empty (reasoning-only response)", async () => {
+6491:  it.skip("MiniMax: sets tool_choice=required on the call AFTER a narration kick (no toolChoiceRequired option)", async () => {
+6529:  it.skip("Azure: sets tool_choice=required on the call AFTER a narration kick (no toolChoiceRequired option)", async () => {
+6576:  it.skip("MiniMax: sets tool_choice=required after an empty kick (any kick, not just narration)", async () => {
+6646:  it.skip("after narration kick, final_answer is present in tools sent to API", async () => {
+6685:  it.skip("after empty kick, final_answer is NOT in tools (narration-only injection)", async () => {
+6722:  it.skip("model calls final_answer after narration kick -- terminates cleanly", async () => {
+6759:  it.skip("activeTools computed per-iteration -- first call has no final_answer, after kick it does", async () => {

@@ -4648,6 +4648,7 @@ describe("kick mechanism", () => {
   })
 
   // Kick detection disabled — see core.ts
+  // skip: kick detection deferred per audit
   it.skip("fires onKick when model narrates intent without tool calls, then retries", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
@@ -4684,6 +4685,7 @@ describe("kick mechanism", () => {
   })
 
   // Kick detection disabled — see core.ts
+  // skip: kick detection deferred per audit
   it.skip("pushes self-correction message before retry", async () => {
     let callCount = 0
     mockCreate.mockImplementation((params: any) => {
@@ -4715,6 +4717,7 @@ describe("kick mechanism", () => {
   })
 
   // Kick detection disabled — see core.ts
+  // skip: kick detection deferred per audit
   it.skip("onKick callback receives no arguments", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
@@ -4746,6 +4749,7 @@ describe("kick mechanism", () => {
   })
 
   // Kick detection disabled — see core.ts
+  // skip: kick detection deferred per audit
   it.skip("onKick callback is optional (no crash if not provided)", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
@@ -4774,6 +4778,7 @@ describe("kick mechanism", () => {
   })
 
   // Kick detection disabled — see core.ts
+  // skip: kick detection deferred per audit
   it.skip("malformed assistant message is NOT in history after kick", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
@@ -4807,6 +4812,7 @@ describe("kick mechanism", () => {
   })
 
   // Kick detection disabled — see core.ts
+  // skip: kick detection deferred per audit
   it.skip("Azure: kick cleans up azureInput output items and forces rebuild on retry", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
@@ -6081,6 +6087,7 @@ describe("integration: kick + tool_choice required combined", () => {
   })
 
   // Kick detection disabled — see core.ts
+  // skip: kick detection deferred per audit
   it.skip("kick fires when toolChoiceRequired is true and model narrates intent", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
@@ -6117,6 +6124,7 @@ describe("integration: kick + tool_choice required combined", () => {
   })
 
   // Kick detection disabled — see core.ts
+  // skip: kick detection deferred per audit
   it.skip("after kick, model returns final_answer -- terminates cleanly", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
@@ -6152,6 +6160,7 @@ describe("integration: kick + tool_choice required combined", () => {
   })
 
   // Kick detection disabled — see core.ts
+  // skip: kick detection deferred per audit
   it.skip("abort during kick attempt -- clean stop, no dangling messages", async () => {
     const controller = new AbortController()
     let callCount = 0
@@ -6192,6 +6201,7 @@ describe("integration: kick + tool_choice required combined", () => {
   })
 
   // Kick detection disabled — see core.ts
+  // skip: kick detection deferred per audit
   it.skip("empty content with no tool_calls -- kicks (empty response is always wrong)", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
@@ -6303,6 +6313,7 @@ describe("integration: kick + tool_choice required combined", () => {
   })
 
   // Kick detection disabled — see core.ts
+  // skip: kick detection deferred per audit
   it.skip("toolChoiceRequired kicks even when content is empty (reasoning-only response)", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
@@ -6476,6 +6487,7 @@ describe("tool_choice forcing after kick (Bug 4)", () => {
   })
 
   // Kick detection disabled — see core.ts
+  // skip: kick detection deferred per audit
   it.skip("MiniMax: sets tool_choice=required on the call AFTER a narration kick (no toolChoiceRequired option)", async () => {
     const paramsPerCall: any[] = []
     let callCount = 0
@@ -6513,6 +6525,7 @@ describe("tool_choice forcing after kick (Bug 4)", () => {
   })
 
   // Kick detection disabled — see core.ts
+  // skip: kick detection deferred per audit
   it.skip("Azure: sets tool_choice=required on the call AFTER a narration kick (no toolChoiceRequired option)", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
@@ -6559,6 +6572,7 @@ describe("tool_choice forcing after kick (Bug 4)", () => {
   })
 
   // Kick detection disabled — see core.ts
+  // skip: kick detection deferred per audit
   it.skip("MiniMax: sets tool_choice=required after an empty kick (any kick, not just narration)", async () => {
     const paramsPerCall: any[] = []
     let callCount = 0
@@ -6628,6 +6642,7 @@ describe("final_answer injection after narration kick", () => {
   })
 
   // Kick detection disabled — see core.ts (final_answer is now always in tools)
+  // skip: kick detection deferred per audit
   it.skip("after narration kick, final_answer is present in tools sent to API", async () => {
     const toolsPerCall: any[][] = []
     let callCount = 0
@@ -6666,6 +6681,7 @@ describe("final_answer injection after narration kick", () => {
   })
 
   // Kick detection disabled — see core.ts (final_answer is now always in tools)
+  // skip: kick detection deferred per audit
   it.skip("after empty kick, final_answer is NOT in tools (narration-only injection)", async () => {
     const toolsPerCall: any[][] = []
     let callCount = 0
@@ -6702,6 +6718,7 @@ describe("final_answer injection after narration kick", () => {
   })
 
   // Kick detection disabled — see core.ts (final_answer is now always in tools)
+  // skip: kick detection deferred per audit
   it.skip("model calls final_answer after narration kick -- terminates cleanly", async () => {
     let callCount = 0
     mockCreate.mockImplementation(() => {
@@ -6738,6 +6755,7 @@ describe("final_answer injection after narration kick", () => {
   })
 
   // Kick detection disabled — see core.ts (final_answer is now always in tools)
+  // skip: kick detection deferred per audit
   it.skip("activeTools computed per-iteration -- first call has no final_answer, after kick it does", async () => {
     const toolsPerCall: any[][] = []
     let callCount = 0
