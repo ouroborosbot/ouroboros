@@ -4,7 +4,8 @@ import { getProviderDisplayLabel } from "../heart/core";
 import { finalAnswerTool, getToolsForChannel } from "../repertoire/tools";
 import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName } from "../heart/identity";
-import type { ResolvedContext } from "./friends/types";
+import * as os from "os";
+import type { Channel, ResolvedContext } from "./friends/types";
 import { getChannelCapabilities } from "./friends/channel";
 import { emitNervesEvent } from "../nerves/runtime";
 import { getFirstImpressions } from "./first-impressions";
@@ -50,7 +51,127 @@ export function resetPsycheCache(): void {
   _psycheCache = null;
 }
 
-export type Channel = "cli" | "teams";
+export type { Channel }
+
+const DEFAULT_ACTIVE_THRESHOLD_MS = 24 * 60 * 60 * 1000 // 24 hours
+
+export interface SessionSummaryOptions {
+  sessionsDir: string
+  friendsDir: string
+  agentName: string
+  currentFriendId?: string
+  currentChannel?: string
+  currentKey?: string
+  activeThresholdMs?: number
+}
+
+interface SessionEntry {
+  friendId: string
+  displayName: string
+  channel: string
+  key: string
+  lastActivityMs: number
+}
+
+function resolveFriendName(friendId: string, friendsDir: string, agentName: string): string {
+  if (friendId === "self") return agentName
+  try {
+    const raw = fs.readFileSync(path.join(friendsDir, `${friendId}.json`), "utf-8")
+    const record = JSON.parse(raw) as { name?: string }
+    return record.name ?? friendId
+  } catch {
+    return friendId
+  }
+}
+
+export function buildSessionSummary(options: SessionSummaryOptions): string {
+  const {
+    sessionsDir,
+    friendsDir,
+    agentName,
+    currentFriendId,
+    currentChannel,
+    currentKey,
+    activeThresholdMs = DEFAULT_ACTIVE_THRESHOLD_MS,
+  } = options
+
+  if (!fs.existsSync(sessionsDir)) return ""
+
+  const now = Date.now()
+  const entries: SessionEntry[] = []
+
+  let friendDirs: string[]
+  try {
+    friendDirs = fs.readdirSync(sessionsDir) as unknown as string[]
+  } catch {
+    return ""
+  }
+
+  for (const friendId of friendDirs) {
+    const friendPath = path.join(sessionsDir, friendId)
+    let channels: string[]
+    try {
+      channels = fs.readdirSync(friendPath) as unknown as string[]
+    } catch {
+      continue
+    }
+
+    for (const channel of channels) {
+      const channelPath = path.join(friendPath, channel)
+      let keys: string[]
+      try {
+        keys = fs.readdirSync(channelPath) as unknown as string[]
+      } catch {
+        continue
+      }
+
+      for (const keyFile of keys) {
+        if (!keyFile.endsWith(".json")) continue
+        const key = keyFile.replace(/\.json$/, "")
+
+        // Exclude current session
+        if (friendId === currentFriendId && channel === currentChannel && key === currentKey) {
+          continue
+        }
+
+        const filePath = path.join(channelPath, keyFile)
+        let mtimeMs: number
+        try {
+          mtimeMs = fs.statSync(filePath).mtimeMs
+        } catch {
+          continue
+        }
+
+        if (now - mtimeMs > activeThresholdMs) continue
+
+        const displayName = resolveFriendName(friendId, friendsDir, agentName)
+        entries.push({ friendId, displayName, channel, key, lastActivityMs: mtimeMs })
+      }
+    }
+  }
+
+  if (entries.length === 0) return ""
+
+  // Sort by most recent first
+  entries.sort((a, b) => b.lastActivityMs - a.lastActivityMs)
+
+  const lines: string[] = ["## active sessions"]
+  for (const entry of entries) {
+    const ago = formatTimeAgo(now - entry.lastActivityMs)
+    lines.push(`- ${entry.displayName}/${entry.channel}/${entry.key} (last: ${ago})`)
+  }
+
+  return lines.join("\n")
+}
+
+function formatTimeAgo(ms: number): string {
+  const minutes = Math.floor(ms / 60000)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
 
 function soulSection(): string {
   return loadPsyche().soul;
@@ -235,6 +356,14 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     toolsSection(channel, options),
     skillsSection(),
     taskBoardSection(),
+    buildSessionSummary({
+      sessionsDir: path.join(os.homedir(), ".agentstate", getAgentName(), "sessions"),
+      friendsDir: path.join(getAgentRoot(), "friends"),
+      agentName: getAgentName(),
+      currentFriendId: context?.friend?.id,
+      currentChannel: channel,
+      currentKey: "session",
+    }),
     memoryFriendToolContractSection(),
     toolBehaviorSection(options),
     contextSection(context),

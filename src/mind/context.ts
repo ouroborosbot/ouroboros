@@ -170,7 +170,85 @@ export function trimMessages(
 }
 
 
+/**
+ * Checks session invariant: after system messages, sequence must be
+ * user → assistant (with optional tool calls/results) → user → assistant...
+ * Never assistant → assistant without a user in between.
+ */
+export function validateSessionMessages(messages: OpenAI.ChatCompletionMessageParam[]): string[] {
+  const violations: string[] = []
+  let prevNonToolRole: string | null = null
+  let prevAssistantHadToolCalls = false
+  let sawToolResultSincePrevAssistant = false
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i]
+    if (msg.role === "system") continue
+
+    if (msg.role === "tool") {
+      sawToolResultSincePrevAssistant = true
+      continue
+    }
+
+    if (msg.role === "assistant" && prevNonToolRole === "assistant") {
+      // assistant → tool(s) → assistant is valid (tool call flow)
+      if (!(prevAssistantHadToolCalls && sawToolResultSincePrevAssistant)) {
+        violations.push(`back-to-back assistant at index ${i}`)
+      }
+    }
+
+    prevAssistantHadToolCalls = msg.role === "assistant" && Array.isArray((msg as any).tool_calls) && (msg as any).tool_calls.length > 0
+    sawToolResultSincePrevAssistant = false
+    prevNonToolRole = msg.role
+  }
+
+  return violations
+}
+
+/**
+ * Repairs session invariant violations by merging consecutive assistant messages.
+ */
+export function repairSessionMessages(messages: OpenAI.ChatCompletionMessageParam[]): OpenAI.ChatCompletionMessageParam[] {
+  const violations = validateSessionMessages(messages)
+  if (violations.length === 0) return messages
+
+  const result: OpenAI.ChatCompletionMessageParam[] = []
+  for (const msg of messages) {
+    if (msg.role === "assistant" && result.length > 0) {
+      const prev = result[result.length - 1]
+      if (prev.role === "assistant" && !("tool_calls" in prev)) {
+        const prevContent = typeof (prev as any).content === "string" ? (prev as any).content : ""
+        const curContent = typeof (msg as any).content === "string" ? (msg as any).content : ""
+        ;(prev as any).content = `${prevContent}\n\n${curContent}`
+        continue
+      }
+    }
+    result.push(msg)
+  }
+
+  emitNervesEvent({
+    level: "warn",
+    event: "mind.session_invariant_repair",
+    component: "mind",
+    message: "repaired session invariant violations",
+    meta: { violations },
+  })
+
+  return result
+}
+
 export function saveSession(filePath: string, messages: OpenAI.ChatCompletionMessageParam[], lastUsage?: UsageData): void {
+  const violations = validateSessionMessages(messages)
+  if (violations.length > 0) {
+    emitNervesEvent({
+      level: "warn",
+      event: "mind.session_invariant_violation",
+      component: "mind",
+      message: "session invariant violated on save",
+      meta: { path: filePath, violations },
+    })
+    messages = repairSessionMessages(messages)
+  }
   fs.mkdirSync(path.dirname(filePath), { recursive: true })
   const envelope: { version: number; messages: OpenAI.ChatCompletionMessageParam[]; lastUsage?: UsageData } = { version: 1, messages }
   if (lastUsage) envelope.lastUsage = lastUsage
@@ -182,7 +260,19 @@ export function loadSession(filePath: string): { messages: OpenAI.ChatCompletion
     const raw = fs.readFileSync(filePath, "utf-8")
     const data = JSON.parse(raw)
     if (data.version !== 1) return null
-    return { messages: data.messages, lastUsage: data.lastUsage }
+    let messages: OpenAI.ChatCompletionMessageParam[] = data.messages
+    const violations = validateSessionMessages(messages)
+    if (violations.length > 0) {
+      emitNervesEvent({
+        level: "warn",
+        event: "mind.session_invariant_violation",
+        component: "mind",
+        message: "session invariant violated on load",
+        meta: { path: filePath, violations },
+      })
+      messages = repairSessionMessages(messages)
+    }
+    return { messages, lastUsage: data.lastUsage }
   } catch {
     return null
   }
