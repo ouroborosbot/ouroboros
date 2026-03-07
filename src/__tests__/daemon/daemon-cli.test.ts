@@ -15,6 +15,27 @@ describe("ouro CLI parsing", () => {
     expect(parseOuroCommand(["status"])).toEqual({ kind: "daemon.status" })
     expect(parseOuroCommand(["logs"])).toEqual({ kind: "daemon.logs" })
     expect(parseOuroCommand(["hatch"])).toEqual({ kind: "hatch.start" })
+    expect(
+      parseOuroCommand([
+        "hatch",
+        "--agent",
+        "Sprout",
+        "--human",
+        "Ari",
+        "--provider",
+        "anthropic",
+        "--setup-token",
+        "sk-ant-oat01-test-token",
+      ]),
+    ).toEqual({
+      kind: "hatch.start",
+      agentName: "Sprout",
+      humanName: "Ari",
+      provider: "anthropic",
+      credentials: {
+        setupToken: "sk-ant-oat01-test-token",
+      },
+    })
   })
 
   it("parses chat, message, and poke commands", () => {
@@ -395,6 +416,54 @@ describe("ouro CLI execution", () => {
       content: "hi",
     }))
     expect(result).toContain("queued message fallback")
+  })
+
+  it("executes hatch flow locally and starts daemon after auth verification", async () => {
+    const runHatchFlow = vi.fn(async () => ({
+      bundleRoot: "/tmp/AgentBundles/Sprout.ouro",
+      selectedIdentity: "medusa.md",
+      specialistSecretsPath: "/tmp/.agentsecrets/AdoptionSpecialist/secrets.json",
+      hatchlingSecretsPath: "/tmp/.agentsecrets/Sprout/secrets.json",
+    }))
+
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, message: "unexpected sendCommand call" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 999 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      runHatchFlow,
+    } as OuroCliDeps & {
+      runHatchFlow: typeof runHatchFlow
+    }
+
+    const result = await runOuroCli([
+      "hatch",
+      "--agent",
+      "Sprout",
+      "--human",
+      "Ari",
+      "--provider",
+      "anthropic",
+      "--setup-token",
+      "sk-ant-oat01-test-token",
+    ], deps)
+
+    expect(runHatchFlow).toHaveBeenCalledWith({
+      agentName: "Sprout",
+      humanName: "Ari",
+      provider: "anthropic",
+      credentials: {
+        setupToken: "sk-ant-oat01-test-token",
+      },
+    })
+    expect(deps.startDaemonProcess).toHaveBeenCalledWith("/tmp/ouro-test.sock")
+    expect(result).toContain("hatched Sprout")
+    expect(result).toContain("/tmp/AgentBundles/Sprout.ouro")
+    expect(result).toContain("medusa.md")
   })
 })
 

@@ -17,7 +17,7 @@ Deliver the full Gate 6 first-run contract: Adoption Specialist integration, `ou
 
 ## Completion Criteria
 - [x] Adoption Specialist bundle in repo includes copied pre-authored identity files and random identity selection behavior
-- [ ] `ouro hatch` performs provider auth/verification flow and creates canonical hatchling bundle with required defaults
+- [x] `ouro hatch` performs provider auth/verification flow and creates canonical hatchling bundle with required defaults
 - [x] Bare `ouro` routes correctly based on discovered-agent count
 - [ ] `npx ouro.bot` first-run wrapper delegates correctly to CLI flow
 - [ ] Gate 6 tests cover first-run contracts and pass
@@ -63,7 +63,7 @@ Deliver the full Gate 6 first-run contract: Adoption Specialist integration, `ou
 **Output**: Updated CLI routing behavior with coverage.
 **Acceptance**: Zero agents triggers hatch, one triggers chat, many trigger selector behavior.
 
-### ⬜ Unit 3: `ouro hatch` Auth + Bundle Creation Contract (TDD)
+### ✅ Unit 3: `ouro hatch` Auth + Bundle Creation Contract (TDD)
 **What**: Add failing tests for provider auth verification and hatchling bundle creation defaults, then implement required flow and artifacts.
 **Output**: `ouro hatch` flow updates and validated bundle creation output.
 **Acceptance**: Tests verify secrets flow, canonical bundle structure, `enabled: true`, family imprint, heartbeat task creation.
@@ -99,3 +99,4 @@ Deliver the full Gate 6 first-run contract: Adoption Specialist integration, `ou
 - 2026-03-07 02:58 Unit 0 complete: captured daemon CLI/daemon hatch baseline and first-run surface scan artifacts.
 - 2026-03-07 03:03 Unit 1 complete: added specialist identity sync/pick module, repo-shipped AdoptionSpecialist bundle scaffold, and specialist contract tests.
 - 2026-03-07 03:04 Unit 2 complete: implemented bare `ouro` auto-routing by discovered agent count with coverage in daemon CLI tests.
+- 2026-03-07 03:14 Unit 3 complete: implemented hatch auth/credential verification, canonical bundle creation, specialist identity selection, and daemon-cli hatch wiring with green tests.

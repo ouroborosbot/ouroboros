@@ -1,13 +1,20 @@
 import { spawn } from "child_process"
 import * as fs from "fs"
 import * as net from "net"
+import * as os from "os"
 import * as path from "path"
-import { getAgentBundlesRoot, getRepoRoot } from "../heart/identity"
+import { getAgentBundlesRoot, getRepoRoot, type AgentProvider } from "../heart/identity"
 import { emitNervesEvent } from "../nerves/runtime"
 import { FileFriendStore } from "../mind/friends/store-file"
 import { isIdentityProvider, type IdentityProvider } from "../mind/friends/types"
 import type { DaemonCommand, DaemonResponse } from "./daemon"
 import { installSubagentsForAvailableCli, type SubagentInstallResult } from "./subagent-installer"
+import {
+  runHatchFlow as defaultRunHatchFlow,
+  type HatchCredentialsInput,
+  type HatchFlowInput,
+  type HatchFlowResult,
+} from "./hatch-flow"
 
 export type OuroCliCommand =
   | { kind: "daemon.up" }
@@ -18,7 +25,7 @@ export type OuroCliCommand =
   | { kind: "message.send"; from: string; to: string; content: string; sessionId?: string; taskRef?: string }
   | { kind: "task.poke"; agent: string; taskId: string }
   | { kind: "friend.link"; agent: string; friendId: string; provider: IdentityProvider; externalId: string }
-  | { kind: "hatch.start" }
+  | { kind: "hatch.start"; agentName?: string; humanName?: string; provider?: AgentProvider; credentials?: HatchCredentialsInput; migrationPath?: string }
 
 export interface OuroCliDeps {
   socketPath: string
@@ -31,6 +38,8 @@ export interface OuroCliDeps {
   installSubagents: () => Promise<SubagentInstallResult>
   linkFriendIdentity?: (command: Extract<OuroCliCommand, { kind: "friend.link" }>) => Promise<string>
   listDiscoveredAgents?: () => Promise<string[]> | string[]
+  runHatchFlow?: (input: HatchFlowInput) => Promise<HatchFlowResult>
+  promptInput?: (question: string) => Promise<string>
 }
 
 function usage(): string {
@@ -142,6 +151,80 @@ function parseLinkCommand(args: string[]): OuroCliCommand {
   }
 }
 
+function isAgentProvider(value: unknown): value is AgentProvider {
+  return value === "azure" || value === "anthropic" || value === "minimax" || value === "openai-codex"
+}
+
+function parseHatchCommand(args: string[]): OuroCliCommand {
+  let agentName: string | undefined
+  let humanName: string | undefined
+  let providerRaw: string | undefined
+  let migrationPath: string | undefined
+  const credentials: HatchCredentialsInput = {}
+
+  for (let i = 0; i < args.length; i += 1) {
+    const token = args[i]
+    if (token === "--agent") {
+      agentName = args[i + 1]
+      i += 1
+      continue
+    }
+    if (token === "--human") {
+      humanName = args[i + 1]
+      i += 1
+      continue
+    }
+    if (token === "--provider") {
+      providerRaw = args[i + 1]
+      i += 1
+      continue
+    }
+    if (token === "--setup-token") {
+      credentials.setupToken = args[i + 1]
+      i += 1
+      continue
+    }
+    if (token === "--oauth-token") {
+      credentials.oauthAccessToken = args[i + 1]
+      i += 1
+      continue
+    }
+    if (token === "--api-key") {
+      credentials.apiKey = args[i + 1]
+      i += 1
+      continue
+    }
+    if (token === "--endpoint") {
+      credentials.endpoint = args[i + 1]
+      i += 1
+      continue
+    }
+    if (token === "--deployment") {
+      credentials.deployment = args[i + 1]
+      i += 1
+      continue
+    }
+    if (token === "--migration-path") {
+      migrationPath = args[i + 1]
+      i += 1
+      continue
+    }
+  }
+
+  if (providerRaw && !isAgentProvider(providerRaw)) {
+    throw new Error("Unknown provider. Use azure|anthropic|minimax|openai-codex.")
+  }
+
+  return {
+    kind: "hatch.start",
+    agentName,
+    humanName,
+    provider: providerRaw,
+    credentials: Object.keys(credentials).length > 0 ? credentials : undefined,
+    migrationPath,
+  }
+}
+
 export function parseOuroCommand(args: string[]): OuroCliCommand {
   const [head, second] = args
   if (!head) return { kind: "daemon.up" }
@@ -150,7 +233,7 @@ export function parseOuroCommand(args: string[]): OuroCliCommand {
   if (head === "stop") return { kind: "daemon.stop" }
   if (head === "status") return { kind: "daemon.status" }
   if (head === "logs") return { kind: "daemon.logs" }
-  if (head === "hatch") return { kind: "hatch.start" }
+  if (head === "hatch") return parseHatchCommand(args.slice(1))
   if (head === "chat") {
     if (!second) throw new Error(`Usage\n${usage()}`)
     return { kind: "chat.connect", agent: second }
@@ -294,6 +377,20 @@ async function defaultInstallSubagents(): Promise<SubagentInstallResult> {
   })
 }
 
+async function defaultPromptInput(question: string): Promise<string> {
+  const readline = await import("readline/promises")
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  })
+  try {
+    const response = await rl.question(question)
+    return response.trim()
+  } finally {
+    rl.close()
+  }
+}
+
 function defaultListDiscoveredAgents(): string[] {
   const bundlesRoot = getAgentBundlesRoot()
   let entries: fs.Dirent[]
@@ -369,11 +466,48 @@ export function createDefaultOuroCliDeps(socketPath = "/tmp/ouroboros-daemon.soc
     installSubagents: defaultInstallSubagents,
     linkFriendIdentity: defaultLinkFriendIdentity,
     listDiscoveredAgents: defaultListDiscoveredAgents,
+    runHatchFlow: defaultRunHatchFlow,
+    promptInput: defaultPromptInput,
   }
 }
 
-function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "friend.link" }>): DaemonCommand {
+function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "friend.link" } | { kind: "hatch.start" }>): DaemonCommand {
   return command
+}
+
+async function resolveHatchInput(command: Extract<OuroCliCommand, { kind: "hatch.start" }>, deps: OuroCliDeps): Promise<HatchFlowInput> {
+  const prompt = deps.promptInput
+  const agentName = command.agentName ?? (prompt ? await prompt("Hatchling name: ") : "")
+  const humanName = command.humanName ?? (prompt ? await prompt("Your name: ") : os.userInfo().username)
+  const providerRaw = command.provider ?? (prompt ? await prompt("Provider (azure|anthropic|minimax|openai-codex): ") : "")
+
+  if (!agentName || !humanName || !isAgentProvider(providerRaw)) {
+    throw new Error(`Usage\n${usage()}`)
+  }
+
+  const credentials: HatchCredentialsInput = { ...(command.credentials ?? {}) }
+  if (providerRaw === "anthropic" && !credentials.setupToken && prompt) {
+    credentials.setupToken = await prompt("Anthropic setup-token: ")
+  }
+  if (providerRaw === "openai-codex" && !credentials.oauthAccessToken && prompt) {
+    credentials.oauthAccessToken = await prompt("OpenAI Codex OAuth token: ")
+  }
+  if (providerRaw === "minimax" && !credentials.apiKey && prompt) {
+    credentials.apiKey = await prompt("MiniMax API key: ")
+  }
+  if (providerRaw === "azure") {
+    if (!credentials.apiKey && prompt) credentials.apiKey = await prompt("Azure API key: ")
+    if (!credentials.endpoint && prompt) credentials.endpoint = await prompt("Azure endpoint: ")
+    if (!credentials.deployment && prompt) credentials.deployment = await prompt("Azure deployment: ")
+  }
+
+  return {
+    agentName,
+    humanName,
+    provider: providerRaw,
+    credentials,
+    migrationPath: command.migrationPath,
+  }
 }
 
 export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefaultOuroCliDeps()): Promise<string> {
@@ -435,6 +569,43 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   if (command.kind === "friend.link") {
     const linker = deps.linkFriendIdentity ?? defaultLinkFriendIdentity
     const message = await linker(command)
+    deps.writeStdout(message)
+    return message
+  }
+
+  if (command.kind === "hatch.start") {
+    const hatchRunner = deps.runHatchFlow
+    if (!hatchRunner) {
+      const response = await deps.sendCommand(deps.socketPath, { kind: "hatch.start" })
+      const message = response.summary ?? response.message ?? (response.ok ? "ok" : `error: ${response.error ?? "unknown error"}`)
+      deps.writeStdout(message)
+      return message
+    }
+
+    const hatchInput = await resolveHatchInput(command, deps)
+    const result = await hatchRunner(hatchInput)
+
+    try {
+      await deps.installSubagents()
+    } catch (error) {
+      emitNervesEvent({
+        level: "warn",
+        component: "daemon",
+        event: "daemon.subagent_install_error",
+        message: "subagent auto-install failed",
+        meta: { error: error instanceof Error ? error.message : String(error) },
+      })
+    }
+
+    const alive = await deps.checkSocketAlive(deps.socketPath)
+    let daemonMessage = `daemon already running (${deps.socketPath})`
+    if (!alive) {
+      deps.cleanupStaleSocket(deps.socketPath)
+      const started = await deps.startDaemonProcess(deps.socketPath)
+      daemonMessage = `daemon started (pid ${started.pid ?? "unknown"})`
+    }
+
+    const message = `hatched ${hatchInput.agentName} at ${result.bundleRoot} using specialist identity ${result.selectedIdentity}; ${daemonMessage}`
     deps.writeStdout(message)
     return message
   }
