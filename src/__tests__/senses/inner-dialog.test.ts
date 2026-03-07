@@ -86,41 +86,10 @@ describe("inner dialog runtime", () => {
     expect(message).toContain("No explicit aspirations file found")
   })
 
-  it("loads instincts from bundle config and falls back to defaults when missing", () => {
-    const instinctsFile = path.join(agentRoot, "psyche", "inner-dialog-instincts.json")
-    fs.writeFileSync(
-      instinctsFile,
-      JSON.stringify([{ id: "backlog", prompt: "Instinct: review pending tasks.", enabled: true }], null, 2),
-      "utf8",
-    )
-    const configured = loadInnerDialogInstincts(agentRoot)
-    expect(configured).toHaveLength(1)
-    expect(configured[0].prompt).toContain("review pending tasks")
-
-    fs.unlinkSync(instinctsFile)
-    const fallback = loadInnerDialogInstincts(agentRoot)
-    expect(fallback.length).toBeGreaterThan(0)
-    expect(fallback[0].prompt.toLowerCase()).toContain("heartbeat")
-  })
-
-  it("falls back to defaults for empty, malformed, or disabled instinct configs", () => {
-    const instinctsFile = path.join(agentRoot, "psyche", "inner-dialog-instincts.json")
-
-    fs.writeFileSync(instinctsFile, "", "utf8")
-    expect(loadInnerDialogInstincts(agentRoot)[0].prompt.toLowerCase()).toContain("heartbeat")
-
-    fs.writeFileSync(instinctsFile, JSON.stringify({ not: "an-array" }), "utf8")
-    expect(loadInnerDialogInstincts(agentRoot)[0].prompt.toLowerCase()).toContain("heartbeat")
-
-    fs.writeFileSync(
-      instinctsFile,
-      JSON.stringify([{ id: "disabled", prompt: "disabled instinct", enabled: false }]),
-      "utf8",
-    )
-    expect(loadInnerDialogInstincts(agentRoot)[0].prompt.toLowerCase()).toContain("heartbeat")
-
-    fs.writeFileSync(instinctsFile, "{bad-json", "utf8")
-    expect(loadInnerDialogInstincts(agentRoot)[0].prompt.toLowerCase()).toContain("heartbeat")
+  it("returns default instincts", () => {
+    const instincts = loadInnerDialogInstincts()
+    expect(instincts.length).toBeGreaterThan(0)
+    expect(instincts[0].prompt.toLowerCase()).toContain("heartbeat")
   })
 
   it("uses instinct text to produce user-role prompts (not hardcoded continue)", () => {
@@ -249,11 +218,6 @@ describe("inner dialog runtime", () => {
   })
 
   it("uses default reason/clock/instinct loading when options are omitted", async () => {
-    fs.writeFileSync(
-      path.join(agentRoot, "psyche", "inner-dialog-instincts.json"),
-      JSON.stringify([{ id: "default-file", prompt: "Instinct from file.", enabled: true }]),
-      "utf8",
-    )
     mockLoadSession.mockReturnValue({
       messages: [
         { role: "system", content: "system prompt" },
@@ -266,7 +230,7 @@ describe("inner dialog runtime", () => {
     const [messages] = mockRunAgent.mock.calls[0]
     const lastUser = [...messages].reverse().find((message: OpenAI.ChatCompletionMessageParam) => message.role === "user")
     expect(lastUser).toBeDefined()
-    expect(String(lastUser!.content)).toContain("Instinct from file.")
+    expect(String(lastUser!.content).toLowerCase()).toContain("heartbeat")
     expect(String(lastUser!.content)).toContain("reason: heartbeat")
   })
 

@@ -1,7 +1,0 @@
-src/__tests__/nerves/bundle-skeleton.contract.test.ts:7:import { CANONICAL_BUNDLE_MANIFEST } from "../../mind/bundle-manifest"
-src/__tests__/nerves/bundle-skeleton.contract.test.ts:44:  return CANONICAL_BUNDLE_MANIFEST.map((entry) => join(root, entry.path))
-src/mind/bundle-manifest.ts:10:export const CANONICAL_BUNDLE_MANIFEST: readonly BundleManifestEntry[] = [
-src/mind/bundle-manifest.ts:22:  { path: "senses/teams", kind: "dir" },
-src/mind/bundle-manifest.ts:26:  CANONICAL_BUNDLE_MANIFEST
-src/mind/bundle-manifest.ts:31:const CANONICAL_DIR_PATHS = CANONICAL_BUNDLE_MANIFEST
-src/mind/bundle-manifest.ts:51:export function findNonCanonicalBundlePaths(bundleRoot: string): string[] {
