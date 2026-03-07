@@ -1,0 +1,64 @@
+# Baseline Tool Surface
+
+## Existing memory/friend tool symbols
+src/repertoire/tools.ts:183:  if (name === "memory_search") return summarizeKeyValues(args, ["query"]);
+src/repertoire/tools.ts:184:  if (name === "save_friend_note") {
+src/repertoire/tools-base.ts:284:        name: "memory_search",
+src/repertoire/tools-base.ts:462:        name: "save_friend_note",
+src/repertoire/tools-base.ts:480:        event: "repertoire.save_friend_note",
+src/__tests__/repertoire/__snapshots__/tools-registry.contract.test.ts.snap:16:  "memory_search",
+src/__tests__/repertoire/__snapshots__/tools-registry.contract.test.ts.snap:18:  "save_friend_note",
+src/mind/prompt.ts:181:  lines.push("my conversation memory is ephemeral -- it resets between sessions. anything i learn about my friend, i save with save_friend_note so future me remembers.")
+src/mind/prompt.ts:184:  lines.push("i save ANYTHING i learn about my friend immediately with save_friend_note -- names, preferences, what they do, what they care about. when in doubt, save it. saving comes BEFORE responding: i call save_friend_note first, then final_answer on the next turn.")
+src/__tests__/repertoire/tools.test.ts:372:  // ── memory_search ──
+src/__tests__/repertoire/tools.test.ts:373:  it("memory_search returns relevant memory facts for a query", async () => {
+src/__tests__/repertoire/tools.test.ts:394:    const result = await execTool("memory_search", { query: "pizza" })
+src/__tests__/repertoire/tools.test.ts:399:  it("memory_search returns a query-required error when query is empty", async () => {
+src/__tests__/repertoire/tools.test.ts:400:    const result = await execTool("memory_search", { query: "   " })
+src/__tests__/repertoire/tools.test.ts:404:  it("memory_search returns a query-required error when query is omitted", async () => {
+src/__tests__/repertoire/tools.test.ts:405:    const result = await execTool("memory_search", {})
+src/__tests__/repertoire/tools.test.ts:409:  it("memory_search returns error text when reading memory facts fails", async () => {
+src/__tests__/repertoire/tools.test.ts:415:    const result = await execTool("memory_search", { query: "pizza" })
+src/__tests__/repertoire/tools.test.ts:420:  it("memory_search stringifies non-Error read failures", async () => {
+src/__tests__/repertoire/tools.test.ts:426:    const result = await execTool("memory_search", { query: "pizza" })
+src/__tests__/repertoire/tools.test.ts:731:  it("returns truncated query for memory_search", () => {
+src/__tests__/repertoire/tools.test.ts:733:    expect(summarizeArgs("memory_search", { query })).toBe("query=" + "a".repeat(60) + "...")
+src/__tests__/repertoire/tools.test.ts:736:  it("returns empty string for memory_search with no query", () => {
+src/__tests__/repertoire/tools.test.ts:737:    expect(summarizeArgs("memory_search", {})).toBe("")
+src/__tests__/repertoire/tools.test.ts:2003:  it("returns type+key summary for save_friend_note", () => {
+src/__tests__/repertoire/tools.test.ts:2004:    expect(summarizeArgs("save_friend_note", { type: "tool_preference", key: "ado", content: "flat backlog" })).toBe("type=tool_preference key=ado content=flat backlog")
+src/__tests__/repertoire/tools.test.ts:2007:  it("returns type for save_friend_note name type (no key)", () => {
+src/__tests__/repertoire/tools.test.ts:2008:    expect(summarizeArgs("save_friend_note", { type: "name", content: "Jordan" })).toBe("type=name content=Jordan")
+src/__tests__/repertoire/tools.test.ts:2020:describe("save_friend_note tool", () => {
+src/__tests__/repertoire/tools.test.ts:2060:    const def = baseToolDefinitions.find(d => d.tool.function.name === "save_friend_note")
+src/__tests__/repertoire/tools.test.ts:2068:    const def = baseToolDefinitions.find(d => d.tool.function.name === "save_friend_note")!
+src/__tests__/repertoire/tools.test.ts:2078:    const result = await execTool("save_friend_note", { type: "note", key: "role" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2087:    const result = await execTool("save_friend_note", { type: "tool_preference", content: "flat backlog" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2096:    const result = await execTool("save_friend_note", { type: "note", content: "engineering manager" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2105:    const result = await execTool("save_friend_note", { type: "invalid", key: "k", content: "v" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2113:    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "eng" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2127:    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "eng" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2137:    const result = await execTool("save_friend_note", { type: "name", content: "Jordan Lee" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2154:    const result = await execTool("save_friend_note", { type: "name", content: "Alex" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2164:    const result = await execTool("save_friend_note", { type: "tool_preference", key: "ado", content: "flat backlog view" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2178:    const result = await execTool("save_friend_note", { type: "tool_preference", key: "ado", content: "new preference" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2190:    const result = await execTool("save_friend_note", { type: "tool_preference", key: "ado", content: "new preference", override: "true" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2206:    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "engineering manager" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2220:    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "new role" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2231:    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "new role", override: "true" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2247:    const result = await execTool("save_friend_note", { type: "note", key: "name", content: "Ari" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2263:    const result = await execTool("save_friend_note", { type: "note", key: "name", content: "Ari" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2274:    const result = await execTool("save_friend_note", { type: "note", key: "name", content: "Ari", override: "true" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2288:    const result = await execTool("save_friend_note", { type: "note", key: "name", content: "New Name" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2311:    await execTool("save_friend_note", { type: "note", key: "role", content: "manager" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2332:    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "test" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2346:    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "test" }, ctx)
+src/__tests__/repertoire/tools.test.ts:2354:    const result = await execTool("save_friend_note", { type: "note", key: "role", content: "test" }, ctx)
+src/__tests__/senses/inner-dialog.test.ts:64:      callbacks?.onToolStart?.("memory_search")
+src/__tests__/senses/inner-dialog.test.ts:65:      callbacks?.onToolEnd?.("memory_search", true)
+src/mind/first-impressions.ts:42:  lines.push("i save everything i learn immediately with save_friend_note -- names, roles, preferences, projects, anything. the bar is low: if i learned it, i save it.")
+src/__tests__/wardrobe/format.test.ts:18:    expect(formatToolResult("save_friend_note", "type=name\ncontent=Ari", true)).toBe(
+src/__tests__/wardrobe/format.test.ts:19:      "✓ save_friend_note (type=name content=Ari)",
+src/__tests__/mind/prompt.test.ts:1091:    expect(result).toContain("save_friend_note")
+src/__tests__/mind/memory.test.ts:221:    expect(names).toContain("save_friend_note");
+src/__tests__/mind/memory.test.ts:222:    expect(names).toContain("memory_search");
