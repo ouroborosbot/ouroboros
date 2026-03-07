@@ -62,7 +62,7 @@ Complete Gate 7 by shipping final docs, auditing all skipped tests called out by
 **Output**: Updated architecture documentation aligned with current codebase.
 **Acceptance**: Doc covers unified process model, subsystem/body metaphor, removed components, daemon command surface, directory layout, and canonical bundle manifest.
 
-### ⬜ Unit 3: 18 Skipped Tests Audit + Remediation (TDD)
+### ✅ Unit 3: 18 Skipped Tests Audit + Remediation (TDD)
 **What**: Audit all skipped tests in `src/__tests__/heart/core.test.ts`; unskip and fix active behaviors or add required defer comment exactly where still intentionally deferred.
 **Output**: Updated `core.test.ts` with audited skip state and any supporting code/test fixes.
 **Acceptance**: Every previously skipped test has explicit disposition and suite remains green with required audit comments for deferred kick-detection cases.
@@ -88,3 +88,4 @@ Complete Gate 7 by shipping final docs, auditing all skipped tests called out by
 - 2026-03-07 04:00 Unit 0 complete: baseline doc/test inventory captured in artifacts.
 - 2026-03-07 04:01 Unit 1 complete: added testing-guide contract test and authored docs/testing-guide.md walkthrough with troubleshooting.
 - 2026-03-07 04:03 Unit 2 complete: refreshed ARCHITECTURE.md for unified daemon runtime, subsystem map, command surface, and canonical bundle contract.
+- 2026-03-07 04:04 Unit 3 complete: audited all 18 skipped kick-detection tests and added required defer comments on each skipped case.
