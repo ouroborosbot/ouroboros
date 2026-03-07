@@ -4,7 +4,7 @@ import { getProviderDisplayLabel } from "../heart/core";
 import { finalAnswerTool, getToolsForChannel } from "../repertoire/tools";
 import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName } from "../heart/identity";
-import type { ResolvedContext } from "./friends/types";
+import type { Channel, ResolvedContext } from "./friends/types";
 import { getChannelCapabilities } from "./friends/channel";
 import { emitNervesEvent } from "../nerves/runtime";
 import { getFirstImpressions } from "./first-impressions";
@@ -50,7 +50,7 @@ export function resetPsycheCache(): void {
   _psycheCache = null;
 }
 
-export type Channel = "cli" | "teams";
+export type { Channel }
 
 function soulSection(): string {
   return loadPsyche().soul;

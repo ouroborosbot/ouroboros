@@ -2,7 +2,7 @@ import * as fs from "fs"
 import * as path from "path"
 import { getAgentRoot } from "../heart/identity"
 import { emitNervesEvent } from "../nerves/runtime"
-import type { FriendRecord, IdentityProvider } from "../mind/friends/types"
+import type { Channel, FriendRecord, IdentityProvider } from "../mind/friends/types"
 
 export const STRANGER_AUTO_REPLY = "I'm sorry, I'm not allowed to talk to strangers"
 
@@ -15,7 +15,7 @@ export interface TrustGateInput {
   provider: IdentityProvider
   externalId: string
   tenantId?: string
-  channel: "cli" | "teams"
+  channel: Channel
   bundleRoot?: string
   now?: () => Date
 }
