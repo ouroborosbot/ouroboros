@@ -36,22 +36,22 @@ See planning doc for full list (30+ items). Key gates:
 ### Legend
 - Not started / In progress / Done / Blocked
 
-### Unit 1: Channel Type Consolidation
+### Unit 1: Channel Type Consolidation ✅
 **What**: Define `Channel = "cli" | "teams" | "inner"` once in a shared location. Update all 3 existing definitions (prompt.ts:53, friends/types.ts:71, trust-gate.ts:18) to import from the single source. Add `"inner"` variant.
 **Tests**: Type-level tests + verify imports compile. Existing tests must still pass.
 **Acceptance**: Single `Channel` definition, all imports updated, all tests pass.
 
-### Unit 2: buildSessionSummary (Layer 1: Awareness)
+### Unit 2: buildSessionSummary (Layer 1: Awareness) ✅
 **What**: Add `buildSessionSummary(agentName, currentFriendId, currentChannel, currentKey)` to `src/mind/prompt.ts`. Scans `~/.agentstate/<agent>/sessions/` directory tree. Returns `## active sessions` metadata block with friend name, channel, key, last activity timestamp. Excludes current session. Resolves friend UUIDs to display names via direct file read from bundle `friends/` dir. `"self"` maps to agent's own name.
 **Tests**: Mock fs to simulate session directory structure. Test: multiple sessions listed, current session excluded, friend names resolved, empty sessions dir returns empty block, "self" resolved to agent name.
 **Acceptance**: Tests pass, `buildSessionSummary()` integrated into `buildSystem()`.
 
-### Unit 3: Session Invariant
+### Unit 3: Session Invariant ✅
 **What**: Add `validateSessionMessages(messages)` function. Checks that after system message, sequence is always user -> assistant (with optional tool calls/results) -> user -> assistant. Never assistant -> assistant without user in between. Returns violations array. Called in `saveSession()` and `loadSession()`. Repair: merge consecutive assistants.
 **Tests**: Valid sequences pass, invalid sequences (back-to-back assistant) detected, repair merges correctly, tool call sequences validated.
 **Acceptance**: Tests pass, validation wired into save/load paths.
 
-### Unit 4: query_session Tool (Layer 2: Recall)
+### Unit 4: query_session Tool (Layer 2: Recall) ✅
 **What**: Add `query_session` tool to `src/repertoire/tools-base.ts`. Schema: `{ sessionPath, messageCount? }`. Loads last N messages from target session file, calls LLM for summarization with trust-level context in the prompt. Self-queries (from inner dialog, no friend context) use fully transparent summarization.
 **Tests**: Mock session file + LLM call. Test: loads correct session, passes trust level to summarization prompt, self-query is transparent, handles missing session file.
 **Acceptance**: Tests pass, tool registered in definitions.
