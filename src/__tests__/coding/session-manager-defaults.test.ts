@@ -60,4 +60,88 @@ describe("coding session manager defaults", () => {
       expect.objectContaining({ runner: "claude", taskRef: "task-do-it" }),
     )
   })
+
+  it("uses default pid liveness checks during restore", async () => {
+    vi.resetModules()
+
+    vi.doMock("../../coding/spawner", () => ({
+      spawnCodingProcess: vi.fn(() => ({
+        process: new FakeProcess(1),
+        command: "claude",
+        args: [],
+        prompt: "",
+      })),
+    }))
+
+    const { CodingSessionManager } = await import("../../coding/manager")
+
+    const persisted = {
+      sequence: 2,
+      records: [
+        {
+          request: {
+            runner: "claude",
+            workdir: "/tmp/repo",
+            prompt: "alive",
+            taskRef: "task-alive",
+            sessionId: "coding-001",
+            parentAgent: "slugger",
+          },
+          session: {
+            id: "coding-001",
+            runner: "claude",
+            workdir: "/tmp/repo",
+            taskRef: "task-alive",
+            status: "running",
+            pid: process.pid,
+            startedAt: "2026-03-07T00:00:00.000Z",
+            lastActivityAt: "2026-03-07T00:00:00.000Z",
+            endedAt: null,
+            restartCount: 0,
+            lastExitCode: null,
+            lastSignal: null,
+            failure: null,
+          },
+        },
+        {
+          request: {
+            runner: "claude",
+            workdir: "/tmp/repo",
+            prompt: "dead",
+            taskRef: "task-dead",
+            sessionId: "coding-002",
+            parentAgent: "slugger",
+          },
+          session: {
+            id: "coding-002",
+            runner: "claude",
+            workdir: "/tmp/repo",
+            taskRef: "task-dead",
+            status: "running",
+            pid: 999_999_999,
+            startedAt: "2026-03-07T00:00:00.000Z",
+            lastActivityAt: "2026-03-07T00:00:00.000Z",
+            endedAt: null,
+            restartCount: 0,
+            lastExitCode: null,
+            lastSignal: null,
+            failure: null,
+          },
+        },
+      ],
+    }
+
+    const manager = new CodingSessionManager({
+      spawnProcess: vi.fn(() => new FakeProcess(333)),
+      nowIso: () => "2026-03-07T00:10:00.000Z",
+      stateFilePath: "/tmp/coding-default-pid-check.json",
+      existsSync: () => true,
+      readFileSync: () => JSON.stringify(persisted),
+      writeFileSync: vi.fn(),
+      mkdirSync: vi.fn(),
+    })
+
+    expect(manager.getSession("coding-001")?.status).toBe("running")
+    expect(manager.getSession("coding-002")?.status).toBe("failed")
+  })
 })
