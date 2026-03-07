@@ -1,0 +1,12 @@
+# Baseline Daemon CLI Surface
+
+16:  | { kind: "message.send"; from: string; to: string; content: string; sessionId?: string; taskRef?: string }
+17:  | { kind: "task.poke"; agent: string; taskId: string }
+18:  | { kind: "hatch.start" }
+27:  fallbackPendingMessage: (command: Extract<DaemonCommand, { kind: "message.send" }>) => string
+72:    kind: "message.send",
+94:  return { kind: "task.poke", agent, taskId }
+97:export function parseOuroCommand(args: string[]): OuroCliCommand {
+105:  if (head === "hatch") return { kind: "hatch.start" }
+212:function defaultFallbackPendingMessage(command: Extract<DaemonCommand, { kind: "message.send" }>): string {
+266:  const command = parseOuroCommand(args)
