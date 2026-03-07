@@ -66,7 +66,7 @@ See planning doc for full list (30+ items). Key gates:
 **Tests**: Mock fs.watch + readline. Test: startup drain, idle drain, gated drain during runAgent, crash safety rename flow, processing file retry.
 **Acceptance**: Tests pass, CLI drain integrated.
 
-### Unit 7: Post-Turn System Prompt Refresh
+### Unit 7: Post-Turn System Prompt Refresh ✅
 **What**: Extract `refreshSystemPrompt()` from `runAgent()` in core.ts. Call after `postTurn()` in CLI and inner dialog senses. Prompt sits ready in `messages[0]` for next turn.
 **Tests**: Verify system prompt is refreshed after postTurn, not stale.
 **Acceptance**: Tests pass, prompt refresh extracted and wired.
