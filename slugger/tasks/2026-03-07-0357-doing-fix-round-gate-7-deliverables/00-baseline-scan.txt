@@ -1,0 +1,34 @@
+Gate 7 baseline scan (2026-03-07 04:00)
+
+- docs/testing-guide.md: missing
+- ARCHITECTURE.md headings:
+1:# ARCHITECTURE
+5:## Core Principle
+12:## Bootstrap Sequence
+21:## Bundle Layout (Repo-Root During Phase 1)
+36:## Shared Protocols
+46:## Runtime Guardrails
+53:## Ownership
+
+- heart/core skipped tests (it.skip):
+4651:  it.skip("fires onKick when model narrates intent without tool calls, then retries", async () => {
+4687:  it.skip("pushes self-correction message before retry", async () => {
+4718:  it.skip("onKick callback receives no arguments", async () => {
+4749:  it.skip("onKick callback is optional (no crash if not provided)", async () => {
+4777:  it.skip("malformed assistant message is NOT in history after kick", async () => {
+4810:  it.skip("Azure: kick cleans up azureInput output items and forces rebuild on retry", async () => {
+6084:  it.skip("kick fires when toolChoiceRequired is true and model narrates intent", async () => {
+6120:  it.skip("after kick, model returns final_answer -- terminates cleanly", async () => {
+6155:  it.skip("abort during kick attempt -- clean stop, no dangling messages", async () => {
+6195:  it.skip("empty content with no tool_calls -- kicks (empty response is always wrong)", async () => {
+6306:  it.skip("toolChoiceRequired kicks even when content is empty (reasoning-only response)", async () => {
+6479:  it.skip("MiniMax: sets tool_choice=required on the call AFTER a narration kick (no toolChoiceRequired option)", async () => {
+6516:  it.skip("Azure: sets tool_choice=required on the call AFTER a narration kick (no toolChoiceRequired option)", async () => {
+6562:  it.skip("MiniMax: sets tool_choice=required after an empty kick (any kick, not just narration)", async () => {
+6631:  it.skip("after narration kick, final_answer is present in tools sent to API", async () => {
+6669:  it.skip("after empty kick, final_answer is NOT in tools (narration-only injection)", async () => {
+6705:  it.skip("model calls final_answer after narration kick -- terminates cleanly", async () => {
+6741:  it.skip("activeTools computed per-iteration -- first call has no final_answer, after kick it does", async () => {
+
+- skip count:
+18
