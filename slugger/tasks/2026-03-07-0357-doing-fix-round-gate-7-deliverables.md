@@ -47,7 +47,7 @@ Complete Gate 7 by shipping final docs, auditing all skipped tests called out by
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Gate 7 Baseline Audit
+### ✅ Unit 0: Gate 7 Baseline Audit
 **What**: Inspect current docs and skipped-test inventory (`docs/`, `ARCHITECTURE.md`, `src/__tests__/heart/core.test.ts`) and capture baseline counts/notes.
 **Output**: Baseline artifact notes under gate artifacts directory.
 **Acceptance**: Baseline clearly identifies required doc deltas and exact skipped-test set to audit.
@@ -85,3 +85,4 @@ Complete Gate 7 by shipping final docs, auditing all skipped tests called out by
 - 2026-03-07 03:58 Granularity pass complete (no changes needed).
 - 2026-03-07 03:59 Validation pass complete (paths and target files confirmed).
 - 2026-03-07 03:59 Quality pass complete (no changes needed).
+- 2026-03-07 04:00 Unit 0 complete: baseline doc/test inventory captured in artifacts.
