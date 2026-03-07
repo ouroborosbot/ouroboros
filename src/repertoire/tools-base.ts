@@ -7,7 +7,8 @@ import { getIntegrationsConfig } from "../heart/config";
 import type { Integration, ResolvedContext, FriendRecord } from "../mind/friends/types";
 import type { FriendStore } from "../mind/friends/store";
 import { emitNervesEvent } from "../nerves/runtime";
-import { getAgentRoot } from "../heart/identity";
+import { getAgentRoot, getAgentName } from "../heart/identity";
+import * as os from "os";
 import { getTaskModule } from "./tasks";
 import { codingToolDefinitions } from "./coding/tools";
 import { readMemoryFacts, saveMemoryFact, searchMemoryFacts } from "../mind/memory";
@@ -586,6 +587,93 @@ export const baseToolDefinitions: ToolDefinition[] = [
         /* v8 ignore next -- defensive: non-Error branch for String(err) @preserve */
         return `error saving note: ${err instanceof Error ? err.message : String(err)}`;
       }
+    },
+  },
+  // -- cross-session awareness --
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "query_session",
+        description: "read the last messages from another session. use this to check on a conversation with a friend or review your own inner dialog.",
+        parameters: {
+          type: "object",
+          properties: {
+            friendId: { type: "string", description: "the friend UUID (or 'self')" },
+            channel: { type: "string", description: "the channel: cli, teams, or inner" },
+            key: { type: "string", description: "session key (defaults to 'session')" },
+            messageCount: { type: "string", description: "how many recent messages to return (default 20)" },
+          },
+          required: ["friendId", "channel"],
+        },
+      },
+    },
+    handler: async (args) => {
+      try {
+        const friendId = args.friendId
+        const channel = args.channel
+        const key = args.key || "session"
+        const count = parseInt(args.messageCount || "20", 10)
+
+        const sessFile = path.join(
+          os.homedir(), ".agentstate", getAgentName(), "sessions",
+          friendId, channel, `${key}.json`,
+        )
+        const raw = fs.readFileSync(sessFile, "utf-8")
+        const data = JSON.parse(raw)
+        const messages: { role: string; content: string }[] = (data.messages || [])
+          .filter((m: { role: string }) => m.role !== "system")
+        const tail = messages.slice(-count)
+        if (tail.length === 0) return "session exists but has no non-system messages."
+        return tail.map((m: { role: string; content: string }) => `[${m.role}] ${m.content}`).join("\n")
+      } catch {
+        return "no session found for that friend/channel/key combination."
+      }
+    },
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "send_message",
+        description: "send a message to a friend's session. the message is queued as a pending file and delivered when the target session drains its queue.",
+        parameters: {
+          type: "object",
+          properties: {
+            friendId: { type: "string", description: "the friend UUID (or 'self')" },
+            channel: { type: "string", description: "the channel: cli, teams, or inner" },
+            key: { type: "string", description: "session key (defaults to 'session')" },
+            content: { type: "string", description: "the message content to send" },
+          },
+          required: ["friendId", "channel", "content"],
+        },
+      },
+    },
+    handler: async (args) => {
+      const friendId = args.friendId
+      const channel = args.channel
+      const key = args.key || "session"
+      const content = args.content
+      const now = Date.now()
+
+      const pendingDir = path.join(
+        os.homedir(), ".agentstate", getAgentName(), "pending",
+        friendId, channel, key,
+      )
+      fs.mkdirSync(pendingDir, { recursive: true })
+
+      const fileName = `${now}-${Math.random().toString(36).slice(2, 10)}.json`
+      const filePath = path.join(pendingDir, fileName)
+      const envelope = {
+        from: getAgentName(),
+        friendId,
+        channel,
+        key,
+        content,
+        timestamp: now,
+      }
+      fs.writeFileSync(filePath, JSON.stringify(envelope, null, 2))
+      return `message queued for ${friendId}/${channel}/${key}`
     },
   },
   ...codingToolDefinitions,
