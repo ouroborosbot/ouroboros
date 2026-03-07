@@ -1,8 +1,7 @@
 export type TaskStatus =
   | "drafting"
   | "processing"
-  | "validating:slugger"
-  | "validating:ari"
+  | "validating"
   | "collaborating"
   | "paused"
   | "blocked"
@@ -68,6 +67,11 @@ export interface CreateTaskInput {
   category: string
   body: string
   status?: TaskStatus | string
+  validator?: string | null
+  requester?: string | null
+  cadence?: string | null
+  scheduledAt?: string | null
+  lastRun?: string | null
 }
 
 export interface TaskModule {

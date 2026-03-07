@@ -121,8 +121,7 @@ describe("buildSystem", () => {
       byStatus: {
         drafting: [],
         processing: [],
-        "validating:slugger": [],
-        "validating:ari": [],
+        "validating": [],
         collaborating: [],
         paused: [],
         blocked: [],
@@ -277,8 +276,7 @@ describe("buildSystem", () => {
       byStatus: {
         drafting: [],
         processing: ["sample-task"],
-        "validating:slugger": [],
-        "validating:ari": [],
+        "validating": [],
         collaborating: [],
         paused: [],
         blocked: [],

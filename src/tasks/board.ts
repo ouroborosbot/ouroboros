@@ -7,8 +7,7 @@ const BOARD_STATUS_ORDER: readonly TaskStatus[] = [
   "processing",
   "collaborating",
   "drafting",
-  "validating:slugger",
-  "validating:ari",
+  "validating",
   "paused",
   "done",
 ]
@@ -22,8 +21,7 @@ function groupByStatus(tasks: TaskFile[]): Record<TaskStatus, string[]> {
   const grouped: Record<TaskStatus, string[]> = {
     drafting: [],
     processing: [],
-    "validating:slugger": [],
-    "validating:ari": [],
+    validating: [],
     collaborating: [],
     paused: [],
     blocked: [],

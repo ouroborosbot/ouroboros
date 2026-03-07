@@ -102,6 +102,11 @@ class FileTaskModule implements TaskModule {
       category: input.category || "infrastructure",
       title: input.title,
       status,
+      validator: input.validator ?? null,
+      requester: input.requester ?? "agent",
+      cadence: input.cadence ?? null,
+      scheduledAt: input.scheduledAt ?? null,
+      lastRun: input.lastRun ?? null,
       created: today,
       updated: today,
       child_tasks: [],
@@ -112,10 +117,6 @@ class FileTaskModule implements TaskModule {
       frontmatter.parent_task = null
       frontmatter.depends_on = []
     }
-    if (type === "habit") {
-      frontmatter.schedule = ""
-    }
-
     const content = renderTaskFile(frontmatter, input.body)
     const validation = validateWrite(filePath, content)
     if (!validation.ok) {
