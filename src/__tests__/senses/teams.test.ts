@@ -2327,7 +2327,6 @@ describe("Teams adapter - session persistence", () => {
     postTurnCalls?: any[][]
     deleteSessionCalls?: string[]
     trimMessagesFn?: any
-    captureTurnMemoriesFn?: any
     parseSlashCommandFn?: any
     dispatchFn?: any
     teamsChannelConfig?: any
@@ -2339,7 +2338,6 @@ describe("Teams adapter - session persistence", () => {
       postTurnCalls = [],
       deleteSessionCalls = [],
       trimMessagesFn = ((msgs: any) => [...msgs]),
-      captureTurnMemoriesFn = vi.fn(),
       parseSlashCommandFn = (() => null),
       dispatchFn = (() => ({ handled: false })),
       teamsChannelConfig = { skipConfirmation: false, port: 3978 },
@@ -2368,9 +2366,6 @@ describe("Teams adapter - session persistence", () => {
       trimMessages: vi.fn().mockImplementation(trimMessagesFn),
 
       postTurn: vi.fn().mockImplementation((...args: any[]) => { postTurnCalls.push(args) }),
-    }))
-    vi.doMock("../../mind/memory-capture", () => ({
-      captureTurnMemories: (...args: any[]) => captureTurnMemoriesFn(...args),
     }))
     vi.doMock("../../repertoire/commands", () => ({
       createCommandRegistry: vi.fn().mockReturnValue({
@@ -2463,27 +2458,6 @@ describe("Teams adapter - session persistence", () => {
     expect(postTurnCalls.length).toBe(1)
     expect(postTurnCalls[0][1]).toBe("/tmp/teams-session.json")
     expect(postTurnCalls[0][2]).toEqual(usageData)
-  })
-
-  it("passes a beforeTrim hook to postTurn that captures memory highlights", async () => {
-    vi.resetModules()
-    const postTurnCalls: any[][] = []
-    const captureTurnMemoriesFn = vi.fn()
-    mockTeamsDeps({
-      runAgentFn: vi.fn().mockResolvedValue({ usage: undefined }),
-      postTurnCalls,
-      captureTurnMemoriesFn,
-    })
-    const teams = await import("../../senses/teams")
-    const mockStream = { emit: vi.fn(), update: vi.fn(), close: vi.fn() }
-    await teams.handleTeamsMessage("hello", mockStream as any, "conv-123")
-
-    expect(postTurnCalls.length).toBe(1)
-    expect(typeof postTurnCalls[0][3]?.beforeTrim).toBe("function")
-
-    const preTrimMessages = [{ role: "user", content: "remember: teams hook payload" }]
-    postTurnCalls[0][3].beforeTrim(preTrimMessages)
-    expect(captureTurnMemoriesFn).toHaveBeenCalledWith(preTrimMessages, "teams")
   })
 
   it("does not call trimMessages directly (postTurn handles it)", async () => {

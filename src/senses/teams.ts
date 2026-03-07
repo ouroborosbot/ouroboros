@@ -17,7 +17,6 @@ import { FriendResolver } from "../mind/friends/resolver"
 import { accumulateFriendTokens } from "../mind/friends/tokens"
 import { createTurnCoordinator } from "../heart/turn-coordinator"
 import { getAgentRoot, getAgentName } from "../identity"
-import { captureTurnMemories } from "../mind/memory-capture"
 import * as os from "os"
 import * as path from "path"
 
@@ -505,9 +504,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   }
 
   // Trim context and save session
-  postTurn(messages, sessPath, result.usage, {
-    beforeTrim: (preTrimMessages) => captureTurnMemories(preTrimMessages, "teams"),
-  })
+  postTurn(messages, sessPath, result.usage)
 
   // Accumulate token usage on friend record
   if (toolContext?.context?.friend?.id) {
