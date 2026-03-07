@@ -42,6 +42,7 @@ export interface OuroCliDeps {
   runHatchFlow?: (input: HatchFlowInput) => Promise<HatchFlowResult>
   promptInput?: (question: string) => Promise<string>
   registerOuroBundleType?: () => Promise<unknown> | unknown
+  startChat?: (agentName: string) => Promise<void>
 }
 
 export interface EnsureDaemonResult {
@@ -561,6 +562,11 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     if (discovered.length === 0) {
       command = { kind: "hatch.start" }
     } else if (discovered.length === 1) {
+      if (deps.startChat) {
+        await ensureDaemonRunning(deps)
+        await deps.startChat(discovered[0])
+        return ""
+      }
       command = { kind: "chat.connect", agent: discovered[0] }
     } else {
       const message = `who do you want to talk to? ${discovered.join(", ")} (use: ouro chat <agent>)`
