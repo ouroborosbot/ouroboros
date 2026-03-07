@@ -1,9 +1,9 @@
 import * as fs from "fs"
 import * as path from "path"
 
-import { getAgentBundlesRoot } from "../identity"
+import { getAgentBundlesRoot } from "../heart/identity"
 import { emitNervesEvent } from "../nerves/runtime"
-import { parseTaskFile, renderTaskFile } from "../tasks/parser"
+import { parseTaskFile, renderTaskFile } from "../repertoire/tasks/parser"
 
 interface ScheduledTaskJob {
   id: string

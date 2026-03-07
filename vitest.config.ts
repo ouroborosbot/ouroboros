@@ -12,11 +12,11 @@ export default defineConfig({
       include: ["src/**/*.ts"],
       exclude: [
         "src/__tests__/**",
-        "src/*-entry.ts",
+        "src/senses/*-entry.ts",
         "src/reflection/*-entry.ts",
-        "src/coding/types.ts",
+        "src/repertoire/coding/types.ts",
         "src/mind/friends/store.ts",
-        "src/tasks/types.ts",
+        "src/repertoire/tasks/types.ts",
         "src/nerves/coverage/cli-main.ts",
       ],
       thresholds: {

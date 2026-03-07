@@ -19,7 +19,7 @@ describe("process manager default dependency wiring", () => {
     const spawn = vi.fn(() => new MockChild())
 
     vi.doMock("child_process", () => ({ spawn }))
-    vi.doMock("../../identity", () => ({ getRepoRoot: () => "/mock/repo" }))
+    vi.doMock("../../heart/identity", () => ({ getRepoRoot: () => "/mock/repo" }))
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
 
     const { DaemonProcessManager } = await import("../../daemon/process-manager")

@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import { getAnthropicConfig } from "../../config";
-import { getAgentName, getAgentSecretsPath } from "../../identity";
+import { getAnthropicConfig } from "../config";
+import { getAgentName, getAgentSecretsPath } from "../identity";
 import type { UsageData } from "../../mind/context";
 import { emitNervesEvent } from "../../nerves/runtime";
 import type { ProviderRuntime, ProviderTurnRequest } from "../core";

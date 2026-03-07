@@ -1,6 +1,6 @@
 import OpenAI from "openai";
-import { getOpenAICodexConfig } from "../../config";
-import { getAgentName, getAgentSecretsPath } from "../../identity";
+import { getOpenAICodexConfig } from "../config";
+import { getAgentName, getAgentSecretsPath } from "../identity";
 import { emitNervesEvent } from "../../nerves/runtime";
 import type { ProviderRuntime, ProviderTurnRequest } from "../core";
 import type { ResponseItem } from "../streaming";

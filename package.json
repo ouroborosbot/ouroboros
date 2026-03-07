@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "tsc && node dist/cli-entry.js --agent ouroboros",
+    "dev": "tsc && node dist/senses/cli-entry.js --agent ouroboros",
     "daemon": "tsc && node dist/daemon/daemon-entry.js",
     "ouro": "tsc && node dist/daemon/ouro-entry.js",
-    "teams": "tsc && node dist/teams-entry.js --agent ouroboros",
+    "teams": "tsc && node dist/senses/teams-entry.js --agent ouroboros",
     "test": "vitest run",
     "test:coverage:vitest": "vitest run --coverage",
     "test:coverage": "node scripts/run-coverage-gate.cjs",

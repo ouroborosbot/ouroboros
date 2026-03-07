@@ -19,7 +19,7 @@ vi.mock("../../heart/core", () => ({
   runAgent: (...args: any[]) => mockRunAgent(...args),
 }))
 
-vi.mock("../../config", () => ({
+vi.mock("../../heart/config", () => ({
   sessionPath: (...args: any[]) => mockSessionPath(...args),
 }))
 
@@ -28,7 +28,7 @@ vi.mock("../../mind/context", () => ({
   postTurn: (...args: any[]) => mockPostTurn(...args),
 }))
 
-vi.mock("../../identity", () => ({
+vi.mock("../../heart/identity", () => ({
   getAgentRoot: (...args: any[]) => mockGetAgentRoot(...args),
 }))
 

@@ -9,11 +9,11 @@ const mockGetAgentRoot = vi.fn()
 const mockEmitNervesEvent = vi.fn()
 const mockFetch = vi.fn()
 
-vi.mock("../../config", () => ({
+vi.mock("../../heart/config", () => ({
   getOpenAIEmbeddingsApiKey: () => mockGetOpenAIEmbeddingsApiKey(),
 }))
 
-vi.mock("../../identity", () => ({
+vi.mock("../../heart/identity", () => ({
   getAgentRoot: () => mockGetAgentRoot(),
 }))
 

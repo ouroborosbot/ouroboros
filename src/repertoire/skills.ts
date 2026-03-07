@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { getAgentRoot, getRepoRoot } from "../identity";
+import { getAgentRoot, getRepoRoot } from "../heart/identity";
 import { emitNervesEvent } from "../nerves/runtime";
 
 // Skills live in {agentRoot}/skills/ directory
