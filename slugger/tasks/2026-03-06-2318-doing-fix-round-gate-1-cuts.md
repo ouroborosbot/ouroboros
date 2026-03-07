@@ -18,8 +18,8 @@ Delete dead subsystems and stale repository artifacts from Gate 1 so later gates
 ## Completion Criteria
 - [ ] All Gate 1 removals and file moves are complete
 - [ ] No production or test references remain to deleted code
-- [ ] `package.json` script surface matches Gate 1 requirements
-- [ ] Root cleanup and docs consolidation are complete
+- [x] `package.json` script surface matches Gate 1 requirements
+- [x] Root cleanup and docs consolidation are complete
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -62,7 +62,7 @@ Delete dead subsystems and stale repository artifacts from Gate 1 so later gates
 **Output**: Test tree aligned with remaining production surfaces.
 **Acceptance**: No test references remain to removed modules.
 
-### ⬜ Unit 3: Root Cleanup And Script Hygiene
+### ✅ Unit 3: Root Cleanup And Script Hygiene
 **What**: Execute Gate 1 root cleanup moves/deletions, merge useful CONSTITUTION content into AGENTS, delete CONSTITUTION, update `.gitignore`, and update `package.json` scripts.
 **Output**: Root layout and scripts match Gate 1 contract.
 **Acceptance**: Required files moved/deleted and script surface constrained to required commands.
@@ -86,3 +86,4 @@ Delete dead subsystems and stale repository artifacts from Gate 1 so later gates
 - 2026-03-06 23:20 Unit 0 complete: Captured baseline inventory, reference scans, and script snapshot artifacts.
 - 2026-03-06 23:25 Unit 1 complete: Removed dead production modules and updated all production callers/imports.
 - 2026-03-06 23:31 Unit 2 complete: Deleted tests tied to removed modules and updated remaining tests/snapshots to match cuts.
+- 2026-03-06 23:34 Unit 3 complete: Moved archived docs, merged constitution guidance into AGENTS, updated gitignore, and trimmed scripts.
