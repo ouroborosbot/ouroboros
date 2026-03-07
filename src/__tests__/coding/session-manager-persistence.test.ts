@@ -493,4 +493,60 @@ describe("coding session manager persistence", () => {
     expect(failed?.failure?.stdoutTail).toContain("stdout payload")
     expect(failed?.failure?.stderrTail).toContain("stderr payload")
   })
+
+  it("covers active-status restoration branches and taskRef fallback from request", () => {
+    const makeRecord = (id: string, status: string) => ({
+      request: {
+        runner: "claude",
+        workdir: "/tmp/repo",
+        prompt: `restore ${id}`,
+        taskRef: `request-${id}`,
+        sessionId: id,
+        parentAgent: "slugger",
+      },
+      session: {
+        id,
+        runner: "claude",
+        workdir: "/tmp/repo",
+        status,
+        pid: 424242,
+        startedAt: "2026-03-07T00:00:00.000Z",
+        lastActivityAt: "2026-03-07T00:00:00.000Z",
+        endedAt: null,
+        restartCount: 0,
+        lastExitCode: null,
+        lastSignal: null,
+        failure: null,
+      },
+    })
+
+    const payload = {
+      sequence: 5,
+      records: [
+        makeRecord("coding-101", "spawning"),
+        makeRecord("coding-102", "running"),
+        makeRecord("coding-103", "waiting_input"),
+        makeRecord("coding-104", "stalled"),
+        makeRecord("coding-105", "completed"),
+      ],
+    }
+
+    const manager = new CodingSessionManager({
+      spawnProcess: vi.fn(() => new FakeProcess(111)),
+      stateFilePath: "/tmp/coding-active-statuses.json",
+      existsSync: () => true,
+      readFileSync: () => JSON.stringify(payload),
+      writeFileSync: vi.fn(),
+      mkdirSync: vi.fn(),
+      pidAlive: () => false,
+      nowIso: () => "2026-03-07T00:30:00.000Z",
+    })
+
+    expect(manager.getSession("coding-101")?.status).toBe("failed")
+    expect(manager.getSession("coding-102")?.status).toBe("failed")
+    expect(manager.getSession("coding-103")?.status).toBe("failed")
+    expect(manager.getSession("coding-104")?.status).toBe("failed")
+    expect(manager.getSession("coding-105")?.status).toBe("completed")
+    expect(manager.getSession("coding-102")?.taskRef).toBe("request-coding-102")
+  })
 })
