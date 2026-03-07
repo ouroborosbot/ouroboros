@@ -84,6 +84,7 @@ vi.mock("../../senses/commands", () => ({
 }))
 vi.mock("../../heart/identity", () => ({
   getAgentName: vi.fn(() => "testagent"),
+  setAgentName: vi.fn(),
   getAgentSecretsPath: vi.fn(() => "/tmp/.agentsecrets/testagent/secrets.json"),
   getAgentRoot: vi.fn(() => "/mock/agent/root"),
   loadAgentConfig: vi.fn(() => ({
@@ -921,5 +922,36 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
 
     expect(mocks.runAgent).not.toHaveBeenCalled()
     expect(stdoutChunks.join("")).toContain("I'm sorry, I'm not allowed to talk to strangers")
+  })
+})
+
+describe("agent.ts main(agentName) parameter", () => {
+  beforeEach(() => {
+    resetMocks()
+    setupSpies()
+  })
+
+  afterEach(() => {
+    restoreSpies()
+    vi.restoreAllMocks()
+  })
+
+  it("calls setAgentName when agentName parameter is provided", async () => {
+    const { setAgentName } = await import("../../heart/identity")
+    setupBasic({ inputSequence: ["/exit"] })
+
+    await main("customAgent")
+
+    expect(setAgentName).toHaveBeenCalledWith("customAgent")
+  })
+
+  it("does not call setAgentName when agentName is omitted", async () => {
+    const { setAgentName } = await import("../../heart/identity")
+    vi.mocked(setAgentName).mockClear()
+    setupBasic({ inputSequence: ["/exit"] })
+
+    await main()
+
+    expect(setAgentName).not.toHaveBeenCalled()
   })
 })
