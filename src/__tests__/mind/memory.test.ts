@@ -2,11 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import type OpenAI from "openai";
 import {
   __memoryTestUtils,
   appendFactsWithDedup,
-  extractMemoryHighlights,
   ensureMemoryStorePaths,
   saveMemoryFact,
   searchMemoryFacts,
@@ -15,30 +13,6 @@ import {
 import { baseToolDefinitions } from "../../repertoire/tools-base";
 
 describe("memory write path", () => {
-  it("extracts highlights from user/assistant messages", () => {
-    const messages: OpenAI.ChatCompletionMessageParam[] = [
-      { role: "system", content: "sys" },
-      { role: "user", content: "remember: ari prefers concise updates" },
-      { role: "assistant", content: "learned: use branch-per-gate discipline" },
-      { role: "assistant", content: "normal text that should be ignored" },
-    ];
-    const highlights = extractMemoryHighlights(messages);
-    expect(highlights).toEqual([
-      "ari prefers concise updates",
-      "use branch-per-gate discipline",
-    ]);
-  });
-
-  it("ignores non-string content and empty highlight payloads", () => {
-    const messages: OpenAI.ChatCompletionMessageParam[] = [
-      { role: "assistant", content: [{ type: "text", text: "remember: should be ignored" } as any] as any },
-      { role: "user", content: "remember:   " },
-      { role: "assistant", content: "learned:    " },
-      { role: "assistant", content: "learned: keep strict TDD" },
-    ];
-    expect(extractMemoryHighlights(messages)).toEqual(["keep strict TDD"]);
-  });
-
   it("ensures memory data file paths exist in bundle psyche memory root", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "memory-paths-"));
     const stores = ensureMemoryStorePaths(root);

@@ -52,23 +52,8 @@ function readAspirations(agentRoot: string): string {
   }
 }
 
-function instinctsPath(agentRoot: string): string {
-  return path.join(agentRoot, "psyche", "inner-dialog-instincts.json")
-}
-
-export function loadInnerDialogInstincts(agentRoot = getAgentRoot()): InnerDialogInstinct[] {
-  try {
-    const raw = fs.readFileSync(instinctsPath(agentRoot), "utf8").trim()
-    if (!raw) return [...DEFAULT_INNER_DIALOG_INSTINCTS]
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return [...DEFAULT_INNER_DIALOG_INSTINCTS]
-    const cleaned = parsed
-      .filter((item): item is InnerDialogInstinct => Boolean(item && typeof item.id === "string" && typeof item.prompt === "string"))
-      .filter((item) => item.enabled !== false)
-    return cleaned.length > 0 ? cleaned : [...DEFAULT_INNER_DIALOG_INSTINCTS]
-  } catch {
-    return [...DEFAULT_INNER_DIALOG_INSTINCTS]
-  }
+export function loadInnerDialogInstincts(): InnerDialogInstinct[] {
+  return [...DEFAULT_INNER_DIALOG_INSTINCTS]
 }
 
 export function buildInnerDialogBootstrapMessage(aspirations: string, stateSummary: string): string {
