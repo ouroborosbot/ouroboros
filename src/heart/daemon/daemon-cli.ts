@@ -42,6 +42,29 @@ export interface OuroCliDeps {
   runHatchFlow?: (input: HatchFlowInput) => Promise<HatchFlowResult>
   promptInput?: (question: string) => Promise<string>
   registerOuroBundleType?: () => Promise<unknown> | unknown
+  startChat?: (agentName: string) => Promise<void>
+}
+
+export interface EnsureDaemonResult {
+  alreadyRunning: boolean
+  message: string
+}
+
+export async function ensureDaemonRunning(deps: OuroCliDeps): Promise<EnsureDaemonResult> {
+  const alive = await deps.checkSocketAlive(deps.socketPath)
+  if (alive) {
+    return {
+      alreadyRunning: true,
+      message: `daemon already running (${deps.socketPath})`,
+    }
+  }
+
+  deps.cleanupStaleSocket(deps.socketPath)
+  const started = await deps.startDaemonProcess(deps.socketPath)
+  return {
+    alreadyRunning: false,
+    message: `daemon started (pid ${started.pid ?? "unknown"})`,
+  }
 }
 
 function usage(): string {
@@ -531,7 +554,27 @@ async function registerOuroBundleTypeNonBlocking(deps: OuroCliDeps): Promise<voi
 }
 
 export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefaultOuroCliDeps()): Promise<string> {
-  let command = parseOuroCommand(args)
+  if (args.includes("--help") || args.includes("-h")) {
+    const text = usage()
+    deps.writeStdout(text)
+    return text
+  }
+
+  let command: OuroCliCommand
+  try {
+    command = parseOuroCommand(args)
+  } catch (parseError) {
+    if (deps.startChat && deps.listDiscoveredAgents && args.length === 1) {
+      const discovered = await Promise.resolve(deps.listDiscoveredAgents())
+      if (discovered.includes(args[0])) {
+        await ensureDaemonRunning(deps)
+        await deps.startChat(args[0])
+        return ""
+      }
+    }
+    throw parseError
+  }
+
   if (args.length === 0) {
     const discovered = await Promise.resolve(
       deps.listDiscoveredAgents ? deps.listDiscoveredAgents() : defaultListDiscoveredAgents(),
@@ -539,8 +582,22 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     if (discovered.length === 0) {
       command = { kind: "hatch.start" }
     } else if (discovered.length === 1) {
+      if (deps.startChat) {
+        await ensureDaemonRunning(deps)
+        await deps.startChat(discovered[0])
+        return ""
+      }
       command = { kind: "chat.connect", agent: discovered[0] }
     } else {
+      if (deps.startChat && deps.promptInput) {
+        const prompt = `who do you want to talk to?\n${discovered.map((a, i) => `${i + 1}. ${a}`).join("\n")}\n`
+        const answer = await deps.promptInput(prompt)
+        const selected = discovered.includes(answer) ? answer : discovered[parseInt(answer, 10) - 1]
+        if (!selected) throw new Error("Invalid selection")
+        await ensureDaemonRunning(deps)
+        await deps.startChat(selected)
+        return ""
+      }
       const message = `who do you want to talk to? ${discovered.join(", ")} (use: ouro chat <agent>)`
       deps.writeStdout(message)
       return message
@@ -574,18 +631,9 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
     await registerOuroBundleTypeNonBlocking(deps)
 
-    const alive = await deps.checkSocketAlive(deps.socketPath)
-    if (alive) {
-      const message = `daemon already running (${deps.socketPath})`
-      deps.writeStdout(message)
-      return message
-    }
-
-    deps.cleanupStaleSocket(deps.socketPath)
-    const started = await deps.startDaemonProcess(deps.socketPath)
-    const message = `daemon started (pid ${started.pid ?? "unknown"})`
-    deps.writeStdout(message)
-    return message
+    const daemonResult = await ensureDaemonRunning(deps)
+    deps.writeStdout(daemonResult.message)
+    return daemonResult.message
   }
 
   if (command.kind === "friend.link") {
@@ -621,15 +669,14 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
     await registerOuroBundleTypeNonBlocking(deps)
 
-    const alive = await deps.checkSocketAlive(deps.socketPath)
-    let daemonMessage = `daemon already running (${deps.socketPath})`
-    if (!alive) {
-      deps.cleanupStaleSocket(deps.socketPath)
-      const started = await deps.startDaemonProcess(deps.socketPath)
-      daemonMessage = `daemon started (pid ${started.pid ?? "unknown"})`
+    const daemonResult = await ensureDaemonRunning(deps)
+
+    if (deps.startChat) {
+      await deps.startChat(hatchInput.agentName)
+      return ""
     }
 
-    const message = `hatched ${hatchInput.agentName} at ${result.bundleRoot} using specialist identity ${result.selectedIdentity}; ${daemonMessage}`
+    const message = `hatched ${hatchInput.agentName} at ${result.bundleRoot} using specialist identity ${result.selectedIdentity}; ${daemonResult.message}`
     deps.writeStdout(message)
     return message
   }
