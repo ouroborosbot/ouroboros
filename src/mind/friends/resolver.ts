@@ -63,6 +63,9 @@ export class FriendResolver {
     const friend: FriendRecord = {
       id: randomUUID(),
       name: this.params.displayName,
+      role: "friend",
+      trustLevel: "friend",
+      connections: [],
       externalIds: [externalId],
       tenantMemberships,
       toolPreferences: {},

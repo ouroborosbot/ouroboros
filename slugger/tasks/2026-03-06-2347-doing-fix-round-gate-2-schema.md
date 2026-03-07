@@ -1,6 +1,6 @@
 # Doing: Fix Round Gate 2 Schema And Data Model
 
-**Status**: in_progress
+**Status**: completed
 **Execution Mode**: direct
 **Created**: 2026-03-06 23:47
 **Planning**: ./2026-03-06-2347-planning-fix-round-gate-2-schema.md
@@ -17,14 +17,14 @@ Implement Gate 2 schema and data-model contracts end-to-end: task lifecycle/fron
 
 ## Completion Criteria
 - [x] Task schema updates complete (statuses, transitions, frontmatter)
-- [ ] Agent config/identity schema updates complete
-- [ ] Friend store unified file contract complete
-- [ ] Psyche canonical cuts reflected in prompt and tests
-- [ ] Canonical bundle manifest + non-canonical detection implemented
-- [ ] Bundle skeleton contract test rewritten to Gate 2 expectations
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] Agent config/identity schema updates complete
+- [x] Friend store unified file contract complete
+- [x] Psyche canonical cuts reflected in prompt and tests
+- [x] Canonical bundle manifest + non-canonical detection implemented
+- [x] Bundle skeleton contract test rewritten to Gate 2 expectations
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -59,27 +59,27 @@ Implement Gate 2 schema and data-model contracts end-to-end: task lifecycle/fron
 **Output**: Updated tasks runtime + passing task/repertoire/prompt tests.
 **Acceptance**: No `validating:slugger` or `validating:ari` references remain in source/tests.
 
-### ⬜ Unit 2: Agent Identity/Config Schema Update
+### ✅ Unit 2: Agent Identity/Config Schema Update
 **What**: Remove `name`/`configPath` from runtime contract, add `version`/`enabled`, derive agent identity from bundle directory, and enforce conventional secrets path.
 **Output**: Updated `identity.ts`/`config.ts` with passing identity/config/auth-adjacent tests.
 **Acceptance**: Agent config loading no longer depends on `agent.json.configPath` or `agent.json.name`.
 
-### ⬜ Unit 3: Friend Store PII Collapse
+### ✅ Unit 3: Friend Store PII Collapse
 **What**: Refactor friend record schema + file store to single-path storage with merged fields and new relationship metadata.
 **Output**: Updated friend types/store/resolver/sense store wiring and tests.
 **Acceptance**: `FileFriendStore` has single root path and all friend tests pass.
 
-### ⬜ Unit 4: Psyche Canonical Cuts
+### ✅ Unit 4: Psyche Canonical Cuts
 **What**: Remove FRIENDS/CONTEXT psyche prompt injection and align canonical psyche usage with Gate 2 cuts.
 **Output**: Updated prompt assembly and prompt/core tests.
 **Acceptance**: Prompt system no longer loads `FRIENDS.md` or `CONTEXT.md` as canonical psyche sources.
 
-### ⬜ Unit 5: Canonical Bundle Manifest + Contract Rewrite
+### ✅ Unit 5: Canonical Bundle Manifest + Contract Rewrite
 **What**: Introduce canonical bundle path manifest and non-canonical file detection helper; rewrite bundle skeleton contract test for Gate 2 structure (`senses/teams`, no skills stubs, no FRIENDS/CONTEXT requirements).
 **Output**: New manifest/detection module + updated bundle contract tests.
 **Acceptance**: Contract test reflects Gate 2 canonical manifest decisions and passes.
 
-### ⬜ Unit 6: Verification
+### ✅ Unit 6: Verification
 **What**: Run full validation (`npm test`, `npm run build`, `npm run test:coverage`) and stale-reference scans for removed schema artifacts.
 **Output**: Verification logs + stale reference scan artifacts.
 **Acceptance**: Full suite/build/coverage pass with no warnings.
@@ -96,3 +96,8 @@ Implement Gate 2 schema and data-model contracts end-to-end: task lifecycle/fron
 - 2026-03-06 23:47 Created from planning doc.
 - 2026-03-06 23:49 Unit 0 complete: Captured baseline task/config/friend/bundle contract reference snapshots.
 - 2026-03-06 23:51 Unit 1 complete: Simplified task validation statuses and added validator/requester/scheduling frontmatter fields with updated task/prompt/tool tests.
+- 2026-03-07 00:02 Unit 2 complete: `agent.json` runtime schema now uses `version`/`enabled` + provider/phrases/context only, config loads from conventional `~/.agentsecrets/<agent>/secrets.json`, provider guidance/auth scripts updated, and identity/config/auth tests pass.
+- 2026-03-07 00:07 Unit 3 complete: Friend store now uses single bundle `friends/` path, records are unified JSON (no PII split), `FriendRecord` includes `role`/`trustLevel`/`connections`, resolver sets defaults, and friend + channel suites pass.
+- 2026-03-07 00:08 Unit 4 complete: Prompt psyche assembly no longer loads/renders `FRIENDS.md`; added canonical-cut assertions in prompt tests and verified prompt suite passes.
+- 2026-03-07 00:11 Unit 5 complete: Added canonical bundle manifest + non-canonical path scanner, rewrote bundle skeleton contract for Gate 2 (`version`/`enabled`, `senses/teams`, no FRIENDS/CONTEXT/skills-stub requirements), and aligned local bundles to the new schema for contract validation.
+- 2026-03-07 00:18 Unit 6 complete: Full verification succeeded (`npm test`, `npm run build`, `npm run test:coverage` all pass), branch coverage reached 100%, and stale-reference scan confirms removed Gate 2 schema artifacts are absent in production code.

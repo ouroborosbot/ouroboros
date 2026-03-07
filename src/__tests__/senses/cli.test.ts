@@ -3,6 +3,7 @@ import type { ChannelCallbacks } from "../../heart/core"
 
 vi.mock("../../identity", () => ({
   getAgentName: vi.fn(() => "testagent"),
+  getAgentSecretsPath: vi.fn(() => "/tmp/.agentsecrets/testagent/secrets.json"),
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",
     configPath: "~/.agentsecrets/testagent/secrets.json",

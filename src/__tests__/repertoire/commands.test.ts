@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 
 vi.mock("../../identity", () => ({
   getAgentName: vi.fn(() => "testagent"),
+  getAgentSecretsPath: vi.fn(() => "/tmp/.agentsecrets/testagent/secrets.json"),
 }))
 
 describe("createCommandRegistry", () => {

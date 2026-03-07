@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { getOpenAICodexConfig } from "../../config";
-import { loadAgentConfig } from "../../identity";
+import { getAgentName, getAgentSecretsPath } from "../../identity";
 import { emitNervesEvent } from "../../nerves/runtime";
 import type { ProviderRuntime, ProviderTurnRequest } from "../core";
 import type { ResponseItem } from "../streaming";
@@ -19,11 +19,11 @@ const OPENAI_CODEX_BACKEND_BASE_URL = "https://chatgpt.com/backend-api/codex";
 type JsonRecord = Record<string, unknown>;
 
 function getOpenAICodexSecretsPathForGuidance(): string {
-  return loadAgentConfig().configPath;
+  return getAgentSecretsPath();
 }
 
 function getOpenAICodexAgentNameForGuidance(): string {
-  return loadAgentConfig().name;
+  return getAgentName();
 }
 
 function getOpenAICodexOAuthInstructions(): string {

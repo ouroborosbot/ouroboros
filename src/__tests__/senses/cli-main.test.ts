@@ -83,6 +83,7 @@ vi.mock("../../repertoire/commands", () => ({
 }))
 vi.mock("../../identity", () => ({
   getAgentName: vi.fn(() => "testagent"),
+  getAgentSecretsPath: vi.fn(() => "/tmp/.agentsecrets/testagent/secrets.json"),
   getAgentRoot: vi.fn(() => "/mock/agent/root"),
   loadAgentConfig: vi.fn(() => ({
     name: "testagent",

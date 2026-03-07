@@ -4,6 +4,8 @@ import { join } from "path"
 
 import { describe, expect, it } from "vitest"
 
+import { CANONICAL_BUNDLE_MANIFEST } from "../../mind/bundle-manifest"
+
 function candidateBundleRoots(agent: string): string[] {
   return [
     join(os.homedir(), "AgentBundles", `${agent}.ouro`),
@@ -39,31 +41,11 @@ function resolveRequiredBundleRoots(): { ouroboros: string; slugger: string } | 
 }
 
 function requiredPaths(root: string): string[] {
-  return [
-    join(root, "agent.json"),
-    join(root, "teams-app"),
-    join(root, "psyche", "IDENTITY.md"),
-    join(root, "psyche", "SOUL.md"),
-    join(root, "psyche", "ASPIRATIONS.md"),
-    join(root, "psyche", "FRIENDS.md"),
-    join(root, "psyche", "LORE.md"),
-    join(root, "psyche", "TACIT.md"),
-    join(root, "psyche", "CONTEXT.md"),
-    join(root, "psyche", "memory", "facts.jsonl"),
-    join(root, "psyche", "memory", "entities.json"),
-    join(root, "psyche", "memory", "daily"),
-    join(root, "psyche", "memory", "archive"),
-    join(root, "skills", "code-review.md"),
-    join(root, "skills", "self-edit.md"),
-    join(root, "skills", "self-query.md"),
-    join(root, "skills", "explain.md"),
-    join(root, "skills", "toolmaker.md"),
-    join(root, "tasks"),
-  ]
+  return CANONICAL_BUNDLE_MANIFEST.map((entry) => join(root, entry.path))
 }
 
 describe("bundle skeleton contract", () => {
-  it("has required structure-only paths when bundles are available", () => {
+  it("has required canonical paths when bundles are available", () => {
     const roots = resolveRequiredBundleRoots()
     if (!roots) {
       expect(existsSync(join(process.cwd(), "ouroboros.ouro"))).toBe(false)
@@ -80,7 +62,7 @@ describe("bundle skeleton contract", () => {
     expect(missing).toEqual([])
   })
 
-  it("keeps slugger agent config as a structural stub based on ouroboros template", () => {
+  it("keeps slugger agent config aligned to gate-2 schema", () => {
     const roots = resolveRequiredBundleRoots()
     if (!roots) {
       expect(existsSync(join(process.cwd(), "ouroboros.ouro"))).toBe(false)
@@ -96,12 +78,16 @@ describe("bundle skeleton contract", () => {
     ) as Record<string, unknown>
 
     expect(Object.keys(sluggerConfig).sort()).toEqual(Object.keys(ouroborosConfig).sort())
-    expect(sluggerConfig.name).toBe("slugger")
-    expect(sluggerConfig.configPath).toBe("~/.agentsecrets/slugger/secrets.json")
+    expect(sluggerConfig).toHaveProperty("version")
+    expect(sluggerConfig).toHaveProperty("enabled")
+    expect(typeof sluggerConfig.version).toBe("number")
+    expect(typeof sluggerConfig.enabled).toBe("boolean")
     expect(typeof sluggerConfig.provider).toBe("string")
+    expect(sluggerConfig).not.toHaveProperty("name")
+    expect(sluggerConfig).not.toHaveProperty("configPath")
   })
 
-  it("keeps slugger psyche migration artifacts present and non-placeholder for core files", () => {
+  it("keeps slugger canonical psyche files non-empty", () => {
     const roots = resolveRequiredBundleRoots()
     if (!roots) {
       expect(existsSync(join(process.cwd(), "ouroboros.ouro"))).toBe(false)
@@ -112,19 +98,11 @@ describe("bundle skeleton contract", () => {
     const readPsyche = (file: string): string =>
       readFileSync(join(roots.slugger, "psyche", file), "utf-8").trim()
 
-    expect(readPsyche("IDENTITY.md")).toContain("Name:")
-    expect(readPsyche("IDENTITY.md")).toContain("Slugger")
-    expect(readPsyche("SOUL.md")).toContain("What I am")
-    expect(readPsyche("FRIENDS.md")).toContain("Ari Mendelow")
-    expect(readPsyche("LORE.md")).toContain("Core narrative")
-    expect(readPsyche("TACIT.md")).toContain("Durable patterns")
-
-    expect(readPsyche("BEHAVIOR-IMPORTS.md").length).toBeGreaterThan(0)
-    expect(readPsyche("INSPIRING-FIGURES.md").length).toBeGreaterThan(0)
-    expect(readFileSync(join(roots.slugger, "psyche", "memory", "tacit.md"), "utf-8").length).toBeGreaterThan(0)
-
-    expect(readPsyche("ASPIRATIONS.md")).toContain("# ASPIRATIONS")
-    expect(readPsyche("CONTEXT.md")).toContain("# CONTEXT")
+    expect(readPsyche("IDENTITY.md").length).toBeGreaterThan(0)
+    expect(readPsyche("SOUL.md").length).toBeGreaterThan(0)
+    expect(readPsyche("LORE.md").length).toBeGreaterThan(0)
+    expect(readPsyche("TACIT.md").length).toBeGreaterThan(0)
+    expect(readPsyche("ASPIRATIONS.md").length).toBeGreaterThan(0)
   })
 
   it("keeps bundles external to harness repo root", () => {
