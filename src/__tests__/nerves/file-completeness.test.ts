@@ -46,6 +46,23 @@ export class MyClass {}
       expect(isTypeOnlyFile(source)).toBe(false)
     })
 
+    it("returns true for file with const-as-const declarations (type-equivalent frozen values)", () => {
+      const source = `
+export const PHASES = ["a", "b", "c"] as const
+export type Phase = (typeof PHASES)[number]
+export interface Config { phase: Phase }
+`
+      expect(isTypeOnlyFile(source)).toBe(true)
+    })
+
+    it("returns false for file mixing const-as-const and regular const", () => {
+      const source = `
+export const PHASES = ["a", "b"] as const
+export const VALUE = 42
+`
+      expect(isTypeOnlyFile(source)).toBe(false)
+    })
+
     it("returns true for empty file", () => {
       expect(isTypeOnlyFile("")).toBe(true)
     })
