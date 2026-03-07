@@ -1,0 +1,55 @@
+
+ RUN  v4.0.18 /Users/arimendelow/Projects/ouroboros-agent-harness
+
+ ❯ src/__tests__/daemon/ouro-bot-entry.test.ts (2 tests | 2 failed) 12ms
+     × invokes wrapper with argv args and emits startup event 8ms
+     × emits error and exits on failure 3ms
+ ❯ src/__tests__/daemon/ouro-bot-wrapper.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/daemon/ouro-bot-wrapper.test.ts [ src/__tests__/daemon/ouro-bot-wrapper.test.ts ]
+Error: Cannot find module '../../daemon/ouro-bot-wrapper' imported from '/Users/arimendelow/Projects/ouroboros-agent-harness/src/__tests__/daemon/ouro-bot-wrapper.test.ts'
+ ❯ src/__tests__/daemon/ouro-bot-wrapper.test.ts:3:1
+      1| import { describe, expect, it, vi } from "vitest"
+      2| 
+      3| import { runOuroBotWrapper } from "../../daemon/ouro-bot-wrapper"
+       | ^
+      4| 
+      5| describe("ouro.bot wrapper", () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/daemon/ouro-bot-entry.test.ts > ouro.bot entrypoint > invokes wrapper with argv args and emits startup event
+Error: Cannot find module '/src/daemon/ouro-bot-entry' imported from '/Users/arimendelow/Projects/ouroboros-agent-harness/src/__tests__/daemon/ouro-bot-entry.test.ts'
+ ❯ src/__tests__/daemon/ouro-bot-entry.test.ts:28:5
+     26|     ])
+     27| 
+     28|     await import("../../daemon/ouro-bot-entry")
+       |     ^
+     29|     await Promise.resolve()
+     30| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/__tests__/daemon/ouro-bot-entry.test.ts > ouro.bot entrypoint > emits error and exits on failure
+Error: Cannot find module '/src/daemon/ouro-bot-entry' imported from '/Users/arimendelow/Projects/ouroboros-agent-harness/src/__tests__/daemon/ouro-bot-entry.test.ts'
+ ❯ src/__tests__/daemon/ouro-bot-entry.test.ts:59:5
+     57|     ])
+     58| 
+     59|     await import("../../daemon/ouro-bot-entry")
+       |     ^
+     60|     await Promise.resolve()
+     61|     await Promise.resolve()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  2 failed (2)
+   Start at  03:18:02
+   Duration  425ms (transform 45ms, setup 56ms, import 12ms, tests 12ms, environment 0ms)
+
