@@ -51,6 +51,47 @@ describe("getAgentName", () => {
   })
 })
 
+describe("setAgentName", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it("primes cache so getAgentName returns it without --agent in argv", async () => {
+    process.argv = ["node", "cli-entry.js"]
+    const { setAgentName, getAgentName, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    setAgentName("slugger")
+    expect(getAgentName()).toBe("slugger")
+  })
+
+  it("overrides argv-parsed name when called after getAgentName", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    const { setAgentName, getAgentName, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    expect(getAgentName()).toBe("ouroboros")
+    setAgentName("slugger")
+    expect(getAgentName()).toBe("slugger")
+  })
+
+  it("is cleared by resetIdentity", async () => {
+    process.argv = ["node", "cli-entry.js"]
+    const { setAgentName, getAgentName, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    setAgentName("slugger")
+    expect(getAgentName()).toBe("slugger")
+    resetIdentity()
+    expect(() => getAgentName()).toThrow("--agent")
+  })
+
+  it("makes downstream paths resolve correctly", async () => {
+    process.argv = ["node", "cli-entry.js"]
+    const { setAgentName, getAgentRoot, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    setAgentName("slugger")
+    expect(getAgentRoot()).toBe(path.join(os.homedir(), "AgentBundles", "slugger.ouro"))
+  })
+})
+
 describe("agent paths", () => {
   beforeEach(() => {
     vi.resetModules()
