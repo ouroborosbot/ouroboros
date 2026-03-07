@@ -32,5 +32,3 @@ export type { CodingActionResult, CodingRunner, CodingSession, CodingSessionRequ
 export { CodingSessionMonitor } from "./monitor"
 export type { CodingMonitorReport, CodingMonitorSummary, CodingRecoveryAction, CodingRecoveryActionType } from "./monitor"
 export { formatCodingMonitorReport } from "./reporter"
-export { runCodingPipeline } from "./pipeline"
-export type { RunCodingPipelineOptions, RunCodingPipelineResult } from "./pipeline"

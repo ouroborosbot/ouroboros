@@ -7,7 +7,6 @@ import { getIntegrationsConfig } from "../config";
 import type { Integration, ResolvedContext, FriendRecord } from "../mind/friends/types";
 import type { FriendStore } from "../mind/friends/store";
 import { emitNervesEvent } from "../nerves/runtime";
-import { queryGovernanceConvention } from "../governance/convention";
 import { getAgentRoot } from "../identity";
 import { getTaskModule } from "../tasks";
 import { codingToolDefinitions } from "../coding/tools";
@@ -188,27 +187,6 @@ export const baseToolDefinitions: ToolDefinition[] = [
       } catch (e) {
         return `error: ${e}`;
       }
-    },
-  },
-  {
-    tool: {
-      type: "function",
-      function: {
-        name: "governance_convention",
-        description: "query constitution/governance classification conventions used by the harness",
-        parameters: {
-          type: "object",
-          properties: {
-            query: {
-              type: "string",
-              description: "optional convention query; supports 'classification' (default)",
-            },
-          },
-        },
-      },
-    },
-    handler: (a) => {
-      return queryGovernanceConvention(a.query);
     },
   },
   {

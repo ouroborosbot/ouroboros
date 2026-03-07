@@ -5,7 +5,6 @@ import { sessionPath } from "../config"
 import { runAgent, type ChannelCallbacks } from "../heart/core"
 import { getAgentRoot } from "../identity"
 import { loadSession, postTurn, type UsageData } from "../mind/context"
-import { captureTurnMemories } from "../mind/memory-capture"
 import { buildSystem } from "../mind/prompt"
 import { createTraceId } from "../nerves"
 import { emitNervesEvent } from "../nerves/runtime"
@@ -193,9 +192,7 @@ export async function runInnerDialogTurn(options?: RunInnerDialogTurnOptions): P
     skipConfirmation: true,
   })
 
-  postTurn(messages, sessionFilePath, result.usage, {
-    beforeTrim: (snapshot) => captureTurnMemories(snapshot, "inner-dialog", now),
-  })
+  postTurn(messages, sessionFilePath, result.usage)
 
   emitNervesEvent({
     component: "senses",

@@ -1,7 +1,6 @@
 import { DaemonProcessManager } from "./process-manager"
 import { OuroDaemon } from "./daemon"
 import { emitNervesEvent } from "../nerves/runtime"
-import { CronScheduler } from "./cron-scheduler"
 import { FileMessageRouter } from "./message-router"
 import { HealthMonitor } from "./health-monitor"
 
@@ -30,10 +29,10 @@ const processManager = new DaemonProcessManager({
   ],
 })
 
-const scheduler = new CronScheduler({
-  jobs: [],
-  runJob: async (job) => ({ ok: true, message: `triggered ${job.id}` }),
-})
+const scheduler = {
+  listJobs: () => [],
+  triggerJob: async (jobId: string) => ({ ok: false, message: `cron scheduler removed: ${jobId}` }),
+}
 
 const router = new FileMessageRouter()
 
