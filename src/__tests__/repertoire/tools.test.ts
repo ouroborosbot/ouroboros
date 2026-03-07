@@ -737,6 +737,14 @@ describe("summarizeArgs", () => {
     expect(summarizeArgs("memory_search", {})).toBe("")
   })
 
+  it("returns text/about for memory_save summaries", () => {
+    expect(summarizeArgs("memory_save", { text: "remember this", about: "ari" })).toBe("text=remember this about=ari")
+  })
+
+  it("returns friendId for get_friend_note summaries", () => {
+    expect(summarizeArgs("get_friend_note", { friendId: "friend-123" })).toBe("friendId=friend-123")
+  })
+
   it("returns key=value summary for unknown tool", () => {
     expect(summarizeArgs("unknown_tool", { key: "value" })).toBe("key=value")
   })

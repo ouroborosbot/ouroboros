@@ -29,12 +29,13 @@ function makeFriend(overrides: Partial<FriendRecord> = {}): FriendRecord {
   }
 }
 
-function createMockStore(existing?: FriendRecord): FriendStore {
+function createMockStore(existing?: FriendRecord, hasAnyFriends = false): FriendStore & { hasAnyFriends: () => Promise<boolean> } {
   return {
     get: vi.fn(async () => existing ?? null),
     put: vi.fn(async () => {}),
     delete: vi.fn(async () => {}),
     findByExternalId: vi.fn(async () => existing ?? null),
+    hasAnyFriends: vi.fn(async () => hasAnyFriends),
   }
 }
 
@@ -100,8 +101,8 @@ describe("FriendResolver", () => {
       expect(ctx.friend.tenantMemberships).toEqual(["t1"])
       expect(ctx.friend.toolPreferences).toEqual({})
       expect(ctx.friend.notes).toEqual({ name: { value: "New Person", savedAt: expect.any(String) } })
-      expect(ctx.friend.role).toBe("friend")
-      expect(ctx.friend.trustLevel).toBe("friend")
+      expect(ctx.friend.role).toBe("primary")
+      expect(ctx.friend.trustLevel).toBe("family")
       expect(ctx.friend.connections).toEqual([])
       expect(ctx.friend.id).toBeTruthy()
       // Should have saved via store.put
@@ -205,6 +206,23 @@ describe("FriendResolver", () => {
       const ctx = await resolver.resolve()
       expect(ctx.friend.externalIds[0].tenantId).toBeUndefined()
       expect(ctx.friend.tenantMemberships).toEqual([])
+    })
+
+    it("creates provisional stranger trust for non-first encounters", async () => {
+      const store = createMockStore(undefined, true)
+      ;(store.findByExternalId as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+
+      const resolver = new FriendResolver(store, {
+        provider: "aad",
+        externalId: "new-aad-id-2",
+        tenantId: "t1",
+        displayName: "Later Contact",
+        channel: "teams",
+      })
+
+      const ctx = await resolver.resolve()
+      expect(ctx.friend.trustLevel).toBe("stranger")
+      expect(ctx.friend.role).toBe("stranger")
     })
   })
 
@@ -335,6 +353,24 @@ describe("FriendResolver", () => {
       const ctx = await resolver.resolve()
       // Should still resolve (creates new friend on search failure)
       expect(ctx.friend.name).toBe("User")
+    })
+
+    it("defaults to first-imprint trust when hasAnyFriends check fails", async () => {
+      const store = createMockStore()
+      ;(store.findByExternalId as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+      ;(store.hasAnyFriends as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("index read failed"))
+
+      const resolver = new FriendResolver(store, {
+        provider: "aad",
+        externalId: "new-aad-id",
+        tenantId: "t1",
+        displayName: "New Person",
+        channel: "teams",
+      })
+
+      const ctx = await resolver.resolve()
+      expect(ctx.friend.role).toBe("primary")
+      expect(ctx.friend.trustLevel).toBe("family")
     })
 
     it("handles store.put failure gracefully on new friend creation", async () => {

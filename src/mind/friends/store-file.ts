@@ -75,6 +75,17 @@ export class FileFriendStore implements FriendStore {
     return null
   }
 
+  async hasAnyFriends(): Promise<boolean> {
+    let entries: string[]
+    try {
+      entries = await fsPromises.readdir(this.friendsPath)
+    } catch {
+      return false
+    }
+
+    return entries.some((entry) => entry.endsWith(".json"))
+  }
+
   private normalize(raw: FriendRecord): FriendRecord {
     const trustLevel = raw.trustLevel
     const normalizedTrustLevel: TrustLevel =

@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   registerDefaultCommands: vi.fn(),
   parseSlashCommand: vi.fn().mockReturnValue(null),
   getToolChoiceRequired: vi.fn().mockReturnValue(false),
+  enforceTrustGate: vi.fn().mockReturnValue({ allowed: true }),
   createInterface: vi.fn(),
   resolveContext: vi.fn().mockResolvedValue({
     friend: {
@@ -111,6 +112,9 @@ vi.mock("../../mind/friends/resolver", () => {
   })
   return { FriendResolver: MockFriendResolver }
 })
+vi.mock("../../senses/trust-gate", () => ({
+  enforceTrustGate: (...a: any[]) => mocks.enforceTrustGate(...a),
+}))
 vi.mock("os", async () => {
   const actual = await vi.importActual<typeof import("os")>("os")
   return {
@@ -197,6 +201,7 @@ function resetMocks() {
   mocks.registerDefaultCommands.mockReset()
   mocks.parseSlashCommand.mockReset().mockReturnValue(null)
   mocks.getToolChoiceRequired.mockReset().mockReturnValue(false)
+  mocks.enforceTrustGate.mockReset().mockReturnValue({ allowed: true })
 
   // Fresh registry each test
   mocks.registry = {
@@ -872,5 +877,49 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
 
     // sessionPath should be called with the friend UUID ("mock-uuid"), not "default"
     expect(mocks.sessionPath).toHaveBeenCalledWith("mock-uuid", "cli", "session")
+  })
+
+  it("blocks stranger traffic before runAgent and emits one-time auto reply", async () => {
+    setupBasic({ inputSequence: ["hello", "/exit"] })
+    mocks.enforceTrustGate.mockReturnValueOnce({
+      allowed: false,
+      reason: "stranger_first_reply",
+      autoReply: "I'm sorry, I'm not allowed to talk to strangers",
+    }).mockReturnValue({ allowed: true })
+
+    await main()
+
+    expect(mocks.runAgent).not.toHaveBeenCalled()
+    expect(stdoutChunks.join("")).toContain("I'm sorry, I'm not allowed to talk to strangers")
+  })
+
+  it("silently drops stranger input before runAgent", async () => {
+    setupBasic({ inputSequence: ["hello", "/exit"] })
+    mocks.enforceTrustGate.mockReturnValue({
+      allowed: false,
+      reason: "stranger_silent_drop",
+    })
+
+    await main()
+
+    expect(mocks.runAgent).not.toHaveBeenCalled()
+    expect(stdoutChunks.join("")).not.toContain("I'm sorry, I'm not allowed to talk to strangers")
+  })
+
+  it("breaks the input loop when closed flag is raised during stranger block handling", async () => {
+    const setup = setupBasic({ inputSequence: ["hello", "/exit"] })
+    mocks.enforceTrustGate.mockImplementation(() => {
+      setup.getCloseHandler()?.()
+      return {
+        allowed: false,
+        reason: "stranger_first_reply",
+        autoReply: "I'm sorry, I'm not allowed to talk to strangers",
+      }
+    })
+
+    await main()
+
+    expect(mocks.runAgent).not.toHaveBeenCalled()
+    expect(stdoutChunks.join("")).toContain("I'm sorry, I'm not allowed to talk to strangers")
   })
 })

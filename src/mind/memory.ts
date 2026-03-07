@@ -1,6 +1,9 @@
 import type OpenAI from "openai";
 import * as fs from "fs";
 import * as path from "path";
+import { randomUUID } from "crypto";
+import { getOpenAIEmbeddingsApiKey } from "../config";
+import { getAgentRoot } from "../identity";
 import { emitNervesEvent } from "../nerves/runtime";
 
 export interface MemoryStorePaths {
@@ -15,12 +18,27 @@ export interface MemoryFact {
   text: string;
   source: string;
   createdAt: string;
+  about?: string;
   embedding: number[];
 }
 
 export interface MemoryWriteResult {
   added: number;
   skipped: number;
+}
+
+export interface MemoryEmbeddingProvider {
+  embed(texts: string[]): Promise<number[][]>;
+}
+
+export interface SaveMemoryFactOptions {
+  text: string;
+  source: string;
+  about?: string;
+  memoryRoot?: string;
+  now?: () => Date;
+  idFactory?: () => string;
+  embeddingProvider?: MemoryEmbeddingProvider;
 }
 
 export interface EntityIndexEntry {
@@ -34,6 +52,36 @@ export type EntityIndex = Record<string, EntityIndexEntry>;
 const HIGHLIGHT_PREFIX = /^\s*(?:remember|learned)\s*:\s*(.+)\s*$/i;
 const DEDUP_THRESHOLD = 0.6;
 const ENTITY_TOKEN = /[a-z0-9]+/g;
+const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
+
+class OpenAIEmbeddingProvider implements MemoryEmbeddingProvider {
+  constructor(private readonly apiKey: string, private readonly model: string = DEFAULT_EMBEDDING_MODEL) {}
+
+  async embed(texts: string[]): Promise<number[][]> {
+    const response = await fetch("https://api.openai.com/v1/embeddings", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: this.model,
+        input: texts,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`embedding request failed: ${response.status} ${response.statusText}`);
+    }
+
+    const payload = (await response.json()) as { data?: Array<{ embedding: number[] }> };
+    if (!payload.data || payload.data.length !== texts.length) {
+      throw new Error("embedding response missing expected vectors");
+    }
+
+    return payload.data.map((entry) => entry.embedding);
+  }
+}
 
 export function ensureMemoryStorePaths(rootDir: string): MemoryStorePaths {
   const factsPath = path.join(rootDir, "facts.jsonl");
@@ -178,4 +226,148 @@ export function appendFactsWithDedup(stores: MemoryStorePaths, incoming: MemoryF
     meta: { added, skipped },
   });
   return { added, skipped };
+}
+
+function cosineSimilarity(left: number[], right: number[]): number {
+  if (left.length === 0 || right.length === 0 || left.length !== right.length) return 0;
+  let dot = 0;
+  let leftNorm = 0;
+  let rightNorm = 0;
+  for (let i = 0; i < left.length; i += 1) {
+    dot += left[i] * right[i];
+    leftNorm += left[i] * left[i];
+    rightNorm += right[i] * right[i];
+  }
+  if (leftNorm === 0 || rightNorm === 0) return 0;
+  return dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm));
+}
+
+export const __memoryTestUtils = {
+  cosineSimilarity,
+};
+
+function createDefaultEmbeddingProvider(): MemoryEmbeddingProvider | null {
+  const apiKey = getOpenAIEmbeddingsApiKey().trim();
+  if (!apiKey) return null;
+  return new OpenAIEmbeddingProvider(apiKey);
+}
+
+async function buildEmbedding(text: string, embeddingProvider?: MemoryEmbeddingProvider): Promise<number[]> {
+  const provider = embeddingProvider ?? createDefaultEmbeddingProvider();
+  if (!provider) {
+    emitNervesEvent({
+      level: "warn",
+      component: "mind",
+      event: "mind.memory_embedding_unavailable",
+      message: "embedding provider unavailable for memory write",
+      meta: { reason: "missing_openai_embeddings_key" },
+    });
+    return [];
+  }
+
+  try {
+    const vectors = await provider.embed([text]);
+    return vectors[0] ?? [];
+  } catch (error) {
+    emitNervesEvent({
+      level: "warn",
+      component: "mind",
+      event: "mind.memory_embedding_unavailable",
+      message: "embedding provider unavailable for memory write",
+      meta: {
+        reason: error instanceof Error ? error.message : String(error),
+      },
+    });
+    return [];
+  }
+}
+
+export function readMemoryFacts(memoryRoot = path.join(getAgentRoot(), "psyche", "memory")): MemoryFact[] {
+  return readExistingFacts(path.join(memoryRoot, "facts.jsonl"));
+}
+
+export async function saveMemoryFact(options: SaveMemoryFactOptions): Promise<MemoryWriteResult> {
+  const text = options.text.trim();
+  const memoryRoot = options.memoryRoot ?? path.join(getAgentRoot(), "psyche", "memory");
+  const stores = ensureMemoryStorePaths(memoryRoot);
+  const embedding = await buildEmbedding(text, options.embeddingProvider);
+
+  const fact: MemoryFact = {
+    id: options.idFactory ? options.idFactory() : randomUUID(),
+    text,
+    source: options.source,
+    about: options.about?.trim() || undefined,
+    createdAt: (options.now ?? (() => new Date()))().toISOString(),
+    embedding,
+  };
+
+  return appendFactsWithDedup(stores, [fact]);
+}
+
+function substringMatches(queryLower: string, facts: MemoryFact[]): MemoryFact[] {
+  return facts.filter((fact) => fact.text.toLowerCase().includes(queryLower));
+}
+
+function uniqueFacts(facts: MemoryFact[]): MemoryFact[] {
+  const seen = new Set<string>();
+  const unique: MemoryFact[] = [];
+  for (const fact of facts) {
+    if (seen.has(fact.id)) continue;
+    seen.add(fact.id);
+    unique.push(fact);
+  }
+  return unique;
+}
+
+export async function searchMemoryFacts(
+  query: string,
+  facts: MemoryFact[],
+  embeddingProvider?: MemoryEmbeddingProvider,
+): Promise<MemoryFact[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  const queryLower = trimmed.toLowerCase();
+  const substringFallback = () => substringMatches(queryLower, facts).slice(0, 5);
+
+  const embeddedFacts = facts.filter((fact) => Array.isArray(fact.embedding) && fact.embedding.length > 0);
+  if (embeddedFacts.length === 0) {
+    return substringFallback();
+  }
+
+  const provider = embeddingProvider ?? createDefaultEmbeddingProvider();
+  if (!provider) {
+    return substringFallback();
+  }
+
+  try {
+    const vectors = await provider.embed([trimmed]);
+    const queryEmbedding = vectors[0];
+    if (!Array.isArray(queryEmbedding) || queryEmbedding.length === 0) {
+      return substringFallback();
+    }
+
+    const scored = embeddedFacts
+      .filter((fact) => fact.embedding.length === queryEmbedding.length)
+      .map((fact) => ({
+        fact,
+        score: cosineSimilarity(queryEmbedding, fact.embedding),
+      }))
+      .filter((entry) => entry.score > 0)
+      .sort((left, right) => right.score - left.score)
+      .map((entry) => entry.fact);
+
+    const fallback = substringFallback();
+    return uniqueFacts([...scored, ...fallback]).slice(0, 5);
+  } catch (error) {
+    emitNervesEvent({
+      level: "warn",
+      component: "mind",
+      event: "mind.memory_embedding_unavailable",
+      message: "embedding provider unavailable for memory search",
+      meta: {
+        reason: error instanceof Error ? error.message : String(error),
+      },
+    });
+    return substringFallback();
+  }
 }
