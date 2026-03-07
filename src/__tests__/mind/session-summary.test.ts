@@ -244,4 +244,155 @@ describe("buildSessionSummary", () => {
     })
     expect(long).toContain("Bob")
   })
+
+  it("returns empty string when readdirSync throws on sessions dir", async () => {
+    const { buildSessionSummary } = await import("../../mind/prompt")
+
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readdirSync).mockImplementation(() => { throw new Error("EACCES") })
+
+    const result = buildSessionSummary({
+      sessionsDir: "/mock/sessions",
+      friendsDir: "/mock/friends",
+      agentName: "slugger",
+    })
+
+    expect(result).toBe("")
+  })
+
+  it("skips friend dir when channel readdirSync throws", async () => {
+    const { buildSessionSummary } = await import("../../mind/prompt")
+
+    const sessionsDir = "/mock/sessions"
+    const friendsDir = "/mock/friends"
+
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readdirSync).mockImplementation(((p: string) => {
+      if (p === sessionsDir) return ["friend-1"] as any
+      if (p === path.join(sessionsDir, "friend-1")) throw new Error("EACCES")
+      return [] as any
+    }) as any)
+
+    const result = buildSessionSummary({ sessionsDir, friendsDir, agentName: "slugger" })
+    expect(result).toBe("")
+  })
+
+  it("skips channel dir when key readdirSync throws", async () => {
+    const { buildSessionSummary } = await import("../../mind/prompt")
+
+    const sessionsDir = "/mock/sessions"
+    const friendsDir = "/mock/friends"
+
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readdirSync).mockImplementation(((p: string) => {
+      if (p === sessionsDir) return ["friend-1"] as any
+      if (p === path.join(sessionsDir, "friend-1")) return ["cli"] as any
+      if (p === path.join(sessionsDir, "friend-1", "cli")) throw new Error("EACCES")
+      return [] as any
+    }) as any)
+
+    const result = buildSessionSummary({ sessionsDir, friendsDir, agentName: "slugger" })
+    expect(result).toBe("")
+  })
+
+  it("skips file when statSync throws", async () => {
+    const { buildSessionSummary } = await import("../../mind/prompt")
+
+    const sessionsDir = "/mock/sessions"
+    const friendsDir = "/mock/friends"
+
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readdirSync).mockImplementation(((p: string) => {
+      if (p === sessionsDir) return ["friend-1"] as any
+      if (p === path.join(sessionsDir, "friend-1")) return ["cli"] as any
+      if (p === path.join(sessionsDir, "friend-1", "cli")) return ["session.json"] as any
+      return [] as any
+    }) as any)
+
+    vi.mocked(fs.statSync).mockImplementation(() => { throw new Error("ENOENT") })
+
+    const result = buildSessionSummary({ sessionsDir, friendsDir, agentName: "slugger" })
+    expect(result).toBe("")
+  })
+
+  it("falls back to friendId when friend record has no name", async () => {
+    const { buildSessionSummary } = await import("../../mind/prompt")
+
+    const sessionsDir = "/mock/sessions"
+    const friendsDir = "/mock/friends"
+
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readdirSync).mockImplementation(((p: string) => {
+      if (p === sessionsDir) return ["friend-no-name"] as any
+      if (p === path.join(sessionsDir, "friend-no-name")) return ["cli"] as any
+      if (p === path.join(sessionsDir, "friend-no-name", "cli")) return ["session.json"] as any
+      return [] as any
+    }) as any)
+
+    vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: Date.now() - 1000 * 60 * 5 } as any)
+
+    // Friend record exists but has no name field
+    vi.mocked(fs.readFileSync).mockImplementation(((p: string) => {
+      if (p === path.join(friendsDir, "friend-no-name.json")) {
+        return JSON.stringify({ id: "friend-no-name" })
+      }
+      throw new Error("ENOENT")
+    }) as any)
+
+    const result = buildSessionSummary({ sessionsDir, friendsDir, agentName: "slugger" })
+    expect(result).toContain("friend-no-name")
+  })
+
+  it("skips non-json files in session directory", async () => {
+    const { buildSessionSummary } = await import("../../mind/prompt")
+
+    const sessionsDir = "/mock/sessions"
+    const friendsDir = "/mock/friends"
+
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readdirSync).mockImplementation(((p: string) => {
+      if (p === sessionsDir) return ["friend-1"] as any
+      if (p === path.join(sessionsDir, "friend-1")) return ["cli"] as any
+      if (p === path.join(sessionsDir, "friend-1", "cli")) return ["session.json", ".DS_Store", "notes.txt"] as any
+      return [] as any
+    }) as any)
+
+    vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: Date.now() - 1000 * 60 * 5 } as any)
+    vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error("ENOENT") })
+
+    const result = buildSessionSummary({ sessionsDir, friendsDir, agentName: "slugger" })
+    // Only session.json should be listed, not .DS_Store or notes.txt
+    expect(result).toContain("session")
+    expect(result).not.toContain("DS_Store")
+    expect(result).not.toContain("notes")
+  })
+
+  it("formats time ago in days for old sessions", async () => {
+    const { buildSessionSummary } = await import("../../mind/prompt")
+
+    const sessionsDir = "/mock/sessions"
+    const friendsDir = "/mock/friends"
+
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readdirSync).mockImplementation(((p: string) => {
+      if (p === sessionsDir) return ["friend-1"] as any
+      if (p === path.join(sessionsDir, "friend-1")) return ["cli"] as any
+      if (p === path.join(sessionsDir, "friend-1", "cli")) return ["session.json"] as any
+      return [] as any
+    }) as any)
+
+    // 2 days ago (needs activeThreshold > 2 days to show)
+    vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: Date.now() - 1000 * 60 * 60 * 48 } as any)
+
+    vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error("ENOENT") })
+
+    const result = buildSessionSummary({
+      sessionsDir,
+      friendsDir,
+      agentName: "slugger",
+      activeThresholdMs: 1000 * 60 * 60 * 72, // 3 day threshold
+    })
+
+    expect(result).toContain("2d ago")
+  })
 })

@@ -265,6 +265,24 @@ describe("saveSession", () => {
     const parsed = JSON.parse(written)
     expect(parsed.lastUsage).toBeUndefined()
   })
+
+  it("repairs back-to-back assistant messages on save", async () => {
+    const { saveSession } = await import("../../mind/context")
+    const msgs: any[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "first" },
+      { role: "assistant", content: "second" },
+    ]
+    saveSession("/tmp/session.json", msgs)
+
+    const written = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string
+    const parsed = JSON.parse(written)
+    // Should have merged the two assistant messages
+    expect(parsed.messages).toHaveLength(3)
+    expect(parsed.messages[2].content).toContain("first")
+    expect(parsed.messages[2].content).toContain("second")
+  })
 })
 
 describe("loadSession", () => {
@@ -326,6 +344,26 @@ describe("loadSession", () => {
       throw new Error("EPERM")
     })
     expect(loadSession("/tmp/noperm.json")).toBeNull()
+  })
+
+  it("repairs back-to-back assistant messages on load", async () => {
+    const { loadSession } = await import("../../mind/context")
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 1,
+        messages: [
+          { role: "system", content: "sys" },
+          { role: "user", content: "hi" },
+          { role: "assistant", content: "first" },
+          { role: "assistant", content: "second" },
+        ],
+      }),
+    )
+    const result = loadSession("/tmp/session.json")
+    expect(result).not.toBeNull()
+    expect(result!.messages).toHaveLength(3)
+    expect((result!.messages[2] as any).content).toContain("first")
+    expect((result!.messages[2] as any).content).toContain("second")
   })
 })
 
@@ -675,5 +713,19 @@ describe("repairSessionMessages", () => {
     ]
     const repaired = repairSessionMessages(messages)
     expect(repaired).toEqual(messages)
+  })
+
+  it("handles non-string content in back-to-back assistant messages", async () => {
+    const { repairSessionMessages } = await import("../../mind/context")
+    const messages: any[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "hi" },
+      { role: "assistant", content: null },
+      { role: "assistant", content: undefined },
+    ]
+    const repaired = repairSessionMessages(messages)
+    expect(repaired).toHaveLength(3)
+    // Both non-string contents should fall back to ""
+    expect((repaired[2] as any).content).toBe("\n\n")
   })
 })
