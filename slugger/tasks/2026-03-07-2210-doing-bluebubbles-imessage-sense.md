@@ -56,7 +56,7 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 **Output**: Fixture-backed failing tests for the sense’s core message model.
 **Acceptance**: Tests fail red against the missing normalization/runtime code and cover every observed primitive that materially affects UX/AX.
 
-### ⬜ Unit 2b: BlueBubbles Message Model — Implementation
+### ✅ Unit 2b: BlueBubbles Message Model — Implementation
 **What**: Implement the pure message-model layer and its helpers in new BlueBubbles sense modules under `src/senses/`. The model should preserve creation vs mutation as first-class distinctions, compute stable session/routing identity, and emit explicit fallback state for missing media hydration instead of silently dropping context.
 **Output**: Pure BlueBubbles parsing/normalization modules ready to feed the sense runtime.
 **Acceptance**: Unit 2a tests pass, all branches are covered, and the model matches the live-observed payload contracts.
@@ -104,3 +104,4 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 - 2026-03-07 22:24 Unit 1a complete: added failing channel/config/prompt/tool-safety tests and captured red output
 - 2026-03-07 22:26 Unit 1b complete: wired bluebubbles into channel types, config, prompt behavior, and remote tool safety
 - 2026-03-07 22:40 Unit 2a complete: added fixture-backed red tests for message, thread, group, reaction, edit, unsend, and read-state normalization
+- 2026-03-07 22:50 Unit 2b complete: implemented BlueBubbles event normalization with stable chat/thread identity, mutation modeling, explicit fallback text, and 100% coverage on the new model
