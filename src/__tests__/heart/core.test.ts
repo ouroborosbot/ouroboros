@@ -215,6 +215,45 @@ describe("isTransientError", () => {
   })
 })
 
+describe("classifyTransientError", () => {
+  it("classifies non-Error values as unknown error", async () => {
+    const { classifyTransientError } = await import("../../heart/core")
+    expect(classifyTransientError("string-error")).toBe("unknown error")
+    expect(classifyTransientError(42)).toBe("unknown error")
+    expect(classifyTransientError(null)).toBe("unknown error")
+  })
+
+  it("classifies 429 as rate limited", async () => {
+    const { classifyTransientError } = await import("../../heart/core")
+    const err: any = new Error("too many requests")
+    err.status = 429
+    expect(classifyTransientError(err)).toBe("rate limited")
+  })
+
+  it("classifies 401 and 403 as auth error", async () => {
+    const { classifyTransientError } = await import("../../heart/core")
+    for (const status of [401, 403]) {
+      const err: any = new Error("unauthorized")
+      err.status = status
+      expect(classifyTransientError(err)).toBe("auth error")
+    }
+  })
+
+  it("classifies 5xx as server error", async () => {
+    const { classifyTransientError } = await import("../../heart/core")
+    for (const status of [500, 502, 503, 504]) {
+      const err: any = new Error("server error")
+      err.status = status
+      expect(classifyTransientError(err)).toBe("server error")
+    }
+  })
+
+  it("classifies regular errors as network error", async () => {
+    const { classifyTransientError } = await import("../../heart/core")
+    expect(classifyTransientError(new Error("ECONNRESET"))).toBe("network error")
+    expect(classifyTransientError(new Error("fetch failed"))).toBe("network error")
+  })
+})
 
 describe("ChannelCallbacks interface", () => {
   it("accepts an object with all required callback signatures", () => {

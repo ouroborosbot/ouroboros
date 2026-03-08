@@ -239,6 +239,15 @@ export function isTransientError(err: unknown): boolean {
   return false;
 }
 
+export function classifyTransientError(err: unknown): string {
+  if (!(err instanceof Error)) return "unknown error";
+  const status = (err as HttpError).status;
+  if (status === 429) return "rate limited";
+  if (status === 401 || status === 403) return "auth error";
+  if (status && status >= 500) return "server error";
+  return "network error";
+}
+
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 2000;
 
@@ -507,11 +516,12 @@ export async function runAgent(
         callbacks.onError(new Error("context trimmed, retrying..."), "transient");
         continue;
       }
-      // Transient network errors: retry with exponential backoff
+      // Transient errors: retry with exponential backoff
       if (isTransientError(e) && retryCount < MAX_RETRIES) {
         retryCount++;
         const delay = RETRY_BASE_MS * Math.pow(2, retryCount - 1);
-        callbacks.onError(new Error(`network error, retrying in ${delay / 1000}s (${retryCount}/${MAX_RETRIES})...`), "transient");
+        const cause = classifyTransientError(e);
+        callbacks.onError(new Error(`${cause}, retrying in ${delay / 1000}s (${retryCount}/${MAX_RETRIES})...`), "transient");
         // Wait with abort support
         const aborted = await new Promise<boolean>((resolve) => {
           const timer = setTimeout(() => resolve(false), delay);

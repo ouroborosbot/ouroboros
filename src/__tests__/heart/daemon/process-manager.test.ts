@@ -27,8 +27,8 @@ describe("daemon process manager", () => {
   })
   const clearTimeoutFn = vi.fn()
   const agents: DaemonManagedAgent[] = [
-    { name: "slugger", entry: "inner-worker-entry.js", channel: "cli", autoStart: true },
-    { name: "ouroboros", entry: "inner-worker-entry.js", channel: "cli", autoStart: false },
+    { name: "slugger", entry: "heart/agent-entry.js", channel: "cli", autoStart: true },
+    { name: "ouroboros", entry: "heart/agent-entry.js", channel: "cli", autoStart: false },
   ]
 
   beforeEach(() => {
@@ -57,7 +57,7 @@ describe("daemon process manager", () => {
     expect(spawn).toHaveBeenCalledTimes(1)
     expect(spawn).toHaveBeenCalledWith(
       "node",
-      [expect.stringContaining("inner-worker-entry.js"), "--agent", "slugger"],
+      [expect.stringContaining("heart/agent-entry.js"), "--agent", "slugger"],
       expect.objectContaining({ cwd: expect.any(String) }),
     )
     expect(manager.getAgentSnapshot("slugger")?.status).toBe("running")
@@ -269,7 +269,7 @@ describe("daemon process manager", () => {
     now.mockReturnValue(1_000)
 
     const envAgents: DaemonManagedAgent[] = [
-      { name: "slugger", entry: "inner-worker-entry.js", channel: "cli", autoStart: true, env: { TEST_FLAG: "1" } },
+      { name: "slugger", entry: "heart/agent-entry.js", channel: "cli", autoStart: true, env: { TEST_FLAG: "1" } },
     ]
 
     const manager = new DaemonProcessManager({
@@ -284,7 +284,7 @@ describe("daemon process manager", () => {
 
     expect(spawn).toHaveBeenCalledWith(
       "node",
-      [expect.stringContaining("inner-worker-entry.js"), "--agent", "slugger"],
+      [expect.stringContaining("heart/agent-entry.js"), "--agent", "slugger"],
       expect.objectContaining({
         env: expect.objectContaining({ TEST_FLAG: "1" }),
       }),

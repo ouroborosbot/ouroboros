@@ -12,7 +12,7 @@ import { getPendingDir, drainPending } from "../mind/pending"
 import { refreshSystemPrompt } from "../mind/prompt-refresh"
 import type { UsageData } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand, getToolChoiceRequired } from "./commands"
-import { getAgentName, setAgentName, getAgentRoot } from "../heart/identity"
+import { getAgentName, setAgentName, getAgentRoot, loadAgentConfig } from "../heart/identity"
 import { createTraceId } from "../nerves"
 import { FileFriendStore } from "../mind/friends/store-file"
 import { FriendResolver } from "../mind/friends/resolver"
@@ -343,8 +343,9 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
   }
 }
 
-export async function main(agentName?: string) {
+export async function main(agentName?: string, options?: { pasteDebounceMs?: number }) {
   if (agentName) setAgentName(agentName)
+  const pasteDebounceMs = options?.pasteDebounceMs ?? 50
 
   // Fail fast if provider is misconfigured (triggers human-readable error + exit)
   getProvider()
@@ -374,7 +375,11 @@ export async function main(agentName?: string) {
   }
 
   const friendId = resolvedContext.friend.id
-  configureCliRuntimeLogger(friendId)
+  const agentConfig = loadAgentConfig()
+  configureCliRuntimeLogger(friendId, {
+    level: agentConfig.logging?.level,
+    sinks: agentConfig.logging?.sinks,
+  })
   const sessPath = sessionPath(friendId, "cli", "session")
 
   // Load existing session or start fresh
@@ -436,8 +441,38 @@ export async function main(agentName?: string) {
     }
   })
 
+  // Debounced line iterator: collects rapid-fire lines (paste) into a single input
+  async function* debouncedLines(source: AsyncIterable<string>): AsyncGenerator<string> {
+    if (pasteDebounceMs <= 0) {
+      yield* source
+      return
+    }
+    const iter = source[Symbol.asyncIterator]()
+    while (true) {
+      const first = await iter.next()
+      if (first.done) break
+      // Collect any lines that arrive within the debounce window (paste detection)
+      const lines = [first.value]
+      let more = true
+      while (more) {
+        const raced = await Promise.race([
+          iter.next().then((r) => ({ kind: "line" as const, result: r })),
+          new Promise<{ kind: "timeout" }>((r) => setTimeout(() => r({ kind: "timeout" }), pasteDebounceMs)),
+        ])
+        if (raced.kind === "timeout") {
+          more = false
+        } else if (raced.result.done) {
+          more = false
+        } else {
+          lines.push(raced.result.value)
+        }
+      }
+      yield lines.join("\n")
+    }
+  }
+
   try {
-    for await (const input of rl) {
+    for await (const input of debouncedLines(rl)) {
       if (closed) break
       if (!input.trim()) { process.stdout.write("\x1b[36m> \x1b[0m"); continue }
 
@@ -480,12 +515,15 @@ export async function main(agentName?: string) {
         }
       }
 
-      // Re-style the echoed input line (readline terminal:true echoes it as "> input")
-      // Calculate terminal rows the echo occupied (prompt "> " + input, wrapped)
+      // Re-style the echoed input lines (readline terminal:true echoes each line)
+      // For multiline paste, each line was echoed separately — erase them all
       const cols = process.stdout.columns || 80
-      const echoLen = 2 + input.length // "> " prefix + input
-      const rows = Math.ceil(echoLen / cols)
-      process.stdout.write(`\x1b[${rows}A\x1b[K` + `\x1b[1m> ${input}\x1b[0m\n\n`)
+      const inputLines = input.split("\n")
+      let echoRows = 0
+      for (const line of inputLines) {
+        echoRows += Math.ceil((2 + line.length) / cols) // "> " prefix + line content
+      }
+      process.stdout.write(`\x1b[${echoRows}A\x1b[K` + `\x1b[1m> ${inputLines[0]}${inputLines.length > 1 ? ` (+${inputLines.length - 1} lines)` : ""}\x1b[0m\n\n`)
 
       messages.push({ role: "user", content: input })
       addHistory(history, input)

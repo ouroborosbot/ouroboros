@@ -268,7 +268,7 @@ describe("agent.ts main()", () => {
     const runAgentCalls: any[][] = []
     mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     const flatLogs = logCalls.flat()
     expect(flatLogs.some((l) => l.includes("testagent") || l.includes("/commands"))).toBe(true)
@@ -282,7 +282,7 @@ describe("agent.ts main()", () => {
     const runAgentCalls: any[][] = []
     mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(runAgentCalls.length).toBe(0) // no calls (no boot greeting, all input empty)
     const prompts = stdoutChunks.filter((c) => c.includes("> "))
@@ -419,7 +419,7 @@ describe("agent.ts main()", () => {
       return { usage: undefined }
     })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     const flatLogs = logCalls.flat()
     expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
@@ -445,7 +445,7 @@ describe("agent.ts main()", () => {
       return { usage: undefined }
     })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(agentSignal?.aborted).toBe(true)
   })
@@ -453,7 +453,7 @@ describe("agent.ts main()", () => {
   it("exits when input is /Exit (case insensitive slash command)", async () => {
     setupBasic({ inputSequence: ["/Exit"] })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     const flatLogs = logCalls.flat()
     expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
@@ -481,7 +481,7 @@ describe("agent.ts main() - session persistence", () => {
     setupBasic({ inputSequence: ["/exit"], loadSessionReturn: { messages: savedSession, lastUsage: undefined } })
     mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(runAgentCalls.length).toBe(0)
   })
@@ -491,7 +491,7 @@ describe("agent.ts main() - session persistence", () => {
     setupBasic({ inputSequence: ["/exit"] })
     mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(runAgentCalls.length).toBe(0) // no boot greeting
   })
@@ -501,7 +501,7 @@ describe("agent.ts main() - session persistence", () => {
     setupBasic({ inputSequence: ["/exit"], loadSessionReturn: null })
     mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(runAgentCalls.length).toBe(0) // no boot greeting
   })
@@ -515,7 +515,7 @@ describe("agent.ts main() - session persistence", () => {
       return { usage: undefined }
     })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     const output = stdoutChunks.join("")
     // Markdown should be rendered (bold ANSI codes, not raw **)
@@ -530,7 +530,7 @@ describe("agent.ts main() - session persistence", () => {
     mocks.runAgent.mockImplementation(async () => ({ usage: usageData }))
     mocks.postTurn.mockImplementation((...args: any[]) => { postTurnCalls.push(args) })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(postTurnCalls.length).toBe(1)
     expect(postTurnCalls[0][0]).toEqual(expect.arrayContaining([
@@ -546,7 +546,7 @@ describe("agent.ts main() - session persistence", () => {
     mocks.runAgent.mockImplementation(async () => ({ usage: undefined }))
     mocks.trimMessages.mockImplementation((...args: any[]) => { trimCalls.push(args); return [...args[0]] })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(trimCalls.length).toBe(0) // trimming moved to postTurn
   })
@@ -554,7 +554,7 @@ describe("agent.ts main() - session persistence", () => {
   it("/exit quits the process", async () => {
     setupBasic({ inputSequence: ["/exit"] })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     const flatLogs = logCalls.flat()
     expect(flatLogs.some((l) => l.includes("bye"))).toBe(true)
@@ -572,7 +572,7 @@ describe("agent.ts main() - session persistence", () => {
     })
     mocks.deleteSession.mockImplementation((...args: any[]) => { deleteSessionCalls.push(args[0]) })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(deleteSessionCalls.length).toBeGreaterThanOrEqual(1)
   })
@@ -589,7 +589,7 @@ describe("agent.ts main() - session persistence", () => {
     })
     mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(runAgentCalls.length).toBe(0) // no boot greeting, /commands handled without runAgent
   })
@@ -600,7 +600,7 @@ describe("agent.ts main() - session persistence", () => {
     mocks.runAgent.mockImplementation(async () => ({ usage: undefined }))
     mocks.postTurn.mockImplementation((...args: any[]) => { postTurnCalls.push(args) })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     // postTurn called once per user message (msg1, msg2)
     expect(postTurnCalls.length).toBe(2)
@@ -623,7 +623,7 @@ describe("agent.ts main() - session persistence", () => {
     })
     mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(runAgentCalls.length).toBe(1) // "hello" turn
     // channel is the 3rd argument (index 2)
@@ -641,7 +641,7 @@ describe("agent.ts main() - session persistence", () => {
     })
     mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     // /unknown is not handled, so it's sent to runAgent as regular input
     // No boot greeting, just "/unknown" as text = 1 call
@@ -660,7 +660,7 @@ describe("agent.ts main() - session persistence", () => {
     })
     mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     // /weird is handled but action is unknown, falls through to regular input
     // No boot greeting, just "/weird" as text = 1 call
@@ -677,7 +677,7 @@ describe("agent.ts main() - session persistence", () => {
       },
     })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     const flatLogs = logCalls.flat()
     expect(flatLogs.some((l) => l === "")).toBe(true)
@@ -686,7 +686,7 @@ describe("agent.ts main() - session persistence", () => {
   it("welcome banner shows slash command hints", async () => {
     setupBasic({ inputSequence: ["/exit"] })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     const flatLogs = logCalls.flat()
     expect(flatLogs.some((l) => l.includes("/commands"))).toBe(true)
@@ -712,7 +712,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
       return { usage: undefined }
     })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     const stderrOutput = stderrChunks.join("")
     expect(stderrOutput).toContain("kick")
@@ -730,7 +730,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
       return { usage: undefined }
     })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     const stderrOutput = stderrChunks.join("")
     // Each kick should produce "kick" text
@@ -747,7 +747,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
       return { usage: undefined }
     })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     const stdoutOutput = stdoutChunks.join("")
     // The partial text should be followed by a newline before kick clears textDirty
@@ -769,7 +769,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
     })
     mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(runAgentCalls.length).toBe(1)
     // 5th argument (index 4) should be options with toolChoiceRequired: true
@@ -781,7 +781,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
     setupBasic({ inputSequence: ["hello", "/exit"] })
     mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(runAgentCalls.length).toBe(1)
     // 5th argument (index 4) should have toolChoiceRequired: false
@@ -793,7 +793,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
     setupBasic({ inputSequence: ["hello", "/exit"] })
     mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(runAgentCalls.length).toBe(1)
     expect(runAgentCalls[0][4]).toEqual(expect.objectContaining({ traceId: expect.any(String) }))
@@ -806,7 +806,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
       return { usage: undefined }
     })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     const stderrOutput = stderrChunks.join("")
     expect(stderrOutput).toContain("(empty response)")
@@ -819,7 +819,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
       return { usage: undefined }
     })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     const stderrOutput = stderrChunks.join("")
     expect(stderrOutput).toContain("(empty response)")
@@ -833,7 +833,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
       return { usage: undefined }
     })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(runAgentCalls.length).toBe(1)
     const options = runAgentCalls[0][4] // 5th arg is RunAgentOptions
@@ -853,7 +853,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
     setupBasic({ inputSequence: ["hello", "/exit"] })
     mocks.loadSession.mockReturnValue(null) // force new session -> calls buildSystem
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(mocks.buildSystem).toHaveBeenCalledWith(
       "cli",
@@ -873,7 +873,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
       return { usage: undefined }
     })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     const options = runAgentCalls[0][4]
     expect(options.toolContext.friendStore).toBeDefined()
@@ -882,7 +882,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
   it("session path uses friend UUID from resolved context", async () => {
     setupBasic({ inputSequence: ["hello", "/exit"] })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     // sessionPath should be called with the friend UUID ("mock-uuid"), not "default"
     expect(mocks.sessionPath).toHaveBeenCalledWith("mock-uuid", "cli", "session")
@@ -895,7 +895,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
     ])
     setupBasic({ inputSequence: ["/exit"] })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     // The drain should inject harness-context + assistant pairs and save
     expect(mocks.saveSession).toHaveBeenCalled()
@@ -914,7 +914,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
       autoReply: "I'm sorry, I'm not allowed to talk to strangers",
     }).mockReturnValue({ allowed: true })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(mocks.runAgent).not.toHaveBeenCalled()
     expect(stdoutChunks.join("")).toContain("I'm sorry, I'm not allowed to talk to strangers")
@@ -927,7 +927,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
       reason: "stranger_silent_drop",
     })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(mocks.runAgent).not.toHaveBeenCalled()
     expect(stdoutChunks.join("")).not.toContain("I'm sorry, I'm not allowed to talk to strangers")
@@ -944,7 +944,7 @@ describe("agent.ts main() - onKick and toolChoiceRequired", () => {
       }
     })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(mocks.runAgent).not.toHaveBeenCalled()
     expect(stdoutChunks.join("")).toContain("I'm sorry, I'm not allowed to talk to strangers")
@@ -962,11 +962,71 @@ describe("agent.ts main(agentName) parameter", () => {
     vi.restoreAllMocks()
   })
 
+  it("coalesces rapid-fire lines when debounce is active", async () => {
+    // With pasteDebounceMs > 0 and synchronous mock iterator, all lines
+    // are collected into a single input (simulating paste detection)
+    const runAgentCalls: any[][] = []
+    setupBasic({ inputSequence: ["line1", "line2", "line3"] })
+    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
+
+    await main(undefined, { pasteDebounceMs: 1 })
+
+    // All three lines coalesced into one call
+    expect(runAgentCalls.length).toBe(1)
+    const sentMessage = runAgentCalls[0][0].find((m: any) => m.role === "user")
+    expect(sentMessage.content).toBe("line1\nline2\nline3")
+  })
+
+  it("debounce timeout branch fires when iterator pauses", async () => {
+    // Create a mock that pauses after the first line, letting the debounce timeout fire
+    let inputCall = 0
+    const mockRl: any = {
+      on: (event: string, handler: any) => { return mockRl },
+      close: () => {},
+      pause: () => {},
+      resume: () => {},
+      line: "",
+      [Symbol.asyncIterator]: () => ({
+        next: async (): Promise<IteratorResult<string>> => {
+          inputCall++
+          if (inputCall === 1) return { value: "first", done: false }
+          if (inputCall === 2) {
+            // Pause longer than debounce to let timeout win
+            await new Promise((r) => setTimeout(r, 30))
+            return { value: "/exit", done: false }
+          }
+          return { value: undefined as any, done: true }
+        },
+      }),
+    }
+    mocks.createInterface.mockReturnValue(mockRl)
+    mocks.loadSession.mockReturnValue(null)
+
+    const runAgentCalls: any[][] = []
+    mocks.runAgent.mockImplementation(async (...args: any[]) => { runAgentCalls.push(args); return { usage: undefined } })
+    mocks.parseSlashCommand.mockImplementation((input: string) => {
+      if (input.startsWith("/exit")) return { command: "exit", args: "" }
+      return null
+    })
+    const dispatch = vi.fn((name: string) => {
+      if (name === "exit") return { handled: true, result: { action: "exit" } }
+      return { handled: false }
+    })
+    mocks.createCommandRegistry.mockReturnValue({ register: vi.fn(), dispatch })
+
+    await main(undefined, { pasteDebounceMs: 5 })
+
+    // "first" should be its own message (timeout fired before "/exit" arrived)
+    expect(runAgentCalls.length).toBe(1)
+    const sentMessage = runAgentCalls[0][0].find((m: any) => m.role === "user")
+    expect(sentMessage.content).toBe("first")
+  })
+
   it("calls setAgentName when agentName parameter is provided", async () => {
     const { setAgentName } = await import("../../heart/identity")
     setupBasic({ inputSequence: ["/exit"] })
 
-    await main("customAgent")
+    await main("customAgent", { pasteDebounceMs: 0 })
 
     expect(setAgentName).toHaveBeenCalledWith("customAgent")
   })
@@ -976,7 +1036,7 @@ describe("agent.ts main(agentName) parameter", () => {
     vi.mocked(setAgentName).mockClear()
     setupBasic({ inputSequence: ["/exit"] })
 
-    await main()
+    await main(undefined, { pasteDebounceMs: 0 })
 
     expect(setAgentName).not.toHaveBeenCalled()
   })
