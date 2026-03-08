@@ -1,7 +1,7 @@
 # Planning: Runtime Version Awareness + Changelog Injection
 
 **Status**: drafting
-**Created**: TBD
+**Created**: 2026-03-08 14:32
 
 ## Goal
 When the ouro runtime (`@ouro.bot/cli`) auto-updates via the `@latest` wrapper, agents should know what changed. Today they wake up with new capabilities and have no idea. This feature adds per-agent version tracking, change detection on startup, and changelog injection into the system prompt so agents naturally discover what's new.
@@ -63,4 +63,4 @@ When the ouro runtime (`@ouro.bot/cli`) auto-updates via the `@latest` wrapper, 
 Minimal scratchpad. Implementation details go in doing doc.
 
 ## Progress Log
-- TBD Created
+- 2026-03-08 14:32 Created
