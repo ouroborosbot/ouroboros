@@ -367,4 +367,4 @@ The loop:
 - 2026-03-07 22:57 Unit 6 complete: specialist-tools.ts created, 12 tests (5 schema + 7 execution), 100% coverage
 - 2026-03-07 23:16 Unit 7 complete: specialist-session.ts created, 15 tests, 100% coverage, nerves audit pass
 - 2026-03-07 23:25 Unit 8 complete: specialist-orchestrator.ts created, 15 tests, 100% coverage, fixed cleanup bug
-- PENDING Unit 9 complete: daemon-cli.ts integration, 6 new tests (56 total), 100% coverage, runAdoptionSpecialist dep wired
+- 2026-03-07 23:31 Unit 9 complete: daemon-cli.ts integration, 6 new tests (56 total), 100% coverage, runAdoptionSpecialist dep wired
