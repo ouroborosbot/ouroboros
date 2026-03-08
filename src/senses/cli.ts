@@ -2,12 +2,14 @@ import OpenAI from "openai"
 import * as readline from "readline"
 import * as os from "os"
 import * as path from "path"
-import { runAgent, ChannelCallbacks, getProvider } from "../heart/core"
+import { runAgent, ChannelCallbacks, getProvider, createSummarize } from "../heart/core"
 import { buildSystem } from "../mind/prompt"
 import { pickPhrase, getPhrases } from "../mind/phrases"
 import { formatToolResult, formatKick, formatError } from "../mind/format"
 import { sessionPath } from "../heart/config"
-import { loadSession, deleteSession, postTurn } from "../mind/context"
+import { loadSession, deleteSession, postTurn, saveSession } from "../mind/context"
+import { getPendingDir, drainPending } from "../mind/pending"
+import { refreshSystemPrompt } from "../mind/prompt-refresh"
 import type { UsageData } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand, getToolChoiceRequired } from "./commands"
 import { getAgentName, setAgentName, getAgentRoot } from "../heart/identity"
@@ -368,6 +370,7 @@ export async function main(agentName?: string) {
     signin: async () => undefined,
     context: resolvedContext,
     friendStore,
+    summarize: createSummarize(),
   }
 
   const friendId = resolvedContext.friend.id
@@ -379,6 +382,24 @@ export async function main(agentName?: string) {
   const messages: OpenAI.ChatCompletionMessageParam[] = existing?.messages && existing.messages.length > 0
     ? existing.messages
     : [{ role: "system", content: await buildSystem("cli", undefined, resolvedContext) }]
+
+  // Pending queue drain: inject pending messages as harness-context + assistant-content pairs
+  const pendingDir = getPendingDir(getAgentName(), friendId, "cli", "session")
+  const drainToMessages = () => {
+    const pending = drainPending(pendingDir)
+    if (pending.length === 0) return 0
+    for (const msg of pending) {
+      messages.push({ role: "user", name: "harness", content: `[proactive message from ${msg.from}]` })
+      messages.push({ role: "assistant", content: msg.content })
+    }
+    return pending.length
+  }
+
+  // Startup drain: deliver offline messages
+  const startupCount = drainToMessages()
+  if (startupCount > 0) {
+    saveSession(sessPath, messages)
+  }
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true })
   const ctrl = new InputController(rl)
@@ -496,6 +517,12 @@ export async function main(agentName?: string) {
 
       postTurn(messages, sessPath, result?.usage)
       await accumulateFriendTokens(friendStore, resolvedContext.friend.id, result?.usage)
+
+      // Post-turn: drain any pending messages that arrived during runAgent
+      drainToMessages()
+
+      // Post-turn: refresh system prompt so active sessions metadata is current
+      await refreshSystemPrompt(messages, "cli", undefined, resolvedContext)
 
       if (closed) break
       process.stdout.write("\x1b[36m> \x1b[0m")

@@ -1,7 +1,7 @@
 import OpenAI from "openai"
 import { App } from "@microsoft/teams.apps"
 import { DevtoolsPlugin } from "@microsoft/teams.dev"
-import { runAgent, ChannelCallbacks, RunAgentOptions } from "../heart/core"
+import { runAgent, ChannelCallbacks, RunAgentOptions, createSummarize } from "../heart/core"
 import type { ToolContext } from "../repertoire/tools"
 import { getOAuthConfig } from "../heart/config"
 import { buildSystem } from "../mind/prompt"
@@ -432,6 +432,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
     githubToken: teamsContext.githubToken,
     signin: teamsContext.signin,
     friendStore: store,
+    summarize: createSummarize(),
   } : undefined
 
   if (toolContext) {

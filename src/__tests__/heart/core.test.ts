@@ -215,6 +215,7 @@ describe("isTransientError", () => {
   })
 })
 
+
 describe("ChannelCallbacks interface", () => {
   it("accepts an object with all required callback signatures", () => {
     const callbacks: ChannelCallbacks = {
@@ -7407,5 +7408,48 @@ describe("confirmation system", () => {
     // These should appear in the system prompt via contextSection
     const systemContent = messages[0].content
     expect(systemContent).toContain("Fresh Name")
+  })
+})
+
+describe("createSummarize", () => {
+  it("returns a function that calls the provider for LLM summarization", async () => {
+    vi.resetModules()
+    await setupMinimax()
+    const core = await import("../../heart/core")
+
+    // Get the runtime client and mock its create method
+    const summarize = core.createSummarize()
+    // The client is initialized via getProviderRuntime — spy on the OpenAI ctor mock
+    const spyCreate = mockCreate.mockResolvedValueOnce({
+      choices: [{ message: { content: "summarized content" } }],
+    })
+
+    const result = await summarize("some transcript", "summarize this")
+
+    expect(result).toBe("summarized content")
+    expect(spyCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [
+          { role: "system", content: "summarize this" },
+          { role: "user", content: "some transcript" },
+        ],
+        max_tokens: 500,
+      }),
+    )
+  })
+
+  it("falls back to transcript when response has no content", async () => {
+    vi.resetModules()
+    await setupMinimax()
+    const core = await import("../../heart/core")
+
+    const summarize = core.createSummarize()
+    mockCreate.mockResolvedValueOnce({
+      choices: [{ message: { content: null } }],
+    })
+
+    const result = await summarize("original transcript", "summarize")
+
+    expect(result).toBe("original transcript")
   })
 })
