@@ -15,9 +15,9 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 - [x] Runtime config supports BlueBubbles without introducing environment variables
 - [x] Inbound BlueBubbles handling models both `new-message` and `updated-message`
 - [x] Reply threading works from `threadOriginatorGuid` in both DM and group contexts
-- [ ] Reactions, edits, unsends, and delivery/read mutations are not silently dropped
+- [x] Reactions, edits, unsends, and delivery/read mutations are not silently dropped
 - [x] Session identity is stable for DM/group/thread-aware routing
-- [ ] Attachment and OG-card handling give the agent useful context or an explicit fallback
+- [x] Attachment and OG-card handling give the agent useful context or an explicit fallback
 - [ ] Automated tests cover all new code at 100%
 - [ ] `npm test` passes
 - [ ] `npx tsc --noEmit` passes
@@ -76,7 +76,7 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 **Output**: Failing tests that lock the “no silent failure” behavior into place.
 **Acceptance**: Tests fail red and cover fallback, enrichment, and mutation persistence branches.
 
-### ⬜ Unit 4b: Mutation And Rich-Content Repair — Implementation
+### ✅ Unit 4b: Mutation And Rich-Content Repair — Implementation
 **What**: Implement the enrichment/repair path needed by the sense so attachment/OG-card context and mutation updates reach the agent coherently. Keep the implementation small and auditable; prefer pure helpers plus a narrow runtime seam over broad adapter magic.
 **Output**: BlueBubbles sense runtime that preserves rich/mutation context or emits explicit fallback state.
 **Acceptance**: Unit 4a tests pass, no silent-drop paths remain in the new code, and the implementation remains reversible.
@@ -108,3 +108,4 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 - 2026-03-07 23:01 Unit 3a complete: added red runtime and entrypoint tests for webhook startup, DM/group routing, mutation handling, and outbound threaded replies
 - 2026-03-07 23:12 Unit 3b complete: added the BlueBubbles transport, webhook runtime, and entrypoint with 100% coverage on the new sense runtime files
 - 2026-03-07 23:22 Unit 4a complete: added red tests for GUID-based repair, explicit repair fallback notices, and durable mutation logging outside the session prompt
+- 2026-03-07 23:31 Unit 4b complete: implemented GUID-based repair fetches, explicit repair notices, durable mutation sidecar logging, and restored 100% coverage on the touched sense files
