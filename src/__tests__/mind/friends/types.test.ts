@@ -23,6 +23,10 @@ describe("IdentityProvider type guard", () => {
     expect(isIdentityProvider("teams-conversation")).toBe(true)
   })
 
+  it("accepts 'imessage-handle'", () => {
+    expect(isIdentityProvider("imessage-handle")).toBe(true)
+  })
+
   it("rejects invalid strings", () => {
     expect(isIdentityProvider("google")).toBe(false)
     expect(isIdentityProvider("")).toBe(false)
@@ -175,6 +179,21 @@ describe("ChannelCapabilities type", () => {
     expect(caps.availableIntegrations).toEqual(["ado", "graph"])
     expect(caps.supportsRichCards).toBe(true)
     expect(caps.maxMessageLength).toBe(Infinity)
+  })
+
+  it("constructs BlueBubbles capabilities", () => {
+    const caps: ChannelCapabilities = {
+      channel: "bluebubbles",
+      availableIntegrations: [],
+      supportsMarkdown: false,
+      supportsStreaming: false,
+      supportsRichCards: false,
+      maxMessageLength: Infinity,
+    }
+    expect(caps.channel).toBe("bluebubbles")
+    expect(caps.availableIntegrations).toEqual([])
+    expect(caps.supportsStreaming).toBe(false)
+    expect(caps.supportsRichCards).toBe(false)
   })
 })
 

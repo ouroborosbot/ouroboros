@@ -697,6 +697,19 @@ describe("runtimeInfoSection", () => {
     expect(result).toContain("Microsoft Teams")
     expect(result).toContain("concise")
   })
+
+  it("bluebubbles channel describes iMessage-native behavior", async () => {
+    setupReadFileSync()
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = runtimeInfoSection("bluebubbles")
+    expect(result).toContain("iMessage")
+    expect(result).toContain("short")
+    expect(result).toContain("i do not use markdown")
+  })
 })
 
 describe("psyche loading", () => {

@@ -23,6 +23,16 @@ describe("getChannelCapabilities", () => {
     expect(caps.maxMessageLength).toBe(Infinity)
   })
 
+  it("returns BlueBubbles capabilities with remote-safe defaults", () => {
+    const caps = getChannelCapabilities("bluebubbles")
+    expect(caps.channel).toBe("bluebubbles")
+    expect(caps.availableIntegrations).toEqual([])
+    expect(caps.supportsMarkdown).toBe(false)
+    expect(caps.supportsStreaming).toBe(false)
+    expect(caps.supportsRichCards).toBe(false)
+    expect(caps.maxMessageLength).toBe(Infinity)
+  })
+
   it("returns minimal default capabilities for unknown channel", () => {
     const caps = getChannelCapabilities("slack" as any)
     expect(caps.channel).toBe("cli") // falls back to CLI-like defaults
@@ -51,7 +61,7 @@ describe("getChannelCapabilities", () => {
   })
 
   it("all capability fields are present and correctly typed", () => {
-    for (const channel of ["cli", "teams"] as const) {
+    for (const channel of ["cli", "teams", "bluebubbles"] as const) {
       const caps = getChannelCapabilities(channel)
       expect(typeof caps.channel).toBe("string")
       expect(Array.isArray(caps.availableIntegrations)).toBe(true)

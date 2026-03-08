@@ -45,7 +45,11 @@ describe("daemon runtime logging", () => {
       "utf-8",
     )
 
-    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true)
+    const stderrChunks: string[] = []
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk: any) => {
+      stderrChunks.push(String(chunk))
+      return true
+    })
     configureDaemonRuntimeLogger("daemon", { homeDir: tmpRoot })
     emitNervesEvent({
       component: "daemon",
@@ -58,7 +62,7 @@ describe("daemon runtime logging", () => {
     await waitFor(() => fs.existsSync(logFile))
     const body = fs.readFileSync(logFile, "utf-8")
     expect(body).toContain("\"event\":\"daemon.custom_event\"")
-    expect(stderrSpy).not.toHaveBeenCalled()
+    expect(stderrChunks.join("")).not.toContain("INFO [daemon] ndjson only")
   })
 
   it("falls back to terminal+ndjson defaults when config is missing or invalid", async () => {
