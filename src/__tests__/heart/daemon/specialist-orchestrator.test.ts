@@ -43,6 +43,7 @@ vi.mock("../../../heart/identity", () => ({
   getAgentBundlesRoot: vi.fn(() => "/mock/bundles"),
   buildDefaultAgentTemplate: vi.fn(),
   DEFAULT_AGENT_CONTEXT: { maxTokens: 80000, contextMargin: 20 },
+  DEFAULT_AGENT_PHRASES: { thinking: ["working"], tool: ["running tool"], followup: ["processing"] },
 }))
 
 vi.mock("../../../heart/config", () => ({
@@ -443,6 +444,104 @@ describe("runAdoptionSpecialist", () => {
     sessionDeps.restoreInput()
     expect(mockCtrl.restore).toHaveBeenCalled()
     sessionDeps.writePrompt()
+  })
+
+  it("loads identity-specific phrases from agent.json when available", async () => {
+    mockRunSpecialistSession.mockResolvedValue({ hatchedAgentName: null })
+
+    const { runAdoptionSpecialist } = await import("../../../heart/daemon/specialist-orchestrator")
+    const deps = makeDeps()
+
+    // Write agent.json with identityPhrases into the bundle source
+    // random=0.5 picks python.md (second of two files)
+    fs.writeFileSync(
+      path.join(deps.bundleSourceDir, "agent.json"),
+      JSON.stringify({
+        phrases: { thinking: ["base thinking"], tool: ["base tool"], followup: ["base followup"] },
+        identityPhrases: {
+          python: {
+            thinking: ["the oracle contemplates", "reading the signs"],
+            tool: ["consulting the sacred texts"],
+            followup: ["the prophecy takes shape"],
+          },
+        },
+      }),
+    )
+
+    await runAdoptionSpecialist(deps)
+
+    // Config override should use identity-specific phrases
+    const overrideConfig = mockSetAgentConfigOverride.mock.calls[0][0]
+    expect(overrideConfig.phrases.thinking).toContain("the oracle contemplates")
+  })
+
+  it("falls back to base phrases from agent.json when identity phrases not found", async () => {
+    mockRunSpecialistSession.mockResolvedValue({ hatchedAgentName: null })
+
+    const { runAdoptionSpecialist } = await import("../../../heart/daemon/specialist-orchestrator")
+    const deps = makeDeps()
+
+    // agent.json with base phrases but no matching identity
+    fs.writeFileSync(
+      path.join(deps.bundleSourceDir, "agent.json"),
+      JSON.stringify({
+        phrases: { thinking: ["base thinking"], tool: ["base tool"], followup: ["base followup"] },
+        identityPhrases: {
+          nonexistent: { thinking: ["nope"], tool: ["nope"], followup: ["nope"] },
+        },
+      }),
+    )
+
+    await runAdoptionSpecialist(deps)
+
+    const overrideConfig = mockSetAgentConfigOverride.mock.calls[0][0]
+    expect(overrideConfig.phrases.thinking).toContain("base thinking")
+  })
+
+  it("falls back to DEFAULT_AGENT_PHRASES when agent.json is missing", async () => {
+    mockRunSpecialistSession.mockResolvedValue({ hatchedAgentName: null })
+
+    const { runAdoptionSpecialist } = await import("../../../heart/daemon/specialist-orchestrator")
+    const deps = makeDeps()
+    // No agent.json written — should fall back to defaults
+
+    await runAdoptionSpecialist(deps)
+
+    const overrideConfig = mockSetAgentConfigOverride.mock.calls[0][0]
+    expect(overrideConfig.phrases.thinking).toContain("working")
+  })
+
+  it("falls back to DEFAULT_AGENT_PHRASES when base phrases are incomplete", async () => {
+    mockRunSpecialistSession.mockResolvedValue({ hatchedAgentName: null })
+
+    const { runAdoptionSpecialist } = await import("../../../heart/daemon/specialist-orchestrator")
+    const deps = makeDeps()
+    // agent.json with incomplete base phrases (missing followup) and no matching identity
+    fs.writeFileSync(
+      path.join(deps.bundleSourceDir, "agent.json"),
+      JSON.stringify({
+        phrases: { thinking: ["partial"], tool: ["partial"] },
+        identityPhrases: {},
+      }),
+    )
+
+    await runAdoptionSpecialist(deps)
+
+    const overrideConfig = mockSetAgentConfigOverride.mock.calls[0][0]
+    expect(overrideConfig.phrases.thinking).toContain("working")
+  })
+
+  it("falls back to DEFAULT_AGENT_PHRASES when agent.json is malformed", async () => {
+    mockRunSpecialistSession.mockResolvedValue({ hatchedAgentName: null })
+
+    const { runAdoptionSpecialist } = await import("../../../heart/daemon/specialist-orchestrator")
+    const deps = makeDeps()
+    fs.writeFileSync(path.join(deps.bundleSourceDir, "agent.json"), "not-json{{{")
+
+    await runAdoptionSpecialist(deps)
+
+    const overrideConfig = mockSetAgentConfigOverride.mock.calls[0][0]
+    expect(overrideConfig.phrases.thinking).toContain("working")
   })
 
   it("wires execTool lambda to execSpecialistTool with correct deps", async () => {
