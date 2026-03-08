@@ -61,7 +61,7 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 **Output**: Pure BlueBubbles parsing/normalization modules ready to feed the sense runtime.
 **Acceptance**: Unit 2a tests pass, all branches are covered, and the model matches the live-observed payload contracts.
 
-### ⬜ Unit 3a: Sense Runtime Wiring — Tests
+### ✅ Unit 3a: Sense Runtime Wiring — Tests
 **What**: Add failing tests for the BlueBubbles runtime path: startup, entrypoint behavior, inbound event handling, session key derivation, friend resolution, reply-thread routing, and outbound send/update flow. Cover both DM and group shapes plus mutation events that previously disappeared in OpenClaw.
 **Output**: Red tests for the actual sense runtime and its integration points.
 **Acceptance**: Tests demonstrate the runtime behavior we expect before implementation lands.
@@ -105,3 +105,4 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 - 2026-03-07 22:26 Unit 1b complete: wired bluebubbles into channel types, config, prompt behavior, and remote tool safety
 - 2026-03-07 22:40 Unit 2a complete: added fixture-backed red tests for message, thread, group, reaction, edit, unsend, and read-state normalization
 - 2026-03-07 22:50 Unit 2b complete: implemented BlueBubbles event normalization with stable chat/thread identity, mutation modeling, explicit fallback text, and 100% coverage on the new model
+- 2026-03-07 23:01 Unit 3a complete: added red runtime and entrypoint tests for webhook startup, DM/group routing, mutation handling, and outbound threaded replies
