@@ -4,8 +4,9 @@ import * as path from "path"
 import { getAgentBundlesRoot } from "../identity"
 import { emitNervesEvent } from "../../nerves/runtime"
 import { parseTaskFile, renderTaskFile } from "../../repertoire/tasks/parser"
+import type { OsCronManager } from "./os-cron"
 
-interface ScheduledTaskJob {
+export interface ScheduledTaskJob {
   id: string
   agent: string
   taskId: string
@@ -28,6 +29,7 @@ export interface TaskDrivenSchedulerOptions {
   readFileSync?: ReadText
   writeFileSync?: WriteText
   readdirSync?: Readdir
+  osCronManager?: OsCronManager
 }
 
 function walkMarkdownFiles(
@@ -100,6 +102,7 @@ export class TaskDrivenScheduler {
   private readonly readFileSync: ReadText
   private readonly writeFileSync: WriteText
   private readonly readdirSync: Readdir
+  private readonly osCronManager?: OsCronManager
   private readonly jobs = new Map<string, ScheduledTaskJob>()
   private readonly taskPathByKey = new Map<string, string>()
 
@@ -111,6 +114,7 @@ export class TaskDrivenScheduler {
     this.readFileSync = options.readFileSync ?? fs.readFileSync
     this.writeFileSync = options.writeFileSync ?? fs.writeFileSync
     this.readdirSync = options.readdirSync ?? fs.readdirSync
+    this.osCronManager = options.osCronManager
   }
 
   start(): void {
@@ -118,7 +122,7 @@ export class TaskDrivenScheduler {
   }
 
   stop(): void {
-    // no long-lived resources; reconciliation is stateless across ticks
+    this.osCronManager?.removeAll()
   }
 
   listJobs(): Array<{ id: string; schedule: string; lastRun: string | null }> {
@@ -208,6 +212,8 @@ export class TaskDrivenScheduler {
       message: "reconciled task-driven schedule jobs",
       meta: { jobCount: this.jobs.size, agents: this.agents.length },
     })
+
+    this.osCronManager?.sync([...this.jobs.values()])
   }
 
   async recordTaskRun(agent: string, taskId: string): Promise<void> {

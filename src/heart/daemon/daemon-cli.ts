@@ -43,6 +43,7 @@ export interface OuroCliDeps {
   promptInput?: (question: string) => Promise<string>
   registerOuroBundleType?: () => Promise<unknown> | unknown
   startChat?: (agentName: string) => Promise<void>
+  tailLogs?: (options?: { follow?: boolean; lines?: number; agentFilter?: string }) => () => void
 }
 
 export interface EnsureDaemonResult {
@@ -495,6 +496,11 @@ export function createDefaultOuroCliDeps(socketPath = "/tmp/ouroboros-daemon.soc
     runHatchFlow: defaultRunHatchFlow,
     promptInput: defaultPromptInput,
     registerOuroBundleType: defaultRegisterOuroBundleUti,
+    /* v8 ignore next 3 -- integration: launches interactive CLI session @preserve */
+    startChat: async (agentName: string) => {
+      const { main } = await import("../../senses/cli")
+      await main(agentName)
+    },
   }
 }
 
@@ -634,6 +640,11 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     const daemonResult = await ensureDaemonRunning(deps)
     deps.writeStdout(daemonResult.message)
     return daemonResult.message
+  }
+
+  if (command.kind === "daemon.logs" && deps.tailLogs) {
+    deps.tailLogs()
+    return ""
   }
 
   if (command.kind === "friend.link") {

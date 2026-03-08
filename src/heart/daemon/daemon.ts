@@ -27,6 +27,7 @@ export interface DaemonProcessManagerLike {
   startAgent(agent: string): Promise<void>
   stopAgent?(agent: string): Promise<void>
   restartAgent?(agent: string): Promise<void>
+  sendToAgent?(agent: string, message: Record<string, unknown>): void
   listAgentSnapshots(): Array<{
     name: string
     channel: string
@@ -317,6 +318,7 @@ export class OuroDaemon {
           ok: true,
           summary: "logs: use `ouro logs` to tail daemon and agent output",
           message: "log streaming available via ouro logs",
+          data: { logDir: "~/.agentstate/daemon/logs" },
         }
       case "agent.start":
         await this.processManager.startAgent(command.agent)
@@ -347,6 +349,7 @@ export class OuroDaemon {
           sessionId: command.sessionId,
           taskRef: command.taskRef,
         })
+        this.processManager.sendToAgent?.(command.to, { type: "message" })
         return { ok: true, message: `queued message ${receipt.id}`, data: receipt }
       }
       case "message.poll": {
@@ -372,6 +375,7 @@ export class OuroDaemon {
           taskRef: command.taskId,
         })
         await this.scheduler.recordTaskRun?.(command.agent, command.taskId)
+        this.processManager.sendToAgent?.(command.agent, { type: "poke", taskId: command.taskId })
         return {
           ok: true,
           message: `queued poke ${receipt.id}`,
