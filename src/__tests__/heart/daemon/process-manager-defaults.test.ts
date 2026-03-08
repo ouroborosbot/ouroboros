@@ -26,7 +26,7 @@ describe("process manager default dependency wiring", () => {
 
     const manager = new DaemonProcessManager({
       agents: [
-        { name: "slugger", entry: "inner-worker-entry.js", channel: "cli", autoStart: true },
+        { name: "slugger", entry: "heart/agent-entry.js", channel: "cli", autoStart: true },
       ],
       initialBackoffMs: 5,
       maxBackoffMs: 10,
@@ -37,7 +37,7 @@ describe("process manager default dependency wiring", () => {
 
     expect(spawn).toHaveBeenCalledWith(
       "node",
-      ["/mock/repo/dist/inner-worker-entry.js", "--agent", "slugger"],
+      ["/mock/repo/dist/heart/agent-entry.js", "--agent", "slugger"],
       expect.objectContaining({ cwd: "/mock/repo" }),
     )
 

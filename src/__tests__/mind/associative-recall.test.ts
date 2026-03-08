@@ -244,27 +244,42 @@ describe("associative recall", () => {
     expect(messages[0].content).toContain("Ari likes mushroom pizza")
   })
 
-  it("emits a warn event when embeddings API key is missing", async () => {
+  it("falls back to substring matching when embeddings API key is missing", async () => {
     const memoryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "associative-recall-"))
     writeFacts(memoryRoot, [makeFact("f1", "Ari likes mushroom pizza", [0.99, 0.01])])
     mockGetOpenAIEmbeddingsApiKey.mockReturnValue("")
     const messages: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: "base system prompt" },
-      { role: "user", content: "pizza?" },
+      { role: "user", content: "pizza" },
     ]
 
     await injectAssociativeRecall(messages, { memoryRoot })
+    expect(messages[0].content).toContain("Ari likes mushroom pizza")
     expect(mockEmitNervesEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        event: "mind.associative_recall_error",
-        meta: expect.objectContaining({
-          reason: "openaiEmbeddingsApiKey not configured",
-        }),
+        event: "mind.associative_recall_fallback",
+        meta: expect.objectContaining({ matchCount: 1 }),
       }),
     )
   })
 
-  it("emits a warn event when embedding request fails", async () => {
+  it("silently degrades when embeddings fail and no substring match exists", async () => {
+    const memoryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "associative-recall-"))
+    writeFacts(memoryRoot, [makeFact("f1", "Ari likes mushroom pizza", [0.99, 0.01])])
+    mockGetOpenAIEmbeddingsApiKey.mockReturnValue("")
+    const messages: OpenAI.ChatCompletionMessageParam[] = [
+      { role: "system", content: "base system prompt" },
+      { role: "user", content: "basketball" },
+    ]
+
+    await injectAssociativeRecall(messages, { memoryRoot })
+    expect(messages[0].content).toBe("base system prompt")
+    expect(mockEmitNervesEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ event: "mind.associative_recall_fallback" }),
+    )
+  })
+
+  it("falls back to substring matching when embedding request fails", async () => {
     const memoryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "associative-recall-"))
     writeFacts(memoryRoot, [makeFact("f1", "Ari likes mushroom pizza", [0.99, 0.01])])
     mockFetch.mockResolvedValue({
@@ -274,21 +289,19 @@ describe("associative recall", () => {
     })
     const messages: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: "base system prompt" },
-      { role: "user", content: "pizza?" },
+      { role: "user", content: "mushroom" },
     ]
 
     await injectAssociativeRecall(messages, { memoryRoot })
+    expect(messages[0].content).toContain("Ari likes mushroom pizza")
     expect(mockEmitNervesEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        event: "mind.associative_recall_error",
-        meta: expect.objectContaining({
-          reason: "embedding request failed: 500 Boom",
-        }),
+        event: "mind.associative_recall_fallback",
       }),
     )
   })
 
-  it("emits a warn event when embedding response vectors are missing", async () => {
+  it("falls back to substring matching when embedding response vectors are missing", async () => {
     const memoryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "associative-recall-"))
     writeFacts(memoryRoot, [makeFact("f1", "Ari likes mushroom pizza", [0.99, 0.01])])
     mockFetch.mockResolvedValue({
@@ -299,21 +312,19 @@ describe("associative recall", () => {
     })
     const messages: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: "base system prompt" },
-      { role: "user", content: "pizza?" },
+      { role: "user", content: "pizza" },
     ]
 
     await injectAssociativeRecall(messages, { memoryRoot })
+    expect(messages[0].content).toContain("Ari likes mushroom pizza")
     expect(mockEmitNervesEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        event: "mind.associative_recall_error",
-        meta: expect.objectContaining({
-          reason: "embedding response missing expected vectors",
-        }),
+        event: "mind.associative_recall_fallback",
       }),
     )
   })
 
-  it("converts non-Error thrown values to strings in warn event metadata", async () => {
+  it("converts non-Error thrown values gracefully in substring fallback", async () => {
     const memoryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "associative-recall-"))
     writeFacts(memoryRoot, [makeFact("f1", "Ari likes mushroom pizza", [0.99, 0.01])])
     const provider: EmbeddingProvider = {
@@ -323,16 +334,47 @@ describe("associative recall", () => {
     }
     const messages: OpenAI.ChatCompletionMessageParam[] = [
       { role: "system", content: "base system prompt" },
-      { role: "user", content: "pizza?" },
+      { role: "user", content: "pizza" },
     ]
 
     await injectAssociativeRecall(messages, { memoryRoot, provider })
+    // Falls back to substring, finds match, injects recall
+    expect(messages[0].content).toContain("Ari likes mushroom pizza")
+    expect(mockEmitNervesEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "mind.associative_recall_fallback",
+      }),
+    )
+  })
+
+  it("emits outer error event with string reason for non-Error throws", async () => {
+    mockGetAgentRoot.mockImplementation(() => { throw "non-error-value" })
+    const messages: OpenAI.ChatCompletionMessageParam[] = [
+      { role: "system", content: "base system prompt" },
+      { role: "user", content: "anything" },
+    ]
+
+    await injectAssociativeRecall(messages)
     expect(mockEmitNervesEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         event: "mind.associative_recall_error",
-        meta: expect.objectContaining({
-          reason: "boom-value",
-        }),
+        meta: expect.objectContaining({ reason: "non-error-value" }),
+      }),
+    )
+  })
+
+  it("emits outer error event when facts file contains invalid JSON", async () => {
+    const memoryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "associative-recall-"))
+    fs.writeFileSync(path.join(memoryRoot, "facts.jsonl"), "not valid json\n", "utf8")
+    const messages: OpenAI.ChatCompletionMessageParam[] = [
+      { role: "system", content: "base system prompt" },
+      { role: "user", content: "anything" },
+    ]
+
+    await injectAssociativeRecall(messages, { memoryRoot })
+    expect(mockEmitNervesEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "mind.associative_recall_error",
       }),
     )
   })

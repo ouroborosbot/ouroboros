@@ -177,6 +177,41 @@ describe("loadAgentConfig", () => {
     expect((config as any).configPath).toBeUndefined()
   })
 
+  it("parses logging config when present", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 1,
+        enabled: true,
+        provider: "anthropic",
+        logging: { level: "debug", sinks: ["terminal"] },
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+      }),
+    )
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    const config = loadAgentConfig()
+
+    expect(config.logging).toEqual({ level: "debug", sinks: ["terminal"] })
+  })
+
+  it("leaves logging undefined when omitted from agent.json", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 1,
+        enabled: true,
+        provider: "anthropic",
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+      }),
+    )
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    const config = loadAgentConfig()
+
+    expect(config.logging).toBeUndefined()
+  })
+
   it("defaults version/enabled when omitted", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(
       JSON.stringify({

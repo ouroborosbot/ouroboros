@@ -5,6 +5,7 @@ import * as path from "path";
 import {
   __memoryTestUtils,
   appendFactsWithDedup,
+  backfillEmbeddings,
   ensureMemoryStorePaths,
   saveMemoryFact,
   searchMemoryFacts,
@@ -518,6 +519,158 @@ describe("memory write path", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it("backfillEmbeddings fills empty embeddings for existing facts", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "memory-backfill-"));
+    const factsPath = path.join(root, "facts.jsonl");
+    const facts: MemoryFact[] = [
+      { id: "has-embed", text: "already embedded", source: "cli", createdAt: "2026-03-06T00:00:00.000Z", embedding: [0.1, 0.2] },
+      { id: "no-embed-1", text: "needs embedding one", source: "cli", createdAt: "2026-03-06T00:01:00.000Z", embedding: [] },
+      { id: "no-embed-2", text: "needs embedding two", source: "cli", createdAt: "2026-03-06T00:02:00.000Z", embedding: [] },
+    ];
+    fs.writeFileSync(factsPath, facts.map((f) => JSON.stringify(f)).join("\n") + "\n", "utf8");
+
+    const result = await backfillEmbeddings({
+      memoryRoot: root,
+      embeddingProvider: {
+        embed: async (texts) => texts.map(() => [0.5, 0.6]),
+      },
+    });
+
+    expect(result).toEqual({ total: 3, backfilled: 2, failed: 0 });
+    const updated = fs.readFileSync(factsPath, "utf8").trim().split("\n").map((l) => JSON.parse(l) as MemoryFact);
+    expect(updated[0].embedding).toEqual([0.1, 0.2]); // untouched
+    expect(updated[1].embedding).toEqual([0.5, 0.6]); // filled
+    expect(updated[2].embedding).toEqual([0.5, 0.6]); // filled
+  });
+
+  it("backfillEmbeddings returns zeros when no facts need embedding", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "memory-backfill-noop-"));
+    const factsPath = path.join(root, "facts.jsonl");
+    fs.writeFileSync(factsPath, JSON.stringify({ id: "ok", text: "good", source: "cli", createdAt: "", embedding: [1] }) + "\n", "utf8");
+
+    const result = await backfillEmbeddings({ memoryRoot: root });
+    expect(result).toEqual({ total: 1, backfilled: 0, failed: 0 });
+  });
+
+  it("backfillEmbeddings returns zeros for missing facts file", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "memory-backfill-missing-"));
+    const result = await backfillEmbeddings({ memoryRoot: root });
+    expect(result).toEqual({ total: 0, backfilled: 0, failed: 0 });
+  });
+
+  it("backfillEmbeddings reports failed count when provider is unavailable", async () => {
+    vi.resetModules();
+    vi.doMock("../../heart/config", async () => {
+      const actual = await vi.importActual<typeof import("../../heart/config")>("../../heart/config");
+      return { ...actual, getOpenAIEmbeddingsApiKey: () => "" };
+    });
+    const { backfillEmbeddings: dynamicBackfill } = await import("../../mind/memory");
+
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "memory-backfill-noprovider-"));
+    const factsPath = path.join(root, "facts.jsonl");
+    fs.writeFileSync(factsPath, JSON.stringify({ id: "x", text: "needs it", source: "cli", createdAt: "", embedding: [] }) + "\n", "utf8");
+
+    const result = await dynamicBackfill({ memoryRoot: root });
+    expect(result).toEqual({ total: 1, backfilled: 0, failed: 1 });
+  });
+
+  it("backfillEmbeddings handles batch errors gracefully", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "memory-backfill-batcherr-"));
+    const factsPath = path.join(root, "facts.jsonl");
+    const facts: MemoryFact[] = [
+      { id: "f1", text: "first", source: "cli", createdAt: "", embedding: [] },
+      { id: "f2", text: "second", source: "cli", createdAt: "", embedding: [] },
+      { id: "f3", text: "third", source: "cli", createdAt: "", embedding: [] },
+    ];
+    fs.writeFileSync(factsPath, facts.map((f) => JSON.stringify(f)).join("\n") + "\n", "utf8");
+
+    let callCount = 0;
+    const result = await backfillEmbeddings({
+      memoryRoot: root,
+      batchSize: 2,
+      embeddingProvider: {
+        embed: async (texts) => {
+          callCount++;
+          if (callCount === 1) throw new Error("batch 1 failed");
+          return texts.map(() => [0.9]);
+        },
+      },
+    });
+
+    expect(result).toEqual({ total: 3, backfilled: 1, failed: 2 });
+  });
+
+  it("backfillEmbeddings handles undefined vector entries from provider", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "memory-backfill-undef-"));
+    const factsPath = path.join(root, "facts.jsonl");
+    fs.writeFileSync(factsPath, JSON.stringify({ id: "f1", text: "test", source: "cli", createdAt: "", embedding: [] }) + "\n", "utf8");
+
+    const result = await backfillEmbeddings({
+      memoryRoot: root,
+      embeddingProvider: {
+        // Return fewer vectors than facts — vectors[1] is undefined
+        embed: async () => [] as number[][],
+      },
+    });
+
+    expect(result).toEqual({ total: 1, backfilled: 0, failed: 1 });
+  });
+
+  it("backfillEmbeddings uses default memoryRoot when not provided", async () => {
+    vi.resetModules();
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "memory-backfill-default-"));
+    const memoryDir = path.join(tmpRoot, "psyche", "memory");
+    fs.mkdirSync(memoryDir, { recursive: true });
+    const factsPath = path.join(memoryDir, "facts.jsonl");
+    fs.writeFileSync(factsPath, JSON.stringify({ id: "f1", text: "test", source: "cli", createdAt: "", embedding: [] }) + "\n", "utf8");
+
+    vi.doMock("../../heart/identity", async () => {
+      const actual = await vi.importActual<typeof import("../../heart/identity")>("../../heart/identity");
+      return { ...actual, getAgentRoot: () => tmpRoot };
+    });
+    const { backfillEmbeddings: dynamicBackfill } = await import("../../mind/memory");
+
+    const result = await dynamicBackfill({
+      embeddingProvider: { embed: async () => [[0.1]] },
+    });
+
+    expect(result).toEqual({ total: 1, backfilled: 1, failed: 0 });
+  });
+
+  it("backfillEmbeddings counts empty vectors from provider as failed", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "memory-backfill-emptyvec-"));
+    const factsPath = path.join(root, "facts.jsonl");
+    const facts: MemoryFact[] = [
+      { id: "f1", text: "gets a vector", source: "cli", createdAt: "", embedding: [] },
+      { id: "f2", text: "gets empty", source: "cli", createdAt: "", embedding: [] },
+    ];
+    fs.writeFileSync(factsPath, facts.map((f) => JSON.stringify(f)).join("\n") + "\n", "utf8");
+
+    const result = await backfillEmbeddings({
+      memoryRoot: root,
+      embeddingProvider: {
+        embed: async () => [[0.5, 0.6], []],
+      },
+    });
+
+    expect(result).toEqual({ total: 2, backfilled: 1, failed: 1 });
+  });
+
+  it("backfillEmbeddings handles batch error from non-Error throw", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "memory-backfill-nonError-"));
+    const factsPath = path.join(root, "facts.jsonl");
+    fs.writeFileSync(factsPath, JSON.stringify({ id: "f1", text: "first", source: "cli", createdAt: "", embedding: [] }) + "\n", "utf8");
+
+    const result = await backfillEmbeddings({
+      memoryRoot: root,
+      embeddingProvider: {
+        embed: async () => { throw "string-error"; },
+      },
+    });
+
+    expect(result).toEqual({ total: 1, backfilled: 0, failed: 1 });
   });
 
   it("searchMemoryFacts falls back when default OpenAI embedding payload is malformed", async () => {

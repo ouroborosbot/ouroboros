@@ -282,6 +282,80 @@ export async function saveMemoryFact(options: SaveMemoryFactOptions): Promise<Me
   return appendFactsWithDedup(stores, [fact]);
 }
 
+export interface BackfillEmbeddingsResult {
+  total: number;
+  backfilled: number;
+  failed: number;
+}
+
+export async function backfillEmbeddings(options?: {
+  memoryRoot?: string;
+  embeddingProvider?: MemoryEmbeddingProvider;
+  batchSize?: number;
+}): Promise<BackfillEmbeddingsResult> {
+  const memoryRoot = options?.memoryRoot ?? path.join(getAgentRoot(), "psyche", "memory");
+  const factsPath = path.join(memoryRoot, "facts.jsonl");
+  if (!fs.existsSync(factsPath)) return { total: 0, backfilled: 0, failed: 0 };
+
+  const facts = readExistingFacts(factsPath);
+  const needsEmbedding = facts.filter((f) => !Array.isArray(f.embedding) || f.embedding.length === 0);
+  if (needsEmbedding.length === 0) return { total: facts.length, backfilled: 0, failed: 0 };
+
+  const provider = options?.embeddingProvider ?? createDefaultEmbeddingProvider();
+  if (!provider) {
+    emitNervesEvent({
+      level: "warn",
+      component: "mind",
+      event: "mind.memory_backfill_skipped",
+      message: "embedding provider unavailable for backfill",
+      meta: { needsEmbedding: needsEmbedding.length },
+    });
+    return { total: facts.length, backfilled: 0, failed: needsEmbedding.length };
+  }
+
+  const batchSize = options?.batchSize ?? 50;
+  let backfilled = 0;
+  let failed = 0;
+
+  for (let i = 0; i < needsEmbedding.length; i += batchSize) {
+    const batch = needsEmbedding.slice(i, i + batchSize);
+    try {
+      const vectors = await provider.embed(batch.map((f) => f.text));
+      for (let j = 0; j < batch.length; j++) {
+        batch[j].embedding = vectors[j] ?? [];
+        if (batch[j].embedding.length > 0) backfilled++;
+        else failed++;
+      }
+    } catch (error) {
+      failed += batch.length;
+      emitNervesEvent({
+        level: "warn",
+        component: "mind",
+        event: "mind.memory_backfill_batch_error",
+        message: "embedding backfill batch failed",
+        meta: {
+          batchStart: i,
+          batchSize: batch.length,
+          reason: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
+  }
+
+  // Rewrite facts file with updated embeddings
+  const lines = facts.map((f) => JSON.stringify(f)).join("\n") + "\n";
+  fs.writeFileSync(factsPath, lines, "utf8");
+
+  emitNervesEvent({
+    component: "mind",
+    event: "mind.memory_backfill_complete",
+    message: "embedding backfill completed",
+    meta: { total: facts.length, backfilled, failed },
+  });
+
+  return { total: facts.length, backfilled, failed };
+}
+
 function substringMatches(queryLower: string, facts: MemoryFact[]): MemoryFact[] {
   return facts.filter((fact) => fact.text.toLowerCase().includes(queryLower));
 }
