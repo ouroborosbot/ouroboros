@@ -7492,3 +7492,40 @@ describe("createSummarize", () => {
     expect(result).toBe("original transcript")
   })
 })
+
+describe("resetProviderRuntime", () => {
+  it("clears cached provider so next access re-creates from current config", async () => {
+    vi.resetModules()
+    await setupMinimax("key-1", "model-1")
+    const core = await import("../../heart/core")
+
+    // First access: creates provider runtime for minimax
+    const model1 = core.getModel()
+    expect(model1).toBe("model-1")
+
+    // Change config to a different model
+    await setupMinimax("key-2", "model-2")
+
+    // Without reset, cached provider still returns old model
+    expect(core.getModel()).toBe("model-1")
+
+    // After reset, next access picks up new config
+    core.resetProviderRuntime()
+    expect(core.getModel()).toBe("model-2")
+  })
+
+  it("after reset, provider picks up new config values", async () => {
+    vi.resetModules()
+    await setupMinimax("key-a", "model-a")
+    const core = await import("../../heart/core")
+
+    expect(core.getProvider()).toBe("minimax")
+
+    // Switch provider via config mock
+    await setupAzure("az-key", "https://test.openai.azure.com", "dep-1", "gpt-5.2-chat")
+
+    // Reset provider runtime so it re-creates
+    core.resetProviderRuntime()
+    expect(core.getProvider()).toBe("azure")
+  })
+})
