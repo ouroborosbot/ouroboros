@@ -81,10 +81,15 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 **Output**: BlueBubbles sense runtime that preserves rich/mutation context or emits explicit fallback state.
 **Acceptance**: Unit 4a tests pass, no silent-drop paths remain in the new code, and the implementation remains reversible.
 
-### ⬜ Unit 5: Verification And Live Smoke Pass
-**What**: Run the full automated verification (`npm test`, `npx tsc --noEmit`, coverage on new code) and then perform the best-available live smoke pass against the local BlueBubbles/OpenClaw environment to confirm the sense behaves coherently for DM/group replies, OG cards/media, and mutations.
-**Output**: Passing automated checks plus saved verification notes/logs in the artifacts directory.
-**Acceptance**: All completion criteria are satisfied with evidence, coverage is 100% on new code, and the live smoke pass documents what was verified end to end.
+### ⬜ Unit 5a: Automated Verification
+**What**: Run the full automated verification (`npm test`, `npx tsc --noEmit`, coverage on new code), fix anything still failing, and save command outputs in the artifacts directory.
+**Output**: Passing automated checks with captured logs.
+**Acceptance**: All automated checks pass, coverage is 100% on new code, and no warnings remain.
+
+### ⬜ Unit 5b: Live Smoke Pass
+**What**: Perform the best-available live smoke pass against the local BlueBubbles/OpenClaw environment to confirm the sense behaves coherently for DM/group replies, OG cards/media, and mutations.
+**Output**: Saved verification notes/logs describing the live scenarios run and what was confirmed end to end.
+**Acceptance**: The live smoke pass documents what was verified, any residual gaps are explicit, and the final completion criteria are supported by evidence.
 
 ## Execution
 - **TDD strictly enforced**: tests → red → implement → green → refactor
