@@ -1,7 +1,7 @@
 import * as fs from "fs"
 import * as path from "path"
 import { emitNervesEvent } from "../../nerves/runtime"
-import { setAgentName, setAgentConfigOverride, type AgentProvider } from "../identity"
+import { setAgentName, setAgentConfigOverride, DEFAULT_AGENT_PHRASES, type AgentProvider, type AgentConfig } from "../identity"
 import { resetConfigCache } from "../config"
 import { resetProviderRuntime, createProviderRegistry, type ChannelCallbacks } from "../core"
 import { writeSecretsFile, type HatchCredentialsInput } from "./hatch-flow"
@@ -41,6 +41,31 @@ function listExistingBundles(bundlesRoot: string): string[] {
     discovered.push(agentName)
   }
   return discovered.sort((a, b) => a.localeCompare(b))
+}
+
+function loadIdentityPhrases(
+  bundleSourceDir: string,
+  identityFileName: string,
+): AgentConfig["phrases"] {
+  const agentJsonPath = path.join(bundleSourceDir, "agent.json")
+  try {
+    const raw = fs.readFileSync(agentJsonPath, "utf-8")
+    const parsed = JSON.parse(raw) as {
+      phrases?: AgentConfig["phrases"]
+      identityPhrases?: Record<string, AgentConfig["phrases"]>
+    }
+    const identityKey = identityFileName.replace(/\.md$/, "")
+    const identity = parsed.identityPhrases?.[identityKey]
+    if (identity?.thinking?.length && identity?.tool?.length && identity?.followup?.length) {
+      return identity
+    }
+    if (parsed.phrases?.thinking?.length && parsed.phrases?.tool?.length && parsed.phrases?.followup?.length) {
+      return parsed.phrases
+    }
+  } catch {
+    // agent.json missing or malformed — fall through
+  }
+  return { ...DEFAULT_AGENT_PHRASES }
 }
 
 function pickRandomIdentity(identitiesDir: string, random: () => number): { fileName: string; content: string } {
@@ -104,13 +129,14 @@ export async function runAdoptionSpecialist(
   // 4. Build system prompt
   const systemPrompt = buildSpecialistSystemPrompt(soulText, identity.content, existingBundles)
 
-  // 5. Set up provider
+  // 5. Set up provider with identity-specific phrases
+  const phrases = loadIdentityPhrases(bundleSourceDir, identity.fileName)
   setAgentName("AdoptionSpecialist")
   setAgentConfigOverride({
     version: 1,
     enabled: true,
     provider,
-    phrases: { thinking: ["thinking"], tool: ["checking"], followup: ["processing"] },
+    phrases,
   })
   writeSecretsFile("AdoptionSpecialist", provider, credentials, secretsRoot)
   resetConfigCache()

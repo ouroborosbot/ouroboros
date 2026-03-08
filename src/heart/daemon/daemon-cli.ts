@@ -9,6 +9,7 @@ import { FileFriendStore } from "../../mind/friends/store-file"
 import { isIdentityProvider, type IdentityProvider } from "../../mind/friends/types"
 import type { DaemonCommand, DaemonResponse } from "./daemon"
 import { registerOuroBundleUti as defaultRegisterOuroBundleUti } from "./ouro-uti"
+import { installOuroCommand as defaultInstallOuroCommand, type OuroPathInstallResult } from "./ouro-path-installer"
 import { installSubagentsForAvailableCli, type SubagentInstallResult } from "./subagent-installer"
 import {
   runHatchFlow as defaultRunHatchFlow,
@@ -44,6 +45,7 @@ export interface OuroCliDeps {
   runAdoptionSpecialist?: () => Promise<string | null>
   promptInput?: (question: string) => Promise<string>
   registerOuroBundleType?: () => Promise<unknown> | unknown
+  installOuroCommand?: () => OuroPathInstallResult
   startChat?: (agentName: string) => Promise<void>
   tailLogs?: (options?: { follow?: boolean; lines?: number; agentFilter?: string }) => () => void
 }
@@ -657,6 +659,7 @@ export function createDefaultOuroCliDeps(socketPath = "/tmp/ouroboros-daemon.soc
     promptInput: defaultPromptInput,
     runAdoptionSpecialist: defaultRunAdoptionSpecialist,
     registerOuroBundleType: defaultRegisterOuroBundleUti,
+    installOuroCommand: defaultInstallOuroCommand,
     /* v8 ignore next 3 -- integration: launches interactive CLI session @preserve */
     startChat: async (agentName: string) => {
       const { main } = await import("../../senses/cli")
@@ -720,6 +723,39 @@ async function registerOuroBundleTypeNonBlocking(deps: OuroCliDeps): Promise<voi
   }
 }
 
+async function performSystemSetup(deps: OuroCliDeps): Promise<void> {
+  // Install ouro command to PATH (non-blocking)
+  if (deps.installOuroCommand) {
+    try {
+      deps.installOuroCommand()
+    } catch (error) {
+      emitNervesEvent({
+        level: "warn",
+        component: "daemon",
+        event: "daemon.system_setup_ouro_cmd_error",
+        message: "failed to install ouro command to PATH",
+        meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
+      })
+    }
+  }
+
+  // Install subagents (claude/codex skills)
+  try {
+    await deps.installSubagents()
+  } catch (error) {
+    emitNervesEvent({
+      level: "warn",
+      component: "daemon",
+      event: "daemon.subagent_install_error",
+      message: "subagent auto-install failed",
+      meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
+    })
+  }
+
+  // Register .ouro bundle type (UTI on macOS)
+  await registerOuroBundleTypeNonBlocking(deps)
+}
+
 export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefaultOuroCliDeps()): Promise<string> {
   if (args.includes("--help") || args.includes("-h")) {
     const text = usage()
@@ -747,24 +783,14 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       deps.listDiscoveredAgents ? deps.listDiscoveredAgents() : defaultListDiscoveredAgents(),
     )
     if (discovered.length === 0 && deps.runAdoptionSpecialist) {
+      // System setup first — ouro command, subagents, UTI — before the interactive specialist
+      await performSystemSetup(deps)
+
       const hatchlingName = await deps.runAdoptionSpecialist()
       if (!hatchlingName) {
         return ""
       }
 
-      try {
-        await deps.installSubagents()
-      } catch (error) {
-        emitNervesEvent({
-          level: "warn",
-          component: "daemon",
-          event: "daemon.subagent_install_error",
-          message: "subagent auto-install failed",
-          meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
-        })
-      }
-
-      await registerOuroBundleTypeNonBlocking(deps)
       await ensureDaemonRunning(deps)
 
       if (deps.startChat) {
@@ -809,19 +835,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   })
 
   if (command.kind === "daemon.up") {
-    try {
-      await deps.installSubagents()
-    } catch (error) {
-      emitNervesEvent({
-        level: "warn",
-        component: "daemon",
-        event: "daemon.subagent_install_error",
-        message: "subagent auto-install failed",
-        meta: { error: error instanceof Error ? error.message : String(error) },
-      })
-    }
-
-    await registerOuroBundleTypeNonBlocking(deps)
+    await performSystemSetup(deps)
 
     const daemonResult = await ensureDaemonRunning(deps)
     deps.writeStdout(daemonResult.message)
@@ -844,24 +858,14 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     // Route through adoption specialist when no explicit hatch args were provided
     const hasExplicitHatchArgs = !!(command.agentName || command.humanName || command.provider || command.credentials)
     if (deps.runAdoptionSpecialist && !hasExplicitHatchArgs) {
+      // System setup first — ouro command, subagents, UTI — before the interactive specialist
+      await performSystemSetup(deps)
+
       const hatchlingName = await deps.runAdoptionSpecialist()
       if (!hatchlingName) {
         return ""
       }
 
-      try {
-        await deps.installSubagents()
-      } catch (error) {
-        emitNervesEvent({
-          level: "warn",
-          component: "daemon",
-          event: "daemon.subagent_install_error",
-          message: "subagent auto-install failed",
-          meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
-        })
-      }
-
-      await registerOuroBundleTypeNonBlocking(deps)
       await ensureDaemonRunning(deps)
 
       if (deps.startChat) {
@@ -881,19 +885,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     const hatchInput = await resolveHatchInput(command, deps)
     const result = await hatchRunner(hatchInput)
 
-    try {
-      await deps.installSubagents()
-    } catch (error) {
-      emitNervesEvent({
-        level: "warn",
-        component: "daemon",
-        event: "daemon.subagent_install_error",
-        message: "subagent auto-install failed",
-        meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
-      })
-    }
-
-    await registerOuroBundleTypeNonBlocking(deps)
+    await performSystemSetup(deps)
 
     const daemonResult = await ensureDaemonRunning(deps)
 

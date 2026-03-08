@@ -1554,9 +1554,74 @@ describe("specialist integration (zero agents -> adoption specialist)", () => {
 
     expect(runAdoptionSpecialist).toHaveBeenCalledTimes(1)
     expect(startChat).not.toHaveBeenCalled()
-    expect(deps.installSubagents).not.toHaveBeenCalled()
+    // System setup runs BEFORE the specialist, so installSubagents is called even if specialist aborts
+    expect(deps.installSubagents).toHaveBeenCalledTimes(1)
     expect(deps.startDaemonProcess).not.toHaveBeenCalled()
     expect(result).toBe("")
+  })
+
+  it("calls installOuroCommand during system setup before specialist runs", async () => {
+    const callOrder: string[] = []
+    const installOuroCommand = vi.fn(() => {
+      callOrder.push("installOuroCommand")
+      return { installed: true, scriptPath: "/home/test/.local/bin/ouro", pathReady: true, shellProfileUpdated: null }
+    })
+    const runAdoptionSpecialist = vi.fn(async () => {
+      callOrder.push("runAdoptionSpecialist")
+      return "OrderBot"
+    })
+    const startChat = vi.fn(async () => {})
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => {
+        callOrder.push("installSubagents")
+        return { claudeInstalled: 0, codexInstalled: 0, notes: [] }
+      }),
+      listDiscoveredAgents: vi.fn(async () => []),
+      runAdoptionSpecialist,
+      installOuroCommand,
+      startChat,
+    }
+
+    await runOuroCli([], deps)
+
+    expect(installOuroCommand).toHaveBeenCalledTimes(1)
+    // System setup should happen before the specialist
+    expect(callOrder.indexOf("installOuroCommand")).toBeLessThan(callOrder.indexOf("runAdoptionSpecialist"))
+    expect(callOrder.indexOf("installSubagents")).toBeLessThan(callOrder.indexOf("runAdoptionSpecialist"))
+  })
+
+  it("handles installOuroCommand failure gracefully during system setup", async () => {
+    const installOuroCommand = vi.fn(() => { throw new Error("permission denied") })
+    const runAdoptionSpecialist = vi.fn(async () => "GracefulBot")
+    const startChat = vi.fn(async () => {})
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      listDiscoveredAgents: vi.fn(async () => []),
+      runAdoptionSpecialist,
+      installOuroCommand,
+      startChat,
+    }
+
+    // Should not throw — failure is non-blocking
+    await runOuroCli([], deps)
+
+    expect(installOuroCommand).toHaveBeenCalledTimes(1)
+    expect(runAdoptionSpecialist).toHaveBeenCalledTimes(1)
+    expect(startChat).toHaveBeenCalledWith("GracefulBot")
   })
 
   it("falls back to old hatch flow for explicit ouro hatch command even when specialist dep exists", async () => {
@@ -1690,7 +1755,8 @@ describe("specialist integration (zero agents -> adoption specialist)", () => {
     const result = await runOuroCli(["hatch"], deps)
 
     expect(runAdoptionSpecialist).toHaveBeenCalledTimes(1)
-    expect(deps.installSubagents).not.toHaveBeenCalled()
+    // System setup runs BEFORE the specialist, so installSubagents is called even if specialist aborts
+    expect(deps.installSubagents).toHaveBeenCalledTimes(1)
     expect(result).toBe("")
   })
 
