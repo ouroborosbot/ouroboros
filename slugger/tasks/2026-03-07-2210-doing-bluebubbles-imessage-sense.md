@@ -18,10 +18,10 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 - [x] Reactions, edits, unsends, and delivery/read mutations are not silently dropped
 - [x] Session identity is stable for DM/group/thread-aware routing
 - [x] Attachment and OG-card handling give the agent useful context or an explicit fallback
-- [ ] Automated tests cover all new code at 100%
-- [ ] `npm test` passes
-- [ ] `npx tsc --noEmit` passes
-- [ ] No warnings
+- [x] Automated tests cover all new code at 100%
+- [x] `npm test` passes
+- [x] `npx tsc --noEmit` passes
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -81,7 +81,7 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 **Output**: BlueBubbles sense runtime that preserves rich/mutation context or emits explicit fallback state.
 **Acceptance**: Unit 4a tests pass, no silent-drop paths remain in the new code, and the implementation remains reversible.
 
-### ⬜ Unit 5a: Automated Verification
+### ✅ Unit 5a: Automated Verification
 **What**: Run the full automated verification (`npm test`, `npx tsc --noEmit`, coverage on new code), fix anything still failing, and save command outputs in the artifacts directory.
 **Output**: Passing automated checks with captured logs.
 **Acceptance**: All automated checks pass, coverage is 100% on new code, and no warnings remain.
@@ -109,3 +109,4 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 - 2026-03-07 23:12 Unit 3b complete: added the BlueBubbles transport, webhook runtime, and entrypoint with 100% coverage on the new sense runtime files
 - 2026-03-07 23:22 Unit 4a complete: added red tests for GUID-based repair, explicit repair fallback notices, and durable mutation logging outside the session prompt
 - 2026-03-07 23:31 Unit 4b complete: implemented GUID-based repair fetches, explicit repair notices, durable mutation sidecar logging, and restored 100% coverage on the touched sense files
+- 2026-03-07 23:33 Unit 5a complete: full npm test, tsc, and build passed; targeted coverage on the new BlueBubbles files is 100% with saved verification logs
