@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   emitNervesEvent: vi.fn(),
   sendText: vi.fn().mockResolvedValue({ messageGuid: "sent-guid" }),
   repairEvent: vi.fn(async (event: unknown) => event),
+  recordMutation: vi.fn(),
   createServer: vi.fn(),
   listen: vi.fn((_: number, cb?: () => void) => cb?.()),
 }))
@@ -295,6 +296,7 @@ function resetMocks(): void {
   mocks.emitNervesEvent.mockReset()
   mocks.sendText.mockReset().mockResolvedValue({ messageGuid: "sent-guid" })
   mocks.repairEvent.mockReset().mockImplementation(async (event: unknown) => event)
+  mocks.recordMutation.mockReset()
   mocks.listen.mockReset().mockImplementation((_: number, cb?: () => void) => cb?.())
   mocks.createServer.mockReset().mockImplementation((handler: unknown) => ({
     listen: mocks.listen,
@@ -498,6 +500,22 @@ describe("BlueBubbles sense runtime", () => {
         reason: "mutation_state_only",
       }),
     )
+    expect(mocks.recordMutation).toHaveBeenNthCalledWith(
+      1,
+      "testagent",
+      expect.objectContaining({
+        mutationType: "reaction",
+        messageGuid: "BA2CFB68-52D2-4D8F-8A33-394C37035347",
+      }),
+    )
+    expect(mocks.recordMutation).toHaveBeenNthCalledWith(
+      2,
+      "testagent",
+      expect.objectContaining({
+        mutationType: "read",
+        messageGuid: "174D57C8-5985-4528-8539-E4DBD777FE59",
+      }),
+    )
     expect(mocks.runAgent).toHaveBeenCalledTimes(1)
   })
 
@@ -593,6 +611,53 @@ describe("BlueBubbles sense runtime", () => {
       expect.arrayContaining([
         expect.objectContaining({ role: "user", content: "ari@mendelow.me reacted with love" }),
       ]),
+    )
+  })
+
+  it("appends explicit repair-failure fallback to the agent-visible inbound text", async () => {
+    mocks.repairEvent.mockResolvedValueOnce({
+      kind: "message",
+      eventType: "new-message",
+      messageGuid: "repair-failed-msg",
+      timestamp: 9,
+      fromMe: false,
+      sender: {
+        provider: "imessage-handle",
+        externalId: "ari@mendelow.me",
+        rawId: "ari@mendelow.me",
+        displayName: "ari@mendelow.me",
+      },
+      chat: {
+        chatGuid: "any;-;ari@mendelow.me",
+        chatIdentifier: "ari@mendelow.me",
+        isGroup: false,
+        sessionKey: "chat:any;-;ari@mendelow.me",
+        sendTarget: { kind: "chat_guid", value: "any;-;ari@mendelow.me" },
+      },
+      text: "",
+      textForAgent: "[audio attachment: Audio Message.mp3]",
+      attachments: [{ guid: "audio-guid", mimeType: "audio/mp3", transferName: "Audio Message.mp3" }],
+      hasPayloadData: false,
+      requiresRepair: false,
+      repairNotice: "BlueBubbles repair failed: network down",
+    })
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(dmThreadPayload, {
+      recordMutation: mocks.recordMutation,
+    } as any)
+
+    expect(mocks.runAgent).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: "user",
+          content: expect.stringContaining("BlueBubbles repair failed: network down"),
+        }),
+      ]),
+      expect.any(Object),
+      "bluebubbles",
+      expect.any(AbortSignal),
+      expect.any(Object),
     )
   })
 
