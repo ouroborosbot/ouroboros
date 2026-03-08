@@ -779,6 +779,24 @@ describe("getBlueBubblesConfig", () => {
     expect(bb.accountId).toBe("personal")
   })
 
+  it("falls back to default accountId when the configured value is blank", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      bluebubbles: {
+        serverUrl: " http://localhost:1234 ",
+        password: " secret-pass ",
+        accountId: "   ",
+      },
+    }))
+
+    const { getBlueBubblesConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    const bb = getBlueBubblesConfig()
+
+    expect(bb.serverUrl).toBe("http://localhost:1234")
+    expect(bb.password).toBe("secret-pass")
+    expect(bb.accountId).toBe("default")
+  })
+
   it("fails fast when bluebubbles serverUrl is missing", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
       bluebubbles: {
