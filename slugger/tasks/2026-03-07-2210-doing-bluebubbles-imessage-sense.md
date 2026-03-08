@@ -1,6 +1,6 @@
 # Doing: BlueBubbles iMessage Sense
 
-**Status**: READY_FOR_EXECUTION
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-03-07
 **Planning**: /Users/arimendelow/Projects/ouroboros-agent-harness-bluebubbles/slugger/tasks/2026-03-07-2210-planning-bluebubbles-imessage-sense.md
@@ -86,7 +86,7 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 **Output**: Passing automated checks with captured logs.
 **Acceptance**: All automated checks pass, coverage is 100% on new code, and no warnings remain.
 
-### ⬜ Unit 5b: Live Smoke Pass
+### ✅ Unit 5b: Live Smoke Pass
 **What**: Perform the best-available live smoke pass against the local BlueBubbles/OpenClaw environment to confirm the sense behaves coherently for DM/group replies, OG cards/media, and mutations.
 **Output**: Saved verification notes/logs describing the live scenarios run and what was confirmed end to end.
 **Acceptance**: The live smoke pass documents what was verified, any residual gaps are explicit, and the final completion criteria are supported by evidence.
@@ -110,3 +110,5 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 - 2026-03-07 23:22 Unit 4a complete: added red tests for GUID-based repair, explicit repair fallback notices, and durable mutation logging outside the session prompt
 - 2026-03-07 23:31 Unit 4b complete: implemented GUID-based repair fetches, explicit repair notices, durable mutation sidecar logging, and restored 100% coverage on the touched sense files
 - 2026-03-07 23:33 Unit 5a complete: full npm test, tsc, and build passed; targeted coverage on the new BlueBubbles files is 100% with saved verification logs
+- 2026-03-07 23:40 Unit 5b complete: replayed real BlueBubbles DM/group/media/mutation payloads against the real repair client, confirmed live startup under Slugger config, and verified the live webhook entrypoint with a captured from-me payload
+- 2026-03-07 23:40 All units complete: BlueBubbles sense implementation, automated verification, and best-available live smoke evidence are complete
