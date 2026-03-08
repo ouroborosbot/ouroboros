@@ -137,4 +137,19 @@ describe("session-lock", () => {
 
     expect(() => lock.release()).not.toThrow()
   })
+
+  it("acquires lock using real fs deps when no deps argument is given", () => {
+    const fs = require("fs") as typeof import("fs")
+    const os = require("os") as typeof import("os")
+    const path = require("path") as typeof import("path")
+    const lockPath = path.join(os.tmpdir(), `session-lock-default-${Date.now()}.lock`)
+    try {
+      const lock = acquireSessionLock(lockPath, "slugger")
+      expect(fs.existsSync(lockPath)).toBe(true)
+      lock.release()
+      expect(fs.existsSync(lockPath)).toBe(false)
+    } finally {
+      try { fs.unlinkSync(lockPath) } catch { /* cleanup */ }
+    }
+  })
 })

@@ -1,3 +1,5 @@
+import * as fs from "fs"
+
 export class SessionLockError extends Error {
   readonly agentName: string
 
@@ -12,7 +14,6 @@ export interface SessionLockDeps {
   writeFileSync: (path: string, data: string, options: { flag: string }) => void
   readFileSync: (path: string, encoding: "utf-8") => string
   unlinkSync: (path: string) => void
-  existsSync: (path: string) => boolean
   pid: number
   isProcessAlive: (pid: number) => boolean
 }
@@ -21,32 +22,21 @@ export interface SessionLock {
   release: () => void
 }
 
+function defaultIsProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
 const defaultDeps: SessionLockDeps = {
-  writeFileSync: (p, d, o) => {
-    const fs = require("fs") as typeof import("fs")
-    fs.writeFileSync(p, d, o)
-  },
-  readFileSync: (p, e) => {
-    const fs = require("fs") as typeof import("fs")
-    return fs.readFileSync(p, e)
-  },
-  unlinkSync: (p) => {
-    const fs = require("fs") as typeof import("fs")
-    fs.unlinkSync(p)
-  },
-  existsSync: (p) => {
-    const fs = require("fs") as typeof import("fs")
-    return fs.existsSync(p)
-  },
+  writeFileSync: (p, d, o) => fs.writeFileSync(p, d, o),
+  readFileSync: (p, e) => fs.readFileSync(p, e),
+  unlinkSync: (p) => fs.unlinkSync(p),
   pid: process.pid,
-  isProcessAlive: (pid: number) => {
-    try {
-      process.kill(pid, 0)
-      return true
-    } catch {
-      return false
-    }
-  },
+  isProcessAlive: defaultIsProcessAlive,
 }
 
 export function acquireSessionLock(lockPath: string, agentName: string, deps: SessionLockDeps = defaultDeps): SessionLock {
