@@ -55,6 +55,18 @@ export interface TeamsChannelConfig {
   port: number
 }
 
+export interface BlueBubblesConfig {
+  serverUrl: string
+  password: string
+  accountId: string
+}
+
+export interface BlueBubblesChannelConfig {
+  port: number
+  webhookPath: string
+  requestTimeoutMs: number
+}
+
 export interface IntegrationsConfig {
   perplexityApiKey: string
   openaiEmbeddingsApiKey: string
@@ -71,6 +83,8 @@ export interface OuroborosConfig {
   oauth: OAuthConfig
   context: ContextConfig
   teamsChannel: TeamsChannelConfig
+  bluebubbles: BlueBubblesConfig
+  bluebubblesChannel: BlueBubblesChannelConfig
   integrations: IntegrationsConfig
 }
 
@@ -112,6 +126,16 @@ const DEFAULT_SECRETS_TEMPLATE: Omit<OuroborosConfig, "context"> = {
     skipConfirmation: true,
     port: 3978,
   },
+  bluebubbles: {
+    serverUrl: "",
+    password: "",
+    accountId: "default",
+  },
+  bluebubblesChannel: {
+    port: 18790,
+    webhookPath: "/bluebubbles-webhook",
+    requestTimeoutMs: 30000,
+  },
   integrations: {
     perplexityApiKey: "",
     openaiEmbeddingsApiKey: "",
@@ -130,6 +154,8 @@ function defaultRuntimeConfig(): OuroborosConfig {
     oauth: { ...DEFAULT_SECRETS_TEMPLATE.oauth },
     context: { ...DEFAULT_AGENT_CONTEXT },
     teamsChannel: { ...DEFAULT_SECRETS_TEMPLATE.teamsChannel },
+    bluebubbles: { ...DEFAULT_SECRETS_TEMPLATE.bluebubbles },
+    bluebubblesChannel: { ...DEFAULT_SECRETS_TEMPLATE.bluebubblesChannel },
     integrations: { ...DEFAULT_SECRETS_TEMPLATE.integrations },
   }
 }
@@ -327,6 +353,30 @@ export function getTeamsChannelConfig(): TeamsChannelConfig {
   const config = loadConfig()
   const { skipConfirmation, flushIntervalMs, port } = config.teamsChannel
   return { skipConfirmation, flushIntervalMs, port }
+}
+
+export function getBlueBubblesConfig(): BlueBubblesConfig {
+  const config = loadConfig()
+  const { serverUrl, password, accountId } = config.bluebubbles
+
+  if (!serverUrl.trim()) {
+    throw new Error("bluebubbles.serverUrl is required in secrets.json to run the BlueBubbles sense.")
+  }
+  if (!password.trim()) {
+    throw new Error("bluebubbles.password is required in secrets.json to run the BlueBubbles sense.")
+  }
+
+  return {
+    serverUrl: serverUrl.trim(),
+    password: password.trim(),
+    accountId: accountId.trim() || "default",
+  }
+}
+
+export function getBlueBubblesChannelConfig(): BlueBubblesChannelConfig {
+  const config = loadConfig()
+  const { port, webhookPath, requestTimeoutMs } = config.bluebubblesChannel
+  return { port, webhookPath, requestTimeoutMs }
 }
 
 export function getIntegrationsConfig(): IntegrationsConfig {

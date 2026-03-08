@@ -17,7 +17,7 @@ const allDefinitions: ToolDefinition[] = [...baseToolDefinitions, ...teamsToolDe
 const REMOTE_BLOCKED_LOCAL_TOOLS = new Set(["shell", "read_file", "write_file", "git_commit", "gh_cli"]);
 
 function baseToolsForCapabilities(capabilities?: ChannelCapabilities): OpenAI.ChatCompletionFunctionTool[] {
-  const isRemoteChannel = capabilities?.channel === "teams";
+  const isRemoteChannel = capabilities?.channel === "teams" || capabilities?.channel === "bluebubbles";
   if (!isRemoteChannel) return tools;
   return tools.filter((tool) => !REMOTE_BLOCKED_LOCAL_TOOLS.has(tool.function.name));
 }
@@ -99,7 +99,8 @@ export async function execTool(name: string, args: Record<string, string>, ctx?:
     return `unknown: ${name}`;
   }
 
-  const isRemoteChannel = ctx?.context?.channel?.channel === "teams";
+  const isRemoteChannel =
+    ctx?.context?.channel?.channel === "teams" || ctx?.context?.channel?.channel === "bluebubbles";
   if (isRemoteChannel && REMOTE_BLOCKED_LOCAL_TOOLS.has(name)) {
     const message =
       "I can't do that from here because I'm talking to multiple people in a shared remote channel, and local shell/file/git/gh operations could let conversations interfere with each other. Ask me for a remote-safe alternative (Graph/ADO/web), or run that operation from CLI.";
@@ -108,7 +109,7 @@ export async function execTool(name: string, args: Record<string, string>, ctx?:
       event: "tool.error",
       component: "tools",
       message: "blocked local tool in remote channel",
-      meta: { name, channel: "teams" },
+      meta: { name, channel: ctx?.context?.channel?.channel },
     });
     return message;
   }

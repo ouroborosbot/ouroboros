@@ -21,6 +21,14 @@ const CHANNEL_CAPABILITIES: Record<string, ChannelCapabilities> = {
     supportsRichCards: true,
     maxMessageLength: Infinity,
   },
+  bluebubbles: {
+    channel: "bluebubbles",
+    availableIntegrations: [],
+    supportsMarkdown: false,
+    supportsStreaming: false,
+    supportsRichCards: false,
+    maxMessageLength: Infinity,
+  },
 }
 
 const DEFAULT_CAPABILITIES: ChannelCapabilities = {
