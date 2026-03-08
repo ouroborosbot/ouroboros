@@ -483,7 +483,62 @@ async function defaultLinkFriendIdentity(command: Extract<OuroCliCommand, { kind
   return `linked ${command.provider}:${command.externalId} to ${command.friendId}`
 }
 
-/* v8 ignore next 49 -- integration: interactive terminal specialist session @preserve */
+export interface DiscoveredCredential {
+  agentName: string
+  provider: AgentProvider
+  credentials: HatchCredentialsInput
+}
+
+export function discoverExistingCredentials(secretsRoot: string): DiscoveredCredential[] {
+  const found: DiscoveredCredential[] = []
+  let entries: fs.Dirent[]
+  try {
+    entries = fs.readdirSync(secretsRoot, { withFileTypes: true })
+  } catch {
+    return found
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const secretsPath = path.join(secretsRoot, entry.name, "secrets.json")
+    let raw: string
+    try {
+      raw = fs.readFileSync(secretsPath, "utf-8")
+    } catch {
+      continue
+    }
+    let parsed: { providers?: Record<string, Record<string, string>> }
+    try {
+      parsed = JSON.parse(raw) as typeof parsed
+    } catch {
+      continue
+    }
+    if (!parsed.providers) continue
+
+    for (const [provName, provConfig] of Object.entries(parsed.providers)) {
+      if (provName === "anthropic" && provConfig.setupToken) {
+        found.push({ agentName: entry.name, provider: "anthropic", credentials: { setupToken: provConfig.setupToken } })
+      } else if (provName === "openai-codex" && provConfig.oauthAccessToken) {
+        found.push({ agentName: entry.name, provider: "openai-codex", credentials: { oauthAccessToken: provConfig.oauthAccessToken } })
+      } else if (provName === "minimax" && provConfig.apiKey) {
+        found.push({ agentName: entry.name, provider: "minimax", credentials: { apiKey: provConfig.apiKey } })
+      } else if (provName === "azure" && provConfig.apiKey && provConfig.endpoint && provConfig.deployment) {
+        found.push({ agentName: entry.name, provider: "azure", credentials: { apiKey: provConfig.apiKey, endpoint: provConfig.endpoint, deployment: provConfig.deployment } })
+      }
+    }
+  }
+
+  // Deduplicate by provider+credential value (keep first seen)
+  const seen = new Set<string>()
+  return found.filter((cred) => {
+    const key = `${cred.provider}:${JSON.stringify(cred.credentials)}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+/* v8 ignore next 79 -- integration: interactive terminal specialist session @preserve */
 async function defaultRunAdoptionSpecialist(): Promise<string | null> {
   const readline = await import("readline/promises")
 
@@ -494,22 +549,61 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
   }
 
   try {
-    process.stdout.write("\nwelcome to ouro. let's get you set up.\n")
-    process.stdout.write("i need an API key to power our conversation.\n\n")
-    const providerRaw = await prompt("provider (anthropic/azure/minimax/openai-codex): ")
-    if (!isAgentProvider(providerRaw)) {
-      process.stdout.write("unknown provider. run `ouro hatch` to try again.\n")
-      return null
-    }
+    const secretsRoot = path.join(os.homedir(), ".agentsecrets")
+    const discovered = discoverExistingCredentials(secretsRoot)
 
-    const credentials: HatchCredentialsInput = {}
-    if (providerRaw === "anthropic") credentials.setupToken = await prompt("API key: ")
-    if (providerRaw === "openai-codex") credentials.oauthAccessToken = await prompt("OAuth token: ")
-    if (providerRaw === "minimax") credentials.apiKey = await prompt("API key: ")
-    if (providerRaw === "azure") {
-      credentials.apiKey = await prompt("API key: ")
-      credentials.endpoint = await prompt("endpoint: ")
-      credentials.deployment = await prompt("deployment: ")
+    let providerRaw: AgentProvider
+    let credentials: HatchCredentialsInput = {}
+
+    if (discovered.length > 0) {
+      process.stdout.write("\nwelcome to ouro. let's get you set up.\n")
+      process.stdout.write("i found existing API credentials:\n\n")
+      const unique = [...new Map(discovered.map((d) => [`${d.provider}`, d])).values()]
+      for (let i = 0; i < unique.length; i++) {
+        process.stdout.write(`  ${i + 1}. ${unique[i].provider} (from ${unique[i].agentName})\n`)
+      }
+      process.stdout.write("\n")
+      const choice = await prompt("use one of these? enter number, or 'new' for a different key: ")
+
+      const idx = parseInt(choice, 10) - 1
+      if (idx >= 0 && idx < unique.length) {
+        providerRaw = unique[idx].provider
+        credentials = unique[idx].credentials
+      } else {
+        const pRaw = await prompt("provider (anthropic/azure/minimax/openai-codex): ")
+        if (!isAgentProvider(pRaw)) {
+          process.stdout.write("unknown provider. run `ouro hatch` to try again.\n")
+          rl.close()
+          return null
+        }
+        providerRaw = pRaw
+        if (providerRaw === "anthropic") credentials.setupToken = await prompt("API key: ")
+        if (providerRaw === "openai-codex") credentials.oauthAccessToken = await prompt("OAuth token: ")
+        if (providerRaw === "minimax") credentials.apiKey = await prompt("API key: ")
+        if (providerRaw === "azure") {
+          credentials.apiKey = await prompt("API key: ")
+          credentials.endpoint = await prompt("endpoint: ")
+          credentials.deployment = await prompt("deployment: ")
+        }
+      }
+    } else {
+      process.stdout.write("\nwelcome to ouro. let's get you set up.\n")
+      process.stdout.write("i need an API key to power our conversation.\n\n")
+      const pRaw = await prompt("provider (anthropic/azure/minimax/openai-codex): ")
+      if (!isAgentProvider(pRaw)) {
+        process.stdout.write("unknown provider. run `ouro hatch` to try again.\n")
+        rl.close()
+        return null
+      }
+      providerRaw = pRaw
+      if (providerRaw === "anthropic") credentials.setupToken = await prompt("API key: ")
+      if (providerRaw === "openai-codex") credentials.oauthAccessToken = await prompt("OAuth token: ")
+      if (providerRaw === "minimax") credentials.apiKey = await prompt("API key: ")
+      if (providerRaw === "azure") {
+        credentials.apiKey = await prompt("API key: ")
+        credentials.endpoint = await prompt("endpoint: ")
+        credentials.deployment = await prompt("deployment: ")
+      }
     }
 
     rl.close()
@@ -518,7 +612,6 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
     // Locate the bundled AdoptionSpecialist.ouro shipped with the npm package
     const bundleSourceDir = path.resolve(__dirname, "..", "..", "..", "AdoptionSpecialist.ouro")
     const bundlesRoot = getAgentBundlesRoot()
-    const secretsRoot = path.join(os.homedir(), ".agentsecrets")
 
     return await runSpecialistOrchestrator({
       bundleSourceDir,
