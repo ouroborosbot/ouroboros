@@ -609,4 +609,48 @@ describe("runSpecialistSession", () => {
     // question should have been called 3 times (2 empty + 1 real)
     expect(readline.question).toHaveBeenCalledTimes(3)
   })
+
+  it("kickoffMessage injects first user message so specialist speaks before prompting", async () => {
+    const { runSpecialistSession } = await import("../../../heart/daemon/specialist-session")
+    const requests: ProviderTurnRequest[] = []
+    let callCount = 0
+
+    const provider = makeProvider(async (req) => {
+      requests.push(req)
+      callCount++
+      if (callCount === 1) {
+        // First call is the kickoff — specialist responds with text
+        return makeTurnResult({ content: "Hello! I'm your specialist." })
+      }
+      // Second call after real user input — ends session
+      return makeTurnResult({
+        toolCalls: [{
+          id: "tc-end",
+          name: "final_answer",
+          arguments: JSON.stringify({ answer: "Done!" }),
+        }],
+      })
+    })
+
+    const readline = {
+      // Only called once — after the kickoff turn, not before
+      question: vi.fn().mockResolvedValueOnce("Tell me more"),
+      close: vi.fn(),
+    }
+
+    await runSpecialistSession({
+      providerRuntime: provider,
+      systemPrompt: "You are the specialist.",
+      tools: [],
+      execTool: vi.fn(),
+      readline,
+      callbacks: makeCallbacks(),
+      kickoffMessage: "hi, i just ran ouro for the first time",
+    })
+
+    // First call should have kickoff as user message (no readline prompt first)
+    expect(requests[0].messages[1]).toEqual({ role: "user", content: "hi, i just ran ouro for the first time" })
+    // readline.question called only once (for the second turn)
+    expect(readline.question).toHaveBeenCalledTimes(1)
+  })
 })

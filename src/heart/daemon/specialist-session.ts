@@ -15,6 +15,8 @@ export interface SpecialistSessionDeps {
   readline: SpecialistReadline
   callbacks: ChannelCallbacks
   signal?: AbortSignal
+  /** If provided, sent as the first user message so the specialist speaks first without waiting for input. */
+  kickoffMessage?: string
 }
 
 export interface SpecialistSessionResult {
@@ -36,7 +38,7 @@ export interface SpecialistSessionResult {
 export async function runSpecialistSession(
   deps: SpecialistSessionDeps,
 ): Promise<SpecialistSessionResult> {
-  const { providerRuntime, systemPrompt, tools, execTool, readline, callbacks, signal } = deps
+  const { providerRuntime, systemPrompt, tools, execTool, readline, callbacks, signal, kickoffMessage } = deps
 
   emitNervesEvent({
     component: "daemon",
@@ -51,16 +53,22 @@ export async function runSpecialistSession(
 
   let hatchedAgentName: string | null = null
   let done = false
+  let isFirstTurn = true
 
   try {
     while (!done) {
       if (signal?.aborted) break
 
-      // Get user input
-      const userInput = await readline.question("> ")
-      if (!userInput.trim()) continue
-
-      messages.push({ role: "user", content: userInput })
+      // On the first turn with a kickoff message, inject it so the specialist speaks first
+      if (isFirstTurn && kickoffMessage) {
+        isFirstTurn = false
+        messages.push({ role: "user", content: kickoffMessage })
+      } else {
+        // Get user input
+        const userInput = await readline.question("> ")
+        if (!userInput.trim()) continue
+        messages.push({ role: "user", content: userInput })
+      }
       providerRuntime.resetTurnState(messages)
 
       // Inner loop: process tool calls until we get a final_answer or plain text
