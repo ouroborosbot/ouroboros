@@ -140,7 +140,7 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 
 ---
 
-### ⬜ Unit 5a: Specialist System Prompt Builder -- Tests
+### ✅ Unit 5a: Specialist System Prompt Builder -- Tests
 **What**: Write tests for `buildSpecialistSystemPrompt(soulText, identityText, existingBundles)` that assembles the specialist's system prompt. The prompt should be first-person, include SOUL.md content, identity content, list of existing bundles, and instructions about available tools.
 **Files**: `src/__tests__/heart/daemon/specialist-prompt.test.ts` (new file)
 **Tests to write**:
@@ -151,12 +151,12 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - Prompt includes tool usage guidance (hatch_agent, final_answer, read_file, list_directory)
 **Acceptance**: Tests FAIL because the module does not exist yet.
 
-### ⬜ Unit 5b: Specialist System Prompt Builder -- Implementation
+### ✅ Unit 5b: Specialist System Prompt Builder -- Implementation
 **What**: Create `src/heart/daemon/specialist-prompt.ts` with `buildSpecialistSystemPrompt(soulText: string, identityText: string, existingBundles: string[]): string`. Assembles first-person prompt from the inputs.
 **Files**: `src/heart/daemon/specialist-prompt.ts` (new file)
 **Acceptance**: All tests PASS (green).
 
-### ⬜ Unit 5c: Specialist System Prompt Builder -- Coverage & Refactor
+### ✅ Unit 5c: Specialist System Prompt Builder -- Coverage & Refactor
 **What**: Verify 100% coverage.
 **Acceptance**: 100% coverage, tests still green.
 
@@ -362,3 +362,4 @@ The loop:
 - 2026-03-07 22:49 Unit 1 complete: setAgentConfigOverride added to identity.ts, 4 new tests, 100% coverage
 - 2026-03-07 22:50 Unit 2 complete: resetProviderRuntime added to core.ts, 2 new tests, 100% coverage
 - 2026-03-07 22:51 Unit 3 complete: writeSecretsFile exported from hatch-flow.ts, 3 new tests, 100% coverage
+- 2026-03-07 22:53 Unit 4 complete: hatch-animation.ts created, 4 tests, 100% coverage
