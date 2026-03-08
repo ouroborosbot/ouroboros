@@ -91,6 +91,7 @@ describe("execSpecialistTool", () => {
         credentials: { setupToken: `sk-ant-oat01-${"a".repeat(80)}` },
         bundlesRoot,
         secretsRoot,
+        specialistIdentitiesDir: specialistSource,
         animationWriter: (text: string) => animChunks.push(text),
       },
     )
@@ -100,6 +101,54 @@ describe("execSpecialistTool", () => {
     expect(result).toContain("identity seed:")
     // Animation should have been called
     expect(animChunks.join("")).toContain("TestHatch")
+  })
+
+  it("hatch_agent without specialistIdentitiesDir omits identity overrides", async () => {
+    const bundlesRoot = makeTempDir("spec-tools-bundles-no-id")
+    const secretsRoot = makeTempDir("spec-tools-secrets-no-id")
+    cleanup.push(bundlesRoot, secretsRoot)
+
+    // Mock hatch-flow so we can inspect deps without needing real identity dirs
+    const capturedDeps: Record<string, unknown>[] = []
+    vi.doMock("../../../heart/daemon/hatch-flow", async (importOriginal) => {
+      const orig = (await importOriginal()) as Record<string, unknown>
+      return {
+        ...orig,
+        runHatchFlow: async (_input: unknown, deps: Record<string, unknown>) => {
+          capturedDeps.push(deps)
+          return {
+            bundleRoot: "/tmp/fake-bundle",
+            selectedIdentity: "fake.md",
+            specialistSecretsPath: "/tmp/fake-secrets",
+            hatchlingSecretsPath: "/tmp/fake-hatchling-secrets",
+          }
+        },
+      }
+    })
+    vi.resetModules()
+
+    const { execSpecialistTool } = await import("../../../heart/daemon/specialist-tools")
+
+    const result = await execSpecialistTool(
+      "hatch_agent",
+      { name: "TestNoIdDir" },
+      {
+        humanName: "Ari",
+        provider: "anthropic",
+        credentials: { setupToken: `sk-ant-oat01-${"a".repeat(80)}` },
+        bundlesRoot,
+        secretsRoot,
+        animationWriter: () => {},
+      },
+    )
+
+    expect(result).toContain("hatched TestNoIdDir successfully")
+    // Verify identity overrides were NOT passed (falsy branch of ternary)
+    expect(capturedDeps).toHaveLength(1)
+    expect(capturedDeps[0]).not.toHaveProperty("specialistIdentitySourceDir")
+    expect(capturedDeps[0]).not.toHaveProperty("specialistIdentityTargetDir")
+
+    vi.restoreAllMocks()
   })
 
   it("hatch_agent with missing name returns error", async () => {

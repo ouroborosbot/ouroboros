@@ -134,6 +134,7 @@ export async function runAdoptionSpecialist(
           credentials,
           bundlesRoot,
           secretsRoot,
+          specialistIdentitiesDir: identitiesDir,
         }),
       readline,
       callbacks,

@@ -421,13 +421,13 @@ describe("runAdoptionSpecialist", () => {
     expect(mockExecSpecialistTool).toHaveBeenCalledWith(
       "read_file",
       { path: "/tmp/test.txt" },
-      {
+      expect.objectContaining({
         humanName: "Ari",
         provider: "anthropic",
         credentials: { setupToken: "test-token" },
         bundlesRoot: deps.bundlesRoot,
         secretsRoot: deps.secretsRoot,
-      },
+      }),
     )
   })
 })

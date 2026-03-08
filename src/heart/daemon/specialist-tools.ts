@@ -41,6 +41,7 @@ export interface ExecSpecialistToolDeps {
   credentials: HatchCredentialsInput
   bundlesRoot?: string
   secretsRoot?: string
+  specialistIdentitiesDir?: string
   animationWriter?: (text: string) => void
 }
 
@@ -72,9 +73,14 @@ export async function execSpecialistTool(
       provider: deps.provider,
       credentials: deps.credentials,
     }
+    // Pass identity dirs to prevent hatch flow from syncing to ~/AgentBundles/AdoptionSpecialist.ouro/
+    // or cwd/AdoptionSpecialist.ouro/. The specialist already picked its identity; the hatch flow
+    // just needs a valid source dir to pick from for the hatchling's LORE.md seed.
+    const identitiesDir = deps.specialistIdentitiesDir
     const result = await runHatchFlow(input, {
       bundlesRoot: deps.bundlesRoot,
       secretsRoot: deps.secretsRoot,
+      ...(identitiesDir ? { specialistIdentitySourceDir: identitiesDir, specialistIdentityTargetDir: identitiesDir } : {}),
     })
     await playHatchAnimation(agentName, deps.animationWriter)
 
