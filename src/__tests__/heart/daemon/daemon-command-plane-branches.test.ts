@@ -108,6 +108,20 @@ describe("daemon command plane branches", () => {
       workers: [],
     })
 
+    senseManager.listSenseRows.mockReturnValueOnce([
+      {
+        agent: "slugger",
+        sense: "teams",
+        label: "Teams",
+        enabled: false,
+        status: "disabled",
+        detail: "not enabled in agent.json",
+      },
+    ])
+
+    const disabledOnlyStatus = await daemon.handleCommand({ kind: "daemon.status" })
+    expect(disabledOnlyStatus.summary).toBe("daemon=running\tworkers=0\tsenses=1\thealth=ok")
+
     processManager.listAgentSnapshots.mockReturnValueOnce([
       {
         name: "slugger",

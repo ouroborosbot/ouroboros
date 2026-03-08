@@ -168,6 +168,30 @@ describe("subagent installer", () => {
     expect(fs.readlinkSync(claudeTarget)).toBe(path.join(repoRoot, "subagents", "work-planner.md"))
   })
 
+  it("replaces broken symlink targets instead of throwing EEXIST", async () => {
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "subagent-installer-"))
+    const repoRoot = path.join(tmpRoot, "repo")
+    const homeDir = path.join(tmpRoot, "home")
+    writeSubagents(repoRoot)
+
+    const claudeTarget = path.join(homeDir, ".claude", "agents", "work-merger.md")
+    const missingSource = path.join(tmpRoot, "missing", "work-merger.md")
+    fs.mkdirSync(path.dirname(claudeTarget), { recursive: true })
+    fs.symlinkSync(missingSource, claudeTarget)
+
+    await expect(installSubagentsForAvailableCli({
+      repoRoot,
+      homeDir,
+      which: (binary) => (binary === "claude" ? "/usr/bin/claude" : null),
+    })).resolves.toMatchObject({
+      claudeInstalled: 3,
+      codexInstalled: 0,
+    })
+
+    expect(fs.lstatSync(claudeTarget).isSymbolicLink()).toBe(true)
+    expect(fs.readlinkSync(claudeTarget)).toBe(path.join(repoRoot, "subagents", "work-merger.md"))
+  })
+
   it("uses default repo/home resolution when options omit those paths", async () => {
     tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "subagent-installer-"))
 
