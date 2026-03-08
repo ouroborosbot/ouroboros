@@ -10,13 +10,13 @@
 Implement a first-class `bluebubbles` sense for the harness that preserves the BlueBubbles primitives we observed live: message creation, message mutation, reply threading, attachment/OG-card context, and stable DM/group routing.
 
 ## Completion Criteria
-- [ ] Harness exposes a first-class `bluebubbles` sense entrypoint alongside existing senses
-- [ ] `Channel`/capability plumbing recognizes `bluebubbles` as a distinct sense
-- [ ] Runtime config supports BlueBubbles without introducing environment variables
-- [ ] Inbound BlueBubbles handling models both `new-message` and `updated-message`
-- [ ] Reply threading works from `threadOriginatorGuid` in both DM and group contexts
+- [x] Harness exposes a first-class `bluebubbles` sense entrypoint alongside existing senses
+- [x] `Channel`/capability plumbing recognizes `bluebubbles` as a distinct sense
+- [x] Runtime config supports BlueBubbles without introducing environment variables
+- [x] Inbound BlueBubbles handling models both `new-message` and `updated-message`
+- [x] Reply threading works from `threadOriginatorGuid` in both DM and group contexts
 - [ ] Reactions, edits, unsends, and delivery/read mutations are not silently dropped
-- [ ] Session identity is stable for DM/group/thread-aware routing
+- [x] Session identity is stable for DM/group/thread-aware routing
 - [ ] Attachment and OG-card handling give the agent useful context or an explicit fallback
 - [ ] Automated tests cover all new code at 100%
 - [ ] `npm test` passes
@@ -66,7 +66,7 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 **Output**: Red tests for the actual sense runtime and its integration points.
 **Acceptance**: Tests demonstrate the runtime behavior we expect before implementation lands.
 
-### ⬜ Unit 3b: Sense Runtime Wiring — Implementation
+### ✅ Unit 3b: Sense Runtime Wiring — Implementation
 **What**: Implement the BlueBubbles sense runtime and entrypoint in `src/senses/`, wire it into the harness runtime, and connect it to the message model from Unit 2. The runtime should treat event delivery as wakeup/input and use repair/enrichment when needed so mutations and rich content are not lost just because the first payload is incomplete. This unit should also wire the channel through the existing friend-resolution, system-prompt, and tool-selection paths rather than leaving BlueBubbles as a sidecar.
 **Output**: Runnable `bluebubbles` sense entrypoint and supporting runtime code.
 **Acceptance**: Unit 3a tests pass, build is clean, and the sense can be started with explicit BlueBubbles config.
@@ -106,3 +106,4 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 - 2026-03-07 22:40 Unit 2a complete: added fixture-backed red tests for message, thread, group, reaction, edit, unsend, and read-state normalization
 - 2026-03-07 22:50 Unit 2b complete: implemented BlueBubbles event normalization with stable chat/thread identity, mutation modeling, explicit fallback text, and 100% coverage on the new model
 - 2026-03-07 23:01 Unit 3a complete: added red runtime and entrypoint tests for webhook startup, DM/group routing, mutation handling, and outbound threaded replies
+- 2026-03-07 23:12 Unit 3b complete: added the BlueBubbles transport, webhook runtime, and entrypoint with 100% coverage on the new sense runtime files
