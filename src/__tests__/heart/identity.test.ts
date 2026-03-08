@@ -139,6 +139,11 @@ describe("buildDefaultAgentTemplate", () => {
         tool: ["running tool"],
         followup: ["processing"],
       },
+      senses: {
+        cli: { enabled: true },
+        teams: { enabled: false },
+        bluebubbles: { enabled: false },
+      },
     })
     expect((template as any).name).toBeUndefined()
     expect((template as any).configPath).toBeUndefined()
@@ -193,6 +198,71 @@ describe("loadAgentConfig", () => {
     const config = loadAgentConfig()
 
     expect(config.logging).toEqual({ level: "debug", sinks: ["terminal"] })
+  })
+
+  it("parses senses config when present", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 1,
+        enabled: true,
+        provider: "anthropic",
+        senses: {
+          cli: { enabled: true },
+          teams: { enabled: true },
+          bluebubbles: { enabled: false },
+        },
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+      }),
+    )
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    const config = loadAgentConfig()
+
+    expect((config as any).senses).toEqual({
+      cli: { enabled: true },
+      teams: { enabled: true },
+      bluebubbles: { enabled: false },
+    })
+  })
+
+  it("defaults missing senses config to cli enabled and other senses disabled", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 1,
+        enabled: true,
+        provider: "anthropic",
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+      }),
+    )
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    const config = loadAgentConfig()
+
+    expect((config as any).senses).toEqual({
+      cli: { enabled: true },
+      teams: { enabled: false },
+      bluebubbles: { enabled: false },
+    })
+  })
+
+  it("rejects non-boolean sense enablement flags", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 1,
+        enabled: true,
+        provider: "anthropic",
+        senses: {
+          cli: { enabled: "yes" },
+        },
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+      }),
+    )
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/senses/i)
   })
 
   it("leaves logging undefined when omitted from agent.json", async () => {
