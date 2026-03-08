@@ -81,7 +81,7 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 
 ---
 
-### ⬜ Unit 2a: core.ts -- resetProviderRuntime -- Tests
+### ✅ Unit 2a: core.ts -- resetProviderRuntime -- Tests
 **What**: Write tests for a new `resetProviderRuntime()` function on `core.ts`. When called, the cached `_providerRuntime` singleton should be cleared so the next call to `getProviderRuntime()` re-creates it from current config.
 **Files**: `src/__tests__/heart/core.test.ts` (add tests to existing file or create if needed)
 **Tests to write**:
@@ -89,12 +89,12 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - After `resetProviderRuntime()`, provider picks up new config values (e.g., different provider in agent config)
 **Acceptance**: Tests exist and FAIL (red) because `resetProviderRuntime` does not exist yet.
 
-### ⬜ Unit 2b: core.ts -- resetProviderRuntime -- Implementation
+### ✅ Unit 2b: core.ts -- resetProviderRuntime -- Implementation
 **What**: Add `export function resetProviderRuntime(): void` to `core.ts` that sets `_providerRuntime = null`.
 **Files**: `src/heart/core.ts`
 **Acceptance**: All tests PASS (green), no warnings.
 
-### ⬜ Unit 2c: core.ts -- resetProviderRuntime -- Coverage & Refactor
+### ✅ Unit 2c: core.ts -- resetProviderRuntime -- Coverage & Refactor
 **What**: Verify 100% coverage on `resetProviderRuntime`.
 **Acceptance**: 100% coverage, tests still green.
 
@@ -359,3 +359,4 @@ The loop:
 - 2026-03-07 22:40 Created from planning doc
 - 2026-03-07 22:43 Passes complete (granularity, validation, quality). Status: READY_FOR_EXECUTION
 - 2026-03-07 22:46 Unit 0 complete: 2046 tests passing, 18 skipped, 100% coverage, clean tsc build
+- 2026-03-07 22:49 Unit 1 complete: setAgentConfigOverride added to identity.ts, 4 new tests, 100% coverage

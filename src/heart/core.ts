@@ -98,6 +98,15 @@ function getProviderRuntime(): ProviderRuntime {
   return _providerRuntime;
 }
 
+/**
+ * Clear the cached provider runtime so the next call to getProviderRuntime()
+ * re-creates it from current config. Used by the adoption specialist to
+ * switch provider context without restarting the process.
+ */
+export function resetProviderRuntime(): void {
+  _providerRuntime = null;
+}
+
 export function getModel(): string {
   return getProviderRuntime().model;
 }
