@@ -87,17 +87,17 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 **Output**: Coverage artifacts and any supplemental tests needed for complete coverage.
 **Acceptance**: 100% coverage on new code, tests remain green, and build still passes.
 
-### ⬜ Unit 3a: Status UX And Prompt Sense Awareness — Tests
+### ✅ Unit 3a: Status UX And Prompt Sense Awareness — Tests
 **What**: Write failing tests for `ouro status` rendering (`Overview / Senses / Workers`), prompt runtime info showing current + available senses, and prompt language that makes sense states explainable in the existing daemon CLI and prompt test suites.
 **Output**: New red-phase CLI/prompt tests covering status rendering and sense-awareness language.
 **Acceptance**: Tests exist in CLI/prompt suites and FAIL (red).
 
-### ⬜ Unit 3b: Status UX And Prompt Sense Awareness — Implementation
+### ✅ Unit 3b: Status UX And Prompt Sense Awareness — Implementation
 **What**: Implement the status rendering UX and prompt updates so the agent can truthfully explain current sense, available senses, state meanings, and how to enable another sense when asked.
 **Output**: Updated CLI status formatting plus prompt/runtime sense-awareness behavior.
 **Acceptance**: New tests PASS (green), build passes, and no warnings are emitted.
 
-### ⬜ Unit 3c: Status UX And Prompt Sense Awareness — Coverage & Refactor
+### ✅ Unit 3c: Status UX And Prompt Sense Awareness — Coverage & Refactor
 **What**: Verify full coverage for the new status/prompt paths, add missing edge/error-path tests, and refactor if needed.
 **Output**: Coverage artifacts and any supplemental tests needed for complete coverage.
 **Acceptance**: 100% coverage on new code, tests remain green, and build still passes.
@@ -131,3 +131,6 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 - 2026-03-08 10:11 Unit 2a complete: wrote daemon red-phase tests for managed senses, worker separation, and sense-aware status payloads
 - 2026-03-08 10:17 Unit 2b complete: implemented daemon-managed sense startup and status payload support with shared sense-truth data
 - 2026-03-08 10:32 Unit 2c complete: closed coverage gaps for daemon sense lifecycle/status paths and reached 100% coverage on the modified daemon files
+- 2026-03-08 10:41 Unit 3a complete: wrote red-phase tests for `ouro status` sense grids and prompt sense-awareness language
+- 2026-03-08 10:46 Unit 3b complete: implemented `Overview / Senses / Workers` status rendering and prompt-time sense/status guidance
+- 2026-03-08 10:51 Unit 3c complete: closed daemon CLI parser edge cases and reached 100% coverage on `src/heart/daemon/daemon-cli.ts` and `src/mind/prompt.ts`

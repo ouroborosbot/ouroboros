@@ -139,8 +139,10 @@ function parseStatusPayload(data: unknown): StatusPayload | null {
     const worker = stringField(row.worker)
     const status = stringField(row.status)
     const restartCount = numberField(row.restartCount)
+    const hasPid = Object.prototype.hasOwnProperty.call(row, "pid")
     const pid = row.pid === null ? null : numberField(row.pid)
-    if (!agent || !worker || !status || restartCount === null || pid === undefined) return null
+    const pidInvalid = !hasPid || (row.pid !== null && pid === null)
+    if (!agent || !worker || !status || restartCount === null || pidInvalid) return null
     return {
       agent,
       worker,
@@ -169,7 +171,7 @@ function humanizeSenseName(sense: string, label?: string): string {
 
 function formatTable(headers: string[], rows: string[][]): string {
   const widths = headers.map((header, index) =>
-    Math.max(header.length, ...rows.map((row) => (row[index] ?? "").length)),
+    Math.max(header.length, ...rows.map((row) => row[index]!.length)),
   )
   const renderRow = (row: string[]) => `| ${row.map((cell, index) => cell.padEnd(widths[index])).join(" | ")} |`
   const divider = `|-${widths.map((width) => "-".repeat(width)).join("-|-")}-|`
