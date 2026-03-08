@@ -1,7 +1,7 @@
 # Planning: Adoption Specialist First-Run Experience
 
 **Status**: drafting
-**Created**: (pending initial commit)
+**Created**: 2026-03-07 22:35
 
 ## Goal
 Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no agents, the Adoption Specialist (an ephemeral LLM agent with a random snake identity) conducts an interview, hatches a new agent, and hands off to the hatchling in a single seamless session.
@@ -97,4 +97,4 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - `hatch_agent` tool will call `runHatchFlow()` from hatch-flow.ts internally
 
 ## Progress Log
-- (pending initial commit) Created
+- 2026-03-07 22:35 Created
