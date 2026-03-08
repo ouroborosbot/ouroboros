@@ -233,6 +233,7 @@ export interface CreateOsCronManagerOptions {
 export function createOsCronManager(options: CreateOsCronManagerOptions = {}): OsCronManager {
   const platform = options.platform ?? process.platform
   if (platform === "darwin") {
+    /* v8 ignore start -- integration: default stubs for real OS operations @preserve */
     const deps: OsCronDeps = options.launchdDeps ?? {
       exec: () => {},
       writeFile: () => {},
@@ -242,6 +243,7 @@ export function createOsCronManager(options: CreateOsCronManagerOptions = {}): O
       mkdirp: () => {},
       homeDir: os.homedir(),
     }
+    /* v8 ignore stop */
     return new LaunchdCronManager(deps)
   }
 

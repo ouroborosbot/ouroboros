@@ -89,6 +89,25 @@ describe("log-tailer", () => {
       expect(formatLogLine("not-json")).toBe("not-json")
     })
 
+    it("uses no color prefix for unknown log level", () => {
+      const entry = JSON.stringify({
+        ts: "2026-03-07T12:00:00.000Z",
+        level: "trace",
+        event: "test",
+        trace_id: "abc",
+        component: "daemon",
+        message: "trace msg",
+        meta: {},
+      })
+
+      const formatted = formatLogLine(entry)
+      expect(formatted).toContain("trace msg")
+      // No color prefix — fallback to empty string
+      expect(formatted).not.toContain("\x1b[36m")
+      expect(formatted).not.toContain("\x1b[33m")
+      expect(formatted).not.toContain("\x1b[31m")
+    })
+
     it("uses warn color for warn level", () => {
       const entry = JSON.stringify({
         ts: "2026-03-07T12:00:00.000Z",
@@ -195,6 +214,38 @@ describe("log-tailer", () => {
       watchCallback?.()
 
       expect(output.some((line) => line.includes("new event"))).toBe(true)
+    })
+
+    it("skips writing when content has not grown in follow mode", () => {
+      const output: string[] = []
+      const initialContent = JSON.stringify({
+        ts: "2026-03-07T12:00:00.000Z",
+        level: "info",
+        event: "test",
+        trace_id: "abc",
+        component: "daemon",
+        message: "existing",
+        meta: {},
+      }) + "\n"
+      let watchCallback: (() => void) | null = null
+
+      tailLogs({
+        homeDir: "/home/test",
+        existsSync: (p) => p.includes("logs"),
+        readdirSync: () => ["daemon.ndjson"],
+        readFileSync: () => initialContent,
+        writer: (text: string) => { output.push(text) },
+        follow: true,
+        watchFile: (_target, listener) => { watchCallback = listener },
+        unwatchFile: () => {},
+      })
+
+      // Clear initial output
+      output.length = 0
+
+      // Trigger watch callback — content hasn't grown, so nothing new should be written
+      watchCallback?.()
+      expect(output).toHaveLength(0)
     })
 
     it("handles read errors during follow mode gracefully", () => {
