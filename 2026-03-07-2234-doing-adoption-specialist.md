@@ -52,14 +52,15 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 ### Legend
 - Not started / In progress / Done / Blocked
 
-### Unit 0: Baseline Verification
+### ⬜ Unit 0: Baseline Verification
+**Depends on**: nothing
 **What**: Run full test suite to confirm green baseline before any changes.
 **Output**: All 1962 tests passing, 100% coverage, clean tsc build.
 **Acceptance**: `npm test` passes with no failures and no warnings. Record pass count in progress log.
 
 ---
 
-### Unit 1a: identity.ts -- setAgentConfigOverride -- Tests
+### ⬜ Unit 1a: identity.ts -- setAgentConfigOverride -- Tests
 **What**: Write tests for a new `setAgentConfigOverride(config | null)` function on `identity.ts`. When set to a non-null `AgentConfig`, `loadAgentConfig()` should return the override instead of reading from disk. When set to `null`, normal disk-based loading resumes. `resetIdentity()` should also clear the override.
 **Files**: `src/__tests__/heart/identity.test.ts` (add tests to existing file)
 **Tests to write**:
@@ -69,18 +70,18 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - Override takes precedence over cached disk config
 **Acceptance**: Tests exist and FAIL (red) because `setAgentConfigOverride` does not exist yet.
 
-### Unit 1b: identity.ts -- setAgentConfigOverride -- Implementation
+### ⬜ Unit 1b: identity.ts -- setAgentConfigOverride -- Implementation
 **What**: Add `setAgentConfigOverride(config: AgentConfig | null): void` to `identity.ts`. Add a `_agentConfigOverride` module-level variable. Modify `loadAgentConfig()` to check the override first. Modify `resetIdentity()` to clear it.
 **Files**: `src/heart/identity.ts`
 **Acceptance**: All tests PASS (green), no warnings. Existing identity tests still pass.
 
-### Unit 1c: identity.ts -- setAgentConfigOverride -- Coverage & Refactor
+### ⬜ Unit 1c: identity.ts -- setAgentConfigOverride -- Coverage & Refactor
 **What**: Verify 100% coverage on new code. Refactor if needed.
 **Acceptance**: 100% coverage on `setAgentConfigOverride` and modified `loadAgentConfig()` paths. Tests still green.
 
 ---
 
-### Unit 2a: core.ts -- resetProviderRuntime -- Tests
+### ⬜ Unit 2a: core.ts -- resetProviderRuntime -- Tests
 **What**: Write tests for a new `resetProviderRuntime()` function on `core.ts`. When called, the cached `_providerRuntime` singleton should be cleared so the next call to `getProviderRuntime()` re-creates it from current config.
 **Files**: `src/__tests__/heart/core.test.ts` (add tests to existing file or create if needed)
 **Tests to write**:
@@ -88,18 +89,18 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - After `resetProviderRuntime()`, provider picks up new config values (e.g., different provider in agent config)
 **Acceptance**: Tests exist and FAIL (red) because `resetProviderRuntime` does not exist yet.
 
-### Unit 2b: core.ts -- resetProviderRuntime -- Implementation
+### ⬜ Unit 2b: core.ts -- resetProviderRuntime -- Implementation
 **What**: Add `export function resetProviderRuntime(): void` to `core.ts` that sets `_providerRuntime = null`.
 **Files**: `src/heart/core.ts`
 **Acceptance**: All tests PASS (green), no warnings.
 
-### Unit 2c: core.ts -- resetProviderRuntime -- Coverage & Refactor
+### ⬜ Unit 2c: core.ts -- resetProviderRuntime -- Coverage & Refactor
 **What**: Verify 100% coverage on `resetProviderRuntime`.
 **Acceptance**: 100% coverage, tests still green.
 
 ---
 
-### Unit 3a: hatch-flow.ts -- Export writeSecretsFile -- Tests
+### ⬜ Unit 3a: hatch-flow.ts -- Export writeSecretsFile -- Tests
 **What**: Write tests verifying `writeSecretsFile` can be imported and called directly (it is currently private). Tests should verify it writes a valid secrets.json for each provider type to a given path.
 **Files**: `src/__tests__/heart/daemon/hatch-flow.test.ts` (add tests)
 **Tests to write**:
@@ -108,18 +109,18 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - Returns the path to the written secrets file
 **Acceptance**: Tests FAIL because `writeSecretsFile` is not exported.
 
-### Unit 3b: hatch-flow.ts -- Export writeSecretsFile -- Implementation
+### ⬜ Unit 3b: hatch-flow.ts -- Export writeSecretsFile -- Implementation
 **What**: Change `writeSecretsFile` from a private function to an exported function in `hatch-flow.ts`. No logic changes -- just add `export` keyword.
 **Files**: `src/heart/daemon/hatch-flow.ts`
 **Acceptance**: All tests PASS (green). Existing hatch-flow tests still pass.
 
-### Unit 3c: hatch-flow.ts -- Export writeSecretsFile -- Coverage & Refactor
+### ⬜ Unit 3c: hatch-flow.ts -- Export writeSecretsFile -- Coverage & Refactor
 **What**: Verify coverage. The function was already covered by existing tests calling `runHatchFlow`. New direct tests add additional coverage paths.
 **Acceptance**: 100% coverage on `writeSecretsFile`, tests still green.
 
 ---
 
-### Unit 4a: Hatch Animation -- Tests
+### ⬜ Unit 4a: Hatch Animation -- Tests
 **What**: Write tests for a `playHatchAnimation(hatchlingName: string, writer?: (text: string) => void)` function. The function prints egg emoji, pauses, prints snake emoji + name. Tests use a mock writer to capture output.
 **Files**: `src/__tests__/heart/daemon/hatch-animation.test.ts` (new file)
 **Tests to write**:
@@ -128,18 +129,18 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - Output contains the hatchling name
 **Acceptance**: Tests FAIL because the module does not exist yet.
 
-### Unit 4b: Hatch Animation -- Implementation
+### ⬜ Unit 4b: Hatch Animation -- Implementation
 **What**: Create `src/heart/daemon/hatch-animation.ts` with `playHatchAnimation(hatchlingName, writer?)`. Uses `setTimeout` for timing (~1-2 seconds total). Default writer is `process.stderr.write`. Sequence: egg emoji -> animated dots -> snake emoji + name with ANSI color.
 **Files**: `src/heart/daemon/hatch-animation.ts` (new file)
 **Acceptance**: All tests PASS (green).
 
-### Unit 4c: Hatch Animation -- Coverage & Refactor
+### ⬜ Unit 4c: Hatch Animation -- Coverage & Refactor
 **What**: Verify 100% coverage on the animation module. Ensure default writer branch is covered.
 **Acceptance**: 100% coverage, tests still green.
 
 ---
 
-### Unit 5a: Specialist System Prompt Builder -- Tests
+### ⬜ Unit 5a: Specialist System Prompt Builder -- Tests
 **What**: Write tests for `buildSpecialistSystemPrompt(soulText, identityText, existingBundles)` that assembles the specialist's system prompt. The prompt should be first-person, include SOUL.md content, identity content, list of existing bundles, and instructions about available tools.
 **Files**: `src/__tests__/heart/daemon/specialist-prompt.test.ts` (new file)
 **Tests to write**:
@@ -150,18 +151,18 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - Prompt includes tool usage guidance (hatch_agent, final_answer, read_file, list_directory)
 **Acceptance**: Tests FAIL because the module does not exist yet.
 
-### Unit 5b: Specialist System Prompt Builder -- Implementation
+### ⬜ Unit 5b: Specialist System Prompt Builder -- Implementation
 **What**: Create `src/heart/daemon/specialist-prompt.ts` with `buildSpecialistSystemPrompt(soulText: string, identityText: string, existingBundles: string[]): string`. Assembles first-person prompt from the inputs.
 **Files**: `src/heart/daemon/specialist-prompt.ts` (new file)
 **Acceptance**: All tests PASS (green).
 
-### Unit 5c: Specialist System Prompt Builder -- Coverage & Refactor
+### ⬜ Unit 5c: Specialist System Prompt Builder -- Coverage & Refactor
 **What**: Verify 100% coverage.
 **Acceptance**: 100% coverage, tests still green.
 
 ---
 
-### Unit 6a: Specialist Tool Definitions -- Tests
+### ⬜ Unit 6a: Specialist Tool Definitions -- Tests
 **What**: Write tests for `getSpecialistTools(deps)` that returns the specialist's tool schema array. Should include: `hatch_agent` (with `name` string param, required), `final_answer` (with `answer` string param), `read_file` (from base tools), `list_directory` (from base tools).
 **Files**: `src/__tests__/heart/daemon/specialist-tools.test.ts` (new file)
 **Tests to write**:
@@ -172,12 +173,12 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - Tool names are correct
 **Acceptance**: Tests FAIL because the module does not exist yet.
 
-### Unit 6b: Specialist Tool Definitions -- Implementation
+### ⬜ Unit 6b: Specialist Tool Definitions -- Implementation
 **What**: Create `src/heart/daemon/specialist-tools.ts`. Define `hatch_agent` tool schema. Re-export `read_file` and `list_directory` schemas from `tools-base.ts`. Re-export `finalAnswerTool`. Provide `getSpecialistTools()` that returns the array. Provide `execSpecialistTool(name, args, deps)` that dispatches tool calls -- `hatch_agent` calls `runHatchFlow` + `playHatchAnimation`, `read_file`/`list_directory` call the base handlers, `final_answer` is handled inline by the session loop (not dispatched here).
 **Files**: `src/heart/daemon/specialist-tools.ts` (new file)
 **Acceptance**: All tests PASS (green).
 
-### Unit 6c: Specialist Tool Execution -- Tests
+### ⬜ Unit 6c: Specialist Tool Execution -- Tests
 **What**: Write tests for `execSpecialistTool(name, args, deps)`.
 **Files**: `src/__tests__/heart/daemon/specialist-tools.test.ts` (add to existing)
 **Tests to write**:
@@ -188,13 +189,13 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - Unknown tool name returns "unknown" error
 **Acceptance**: Tests PASS (green).
 
-### Unit 6d: Specialist Tools -- Coverage & Refactor
+### ⬜ Unit 6d: Specialist Tools -- Coverage & Refactor
 **What**: Verify 100% coverage on specialist tools module.
 **Acceptance**: 100% coverage, tests still green.
 
 ---
 
-### Unit 7a: Specialist Session Loop -- Tests
+### ⬜ Unit 7a: Specialist Session Loop -- Tests
 **What**: Write tests for `runSpecialistSession(deps)` -- the main conversation loop. This is the core of the feature. The session loop: reads user input, calls the provider's `streamTurn`, handles tool calls, handles `final_answer`, supports Ctrl-C abort.
 **Files**: `src/__tests__/heart/daemon/specialist-session.test.ts` (new file)
 
@@ -218,7 +219,7 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - Empty user input is skipped (prompt re-displayed)
 **Acceptance**: Tests FAIL because the module does not exist yet.
 
-### Unit 7b: Specialist Session Loop -- Implementation
+### ⬜ Unit 7b: Specialist Session Loop -- Implementation
 **What**: Create `src/heart/daemon/specialist-session.ts` with `runSpecialistSession(deps: SpecialistSessionDeps): Promise<SpecialistSessionResult>`.
 
 The loop:
@@ -233,13 +234,13 @@ The loop:
 **Files**: `src/heart/daemon/specialist-session.ts` (new file)
 **Acceptance**: All tests PASS (green).
 
-### Unit 7c: Specialist Session Loop -- Coverage & Refactor
+### ⬜ Unit 7c: Specialist Session Loop -- Coverage & Refactor
 **What**: Verify 100% coverage. Add edge case tests if needed (e.g., malformed final_answer, tool execution error, mixed final_answer with other tools).
 **Acceptance**: 100% coverage, tests still green.
 
 ---
 
-### Unit 8a: Specialist Orchestrator -- Tests
+### ⬜ Unit 8a: Specialist Orchestrator -- Tests
 **What**: Write tests for `runAdoptionSpecialist(deps)` -- the top-level orchestrator that wires everything together. This function:
 1. Picks a random identity from the bundled `AdoptionSpecialist.ouro/`
 2. Reads SOUL.md from the bundled copy
@@ -262,7 +263,7 @@ The loop:
 - Cleanup runs even if session throws
 **Acceptance**: Tests FAIL because the module does not exist yet.
 
-### Unit 8b: Specialist Orchestrator -- Implementation
+### ⬜ Unit 8b: Specialist Orchestrator -- Implementation
 **What**: Create `src/heart/daemon/specialist-orchestrator.ts` with `runAdoptionSpecialist(deps: AdoptionSpecialistDeps): Promise<string | null>`.
 
 **Deps interface** should include:
@@ -280,13 +281,13 @@ The loop:
 **Files**: `src/heart/daemon/specialist-orchestrator.ts` (new file)
 **Acceptance**: All tests PASS (green).
 
-### Unit 8c: Specialist Orchestrator -- Coverage & Refactor
+### ⬜ Unit 8c: Specialist Orchestrator -- Coverage & Refactor
 **What**: Verify 100% coverage. Test cleanup-on-error path. Test edge cases.
 **Acceptance**: 100% coverage, tests still green.
 
 ---
 
-### Unit 9a: daemon-cli.ts Integration -- Tests
+### ⬜ Unit 9a: daemon-cli.ts Integration -- Tests
 **What**: Write tests for the modified `runOuroCli` flow. When zero agents are discovered AND `runHatchFlow` dep is available, the CLI should route to the specialist orchestrator instead of the old interactive `resolveHatchInput` flow.
 **Files**: `src/__tests__/heart/daemon/daemon-cli.test.ts` (add tests to existing file)
 **Tests to write**:
@@ -296,7 +297,7 @@ The loop:
 - The old `resolveHatchInput` prompts still work for `ouro hatch --agent X --provider Y` (explicit hatch command with args)
 **Acceptance**: Tests FAIL because the integration code does not exist yet.
 
-### Unit 9b: daemon-cli.ts Integration -- Implementation
+### ⬜ Unit 9b: daemon-cli.ts Integration -- Implementation
 **What**: Modify `runOuroCli` in `daemon-cli.ts`:
 - Add `runAdoptionSpecialist` to `OuroCliDeps` as an optional dep
 - When `args.length === 0` and `discovered.length === 0`: if `runAdoptionSpecialist` dep exists, call it with an `AdoptionSpecialistDeps` object
@@ -309,20 +310,20 @@ The loop:
 **Files**: `src/heart/daemon/daemon-cli.ts`
 **Acceptance**: All tests PASS (green). Existing daemon-cli tests still pass.
 
-### Unit 9c: daemon-cli.ts Integration -- Coverage & Refactor
+### ⬜ Unit 9c: daemon-cli.ts Integration -- Coverage & Refactor
 **What**: Verify 100% coverage on modified code paths. Ensure no regressions.
 **Acceptance**: 100% coverage, tests still green.
 
 ---
 
-### Unit 10: Full Test Suite Verification
+### ⬜ Unit 10: Full Test Suite Verification
 **What**: Run the complete test suite. Verify all tests pass, 100% coverage maintained, no warnings, clean tsc build.
 **Output**: Test results summary in progress log.
 **Acceptance**: All tests pass. Coverage at 100% (statements, branches, functions, lines). `npx tsc --noEmit` clean.
 
 ---
 
-### Unit 11: E2E Validation Checklist
+### ⬜ Unit 11: E2E Validation Checklist
 **What**: Manual verification checklist (not automated -- requires real provider credentials).
 **Output**: Checklist results documented in artifacts directory.
 **Acceptance**: All items checked.
