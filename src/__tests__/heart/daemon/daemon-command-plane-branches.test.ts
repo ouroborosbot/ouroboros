@@ -52,8 +52,22 @@ describe("daemon command plane branches", () => {
       pollInbox: vi.fn(() => [{ id: "m", from: "slugger", content: "hello", queuedAt: "x", priority: "normal" }]),
     }
 
-    const daemon = new OuroDaemon({ socketPath, processManager, scheduler, healthMonitor, router, bundlesRoot })
-    return { daemon, processManager, scheduler, healthMonitor, router }
+    const senseManager = {
+      startAutoStartSenses: vi.fn(async () => undefined),
+      stopAll: vi.fn(async () => undefined),
+      listSenseRows: vi.fn(() => []),
+    }
+
+    const daemon = new OuroDaemon({
+      socketPath,
+      processManager,
+      scheduler,
+      healthMonitor,
+      router,
+      bundlesRoot,
+      senseManager,
+    } as any)
+    return { daemon, processManager, scheduler, healthMonitor, router, senseManager }
   }
 
   afterEach(() => {
@@ -64,30 +78,40 @@ describe("daemon command plane branches", () => {
     const socketPath = tmpSocketPath("daemon-start-stop")
     fs.writeFileSync(socketPath, "stale", "utf-8")
 
-    const { daemon, processManager } = make(socketPath)
+    const { daemon, processManager, senseManager } = make(socketPath)
 
     const started = await daemon.handleCommand({ kind: "daemon.start" })
     expect(started).toEqual({ ok: true, message: "daemon started" })
     expect(processManager.startAutoStartAgents).toHaveBeenCalledTimes(1)
+    expect(senseManager.startAutoStartSenses).toHaveBeenCalledTimes(1)
     expect(fs.existsSync(socketPath)).toBe(true)
 
     const stopped = await daemon.handleCommand({ kind: "daemon.stop" })
     expect(stopped).toEqual({ ok: true, message: "daemon stopped" })
     expect(processManager.stopAll).toHaveBeenCalled()
+    expect(senseManager.stopAll).toHaveBeenCalled()
     expect(fs.existsSync(socketPath)).toBe(false)
   })
 
-  it("returns status summary for empty and populated snapshots", async () => {
+  it("returns structured status data with separate senses and workers", async () => {
     const socketPath = tmpSocketPath("daemon-status")
-    const { daemon, processManager } = make(socketPath)
+    const { daemon, processManager, senseManager } = make(socketPath)
 
     const emptyStatus = await daemon.handleCommand({ kind: "daemon.status" })
-    expect(emptyStatus.summary).toBe("no managed agents")
+    expect(emptyStatus.data).toEqual({
+      overview: expect.objectContaining({
+        daemon: "running",
+        workerCount: 0,
+        senseCount: 0,
+      }),
+      senses: [],
+      workers: [],
+    })
 
     processManager.listAgentSnapshots.mockReturnValueOnce([
       {
         name: "slugger",
-        channel: "cli",
+        channel: "inner-dialog",
         status: "running",
         pid: null,
         restartCount: 2,
@@ -96,10 +120,56 @@ describe("daemon command plane branches", () => {
         backoffMs: 1000,
       },
     ])
+    senseManager.listSenseRows.mockReturnValueOnce([
+      {
+        agent: "slugger",
+        sense: "cli",
+        label: "CLI",
+        enabled: true,
+        status: "interactive",
+        detail: "local interactive terminal",
+      },
+      {
+        agent: "slugger",
+        sense: "teams",
+        label: "Teams",
+        enabled: false,
+        status: "disabled",
+        detail: "not enabled in agent.json",
+      },
+      {
+        agent: "slugger",
+        sense: "bluebubbles",
+        label: "BlueBubbles",
+        enabled: true,
+        status: "running",
+        detail: ":18790 /bluebubbles-webhook",
+      },
+    ])
 
     const populatedStatus = await daemon.handleCommand({ kind: "daemon.status" })
-    expect(populatedStatus.summary).toContain("slugger")
-    expect(populatedStatus.summary).toContain("restarts=2")
+    expect(populatedStatus.summary).toContain("workers=1")
+    expect(populatedStatus.summary).toContain("senses=3")
+    expect(populatedStatus.data).toEqual({
+      overview: expect.objectContaining({
+        daemon: "running",
+        workerCount: 1,
+        senseCount: 3,
+      }),
+      workers: [
+        expect.objectContaining({
+          agent: "slugger",
+          worker: "inner-dialog",
+          status: "running",
+          restartCount: 2,
+        }),
+      ],
+      senses: [
+        expect.objectContaining({ agent: "slugger", sense: "cli", status: "interactive" }),
+        expect.objectContaining({ agent: "slugger", sense: "teams", status: "disabled" }),
+        expect.objectContaining({ agent: "slugger", sense: "bluebubbles", status: "running" }),
+      ],
+    })
   })
 
   it("handles logs, chat connect, message, task poke, and hatch commands", async () => {
