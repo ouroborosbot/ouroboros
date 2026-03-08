@@ -28,6 +28,7 @@ export interface RunInnerDialogTurnOptions {
   instincts?: InnerDialogInstinct[]
   now?: () => Date
   signal?: AbortSignal
+  drainInbox?: () => Array<{ from: string; content: string }>
 }
 
 export interface InnerDialogTurnResult {
@@ -186,6 +187,21 @@ export async function runInnerDialogTurn(options?: RunInnerDialogTurnOptions): P
     state.checkpoint = deriveResumeCheckpoint(messages)
     const instinctPrompt = buildInstinctUserMessage(instincts, reason, state)
     messages.push({ role: "user", content: instinctPrompt })
+  }
+
+  const inboxMessages = options?.drainInbox?.() ?? []
+  if (inboxMessages.length > 0) {
+    const lastUserIdx = messages.length - 1
+    const lastUser = messages[lastUserIdx]
+    if (lastUser?.role === "user" && typeof lastUser.content === "string") {
+      const section = inboxMessages
+        .map((msg) => `- **${msg.from}**: ${msg.content}`)
+        .join("\n")
+      messages[lastUserIdx] = {
+        ...lastUser,
+        content: `${lastUser.content}\n\n## incoming messages\n${section}`,
+      }
+    }
   }
 
   const callbacks = createInnerDialogCallbacks()
