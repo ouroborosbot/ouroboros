@@ -1,6 +1,6 @@
 # Planning: BlueBubbles iMessage Sense
 
-**Status**: NEEDS_REVIEW
+**Status**: approved
 **Created**: 2026-03-07 22:10
 
 ## Goal
@@ -44,7 +44,7 @@ Add BlueBubbles-backed iMessage support as a first-class Ouroboros sense alongsi
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [ ] Confirm the repo-local planning doc as the approved scope handoff for implementation in this worktree.
+- [x] Confirm the repo-local planning doc as the approved scope handoff for implementation in this worktree.
 
 ## Decisions Made
 - BlueBubbles will be a separate modular sense, not folded into CLI, Teams, or a generic ad hoc channel.
@@ -73,3 +73,4 @@ Live observation collapsed the major UX/AX unknowns. The most important findings
 
 ## Progress Log
 - 2026-03-07 22:10 Created
+- 2026-03-07 22:13 Approved from prior explicit direction to begin implementation in a dedicated worktree
