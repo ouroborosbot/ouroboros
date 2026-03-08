@@ -53,6 +53,171 @@ export interface EnsureDaemonResult {
   message: string
 }
 
+interface StatusOverviewRow {
+  daemon: string
+  health: string
+  socketPath: string
+  workerCount: number
+  senseCount: number
+}
+
+interface StatusSenseRow {
+  agent: string
+  sense: string
+  label?: string
+  enabled: boolean
+  status: string
+  detail: string
+}
+
+interface StatusWorkerRow {
+  agent: string
+  worker: string
+  status: string
+  pid: number | null
+  restartCount: number
+}
+
+interface StatusPayload {
+  overview: StatusOverviewRow
+  senses: StatusSenseRow[]
+  workers: StatusWorkerRow[]
+}
+
+function stringField(value: unknown): string | null {
+  return typeof value === "string" ? value : null
+}
+
+function numberField(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null
+}
+
+function booleanField(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null
+}
+
+function parseStatusPayload(data: unknown): StatusPayload | null {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null
+  const raw = data as Record<string, unknown>
+  const overview = raw.overview
+  const senses = raw.senses
+  const workers = raw.workers
+  if (!overview || typeof overview !== "object" || Array.isArray(overview)) return null
+  if (!Array.isArray(senses) || !Array.isArray(workers)) return null
+
+  const parsedOverview: StatusOverviewRow = {
+    daemon: stringField((overview as Record<string, unknown>).daemon) ?? "unknown",
+    health: stringField((overview as Record<string, unknown>).health) ?? "unknown",
+    socketPath: stringField((overview as Record<string, unknown>).socketPath) ?? "unknown",
+    workerCount: numberField((overview as Record<string, unknown>).workerCount) ?? 0,
+    senseCount: numberField((overview as Record<string, unknown>).senseCount) ?? 0,
+  }
+
+  const parsedSenses = senses.map((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null
+    const row = entry as Record<string, unknown>
+    const agent = stringField(row.agent)
+    const sense = stringField(row.sense)
+    const status = stringField(row.status)
+    const detail = stringField(row.detail)
+    const enabled = booleanField(row.enabled)
+    if (!agent || !sense || !status || detail === null || enabled === null) return null
+    return {
+      agent,
+      sense,
+      label: stringField(row.label) ?? undefined,
+      enabled,
+      status,
+      detail,
+    } satisfies StatusSenseRow
+  })
+
+  const parsedWorkers = workers.map((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null
+    const row = entry as Record<string, unknown>
+    const agent = stringField(row.agent)
+    const worker = stringField(row.worker)
+    const status = stringField(row.status)
+    const restartCount = numberField(row.restartCount)
+    const pid = row.pid === null ? null : numberField(row.pid)
+    if (!agent || !worker || !status || restartCount === null || pid === undefined) return null
+    return {
+      agent,
+      worker,
+      status,
+      pid,
+      restartCount,
+    } satisfies StatusWorkerRow
+  })
+
+  if (parsedSenses.some((row) => row === null) || parsedWorkers.some((row) => row === null)) return null
+
+  return {
+    overview: parsedOverview,
+    senses: parsedSenses as StatusSenseRow[],
+    workers: parsedWorkers as StatusWorkerRow[],
+  }
+}
+
+function humanizeSenseName(sense: string, label?: string): string {
+  if (label) return label
+  if (sense === "cli") return "CLI"
+  if (sense === "bluebubbles") return "BlueBubbles"
+  if (sense === "teams") return "Teams"
+  return sense
+}
+
+function formatTable(headers: string[], rows: string[][]): string {
+  const widths = headers.map((header, index) =>
+    Math.max(header.length, ...rows.map((row) => (row[index] ?? "").length)),
+  )
+  const renderRow = (row: string[]) => `| ${row.map((cell, index) => cell.padEnd(widths[index])).join(" | ")} |`
+  const divider = `|-${widths.map((width) => "-".repeat(width)).join("-|-")}-|`
+  return [
+    renderRow(headers),
+    divider,
+    ...rows.map(renderRow),
+  ].join("\n")
+}
+
+function formatDaemonStatusOutput(response: DaemonResponse, fallback: string): string {
+  const payload = parseStatusPayload(response.data)
+  if (!payload) return fallback
+
+  const overviewRows = [
+    ["Daemon", payload.overview.daemon],
+    ["Socket", payload.overview.socketPath],
+    ["Workers", String(payload.overview.workerCount)],
+    ["Senses", String(payload.overview.senseCount)],
+    ["Health", payload.overview.health],
+  ]
+  const senseRows = payload.senses.map((row) => [
+    row.agent,
+    humanizeSenseName(row.sense, row.label),
+    row.enabled ? "ON" : "OFF",
+    row.status,
+    row.detail,
+  ])
+  const workerRows = payload.workers.map((row) => [
+    row.agent,
+    row.worker,
+    row.status,
+    row.pid === null ? "n/a" : String(row.pid),
+    String(row.restartCount),
+  ])
+
+  return [
+    "Overview",
+    formatTable(["Item", "Value"], overviewRows),
+    "",
+    "Senses",
+    formatTable(["Agent", "Sense", "Enabled", "State", "Detail"], senseRows),
+    "",
+    "Workers",
+    formatTable(["Agent", "Worker", "State", "PID", "Restarts"], workerRows),
+  ].join("\n")
+}
+
 export async function ensureDaemonRunning(deps: OuroCliDeps): Promise<EnsureDaemonResult> {
   const alive = await deps.checkSocketAlive(deps.socketPath)
   if (alive) {
@@ -824,7 +989,10 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     }
     throw error
   }
-  const message = response.summary ?? response.message ?? (response.ok ? "ok" : `error: ${response.error ?? "unknown error"}`)
+  const fallbackMessage = response.summary ?? response.message ?? (response.ok ? "ok" : `error: ${response.error ?? "unknown error"}`)
+  const message = command.kind === "daemon.status"
+    ? formatDaemonStatusOutput(response, fallbackMessage)
+    : fallbackMessage
   deps.writeStdout(message)
   return message
 }

@@ -141,7 +141,14 @@ function formatStatusSummary(payload: DaemonStatusPayload): string {
   if (payload.overview.workerCount === 0 && payload.overview.senseCount === 0) {
     return "no managed agents"
   }
-  return `daemon=${payload.overview.daemon}\tworkers=${payload.overview.workerCount}\tsenses=${payload.overview.senseCount}\thealth=${payload.overview.health}`
+  const rows = [
+    ...payload.workers.map((row) => `${row.agent}/${row.worker}:${row.status}`),
+    ...payload.senses
+      .filter((row) => row.enabled)
+      .map((row) => `${row.agent}/${row.sense}:${row.status}`),
+  ]
+  const detail = rows.length > 0 ? `\titems=${rows.join(",")}` : ""
+  return `daemon=${payload.overview.daemon}\tworkers=${payload.overview.workerCount}\tsenses=${payload.overview.senseCount}\thealth=${payload.overview.health}${detail}`
 }
 
 function parseIncomingCommand(raw: string): DaemonCommand {
