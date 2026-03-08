@@ -142,6 +142,16 @@ describe("loadConfig", () => {
         skipConfirmation: true,
         port: 3978,
       },
+      bluebubbles: {
+        serverUrl: "",
+        password: "",
+        accountId: "default",
+      },
+      bluebubblesChannel: {
+        port: 18790,
+        webhookPath: "/bluebubbles-webhook",
+        requestTimeoutMs: 30000,
+      },
       integrations: {
         perplexityApiKey: "",
       },
@@ -743,6 +753,112 @@ describe("getTeamsChannelConfig", () => {
     expect(tc.skipConfirmation).toBe(true)
     expect(tc).not.toHaveProperty("disableStreaming")
     expect(tc.port).toBe(5000)
+  })
+})
+
+describe("getBlueBubblesConfig", () => {
+  beforeEach(async () => {
+    vi.resetModules()
+  })
+
+  it("returns bluebubbles config from secrets config", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      bluebubbles: {
+        serverUrl: "http://localhost:1234",
+        password: "secret-pass",
+        accountId: "personal",
+      },
+    }))
+
+    const { getBlueBubblesConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    const bb = getBlueBubblesConfig()
+
+    expect(bb.serverUrl).toBe("http://localhost:1234")
+    expect(bb.password).toBe("secret-pass")
+    expect(bb.accountId).toBe("personal")
+  })
+
+  it("falls back to default accountId when the configured value is blank", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      bluebubbles: {
+        serverUrl: " http://localhost:1234 ",
+        password: " secret-pass ",
+        accountId: "   ",
+      },
+    }))
+
+    const { getBlueBubblesConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    const bb = getBlueBubblesConfig()
+
+    expect(bb.serverUrl).toBe("http://localhost:1234")
+    expect(bb.password).toBe("secret-pass")
+    expect(bb.accountId).toBe("default")
+  })
+
+  it("fails fast when bluebubbles serverUrl is missing", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      bluebubbles: {
+        serverUrl: "",
+        password: "secret-pass",
+      },
+    }))
+
+    const { getBlueBubblesConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+
+    expect(() => getBlueBubblesConfig()).toThrow(/bluebubbles\.serverUrl/i)
+  })
+
+  it("fails fast when bluebubbles password is missing", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      bluebubbles: {
+        serverUrl: "http://localhost:1234",
+        password: "",
+      },
+    }))
+
+    const { getBlueBubblesConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+
+    expect(() => getBlueBubblesConfig()).toThrow(/bluebubbles\.password/i)
+  })
+})
+
+describe("getBlueBubblesChannelConfig", () => {
+  beforeEach(async () => {
+    vi.resetModules()
+  })
+
+  it("returns default bluebubblesChannel config when not specified", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}))
+
+    const { getBlueBubblesChannelConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    const bb = getBlueBubblesChannelConfig()
+
+    expect(bb.port).toBe(18790)
+    expect(bb.webhookPath).toBe("/bluebubbles-webhook")
+    expect(bb.requestTimeoutMs).toBe(30000)
+  })
+
+  it("returns bluebubblesChannel config from secrets config", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      bluebubblesChannel: {
+        port: 18888,
+        webhookPath: "/hooks/imessage",
+        requestTimeoutMs: 12345,
+      },
+    }))
+
+    const { getBlueBubblesChannelConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    const bb = getBlueBubblesChannelConfig()
+
+    expect(bb.port).toBe(18888)
+    expect(bb.webhookPath).toBe("/hooks/imessage")
+    expect(bb.requestTimeoutMs).toBe(12345)
   })
 })
 

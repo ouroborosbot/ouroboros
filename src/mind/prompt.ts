@@ -211,6 +211,10 @@ export function runtimeInfoSection(channel: Channel): string {
 
   if (channel === "cli") {
     lines.push("i introduce myself on boot with a fun random greeting.");
+  } else if (channel === "bluebubbles") {
+    lines.push(
+      "i am responding in iMessage through BlueBubbles. i keep replies short and phone-native. i do not use markdown. i do not introduce myself on boot.",
+    );
   } else {
     lines.push(
       "i am responding in Microsoft Teams. i keep responses concise. i use markdown formatting. i do not introduce myself on boot.",
