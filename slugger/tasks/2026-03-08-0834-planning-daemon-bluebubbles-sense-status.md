@@ -31,6 +31,7 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 - [ ] Existing daemon-managed worker status remains visible and is not mislabeled as an external sense.
 - [ ] BlueBubbles secrets remain sourced from `~/.agentsecrets/slugger/secrets.json`.
 - [ ] System prompt runtime info includes both the current sense and a lightweight available-senses summary without turning into setup documentation.
+- [ ] When asked how to enable or set up another sense, the agent can answer truthfully from sense/status/config information instead of guessing.
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -56,6 +57,7 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 - The temporary Slugger bundle move is an implementation-time editing concern, not a reason to add bundle-path configurability to the daemon/runtime.
 - `ouro status` should use an `Overview` section, a channel-first `Senses` grid, and a separate `Workers` section so external senses and background workers are not conflated.
 - The system prompt should keep the current channel explicit and add a lightweight available-senses summary, but it should not become a setup/how-to surface.
+- The agent should still be able to help set up other senses when asked, using truthful sense/status/config context rather than embedding full setup docs in every prompt.
 
 ## Context / References
 - Current daemon CLI parsing and `ouro up` / `ouro status`: `/Users/arimendelow/Projects/ouroboros-agent-harness-daemon-status/src/heart/daemon/daemon-cli.ts`
@@ -79,9 +81,11 @@ Prompt UX preview to target:
 - keep `channel: <current>` explicit in runtime info
 - add a concise `available senses` summary with enabled/disabled visibility
 - do not include operational setup instructions in the base system prompt
+- make sense setup help available through truthful config/status context when explicitly asked
 
 ## Progress Log
 - 2026-03-08 08:35 Created
 - 2026-03-08 08:35 Decided to use `agent.json` `senses` enablement without a separate `autoStart` flag
 - 2026-03-08 08:35 Decided status should show all available senses, including disabled ones, and kept temporary bundle relocation out of runtime scope
 - 2026-03-08 08:35 Locked status UX to `Overview / Senses / Workers` and added prompt-level available-senses visibility
+- 2026-03-08 08:50 Kept the base prompt concise while requiring truthful help for enabling additional senses on request
