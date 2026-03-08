@@ -9,6 +9,10 @@ import { buildSpecialistSystemPrompt } from "./specialist-prompt"
 import { getSpecialistTools, execSpecialistTool } from "./specialist-tools"
 import { runSpecialistSession, type SpecialistReadline } from "./specialist-session"
 
+export interface SpecialistReadlineWithController extends SpecialistReadline {
+  inputController?: { suppress: (onInterrupt?: () => void) => void; restore: () => void }
+}
+
 export interface AdoptionSpecialistDeps {
   bundleSourceDir: string
   bundlesRoot: string
@@ -17,8 +21,8 @@ export interface AdoptionSpecialistDeps {
   credentials: HatchCredentialsInput
   humanName: string
   random?: () => number
-  createReadline: () => SpecialistReadline
-  callbacks: ChannelCallbacks
+  createReadline: () => SpecialistReadlineWithController
+  callbacks: ChannelCallbacks & { flushMarkdown?: () => void }
   signal?: AbortSignal
 }
 
@@ -122,6 +126,7 @@ export async function runAdoptionSpecialist(
     // 6. Run session
     const tools = getSpecialistTools()
     const readline = deps.createReadline()
+    const ctrl = readline.inputController
 
     const result = await runSpecialistSession({
       providerRuntime,
@@ -140,6 +145,10 @@ export async function runAdoptionSpecialist(
       callbacks,
       signal,
       kickoffMessage: "hi, i just ran ouro for the first time",
+      suppressInput: ctrl ? (onInterrupt) => ctrl.suppress(onInterrupt) : undefined,
+      restoreInput: ctrl ? () => ctrl.restore() : undefined,
+      flushMarkdown: callbacks.flushMarkdown,
+      writePrompt: ctrl ? () => process.stdout.write("\x1b[36m> \x1b[0m") : undefined,
     })
 
     return result.hatchedAgentName
