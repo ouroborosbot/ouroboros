@@ -1,13 +1,17 @@
 import * as fs from "fs"
 import * as path from "path"
 import { emitNervesEvent } from "../../nerves/runtime"
-import { setAgentName, setAgentConfigOverride, type AgentProvider } from "../identity"
+import { setAgentName, setAgentConfigOverride, DEFAULT_AGENT_PHRASES, type AgentProvider, type AgentConfig } from "../identity"
 import { resetConfigCache } from "../config"
 import { resetProviderRuntime, createProviderRegistry, type ChannelCallbacks } from "../core"
 import { writeSecretsFile, type HatchCredentialsInput } from "./hatch-flow"
 import { buildSpecialistSystemPrompt } from "./specialist-prompt"
 import { getSpecialistTools, execSpecialistTool } from "./specialist-tools"
 import { runSpecialistSession, type SpecialistReadline } from "./specialist-session"
+
+export interface SpecialistReadlineWithController extends SpecialistReadline {
+  inputController?: { suppress: (onInterrupt?: () => void) => void; restore: () => void }
+}
 
 export interface AdoptionSpecialistDeps {
   bundleSourceDir: string
@@ -17,8 +21,8 @@ export interface AdoptionSpecialistDeps {
   credentials: HatchCredentialsInput
   humanName: string
   random?: () => number
-  createReadline: () => SpecialistReadline
-  callbacks: ChannelCallbacks
+  createReadline: () => SpecialistReadlineWithController
+  callbacks: ChannelCallbacks & { flushMarkdown?: () => void }
   signal?: AbortSignal
 }
 
@@ -37,6 +41,31 @@ function listExistingBundles(bundlesRoot: string): string[] {
     discovered.push(agentName)
   }
   return discovered.sort((a, b) => a.localeCompare(b))
+}
+
+function loadIdentityPhrases(
+  bundleSourceDir: string,
+  identityFileName: string,
+): AgentConfig["phrases"] {
+  const agentJsonPath = path.join(bundleSourceDir, "agent.json")
+  try {
+    const raw = fs.readFileSync(agentJsonPath, "utf-8")
+    const parsed = JSON.parse(raw) as {
+      phrases?: AgentConfig["phrases"]
+      identityPhrases?: Record<string, AgentConfig["phrases"]>
+    }
+    const identityKey = identityFileName.replace(/\.md$/, "")
+    const identity = parsed.identityPhrases?.[identityKey]
+    if (identity?.thinking?.length && identity?.tool?.length && identity?.followup?.length) {
+      return identity
+    }
+    if (parsed.phrases?.thinking?.length && parsed.phrases?.tool?.length && parsed.phrases?.followup?.length) {
+      return parsed.phrases
+    }
+  } catch {
+    // agent.json missing or malformed — fall through
+  }
+  return { ...DEFAULT_AGENT_PHRASES }
 }
 
 function pickRandomIdentity(identitiesDir: string, random: () => number): { fileName: string; content: string } {
@@ -100,13 +129,14 @@ export async function runAdoptionSpecialist(
   // 4. Build system prompt
   const systemPrompt = buildSpecialistSystemPrompt(soulText, identity.content, existingBundles)
 
-  // 5. Set up provider
+  // 5. Set up provider with identity-specific phrases
+  const phrases = loadIdentityPhrases(bundleSourceDir, identity.fileName)
   setAgentName("AdoptionSpecialist")
   setAgentConfigOverride({
     version: 1,
     enabled: true,
     provider,
-    phrases: { thinking: ["thinking"], tool: ["checking"], followup: ["processing"] },
+    phrases,
   })
   writeSecretsFile("AdoptionSpecialist", provider, credentials, secretsRoot)
   resetConfigCache()
@@ -122,6 +152,7 @@ export async function runAdoptionSpecialist(
     // 6. Run session
     const tools = getSpecialistTools()
     const readline = deps.createReadline()
+    const ctrl = readline.inputController
 
     const result = await runSpecialistSession({
       providerRuntime,
@@ -139,6 +170,11 @@ export async function runAdoptionSpecialist(
       readline,
       callbacks,
       signal,
+      kickoffMessage: "hi, i just ran ouro for the first time",
+      suppressInput: ctrl ? (onInterrupt) => ctrl.suppress(onInterrupt) : undefined,
+      restoreInput: ctrl ? () => ctrl.restore() : undefined,
+      flushMarkdown: callbacks.flushMarkdown,
+      writePrompt: ctrl ? () => process.stdout.write("\x1b[36m> \x1b[0m") : undefined,
     })
 
     return result.hatchedAgentName

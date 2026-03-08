@@ -15,6 +15,16 @@ export interface SpecialistSessionDeps {
   readline: SpecialistReadline
   callbacks: ChannelCallbacks
   signal?: AbortSignal
+  /** If provided, sent as the first user message so the specialist speaks first without waiting for input. */
+  kickoffMessage?: string
+  /** Suppress keyboard input during model/tool execution (e.g. InputController.suppress). */
+  suppressInput?: (onInterrupt: () => void) => void
+  /** Restore keyboard input after model/tool execution (e.g. InputController.restore). */
+  restoreInput?: () => void
+  /** Flush any buffered markdown after a complete model turn. */
+  flushMarkdown?: () => void
+  /** Write the input prompt. Defaults to writing "> ". */
+  writePrompt?: () => void
 }
 
 export interface SpecialistSessionResult {
@@ -36,7 +46,10 @@ export interface SpecialistSessionResult {
 export async function runSpecialistSession(
   deps: SpecialistSessionDeps,
 ): Promise<SpecialistSessionResult> {
-  const { providerRuntime, systemPrompt, tools, execTool, readline, callbacks, signal } = deps
+  const {
+    providerRuntime, systemPrompt, tools, execTool, readline, callbacks, signal,
+    kickoffMessage, suppressInput, restoreInput, flushMarkdown, writePrompt,
+  } = deps
 
   emitNervesEvent({
     component: "daemon",
@@ -51,22 +64,39 @@ export async function runSpecialistSession(
 
   let hatchedAgentName: string | null = null
   let done = false
+  let isFirstTurn = true
+  let currentAbort: AbortController | null = null
 
   try {
     while (!done) {
       if (signal?.aborted) break
 
-      // Get user input
-      const userInput = await readline.question("> ")
-      if (!userInput.trim()) continue
-
-      messages.push({ role: "user", content: userInput })
+      // On the first turn with a kickoff message, inject it so the specialist speaks first
+      if (isFirstTurn && kickoffMessage) {
+        isFirstTurn = false
+        messages.push({ role: "user", content: kickoffMessage })
+      } else {
+        // Get user input
+        const userInput = await readline.question(writePrompt ? "" : "> ")
+        if (!userInput.trim()) {
+          if (writePrompt) writePrompt()
+          continue
+        }
+        messages.push({ role: "user", content: userInput })
+      }
       providerRuntime.resetTurnState(messages)
+
+      // Suppress input during model execution
+      currentAbort = new AbortController()
+      const mergedSignal = signal
+      if (suppressInput) {
+        suppressInput(() => currentAbort!.abort())
+      }
 
       // Inner loop: process tool calls until we get a final_answer or plain text
       let turnDone = false
       while (!turnDone) {
-        if (signal?.aborted) {
+        if (mergedSignal?.aborted || currentAbort.signal.aborted) {
           done = true
           break
         }
@@ -77,7 +107,7 @@ export async function runSpecialistSession(
           messages,
           activeTools: tools,
           callbacks,
-          signal,
+          signal: mergedSignal,
         })
 
         // Build assistant message
@@ -94,7 +124,8 @@ export async function runSpecialistSession(
         }
 
         if (!result.toolCalls.length) {
-          // Plain text response -- push and re-prompt
+          // Plain text response -- flush markdown, push and re-prompt
+          if (flushMarkdown) flushMarkdown()
           messages.push(assistantMsg)
           turnDone = true
           continue
@@ -119,6 +150,7 @@ export async function runSpecialistSession(
 
           if (answer != null) {
             callbacks.onTextChunk(answer)
+            if (flushMarkdown) flushMarkdown()
             messages.push(assistantMsg)
             done = true
             turnDone = true
@@ -139,7 +171,7 @@ export async function runSpecialistSession(
         // Execute tool calls
         messages.push(assistantMsg)
         for (const tc of result.toolCalls) {
-          if (signal?.aborted) break
+          if (mergedSignal?.aborted) break
 
           let args: Record<string, string> = {}
           try {
@@ -169,8 +201,19 @@ export async function runSpecialistSession(
         }
         // After processing tool calls, continue inner loop for tool result processing
       }
+
+      // Restore input and show prompt for next turn
+      if (flushMarkdown) flushMarkdown()
+      if (restoreInput) restoreInput()
+      currentAbort = null
+
+      if (!done) {
+        process.stdout.write("\n\n")
+        if (writePrompt) writePrompt()
+      }
     }
   } finally {
+    if (restoreInput) restoreInput()
     readline.close()
   }
 
