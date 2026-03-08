@@ -66,6 +66,10 @@ describe("os-cron helpers", () => {
     expect(cadenceToSeconds("0 0 */3 * *")).toBeNull()
   })
 
+  it("cadenceToSeconds returns null for fixed-time schedules without interval patterns", () => {
+    expect(cadenceToSeconds("30 8 * * *")).toBeNull()
+  })
+
   it("scheduleToCalendarInterval extracts time components", () => {
     expect(scheduleToCalendarInterval("30 8 15 3 *")).toEqual({
       Minute: 30,
@@ -317,5 +321,22 @@ describe("createOsCronManager", () => {
     const manager = createOsCronManager({ platform: "linux", crontabDeps: deps })
     manager.sync([makeJob()])
     expect(deps.execWrite).toHaveBeenCalled()
+  })
+
+  it("uses default fallback deps for darwin when no launchdDeps provided", () => {
+    const manager = createOsCronManager({ platform: "darwin" })
+    expect(manager).toBeInstanceOf(LaunchdCronManager)
+    // Exercise default deps: list calls existsFile (returns false), sync calls mkdirp + listDir
+    expect(manager.list()).toEqual([])
+    expect(() => manager.sync([makeJob()])).not.toThrow()
+    expect(() => manager.removeAll()).not.toThrow()
+  })
+
+  it("uses default fallback deps for linux when no crontabDeps provided", () => {
+    const manager = createOsCronManager({ platform: "linux" })
+    expect(manager).toBeInstanceOf(CrontabCronManager)
+    expect(manager.list()).toEqual([])
+    expect(() => manager.sync([makeJob()])).not.toThrow()
+    expect(() => manager.removeAll()).not.toThrow()
   })
 })
