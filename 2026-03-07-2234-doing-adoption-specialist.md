@@ -162,7 +162,7 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 
 ---
 
-### ⬜ Unit 6a: Specialist Tool Definitions -- Tests
+### ✅ Unit 6a: Specialist Tool Definitions -- Tests
 **What**: Write tests for `getSpecialistTools(deps)` that returns the specialist's tool schema array. Should include: `hatch_agent` (with `name` string param, required), `final_answer` (with `answer` string param), `read_file` (from base tools), `list_directory` (from base tools).
 **Files**: `src/__tests__/heart/daemon/specialist-tools.test.ts` (new file)
 **Tests to write**:
@@ -173,12 +173,12 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - Tool names are correct
 **Acceptance**: Tests FAIL because the module does not exist yet.
 
-### ⬜ Unit 6b: Specialist Tool Definitions -- Implementation
+### ✅ Unit 6b: Specialist Tool Definitions -- Implementation
 **What**: Create `src/heart/daemon/specialist-tools.ts`. Define `hatch_agent` tool schema. Re-export `read_file` and `list_directory` schemas from `tools-base.ts`. Re-export `finalAnswerTool`. Provide `getSpecialistTools()` that returns the array. Provide `execSpecialistTool(name, args, deps)` that dispatches tool calls -- `hatch_agent` calls `runHatchFlow` + `playHatchAnimation`, `read_file`/`list_directory` call the base handlers, `final_answer` is handled inline by the session loop (not dispatched here).
 **Files**: `src/heart/daemon/specialist-tools.ts` (new file)
 **Acceptance**: All tests PASS (green).
 
-### ⬜ Unit 6c: Specialist Tool Execution -- Tests
+### ✅ Unit 6c: Specialist Tool Execution -- Tests
 **What**: Write tests for `execSpecialistTool(name, args, deps)`.
 **Files**: `src/__tests__/heart/daemon/specialist-tools.test.ts` (add to existing)
 **Tests to write**:
@@ -189,7 +189,7 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - Unknown tool name returns "unknown" error
 **Acceptance**: Tests PASS (green).
 
-### ⬜ Unit 6d: Specialist Tools -- Coverage & Refactor
+### ✅ Unit 6d: Specialist Tools -- Coverage & Refactor
 **What**: Verify 100% coverage on specialist tools module.
 **Acceptance**: 100% coverage, tests still green.
 
@@ -363,3 +363,4 @@ The loop:
 - 2026-03-07 22:50 Unit 2 complete: resetProviderRuntime added to core.ts, 2 new tests, 100% coverage
 - 2026-03-07 22:51 Unit 3 complete: writeSecretsFile exported from hatch-flow.ts, 3 new tests, 100% coverage
 - 2026-03-07 22:53 Unit 4 complete: hatch-animation.ts created, 4 tests, 100% coverage
+- 2026-03-07 22:54 Unit 5 complete: specialist-prompt.ts created, 6 tests, 100% coverage
