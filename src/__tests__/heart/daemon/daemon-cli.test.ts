@@ -1598,6 +1598,101 @@ describe("specialist integration (zero agents -> adoption specialist)", () => {
     expect(result).toContain("hatched ExplicitBot")
   })
 
+  it("routes bare ouro hatch through specialist when no explicit args given", async () => {
+    const runAdoptionSpecialist = vi.fn(async () => "HatchedViaSpecialist")
+    const startChat = vi.fn(async () => {})
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 42 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
+      runAdoptionSpecialist,
+      startChat,
+    }
+
+    const result = await runOuroCli(["hatch"], deps)
+
+    expect(runAdoptionSpecialist).toHaveBeenCalledTimes(1)
+    expect(startChat).toHaveBeenCalledWith("HatchedViaSpecialist")
+    expect(deps.installSubagents).toHaveBeenCalledTimes(1)
+    expect(result).toBe("")
+  })
+
+  it("continues gracefully when subagent install fails during bare ouro hatch specialist flow", async () => {
+    const runAdoptionSpecialist = vi.fn(async () => "HatchSubagentFail")
+    const startChat = vi.fn(async () => {})
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 77 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => {
+        throw new Error("subagent install failed in hatch path")
+      }),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
+      runAdoptionSpecialist,
+      startChat,
+    }
+
+    const result = await runOuroCli(["hatch"], deps)
+
+    expect(runAdoptionSpecialist).toHaveBeenCalledTimes(1)
+    expect(startChat).toHaveBeenCalledWith("HatchSubagentFail")
+    expect(result).toBe("")
+  })
+
+  it("returns empty string without starting chat on bare ouro hatch when startChat is not provided", async () => {
+    const runAdoptionSpecialist = vi.fn(async () => "NoChatHatch")
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 11 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
+      runAdoptionSpecialist,
+      // No startChat provided
+    }
+
+    const result = await runOuroCli(["hatch"], deps)
+
+    expect(runAdoptionSpecialist).toHaveBeenCalledTimes(1)
+    expect(deps.installSubagents).toHaveBeenCalledTimes(1)
+    expect(result).toBe("")
+  })
+
+  it("returns empty string when specialist returns null on bare ouro hatch", async () => {
+    const runAdoptionSpecialist = vi.fn(async () => null)
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      runAdoptionSpecialist,
+    }
+
+    const result = await runOuroCli(["hatch"], deps)
+
+    expect(runAdoptionSpecialist).toHaveBeenCalledTimes(1)
+    expect(deps.installSubagents).not.toHaveBeenCalled()
+    expect(result).toBe("")
+  })
+
   it("returns empty string without starting chat when startChat is not provided", async () => {
     const runAdoptionSpecialist = vi.fn(async () => "NoChatBot")
     const deps: OuroCliDeps = {
