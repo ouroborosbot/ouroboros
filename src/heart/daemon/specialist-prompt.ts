@@ -1,3 +1,5 @@
+import { emitNervesEvent } from "../../nerves/runtime"
+
 /**
  * Build the adoption specialist's system prompt from its components.
  * The prompt is written in first person (the specialist's own voice).
@@ -7,6 +9,13 @@ export function buildSpecialistSystemPrompt(
   identityText: string,
   existingBundles: string[],
 ): string {
+  emitNervesEvent({
+    component: "daemon",
+    event: "daemon.specialist_prompt_build",
+    message: "building specialist system prompt",
+    meta: { bundleCount: existingBundles.length },
+  })
+
   const sections: string[] = []
 
   if (soulText) {

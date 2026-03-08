@@ -1,3 +1,5 @@
+import { emitNervesEvent } from "../../nerves/runtime"
+
 const EGG = "\uD83E\uDD5A"
 const SNAKE = "\uD83D\uDC0D"
 const DOTS = " . . . "
@@ -14,6 +16,13 @@ export async function playHatchAnimation(
   hatchlingName: string,
   writer?: (text: string) => void,
 ): Promise<void> {
+  emitNervesEvent({
+    component: "daemon",
+    event: "daemon.hatch_animation_start",
+    message: "playing hatch animation",
+    meta: { hatchlingName },
+  })
+
   const write = writer ?? ((text: string) => process.stderr.write(text))
 
   write(`\n  ${EGG}`)

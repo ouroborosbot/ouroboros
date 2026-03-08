@@ -195,7 +195,7 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 
 ---
 
-### ⬜ Unit 7a: Specialist Session Loop -- Tests
+### ✅ Unit 7a: Specialist Session Loop -- Tests
 **What**: Write tests for `runSpecialistSession(deps)` -- the main conversation loop. This is the core of the feature. The session loop: reads user input, calls the provider's `streamTurn`, handles tool calls, handles `final_answer`, supports Ctrl-C abort.
 **Files**: `src/__tests__/heart/daemon/specialist-session.test.ts` (new file)
 
@@ -219,7 +219,7 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - Empty user input is skipped (prompt re-displayed)
 **Acceptance**: Tests FAIL because the module does not exist yet.
 
-### ⬜ Unit 7b: Specialist Session Loop -- Implementation
+### ✅ Unit 7b: Specialist Session Loop -- Implementation
 **What**: Create `src/heart/daemon/specialist-session.ts` with `runSpecialistSession(deps: SpecialistSessionDeps): Promise<SpecialistSessionResult>`.
 
 The loop:
@@ -234,7 +234,7 @@ The loop:
 **Files**: `src/heart/daemon/specialist-session.ts` (new file)
 **Acceptance**: All tests PASS (green).
 
-### ⬜ Unit 7c: Specialist Session Loop -- Coverage & Refactor
+### ✅ Unit 7c: Specialist Session Loop -- Coverage & Refactor
 **What**: Verify 100% coverage. Add edge case tests if needed (e.g., malformed final_answer, tool execution error, mixed final_answer with other tools).
 **Acceptance**: 100% coverage, tests still green.
 
@@ -364,3 +364,4 @@ The loop:
 - 2026-03-07 22:51 Unit 3 complete: writeSecretsFile exported from hatch-flow.ts, 3 new tests, 100% coverage
 - 2026-03-07 22:53 Unit 4 complete: hatch-animation.ts created, 4 tests, 100% coverage
 - 2026-03-07 22:54 Unit 5 complete: specialist-prompt.ts created, 6 tests, 100% coverage
+- 2026-03-07 22:57 Unit 6 complete: specialist-tools.ts created, 12 tests (5 schema + 7 execution), 100% coverage

@@ -4,6 +4,7 @@ import { baseToolDefinitions, finalAnswerTool } from "../../repertoire/tools-bas
 import { runHatchFlow, type HatchFlowInput, type HatchCredentialsInput } from "./hatch-flow"
 import { playHatchAnimation } from "./hatch-animation"
 import type { AgentProvider } from "../identity"
+import { emitNervesEvent } from "../../nerves/runtime"
 
 const hatchAgentTool: OpenAI.ChatCompletionFunctionTool = {
   type: "function",
@@ -52,6 +53,13 @@ export async function execSpecialistTool(
   args: Record<string, string>,
   deps: ExecSpecialistToolDeps,
 ): Promise<string> {
+  emitNervesEvent({
+    component: "daemon",
+    event: "daemon.specialist_tool_exec",
+    message: "executing specialist tool",
+    meta: { tool: name },
+  })
+
   if (name === "hatch_agent") {
     const agentName = args.name
     if (!agentName) {
@@ -64,11 +72,10 @@ export async function execSpecialistTool(
       provider: deps.provider,
       credentials: deps.credentials,
     }
-    const hatchDeps: { bundlesRoot?: string; secretsRoot?: string } = {}
-    if (deps.bundlesRoot) hatchDeps.bundlesRoot = deps.bundlesRoot
-    if (deps.secretsRoot) hatchDeps.secretsRoot = deps.secretsRoot
-
-    const result = await runHatchFlow(input, hatchDeps)
+    const result = await runHatchFlow(input, {
+      bundlesRoot: deps.bundlesRoot,
+      secretsRoot: deps.secretsRoot,
+    })
     await playHatchAnimation(agentName, deps.animationWriter)
 
     return [
@@ -84,7 +91,7 @@ export async function execSpecialistTool(
     try {
       return fs.readFileSync(args.path, "utf-8")
     } catch (e) {
-      return `error: ${e instanceof Error ? e.message : String(e)}`
+      return `error: ${e instanceof Error ? e.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(e)}`
     }
   }
 
@@ -95,7 +102,7 @@ export async function execSpecialistTool(
         .map((e) => `${e.isDirectory() ? "d" : "-"}  ${e.name}`)
         .join("\n")
     } catch (e) {
-      return `error: ${e instanceof Error ? e.message : String(e)}`
+      return `error: ${e instanceof Error ? e.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(e)}`
     }
   }
 
