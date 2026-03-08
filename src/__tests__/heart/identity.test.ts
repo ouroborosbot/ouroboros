@@ -97,6 +97,11 @@ describe("agent paths", () => {
     vi.resetModules()
   })
 
+  it("resolves repo root from the current module location", async () => {
+    const { getRepoRoot } = await import("../../heart/identity")
+    expect(getRepoRoot()).toBe(process.cwd())
+  })
+
   it("resolves agent bundle root", async () => {
     process.argv = ["node", "cli-entry.js", "--agent", "slugger"]
     const { getAgentRoot, resetIdentity } = await import("../../heart/identity")
@@ -247,6 +252,64 @@ describe("loadAgentConfig", () => {
     })
   })
 
+  it("fills missing individual senses from defaults when only some senses are configured", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 1,
+        enabled: true,
+        provider: "anthropic",
+        senses: {
+          teams: { enabled: true },
+        },
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+      }),
+    )
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    const config = loadAgentConfig()
+
+    expect((config as any).senses).toEqual({
+      cli: { enabled: true },
+      teams: { enabled: true },
+      bluebubbles: { enabled: false },
+    })
+  })
+
+  it("rejects non-object senses blocks", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 1,
+        enabled: true,
+        provider: "anthropic",
+        senses: [],
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+      }),
+    )
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/senses as an object/i)
+  })
+
+  it("rejects invalid nested sense config objects", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 1,
+        enabled: true,
+        provider: "anthropic",
+        senses: {
+          teams: [],
+        },
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+      }),
+    )
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/invalid senses\.teams config/i)
+  })
+
   it("rejects non-boolean sense enablement flags", async () => {
     vi.mocked(fs.readFileSync).mockReturnValue(
       JSON.stringify({
@@ -263,6 +326,24 @@ describe("loadAgentConfig", () => {
     const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
     resetIdentity()
     expect(() => loadAgentConfig()).toThrow(/senses/i)
+  })
+
+  it("rejects missing sense enabled flags", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 1,
+        enabled: true,
+        provider: "anthropic",
+        senses: {
+          cli: {},
+        },
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+      }),
+    )
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/senses\.cli\.enabled/i)
   })
 
   it("leaves logging undefined when omitted from agent.json", async () => {
