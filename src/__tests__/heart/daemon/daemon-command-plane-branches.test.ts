@@ -33,6 +33,7 @@ describe("daemon command plane branches", () => {
       startAutoStartAgents: vi.fn(async () => undefined),
       stopAll: vi.fn(async () => undefined),
       startAgent: vi.fn(async () => undefined),
+      sendToAgent: vi.fn(),
     }
 
     const scheduler = {
@@ -130,6 +131,7 @@ describe("daemon command plane branches", () => {
       sessionId: "session-1",
       taskRef: "task-7",
     }))
+    expect(processManager.sendToAgent).toHaveBeenCalledWith("ouroboros", { type: "message" })
 
     const polled = await daemon.handleCommand({ kind: "message.poll", agent: "ouroboros" })
     expect(polled.summary).toBe("1 messages")
@@ -142,6 +144,7 @@ describe("daemon command plane branches", () => {
       taskRef: "habit-heartbeat",
     }))
     expect(scheduler.recordTaskRun).toHaveBeenCalledWith("slugger", "habit-heartbeat")
+    expect(processManager.sendToAgent).toHaveBeenCalledWith("slugger", { type: "poke", taskId: "habit-heartbeat" })
 
     const hatch = await daemon.handleCommand({ kind: "hatch.start" })
     expect(hatch.ok).toBe(true)
