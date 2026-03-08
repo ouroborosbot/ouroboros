@@ -5,6 +5,9 @@ import { emitNervesEvent } from "../nerves/runtime"
 
 export type AgentProvider = "azure" | "minimax" | "anthropic" | "openai-codex"
 
+export type LogLevel = "debug" | "info" | "warn" | "error"
+export type LogSinkType = "terminal" | "ndjson"
+
 export interface AgentConfig {
   version: number
   enabled: boolean
@@ -12,6 +15,10 @@ export interface AgentConfig {
   context?: {
     maxTokens?: number
     contextMargin?: number
+  }
+  logging?: {
+    level?: LogLevel
+    sinks?: LogSinkType[]
   }
   phrases: {
     thinking: string[]
@@ -258,6 +265,7 @@ export function loadAgentConfig(): AgentConfig {
     enabled,
     provider: rawProvider,
     context: parsed.context as AgentConfig["context"] | undefined,
+    logging: parsed.logging as AgentConfig["logging"] | undefined,
     phrases: parsed.phrases as AgentConfig["phrases"],
   }
   emitNervesEvent({
