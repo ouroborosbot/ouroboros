@@ -90,11 +90,11 @@ export function getAgentName(): string {
 
 /**
  * Resolve repo root from __dirname.
- * In dev (tsx): __dirname is `<repo>/src`, so repo root is one level up.
- * In compiled (node dist/): __dirname is `<repo>/dist`, so repo root is one level up.
+ * In dev (tsx): __dirname is `<repo>/src/heart`, so repo root is two levels up.
+ * In compiled (node dist/): __dirname is `<repo>/dist/heart`, so repo root is two levels up.
  */
 export function getRepoRoot(): string {
-  return path.resolve(__dirname, "..")
+  return path.resolve(__dirname, "../..")
 }
 
 /**
