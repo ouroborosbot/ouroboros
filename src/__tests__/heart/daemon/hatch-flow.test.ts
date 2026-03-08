@@ -66,9 +66,12 @@ describe("hatch flow", () => {
     const friend = JSON.parse(fs.readFileSync(path.join(friendDir, friendFiles[0]), "utf-8")) as {
       name: string
       trustLevel: string
+      externalIds: { provider: string; externalId: string }[]
     }
     expect(friend.name).toBe("Ari")
     expect(friend.trustLevel).toBe("family")
+    expect(friend.externalIds[0].provider).toBe("local")
+    expect(friend.externalIds[0].externalId).toBe(`${os.userInfo().username}@${os.hostname()}`)
 
     const habitsDir = path.join(result.bundleRoot, "tasks", "habits")
     const heartbeatFiles = fs.readdirSync(habitsDir).filter((name) => name.includes("heartbeat"))
