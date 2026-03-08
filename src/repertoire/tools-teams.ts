@@ -242,7 +242,7 @@ export const teamsToolDefinitions: ToolDefinition[] = [
 ];
 
 // Backward-compat: extract just the OpenAI tool schemas
-export const teamsTools: import("openai").default.ChatCompletionTool[] = teamsToolDefinitions.map((d) => d.tool);
+export const teamsTools: import("openai").default.ChatCompletionFunctionTool[] = teamsToolDefinitions.map((d) => d.tool);
 
 // Backward-compat: extract just the handlers by name
 export const teamsToolHandlers: Record<string, ToolHandler> = Object.fromEntries(

@@ -36,7 +36,7 @@ export interface ProviderRuntime {
 
 export interface ProviderTurnRequest {
   messages: OpenAI.ChatCompletionMessageParam[];
-  activeTools: OpenAI.ChatCompletionTool[];
+  activeTools: OpenAI.ChatCompletionFunctionTool[];
   callbacks: ChannelCallbacks;
   signal?: AbortSignal;
   traceId?: string;

@@ -28,25 +28,30 @@ const DEFAULT_RUNTIME_LOGGING: RuntimeLoggingConfig = {
   sinks: ["terminal", "ndjson"],
 }
 
+function defaultLevelForProcess(processName: "daemon" | "ouro" | "ouro-bot"): LogLevel {
+  return processName === "daemon" ? "info" : "warn"
+}
+
 function isLogLevel(value: unknown): value is LogLevel {
   return value === "debug" || value === "info" || value === "warn" || value === "error"
 }
 
-function resolveRuntimeLoggingConfig(configPath: string): RuntimeLoggingConfig {
+function resolveRuntimeLoggingConfig(configPath: string, processName: "daemon" | "ouro" | "ouro-bot"): RuntimeLoggingConfig {
+  const defaultLevel = defaultLevelForProcess(processName)
   let parsed: unknown = null
   try {
     const raw = fs.readFileSync(configPath, "utf-8")
     parsed = JSON.parse(raw)
   } catch {
-    return { ...DEFAULT_RUNTIME_LOGGING }
+    return { ...DEFAULT_RUNTIME_LOGGING, level: defaultLevel }
   }
 
   if (!parsed || typeof parsed !== "object") {
-    return { ...DEFAULT_RUNTIME_LOGGING }
+    return { ...DEFAULT_RUNTIME_LOGGING, level: defaultLevel }
   }
 
   const candidate = parsed as { level?: unknown; sinks?: unknown }
-  const level = isLogLevel(candidate.level) ? candidate.level : DEFAULT_RUNTIME_LOGGING.level
+  const level = isLogLevel(candidate.level) ? candidate.level : defaultLevel
   const sinks = Array.isArray(candidate.sinks)
     ? candidate.sinks.filter((entry): entry is RuntimeSink => entry === "terminal" || entry === "ndjson")
     : DEFAULT_RUNTIME_LOGGING.sinks
@@ -63,7 +68,7 @@ export function configureDaemonRuntimeLogger(
 ): void {
   const homeDir = options.homeDir ?? os.homedir()
   const configPath = options.configPath ?? path.join(homeDir, ".agentstate", "daemon", "logging.json")
-  const config = resolveRuntimeLoggingConfig(configPath)
+  const config = resolveRuntimeLoggingConfig(configPath, processName)
 
   const sinks: LogSink[] = config.sinks.map((sinkName) => {
     if (sinkName === "terminal") {

@@ -10,8 +10,9 @@ export interface OuroBotWrapperDeps {
 }
 
 async function defaultLoadCanonicalRunner(): Promise<OuroCliRunner> {
-  const packageName = "@ouro.bot/cli"
-  const specifier = packageName
+  // Use the subpath export so we get the daemon-cli module directly,
+  // NOT the root entry point which has side-effects (immediately runs the CLI).
+  const specifier = "@ouro.bot/cli/runOuroCli"
   const loaded = await import(specifier) as Record<string, unknown>
   const candidate = Object.prototype.hasOwnProperty.call(loaded, "runOuroCli")
     ? loaded["runOuroCli"]
@@ -19,7 +20,7 @@ async function defaultLoadCanonicalRunner(): Promise<OuroCliRunner> {
   if (typeof candidate === "function") {
     return candidate as OuroCliRunner
   }
-  throw new Error("@ouro.bot/cli does not export runOuroCli")
+  throw new Error("@ouro.bot/cli/runOuroCli does not export runOuroCli")
 }
 
 function defaultWriteStdout(_text: string): void {
