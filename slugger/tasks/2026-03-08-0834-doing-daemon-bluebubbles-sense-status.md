@@ -72,17 +72,17 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 **Output**: Coverage logs and any additional tests required for 100% coverage on new code.
 **Acceptance**: 100% coverage on new code, tests remain green, and build still passes.
 
-### ⬜ Unit 2a: Daemon Lifecycle And Status Data — Tests
+### ✅ Unit 2a: Daemon Lifecycle And Status Data — Tests
 **What**: Write failing tests for daemon-managed BlueBubbles lifecycle, truthful separation of `Senses` versus `Workers`, and status data that includes disabled senses for discovery in the existing daemon entry/command/CLI test surfaces.
 **Output**: New red-phase daemon/status tests covering sense lifecycle and worker separation.
 **Acceptance**: Tests exist in daemon entry/command/status suites and FAIL (red).
 
-### ⬜ Unit 2b: Daemon Lifecycle And Status Data — Implementation
+### ✅ Unit 2b: Daemon Lifecycle And Status Data — Implementation
 **What**: Implement daemon-managed sense lifecycle for enabled senses, preserve the inner-dialog worker as a separate worker concept, and extend daemon status payloads to include the shared sense-truth data.
 **Output**: Updated daemon bootstrap/status behavior for senses and workers.
 **Acceptance**: New tests PASS (green), build passes, and no warnings are emitted.
 
-### ⬜ Unit 2c: Daemon Lifecycle And Status Data — Coverage & Refactor
+### ✅ Unit 2c: Daemon Lifecycle And Status Data — Coverage & Refactor
 **What**: Verify full coverage for new daemon lifecycle/status paths, add missing branch/error-path tests, and refactor if needed.
 **Output**: Coverage artifacts and any supplemental tests needed for complete coverage.
 **Acceptance**: 100% coverage on new code, tests remain green, and build still passes.
@@ -128,3 +128,6 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 - 2026-03-08 16:58 Unit 1a complete: wrote failing tests for agent `senses` parsing/defaults and the shared sense-truth inventory model
 - 2026-03-08 17:00 Unit 1b complete: implemented agent `senses` parsing/defaults and the shared sense-truth inventory module, with targeted tests and build passing
 - 2026-03-08 10:06 Unit 1c complete: added edge-path coverage for sense config validation and ready/default inventory behavior, with 100% coverage on `src/heart/identity.ts` and `src/heart/sense-truth.ts`
+- 2026-03-08 10:11 Unit 2a complete: wrote daemon red-phase tests for managed senses, worker separation, and sense-aware status payloads
+- 2026-03-08 10:17 Unit 2b complete: implemented daemon-managed sense startup and status payload support with shared sense-truth data
+- 2026-03-08 10:32 Unit 2c complete: closed coverage gaps for daemon sense lifecycle/status paths and reached 100% coverage on the modified daemon files
