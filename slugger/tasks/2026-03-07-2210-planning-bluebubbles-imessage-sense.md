@@ -1,6 +1,6 @@
 # Planning: BlueBubbles iMessage Sense
 
-**Status**: approved
+**Status**: done
 **Created**: 2026-03-07 22:10
 
 ## Goal
@@ -26,15 +26,15 @@ Add BlueBubbles-backed iMessage support as a first-class Ouroboros sense alongsi
 - Implementation details that can be finalized during doing work as long as they do not change approved UX/AX outcomes.
 
 ## Completion Criteria
-- [ ] Harness exposes a first-class `bluebubbles` sense entrypoint alongside existing senses.
-- [ ] The sense models both message creation and message mutation/update as first-class inbound primitives.
-- [ ] Thread-aware replies work in both DM and group contexts using BlueBubbles reply metadata when present.
-- [ ] Rich content handling covers plain links, OG cards, image/audio attachments, and clean fallback behavior when content cannot be hydrated.
-- [ ] Group conversations use stable routing/session identity that does not depend on a single surfaced email-or-phone representation.
-- [ ] The implementation does not fail silently on mutation/media/routing gaps.
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] Harness exposes a first-class `bluebubbles` sense entrypoint alongside existing senses.
+- [x] The sense models both message creation and message mutation/update as first-class inbound primitives.
+- [x] Thread-aware replies work in both DM and group contexts using BlueBubbles reply metadata when present.
+- [x] Rich content handling covers plain links, OG cards, image/audio attachments, and clean fallback behavior when content cannot be hydrated.
+- [x] Group conversations use stable routing/session identity that does not depend on a single surfaced email-or-phone representation.
+- [x] The implementation does not fail silently on mutation/media/routing gaps.
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -74,3 +74,4 @@ Live observation collapsed the major UX/AX unknowns. The most important findings
 ## Progress Log
 - 2026-03-07 22:10 Created
 - 2026-03-07 22:13 Approved from prior explicit direction to begin implementation in a dedicated worktree
+- 2026-03-07 23:40 Implementation complete: BlueBubbles sense shipped with repair-by-guid, mutation logging, full automated verification, and live smoke evidence
