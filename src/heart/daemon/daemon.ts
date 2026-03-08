@@ -3,6 +3,7 @@ import * as net from "net"
 import * as path from "path"
 import { getAgentBundlesRoot } from "../identity"
 import { emitNervesEvent } from "../../nerves/runtime"
+import type { DaemonSenseManagerLike, DaemonSenseRow } from "./sense-manager"
 
 export interface DaemonCronJobSummary {
   id: string
@@ -96,16 +97,51 @@ export interface OuroDaemonOptions {
   scheduler: DaemonSchedulerLike
   healthMonitor: DaemonHealthMonitorLike
   router: DaemonRouterLike
+  senseManager?: DaemonSenseManagerLike
   bundlesRoot?: string
 }
 
-function formatStatusSummary(snapshots: ReturnType<DaemonProcessManagerLike["listAgentSnapshots"]>): string {
-  if (snapshots.length === 0) return "no managed agents"
-  return snapshots
-    .map((snapshot) => {
-      return `${snapshot.name}\t${snapshot.channel}\t${snapshot.status}\tpid=${snapshot.pid ?? "none"}\trestarts=${snapshot.restartCount}`
-    })
-    .join("\n")
+interface DaemonWorkerRow {
+  agent: string
+  worker: string
+  status: string
+  pid: number | null
+  restartCount: number
+  startedAt: string | null
+}
+
+interface DaemonStatusOverview {
+  daemon: "running" | "stopped"
+  health: "ok" | "warn"
+  socketPath: string
+  workerCount: number
+  senseCount: number
+}
+
+interface DaemonStatusPayload {
+  overview: DaemonStatusOverview
+  workers: DaemonWorkerRow[]
+  senses: DaemonSenseRow[]
+}
+
+function buildWorkerRows(
+  snapshots: ReturnType<DaemonProcessManagerLike["listAgentSnapshots"]>,
+): DaemonWorkerRow[] {
+  return snapshots.map((snapshot) => ({
+    agent: snapshot.name,
+    worker: snapshot.channel,
+    status: snapshot.status,
+    pid: snapshot.pid,
+    restartCount: snapshot.restartCount,
+    startedAt: snapshot.startedAt,
+  }))
+}
+
+function formatStatusSummary(payload: DaemonStatusPayload): string {
+  if (payload.overview.workerCount === 0 && payload.overview.senseCount === 0) {
+    return "no managed agents"
+  }
+  return `daemon=${payload.overview.daemon}\tworkers=${payload.overview.workerCount}\tsenses=${payload.overview.senseCount}\thealth=${payload.overview.health}`
 }
 
 function parseIncomingCommand(raw: string): DaemonCommand {
@@ -134,6 +170,7 @@ export class OuroDaemon {
   private readonly scheduler: DaemonSchedulerLike
   private readonly healthMonitor: DaemonHealthMonitorLike
   private readonly router: DaemonRouterLike
+  private readonly senseManager: DaemonSenseManagerLike | null
   private readonly bundlesRoot: string
   private server: net.Server | null = null
 
@@ -143,6 +180,7 @@ export class OuroDaemon {
     this.scheduler = options.scheduler
     this.healthMonitor = options.healthMonitor
     this.router = options.router
+    this.senseManager = options.senseManager ?? null
     this.bundlesRoot = options.bundlesRoot ?? getAgentBundlesRoot()
   }
 
@@ -156,6 +194,7 @@ export class OuroDaemon {
       meta: { socketPath: this.socketPath },
     })
     await this.processManager.startAutoStartAgents()
+    await this.senseManager?.startAutoStartSenses()
     this.scheduler.start?.()
     await this.scheduler.reconcile?.()
     await this.drainPendingBundleMessages()
@@ -259,6 +298,7 @@ export class OuroDaemon {
 
     this.scheduler.stop?.()
     await this.processManager.stopAll()
+    await this.senseManager?.stopAll()
 
     if (this.server) {
       await new Promise<void>((resolve) => {
@@ -302,10 +342,23 @@ export class OuroDaemon {
         return { ok: true, message: "daemon stopped" }
       case "daemon.status": {
         const snapshots = this.processManager.listAgentSnapshots()
+        const workers = buildWorkerRows(snapshots)
+        const senses = this.senseManager?.listSenseRows() ?? []
+        const data: DaemonStatusPayload = {
+          overview: {
+            daemon: "running",
+            health: workers.every((worker) => worker.status === "running") ? "ok" : "warn",
+            socketPath: this.socketPath,
+            workerCount: workers.length,
+            senseCount: senses.length,
+          },
+          workers,
+          senses,
+        }
         return {
           ok: true,
-          summary: formatStatusSummary(snapshots),
-          data: snapshots,
+          summary: formatStatusSummary(data),
+          data,
         }
       }
       case "daemon.health": {
