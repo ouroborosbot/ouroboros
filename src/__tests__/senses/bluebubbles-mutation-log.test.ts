@@ -100,4 +100,41 @@ describe("BlueBubbles mutation log", () => {
       }),
     )
   })
+
+  it("records null chat identity fields when BlueBubbles only gives a session key", async () => {
+    const { getBlueBubblesMutationLogPath, recordBlueBubblesMutation } = await import("../../senses/bluebubbles-mutation-log")
+
+    recordBlueBubblesMutation("slugger", {
+      kind: "mutation",
+      eventType: "updated-message",
+      mutationType: "delivery",
+      messageGuid: "msg-3",
+      timestamp: 3,
+      fromMe: false,
+      sender: {
+        provider: "imessage-handle",
+        externalId: "ari@mendelow.me",
+        rawId: "ari@mendelow.me",
+        displayName: "ari@mendelow.me",
+      },
+      chat: {
+        isGroup: true,
+        sessionKey: "chat_identifier:group-only",
+        sendTarget: { kind: "chat_identifier", value: "group-only" },
+      },
+      shouldNotifyAgent: false,
+      textForAgent: "message marked as delivered",
+      requiresRepair: false,
+    })
+
+    const pathToLog = getBlueBubblesMutationLogPath("slugger", "chat_identifier:group-only")
+    const entry = JSON.parse(fs.readFileSync(pathToLog, "utf-8").trim())
+    expect(entry).toEqual(
+      expect.objectContaining({
+        chatGuid: null,
+        chatIdentifier: null,
+        mutationType: "delivery",
+      }),
+    )
+  })
 })

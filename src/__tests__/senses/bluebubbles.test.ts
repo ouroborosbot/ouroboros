@@ -481,9 +481,14 @@ describe("BlueBubbles sense runtime", () => {
   it("runs notifyable mutations but returns explicit non-agent handling for read-only state changes", async () => {
     const bluebubbles = await import("../../senses/bluebubbles")
 
-    const reactionResult = await bluebubbles.handleBlueBubblesEvent(reactionPayload)
+    const runtimeDeps = {
+      getAgentName: () => "testagent",
+      recordMutation: mocks.recordMutation,
+    } as any
+
+    const reactionResult = await bluebubbles.handleBlueBubblesEvent(reactionPayload, runtimeDeps)
     const runAgentCallCount = mocks.runAgent.mock.calls.length
-    const readResult = await bluebubbles.handleBlueBubblesEvent(readPayload)
+    const readResult = await bluebubbles.handleBlueBubblesEvent(readPayload, runtimeDeps)
 
     expect(reactionResult).toEqual(
       expect.objectContaining({
@@ -658,6 +663,52 @@ describe("BlueBubbles sense runtime", () => {
       "bluebubbles",
       expect.any(AbortSignal),
       expect.any(Object),
+    )
+  })
+
+  it("emits an explicit nerves error when mutation sidecar recording fails", async () => {
+    const bluebubbles = await import("../../senses/bluebubbles")
+    mocks.recordMutation.mockImplementationOnce(() => {
+      throw new Error("disk full")
+    })
+
+    await bluebubbles.handleBlueBubblesEvent(readPayload, {
+      getAgentName: () => "testagent",
+      recordMutation: mocks.recordMutation,
+    } as any)
+
+    expect(mocks.emitNervesEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: "error",
+        event: "senses.bluebubbles_mutation_log_error",
+        meta: expect.objectContaining({
+          messageGuid: "174D57C8-5985-4528-8539-E4DBD777FE59",
+          mutationType: "read",
+          reason: "disk full",
+        }),
+      }),
+    )
+  })
+
+  it("captures string-throw mutation log failures explicitly too", async () => {
+    const bluebubbles = await import("../../senses/bluebubbles")
+    mocks.recordMutation.mockImplementationOnce(() => {
+      throw "disk offline"
+    })
+
+    await bluebubbles.handleBlueBubblesEvent(readPayload, {
+      getAgentName: () => "testagent",
+      recordMutation: mocks.recordMutation,
+    } as any)
+
+    expect(mocks.emitNervesEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: "error",
+        event: "senses.bluebubbles_mutation_log_error",
+        meta: expect.objectContaining({
+          reason: "disk offline",
+        }),
+      }),
     )
   })
 

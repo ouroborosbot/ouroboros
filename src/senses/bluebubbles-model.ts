@@ -45,6 +45,7 @@ export type BlueBubblesNormalizedMessage = {
   balloonBundleId?: string
   hasPayloadData: boolean
   requiresRepair: boolean
+  repairNotice?: string
   threadOriginatorGuid?: string
   replyToGuid?: string
 }
@@ -64,6 +65,7 @@ export type BlueBubblesNormalizedMutation = {
   shouldNotifyAgent: boolean
   textForAgent: string
   requiresRepair: boolean
+  repairNotice?: string
 }
 
 export type BlueBubblesNormalizedEvent =

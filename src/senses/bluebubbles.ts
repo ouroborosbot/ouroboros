@@ -3,7 +3,7 @@ import * as path from "node:path"
 import OpenAI from "openai"
 import { runAgent, type ChannelCallbacks, type RunAgentOptions, createSummarize } from "../heart/core"
 import { getBlueBubblesChannelConfig, getBlueBubblesConfig, sessionPath } from "../heart/config"
-import { getAgentRoot } from "../heart/identity"
+import { getAgentName, getAgentRoot } from "../heart/identity"
 import { loadSession, postTurn } from "../mind/context"
 import { accumulateFriendTokens } from "../mind/friends/tokens"
 import { FriendResolver, type FriendResolverParams } from "../mind/friends/resolver"
@@ -16,6 +16,7 @@ import {
   type BlueBubblesNormalizedEvent,
 } from "./bluebubbles-model"
 import { createBlueBubblesClient, type BlueBubblesClient } from "./bluebubbles-client"
+import { recordBlueBubblesMutation } from "./bluebubbles-mutation-log"
 
 type BlueBubblesCallbacks = ChannelCallbacks & {
   flush(): Promise<void>
@@ -29,6 +30,7 @@ export interface BlueBubblesHandleResult {
 }
 
 interface RuntimeDeps {
+  getAgentName: typeof getAgentName
   buildSystem: typeof buildSystem
   runAgent: typeof runAgent
   loadSession: typeof loadSession
@@ -36,12 +38,14 @@ interface RuntimeDeps {
   sessionPath: typeof sessionPath
   accumulateFriendTokens: typeof accumulateFriendTokens
   createClient: () => BlueBubblesClient
+  recordMutation: typeof recordBlueBubblesMutation
   createFriendStore: () => FileFriendStore
   createFriendResolver: (store: FileFriendStore, params: FriendResolverParams) => FriendResolver
   createServer: typeof http.createServer
 }
 
 const defaultDeps: RuntimeDeps = {
+  getAgentName,
   buildSystem,
   runAgent,
   loadSession,
@@ -49,6 +53,7 @@ const defaultDeps: RuntimeDeps = {
   sessionPath,
   accumulateFriendTokens,
   createClient: () => createBlueBubblesClient(),
+  recordMutation: recordBlueBubblesMutation,
   createFriendStore: () => new FileFriendStore(path.join(getAgentRoot(), "friends")),
   createFriendResolver: (store, params) => new FriendResolver(store, params),
   createServer: http.createServer,
@@ -74,7 +79,9 @@ function resolveFriendParams(event: BlueBubblesNormalizedEvent): FriendResolverP
 }
 
 function buildInboundText(event: BlueBubblesNormalizedEvent): string {
-  const baseText = event.textForAgent
+  const baseText = event.repairNotice?.trim()
+    ? `${event.textForAgent}\n[${event.repairNotice.trim()}]`
+    : event.textForAgent
   if (!event.chat.isGroup) return baseText
   if (event.kind === "mutation") {
     return `${event.sender.displayName} ${baseText}`
@@ -199,6 +206,24 @@ export async function handleBlueBubblesEvent(
       },
     })
     return { handled: true, notifiedAgent: false, kind: event.kind, reason: "from_me" }
+  }
+
+  if (event.kind === "mutation") {
+    try {
+      resolvedDeps.recordMutation(resolvedDeps.getAgentName(), event)
+    } catch (error) {
+      emitNervesEvent({
+        level: "error",
+        component: "senses",
+        event: "senses.bluebubbles_mutation_log_error",
+        message: "failed recording bluebubbles mutation sidecar",
+        meta: {
+          messageGuid: event.messageGuid,
+          mutationType: event.mutationType,
+          reason: error instanceof Error ? error.message : String(error),
+        },
+      })
+    }
   }
 
   if (event.kind === "mutation" && !event.shouldNotifyAgent) {
