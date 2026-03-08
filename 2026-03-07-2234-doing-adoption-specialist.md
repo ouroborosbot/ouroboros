@@ -19,12 +19,12 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - [ ] Running `ouro` with no agents in `~/AgentBundles/` launches the specialist session
 - [ ] Provider selection and credential entry happen before the LLM chat
 - [ ] Credentials are verified (provider runtime created successfully) before starting the specialist chat
-- [ ] Specialist loads SOUL.md + a random identity from the bundled `AdoptionSpecialist.ouro/`
-- [ ] Specialist can call `hatch_agent` tool to create a new agent bundle
-- [ ] Hatch animation displays after successful `hatch_agent` call
+- [x] Specialist loads SOUL.md + a random identity from the bundled `AdoptionSpecialist.ouro/`
+- [x] Specialist can call `hatch_agent` tool to create a new agent bundle
+- [x] Hatch animation displays after successful `hatch_agent` call
 - [ ] After specialist session ends, the hatchling's CLI session starts automatically
-- [ ] Specialist secrets are written to `~/.agentsecrets/AdoptionSpecialist/secrets.json` using the user's chosen provider credentials
-- [ ] Hatchling secrets are written to `~/.agentsecrets/{hatchlingName}/secrets.json`
+- [x] Specialist secrets are written to `~/.agentsecrets/AdoptionSpecialist/secrets.json` using the user's chosen provider credentials
+- [x] Hatchling secrets are written to `~/.agentsecrets/{hatchlingName}/secrets.json`
 - [ ] The AdoptionSpecialist.ouro bundle is NEVER copied to `~/AgentBundles/`
 - [ ] All existing tests continue to pass
 - [ ] 100% test coverage on all new code
@@ -240,7 +240,7 @@ The loop:
 
 ---
 
-### ⬜ Unit 8a: Specialist Orchestrator -- Tests
+### ✅ Unit 8a: Specialist Orchestrator -- Tests
 **What**: Write tests for `runAdoptionSpecialist(deps)` -- the top-level orchestrator that wires everything together. This function:
 1. Picks a random identity from the bundled `AdoptionSpecialist.ouro/`
 2. Reads SOUL.md from the bundled copy
@@ -263,7 +263,7 @@ The loop:
 - Cleanup runs even if session throws
 **Acceptance**: Tests FAIL because the module does not exist yet.
 
-### ⬜ Unit 8b: Specialist Orchestrator -- Implementation
+### ✅ Unit 8b: Specialist Orchestrator -- Implementation
 **What**: Create `src/heart/daemon/specialist-orchestrator.ts` with `runAdoptionSpecialist(deps: AdoptionSpecialistDeps): Promise<string | null>`.
 
 **Deps interface** should include:
@@ -281,7 +281,7 @@ The loop:
 **Files**: `src/heart/daemon/specialist-orchestrator.ts` (new file)
 **Acceptance**: All tests PASS (green).
 
-### ⬜ Unit 8c: Specialist Orchestrator -- Coverage & Refactor
+### ✅ Unit 8c: Specialist Orchestrator -- Coverage & Refactor
 **What**: Verify 100% coverage. Test cleanup-on-error path. Test edge cases.
 **Acceptance**: 100% coverage, tests still green.
 
@@ -365,3 +365,5 @@ The loop:
 - 2026-03-07 22:53 Unit 4 complete: hatch-animation.ts created, 4 tests, 100% coverage
 - 2026-03-07 22:54 Unit 5 complete: specialist-prompt.ts created, 6 tests, 100% coverage
 - 2026-03-07 22:57 Unit 6 complete: specialist-tools.ts created, 12 tests (5 schema + 7 execution), 100% coverage
+- 2026-03-07 23:16 Unit 7 complete: specialist-session.ts created, 15 tests, 100% coverage, nerves audit pass
+- 2026-03-08 PENDING Unit 8 complete: specialist-orchestrator.ts created, 15 tests, 100% coverage, fixed cleanup bug
