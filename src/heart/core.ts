@@ -106,6 +106,22 @@ export function getProvider(): ProviderId {
   return getProviderRuntime().id;
 }
 
+export function createSummarize(): (transcript: string, instruction: string) => Promise<string> {
+  return async (transcript: string, instruction: string): Promise<string> => {
+    const runtime = getProviderRuntime()
+    const client = runtime.client as OpenAI
+    const response = await client.chat.completions.create({
+      model: runtime.model,
+      messages: [
+        { role: "system", content: instruction },
+        { role: "user", content: transcript },
+      ],
+      max_tokens: 500,
+    })
+    return response.choices?.[0]?.message?.content ?? transcript
+  }
+}
+
 export function getProviderDisplayLabel(): string {
   const model = getModel();
   const providerLabelBuilders: Record<ProviderId, () => string> = {

@@ -20,6 +20,7 @@ export interface ToolContext {
   signin: (connectionName: string) => Promise<string | undefined>;
   context?: ResolvedContext;
   friendStore?: FriendStore;
+  summarize?: (transcript: string, instruction: string) => Promise<string>;
 }
 
 export type ToolHandler = (args: Record<string, string>, ctx?: ToolContext) => string | Promise<string>;
@@ -608,7 +609,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
         },
       },
     },
-    handler: async (args) => {
+    handler: async (args, ctx) => {
       try {
         const friendId = args.friendId
         const channel = args.channel
@@ -625,7 +626,20 @@ export const baseToolDefinitions: ToolDefinition[] = [
           .filter((m: { role: string }) => m.role !== "system")
         const tail = messages.slice(-count)
         if (tail.length === 0) return "session exists but has no non-system messages."
-        return tail.map((m: { role: string; content: string }) => `[${m.role}] ${m.content}`).join("\n")
+
+        const transcript = tail.map((m: { role: string; content: string }) => `[${m.role}] ${m.content}`).join("\n")
+
+        // LLM summarization when summarize function is available
+        if (ctx?.summarize) {
+          const trustLevel = ctx.context?.friend?.trustLevel ?? "family"
+          const isSelfQuery = friendId === "self"
+          const instruction = isSelfQuery
+            ? "summarize this session transcript fully and transparently. this is my own inner dialog — include all details, decisions, and reasoning."
+            : `summarize this session transcript. the person asking has trust level: ${trustLevel}. family=full transparency, friend=share work and general topics but protect other people's identities, acquaintance=very guarded minimal disclosure.`
+          return await ctx.summarize(transcript, instruction)
+        }
+
+        return transcript
       } catch {
         return "no session found for that friend/channel/key combination."
       }
@@ -673,7 +687,8 @@ export const baseToolDefinitions: ToolDefinition[] = [
         timestamp: now,
       }
       fs.writeFileSync(filePath, JSON.stringify(envelope, null, 2))
-      return `message queued for ${friendId}/${channel}/${key}`
+      const preview = content.length > 80 ? content.slice(0, 80) + "…" : content
+      return `message queued for delivery to ${friendId} on ${channel}/${key}. preview: "${preview}". it will be delivered when their session is next active.`
     },
   },
   ...codingToolDefinitions,

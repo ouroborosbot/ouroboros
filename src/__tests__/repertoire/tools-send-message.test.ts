@@ -138,4 +138,19 @@ describe("send_message tool", () => {
     expect(written.timestamp).toBeDefined()
     expect(typeof written.timestamp).toBe("number")
   })
+
+  it("truncates long content in confirmation preview", async () => {
+    const { baseToolDefinitions } = await import("../../repertoire/tools-base")
+    const tool = baseToolDefinitions.find(d => d.tool.function.name === "send_message")!
+
+    const longContent = "a".repeat(100)
+    const result = await tool.handler({
+      friendId: "friend-uuid-1",
+      channel: "cli",
+      content: longContent,
+    })
+
+    expect(result).toContain("…")
+    expect(result).not.toContain("a".repeat(100))
+  })
 })
