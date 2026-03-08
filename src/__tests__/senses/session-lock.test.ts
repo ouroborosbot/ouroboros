@@ -152,4 +152,36 @@ describe("session-lock", () => {
       try { fs.unlinkSync(lockPath) } catch { /* cleanup */ }
     }
   })
+
+  it("detects live process using default deps and rejects concurrent lock", () => {
+    const fs = require("fs") as typeof import("fs")
+    const os = require("os") as typeof import("os")
+    const path = require("path") as typeof import("path")
+    const lockPath = path.join(os.tmpdir(), `session-lock-conflict-${Date.now()}.lock`)
+    try {
+      const lock = acquireSessionLock(lockPath, "slugger")
+      // Second acquire with default deps should fail (current process is alive)
+      expect(() => acquireSessionLock(lockPath, "slugger")).toThrow(SessionLockError)
+      lock.release()
+    } finally {
+      try { fs.unlinkSync(lockPath) } catch { /* cleanup */ }
+    }
+  })
+
+  it("steals stale lock using default deps when PID is dead", () => {
+    const fs = require("fs") as typeof import("fs")
+    const os = require("os") as typeof import("os")
+    const path = require("path") as typeof import("path")
+    const lockPath = path.join(os.tmpdir(), `session-lock-stale-${Date.now()}.lock`)
+    try {
+      // Write a lock file with a dead PID
+      fs.writeFileSync(lockPath, "999999999", { flag: "wx" })
+      // Should steal the lock since PID 999999999 is dead
+      const lock = acquireSessionLock(lockPath, "slugger")
+      expect(fs.existsSync(lockPath)).toBe(true)
+      lock.release()
+    } finally {
+      try { fs.unlinkSync(lockPath) } catch { /* cleanup */ }
+    }
+  })
 })

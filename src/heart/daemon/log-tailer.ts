@@ -23,9 +23,11 @@ export interface TailLogsOptions {
 }
 
 export function discoverLogFiles(options: Pick<TailLogsOptions, "homeDir" | "existsSync" | "readdirSync" | "agentFilter">): string[] {
+  /* v8 ignore start -- integration: default DI stubs for real OS @preserve */
   const homeDir = options.homeDir ?? os.homedir()
   const existsSync = options.existsSync ?? (() => false)
   const readdirSync = options.readdirSync ?? (() => [])
+  /* v8 ignore stop */
 
   const logDir = path.join(homeDir, ".agentstate", "daemon", "logs")
   const files: string[] = []
@@ -65,9 +67,11 @@ export function formatLogLine(ndjsonLine: string): string {
 }
 
 export function tailLogs(options: TailLogsOptions = {}): () => void {
+  /* v8 ignore start -- integration: default DI stubs for real OS @preserve */
   const writer = options.writer ?? ((text: string) => process.stdout.write(text))
   const lineCount = options.lines ?? 20
   const readFileSync = options.readFileSync ?? (() => "")
+  /* v8 ignore stop */
   const watchFile = options.watchFile
   const unwatchFile = options.unwatchFile
 
@@ -98,6 +102,7 @@ export function tailLogs(options: TailLogsOptions = {}): () => void {
         } catch {
           return
         }
+        /* v8 ignore next -- defensive: fileSizes always populated above @preserve */
         const prevSize = fileSizes.get(file) ?? 0
         if (content.length <= prevSize) return
         fileSizes.set(file, content.length)

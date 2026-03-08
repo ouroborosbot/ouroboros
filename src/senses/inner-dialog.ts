@@ -193,6 +193,7 @@ export async function runInnerDialogTurn(options?: RunInnerDialogTurnOptions): P
   if (inboxMessages.length > 0) {
     const lastUserIdx = messages.length - 1
     const lastUser = messages[lastUserIdx]
+    /* v8 ignore next -- defensive: all code paths push a user message before here @preserve */
     if (lastUser?.role === "user" && typeof lastUser.content === "string") {
       const section = inboxMessages
         .map((msg) => `- **${msg.from}**: ${msg.content}`)

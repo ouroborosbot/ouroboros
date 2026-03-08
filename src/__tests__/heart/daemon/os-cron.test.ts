@@ -250,6 +250,15 @@ describe("CrontabCronManager", () => {
     expect(written).toContain("# ouro:slugger:heartbeat:cadence")
   })
 
+  it("sync writes empty crontab when no jobs and no existing entries", () => {
+    const deps = makeCrontabDeps()
+    const manager = new CrontabCronManager(deps)
+
+    manager.sync([])
+
+    expect(deps.execWrite).toHaveBeenCalledWith("crontab -", "")
+  })
+
   it("removeAll clears all ouro entries", () => {
     const deps = makeCrontabDeps({
       execOutput: vi.fn(() => "0 * * * * /usr/bin/backup\n# ouro:slugger:heartbeat:cadence\n*/30 * * * * ouro poke slugger --task heartbeat\n"),
@@ -294,6 +303,17 @@ describe("CrontabCronManager", () => {
 })
 
 describe("createOsCronManager", () => {
+  it("uses process.platform when no platform specified", () => {
+    const manager = createOsCronManager()
+    // On macOS (darwin), should return LaunchdCronManager
+    // On Linux, should return CrontabCronManager
+    // Either way, it should be an OsCronManager instance
+    expect(manager).toBeDefined()
+    expect(typeof manager.sync).toBe("function")
+    expect(typeof manager.removeAll).toBe("function")
+    expect(typeof manager.list).toBe("function")
+  })
+
   it("returns LaunchdCronManager for darwin", () => {
     const manager = createOsCronManager({ platform: "darwin" })
     expect(manager).toBeInstanceOf(LaunchdCronManager)

@@ -387,11 +387,13 @@ export async function main(agentName?: string, options?: { pasteDebounceMs?: num
   try {
     sessionLock = acquireSessionLock(`${sessPath}.lock`, getAgentName())
   } catch (error) {
+    /* v8 ignore start -- integration: main() is interactive, lock tested in session-lock.test.ts @preserve */
     if (error instanceof SessionLockError) {
       process.stderr.write(`${error.message}\n`)
       return
     }
     throw error
+    /* v8 ignore stop */
   }
 
   // Load existing session or start fresh
