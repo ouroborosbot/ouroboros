@@ -745,6 +745,35 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   }
 
   if (command.kind === "hatch.start") {
+    // Route through adoption specialist when no explicit hatch args were provided
+    const hasExplicitHatchArgs = !!(command.agentName || command.humanName || command.provider || command.credentials)
+    if (deps.runAdoptionSpecialist && !hasExplicitHatchArgs) {
+      const hatchlingName = await deps.runAdoptionSpecialist()
+      if (!hatchlingName) {
+        return ""
+      }
+
+      try {
+        await deps.installSubagents()
+      } catch (error) {
+        emitNervesEvent({
+          level: "warn",
+          component: "daemon",
+          event: "daemon.subagent_install_error",
+          message: "subagent auto-install failed",
+          meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
+        })
+      }
+
+      await registerOuroBundleTypeNonBlocking(deps)
+      await ensureDaemonRunning(deps)
+
+      if (deps.startChat) {
+        await deps.startChat(hatchlingName)
+      }
+      return ""
+    }
+
     const hatchRunner = deps.runHatchFlow
     if (!hatchRunner) {
       const response = await deps.sendCommand(deps.socketPath, { kind: "hatch.start" })
@@ -764,7 +793,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
         component: "daemon",
         event: "daemon.subagent_install_error",
         message: "subagent auto-install failed",
-        meta: { error: error instanceof Error ? error.message : String(error) },
+        meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
       })
     }
 
