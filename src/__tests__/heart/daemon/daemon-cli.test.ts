@@ -306,6 +306,35 @@ describe("ouro CLI execution", () => {
     expect(result).toContain("running")
   })
 
+  it("renders overview defaults when daemon status omits optional overview fields", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({
+        ok: true,
+        summary: "daemon=running\tworkers=0\tsenses=0\thealth=ok",
+        data: {
+          overview: {},
+          senses: [],
+          workers: [],
+        },
+      })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+    }
+
+    const result = await runOuroCli(["status"], deps)
+
+    expect(result).toContain("| Daemon  | unknown |")
+    expect(result).toContain("| Socket  | unknown |")
+    expect(result).toContain("| Workers | 0")
+    expect(result).toContain("| Senses  | 0")
+    expect(result).toContain("| Health  | unknown |")
+  })
+
   it("renders daemon status with Overview, Senses, and Workers sections", async () => {
     const deps: OuroCliDeps = {
       socketPath: "/tmp/ouro-test.sock",
@@ -324,6 +353,7 @@ describe("ouro CLI execution", () => {
             {
               agent: "slugger",
               sense: "cli",
+              label: "CLI",
               enabled: true,
               status: "interactive",
               detail: "local interactive terminal",
@@ -348,7 +378,7 @@ describe("ouro CLI execution", () => {
               agent: "slugger",
               worker: "inner-dialog",
               status: "running",
-              pid: 4321,
+              pid: null,
               restartCount: 0,
             },
           ],
@@ -371,6 +401,298 @@ describe("ouro CLI execution", () => {
     expect(result).toContain("interactive")
     expect(result).toContain("/bluebubbles-webhook")
     expect(result).toContain("inner-dialog")
+    expect(result).toContain("n/a")
+  })
+
+  it("falls back to the raw sense name when daemon status includes an unknown sense label", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({
+        ok: true,
+        summary: "daemon=running\tworkers=0\tsenses=1\thealth=ok",
+        data: {
+          overview: {
+            daemon: "running",
+            socketPath: "/tmp/ouro-test.sock",
+            workerCount: 0,
+            senseCount: 1,
+            health: "ok",
+          },
+          senses: [
+            {
+              agent: "slugger",
+              sense: "pagerduty",
+              enabled: true,
+              status: "running",
+              detail: "custom bridge",
+            },
+          ],
+          workers: [],
+        },
+      })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+    }
+
+    const result = await runOuroCli(["status"], deps)
+
+    expect(result).toContain("pagerduty")
+    expect(result).toContain("custom bridge")
+  })
+
+  it("humanizes built-in sense names and renders numeric worker pids", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({
+        ok: true,
+        summary: "daemon=running\tworkers=1\tsenses=2\thealth=ok",
+        data: {
+          overview: {
+            daemon: "running",
+            socketPath: "/tmp/ouro-test.sock",
+            workerCount: 1,
+            senseCount: 2,
+            health: "ok",
+          },
+          senses: [
+            {
+              agent: "slugger",
+              sense: "cli",
+              enabled: true,
+              status: "interactive",
+              detail: "open with ouro chat slugger",
+            },
+            {
+              agent: "slugger",
+              sense: "teams",
+              enabled: false,
+              status: "disabled",
+              detail: "not enabled in agent.json",
+            },
+          ],
+          workers: [
+            {
+              agent: "slugger",
+              worker: "inner-dialog",
+              status: "running",
+              pid: 12345,
+              restartCount: 2,
+            },
+          ],
+        },
+      })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+    }
+
+    const result = await runOuroCli(["status"], deps)
+
+    expect(result).toContain("CLI")
+    expect(result).toContain("Teams")
+    expect(result).toContain("12345")
+    expect(result).toContain("2")
+  })
+
+  it("falls back to the raw daemon summary when a sense row is malformed", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({
+        ok: true,
+        summary: "malformed-sense-row",
+        data: {
+          overview: {
+            daemon: "running",
+            socketPath: "/tmp/ouro-test.sock",
+            workerCount: 0,
+            senseCount: 1,
+            health: "ok",
+          },
+          senses: ["bad-row"],
+          workers: [],
+        },
+      })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+    }
+
+    const result = await runOuroCli(["status"], deps)
+
+    expect(result).toBe("malformed-sense-row")
+  })
+
+  it("falls back to the raw daemon summary when overview is malformed", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({
+        ok: true,
+        summary: "malformed-overview",
+        data: {
+          overview: [],
+          senses: [],
+          workers: [],
+        },
+      })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+    }
+
+    const result = await runOuroCli(["status"], deps)
+
+    expect(result).toBe("malformed-overview")
+  })
+
+  it("falls back to the raw daemon summary when senses or workers are not arrays", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({
+        ok: true,
+        summary: "malformed-sense-worker-arrays",
+        data: {
+          overview: {
+            daemon: "running",
+            socketPath: "/tmp/ouro-test.sock",
+            workerCount: 0,
+            senseCount: 0,
+            health: "ok",
+          },
+          senses: {},
+          workers: {},
+        },
+      })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+    }
+
+    const result = await runOuroCli(["status"], deps)
+
+    expect(result).toBe("malformed-sense-worker-arrays")
+  })
+
+  it("falls back to the raw daemon summary when a sense row is missing a required field", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({
+        ok: true,
+        summary: "sense-row-missing-field",
+        data: {
+          overview: {
+            daemon: "running",
+            socketPath: "/tmp/ouro-test.sock",
+            workerCount: 0,
+            senseCount: 1,
+            health: "ok",
+          },
+          senses: [
+            {
+              agent: "slugger",
+              sense: "bluebubbles",
+              status: "running",
+              detail: "missing enabled",
+            },
+          ],
+          workers: [],
+        },
+      })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+    }
+
+    const result = await runOuroCli(["status"], deps)
+
+    expect(result).toBe("sense-row-missing-field")
+  })
+
+  it("falls back to the raw daemon summary when a worker row is malformed", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({
+        ok: true,
+        summary: "malformed-worker-row",
+        data: {
+          overview: {
+            daemon: "running",
+            socketPath: "/tmp/ouro-test.sock",
+            workerCount: 1,
+            senseCount: 0,
+            health: "ok",
+          },
+          senses: [],
+          workers: ["bad-row"],
+        },
+      })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+    }
+
+    const result = await runOuroCli(["status"], deps)
+
+    expect(result).toBe("malformed-worker-row")
+  })
+
+  it("falls back to the raw daemon summary when a worker row is missing pid", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({
+        ok: true,
+        summary: "worker-row-missing-pid",
+        data: {
+          overview: {
+            daemon: "running",
+            socketPath: "/tmp/ouro-test.sock",
+            workerCount: 1,
+            senseCount: 0,
+            health: "ok",
+          },
+          senses: [],
+          workers: [
+            {
+              agent: "slugger",
+              worker: "inner-dialog",
+              status: "running",
+              restartCount: 0,
+            },
+          ],
+        },
+      })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+    }
+
+    const result = await runOuroCli(["status"], deps)
+
+    expect(result).toBe("worker-row-missing-pid")
   })
 
   it("routes bare ouro to hatch when no agents are discovered", async () => {
