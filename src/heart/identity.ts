@@ -4,9 +4,19 @@ import * as path from "path"
 import { emitNervesEvent } from "../nerves/runtime"
 
 export type AgentProvider = "azure" | "minimax" | "anthropic" | "openai-codex"
+export type SenseName = "cli" | "teams" | "bluebubbles"
 
 export type LogLevel = "debug" | "info" | "warn" | "error"
 export type LogSinkType = "terminal" | "ndjson"
+export interface AgentSenseConfig {
+  enabled: boolean
+}
+
+export interface AgentSensesConfig {
+  cli: AgentSenseConfig
+  teams: AgentSenseConfig
+  bluebubbles: AgentSenseConfig
+}
 
 export interface AgentConfig {
   version: number
@@ -20,6 +30,7 @@ export interface AgentConfig {
     level?: LogLevel
     sinks?: LogSinkType[]
   }
+  senses?: AgentSensesConfig
   phrases: {
     thinking: string[]
     tool: string[]
@@ -38,12 +49,78 @@ export const DEFAULT_AGENT_PHRASES: AgentConfig["phrases"] = {
   followup: ["processing"],
 }
 
+export const DEFAULT_AGENT_SENSES: AgentSensesConfig = {
+  cli: { enabled: true },
+  teams: { enabled: false },
+  bluebubbles: { enabled: false },
+}
+
+function normalizeSenses(value: unknown, configFile: string): AgentSensesConfig {
+  const defaults: AgentSensesConfig = {
+    cli: { ...DEFAULT_AGENT_SENSES.cli },
+    teams: { ...DEFAULT_AGENT_SENSES.teams },
+    bluebubbles: { ...DEFAULT_AGENT_SENSES.bluebubbles },
+  }
+
+  if (value === undefined) {
+    return defaults
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    emitNervesEvent({
+      level: "error",
+      event: "config_identity.error",
+      component: "config/identity",
+      message: "agent config has invalid senses block",
+      meta: { path: configFile },
+    })
+    throw new Error(`agent.json at ${configFile} must include senses as an object when present.`)
+  }
+
+  const raw = value as Record<string, unknown>
+  const senseNames: SenseName[] = ["cli", "teams", "bluebubbles"]
+  for (const senseName of senseNames) {
+    const rawSense = raw[senseName]
+    if (rawSense === undefined) {
+      continue
+    }
+    if (!rawSense || typeof rawSense !== "object" || Array.isArray(rawSense)) {
+      emitNervesEvent({
+        level: "error",
+        event: "config_identity.error",
+        component: "config/identity",
+        message: "agent config has invalid sense config",
+        meta: { path: configFile, sense: senseName },
+      })
+      throw new Error(`agent.json at ${configFile} has invalid senses.${senseName} config.`)
+    }
+    const enabled = (rawSense as Record<string, unknown>).enabled
+    if (typeof enabled !== "boolean") {
+      emitNervesEvent({
+        level: "error",
+        event: "config_identity.error",
+        component: "config/identity",
+        message: "agent config has invalid sense enabled flag",
+        meta: { path: configFile, sense: senseName, enabled: enabled ?? null },
+      })
+      throw new Error(`agent.json at ${configFile} must include senses.${senseName}.enabled as boolean.`)
+    }
+    defaults[senseName] = { enabled }
+  }
+
+  return defaults
+}
+
 export function buildDefaultAgentTemplate(_agentName: string): AgentConfig {
   return {
     version: 1,
     enabled: true,
     provider: "anthropic",
     context: { ...DEFAULT_AGENT_CONTEXT },
+    senses: {
+      cli: { ...DEFAULT_AGENT_SENSES.cli },
+      teams: { ...DEFAULT_AGENT_SENSES.teams },
+      bluebubbles: { ...DEFAULT_AGENT_SENSES.bluebubbles },
+    },
     phrases: {
       thinking: [...DEFAULT_AGENT_PHRASES.thinking],
       tool: [...DEFAULT_AGENT_PHRASES.tool],
@@ -271,6 +348,7 @@ export function loadAgentConfig(): AgentConfig {
     provider: rawProvider,
     context: parsed.context as AgentConfig["context"] | undefined,
     logging: parsed.logging as AgentConfig["logging"] | undefined,
+    senses: normalizeSenses(parsed.senses, configFile),
     phrases: parsed.phrases as AgentConfig["phrases"],
   }
   emitNervesEvent({

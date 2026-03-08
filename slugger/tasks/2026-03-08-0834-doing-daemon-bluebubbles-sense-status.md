@@ -62,7 +62,7 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 **Output**: New red-phase tests covering sense config parsing and shared state semantics.
 **Acceptance**: Tests exist in the relevant identity/config/daemon suites and FAIL (red).
 
-### ⬜ Unit 1b: Sense Truth Model And Agent Config — Implementation
+### ✅ Unit 1b: Sense Truth Model And Agent Config — Implementation
 **What**: Implement the shared sense-truth/config layer that parses agent-level sense enablement and produces a single source of truth for daemon/status/prompt consumers.
 **Output**: Updated agent config parsing plus shared sense inventory/state code.
 **Acceptance**: New tests PASS (green), build passes, and no warnings are emitted.
@@ -126,3 +126,4 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 - 2026-03-08 09:34 Completed quality pass and marked doc READY_FOR_EXECUTION
 - 2026-03-08 16:56 Unit 0 complete: captured current daemon/status baseline, discovered Slugger bundle relocation candidates, and recorded BlueBubbles source values from `~/.openclaw`
 - 2026-03-08 16:58 Unit 1a complete: wrote failing tests for agent `senses` parsing/defaults and the shared sense-truth inventory model
+- 2026-03-08 17:00 Unit 1b complete: implemented agent `senses` parsing/defaults and the shared sense-truth inventory module, with targeted tests and build passing
