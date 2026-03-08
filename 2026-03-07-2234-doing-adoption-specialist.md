@@ -100,7 +100,7 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 
 ---
 
-### ⬜ Unit 3a: hatch-flow.ts -- Export writeSecretsFile -- Tests
+### ✅ Unit 3a: hatch-flow.ts -- Export writeSecretsFile -- Tests
 **What**: Write tests verifying `writeSecretsFile` can be imported and called directly (it is currently private). Tests should verify it writes a valid secrets.json for each provider type to a given path.
 **Files**: `src/__tests__/heart/daemon/hatch-flow.test.ts` (add tests)
 **Tests to write**:
@@ -109,12 +109,12 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - Returns the path to the written secrets file
 **Acceptance**: Tests FAIL because `writeSecretsFile` is not exported.
 
-### ⬜ Unit 3b: hatch-flow.ts -- Export writeSecretsFile -- Implementation
+### ✅ Unit 3b: hatch-flow.ts -- Export writeSecretsFile -- Implementation
 **What**: Change `writeSecretsFile` from a private function to an exported function in `hatch-flow.ts`. No logic changes -- just add `export` keyword.
 **Files**: `src/heart/daemon/hatch-flow.ts`
 **Acceptance**: All tests PASS (green). Existing hatch-flow tests still pass.
 
-### ⬜ Unit 3c: hatch-flow.ts -- Export writeSecretsFile -- Coverage & Refactor
+### ✅ Unit 3c: hatch-flow.ts -- Export writeSecretsFile -- Coverage & Refactor
 **What**: Verify coverage. The function was already covered by existing tests calling `runHatchFlow`. New direct tests add additional coverage paths.
 **Acceptance**: 100% coverage on `writeSecretsFile`, tests still green.
 
@@ -360,3 +360,4 @@ The loop:
 - 2026-03-07 22:43 Passes complete (granularity, validation, quality). Status: READY_FOR_EXECUTION
 - 2026-03-07 22:46 Unit 0 complete: 2046 tests passing, 18 skipped, 100% coverage, clean tsc build
 - 2026-03-07 22:49 Unit 1 complete: setAgentConfigOverride added to identity.ts, 4 new tests, 100% coverage
+- 2026-03-07 22:50 Unit 2 complete: resetProviderRuntime added to core.ts, 2 new tests, 100% coverage
