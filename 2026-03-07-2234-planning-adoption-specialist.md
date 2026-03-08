@@ -112,3 +112,4 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 
 ## Progress Log
 - 2026-03-07 22:35 Created
+- 2026-03-07 22:38 Approved -- resolved all open questions, added implementation decisions
