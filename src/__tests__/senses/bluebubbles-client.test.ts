@@ -6,6 +6,14 @@ vi.mock("../../nerves/runtime", () => ({
   emitNervesEvent: (...args: any[]) => emitNervesEvent(...args),
 }))
 
+const dmChat = {
+  chatGuid: "any;-;ari@mendelow.me",
+  chatIdentifier: "ari@mendelow.me",
+  isGroup: false,
+  sessionKey: "chat:any;-;ari@mendelow.me",
+  sendTarget: { kind: "chat_guid", value: "any;-;ari@mendelow.me" } as const,
+}
+
 describe("BlueBubbles client", () => {
   const originalFetch = global.fetch
 
@@ -207,17 +215,9 @@ describe("BlueBubbles client", () => {
       },
     )
 
-    const chat = {
-      chatGuid: "any;-;ari@mendelow.me",
-      chatIdentifier: "ari@mendelow.me",
-      isGroup: false,
-      sessionKey: "chat:any;-;ari@mendelow.me",
-      sendTarget: { kind: "chat_guid", value: "any;-;ari@mendelow.me" } as const,
-    }
-
-    await expect(client.sendText({ chat, text: "hello once" })).resolves.toEqual({ messageGuid: undefined })
-    await expect(client.sendText({ chat, text: "hello twice" })).resolves.toEqual({ messageGuid: undefined })
-    await expect(client.sendText({ chat, text: "hello thrice" })).resolves.toEqual({ messageGuid: undefined })
+    await expect(client.sendText({ chat: dmChat, text: "hello once" })).resolves.toEqual({ messageGuid: undefined })
+    await expect(client.sendText({ chat: dmChat, text: "hello twice" })).resolves.toEqual({ messageGuid: undefined })
+    await expect(client.sendText({ chat: dmChat, text: "hello thrice" })).resolves.toEqual({ messageGuid: undefined })
 
     const event = {
       kind: "message" as const,
@@ -231,7 +231,7 @@ describe("BlueBubbles client", () => {
         rawId: "ari@mendelow.me",
         displayName: "ari@mendelow.me",
       },
-      chat,
+      chat: dmChat,
       text: "hi",
       textForAgent: "hi",
       attachments: [],
@@ -240,6 +240,145 @@ describe("BlueBubbles client", () => {
     }
 
     await expect(client.repairEvent(event)).resolves.toBe(event)
+  })
+
+  it("hydrates repairable OG-card messages by fetching the full BlueBubbles message record", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            guid: "msg-og",
+            text: "https://ouroboros.bot",
+            handle: {
+              address: "ari@mendelow.me",
+              service: "iMessage",
+            },
+            attachments: [
+              {
+                guid: "payload-guid",
+                transferName: "preview.pluginPayloadAttachment",
+                totalBytes: 1234,
+              },
+            ],
+            balloonBundleId: "com.apple.messages.URLBalloonProvider",
+            hasPayloadData: true,
+            payloadData: [
+              {
+                title: "Ouroboros Bot",
+                summary: "Agent harness for iMessage",
+              },
+            ],
+            chats: [
+              {
+                guid: "any;-;ari@mendelow.me",
+                style: 45,
+                chatIdentifier: "ari@mendelow.me",
+                displayName: "",
+              },
+            ],
+          },
+        }),
+        { status: 200 },
+      ),
+    ) as typeof fetch
+
+    const { createBlueBubblesClient } = await import("../../senses/bluebubbles-client")
+    const client = createBlueBubblesClient(
+      {
+        serverUrl: "http://bluebubbles.local",
+        password: "secret-token",
+        accountId: "default",
+      },
+      {
+        port: 18790,
+        webhookPath: "/bluebubbles-webhook",
+        requestTimeoutMs: 30000,
+      },
+    )
+
+    const result = await client.repairEvent({
+      kind: "message",
+      eventType: "new-message",
+      messageGuid: "msg-og",
+      timestamp: 1,
+      fromMe: false,
+      sender: {
+        provider: "imessage-handle",
+        externalId: "ari@mendelow.me",
+        rawId: "ari@mendelow.me",
+        displayName: "ari@mendelow.me",
+      },
+      chat: dmChat,
+      text: "https://ouroboros.bot",
+      textForAgent: "https://ouroboros.bot\n[link preview attached]",
+      attachments: [{ guid: "payload-guid", transferName: "preview.pluginPayloadAttachment" }],
+      balloonBundleId: "com.apple.messages.URLBalloonProvider",
+      hasPayloadData: true,
+      requiresRepair: true,
+    })
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/message/msg-og?"),
+      expect.objectContaining({
+        method: "GET",
+        signal: expect.any(AbortSignal),
+      }),
+    )
+    expect(result).toEqual(
+      expect.objectContaining({
+        kind: "message",
+        messageGuid: "msg-og",
+        requiresRepair: false,
+      }),
+    )
+    expect(result.textForAgent).toContain("Ouroboros Bot")
+    expect(result.textForAgent).toContain("Agent harness for iMessage")
+  })
+
+  it("returns an explicit fallback notice when repair fetch fails", async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error("network down")) as typeof fetch
+
+    const { createBlueBubblesClient } = await import("../../senses/bluebubbles-client")
+    const client = createBlueBubblesClient(
+      {
+        serverUrl: "http://bluebubbles.local",
+        password: "secret-token",
+        accountId: "default",
+      },
+      {
+        port: 18790,
+        webhookPath: "/bluebubbles-webhook",
+        requestTimeoutMs: 30000,
+      },
+    )
+
+    const result = await client.repairEvent({
+      kind: "message",
+      eventType: "new-message",
+      messageGuid: "msg-audio",
+      timestamp: 1,
+      fromMe: false,
+      sender: {
+        provider: "imessage-handle",
+        externalId: "ari@mendelow.me",
+        rawId: "ari@mendelow.me",
+        displayName: "ari@mendelow.me",
+      },
+      chat: dmChat,
+      text: "",
+      textForAgent: "[audio attachment: Audio Message.mp3]",
+      attachments: [{ guid: "audio-guid", mimeType: "audio/mp3", transferName: "Audio Message.mp3" }],
+      hasPayloadData: false,
+      requiresRepair: true,
+    })
+
+    expect(result.requiresRepair).toBe(false)
+    expect(result.textForAgent).toContain("audio attachment")
+    expect(result).toEqual(
+      expect.objectContaining({
+        repairNotice: expect.stringContaining("network down"),
+      }),
+    )
   })
 
   it("falls back to an unknown error body when reading the error response fails", async () => {
