@@ -5,7 +5,7 @@ import { getAgentBundlesRoot } from "../identity"
 import { emitNervesEvent } from "../../nerves/runtime"
 import { parseTaskFile, renderTaskFile } from "../../repertoire/tasks/parser"
 
-interface ScheduledTaskJob {
+export interface ScheduledTaskJob {
   id: string
   agent: string
   taskId: string
