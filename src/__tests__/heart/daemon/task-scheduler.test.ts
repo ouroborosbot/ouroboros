@@ -1,10 +1,11 @@
 import * as fs from "fs"
 import * as os from "os"
 import * as path from "path"
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { parseTaskFile, renderTaskFile } from "../../../repertoire/tasks/parser"
 import { TaskDrivenScheduler } from "../../../heart/daemon/task-scheduler"
+import type { OsCronManager } from "../../../heart/daemon/os-cron"
 
 function makeTaskFile(
   bundlesRoot: string,
@@ -327,5 +328,68 @@ describe("task-driven scheduler", () => {
 
     await expect(scheduler.reconcile()).resolves.toBeUndefined()
     scheduler.stop()
+  })
+
+  it("calls osCronManager.sync after reconcile when provided", async () => {
+    bundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "task-scheduler-"))
+
+    makeTaskFile(bundlesRoot, "slugger", "habits", "2026-03-07-1400-cron-sync", {
+      type: "habit",
+      category: "operations",
+      title: "Cron sync test",
+      status: "processing",
+      cadence: "30m",
+      scheduledAt: null,
+      lastRun: null,
+      created: "2026-03-07",
+      updated: "2026-03-07",
+    })
+
+    const osCronManager: OsCronManager = {
+      sync: vi.fn(),
+      removeAll: vi.fn(),
+      list: vi.fn(() => []),
+    }
+
+    const scheduler = new TaskDrivenScheduler({
+      bundlesRoot,
+      agents: ["slugger"],
+      osCronManager,
+    })
+
+    await scheduler.reconcile()
+
+    expect(osCronManager.sync).toHaveBeenCalledTimes(1)
+    const syncedJobs = (osCronManager.sync as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(syncedJobs).toHaveLength(1)
+    expect(syncedJobs[0].id).toBe("slugger:2026-03-07-1400-cron-sync:cadence")
+  })
+
+  it("calls osCronManager.removeAll on stop when provided", () => {
+    const osCronManager: OsCronManager = {
+      sync: vi.fn(),
+      removeAll: vi.fn(),
+      list: vi.fn(() => []),
+    }
+
+    const scheduler = new TaskDrivenScheduler({
+      agents: ["slugger"],
+      existsSync: () => false,
+      osCronManager,
+    })
+
+    scheduler.stop()
+
+    expect(osCronManager.removeAll).toHaveBeenCalledTimes(1)
+  })
+
+  it("works without osCronManager (no errors on reconcile/stop)", async () => {
+    const scheduler = new TaskDrivenScheduler({
+      agents: ["slugger"],
+      existsSync: () => false,
+    })
+
+    await expect(scheduler.reconcile()).resolves.toBeUndefined()
+    expect(() => scheduler.stop()).not.toThrow()
   })
 })
