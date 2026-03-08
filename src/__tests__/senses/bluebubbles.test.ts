@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { EventEmitter } from "node:events"
+import { Readable } from "node:stream"
 
 const mocks = vi.hoisted(() => ({
   runAgent: vi.fn(),
@@ -70,6 +70,22 @@ vi.mock("../../mind/friends/resolver", () => ({
     mocks.resolverCtor(store, params)
     this.resolve = (...args: any[]) => mocks.resolveContext(...args)
   }),
+}))
+
+vi.mock("../../heart/identity", () => ({
+  getAgentName: vi.fn(() => "testagent"),
+  getAgentRoot: vi.fn(() => "/mock/agent/root"),
+  getAgentSecretsPath: vi.fn(() => "/tmp/.agentsecrets/testagent/secrets.json"),
+  loadAgentConfig: vi.fn(() => ({
+    name: "testagent",
+    configPath: "~/.agentsecrets/testagent/secrets.json",
+    provider: "minimax",
+    phrases: {
+      thinking: ["thinking"],
+      tool: ["tool"],
+      followup: ["followup"],
+    },
+  })),
 }))
 
 vi.mock("../../nerves/runtime", () => ({
@@ -184,6 +200,47 @@ const readPayload = {
   },
 }
 
+const fromMePayload = {
+  ...dmThreadPayload,
+  data: {
+    ...dmThreadPayload.data,
+    guid: "EAC6F0AD-2869-4D99-B6F4-10D6D8A03C4A",
+    isFromMe: true,
+  },
+}
+
+const groupReactionPayload = {
+  ...reactionPayload,
+  data: {
+    ...reactionPayload.data,
+    chats: [
+      {
+        guid: "any;+;35820e69c97c459992d29a334f412979",
+        style: 43,
+        chatIdentifier: "35820e69c97c459992d29a334f412979",
+        displayName: "Consciousness TBD",
+      },
+    ],
+  },
+}
+
+const identifierOnlyPayload = {
+  type: "new-message",
+  data: {
+    guid: "E5F304D7-12E2-42FD-8E15-8130BDA37C80",
+    text: "identifier only",
+    handle: {
+      id: "+1 (973) 508-0289",
+    },
+    attachments: [],
+    chats: [
+      {
+        identifier: "+1 (973) 508-0289",
+      },
+    ],
+  },
+}
+
 function resetMocks(): void {
   mocks.runAgent.mockReset().mockImplementation(async (_messages: any, callbacks: any) => {
     callbacks.onModelStart()
@@ -246,12 +303,15 @@ function resetMocks(): void {
   }))
 }
 
-function createMockRequest(method: string, url: string, body?: unknown): EventEmitter & {
+function createMockRequest(method: string, url: string, body?: unknown): Readable & {
   method: string
   url: string
   headers: Record<string, string>
 } {
-  const req = new EventEmitter() as EventEmitter & {
+  const payload = typeof body === "undefined"
+    ? []
+    : [Buffer.from(typeof body === "string" ? body : JSON.stringify(body))]
+  const req = Readable.from(payload) as Readable & {
     method: string
     url: string
     headers: Record<string, string>
@@ -259,13 +319,6 @@ function createMockRequest(method: string, url: string, body?: unknown): EventEm
   req.method = method
   req.url = url
   req.headers = { "content-type": "application/json" }
-  queueMicrotask(() => {
-    if (typeof body !== "undefined") {
-      const payload = typeof body === "string" ? body : JSON.stringify(body)
-      req.emit("data", Buffer.from(payload))
-    }
-    req.emit("end")
-  })
   return req
 }
 
@@ -448,6 +501,207 @@ describe("BlueBubbles sense runtime", () => {
     expect(mocks.runAgent).toHaveBeenCalledTimes(1)
   })
 
+  it("returns explicit from-me handling without invoking the agent loop", async () => {
+    const bluebubbles = await import("../../senses/bluebubbles")
+    const result = await bluebubbles.handleBlueBubblesEvent(fromMePayload)
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        handled: true,
+        notifiedAgent: false,
+        reason: "from_me",
+      }),
+    )
+    expect(mocks.runAgent).not.toHaveBeenCalled()
+    expect(mocks.sendText).not.toHaveBeenCalled()
+  })
+
+  it("can still run a turn when only chat identifier routing is present", async () => {
+    const bluebubbles = await import("../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(identifierOnlyPayload)
+
+    expect(mocks.sendText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chat: expect.objectContaining({
+          chatGuid: undefined,
+          chatIdentifier: "+1 (973) 508-0289",
+        }),
+      }),
+    )
+  })
+
+  it("reuses existing session state and allows callback lifecycle hooks to no-op safely", async () => {
+    mocks.loadSession.mockReturnValueOnce({
+      messages: [{ role: "system", content: "existing prompt" }],
+    })
+    mocks.runAgent.mockImplementationOnce(async (_messages: any, callbacks: any, _channel: any, _signal: any, options: any) => {
+      callbacks.onModelStart()
+      callbacks.onModelStreamStart()
+      callbacks.onReasoningChunk("thinking")
+      callbacks.onToolStart("query_session", {})
+      callbacks.onToolEnd("query_session", "done", true)
+      callbacks.onError(new Error("temporary"), "transient")
+      callbacks.onError(new Error("fatal"), "terminal")
+      callbacks.onTextChunk("discard me")
+      callbacks.onClearText()
+      await options.toolContext.signin("graph")
+      return {
+        usage: {
+          input_tokens: 3,
+          output_tokens: 1,
+          reasoning_tokens: 0,
+          total_tokens: 4,
+        },
+      }
+    })
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(dmThreadPayload)
+
+    expect(mocks.buildSystem).not.toHaveBeenCalled()
+    expect(mocks.sendText).not.toHaveBeenCalled()
+    expect(mocks.postTurn).toHaveBeenCalledTimes(1)
+  })
+
+  it("formats group mutations with sender-forward phrasing before handing them to the agent", async () => {
+    mocks.resolveContext.mockResolvedValueOnce({
+      friend: {
+        id: "group-uuid",
+        name: "Consciousness TBD",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "bluebubbles",
+        availableIntegrations: [],
+        supportsMarkdown: false,
+        supportsStreaming: false,
+        supportsRichCards: false,
+        maxMessageLength: Infinity,
+      },
+    })
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(groupReactionPayload)
+
+    expect(mocks.runAgent.mock.calls[0]?.[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: "user", content: "ari@mendelow.me reacted with love" }),
+      ]),
+    )
+  })
+
+  it("covers friend-identity fallbacks for group identifiers, sender fallback, and unknown DM names", async () => {
+    const bluebubbles = await import("../../senses/bluebubbles")
+
+    mocks.repairEvent.mockResolvedValueOnce({
+      kind: "message",
+      eventType: "new-message",
+      messageGuid: "group-ident-fallback",
+      timestamp: 1,
+      fromMe: false,
+      sender: {
+        provider: "imessage-handle",
+        externalId: "sender-a",
+        rawId: "sender-a",
+        displayName: "Sender A",
+      },
+      chat: {
+        chatIdentifier: "group-ident-only",
+        isGroup: true,
+        sessionKey: "chat_identifier:group-ident-only",
+        sendTarget: { kind: "chat_identifier", value: "group-ident-only" },
+      },
+      text: "hello",
+      textForAgent: "hello",
+      attachments: [],
+      hasPayloadData: false,
+      requiresRepair: false,
+    })
+    await bluebubbles.handleBlueBubblesEvent(dmThreadPayload)
+
+    mocks.repairEvent.mockResolvedValueOnce({
+      kind: "message",
+      eventType: "new-message",
+      messageGuid: "group-sender-fallback",
+      timestamp: 2,
+      fromMe: false,
+      sender: {
+        provider: "imessage-handle",
+        externalId: "sender-only",
+        rawId: "sender-only",
+        displayName: "Sender Only",
+      },
+      chat: {
+        isGroup: true,
+        sessionKey: "chat_identifier:unknown",
+        sendTarget: { kind: "chat_identifier", value: "unknown" },
+      },
+      text: "hello again",
+      textForAgent: "hello again",
+      attachments: [],
+      hasPayloadData: false,
+      requiresRepair: false,
+    })
+    await bluebubbles.handleBlueBubblesEvent(dmThreadPayload)
+
+    mocks.repairEvent.mockResolvedValueOnce({
+      kind: "message",
+      eventType: "new-message",
+      messageGuid: "dm-raw-fallback",
+      timestamp: 3,
+      fromMe: false,
+      sender: {
+        provider: "imessage-handle",
+        externalId: "",
+        rawId: "raw-dm-id",
+        displayName: "",
+      },
+      chat: {
+        chatIdentifier: "raw-dm-id",
+        isGroup: false,
+        sessionKey: "chat_identifier:raw-dm-id",
+        sendTarget: { kind: "chat_identifier", value: "raw-dm-id" },
+      },
+      text: "dm fallback",
+      textForAgent: "dm fallback",
+      attachments: [],
+      hasPayloadData: false,
+      requiresRepair: false,
+    })
+    await bluebubbles.handleBlueBubblesEvent(dmThreadPayload)
+
+    expect(mocks.resolverCtor).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      expect.objectContaining({
+        externalId: "group:group-ident-only",
+        displayName: "Unknown Group",
+      }),
+    )
+    expect(mocks.resolverCtor).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({
+        externalId: "group:sender-only",
+        displayName: "Unknown Group",
+      }),
+    )
+    expect(mocks.resolverCtor).toHaveBeenNthCalledWith(
+      3,
+      expect.anything(),
+      expect.objectContaining({
+        externalId: "raw-dm-id",
+        displayName: "Unknown",
+      }),
+    )
+  })
+
   it("accepts valid webhook posts and rejects incorrect webhook passwords", async () => {
     const bluebubbles = await import("../../senses/bluebubbles")
     const handler = bluebubbles.createBlueBubblesWebhookHandler()
@@ -477,6 +731,64 @@ describe("BlueBubbles sense runtime", () => {
     expect(authorizedRes.getHeader("content-type")).toContain("application/json")
     expect(authorizedRes.getBody()).toContain("\"handled\":true")
     expect(mocks.runAgent).toHaveBeenCalledTimes(1)
+  })
+
+  it("returns explicit webhook errors for missing routes, methods, bad json, and runtime failures", async () => {
+    const bluebubbles = await import("../../senses/bluebubbles")
+    const handler = bluebubbles.createBlueBubblesWebhookHandler()
+
+    const notFoundReq = createMockRequest("POST", "/wrong-path", dmThreadPayload)
+    const notFoundRes = createMockResponse()
+    await handler(notFoundReq as any, notFoundRes.res as any)
+    await notFoundRes.done
+    expect(notFoundRes.res.statusCode).toBe(404)
+
+    const methodReq = createMockRequest("GET", "/bluebubbles-webhook?password=secret-token")
+    const methodRes = createMockResponse()
+    await handler(methodReq as any, methodRes.res as any)
+    await methodRes.done
+    expect(methodRes.res.statusCode).toBe(405)
+
+    const defaultUrlReq = createMockRequest("POST", "/ignored", dmThreadPayload)
+    ;(defaultUrlReq as any).url = undefined
+    const defaultUrlRes = createMockResponse()
+    await handler(defaultUrlReq as any, defaultUrlRes.res as any)
+    await defaultUrlRes.done
+    expect(defaultUrlRes.res.statusCode).toBe(404)
+
+    const badJsonReq = createMockRequest("POST", "/bluebubbles-webhook?password=secret-token", "not json")
+    const badJsonRes = createMockResponse()
+    await handler(badJsonReq as any, badJsonRes.res as any)
+    await badJsonRes.done
+    expect(badJsonRes.res.statusCode).toBe(400)
+
+    const brokenStreamReq = {
+      method: "POST",
+      url: "/bluebubbles-webhook?password=secret-token",
+      async *[Symbol.asyncIterator]() {
+        throw "stream broke"
+      },
+    }
+    const brokenStreamRes = createMockResponse()
+    await handler(brokenStreamReq as any, brokenStreamRes.res as any)
+    await brokenStreamRes.done
+    expect(brokenStreamRes.res.statusCode).toBe(400)
+
+    mocks.repairEvent.mockRejectedValueOnce(new Error("repair blew up"))
+    const boomReq = createMockRequest("POST", "/bluebubbles-webhook?password=secret-token", dmThreadPayload)
+    const boomRes = createMockResponse()
+    await handler(boomReq as any, boomRes.res as any)
+    await boomRes.done
+    expect(boomRes.res.statusCode).toBe(500)
+    expect(boomRes.getBody()).toContain("repair blew up")
+
+    mocks.repairEvent.mockRejectedValueOnce("repair string blew up")
+    const stringBoomReq = createMockRequest("POST", "/bluebubbles-webhook", dmThreadPayload)
+    const stringBoomRes = createMockResponse()
+    await handler(stringBoomReq as any, stringBoomRes.res as any)
+    await stringBoomRes.done
+    expect(stringBoomRes.res.statusCode).toBe(500)
+    expect(stringBoomRes.getBody()).toContain("repair string blew up")
   })
 
   it("starts an HTTP server on the configured BlueBubbles port", async () => {
