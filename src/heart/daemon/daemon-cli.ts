@@ -16,6 +16,7 @@ import {
   type HatchFlowInput,
   type HatchFlowResult,
 } from "./hatch-flow"
+import { runAdoptionSpecialist as runSpecialistOrchestrator } from "./specialist-orchestrator"
 
 export type OuroCliCommand =
   | { kind: "daemon.up" }
@@ -482,6 +483,68 @@ async function defaultLinkFriendIdentity(command: Extract<OuroCliCommand, { kind
   return `linked ${command.provider}:${command.externalId} to ${command.friendId}`
 }
 
+/* v8 ignore next 49 -- integration: interactive terminal specialist session @preserve */
+async function defaultRunAdoptionSpecialist(): Promise<string | null> {
+  const readline = await import("readline/promises")
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+  const prompt = async (q: string) => {
+    const answer = await rl.question(q)
+    return answer.trim()
+  }
+
+  try {
+    const humanName = await prompt("Your name: ")
+    const providerRaw = await prompt("Provider (azure|anthropic|minimax|openai-codex): ")
+    if (!humanName || !isAgentProvider(providerRaw)) {
+      process.stdout.write("Invalid input. Run `ouro hatch` to try again.\n")
+      return null
+    }
+
+    const credentials: HatchCredentialsInput = {}
+    if (providerRaw === "anthropic") credentials.setupToken = await prompt("Anthropic API key: ")
+    if (providerRaw === "openai-codex") credentials.oauthAccessToken = await prompt("OpenAI Codex OAuth token: ")
+    if (providerRaw === "minimax") credentials.apiKey = await prompt("MiniMax API key: ")
+    if (providerRaw === "azure") {
+      credentials.apiKey = await prompt("Azure API key: ")
+      credentials.endpoint = await prompt("Azure endpoint: ")
+      credentials.deployment = await prompt("Azure deployment: ")
+    }
+
+    rl.close()
+
+    // Locate the bundled AdoptionSpecialist.ouro shipped with the npm package
+    const bundleSourceDir = path.resolve(__dirname, "..", "..", "..", "AdoptionSpecialist.ouro")
+    const bundlesRoot = getAgentBundlesRoot()
+    const secretsRoot = path.join(os.homedir(), ".agentsecrets")
+
+    return await runSpecialistOrchestrator({
+      bundleSourceDir,
+      bundlesRoot,
+      secretsRoot,
+      provider: providerRaw,
+      credentials,
+      humanName,
+      createReadline: () => {
+        const rl2 = readline.createInterface({ input: process.stdin, output: process.stdout })
+        return { question: (q: string) => rl2.question(q), close: () => rl2.close() }
+      },
+      callbacks: {
+        onModelStart: () => {},
+        onModelStreamStart: () => {},
+        onTextChunk: (text: string) => process.stdout.write(text),
+        onReasoningChunk: () => {},
+        onToolStart: () => {},
+        onToolEnd: () => {},
+        onError: (err: Error) => process.stderr.write(`error: ${err.message}\n`),
+      },
+    })
+  } catch {
+    rl.close()
+    return null
+  }
+}
+
 export function createDefaultOuroCliDeps(socketPath = "/tmp/ouroboros-daemon.sock"): OuroCliDeps {
   return {
     socketPath,
@@ -496,6 +559,7 @@ export function createDefaultOuroCliDeps(socketPath = "/tmp/ouroboros-daemon.soc
     listDiscoveredAgents: defaultListDiscoveredAgents,
     runHatchFlow: defaultRunHatchFlow,
     promptInput: defaultPromptInput,
+    runAdoptionSpecialist: defaultRunAdoptionSpecialist,
     registerOuroBundleType: defaultRegisterOuroBundleUti,
     /* v8 ignore next 3 -- integration: launches interactive CLI session @preserve */
     startChat: async (agentName: string) => {
