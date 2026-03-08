@@ -1437,6 +1437,47 @@ describe("ensureDaemonRunning", () => {
     expect(result.alreadyRunning).toBe(false)
     expect(result.message).toContain("pid unknown")
   })
+
+  it("calls tailLogs directly for ouro logs when tailLogs dep is provided", async () => {
+    const tailLogs = vi.fn(() => () => {})
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      tailLogs,
+    }
+
+    const result = await runOuroCli(["logs"], deps)
+
+    expect(tailLogs).toHaveBeenCalledTimes(1)
+    expect(deps.sendCommand).not.toHaveBeenCalled()
+    expect(result).toBe("")
+  })
+
+  it("falls back to daemon socket for ouro logs when tailLogs dep is not set", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, summary: "logs available" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+    }
+
+    await runOuroCli(["logs"], deps)
+
+    expect(deps.sendCommand).toHaveBeenCalledWith(
+      "/tmp/ouro-test.sock",
+      { kind: "daemon.logs" },
+    )
+  })
 })
 
 describe("daemon command protocol", () => {
