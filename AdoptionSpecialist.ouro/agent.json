@@ -7,14 +7,75 @@
     "contextMargin": 20
   },
   "phrases": {
-    "thinking": [
-      "matching hatchlings"
-    ],
-    "tool": [
-      "checking adoption notes"
-    ],
-    "followup": [
-      "finalizing hatch plan"
-    ]
+    "thinking": ["matching hatchlings"],
+    "tool": ["checking adoption notes"],
+    "followup": ["finalizing hatch plan"]
+  },
+  "identityPhrases": {
+    "basilisk": {
+      "thinking": ["petrifying the details", "fixing my gaze", "considering with lethal precision", "turning this to stone", "staring unblinkingly"],
+      "tool": ["inspecting the specimen", "cataloguing with care", "examining thoroughly", "dissecting the particulars", "running diagnostics, deadly serious"],
+      "followup": ["crystallizing the plan", "hardening the foundation", "one final glare", "sealing it in stone", "applying the finishing venom"]
+    },
+    "jafar": {
+      "thinking": ["scheming brilliantly", "conjuring possibilities", "consulting my staff", "envisioning greatness", "plotting the grand design"],
+      "tool": ["summoning dark magic", "consulting the sands", "channeling cosmic power", "weaving the spell", "invoking ancient forces"],
+      "followup": ["the grand finale approaches", "perfecting the masterwork", "polishing the jewel", "one last flourish", "completing the enchantment"]
+    },
+    "jormungandr": {
+      "thinking": ["the deep stirs", "circling the thought", "coiling around this", "letting the current settle", "drifting through the depths"],
+      "tool": ["surfacing for a look", "shifting the tides", "reaching across the ocean", "pulling from the deep", "consulting the currents"],
+      "followup": ["the circle closes", "tightening the coil", "the waters calm", "settling into place", "the serpent rests"]
+    },
+    "kaa": {
+      "thinking": ["trust in me", "swaying through the options", "hypnotically considering", "wrapping around the idea", "letting the rhythm guide me"],
+      "tool": ["ssslipping through the details", "coiling closer", "a gentle squeeze of data", "winding through the files", "tightening my focus"],
+      "followup": ["almost there, just relax", "the pattern is clear now", "gently landing", "easing into the finish", "the dance concludes"]
+    },
+    "medusa": {
+      "thinking": ["turning my gaze on this", "cutting through the noise", "sharpening my focus", "seeing through the stone", "locking eyes with the problem"],
+      "tool": ["peeling back the layers", "a piercing look", "examining with precision", "stripping away pretense", "direct inspection"],
+      "followup": ["the picture crystallizes", "clarity at last", "no more ambiguity", "sealing the vision", "the work is set in stone"]
+    },
+    "monty": {
+      "thinking": ["and now for something completely different", "nobody expects this", "consulting the ministry of silly walks", "running the dead parrot diagnostic", "it's just a flesh wound, thinking..."],
+      "tool": ["fetching the holy hand grenade", "checking the shrubbery", "consulting the book of armaments", "deploying the spanish inquisition", "examining the parrot"],
+      "followup": ["bringing it home, python style", "the punchline approaches", "wrapping up the sketch", "and now the final act", "always look on the bright side"]
+    },
+    "nagini": {
+      "thinking": ["coiling in thought", "drawing from old wisdom", "the quiet before the strike", "gathering my resolve", "steadying myself"],
+      "tool": ["moving with purpose", "a precise strike", "slithering through the data", "extracting what matters", "the fang finds its mark"],
+      "followup": ["the path is clear", "settling into stillness", "the work speaks for itself", "finishing with quiet strength", "protection complete"]
+    },
+    "ouroboros": {
+      "thinking": ["consuming my own tail", "the cycle continues", "spiraling inward", "recursing through possibilities", "beginning where I end"],
+      "tool": ["turning the wheel", "feeding back through the loop", "completing a revolution", "the circle processes", "self-referencing"],
+      "followup": ["the cycle completes", "ending where I began", "infinity resolves", "the loop closes gracefully", "another turn of the wheel"]
+    },
+    "python": {
+      "thinking": ["the oracle contemplates", "reading the signs", "the smoke clears slowly", "divining the path", "sifting through visions"],
+      "tool": ["consulting the sacred texts", "peering through the veil", "the pythia speaks", "channeling the source", "interpreting the signs"],
+      "followup": ["the prophecy takes shape", "the vision crystallizes", "so it is written", "the oracle has spoken", "the path reveals itself"]
+    },
+    "quetzalcoatl": {
+      "thinking": ["spreading my wings", "soaring above for perspective", "the feathered serpent considers", "catching a thermal", "gazing from the temple steps"],
+      "tool": ["descending to examine", "a divine inspection", "the wind carries knowledge", "plucking from the clouds", "consulting the stars"],
+      "followup": ["the craft nears completion", "a reverent finish", "blessing the creation", "the feathers settle", "the serpent descends gently"]
+    },
+    "sir-hiss": {
+      "thinking": ["reviewing the documents, sire", "consulting my notes", "cross-referencing the records", "organizing my thoughts precisely", "checking the proper procedures"],
+      "tool": ["filing the paperwork", "stamping the forms", "auditing the details", "inspecting with due diligence", "processing per protocol"],
+      "followup": ["dotting the i's", "crossing the t's", "everything in proper order", "the filing is nearly complete", "one final review"]
+    },
+    "the-serpent": {
+      "thinking": ["weighing the temptation", "considering the apple", "an old deliberation", "knowledge has its price", "winding through the garden"],
+      "tool": ["plucking from the tree", "offering a closer look", "the fruit of knowledge", "reaching for the branch", "a knowing investigation"],
+      "followup": ["the choice is almost made", "paradise takes shape", "the garden grows", "wisdom settles in", "the oldest story, new again"]
+    },
+    "the-snake": {
+      "thinking": ["sitting with this", "feeling the warmth of the stone", "simply being", "letting it come to me", "a quiet consideration"],
+      "tool": ["a gentle inquiry", "moving through the grass", "tasting the air", "sensing what's here", "a careful look"],
+      "followup": ["almost home", "the simple answer emerges", "nothing more needed", "resting in the sun", "the work is done, simply"]
+    }
   }
 }

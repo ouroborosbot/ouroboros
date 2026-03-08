@@ -9,6 +9,7 @@ import { FileFriendStore } from "../../mind/friends/store-file"
 import { isIdentityProvider, type IdentityProvider } from "../../mind/friends/types"
 import type { DaemonCommand, DaemonResponse } from "./daemon"
 import { registerOuroBundleUti as defaultRegisterOuroBundleUti } from "./ouro-uti"
+import { installOuroCommand as defaultInstallOuroCommand, type OuroPathInstallResult } from "./ouro-path-installer"
 import { installSubagentsForAvailableCli, type SubagentInstallResult } from "./subagent-installer"
 import {
   runHatchFlow as defaultRunHatchFlow,
@@ -44,6 +45,7 @@ export interface OuroCliDeps {
   runAdoptionSpecialist?: () => Promise<string | null>
   promptInput?: (question: string) => Promise<string>
   registerOuroBundleType?: () => Promise<unknown> | unknown
+  installOuroCommand?: () => OuroPathInstallResult
   startChat?: (agentName: string) => Promise<void>
   tailLogs?: (options?: { follow?: boolean; lines?: number; agentFilter?: string }) => () => void
 }
@@ -650,40 +652,139 @@ async function defaultLinkFriendIdentity(command: Extract<OuroCliCommand, { kind
   return `linked ${command.provider}:${command.externalId} to ${command.friendId}`
 }
 
-/* v8 ignore next 49 -- integration: interactive terminal specialist session @preserve */
-async function defaultRunAdoptionSpecialist(): Promise<string | null> {
-  const readline = await import("readline/promises")
+export interface DiscoveredCredential {
+  agentName: string
+  provider: AgentProvider
+  credentials: HatchCredentialsInput
+}
 
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-  const prompt = async (q: string) => {
-    const answer = await rl.question(q)
+export function discoverExistingCredentials(secretsRoot: string): DiscoveredCredential[] {
+  const found: DiscoveredCredential[] = []
+  let entries: fs.Dirent[]
+  try {
+    entries = fs.readdirSync(secretsRoot, { withFileTypes: true })
+  } catch {
+    return found
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const secretsPath = path.join(secretsRoot, entry.name, "secrets.json")
+    let raw: string
+    try {
+      raw = fs.readFileSync(secretsPath, "utf-8")
+    } catch {
+      continue
+    }
+    let parsed: { providers?: Record<string, Record<string, string>> }
+    try {
+      parsed = JSON.parse(raw) as typeof parsed
+    } catch {
+      continue
+    }
+    if (!parsed.providers) continue
+
+    for (const [provName, provConfig] of Object.entries(parsed.providers)) {
+      if (provName === "anthropic" && provConfig.setupToken) {
+        found.push({ agentName: entry.name, provider: "anthropic", credentials: { setupToken: provConfig.setupToken } })
+      } else if (provName === "openai-codex" && provConfig.oauthAccessToken) {
+        found.push({ agentName: entry.name, provider: "openai-codex", credentials: { oauthAccessToken: provConfig.oauthAccessToken } })
+      } else if (provName === "minimax" && provConfig.apiKey) {
+        found.push({ agentName: entry.name, provider: "minimax", credentials: { apiKey: provConfig.apiKey } })
+      } else if (provName === "azure" && provConfig.apiKey && provConfig.endpoint && provConfig.deployment) {
+        found.push({ agentName: entry.name, provider: "azure", credentials: { apiKey: provConfig.apiKey, endpoint: provConfig.endpoint, deployment: provConfig.deployment } })
+      }
+    }
+  }
+
+  // Deduplicate by provider+credential value (keep first seen)
+  const seen = new Set<string>()
+  return found.filter((cred) => {
+    const key = `${cred.provider}:${JSON.stringify(cred.credentials)}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+/* v8 ignore next 95 -- integration: interactive terminal specialist session @preserve */
+async function defaultRunAdoptionSpecialist(): Promise<string | null> {
+  const readlineModule = await import("readline")
+  const readlinePromises = await import("readline/promises")
+  const { createCliCallbacks, InputController } = await import("../../senses/cli")
+
+  // Phase 1: cold CLI — collect provider/credentials with a simple readline
+  const coldRl = readlinePromises.createInterface({ input: process.stdin, output: process.stdout })
+  const coldPrompt = async (q: string) => {
+    const answer = await coldRl.question(q)
     return answer.trim()
   }
 
+  let providerRaw: AgentProvider
+  let credentials: HatchCredentialsInput = {}
+
   try {
-    const humanName = await prompt("Your name: ")
-    const providerRaw = await prompt("Provider (azure|anthropic|minimax|openai-codex): ")
-    if (!humanName || !isAgentProvider(providerRaw)) {
-      process.stdout.write("Invalid input. Run `ouro hatch` to try again.\n")
-      return null
+    const secretsRoot = path.join(os.homedir(), ".agentsecrets")
+    const discovered = discoverExistingCredentials(secretsRoot)
+
+    if (discovered.length > 0) {
+      process.stdout.write("\n🐍 welcome to ouro! let's hatch your first agent.\n")
+      process.stdout.write("i found existing API credentials:\n\n")
+      const unique = [...new Map(discovered.map((d) => [`${d.provider}`, d])).values()]
+      for (let i = 0; i < unique.length; i++) {
+        process.stdout.write(`  ${i + 1}. ${unique[i].provider} (from ${unique[i].agentName})\n`)
+      }
+      process.stdout.write("\n")
+      const choice = await coldPrompt("use one of these? enter number, or 'new' for a different key: ")
+
+      const idx = parseInt(choice, 10) - 1
+      if (idx >= 0 && idx < unique.length) {
+        providerRaw = unique[idx].provider
+        credentials = unique[idx].credentials
+      } else {
+        const pRaw = await coldPrompt("provider (anthropic/azure/minimax/openai-codex): ")
+        if (!isAgentProvider(pRaw)) {
+          process.stdout.write("unknown provider. run `ouro hatch` to try again.\n")
+          coldRl.close()
+          return null
+        }
+        providerRaw = pRaw
+        if (providerRaw === "anthropic") credentials.setupToken = await coldPrompt("API key: ")
+        if (providerRaw === "openai-codex") credentials.oauthAccessToken = await coldPrompt("OAuth token: ")
+        if (providerRaw === "minimax") credentials.apiKey = await coldPrompt("API key: ")
+        if (providerRaw === "azure") {
+          credentials.apiKey = await coldPrompt("API key: ")
+          credentials.endpoint = await coldPrompt("endpoint: ")
+          credentials.deployment = await coldPrompt("deployment: ")
+        }
+      }
+    } else {
+      process.stdout.write("\n🐍 welcome to ouro! let's hatch your first agent.\n")
+      process.stdout.write("i need an API key to power our conversation.\n\n")
+      const pRaw = await coldPrompt("provider (anthropic/azure/minimax/openai-codex): ")
+      if (!isAgentProvider(pRaw)) {
+        process.stdout.write("unknown provider. run `ouro hatch` to try again.\n")
+        coldRl.close()
+        return null
+      }
+      providerRaw = pRaw
+      if (providerRaw === "anthropic") credentials.setupToken = await coldPrompt("API key: ")
+      if (providerRaw === "openai-codex") credentials.oauthAccessToken = await coldPrompt("OAuth token: ")
+      if (providerRaw === "minimax") credentials.apiKey = await coldPrompt("API key: ")
+      if (providerRaw === "azure") {
+        credentials.apiKey = await coldPrompt("API key: ")
+        credentials.endpoint = await coldPrompt("endpoint: ")
+        credentials.deployment = await coldPrompt("deployment: ")
+      }
     }
 
-    const credentials: HatchCredentialsInput = {}
-    if (providerRaw === "anthropic") credentials.setupToken = await prompt("Anthropic API key: ")
-    if (providerRaw === "openai-codex") credentials.oauthAccessToken = await prompt("OpenAI Codex OAuth token: ")
-    if (providerRaw === "minimax") credentials.apiKey = await prompt("MiniMax API key: ")
-    if (providerRaw === "azure") {
-      credentials.apiKey = await prompt("Azure API key: ")
-      credentials.endpoint = await prompt("Azure endpoint: ")
-      credentials.deployment = await prompt("Azure deployment: ")
-    }
+    coldRl.close()
+    process.stdout.write("\n")
 
-    rl.close()
-
-    // Locate the bundled AdoptionSpecialist.ouro shipped with the npm package
+    // Phase 2: warm specialist session — full CLI experience with markdown, spinners, input control
     const bundleSourceDir = path.resolve(__dirname, "..", "..", "..", "AdoptionSpecialist.ouro")
     const bundlesRoot = getAgentBundlesRoot()
-    const secretsRoot = path.join(os.homedir(), ".agentsecrets")
+    const cliCallbacks = createCliCallbacks()
 
     return await runSpecialistOrchestrator({
       bundleSourceDir,
@@ -691,23 +792,20 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
       secretsRoot,
       provider: providerRaw,
       credentials,
-      humanName,
+      humanName: os.userInfo().username,
       createReadline: () => {
-        const rl2 = readline.createInterface({ input: process.stdin, output: process.stdout })
-        return { question: (q: string) => rl2.question(q), close: () => rl2.close() }
+        const rl2 = readlineModule.createInterface({ input: process.stdin, output: process.stdout, terminal: true })
+        const ctrl = new InputController(rl2)
+        return {
+          question: (q: string) => new Promise<string>((resolve) => rl2.question(q, resolve)),
+          close: () => rl2.close(),
+          inputController: ctrl,
+        }
       },
-      callbacks: {
-        onModelStart: () => {},
-        onModelStreamStart: () => {},
-        onTextChunk: (text: string) => process.stdout.write(text),
-        onReasoningChunk: () => {},
-        onToolStart: () => {},
-        onToolEnd: () => {},
-        onError: (err: Error) => process.stderr.write(`error: ${err.message}\n`),
-      },
+      callbacks: cliCallbacks,
     })
   } catch {
-    rl.close()
+    coldRl.close()
     return null
   }
 }
@@ -728,6 +826,7 @@ export function createDefaultOuroCliDeps(socketPath = "/tmp/ouroboros-daemon.soc
     promptInput: defaultPromptInput,
     runAdoptionSpecialist: defaultRunAdoptionSpecialist,
     registerOuroBundleType: defaultRegisterOuroBundleUti,
+    installOuroCommand: defaultInstallOuroCommand,
     /* v8 ignore next 3 -- integration: launches interactive CLI session @preserve */
     startChat: async (agentName: string) => {
       const { main } = await import("../../senses/cli")
@@ -791,6 +890,39 @@ async function registerOuroBundleTypeNonBlocking(deps: OuroCliDeps): Promise<voi
   }
 }
 
+async function performSystemSetup(deps: OuroCliDeps): Promise<void> {
+  // Install ouro command to PATH (non-blocking)
+  if (deps.installOuroCommand) {
+    try {
+      deps.installOuroCommand()
+    } catch (error) {
+      emitNervesEvent({
+        level: "warn",
+        component: "daemon",
+        event: "daemon.system_setup_ouro_cmd_error",
+        message: "failed to install ouro command to PATH",
+        meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
+      })
+    }
+  }
+
+  // Install subagents (claude/codex skills)
+  try {
+    await deps.installSubagents()
+  } catch (error) {
+    emitNervesEvent({
+      level: "warn",
+      component: "daemon",
+      event: "daemon.subagent_install_error",
+      message: "subagent auto-install failed",
+      meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
+    })
+  }
+
+  // Register .ouro bundle type (UTI on macOS)
+  await registerOuroBundleTypeNonBlocking(deps)
+}
+
 export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefaultOuroCliDeps()): Promise<string> {
   if (args.includes("--help") || args.includes("-h")) {
     const text = usage()
@@ -818,24 +950,14 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       deps.listDiscoveredAgents ? deps.listDiscoveredAgents() : defaultListDiscoveredAgents(),
     )
     if (discovered.length === 0 && deps.runAdoptionSpecialist) {
+      // System setup first — ouro command, subagents, UTI — before the interactive specialist
+      await performSystemSetup(deps)
+
       const hatchlingName = await deps.runAdoptionSpecialist()
       if (!hatchlingName) {
         return ""
       }
 
-      try {
-        await deps.installSubagents()
-      } catch (error) {
-        emitNervesEvent({
-          level: "warn",
-          component: "daemon",
-          event: "daemon.subagent_install_error",
-          message: "subagent auto-install failed",
-          meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
-        })
-      }
-
-      await registerOuroBundleTypeNonBlocking(deps)
       await ensureDaemonRunning(deps)
 
       if (deps.startChat) {
@@ -880,19 +1002,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   })
 
   if (command.kind === "daemon.up") {
-    try {
-      await deps.installSubagents()
-    } catch (error) {
-      emitNervesEvent({
-        level: "warn",
-        component: "daemon",
-        event: "daemon.subagent_install_error",
-        message: "subagent auto-install failed",
-        meta: { error: error instanceof Error ? error.message : String(error) },
-      })
-    }
-
-    await registerOuroBundleTypeNonBlocking(deps)
+    await performSystemSetup(deps)
 
     const daemonResult = await ensureDaemonRunning(deps)
     deps.writeStdout(daemonResult.message)
@@ -915,24 +1025,14 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     // Route through adoption specialist when no explicit hatch args were provided
     const hasExplicitHatchArgs = !!(command.agentName || command.humanName || command.provider || command.credentials)
     if (deps.runAdoptionSpecialist && !hasExplicitHatchArgs) {
+      // System setup first — ouro command, subagents, UTI — before the interactive specialist
+      await performSystemSetup(deps)
+
       const hatchlingName = await deps.runAdoptionSpecialist()
       if (!hatchlingName) {
         return ""
       }
 
-      try {
-        await deps.installSubagents()
-      } catch (error) {
-        emitNervesEvent({
-          level: "warn",
-          component: "daemon",
-          event: "daemon.subagent_install_error",
-          message: "subagent auto-install failed",
-          meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
-        })
-      }
-
-      await registerOuroBundleTypeNonBlocking(deps)
       await ensureDaemonRunning(deps)
 
       if (deps.startChat) {
@@ -952,19 +1052,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     const hatchInput = await resolveHatchInput(command, deps)
     const result = await hatchRunner(hatchInput)
 
-    try {
-      await deps.installSubagents()
-    } catch (error) {
-      emitNervesEvent({
-        level: "warn",
-        component: "daemon",
-        event: "daemon.subagent_install_error",
-        message: "subagent auto-install failed",
-        meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
-      })
-    }
-
-    await registerOuroBundleTypeNonBlocking(deps)
+    await performSystemSetup(deps)
 
     const daemonResult = await ensureDaemonRunning(deps)
 

@@ -609,4 +609,218 @@ describe("runSpecialistSession", () => {
     // question should have been called 3 times (2 empty + 1 real)
     expect(readline.question).toHaveBeenCalledTimes(3)
   })
+
+  it("kickoffMessage injects first user message so specialist speaks before prompting", async () => {
+    const { runSpecialistSession } = await import("../../../heart/daemon/specialist-session")
+    const requests: ProviderTurnRequest[] = []
+    let callCount = 0
+
+    const provider = makeProvider(async (req) => {
+      requests.push(req)
+      callCount++
+      if (callCount === 1) {
+        // First call is the kickoff — specialist responds with text
+        return makeTurnResult({ content: "Hello! I'm your specialist." })
+      }
+      // Second call after real user input — ends session
+      return makeTurnResult({
+        toolCalls: [{
+          id: "tc-end",
+          name: "final_answer",
+          arguments: JSON.stringify({ answer: "Done!" }),
+        }],
+      })
+    })
+
+    const readline = {
+      // Only called once — after the kickoff turn, not before
+      question: vi.fn().mockResolvedValueOnce("Tell me more"),
+      close: vi.fn(),
+    }
+
+    await runSpecialistSession({
+      providerRuntime: provider,
+      systemPrompt: "You are the specialist.",
+      tools: [],
+      execTool: vi.fn(),
+      readline,
+      callbacks: makeCallbacks(),
+      kickoffMessage: "hi, i just ran ouro for the first time",
+    })
+
+    // First call should have kickoff as user message (no readline prompt first)
+    expect(requests[0].messages[1]).toEqual({ role: "user", content: "hi, i just ran ouro for the first time" })
+    // readline.question called only once (for the second turn)
+    expect(readline.question).toHaveBeenCalledTimes(1)
+  })
+
+  it("calls suppressInput/restoreInput/flushMarkdown/writePrompt hooks during conversation", async () => {
+    const { runSpecialistSession } = await import("../../../heart/daemon/specialist-session")
+    let callCount = 0
+
+    const provider = makeProvider(async () => {
+      callCount++
+      if (callCount === 1) {
+        return makeTurnResult({ content: "Hello!" })
+      }
+      return makeTurnResult({
+        toolCalls: [{
+          id: "tc-end",
+          name: "final_answer",
+          arguments: JSON.stringify({ answer: "Done!" }),
+        }],
+      })
+    })
+
+    const suppressInput = vi.fn()
+    const restoreInput = vi.fn()
+    const flushMarkdown = vi.fn()
+    const writePrompt = vi.fn()
+
+    const readline = {
+      question: vi.fn()
+        .mockResolvedValueOnce("Tell me more"),
+      close: vi.fn(),
+    }
+
+    await runSpecialistSession({
+      providerRuntime: provider,
+      systemPrompt: "system",
+      tools: [],
+      execTool: vi.fn(),
+      readline,
+      callbacks: makeCallbacks(),
+      kickoffMessage: "hi",
+      suppressInput,
+      restoreInput,
+      flushMarkdown,
+      writePrompt,
+    })
+
+    // suppressInput called once per turn (2 turns: kickoff + user input)
+    expect(suppressInput).toHaveBeenCalledTimes(2)
+    // restoreInput called after each turn completes + once in finally
+    expect(restoreInput.mock.calls.length).toBeGreaterThanOrEqual(2)
+    // flushMarkdown called for text responses and at end of turns
+    expect(flushMarkdown.mock.calls.length).toBeGreaterThanOrEqual(2)
+    // writePrompt called between turns (after first turn, before second user input)
+    expect(writePrompt).toHaveBeenCalled()
+  })
+
+  it("suppressInput interrupt handler aborts the current turn", async () => {
+    const { runSpecialistSession } = await import("../../../heart/daemon/specialist-session")
+
+    let capturedInterruptHandler: (() => void) | null = null
+    const suppressInput = vi.fn().mockImplementation((onInterrupt: () => void) => {
+      capturedInterruptHandler = onInterrupt
+    })
+
+    let callCount = 0
+    const provider = makeProvider(async () => {
+      callCount++
+      if (callCount === 1) {
+        // Return a tool call so the inner loop continues
+        return makeTurnResult({
+          toolCalls: [{ id: "tc-1", name: "read_file", arguments: JSON.stringify({ path: "/tmp" }) }],
+        })
+      }
+      // Second streamTurn call after tool result — by now abort is fired
+      return makeTurnResult({ content: "should not reach" })
+    })
+
+    const execTool = vi.fn().mockImplementation(async () => {
+      // Fire the interrupt during tool execution — inner loop will check abort next iteration
+      if (capturedInterruptHandler) capturedInterruptHandler()
+      return "file content"
+    })
+
+    const readline = {
+      question: vi.fn().mockResolvedValueOnce("Go"),
+      close: vi.fn(),
+    }
+
+    const result = await runSpecialistSession({
+      providerRuntime: provider,
+      systemPrompt: "system",
+      tools: [],
+      execTool,
+      readline,
+      callbacks: makeCallbacks(),
+      suppressInput,
+      restoreInput: vi.fn(),
+    })
+
+    // The interrupt should have caused clean exit
+    expect(readline.close).toHaveBeenCalled()
+    expect(result.hatchedAgentName).toBeNull()
+    // Verify the interrupt handler was actually captured and invoked
+    expect(suppressInput).toHaveBeenCalled()
+  })
+
+  it("writePrompt is called on empty input when provided", async () => {
+    const { runSpecialistSession } = await import("../../../heart/daemon/specialist-session")
+
+    const provider = makeProvider(async () =>
+      makeTurnResult({
+        toolCalls: [{
+          id: "tc-end",
+          name: "final_answer",
+          arguments: JSON.stringify({ answer: "Done" }),
+        }],
+      }),
+    )
+
+    const writePrompt = vi.fn()
+    const readline = {
+      question: vi.fn()
+        .mockResolvedValueOnce("")
+        .mockResolvedValueOnce("actual input"),
+      close: vi.fn(),
+    }
+
+    await runSpecialistSession({
+      providerRuntime: provider,
+      systemPrompt: "system",
+      tools: [],
+      execTool: vi.fn(),
+      readline,
+      callbacks: makeCallbacks(),
+      writePrompt,
+    })
+
+    // writePrompt called when empty input is skipped
+    expect(writePrompt).toHaveBeenCalled()
+  })
+
+  it("readline.question receives empty string when writePrompt is provided", async () => {
+    const { runSpecialistSession } = await import("../../../heart/daemon/specialist-session")
+
+    const provider = makeProvider(async () =>
+      makeTurnResult({
+        toolCalls: [{
+          id: "tc-end",
+          name: "final_answer",
+          arguments: JSON.stringify({ answer: "Done" }),
+        }],
+      }),
+    )
+
+    const readline = {
+      question: vi.fn().mockResolvedValueOnce("Hello"),
+      close: vi.fn(),
+    }
+
+    await runSpecialistSession({
+      providerRuntime: provider,
+      systemPrompt: "system",
+      tools: [],
+      execTool: vi.fn(),
+      readline,
+      callbacks: makeCallbacks(),
+      writePrompt: vi.fn(),
+    })
+
+    // When writePrompt is provided, question gets empty string (prompt drawn separately)
+    expect(readline.question).toHaveBeenCalledWith("")
+  })
 })

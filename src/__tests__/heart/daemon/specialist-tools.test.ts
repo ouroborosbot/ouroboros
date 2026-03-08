@@ -10,15 +10,18 @@ describe("getSpecialistTools", () => {
     expect(tools).toHaveLength(4)
   })
 
-  it("hatch_agent tool has name required parameter", async () => {
+  it("hatch_agent tool has name and humanName required parameters", async () => {
     const { getSpecialistTools } = await import("../../../heart/daemon/specialist-tools")
     const tools = getSpecialistTools()
     const hatchTool = tools.find((t) => t.function.name === "hatch_agent")
     expect(hatchTool).toBeDefined()
     expect(hatchTool!.function.parameters).toEqual({
       type: "object",
-      properties: { name: { type: "string", description: expect.any(String) } },
-      required: ["name"],
+      properties: {
+        name: { type: "string", description: expect.any(String) },
+        humanName: { type: "string", description: expect.any(String) },
+      },
+      required: ["name", "humanName"],
     })
   })
 
@@ -84,9 +87,9 @@ describe("execSpecialistTool", () => {
 
     const result = await execSpecialistTool(
       "hatch_agent",
-      { name: "TestHatch" },
+      { name: "TestHatch", humanName: "Ari" },
       {
-        humanName: "Ari",
+        humanName: "DefaultUser",
         provider: "anthropic",
         credentials: { setupToken: `sk-ant-oat01-${"a".repeat(80)}` },
         bundlesRoot,

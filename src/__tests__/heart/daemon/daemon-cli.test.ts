@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 
 import {
+  discoverExistingCredentials,
   parseOuroCommand,
   runOuroCli,
   type OuroCliDeps,
@@ -1942,9 +1943,74 @@ describe("specialist integration (zero agents -> adoption specialist)", () => {
 
     expect(runAdoptionSpecialist).toHaveBeenCalledTimes(1)
     expect(startChat).not.toHaveBeenCalled()
-    expect(deps.installSubagents).not.toHaveBeenCalled()
+    // System setup runs BEFORE the specialist, so installSubagents is called even if specialist aborts
+    expect(deps.installSubagents).toHaveBeenCalledTimes(1)
     expect(deps.startDaemonProcess).not.toHaveBeenCalled()
     expect(result).toBe("")
+  })
+
+  it("calls installOuroCommand during system setup before specialist runs", async () => {
+    const callOrder: string[] = []
+    const installOuroCommand = vi.fn(() => {
+      callOrder.push("installOuroCommand")
+      return { installed: true, scriptPath: "/home/test/.local/bin/ouro", pathReady: true, shellProfileUpdated: null }
+    })
+    const runAdoptionSpecialist = vi.fn(async () => {
+      callOrder.push("runAdoptionSpecialist")
+      return "OrderBot"
+    })
+    const startChat = vi.fn(async () => {})
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => {
+        callOrder.push("installSubagents")
+        return { claudeInstalled: 0, codexInstalled: 0, notes: [] }
+      }),
+      listDiscoveredAgents: vi.fn(async () => []),
+      runAdoptionSpecialist,
+      installOuroCommand,
+      startChat,
+    }
+
+    await runOuroCli([], deps)
+
+    expect(installOuroCommand).toHaveBeenCalledTimes(1)
+    // System setup should happen before the specialist
+    expect(callOrder.indexOf("installOuroCommand")).toBeLessThan(callOrder.indexOf("runAdoptionSpecialist"))
+    expect(callOrder.indexOf("installSubagents")).toBeLessThan(callOrder.indexOf("runAdoptionSpecialist"))
+  })
+
+  it("handles installOuroCommand failure gracefully during system setup", async () => {
+    const installOuroCommand = vi.fn(() => { throw new Error("permission denied") })
+    const runAdoptionSpecialist = vi.fn(async () => "GracefulBot")
+    const startChat = vi.fn(async () => {})
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      listDiscoveredAgents: vi.fn(async () => []),
+      runAdoptionSpecialist,
+      installOuroCommand,
+      startChat,
+    }
+
+    // Should not throw — failure is non-blocking
+    await runOuroCli([], deps)
+
+    expect(installOuroCommand).toHaveBeenCalledTimes(1)
+    expect(runAdoptionSpecialist).toHaveBeenCalledTimes(1)
+    expect(startChat).toHaveBeenCalledWith("GracefulBot")
   })
 
   it("falls back to old hatch flow for explicit ouro hatch command even when specialist dep exists", async () => {
@@ -2078,7 +2144,8 @@ describe("specialist integration (zero agents -> adoption specialist)", () => {
     const result = await runOuroCli(["hatch"], deps)
 
     expect(runAdoptionSpecialist).toHaveBeenCalledTimes(1)
-    expect(deps.installSubagents).not.toHaveBeenCalled()
+    // System setup runs BEFORE the specialist, so installSubagents is called even if specialist aborts
+    expect(deps.installSubagents).toHaveBeenCalledTimes(1)
     expect(result).toBe("")
   })
 
@@ -2202,5 +2269,204 @@ describe("daemon command protocol", () => {
 
     expect(parsed.ok).toBe(false)
     expect(parsed.error).toContain("Invalid daemon command payload")
+  })
+})
+
+describe("discoverExistingCredentials", () => {
+  const fs = require("fs") as typeof import("fs")
+  const os = require("os") as typeof import("os")
+  const path = require("path") as typeof import("path")
+
+  function makeTempSecrets(): string {
+    return fs.mkdtempSync(path.join(os.tmpdir(), "discover-creds-"))
+  }
+
+  it("returns empty array when secretsRoot does not exist", () => {
+    const result = discoverExistingCredentials("/nonexistent/path")
+    expect(result).toEqual([])
+  })
+
+  it("returns empty array when secretsRoot is empty", () => {
+    const tmpDir = makeTempSecrets()
+    try {
+      const result = discoverExistingCredentials(tmpDir)
+      expect(result).toEqual([])
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
+
+  it("discovers anthropic credentials with setupToken", () => {
+    const tmpDir = makeTempSecrets()
+    const agentDir = path.join(tmpDir, "myagent")
+    fs.mkdirSync(agentDir)
+    fs.writeFileSync(
+      path.join(agentDir, "secrets.json"),
+      JSON.stringify({ providers: { anthropic: { setupToken: "sk-ant-test" } } }),
+    )
+    try {
+      const result = discoverExistingCredentials(tmpDir)
+      expect(result).toEqual([
+        { agentName: "myagent", provider: "anthropic", credentials: { setupToken: "sk-ant-test" } },
+      ])
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
+
+  it("discovers minimax credentials with apiKey", () => {
+    const tmpDir = makeTempSecrets()
+    const agentDir = path.join(tmpDir, "minimaxagent")
+    fs.mkdirSync(agentDir)
+    fs.writeFileSync(
+      path.join(agentDir, "secrets.json"),
+      JSON.stringify({ providers: { minimax: { apiKey: "mm-key-123" } } }),
+    )
+    try {
+      const result = discoverExistingCredentials(tmpDir)
+      expect(result).toEqual([
+        { agentName: "minimaxagent", provider: "minimax", credentials: { apiKey: "mm-key-123" } },
+      ])
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
+
+  it("discovers openai-codex credentials with oauthAccessToken", () => {
+    const tmpDir = makeTempSecrets()
+    const agentDir = path.join(tmpDir, "codexagent")
+    fs.mkdirSync(agentDir)
+    fs.writeFileSync(
+      path.join(agentDir, "secrets.json"),
+      JSON.stringify({ providers: { "openai-codex": { oauthAccessToken: "oauth-tok" } } }),
+    )
+    try {
+      const result = discoverExistingCredentials(tmpDir)
+      expect(result).toEqual([
+        { agentName: "codexagent", provider: "openai-codex", credentials: { oauthAccessToken: "oauth-tok" } },
+      ])
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
+
+  it("discovers azure credentials when all three fields present", () => {
+    const tmpDir = makeTempSecrets()
+    const agentDir = path.join(tmpDir, "azureagent")
+    fs.mkdirSync(agentDir)
+    fs.writeFileSync(
+      path.join(agentDir, "secrets.json"),
+      JSON.stringify({
+        providers: { azure: { apiKey: "az-key", endpoint: "https://az.endpoint", deployment: "gpt-deploy" } },
+      }),
+    )
+    try {
+      const result = discoverExistingCredentials(tmpDir)
+      expect(result).toEqual([
+        {
+          agentName: "azureagent",
+          provider: "azure",
+          credentials: { apiKey: "az-key", endpoint: "https://az.endpoint", deployment: "gpt-deploy" },
+        },
+      ])
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
+
+  it("skips azure with missing fields", () => {
+    const tmpDir = makeTempSecrets()
+    const agentDir = path.join(tmpDir, "azuepartial")
+    fs.mkdirSync(agentDir)
+    fs.writeFileSync(
+      path.join(agentDir, "secrets.json"),
+      JSON.stringify({ providers: { azure: { apiKey: "az-key", endpoint: "", deployment: "" } } }),
+    )
+    try {
+      const result = discoverExistingCredentials(tmpDir)
+      expect(result).toEqual([])
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
+
+  it("skips providers with empty credential strings", () => {
+    const tmpDir = makeTempSecrets()
+    const agentDir = path.join(tmpDir, "emptyagent")
+    fs.mkdirSync(agentDir)
+    fs.writeFileSync(
+      path.join(agentDir, "secrets.json"),
+      JSON.stringify({
+        providers: {
+          anthropic: { setupToken: "" },
+          minimax: { apiKey: "" },
+          "openai-codex": { oauthAccessToken: "" },
+        },
+      }),
+    )
+    try {
+      const result = discoverExistingCredentials(tmpDir)
+      expect(result).toEqual([])
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
+
+  it("discovers multiple providers from multiple agents and deduplicates", () => {
+    const tmpDir = makeTempSecrets()
+    const agentA = path.join(tmpDir, "agentA")
+    const agentB = path.join(tmpDir, "agentB")
+    fs.mkdirSync(agentA)
+    fs.mkdirSync(agentB)
+    // Both agents have same anthropic key
+    fs.writeFileSync(
+      path.join(agentA, "secrets.json"),
+      JSON.stringify({ providers: { anthropic: { setupToken: "same-key" } } }),
+    )
+    fs.writeFileSync(
+      path.join(agentB, "secrets.json"),
+      JSON.stringify({ providers: { anthropic: { setupToken: "same-key" }, minimax: { apiKey: "mm-key" } } }),
+    )
+    try {
+      const result = discoverExistingCredentials(tmpDir)
+      // Should have anthropic (deduplicated) + minimax
+      expect(result).toHaveLength(2)
+      expect(result.find((r) => r.provider === "anthropic")).toBeDefined()
+      expect(result.find((r) => r.provider === "minimax")).toBeDefined()
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
+
+  it("skips non-directory entries and invalid JSON", () => {
+    const tmpDir = makeTempSecrets()
+    // File instead of directory
+    fs.writeFileSync(path.join(tmpDir, "not-a-dir"), "hello")
+    // Directory with invalid JSON
+    const badDir = path.join(tmpDir, "badjson")
+    fs.mkdirSync(badDir)
+    fs.writeFileSync(path.join(badDir, "secrets.json"), "not-json{{{")
+    // Directory with no secrets.json
+    const emptyDir = path.join(tmpDir, "nosecrets")
+    fs.mkdirSync(emptyDir)
+    try {
+      const result = discoverExistingCredentials(tmpDir)
+      expect(result).toEqual([])
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
+
+  it("skips entries without providers key", () => {
+    const tmpDir = makeTempSecrets()
+    const agentDir = path.join(tmpDir, "noproviders")
+    fs.mkdirSync(agentDir)
+    fs.writeFileSync(path.join(agentDir, "secrets.json"), JSON.stringify({ integrations: {} }))
+    try {
+      const result = discoverExistingCredentials(tmpDir)
+      expect(result).toEqual([])
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
   })
 })
