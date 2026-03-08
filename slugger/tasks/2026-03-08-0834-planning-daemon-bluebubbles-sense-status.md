@@ -1,7 +1,7 @@
 # Planning: Daemon-Managed Senses And BlueBubbles Status
 
-**Status**: drafting
-**Created**: pending
+**Status**: NEEDS_REVIEW
+**Created**: 2026-03-08 08:35
 
 ## Goal
 Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro up` brings them up and `ouro status` reports a channel-first sense grid instead of only background worker processes.
@@ -65,4 +65,4 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 Current daemon status is process-first, not sense-first. It reports `name/channel/status/pid/restarts`, but the `channel` field currently reflects the inner-dialog worker label rather than a true external sense. Planning and implementation should avoid presenting misleading sense state.
 
 ## Progress Log
-- pending Created
+- 2026-03-08 08:35 Created
