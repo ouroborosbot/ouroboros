@@ -67,7 +67,7 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 **Output**: Updated agent config parsing plus shared sense inventory/state code.
 **Acceptance**: New tests PASS (green), build passes, and no warnings are emitted.
 
-### ⬜ Unit 1c: Sense Truth Model And Agent Config — Coverage & Refactor
+### ✅ Unit 1c: Sense Truth Model And Agent Config — Coverage & Refactor
 **What**: Verify full coverage for the new config/state layer, add any missing edge/error-path tests, and refactor only if needed.
 **Output**: Coverage logs and any additional tests required for 100% coverage on new code.
 **Acceptance**: 100% coverage on new code, tests remain green, and build still passes.
@@ -127,3 +127,4 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 - 2026-03-08 16:56 Unit 0 complete: captured current daemon/status baseline, discovered Slugger bundle relocation candidates, and recorded BlueBubbles source values from `~/.openclaw`
 - 2026-03-08 16:58 Unit 1a complete: wrote failing tests for agent `senses` parsing/defaults and the shared sense-truth inventory model
 - 2026-03-08 17:00 Unit 1b complete: implemented agent `senses` parsing/defaults and the shared sense-truth inventory module, with targeted tests and build passing
+- 2026-03-08 10:06 Unit 1c complete: added edge-path coverage for sense config validation and ready/default inventory behavior, with 100% coverage on `src/heart/identity.ts` and `src/heart/sense-truth.ts`
