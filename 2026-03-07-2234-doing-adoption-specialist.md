@@ -52,7 +52,7 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 ### Legend
 ⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
-### ⬜ Unit 0: Baseline Verification
+### ✅ Unit 0: Baseline Verification
 **Depends on**: nothing
 **What**: Run full test suite to confirm green baseline before any changes.
 **Output**: All 1962 tests passing, 100% coverage, clean tsc build.
