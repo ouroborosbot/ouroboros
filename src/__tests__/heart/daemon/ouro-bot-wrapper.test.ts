@@ -6,7 +6,7 @@ describe("ouro.bot wrapper", () => {
   afterEach(() => {
     vi.restoreAllMocks()
     vi.resetModules()
-    vi.unmock("@ouro.bot/cli")
+    vi.unmock("@ouro.bot/cli/runOuroCli")
   })
 
   it("delegates args to canonical @ouro.bot/cli runner when available", async () => {
@@ -80,6 +80,9 @@ describe("ouro.bot wrapper", () => {
 
   it("uses default canonical loader and falls back when package import fails", async () => {
     vi.resetModules()
+    vi.doMock("@ouro.bot/cli/runOuroCli", () => ({
+      /* no runOuroCli export — simulates missing/incompatible package */
+    }))
     const { runOuroBotWrapper: runWithDefaults } = await import("../../../heart/daemon/ouro-bot-wrapper")
     const fallbackRunCli = vi.fn(async () => "fallback-default")
 
@@ -108,9 +111,9 @@ describe("ouro.bot wrapper", () => {
     expect(result).toBe("default-local-fallback")
   })
 
-  it("falls back when @ouro.bot/cli is present but does not export runOuroCli", async () => {
+  it("falls back when @ouro.bot/cli/runOuroCli is present but does not export runOuroCli", async () => {
     vi.resetModules()
-    vi.doMock("@ouro.bot/cli", () => ({
+    vi.doMock("@ouro.bot/cli/runOuroCli", () => ({
       notRunOuroCli: vi.fn(),
     }))
 
@@ -128,10 +131,10 @@ describe("ouro.bot wrapper", () => {
     expect(result).toBe("fallback-no-export")
   })
 
-  it("uses @ouro.bot/cli runOuroCli export from default loader when available", async () => {
+  it("uses @ouro.bot/cli/runOuroCli export from default loader when available", async () => {
     vi.resetModules()
     const canonicalRunCli = vi.fn(async () => "canonical-default")
-    vi.doMock("@ouro.bot/cli", () => ({
+    vi.doMock("@ouro.bot/cli/runOuroCli", () => ({
       runOuroCli: canonicalRunCli,
     }))
 

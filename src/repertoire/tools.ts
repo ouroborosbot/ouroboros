@@ -16,14 +16,14 @@ export { teamsTools } from "./tools-teams";
 const allDefinitions: ToolDefinition[] = [...baseToolDefinitions, ...teamsToolDefinitions, ...adoSemanticToolDefinitions, ...githubToolDefinitions];
 const REMOTE_BLOCKED_LOCAL_TOOLS = new Set(["shell", "read_file", "write_file", "git_commit", "gh_cli"]);
 
-function baseToolsForCapabilities(capabilities?: ChannelCapabilities): OpenAI.ChatCompletionTool[] {
+function baseToolsForCapabilities(capabilities?: ChannelCapabilities): OpenAI.ChatCompletionFunctionTool[] {
   const isRemoteChannel = capabilities?.channel === "teams";
   if (!isRemoteChannel) return tools;
   return tools.filter((tool) => !REMOTE_BLOCKED_LOCAL_TOOLS.has(tool.function.name));
 }
 
 // Apply a single tool preference to a tool schema, returning a new object.
-function applyPreference(tool: OpenAI.ChatCompletionTool, pref: string): OpenAI.ChatCompletionTool {
+function applyPreference(tool: OpenAI.ChatCompletionFunctionTool, pref: string): OpenAI.ChatCompletionFunctionTool {
   return {
     ...tool,
     function: {
@@ -40,7 +40,7 @@ function applyPreference(tool: OpenAI.ChatCompletionTool, pref: string): OpenAI.
 export function getToolsForChannel(
   capabilities?: ChannelCapabilities,
   toolPreferences?: Record<string, string>,
-): OpenAI.ChatCompletionTool[] {
+): OpenAI.ChatCompletionFunctionTool[] {
   const baseTools = baseToolsForCapabilities(capabilities);
 
   if (!capabilities || capabilities.availableIntegrations.length === 0) {
