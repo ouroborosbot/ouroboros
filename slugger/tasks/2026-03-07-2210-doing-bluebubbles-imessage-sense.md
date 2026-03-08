@@ -46,7 +46,7 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 **Output**: Failing tests that define the channel/config contract before any production changes.
 **Acceptance**: Tests exist, fail red, and cover both happy path and invalid-config branches.
 
-### ⬜ Unit 1b: Channel And Config Contract — Implementation
+### ✅ Unit 1b: Channel And Config Contract — Implementation
 **What**: Implement the approved harness contract in `src/mind/friends/types.ts`, `src/mind/friends/channel.ts`, `src/heart/config.ts`, `src/mind/prompt.ts`, `src/repertoire/tools.ts`, and any entrypoint/package wiring needed for a new sense script. Keep the config source-of-truth aligned with `agent.json` + `~/.agentsecrets/<agent>/secrets.json`.
 **Output**: Production support for a `bluebubbles` sense with explicit capabilities and fail-fast config loading.
 **Acceptance**: Unit 1a tests pass, build is clean, and no unrelated channels regress.
@@ -102,3 +102,4 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 ## Progress Log
 - 2026-03-07 22:15 Created from planning doc
 - 2026-03-07 22:24 Unit 1a complete: added failing channel/config/prompt/tool-safety tests and captured red output
+- 2026-03-07 22:26 Unit 1b complete: wired bluebubbles into channel types, config, prompt behavior, and remote tool safety
