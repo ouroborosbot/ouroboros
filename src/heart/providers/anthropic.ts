@@ -125,6 +125,8 @@ function toAnthropicMessages(
       }
       if (assistant.tool_calls) {
         for (const toolCall of assistant.tool_calls) {
+          /* v8 ignore next -- type narrowing: OpenAI SDK only emits function tool_calls @preserve */
+          if (toolCall.type !== "function") continue;
           blocks.push({
             type: "tool_use",
             id: toolCall.id,
@@ -158,7 +160,7 @@ function toAnthropicMessages(
   return { system, messages: converted };
 }
 
-function toAnthropicTools(tools: OpenAI.ChatCompletionTool[]): Array<Record<string, unknown>> {
+function toAnthropicTools(tools: OpenAI.ChatCompletionFunctionTool[]): Array<Record<string, unknown>> {
   return tools.map((tool) => ({
     name: tool.function.name,
     description: tool.function.description ?? "",

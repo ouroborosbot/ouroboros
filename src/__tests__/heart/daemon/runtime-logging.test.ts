@@ -72,6 +72,7 @@ describe("daemon runtime logging", () => {
 
     configureDaemonRuntimeLogger("ouro", { homeDir: tmpRoot })
     emitNervesEvent({
+      level: "warn",
       component: "daemon",
       event: "daemon.default_sink_test",
       message: "default sinks",
@@ -82,7 +83,7 @@ describe("daemon runtime logging", () => {
     await waitFor(() => fs.existsSync(logFile))
     const body = fs.readFileSync(logFile, "utf-8")
     expect(body).toContain("\"event\":\"daemon.default_sink_test\"")
-    expect(stderrChunks.join("")).toContain("INFO [daemon] default sinks")
+    expect(stderrChunks.join("")).toContain("WARN [daemon] default sinks")
 
     stderrSpy.mockRestore()
   })
