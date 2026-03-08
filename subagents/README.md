@@ -22,11 +22,13 @@ For tools that support skills but not Claude sub-agents, install these as skills
 ```bash
 mkdir -p ~/.codex/skills/work-planner ~/.codex/skills/work-doer ~/.codex/skills/work-merger
 
-# Recommended: hard-link to keep one source of truth and avoid stale copies
+# Hard-link to keep one source of truth
 ln -f "$(pwd)/subagents/work-planner.md" ~/.codex/skills/work-planner/SKILL.md
 ln -f "$(pwd)/subagents/work-doer.md" ~/.codex/skills/work-doer/SKILL.md
 ln -f "$(pwd)/subagents/work-merger.md" ~/.codex/skills/work-merger/SKILL.md
 ```
+
+**Important:** Hard-links break when editors save by replacing the file (new inode). After editing any `subagents/*.md` file, re-run the `ln -f` command for that file to restore the link. You can verify with `stat -f '%i'` — both files should share the same inode.
 
 Optional UI metadata:
 
