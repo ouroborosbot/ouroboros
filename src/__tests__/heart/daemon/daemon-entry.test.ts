@@ -15,6 +15,7 @@ describe("daemon entrypoint", () => {
     const configureDaemonRuntimeLogger = vi.fn()
     const daemonCtor = vi.fn()
     const processManagerCtor = vi.fn()
+    const senseManagerCtor = vi.fn()
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => code as never) as any)
     const onHandlers: Record<string, () => void> = {}
     const onSpy = vi.spyOn(process, "on").mockImplementation(((event: string, cb: () => void) => {
@@ -43,6 +44,16 @@ describe("daemon entrypoint", () => {
     vi.doMock("../../../heart/daemon/process-manager", () => ({
       DaemonProcessManager: MockProcessManager,
     }))
+    vi.doMock("../../../heart/daemon/sense-manager", () => ({
+      DaemonSenseManager: class MockSenseManager {
+        constructor(_opts: unknown) {
+          senseManagerCtor(_opts)
+        }
+        listSenseRows = vi.fn(() => [])
+        startAutoStartSenses = vi.fn(async () => undefined)
+        stopAll = vi.fn(async () => undefined)
+      },
+    }))
     vi.doMock("../../../nerves/runtime", () => ({ emitNervesEvent }))
     vi.doMock("../../../heart/daemon/runtime-logging", () => ({ configureDaemonRuntimeLogger }))
 
@@ -54,6 +65,7 @@ describe("daemon entrypoint", () => {
     expect(start).toHaveBeenCalledTimes(1)
     expect(configureDaemonRuntimeLogger).toHaveBeenCalledWith("daemon")
     expect(processManagerCtor).toHaveBeenCalledTimes(1)
+    expect(senseManagerCtor).toHaveBeenCalledTimes(1)
     expect(daemonCtor).toHaveBeenCalledTimes(1)
 
     const processManagerOptions = processManagerCtor.mock.calls[0]?.[0] as {
@@ -63,6 +75,9 @@ describe("daemon entrypoint", () => {
     expect(processManagerOptions.agents.every((agent) => agent.entry === "heart/agent-entry.js")).toBe(true)
 
     const daemonOptions = daemonCtor.mock.calls[0]?.[0] as {
+      senseManager: {
+        listSenseRows: () => unknown[]
+      }
       scheduler: {
         listJobs: () => unknown[]
         triggerJob: (jobId: string) => Promise<{ ok: boolean; message: string }>
@@ -73,6 +88,7 @@ describe("daemon entrypoint", () => {
         pollInbox: (agent: string) => unknown[]
       }
     }
+    expect(daemonOptions.senseManager.listSenseRows()).toEqual([])
     expect(daemonOptions.scheduler.listJobs()).toEqual([])
     await expect(daemonOptions.scheduler.triggerJob("nightly")).resolves.toEqual({
       ok: false,

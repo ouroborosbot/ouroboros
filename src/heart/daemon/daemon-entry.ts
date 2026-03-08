@@ -6,6 +6,7 @@ import { FileMessageRouter } from "./message-router"
 import { HealthMonitor } from "./health-monitor"
 import { TaskDrivenScheduler } from "./task-scheduler"
 import { configureDaemonRuntimeLogger } from "./runtime-logging"
+import { DaemonSenseManager } from "./sense-manager"
 
 function parseSocketPath(argv: string[]): string {
   const socketIndex = argv.indexOf("--socket")
@@ -27,18 +28,26 @@ emitNervesEvent({
   meta: { socketPath },
 })
 
+const managedAgents = ["ouroboros", "slugger"] as const
+
 const processManager = new DaemonProcessManager({
-  agents: [
-    { name: "ouroboros", entry: "heart/agent-entry.js", channel: "cli", autoStart: true },
-    { name: "slugger", entry: "heart/agent-entry.js", channel: "cli", autoStart: true },
-  ],
+  agents: managedAgents.map((agent) => ({
+    name: agent,
+    entry: "heart/agent-entry.js",
+    channel: "inner-dialog",
+    autoStart: true,
+  })),
 })
 
 const scheduler = new TaskDrivenScheduler({
-  agents: ["ouroboros", "slugger"],
+  agents: [...managedAgents],
 })
 
 const router = new FileMessageRouter()
+
+const senseManager = new DaemonSenseManager({
+  agents: [...managedAgents],
+})
 
 const healthMonitor = new HealthMonitor({
   processManager,
@@ -57,6 +66,7 @@ const healthMonitor = new HealthMonitor({
 const daemon = new OuroDaemon({
   socketPath,
   processManager,
+  senseManager,
   scheduler,
   healthMonitor,
   router,

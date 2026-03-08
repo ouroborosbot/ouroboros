@@ -33,10 +33,19 @@ function listSubagentSources(subagentsDir: string): string[] {
     .sort((a, b) => a.localeCompare(b))
 }
 
+function pathExists(target: string): boolean {
+  try {
+    fs.lstatSync(target)
+    return true
+  } catch {
+    return false
+  }
+}
+
 function ensureSymlink(source: string, target: string): boolean {
   fs.mkdirSync(path.dirname(target), { recursive: true })
 
-  if (fs.existsSync(target)) {
+  if (pathExists(target)) {
     const stats = fs.lstatSync(target)
     if (stats.isSymbolicLink()) {
       const linkedPath = fs.readlinkSync(target)

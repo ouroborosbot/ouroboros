@@ -5,6 +5,7 @@ import { emitNervesEvent } from "../../nerves/runtime"
 
 export interface DaemonManagedAgent {
   name: string
+  agentArg?: string
   entry: string
   channel: string
   autoStart: boolean
@@ -108,7 +109,7 @@ export class DaemonProcessManager {
 
     const runCwd = getRepoRoot()
     const entryScript = path.join(getRepoRoot(), "dist", state.config.entry)
-    const args = [entryScript, "--agent", agent, ...(state.config.args ?? [])]
+    const args = [entryScript, "--agent", state.config.agentArg ?? agent, ...(state.config.args ?? [])]
     const child = this.spawnFn("node", args, {
       cwd: runCwd,
       env: state.config.env ? { ...process.env, ...state.config.env } : process.env,

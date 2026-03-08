@@ -3,7 +3,7 @@ import * as path from "path";
 import { getProviderDisplayLabel } from "../heart/core";
 import { finalAnswerTool, getToolsForChannel } from "../repertoire/tools";
 import { listSkills } from "../repertoire/skills";
-import { getAgentRoot, getAgentName } from "../heart/identity";
+import { getAgentRoot, getAgentName, getAgentSecretsPath, loadAgentConfig, type SenseName } from "../heart/identity";
 import * as os from "os";
 import type { Channel, ResolvedContext } from "./friends/types";
 import { getChannelCapabilities } from "./friends/channel";
@@ -19,6 +19,7 @@ let _psycheCache: {
   tacitKnowledge: string;
   aspirations: string;
 } | null = null;
+let _senseStatusLinesCache: string[] | null = null;
 
 function loadPsycheFile(name: string): string {
   try {
@@ -49,6 +50,7 @@ function loadPsyche(): {
 
 export function resetPsycheCache(): void {
   _psycheCache = null;
+  _senseStatusLinesCache = null;
 }
 
 export type { Channel }
@@ -207,6 +209,7 @@ export function runtimeInfoSection(channel: Channel): string {
   lines.push(`agent: ${agentName}`);
   lines.push(`cwd: ${process.cwd()}`);
   lines.push(`channel: ${channel}`);
+  lines.push(`current sense: ${channel}`);
   lines.push(`i can read and modify my own source code.`);
 
   if (channel === "cli") {
@@ -221,7 +224,79 @@ export function runtimeInfoSection(channel: Channel): string {
     );
   }
 
+  lines.push("")
+  lines.push(...senseRuntimeGuidance(channel))
+
   return lines.join("\n");
+}
+
+function hasTextField(record: Record<string, unknown> | undefined, key: string): boolean {
+  return typeof record?.[key] === "string" && record[key].trim().length > 0
+}
+
+function localSenseStatusLines(): string[] {
+  if (_senseStatusLinesCache) {
+    return [..._senseStatusLinesCache]
+  }
+  const config = loadAgentConfig()
+  const senses = config.senses ?? {
+    cli: { enabled: true },
+    teams: { enabled: false },
+    bluebubbles: { enabled: false },
+  }
+  let payload: Record<string, unknown> = {}
+  try {
+    const raw = fs.readFileSync(getAgentSecretsPath(), "utf-8")
+    const parsed = JSON.parse(raw) as unknown
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      payload = parsed as Record<string, unknown>
+    }
+  } catch {
+    payload = {}
+  }
+
+  const teams = payload.teams as Record<string, unknown> | undefined
+  const bluebubbles = payload.bluebubbles as Record<string, unknown> | undefined
+  const configured: Record<SenseName, boolean> = {
+    cli: true,
+    teams: hasTextField(teams, "clientId") && hasTextField(teams, "clientSecret") && hasTextField(teams, "tenantId"),
+    bluebubbles: hasTextField(bluebubbles, "serverUrl") && hasTextField(bluebubbles, "password"),
+  }
+
+  const rows: Array<{ label: string; status: string }> = [
+    { label: "CLI", status: "interactive" },
+    {
+      label: "Teams",
+      status: !senses.teams.enabled ? "disabled" : configured.teams ? "ready" : "needs_config",
+    },
+    {
+      label: "BlueBubbles",
+      status: !senses.bluebubbles.enabled ? "disabled" : configured.bluebubbles ? "ready" : "needs_config",
+    },
+  ]
+
+  _senseStatusLinesCache = rows.map((row) => `- ${row.label}: ${row.status}`)
+  return [..._senseStatusLinesCache]
+}
+
+function senseRuntimeGuidance(channel: Channel): string[] {
+  const lines = ["available senses:"]
+  lines.push(...localSenseStatusLines())
+  lines.push("sense states:")
+  lines.push("- interactive = available when opened by the user instead of kept running by the daemon")
+  lines.push("- disabled = turned off in agent.json")
+  lines.push("- needs_config = enabled but missing required secrets.json values")
+  lines.push("- ready = enabled and configured; `ouro up` should bring it online")
+  lines.push("- running = enabled and currently active")
+  lines.push("- error = enabled but unhealthy")
+  lines.push("If asked how to enable another sense, I explain the relevant agent.json senses entry and required secrets.json fields instead of guessing.")
+  lines.push("teams setup truth: enable `senses.teams.enabled`, then provide `teams.clientId`, `teams.clientSecret`, and `teams.tenantId` in secrets.json.")
+  lines.push("bluebubbles setup truth: enable `senses.bluebubbles.enabled`, then provide `bluebubbles.serverUrl` and `bluebubbles.password` in secrets.json.")
+  if (channel === "cli") {
+    lines.push("cli is interactive: it is available when the user opens it, not something `ouro up` daemonizes.")
+  }
+
+  return lines
 }
 
 function providerSection(): string {
