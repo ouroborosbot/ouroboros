@@ -21,6 +21,7 @@ import type { ToolContext } from "../repertoire/tools"
 import { configureCliRuntimeLogger } from "../nerves/cli-logging"
 import { emitNervesEvent } from "../nerves/runtime"
 import { enforceTrustGate } from "./trust-gate"
+import { acquireSessionLock, SessionLockError } from "./session-lock"
 
 // readline.Interface exposes undocumented mutable line/cursor for in-progress input
 type ReadlineInternals = readline.Interface & { line: string; cursor: number }
@@ -382,6 +383,17 @@ export async function main(agentName?: string, options?: { pasteDebounceMs?: num
   })
   const sessPath = sessionPath(friendId, "cli", "session")
 
+  let sessionLock: { release: () => void } | null = null
+  try {
+    sessionLock = acquireSessionLock(`${sessPath}.lock`, getAgentName())
+  } catch (error) {
+    if (error instanceof SessionLockError) {
+      process.stderr.write(`${error.message}\n`)
+      return
+    }
+    throw error
+  }
+
   // Load existing session or start fresh
   const existing = loadSession(sessPath)
   const messages: OpenAI.ChatCompletionMessageParam[] = existing?.messages && existing.messages.length > 0
@@ -566,6 +578,7 @@ export async function main(agentName?: string, options?: { pasteDebounceMs?: num
       process.stdout.write("\x1b[36m> \x1b[0m")
     }
   } finally {
+    sessionLock?.release()
     rl.close()
     // eslint-disable-next-line no-console -- terminal UX: goodbye
     console.log("bye")
