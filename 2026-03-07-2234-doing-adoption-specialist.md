@@ -17,8 +17,8 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 
 ## Completion Criteria
 - [x] Running `ouro` with no agents in `~/AgentBundles/` launches the specialist session
-- [ ] Provider selection and credential entry happen before the LLM chat
-- [ ] Credentials are verified (provider runtime created successfully) before starting the specialist chat
+- [x] Provider selection and credential entry happen before the LLM chat
+- [x] Credentials are verified (provider runtime created successfully) before starting the specialist chat
 - [x] Specialist loads SOUL.md + a random identity from the bundled `AdoptionSpecialist.ouro/`
 - [x] Specialist can call `hatch_agent` tool to create a new agent bundle
 - [x] Hatch animation displays after successful `hatch_agent` call
@@ -27,9 +27,9 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - [x] Hatchling secrets are written to `~/.agentsecrets/{hatchlingName}/secrets.json`
 - [x] The AdoptionSpecialist.ouro bundle is NEVER copied to `~/AgentBundles/`
 - [x] All existing tests continue to pass
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -316,7 +316,7 @@ The loop:
 
 ---
 
-### ⬜ Unit 10: Full Test Suite Verification
+### ✅ Unit 10: Full Test Suite Verification
 **What**: Run the complete test suite. Verify all tests pass, 100% coverage maintained, no warnings, clean tsc build.
 **Output**: Test results summary in progress log.
 **Acceptance**: All tests pass. Coverage at 100% (statements, branches, functions, lines). `npx tsc --noEmit` clean.
@@ -368,3 +368,4 @@ The loop:
 - 2026-03-07 23:16 Unit 7 complete: specialist-session.ts created, 15 tests, 100% coverage, nerves audit pass
 - 2026-03-07 23:25 Unit 8 complete: specialist-orchestrator.ts created, 15 tests, 100% coverage, fixed cleanup bug
 - 2026-03-07 23:31 Unit 9 complete: daemon-cli.ts integration, 6 new tests (56 total), 100% coverage, runAdoptionSpecialist dep wired
+- PENDING Unit 10 complete: 2113 tests passing, 18 skipped, 100% coverage, clean tsc, nerves audit pass
