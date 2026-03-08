@@ -255,6 +255,52 @@ describe("hatch flow", () => {
     expect(fs.readFileSync(readmePath, "utf-8")).toContain("custom readme")
   })
 
+  it("writeSecretsFile creates correct anthropic secrets file", async () => {
+    const secretsRoot = makeTempDir("hatch-secrets-ws-anthropic")
+    cleanup.push(secretsRoot)
+
+    const { writeSecretsFile } = await import("../../../heart/daemon/hatch-flow")
+    const resultPath = writeSecretsFile("TestAgent", "anthropic", { setupToken: "sk-test-token" }, secretsRoot)
+
+    expect(resultPath).toBe(path.join(secretsRoot, "TestAgent", "secrets.json"))
+    const secrets = JSON.parse(fs.readFileSync(resultPath, "utf-8")) as {
+      providers: { anthropic: { setupToken: string } }
+    }
+    expect(secrets.providers.anthropic.setupToken).toBe("sk-test-token")
+  })
+
+  it("writeSecretsFile creates correct azure secrets file", async () => {
+    const secretsRoot = makeTempDir("hatch-secrets-ws-azure")
+    cleanup.push(secretsRoot)
+
+    const { writeSecretsFile } = await import("../../../heart/daemon/hatch-flow")
+    const resultPath = writeSecretsFile(
+      "TestAgent",
+      "azure",
+      { apiKey: "az-key", endpoint: "https://az.test", deployment: "gpt-4o" },
+      secretsRoot,
+    )
+
+    expect(resultPath).toBe(path.join(secretsRoot, "TestAgent", "secrets.json"))
+    const secrets = JSON.parse(fs.readFileSync(resultPath, "utf-8")) as {
+      providers: { azure: { apiKey: string; endpoint: string; deployment: string } }
+    }
+    expect(secrets.providers.azure.apiKey).toBe("az-key")
+    expect(secrets.providers.azure.endpoint).toBe("https://az.test")
+    expect(secrets.providers.azure.deployment).toBe("gpt-4o")
+  })
+
+  it("writeSecretsFile returns the path to the written secrets file", async () => {
+    const secretsRoot = makeTempDir("hatch-secrets-ws-return")
+    cleanup.push(secretsRoot)
+
+    const { writeSecretsFile } = await import("../../../heart/daemon/hatch-flow")
+    const resultPath = writeSecretsFile("ReturnTest", "minimax", { apiKey: "mm-key" }, secretsRoot)
+
+    expect(resultPath).toBe(path.join(secretsRoot, "ReturnTest", "secrets.json"))
+    expect(fs.existsSync(resultPath)).toBe(true)
+  })
+
   it("uses default home, source, and target paths when optional deps are omitted", async () => {
     const tempCwd = makeTempDir("hatch-default-cwd")
     cleanup.push(tempCwd)

@@ -40,6 +40,7 @@ export interface OuroCliDeps {
   linkFriendIdentity?: (command: Extract<OuroCliCommand, { kind: "friend.link" }>) => Promise<string>
   listDiscoveredAgents?: () => Promise<string[]> | string[]
   runHatchFlow?: (input: HatchFlowInput) => Promise<HatchFlowResult>
+  runAdoptionSpecialist?: () => Promise<string | null>
   promptInput?: (question: string) => Promise<string>
   registerOuroBundleType?: () => Promise<unknown> | unknown
   startChat?: (agentName: string) => Promise<void>
@@ -585,7 +586,32 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     const discovered = await Promise.resolve(
       deps.listDiscoveredAgents ? deps.listDiscoveredAgents() : defaultListDiscoveredAgents(),
     )
-    if (discovered.length === 0) {
+    if (discovered.length === 0 && deps.runAdoptionSpecialist) {
+      const hatchlingName = await deps.runAdoptionSpecialist()
+      if (!hatchlingName) {
+        return ""
+      }
+
+      try {
+        await deps.installSubagents()
+      } catch (error) {
+        emitNervesEvent({
+          level: "warn",
+          component: "daemon",
+          event: "daemon.subagent_install_error",
+          message: "subagent auto-install failed",
+          meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
+        })
+      }
+
+      await registerOuroBundleTypeNonBlocking(deps)
+      await ensureDaemonRunning(deps)
+
+      if (deps.startChat) {
+        await deps.startChat(hatchlingName)
+      }
+      return ""
+    } else if (discovered.length === 0) {
       command = { kind: "hatch.start" }
     } else if (discovered.length === 1) {
       if (deps.startChat) {
