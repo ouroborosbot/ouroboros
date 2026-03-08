@@ -2,7 +2,7 @@
 
 **Status**: drafting
 **Execution Mode**: direct
-**Created**: (pending initial commit)
+**Created**: 2026-03-07 22:40
 **Planning**: ./2026-03-07-2234-planning-adoption-specialist.md
 **Artifacts**: ./2026-03-07-2234-doing-adoption-specialist/
 
@@ -50,7 +50,7 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 ## Work Units
 
 ### Legend
-- Not started / In progress / Done / Blocked
+⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
 ### ⬜ Unit 0: Baseline Verification
 **Depends on**: nothing
@@ -356,4 +356,4 @@ The loop:
 - **Decisions made**: Update docs immediately, commit right away
 
 ## Progress Log
-- (pending initial commit) Created from planning doc
+- 2026-03-07 22:40 Created from planning doc
