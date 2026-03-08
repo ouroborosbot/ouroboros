@@ -26,7 +26,7 @@ export interface ToolContext {
 export type ToolHandler = (args: Record<string, string>, ctx?: ToolContext) => string | Promise<string>;
 
 export interface ToolDefinition {
-  tool: OpenAI.ChatCompletionTool;
+  tool: OpenAI.ChatCompletionFunctionTool;
   handler: ToolHandler;
   integration?: Integration;
   confirmationRequired?: boolean;
@@ -695,14 +695,14 @@ export const baseToolDefinitions: ToolDefinition[] = [
 ];
 
 // Backward-compat: extract just the OpenAI tool schemas
-export const tools: OpenAI.ChatCompletionTool[] = baseToolDefinitions.map((d) => d.tool);
+export const tools: OpenAI.ChatCompletionFunctionTool[] = baseToolDefinitions.map((d) => d.tool);
 
 // Backward-compat: extract just the handlers by name
 export const baseToolHandlers: Record<string, ToolHandler> = Object.fromEntries(
   baseToolDefinitions.map((d) => [d.tool.function.name, d.handler]),
 );
 
-export const finalAnswerTool: OpenAI.ChatCompletionTool = {
+export const finalAnswerTool: OpenAI.ChatCompletionFunctionTool = {
   type: "function",
   function: {
     name: "final_answer",

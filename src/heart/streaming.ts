@@ -144,6 +144,8 @@ export function toResponsesInput(
       }
       if (a.tool_calls) {
         for (const tc of a.tool_calls) {
+          /* v8 ignore next -- type narrowing: OpenAI SDK only emits function tool_calls @preserve */
+          if (tc.type !== "function") continue;
           input.push({
             type: "function_call",
             call_id: tc.id,
@@ -171,7 +173,7 @@ export function toResponsesInput(
 }
 
 export function toResponsesTools(
-  ccTools: OpenAI.ChatCompletionTool[],
+  ccTools: OpenAI.ChatCompletionFunctionTool[],
 ): { type: "function"; name: string; description: string | null; parameters: Record<string, unknown> | null; strict: false }[] {
   return ccTools.map((t) => ({
     type: "function" as const,
