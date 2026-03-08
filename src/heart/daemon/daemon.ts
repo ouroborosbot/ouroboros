@@ -27,7 +27,7 @@ export interface DaemonProcessManagerLike {
   startAgent(agent: string): Promise<void>
   stopAgent?(agent: string): Promise<void>
   restartAgent?(agent: string): Promise<void>
-  sendToAgent?(agent: string, message: unknown): void
+  sendToAgent?(agent: string, message: Record<string, unknown>): void
   listAgentSnapshots(): Array<{
     name: string
     channel: string

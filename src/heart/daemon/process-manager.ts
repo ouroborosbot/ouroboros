@@ -172,7 +172,7 @@ export class DaemonProcessManager {
     }
   }
 
-  sendToAgent(agent: string, message: unknown): void {
+  sendToAgent(agent: string, message: Record<string, unknown>): void {
     const state = this.requireAgent(agent)
     if (!state.process) return
     try {
