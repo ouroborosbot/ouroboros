@@ -41,7 +41,7 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 
 ## Work Units
 
-### ⬜ Unit 1a: Channel And Config Contract — Tests
+### ✅ Unit 1a: Channel And Config Contract — Tests
 **What**: Add failing tests for the harness-level BlueBubbles contract in `src/__tests__/mind/friends/channel.test.ts`, `src/__tests__/mind/friends/types.test.ts`, and `src/__tests__/heart/config.test.ts`. Cover the new `bluebubbles` channel, its capabilities, the secrets/config surface, and fail-fast validation for incomplete BlueBubbles config.
 **Output**: Failing tests that define the channel/config contract before any production changes.
 **Acceptance**: Tests exist, fail red, and cover both happy path and invalid-config branches.
@@ -101,3 +101,4 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 
 ## Progress Log
 - 2026-03-07 22:15 Created from planning doc
+- 2026-03-07 22:24 Unit 1a complete: added failing channel/config/prompt/tool-safety tests and captured red output
