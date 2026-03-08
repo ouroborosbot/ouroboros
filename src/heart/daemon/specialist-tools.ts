@@ -19,8 +19,12 @@ const hatchAgentTool: OpenAI.ChatCompletionFunctionTool = {
           type: "string",
           description: "the name for the new agent (PascalCase, e.g. 'Slugger')",
         },
+        humanName: {
+          type: "string",
+          description: "the human's preferred name, as they told you during conversation",
+        },
       },
-      required: ["name"],
+      required: ["name", "humanName"],
     },
   },
 }
@@ -69,7 +73,7 @@ export async function execSpecialistTool(
 
     const input: HatchFlowInput = {
       agentName,
-      humanName: deps.humanName,
+      humanName: args.humanName || deps.humanName,
       provider: deps.provider,
       credentials: deps.credentials,
     }

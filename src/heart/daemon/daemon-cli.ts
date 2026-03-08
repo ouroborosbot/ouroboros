@@ -494,24 +494,26 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
   }
 
   try {
-    const humanName = await prompt("Your name: ")
-    const providerRaw = await prompt("Provider (azure|anthropic|minimax|openai-codex): ")
-    if (!humanName || !isAgentProvider(providerRaw)) {
-      process.stdout.write("Invalid input. Run `ouro hatch` to try again.\n")
+    process.stdout.write("\nwelcome to ouro. let's get you set up.\n")
+    process.stdout.write("i need an API key to power our conversation.\n\n")
+    const providerRaw = await prompt("provider (anthropic/azure/minimax/openai-codex): ")
+    if (!isAgentProvider(providerRaw)) {
+      process.stdout.write("unknown provider. run `ouro hatch` to try again.\n")
       return null
     }
 
     const credentials: HatchCredentialsInput = {}
-    if (providerRaw === "anthropic") credentials.setupToken = await prompt("Anthropic API key: ")
-    if (providerRaw === "openai-codex") credentials.oauthAccessToken = await prompt("OpenAI Codex OAuth token: ")
-    if (providerRaw === "minimax") credentials.apiKey = await prompt("MiniMax API key: ")
+    if (providerRaw === "anthropic") credentials.setupToken = await prompt("API key: ")
+    if (providerRaw === "openai-codex") credentials.oauthAccessToken = await prompt("OAuth token: ")
+    if (providerRaw === "minimax") credentials.apiKey = await prompt("API key: ")
     if (providerRaw === "azure") {
-      credentials.apiKey = await prompt("Azure API key: ")
-      credentials.endpoint = await prompt("Azure endpoint: ")
-      credentials.deployment = await prompt("Azure deployment: ")
+      credentials.apiKey = await prompt("API key: ")
+      credentials.endpoint = await prompt("endpoint: ")
+      credentials.deployment = await prompt("deployment: ")
     }
 
     rl.close()
+    process.stdout.write("\n")
 
     // Locate the bundled AdoptionSpecialist.ouro shipped with the npm package
     const bundleSourceDir = path.resolve(__dirname, "..", "..", "..", "AdoptionSpecialist.ouro")
@@ -524,7 +526,7 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
       secretsRoot,
       provider: providerRaw,
       credentials,
-      humanName,
+      humanName: os.userInfo().username,
       createReadline: () => {
         const rl2 = readline.createInterface({ input: process.stdin, output: process.stdout })
         return { question: (q: string) => rl2.question(q), close: () => rl2.close() }

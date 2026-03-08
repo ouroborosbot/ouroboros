@@ -1,12 +1,12 @@
 {
   "name": "ouro.bot",
-  "version": "0.1.0-alpha.3",
+  "version": "0.1.0-alpha.4",
   "description": "npx-friendly wrapper for @ouro.bot/cli",
   "bin": {
     "ouro.bot": "index.js"
   },
   "dependencies": {
-    "@ouro.bot/cli": "*"
+    "@ouro.bot/cli": ">=0.1.0-alpha.0"
   },
   "repository": {
     "type": "git",
