@@ -53,12 +53,12 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
 ### ⬜ Unit 0: Setup/Research
-**What**: Capture the current daemon/status baseline, record the current Slugger bundle relocation candidates, and save the `~/.openclaw` BlueBubbles source values that will inform the live Slugger config update.
+**What**: Capture the current daemon/status baseline, record the current Slugger bundle relocation candidates (`/Users/arimendelow/.Trash/AgentBundles/slugger.ouro` and `/Users/arimendelow/AgentBundles--backup/slugger.ouro` as of validation), and save the `~/.openclaw` BlueBubbles source values that will inform the live Slugger config update.
 **Output**: Baseline notes and command output artifacts under `./2026-03-08-0834-doing-daemon-bluebubbles-sense-status/`.
-**Acceptance**: Artifact notes identify the current `ouro status` baseline, the discovered temporary Slugger bundle candidates, and the BlueBubbles source values from `~/.openclaw`.
+**Acceptance**: Artifact notes identify the current `ouro status` baseline, the discovered temporary Slugger bundle candidates, the rule for choosing the live bundle path during execution, and the BlueBubbles source values from `~/.openclaw`.
 
 ### ⬜ Unit 1a: Sense Truth Model And Agent Config — Tests
-**What**: Write failing tests for the new `agent.json` `senses` block, available-sense discovery, and stable sense state modeling (`disabled`, `needs_config`, `ready`, `running`, `interactive`, `error`).
+**What**: Write failing tests for the new `agent.json` `senses` block, available-sense discovery, and stable sense state modeling (`disabled`, `needs_config`, `ready`, `running`, `interactive`, `error`) in the existing identity/config/daemon test surfaces.
 **Output**: New red-phase tests covering sense config parsing and shared state semantics.
 **Acceptance**: Tests exist in the relevant identity/config/daemon suites and FAIL (red).
 
@@ -73,7 +73,7 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 **Acceptance**: 100% coverage on new code, tests remain green, and build still passes.
 
 ### ⬜ Unit 2a: Daemon Lifecycle And Status Data — Tests
-**What**: Write failing tests for daemon-managed BlueBubbles lifecycle, truthful separation of `Senses` versus `Workers`, and status data that includes disabled senses for discovery.
+**What**: Write failing tests for daemon-managed BlueBubbles lifecycle, truthful separation of `Senses` versus `Workers`, and status data that includes disabled senses for discovery in the existing daemon entry/command/CLI test surfaces.
 **Output**: New red-phase daemon/status tests covering sense lifecycle and worker separation.
 **Acceptance**: Tests exist in daemon entry/command/status suites and FAIL (red).
 
@@ -88,7 +88,7 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 **Acceptance**: 100% coverage on new code, tests remain green, and build still passes.
 
 ### ⬜ Unit 3a: Status UX And Prompt Sense Awareness — Tests
-**What**: Write failing tests for `ouro status` rendering (`Overview / Senses / Workers`), prompt runtime info showing current + available senses, and prompt language that makes sense states explainable.
+**What**: Write failing tests for `ouro status` rendering (`Overview / Senses / Workers`), prompt runtime info showing current + available senses, and prompt language that makes sense states explainable in the existing daemon CLI and prompt test suites.
 **Output**: New red-phase CLI/prompt tests covering status rendering and sense-awareness language.
 **Acceptance**: Tests exist in CLI/prompt suites and FAIL (red).
 
@@ -103,8 +103,8 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 **Acceptance**: 100% coverage on new code, tests remain green, and build still passes.
 
 ### ⬜ Unit 4a: Slugger Live Config And E2E Verification
-**What**: Update Slugger's live config in the currently discovered temporary bundle location, ensure `~/.agentsecrets/slugger/secrets.json` contains the migrated BlueBubbles values, then run live daemon/status smoke checks and a harness explanation smoke check against the approved requirements.
-**Output**: Live verification artifacts, including status output and prompt/harness explanation evidence saved under the artifacts directory.
+**What**: Update Slugger's live config in the currently discovered active bundle location, ensure `~/.agentsecrets/slugger/secrets.json` contains the migrated BlueBubbles values, establish any temporary conventional-path bridge needed for live verification without changing runtime design, then run live daemon/status smoke checks and a harness explanation smoke check against the approved requirements.
+**Output**: Live verification artifacts, including status output, harness explanation evidence, and notes about any temporary bundle-path bridge used for the smoke run.
 **Acceptance**: `ouro up` and `ouro status` demonstrate the expected sense behavior locally, Slugger's live config reflects the new `senses` block, and the captured smoke evidence shows the harness can explain its own sense states/setup truthfully.
 
 ### ⬜ Unit 4b: Final Verification And Completion Sync
