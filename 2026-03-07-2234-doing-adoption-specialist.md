@@ -120,7 +120,7 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 
 ---
 
-### ⬜ Unit 4a: Hatch Animation -- Tests
+### ✅ Unit 4a: Hatch Animation -- Tests
 **What**: Write tests for a `playHatchAnimation(hatchlingName: string, writer?: (text: string) => void)` function. The function prints egg emoji, pauses, prints snake emoji + name. Tests use a mock writer to capture output.
 **Files**: `src/__tests__/heart/daemon/hatch-animation.test.ts` (new file)
 **Tests to write**:
@@ -129,12 +129,12 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - Output contains the hatchling name
 **Acceptance**: Tests FAIL because the module does not exist yet.
 
-### ⬜ Unit 4b: Hatch Animation -- Implementation
+### ✅ Unit 4b: Hatch Animation -- Implementation
 **What**: Create `src/heart/daemon/hatch-animation.ts` with `playHatchAnimation(hatchlingName, writer?)`. Uses `setTimeout` for timing (~1-2 seconds total). Default writer is `process.stderr.write`. Sequence: egg emoji -> animated dots -> snake emoji + name with ANSI color.
 **Files**: `src/heart/daemon/hatch-animation.ts` (new file)
 **Acceptance**: All tests PASS (green).
 
-### ⬜ Unit 4c: Hatch Animation -- Coverage & Refactor
+### ✅ Unit 4c: Hatch Animation -- Coverage & Refactor
 **What**: Verify 100% coverage on the animation module. Ensure default writer branch is covered.
 **Acceptance**: 100% coverage, tests still green.
 
@@ -361,3 +361,4 @@ The loop:
 - 2026-03-07 22:46 Unit 0 complete: 2046 tests passing, 18 skipped, 100% coverage, clean tsc build
 - 2026-03-07 22:49 Unit 1 complete: setAgentConfigOverride added to identity.ts, 4 new tests, 100% coverage
 - 2026-03-07 22:50 Unit 2 complete: resetProviderRuntime added to core.ts, 2 new tests, 100% coverage
+- 2026-03-07 22:51 Unit 3 complete: writeSecretsFile exported from hatch-flow.ts, 3 new tests, 100% coverage
