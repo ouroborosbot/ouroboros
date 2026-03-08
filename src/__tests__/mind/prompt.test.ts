@@ -232,6 +232,100 @@ describe("buildSystem", () => {
     expect(result).not.toContain("i introduce myself on boot")
   })
 
+  it("includes the current sense plus an available-senses summary", async () => {
+    setupReadFileSync()
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
+      context: { maxTokens: 80000, contextMargin: 20 },
+      senses: {
+        cli: { enabled: true },
+        teams: { enabled: true },
+        bluebubbles: { enabled: false },
+      },
+      phrases: {
+        thinking: ["working"],
+        tool: ["running tool"],
+        followup: ["processing"],
+      },
+    })
+    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, _encoding?: any) => {
+      const p = String(filePath)
+      if (p.endsWith("SOUL.md")) return MOCK_SOUL
+      if (p.endsWith("IDENTITY.md")) return MOCK_IDENTITY
+      if (p.endsWith("LORE.md")) return MOCK_LORE
+      if (p.endsWith("TACIT.md")) return MOCK_TACIT_KNOWLEDGE
+      if (p.endsWith("ASPIRATIONS.md")) return MOCK_ASPIRATIONS
+      if (p.endsWith("secrets.json")) {
+        return JSON.stringify({
+          teams: {
+            clientId: "cid",
+            clientSecret: "secret",
+            tenantId: "tenant",
+          },
+        })
+      }
+      return ""
+    })
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("teams")
+
+    expect(result).toContain("current sense: teams")
+    expect(result).toContain("available senses:")
+    expect(result).toContain("CLI: interactive")
+    expect(result).toContain("Teams: ready")
+    expect(result).toContain("BlueBubbles: disabled")
+  })
+
+  it("includes sense-state meanings and truthful setup guidance", async () => {
+    setupReadFileSync()
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
+      context: { maxTokens: 80000, contextMargin: 20 },
+      senses: {
+        cli: { enabled: true },
+        teams: { enabled: false },
+        bluebubbles: { enabled: true },
+      },
+      phrases: {
+        thinking: ["working"],
+        tool: ["running tool"],
+        followup: ["processing"],
+      },
+    })
+    vi.mocked(fs.readFileSync).mockImplementation((filePath: any, _encoding?: any) => {
+      const p = String(filePath)
+      if (p.endsWith("SOUL.md")) return MOCK_SOUL
+      if (p.endsWith("IDENTITY.md")) return MOCK_IDENTITY
+      if (p.endsWith("LORE.md")) return MOCK_LORE
+      if (p.endsWith("TACIT.md")) return MOCK_TACIT_KNOWLEDGE
+      if (p.endsWith("ASPIRATIONS.md")) return MOCK_ASPIRATIONS
+      if (p.endsWith("secrets.json")) return JSON.stringify({})
+      return ""
+    })
+    const { setTestConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    setTestConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+
+    expect(result).toContain("sense states:")
+    expect(result).toContain("interactive = available when opened by the user")
+    expect(result).toContain("disabled = turned off in agent.json")
+    expect(result).toContain("needs_config = enabled but missing required secrets.json values")
+    expect(result).toContain("If asked how to enable another sense, I explain the relevant agent.json senses entry and required secrets.json fields instead of guessing.")
+  })
+
   it("defaults to cli channel", async () => {
     setupReadFileSync()
     const { setTestConfig, resetConfigCache } = await import("../../heart/config")

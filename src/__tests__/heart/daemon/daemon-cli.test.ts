@@ -306,6 +306,73 @@ describe("ouro CLI execution", () => {
     expect(result).toContain("running")
   })
 
+  it("renders daemon status with Overview, Senses, and Workers sections", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({
+        ok: true,
+        summary: "daemon=running\tworkers=1\tsenses=3\thealth=ok",
+        data: {
+          overview: {
+            daemon: "running",
+            socketPath: "/tmp/ouro-test.sock",
+            workerCount: 1,
+            senseCount: 3,
+            health: "ok",
+          },
+          senses: [
+            {
+              agent: "slugger",
+              sense: "cli",
+              enabled: true,
+              status: "interactive",
+              detail: "local interactive terminal",
+            },
+            {
+              agent: "slugger",
+              sense: "bluebubbles",
+              enabled: true,
+              status: "running",
+              detail: ":18790 /bluebubbles-webhook",
+            },
+            {
+              agent: "slugger",
+              sense: "teams",
+              enabled: false,
+              status: "disabled",
+              detail: "not enabled in agent.json",
+            },
+          ],
+          workers: [
+            {
+              agent: "slugger",
+              worker: "inner-dialog",
+              status: "running",
+              pid: 4321,
+              restartCount: 0,
+            },
+          ],
+        },
+      })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+    }
+
+    const result = await runOuroCli(["status"], deps)
+
+    expect(result).toContain("Overview")
+    expect(result).toContain("Senses")
+    expect(result).toContain("Workers")
+    expect(result).toContain("BlueBubbles")
+    expect(result).toContain("interactive")
+    expect(result).toContain("/bluebubbles-webhook")
+    expect(result).toContain("inner-dialog")
+  })
+
   it("routes bare ouro to hatch when no agents are discovered", async () => {
     const deps = {
       socketPath: "/tmp/ouro-test.sock",
