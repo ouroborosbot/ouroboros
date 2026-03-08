@@ -16,17 +16,17 @@
 Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no agents, the Adoption Specialist (an ephemeral LLM agent with a random snake identity) conducts an interview, hatches a new agent, and hands off to the hatchling in a single seamless session.
 
 ## Completion Criteria
-- [ ] Running `ouro` with no agents in `~/AgentBundles/` launches the specialist session
+- [x] Running `ouro` with no agents in `~/AgentBundles/` launches the specialist session
 - [ ] Provider selection and credential entry happen before the LLM chat
 - [ ] Credentials are verified (provider runtime created successfully) before starting the specialist chat
 - [x] Specialist loads SOUL.md + a random identity from the bundled `AdoptionSpecialist.ouro/`
 - [x] Specialist can call `hatch_agent` tool to create a new agent bundle
 - [x] Hatch animation displays after successful `hatch_agent` call
-- [ ] After specialist session ends, the hatchling's CLI session starts automatically
+- [x] After specialist session ends, the hatchling's CLI session starts automatically
 - [x] Specialist secrets are written to `~/.agentsecrets/AdoptionSpecialist/secrets.json` using the user's chosen provider credentials
 - [x] Hatchling secrets are written to `~/.agentsecrets/{hatchlingName}/secrets.json`
-- [ ] The AdoptionSpecialist.ouro bundle is NEVER copied to `~/AgentBundles/`
-- [ ] All existing tests continue to pass
+- [x] The AdoptionSpecialist.ouro bundle is NEVER copied to `~/AgentBundles/`
+- [x] All existing tests continue to pass
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -287,7 +287,7 @@ The loop:
 
 ---
 
-### ⬜ Unit 9a: daemon-cli.ts Integration -- Tests
+### ✅ Unit 9a: daemon-cli.ts Integration -- Tests
 **What**: Write tests for the modified `runOuroCli` flow. When zero agents are discovered AND `runHatchFlow` dep is available, the CLI should route to the specialist orchestrator instead of the old interactive `resolveHatchInput` flow.
 **Files**: `src/__tests__/heart/daemon/daemon-cli.test.ts` (add tests to existing file)
 **Tests to write**:
@@ -297,7 +297,7 @@ The loop:
 - The old `resolveHatchInput` prompts still work for `ouro hatch --agent X --provider Y` (explicit hatch command with args)
 **Acceptance**: Tests FAIL because the integration code does not exist yet.
 
-### ⬜ Unit 9b: daemon-cli.ts Integration -- Implementation
+### ✅ Unit 9b: daemon-cli.ts Integration -- Implementation
 **What**: Modify `runOuroCli` in `daemon-cli.ts`:
 - Add `runAdoptionSpecialist` to `OuroCliDeps` as an optional dep
 - When `args.length === 0` and `discovered.length === 0`: if `runAdoptionSpecialist` dep exists, call it with an `AdoptionSpecialistDeps` object
@@ -310,7 +310,7 @@ The loop:
 **Files**: `src/heart/daemon/daemon-cli.ts`
 **Acceptance**: All tests PASS (green). Existing daemon-cli tests still pass.
 
-### ⬜ Unit 9c: daemon-cli.ts Integration -- Coverage & Refactor
+### ✅ Unit 9c: daemon-cli.ts Integration -- Coverage & Refactor
 **What**: Verify 100% coverage on modified code paths. Ensure no regressions.
 **Acceptance**: 100% coverage, tests still green.
 
@@ -367,3 +367,4 @@ The loop:
 - 2026-03-07 22:57 Unit 6 complete: specialist-tools.ts created, 12 tests (5 schema + 7 execution), 100% coverage
 - 2026-03-07 23:16 Unit 7 complete: specialist-session.ts created, 15 tests, 100% coverage, nerves audit pass
 - 2026-03-07 23:25 Unit 8 complete: specialist-orchestrator.ts created, 15 tests, 100% coverage, fixed cleanup bug
+- PENDING Unit 9 complete: daemon-cli.ts integration, 6 new tests (56 total), 100% coverage, runAdoptionSpecialist dep wired
