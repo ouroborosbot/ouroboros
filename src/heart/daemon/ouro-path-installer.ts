@@ -25,7 +25,7 @@ export interface OuroPathInstallerDeps {
 }
 
 const WRAPPER_SCRIPT = `#!/bin/sh
-exec npx --yes @ouro.bot/cli "$@"
+exec npx --yes @ouro.bot/cli@latest "$@"
 `
 
 function detectShellProfile(homeDir: string, shell: string | undefined): string | null {
