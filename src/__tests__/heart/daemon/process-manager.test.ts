@@ -293,6 +293,77 @@ describe("daemon process manager", () => {
     expect(manager.getAgentSnapshot("slugger")?.pid).toBeNull()
   })
 
+  it("passes agentArg through to spawned sense processes", async () => {
+    const child = new MockChild()
+    spawn.mockReturnValue(child)
+    now.mockReturnValue(1_000)
+
+    const manager = new DaemonProcessManager({
+      agents: [
+        {
+          name: "slugger:bluebubbles",
+          agentArg: "slugger",
+          entry: "senses/bluebubbles-entry.js",
+          channel: "bluebubbles",
+          autoStart: true,
+        },
+      ],
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+    })
+
+    await manager.startAgent("slugger:bluebubbles")
+    child.emit("exit", 1, null)
+    await manager.stopAgent("slugger:bluebubbles")
+
+    expect(spawn).toHaveBeenCalledWith(
+      "node",
+      [expect.stringContaining("senses/bluebubbles-entry.js"), "--agent", "slugger"],
+      expect.objectContaining({ stdio: ["ignore", "ignore", "ignore", "ipc"] }),
+    )
+    expect(now).toHaveBeenCalled()
+    expect(setTimeoutFn).toHaveBeenCalled()
+    expect(clearTimeoutFn).toHaveBeenCalled()
+  })
+
+  it("uses default spawn, clock, and timer helpers when none are injected", async () => {
+    vi.resetModules()
+    const spawnedChild = new MockChild()
+    const defaultSpawn = vi.fn(() => spawnedChild)
+    const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(1_000)
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout").mockImplementation((((cb: () => void) => {
+      timers.push({ delay: 123, cb })
+      return 99
+    }) as unknown) as typeof setTimeout)
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout").mockImplementation((() => undefined) as typeof clearTimeout)
+
+    vi.doMock("child_process", () => ({
+      spawn: defaultSpawn,
+    }))
+
+    const { DaemonProcessManager: DefaultedProcessManager } = await import("../../../heart/daemon/process-manager")
+    const manager = new DefaultedProcessManager({
+      agents,
+      initialBackoffMs: 123,
+      maxBackoffMs: 123,
+    })
+
+    await manager.startAgent("slugger")
+    spawnedChild.emit("exit", 1, null)
+    await manager.startAgent("slugger")
+
+    expect(defaultSpawn).toHaveBeenCalledWith(
+      "node",
+      [expect.stringContaining("heart/agent-entry.js"), "--agent", "slugger"],
+      expect.objectContaining({ cwd: expect.any(String) }),
+    )
+    expect(dateNowSpy).toHaveBeenCalled()
+    expect(setTimeoutSpy).toHaveBeenCalled()
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(99)
+  })
+
   it("keeps increased backoff after short graceful exits and handles null startedAt", async () => {
     const first = new MockChild()
     const second = new MockChild()

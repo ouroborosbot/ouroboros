@@ -249,6 +249,53 @@ describe("daemon command plane branches", () => {
     expect(parsed.error).toBe("string-failure")
   })
 
+  it("builds status rows without a sense manager when none is configured", async () => {
+    const socketPath = tmpSocketPath("daemon-no-sense-manager")
+    const daemon = new OuroDaemon({
+      socketPath,
+      processManager: {
+        listAgentSnapshots: () => [
+          {
+            name: "slugger",
+            channel: "inner-dialog",
+            status: "crashed",
+            pid: null,
+            restartCount: 1,
+            startedAt: null,
+            lastCrashAt: null,
+            backoffMs: 1000,
+          },
+        ],
+        startAutoStartAgents: async () => undefined,
+        stopAll: async () => undefined,
+        startAgent: async () => undefined,
+      },
+      scheduler: {
+        listJobs: () => [],
+        triggerJob: async () => ({ ok: true, message: "triggered" }),
+      },
+      healthMonitor: {
+        runChecks: async () => [],
+      },
+      router: {
+        send: async () => ({ id: "msg-1", queuedAt: "2026-03-05T23:00:00.000Z" }),
+        pollInbox: () => [],
+      },
+    })
+
+    const status = await daemon.handleCommand({ kind: "daemon.status" })
+    expect(status.data).toEqual({
+      overview: expect.objectContaining({
+        daemon: "running",
+        health: "warn",
+        workerCount: 1,
+        senseCount: 0,
+      }),
+      senses: [],
+      workers: [expect.objectContaining({ agent: "slugger", worker: "inner-dialog", status: "crashed" })],
+    })
+  })
+
   it("serves socket requests and can be started twice safely", async () => {
     const socketPath = tmpSocketPath("daemon-socket-integration")
     const { daemon } = make(socketPath)
