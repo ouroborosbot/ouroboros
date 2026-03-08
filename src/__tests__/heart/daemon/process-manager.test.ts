@@ -14,6 +14,7 @@ class MockChild extends EventEmitter {
     this.emit("exit", 0, null)
     return true
   })
+  send = vi.fn((_message: unknown, _callback?: (error: Error | null) => void) => true)
 }
 
 describe("daemon process manager", () => {
@@ -322,6 +323,91 @@ describe("daemon process manager", () => {
 
     expect(manager.getAgentSnapshot("slugger")?.status).toBe("stopped")
     expect(manager.getAgentSnapshot("slugger")?.backoffMs).toBe(200)
+  })
+
+  it("spawns agents with ipc stdio channel", async () => {
+    const child = new MockChild()
+    spawn.mockReturnValue(child)
+    now.mockReturnValue(1_000)
+
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+    })
+
+    await manager.startAgent("slugger")
+
+    expect(spawn).toHaveBeenCalledWith(
+      "node",
+      expect.any(Array),
+      expect.objectContaining({
+        stdio: ["ignore", "ignore", "ignore", "ipc"],
+      }),
+    )
+  })
+
+  it("sends IPC message to running agent via sendToAgent", async () => {
+    const child = new MockChild()
+    spawn.mockReturnValue(child)
+    now.mockReturnValue(1_000)
+
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+    })
+
+    await manager.startAgent("slugger")
+    manager.sendToAgent("slugger", { type: "heartbeat" })
+
+    expect(child.send).toHaveBeenCalledWith({ type: "heartbeat" })
+  })
+
+  it("sendToAgent swallows errors when agent has no process", async () => {
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+    })
+
+    expect(() => manager.sendToAgent("slugger", { type: "heartbeat" })).not.toThrow()
+  })
+
+  it("sendToAgent swallows errors when child.send throws", async () => {
+    const child = new MockChild()
+    child.send.mockImplementation(() => { throw new Error("send-failed") })
+    spawn.mockReturnValue(child)
+    now.mockReturnValue(1_000)
+
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+    })
+
+    await manager.startAgent("slugger")
+    expect(() => manager.sendToAgent("slugger", { type: "poke" })).not.toThrow()
+  })
+
+  it("sendToAgent throws for unknown agent", async () => {
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+    })
+
+    expect(() => manager.sendToAgent("ghost", { type: "heartbeat" })).toThrow("Unknown managed agent 'ghost'.")
   })
 
   it("prunes restart history outside the one-hour window", async () => {

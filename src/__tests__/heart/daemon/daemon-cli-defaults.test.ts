@@ -755,6 +755,7 @@ describe("daemon CLI default dependency branches", () => {
     const result = await runOuroCli([], {
       ...deps,
       writeStdout,
+      startChat: undefined,
     })
 
     expect(result).toContain("who do you want to talk to?")
@@ -786,6 +787,24 @@ describe("daemon CLI default dependency branches", () => {
     const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
 
     expect(deps.listDiscoveredAgents!()).toEqual([])
+  })
+
+  it("default deps include startChat function", async () => {
+    vi.resetModules()
+
+    vi.doMock("net", () => ({ createConnection: vi.fn() }))
+    vi.doMock("child_process", () => ({ spawn: vi.fn() }))
+    vi.doMock("../../../heart/identity", () => ({
+      getRepoRoot: () => "/mock/repo",
+      getAgentBundlesRoot: () => "/mock/AgentBundles",
+    }))
+    vi.doMock("../../../nerves/runtime", () => ({ emitNervesEvent: vi.fn() }))
+    vi.doMock("fs", () => ({ existsSync: vi.fn(() => false), unlinkSync: vi.fn() }))
+
+    const { createDefaultOuroCliDeps } = await import("../../../heart/daemon/daemon-cli")
+    const deps = createDefaultOuroCliDeps("/tmp/daemon.sock")
+
+    expect(typeof deps.startChat).toBe("function")
   })
 
   it("falls back to internal discovery when deps.listDiscoveredAgents is explicitly undefined", async () => {

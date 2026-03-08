@@ -284,4 +284,81 @@ describe("inner dialog runtime", () => {
     ])
     expect(checkpoint).toBe("Unit 3 refactor pass")
   })
+
+  it("drains inbox messages into user message when drainInbox returns messages", async () => {
+    const drainInbox = vi.fn(() => [
+      { from: "ouroboros", content: "review PR #42" },
+      { from: "ari", content: "check task board" },
+    ])
+
+    await runInnerDialogTurn({
+      reason: "boot",
+      instincts: [{ id: "heartbeat", prompt: "Instinct: check in.", enabled: true }],
+      now: () => new Date("2026-03-07T12:00:00.000Z"),
+      drainInbox,
+    })
+
+    expect(drainInbox).toHaveBeenCalledTimes(1)
+    const [messages] = mockRunAgent.mock.calls[0]
+    const lastUser = [...messages].reverse().find((m: OpenAI.ChatCompletionMessageParam) => m.role === "user")
+    const content = String(lastUser!.content)
+    expect(content).toContain("## incoming messages")
+    expect(content).toContain("**ouroboros**: review PR #42")
+    expect(content).toContain("**ari**: check task board")
+  })
+
+  it("does not inject incoming messages section when drainInbox returns empty array", async () => {
+    const drainInbox = vi.fn(() => [])
+
+    await runInnerDialogTurn({
+      reason: "boot",
+      instincts: [{ id: "heartbeat", prompt: "Instinct: check in.", enabled: true }],
+      now: () => new Date("2026-03-07T12:01:00.000Z"),
+      drainInbox,
+    })
+
+    expect(drainInbox).toHaveBeenCalledTimes(1)
+    const [messages] = mockRunAgent.mock.calls[0]
+    const lastUser = [...messages].reverse().find((m: OpenAI.ChatCompletionMessageParam) => m.role === "user")
+    expect(String(lastUser!.content)).not.toContain("## incoming messages")
+  })
+
+  it("works without drainInbox option (default no-op)", async () => {
+    await runInnerDialogTurn({
+      reason: "boot",
+      instincts: [{ id: "heartbeat", prompt: "Instinct: check in.", enabled: true }],
+      now: () => new Date("2026-03-07T12:02:00.000Z"),
+    })
+
+    const [messages] = mockRunAgent.mock.calls[0]
+    const lastUser = [...messages].reverse().find((m: OpenAI.ChatCompletionMessageParam) => m.role === "user")
+    expect(String(lastUser!.content)).not.toContain("## incoming messages")
+  })
+
+  it("drains inbox on resumed sessions (heartbeat) and appends to instinct message", async () => {
+    mockLoadSession.mockReturnValue({
+      messages: [
+        { role: "system", content: "system prompt" },
+        { role: "assistant", content: "checkpoint: working on task board" },
+      ],
+    })
+
+    const drainInbox = vi.fn(() => [
+      { from: "ouro-poke", content: "poke habit-heartbeat" },
+    ])
+
+    await runInnerDialogTurn({
+      reason: "heartbeat",
+      instincts: [{ id: "heartbeat", prompt: "Instinct: check in.", enabled: true }],
+      now: () => new Date("2026-03-07T12:03:00.000Z"),
+      drainInbox,
+    })
+
+    const [messages] = mockRunAgent.mock.calls[0]
+    const lastUser = [...messages].reverse().find((m: OpenAI.ChatCompletionMessageParam) => m.role === "user")
+    const content = String(lastUser!.content)
+    expect(content).toContain("Instinct: check in.")
+    expect(content).toContain("## incoming messages")
+    expect(content).toContain("**ouro-poke**: poke habit-heartbeat")
+  })
 })
