@@ -27,6 +27,7 @@ export interface DaemonProcessManagerLike {
   startAgent(agent: string): Promise<void>
   stopAgent?(agent: string): Promise<void>
   restartAgent?(agent: string): Promise<void>
+  sendToAgent?(agent: string, message: unknown): void
   listAgentSnapshots(): Array<{
     name: string
     channel: string
@@ -347,6 +348,7 @@ export class OuroDaemon {
           sessionId: command.sessionId,
           taskRef: command.taskRef,
         })
+        this.processManager.sendToAgent?.(command.to, { type: "message" })
         return { ok: true, message: `queued message ${receipt.id}`, data: receipt }
       }
       case "message.poll": {
@@ -372,6 +374,7 @@ export class OuroDaemon {
           taskRef: command.taskId,
         })
         await this.scheduler.recordTaskRun?.(command.agent, command.taskId)
+        this.processManager.sendToAgent?.(command.agent, { type: "poke", taskId: command.taskId })
         return {
           ok: true,
           message: `queued poke ${receipt.id}`,

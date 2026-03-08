@@ -112,7 +112,7 @@ export class DaemonProcessManager {
     const child = this.spawnFn("node", args, {
       cwd: runCwd,
       env: state.config.env ? { ...process.env, ...state.config.env } : process.env,
-      stdio: ["ignore", "ignore", "ignore"],
+      stdio: ["ignore", "ignore", "ignore", "ipc"],
     })
 
     state.process = child
@@ -169,6 +169,22 @@ export class DaemonProcessManager {
   async stopAll(): Promise<void> {
     for (const state of this.agents.values()) {
       await this.stopAgent(state.config.name)
+    }
+  }
+
+  sendToAgent(agent: string, message: unknown): void {
+    const state = this.requireAgent(agent)
+    if (!state.process) return
+    try {
+      state.process.send(message)
+    } catch {
+      emitNervesEvent({
+        level: "warn",
+        component: "daemon",
+        event: "daemon.agent_ipc_send_error",
+        message: "failed to send IPC message to managed agent",
+        meta: { agent },
+      })
     }
   }
 
