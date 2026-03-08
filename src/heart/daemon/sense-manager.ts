@@ -206,10 +206,7 @@ export class DaemonSenseManager implements DaemonSenseManagerLike {
       }),
     )
 
-    const managedSenseAgents = options.agents.flatMap((agent) => {
-      const context = this.contexts.get(agent)
-      if (!context) return []
-
+    const managedSenseAgents = [...this.contexts.entries()].flatMap(([agent, context]) => {
       return (["teams", "bluebubbles"] as SenseName[])
         .filter((sense) => context.senses[sense].enabled && context.facts[sense].configured)
         .map((sense) => ({
@@ -255,7 +252,18 @@ export class DaemonSenseManager implements DaemonSenseManagerLike {
     }
 
     const rows = [...this.contexts.entries()].flatMap(([agent, context]) => {
-      const inventory = getSenseInventory({ senses: context.senses }, runtime.get(agent))
+      const runtimeInfo: Partial<Record<SenseName, SenseRuntimeInfo>> = {
+        cli: { configured: true },
+        teams: {
+          configured: context.facts.teams.configured,
+          ...(runtime.get(agent)?.teams ?? {}),
+        },
+        bluebubbles: {
+          configured: context.facts.bluebubbles.configured,
+          ...(runtime.get(agent)?.bluebubbles ?? {}),
+        },
+      }
+      const inventory = getSenseInventory({ senses: context.senses }, runtimeInfo)
       return inventory.map((entry) => ({
         agent,
         sense: entry.sense,
