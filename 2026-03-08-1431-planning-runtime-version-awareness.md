@@ -88,3 +88,4 @@ Minimal scratchpad. Implementation details go in doing doc.
 ## Progress Log
 - 2026-03-08 14:32 Created
 - 2026-03-08 14:35 Decided: bundle-meta.json in bundle root (unified runtime + schema versioning)
+- 2026-03-08 14:42 Expanded scope: holistic versioning strategy, daemon auto-update, AX-first changelog design, JSON format confirmed
