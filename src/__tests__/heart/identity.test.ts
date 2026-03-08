@@ -405,3 +405,112 @@ describe("resetIdentity", () => {
     expect(loadAgentConfig().provider).toBe("anthropic")
   })
 })
+
+describe("setAgentConfigOverride", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it("causes loadAgentConfig to return the override instead of reading from disk", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    const { setAgentConfigOverride, loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+
+    const override = {
+      version: 1,
+      enabled: true,
+      provider: "anthropic" as const,
+      phrases: { thinking: ["override"], tool: ["override"], followup: ["override"] },
+    }
+    setAgentConfigOverride(override)
+
+    const result = loadAgentConfig()
+    expect(result).toBe(override)
+    expect(result.phrases.thinking).toEqual(["override"])
+    // fs.readFileSync should NOT have been called for agent.json
+    expect(fs.readFileSync).not.toHaveBeenCalled()
+  })
+
+  it("setAgentConfigOverride(null) restores disk-based loading", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 1,
+        enabled: true,
+        provider: "minimax",
+        phrases: { thinking: ["disk"], tool: ["disk"], followup: ["disk"] },
+      }),
+    )
+
+    const { setAgentConfigOverride, loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+
+    const override = {
+      version: 1,
+      enabled: true,
+      provider: "anthropic" as const,
+      phrases: { thinking: ["override"], tool: ["override"], followup: ["override"] },
+    }
+    setAgentConfigOverride(override)
+    expect(loadAgentConfig().provider).toBe("anthropic")
+
+    setAgentConfigOverride(null)
+    expect(loadAgentConfig().provider).toBe("minimax")
+  })
+
+  it("resetIdentity clears the override", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 1,
+        enabled: true,
+        provider: "minimax",
+        phrases: { thinking: ["disk"], tool: ["disk"], followup: ["disk"] },
+      }),
+    )
+
+    const { setAgentConfigOverride, loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+
+    const override = {
+      version: 1,
+      enabled: true,
+      provider: "anthropic" as const,
+      phrases: { thinking: ["override"], tool: ["override"], followup: ["override"] },
+    }
+    setAgentConfigOverride(override)
+    expect(loadAgentConfig().provider).toBe("anthropic")
+
+    resetIdentity()
+    expect(loadAgentConfig().provider).toBe("minimax")
+  })
+
+  it("override takes precedence over cached disk config", async () => {
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 1,
+        enabled: true,
+        provider: "minimax",
+        phrases: { thinking: ["disk"], tool: ["disk"], followup: ["disk"] },
+      }),
+    )
+
+    const { setAgentConfigOverride, loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+
+    // First load from disk to populate cache
+    expect(loadAgentConfig().provider).toBe("minimax")
+
+    // Override should take precedence over cached disk value
+    const override = {
+      version: 2,
+      enabled: false,
+      provider: "azure" as const,
+      phrases: { thinking: ["override"], tool: ["override"], followup: ["override"] },
+    }
+    setAgentConfigOverride(override)
+    expect(loadAgentConfig().provider).toBe("azure")
+    expect(loadAgentConfig().version).toBe(2)
+  })
+})

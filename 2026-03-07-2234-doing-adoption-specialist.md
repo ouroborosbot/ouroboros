@@ -60,7 +60,7 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 
 ---
 
-### ⬜ Unit 1a: identity.ts -- setAgentConfigOverride -- Tests
+### ✅ Unit 1a: identity.ts -- setAgentConfigOverride -- Tests
 **What**: Write tests for a new `setAgentConfigOverride(config | null)` function on `identity.ts`. When set to a non-null `AgentConfig`, `loadAgentConfig()` should return the override instead of reading from disk. When set to `null`, normal disk-based loading resumes. `resetIdentity()` should also clear the override.
 **Files**: `src/__tests__/heart/identity.test.ts` (add tests to existing file)
 **Tests to write**:
@@ -70,12 +70,12 @@ Build the end-to-end first-run onboarding flow: when a user runs `ouro` with no 
 - Override takes precedence over cached disk config
 **Acceptance**: Tests exist and FAIL (red) because `setAgentConfigOverride` does not exist yet.
 
-### ⬜ Unit 1b: identity.ts -- setAgentConfigOverride -- Implementation
+### ✅ Unit 1b: identity.ts -- setAgentConfigOverride -- Implementation
 **What**: Add `setAgentConfigOverride(config: AgentConfig | null): void` to `identity.ts`. Add a `_agentConfigOverride` module-level variable. Modify `loadAgentConfig()` to check the override first. Modify `resetIdentity()` to clear it.
 **Files**: `src/heart/identity.ts`
 **Acceptance**: All tests PASS (green), no warnings. Existing identity tests still pass.
 
-### ⬜ Unit 1c: identity.ts -- setAgentConfigOverride -- Coverage & Refactor
+### ✅ Unit 1c: identity.ts -- setAgentConfigOverride -- Coverage & Refactor
 **What**: Verify 100% coverage on new code. Refactor if needed.
 **Acceptance**: 100% coverage on `setAgentConfigOverride` and modified `loadAgentConfig()` paths. Tests still green.
 
@@ -358,3 +358,4 @@ The loop:
 ## Progress Log
 - 2026-03-07 22:40 Created from planning doc
 - 2026-03-07 22:43 Passes complete (granularity, validation, quality). Status: READY_FOR_EXECUTION
+- 2026-03-07 22:46 Unit 0 complete: 2046 tests passing, 18 skipped, 100% coverage, clean tsc build
