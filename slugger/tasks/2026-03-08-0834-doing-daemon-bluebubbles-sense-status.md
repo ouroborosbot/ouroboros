@@ -1,6 +1,6 @@
 # Doing: Daemon-Managed Senses And BlueBubbles Status
 
-**Status**: in-progress
+**Status**: done
 **Execution Mode**: direct
 **Created**: 2026-03-08 09:32
 **Planning**: ./2026-03-08-0834-planning-daemon-bluebubbles-sense-status.md
@@ -16,18 +16,18 @@
 Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro up` brings them up and `ouro status` reports a channel-first sense grid instead of only background worker processes.
 
 ## Completion Criteria
-- [ ] `ouro up` starts Slugger's configured senses, including BlueBubbles, through the daemon path.
-- [ ] `ouro status` includes an `Overview` section plus a `Senses` grid and separate `Workers` section.
-- [ ] The `Senses` grid shows all available senses for each agent, including disabled ones, with enough detail to show enabled state, runtime state, and relevant endpoint/detail.
-- [ ] Slugger's config supports daemon-managed sense enablement without reading live runtime values from `~/.openclaw`.
-- [ ] Existing daemon-managed worker status remains visible and is not mislabeled as an external sense.
-- [ ] BlueBubbles secrets remain sourced from `~/.agentsecrets/slugger/secrets.json`.
-- [ ] System prompt runtime info includes both the current sense and a lightweight available-senses summary without turning into setup documentation.
-- [ ] When asked how to enable or set up another sense, the agent can answer truthfully from sense/status/config information instead of guessing.
-- [ ] When asked what sense states mean, the agent can explain its own harness terminology truthfully and clearly.
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] `ouro up` starts Slugger's configured senses, including BlueBubbles, through the daemon path.
+- [x] `ouro status` includes an `Overview` section plus a `Senses` grid and separate `Workers` section.
+- [x] The `Senses` grid shows all available senses for each agent, including disabled ones, with enough detail to show enabled state, runtime state, and relevant endpoint/detail.
+- [x] Slugger's config supports daemon-managed sense enablement without reading live runtime values from `~/.openclaw`.
+- [x] Existing daemon-managed worker status remains visible and is not mislabeled as an external sense.
+- [x] BlueBubbles secrets remain sourced from `~/.agentsecrets/slugger/secrets.json`.
+- [x] System prompt runtime info includes both the current sense and a lightweight available-senses summary without turning into setup documentation.
+- [x] When asked how to enable or set up another sense, the agent can answer truthfully from sense/status/config information instead of guessing.
+- [x] When asked what sense states mean, the agent can explain its own harness terminology truthfully and clearly.
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -102,12 +102,12 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 **Output**: Coverage artifacts and any supplemental tests needed for complete coverage.
 **Acceptance**: 100% coverage on new code, tests remain green, and build still passes.
 
-### ⬜ Unit 4a: Slugger Live Config And E2E Verification
+### ✅ Unit 4a: Slugger Live Config And E2E Verification
 **What**: Update Slugger's live config in the currently discovered active bundle location, ensure `~/.agentsecrets/slugger/secrets.json` contains the migrated BlueBubbles values, establish any temporary conventional-path bridge needed for live verification without changing runtime design, then run live daemon/status smoke checks and a harness explanation smoke check against the approved requirements.
 **Output**: Live verification artifacts, including status output, harness explanation evidence, and notes about any temporary bundle-path bridge used for the smoke run.
 **Acceptance**: `ouro up` and `ouro status` demonstrate the expected sense behavior locally, Slugger's live config reflects the new `senses` block, and the captured smoke evidence shows the harness can explain its own sense states/setup truthfully.
 
-### ⬜ Unit 4b: Final Verification And Completion Sync
+### ✅ Unit 4b: Final Verification And Completion Sync
 **What**: Run the full required validation pass for the task, sync completion checklists in doing/planning docs, and prepare the branch for work-merger.
 **Output**: Final test/build/coverage artifacts and completed task docs.
 **Acceptance**: Full targeted verification is captured, all completion criteria satisfied by evidence are checked, and the branch is cleanly ready for `$work-doer` completion and `$work-merger`.
@@ -134,3 +134,6 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 - 2026-03-08 10:41 Unit 3a complete: wrote red-phase tests for `ouro status` sense grids and prompt sense-awareness language
 - 2026-03-08 10:46 Unit 3b complete: implemented `Overview / Senses / Workers` status rendering and prompt-time sense/status guidance
 - 2026-03-08 10:51 Unit 3c complete: closed daemon CLI parser edge cases and reached 100% coverage on `src/heart/daemon/daemon-cli.ts` and `src/mind/prompt.ts`
+- 2026-03-08 11:05 Unit 4a complete: updated Slugger live config and secrets, added temporary conventional-path bridge for the moved bundles, and captured clean live smoke for `ouro up`, `ouro status`, and prompt runtime info
+- 2026-03-08 11:05 Unit 4b complete: ran `npm test`, `npm run test:coverage`, `npx tsc --noEmit`, and `npm run build`, then synced planning/doing completion criteria for merge readiness
+- 2026-03-08 11:05 All units complete: branch is ready for work-merger with full live smoke evidence and passing validation artifacts

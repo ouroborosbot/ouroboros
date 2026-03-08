@@ -1,6 +1,6 @@
 # Planning: Daemon-Managed Senses And BlueBubbles Status
 
-**Status**: approved
+**Status**: completed
 **Created**: 2026-03-08 08:35
 
 ## Goal
@@ -24,18 +24,18 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 - Changing where provider credentials live.
 
 ## Completion Criteria
-- [ ] `ouro up` starts Slugger's configured senses, including BlueBubbles, through the daemon path.
-- [ ] `ouro status` includes an `Overview` section plus a `Senses` grid and separate `Workers` section.
-- [ ] The `Senses` grid shows all available senses for each agent, including disabled ones, with enough detail to show enabled state, runtime state, and relevant endpoint/detail.
-- [ ] Slugger's config supports daemon-managed sense enablement without reading live runtime values from `~/.openclaw`.
-- [ ] Existing daemon-managed worker status remains visible and is not mislabeled as an external sense.
-- [ ] BlueBubbles secrets remain sourced from `~/.agentsecrets/slugger/secrets.json`.
-- [ ] System prompt runtime info includes both the current sense and a lightweight available-senses summary without turning into setup documentation.
-- [ ] When asked how to enable or set up another sense, the agent can answer truthfully from sense/status/config information instead of guessing.
-- [ ] When asked what sense states mean, the agent can explain its own harness terminology truthfully and clearly.
-- [ ] 100% test coverage on all new code
-- [ ] All tests pass
-- [ ] No warnings
+- [x] `ouro up` starts Slugger's configured senses, including BlueBubbles, through the daemon path.
+- [x] `ouro status` includes an `Overview` section plus a `Senses` grid and separate `Workers` section.
+- [x] The `Senses` grid shows all available senses for each agent, including disabled ones, with enough detail to show enabled state, runtime state, and relevant endpoint/detail.
+- [x] Slugger's config supports daemon-managed sense enablement without reading live runtime values from `~/.openclaw`.
+- [x] Existing daemon-managed worker status remains visible and is not mislabeled as an external sense.
+- [x] BlueBubbles secrets remain sourced from `~/.agentsecrets/slugger/secrets.json`.
+- [x] System prompt runtime info includes both the current sense and a lightweight available-senses summary without turning into setup documentation.
+- [x] When asked how to enable or set up another sense, the agent can answer truthfully from sense/status/config information instead of guessing.
+- [x] When asked what sense states mean, the agent can explain its own harness terminology truthfully and clearly.
+- [x] 100% test coverage on all new code
+- [x] All tests pass
+- [x] No warnings
 
 ## Code Coverage Requirements
 **MANDATORY: 100% coverage on all new code.**
@@ -103,3 +103,4 @@ Sense product model to target:
 - 2026-03-08 08:55 Chose a shared sense-truth model so status UX and agent setup help are driven by the same product states
 - 2026-03-08 08:55 Renamed the non-daemon state to `interactive` and required the agent to explain sense-state terminology clearly
 - 2026-03-08 09:29 Approved for doing conversion
+- 2026-03-08 11:05 Completed via doing execution with live daemon smoke, full tests, full coverage gate, build, and typecheck passing
