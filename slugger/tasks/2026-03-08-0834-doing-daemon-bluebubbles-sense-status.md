@@ -2,7 +2,7 @@
 
 **Status**: drafting
 **Execution Mode**: direct
-**Created**: pending
+**Created**: 2026-03-08 09:32
 **Planning**: ./2026-03-08-0834-planning-daemon-bluebubbles-sense-status.md
 **Artifacts**: ./2026-03-08-0834-doing-daemon-bluebubbles-sense-status/
 
@@ -59,6 +59,7 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 
 ### ⬜ Unit 1a: Sense Truth Model And Agent Config — Tests
 **What**: Write failing tests for the new `agent.json` `senses` block, available-sense discovery, and stable sense state modeling (`disabled`, `needs_config`, `ready`, `running`, `interactive`, `error`).
+**Output**: New red-phase tests covering sense config parsing and shared state semantics.
 **Acceptance**: Tests exist in the relevant identity/config/daemon suites and FAIL (red).
 
 ### ⬜ Unit 1b: Sense Truth Model And Agent Config — Implementation
@@ -73,6 +74,7 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 
 ### ⬜ Unit 2a: Daemon Lifecycle And Status Data — Tests
 **What**: Write failing tests for daemon-managed BlueBubbles lifecycle, truthful separation of `Senses` versus `Workers`, and status data that includes disabled senses for discovery.
+**Output**: New red-phase daemon/status tests covering sense lifecycle and worker separation.
 **Acceptance**: Tests exist in daemon entry/command/status suites and FAIL (red).
 
 ### ⬜ Unit 2b: Daemon Lifecycle And Status Data — Implementation
@@ -87,6 +89,7 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 
 ### ⬜ Unit 3a: Status UX And Prompt Sense Awareness — Tests
 **What**: Write failing tests for `ouro status` rendering (`Overview / Senses / Workers`), prompt runtime info showing current + available senses, and prompt language that makes sense states explainable.
+**Output**: New red-phase CLI/prompt tests covering status rendering and sense-awareness language.
 **Acceptance**: Tests exist in CLI/prompt suites and FAIL (red).
 
 ### ⬜ Unit 3b: Status UX And Prompt Sense Awareness — Implementation
@@ -119,4 +122,4 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 - **Decisions made**: Update docs immediately, commit right away
 
 ## Progress Log
-- pending Created from planning doc
+- 2026-03-08 09:32 Created from planning doc
