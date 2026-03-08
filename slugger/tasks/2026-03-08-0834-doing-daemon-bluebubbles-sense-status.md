@@ -57,7 +57,7 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 **Output**: Baseline notes and command output artifacts under `./2026-03-08-0834-doing-daemon-bluebubbles-sense-status/`.
 **Acceptance**: Artifact notes identify the current `ouro status` baseline, the discovered temporary Slugger bundle candidates, the rule for choosing the live bundle path during execution, and the BlueBubbles source values from `~/.openclaw`.
 
-### ⬜ Unit 1a: Sense Truth Model And Agent Config — Tests
+### ✅ Unit 1a: Sense Truth Model And Agent Config — Tests
 **What**: Write failing tests for the new `agent.json` `senses` block, available-sense discovery, and stable sense state modeling (`disabled`, `needs_config`, `ready`, `running`, `interactive`, `error`) in the existing identity/config/daemon test surfaces.
 **Output**: New red-phase tests covering sense config parsing and shared state semantics.
 **Acceptance**: Tests exist in the relevant identity/config/daemon suites and FAIL (red).
@@ -125,3 +125,4 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 - 2026-03-08 09:32 Created from planning doc
 - 2026-03-08 09:34 Completed quality pass and marked doc READY_FOR_EXECUTION
 - 2026-03-08 16:56 Unit 0 complete: captured current daemon/status baseline, discovered Slugger bundle relocation candidates, and recorded BlueBubbles source values from `~/.openclaw`
+- 2026-03-08 16:58 Unit 1a complete: wrote failing tests for agent `senses` parsing/defaults and the shared sense-truth inventory model
