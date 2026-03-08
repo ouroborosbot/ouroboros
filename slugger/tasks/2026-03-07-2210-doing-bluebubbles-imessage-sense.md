@@ -47,7 +47,7 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 **Acceptance**: Tests exist, fail red, and cover both happy path and invalid-config branches.
 
 ### ⬜ Unit 1b: Channel And Config Contract — Implementation
-**What**: Implement the approved harness contract in `src/mind/friends/types.ts`, `src/mind/friends/channel.ts`, `src/heart/config.ts`, and any entrypoint/package wiring needed for a new sense script. Keep the config source-of-truth aligned with `agent.json` + `~/.agentsecrets/<agent>/secrets.json`.
+**What**: Implement the approved harness contract in `src/mind/friends/types.ts`, `src/mind/friends/channel.ts`, `src/heart/config.ts`, `src/mind/prompt.ts`, `src/repertoire/tools.ts`, and any entrypoint/package wiring needed for a new sense script. Keep the config source-of-truth aligned with `agent.json` + `~/.agentsecrets/<agent>/secrets.json`.
 **Output**: Production support for a `bluebubbles` sense with explicit capabilities and fail-fast config loading.
 **Acceptance**: Unit 1a tests pass, build is clean, and no unrelated channels regress.
 
@@ -67,7 +67,7 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 **Acceptance**: Tests demonstrate the runtime behavior we expect before implementation lands.
 
 ### ⬜ Unit 3b: Sense Runtime Wiring — Implementation
-**What**: Implement the BlueBubbles sense runtime and entrypoint in `src/senses/`, wire it into the harness runtime, and connect it to the message model from Unit 2. The runtime should treat event delivery as wakeup/input and use repair/enrichment when needed so mutations and rich content are not lost just because the first payload is incomplete.
+**What**: Implement the BlueBubbles sense runtime and entrypoint in `src/senses/`, wire it into the harness runtime, and connect it to the message model from Unit 2. The runtime should treat event delivery as wakeup/input and use repair/enrichment when needed so mutations and rich content are not lost just because the first payload is incomplete. This unit should also wire the channel through the existing friend-resolution, system-prompt, and tool-selection paths rather than leaving BlueBubbles as a sidecar.
 **Output**: Runnable `bluebubbles` sense entrypoint and supporting runtime code.
 **Acceptance**: Unit 3a tests pass, build is clean, and the sense can be started with explicit BlueBubbles config.
 
