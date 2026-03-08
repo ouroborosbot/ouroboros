@@ -110,7 +110,7 @@ function buildSecretsTemplate(): Record<string, unknown> {
   }
 }
 
-function writeSecretsFile(
+export function writeSecretsFile(
   agentName: string,
   provider: AgentProvider,
   credentials: HatchCredentialsInput,
