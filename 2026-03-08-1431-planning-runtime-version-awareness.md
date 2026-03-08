@@ -51,18 +51,19 @@ When the ouro runtime (`@ouro.bot/cli`) auto-updates via the `@latest` wrapper, 
 - [x] Where should version tracking live? **Decided**: `bundle-meta.json` in bundle root, unified with bundle schema versioning.
 - [x] What format for the changelog? **Decided**: Structured JSON.
 - [x] Should the daemon be version-aware? **Decided**: Yes -- daemon auto-checks npm registry, installs updates, restarts itself.
-- [ ] How does the changelog get into the system prompt? New section in `buildSystem()` in `src/mind/prompt.ts`?
-- [ ] What does the injection look like from the agent's perspective? First-person voice, what tone/framing? How should it feel to "wake up" updated?
+- [x] What does the injection look like from the agent's perspective? **Decided**: Hybrid. Runtime version is always a one-liner in the runtime info section. Changelog is a transient section, injected only on first boot after an update, disappears once bundle-meta.json is updated.
 - [ ] How do we handle the very first boot (no previous version stored)? Silently store version, or tell the agent its initial version?
 - [ ] Daemon auto-update: how does a running Node.js daemon restart itself with a new npm package? What's the mechanism?
 - [ ] Changelog granularity: per-feature bullet points? Categorized by type (feature/fix/internal)? What does the agent actually need?
-- [ ] Where in the prompt does the changelog section go? Before or after runtime info? Its own section or part of runtime?
+- [ ] Where in the prompt does the transient changelog section go relative to other sections?
+- [ ] When exactly is bundle-meta.json updated? After first LLM response? At end of session? Immediately after prompt assembly?
 
 ## Decisions Made
 - Use `bundle-meta.json` in bundle root instead of `runtime-version.json`. This file tracks both runtime version awareness AND bundle structural version, unifying two concerns: "what runtime last ran this agent" and "is my bundle structure current." Format: `{ runtimeVersion, bundleSchemaVersion, lastUpdated }`. Rationale: existing versioning is fragmented (AgentConfig.version, FriendRecord.schemaVersion, session envelope version, bundle-manifest with no version) and a unified metadata file at the bundle root positions us for future bundle migrations.
 - Changelog format: structured JSON shipped with the npm package. Primary consumer is code (prompt assembler extracts version range and formats for agent), not humans.
 - Daemon auto-update: daemon periodically checks npm registry for new @ouro.bot/cli versions, installs, and restarts. Human shouldn't need to do anything.
 - AX is the top priority: when designing changelog injection, optimize for how the agent experiences "waking up" with a new runtime.
+- Hybrid prompt injection: runtime version always visible as one-liner in runtime info section (like knowing your age). Changelog is transient -- only injected on first boot after update, disappears once bundle-meta.json is updated to current version.
 
 ## Context / References
 - Agent bundles: `~/AgentBundles/{Name}.ouro/`
