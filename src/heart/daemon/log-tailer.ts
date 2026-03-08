@@ -1,6 +1,7 @@
 import * as os from "os"
 import * as path from "path"
 import { formatTerminalEntry, type LogEvent } from "../../nerves"
+import { emitNervesEvent } from "../../nerves/runtime"
 
 const LEVEL_COLORS: Record<string, string> = {
   debug: "\x1b[2m",
@@ -76,6 +77,7 @@ export function tailLogs(options: TailLogsOptions = {}): () => void {
   const unwatchFile = options.unwatchFile
 
   const files = discoverLogFiles(options)
+  emitNervesEvent({ component: "daemon", event: "daemon.log_tailer_started", message: "log tailer started", meta: { fileCount: files.length, follow: !!options.follow } })
   const fileSizes = new Map<string, number>()
 
   // Read initial lines
