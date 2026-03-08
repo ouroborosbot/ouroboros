@@ -496,6 +496,10 @@ export function createDefaultOuroCliDeps(socketPath = "/tmp/ouroboros-daemon.soc
     runHatchFlow: defaultRunHatchFlow,
     promptInput: defaultPromptInput,
     registerOuroBundleType: defaultRegisterOuroBundleUti,
+    startChat: async (agentName: string) => {
+      const { main } = await import("../../senses/cli")
+      await main(agentName)
+    },
   }
 }
 
