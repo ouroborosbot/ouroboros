@@ -54,6 +54,7 @@ export function buildDefaultAgentTemplate(_agentName: string): AgentConfig {
 
 let _cachedAgentName: string | null = null
 let _cachedAgentConfig: AgentConfig | null = null
+let _agentConfigOverride: AgentConfig | null = null
 
 /**
  * Parse `--agent <name>` from process.argv.
@@ -124,6 +125,10 @@ export function getAgentSecretsPath(agentName: string = getAgentName()): string 
  * Throws descriptive error if file is missing or contains invalid JSON.
  */
 export function loadAgentConfig(): AgentConfig {
+  if (_agentConfigOverride) {
+    return _agentConfigOverride
+  }
+
   if (_cachedAgentConfig) {
     emitNervesEvent({
       event: "identity.resolve",
@@ -288,10 +293,20 @@ export function setAgentName(name: string): void {
 }
 
 /**
+ * Override the agent config returned by loadAgentConfig().
+ * When set to a non-null AgentConfig, loadAgentConfig() returns the override
+ * instead of reading from disk. When set to null, normal disk-based loading resumes.
+ */
+export function setAgentConfigOverride(config: AgentConfig | null): void {
+  _agentConfigOverride = config
+}
+
+/**
  * Clear all cached identity state.
  * Used in tests and when switching agent context.
  */
 export function resetIdentity(): void {
   _cachedAgentName = null
   _cachedAgentConfig = null
+  _agentConfigOverride = null
 }
