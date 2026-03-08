@@ -71,7 +71,7 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 **Output**: Runnable `bluebubbles` sense entrypoint and supporting runtime code.
 **Acceptance**: Unit 3a tests pass, build is clean, and the sense can be started with explicit BlueBubbles config.
 
-### ⬜ Unit 4a: Mutation And Rich-Content Repair — Tests
+### ✅ Unit 4a: Mutation And Rich-Content Repair — Tests
 **What**: Add failing tests for media/OG-card enrichment and message-update repair flows. Cover readable fallbacks when content cannot be hydrated, explicit error signaling instead of silent drops, and mutation persistence for reactions/edits/unsends/read-delivery updates.
 **Output**: Failing tests that lock the “no silent failure” behavior into place.
 **Acceptance**: Tests fail red and cover fallback, enrichment, and mutation persistence branches.
@@ -107,3 +107,4 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 - 2026-03-07 22:50 Unit 2b complete: implemented BlueBubbles event normalization with stable chat/thread identity, mutation modeling, explicit fallback text, and 100% coverage on the new model
 - 2026-03-07 23:01 Unit 3a complete: added red runtime and entrypoint tests for webhook startup, DM/group routing, mutation handling, and outbound threaded replies
 - 2026-03-07 23:12 Unit 3b complete: added the BlueBubbles transport, webhook runtime, and entrypoint with 100% coverage on the new sense runtime files
+- 2026-03-07 23:22 Unit 4a complete: added red tests for GUID-based repair, explicit repair fallback notices, and durable mutation logging outside the session prompt
