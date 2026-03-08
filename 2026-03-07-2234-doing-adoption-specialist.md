@@ -366,4 +366,4 @@ The loop:
 - 2026-03-07 22:54 Unit 5 complete: specialist-prompt.ts created, 6 tests, 100% coverage
 - 2026-03-07 22:57 Unit 6 complete: specialist-tools.ts created, 12 tests (5 schema + 7 execution), 100% coverage
 - 2026-03-07 23:16 Unit 7 complete: specialist-session.ts created, 15 tests, 100% coverage, nerves audit pass
-- 2026-03-08 PENDING Unit 8 complete: specialist-orchestrator.ts created, 15 tests, 100% coverage, fixed cleanup bug
+- 2026-03-07 23:25 Unit 8 complete: specialist-orchestrator.ts created, 15 tests, 100% coverage, fixed cleanup bug
