@@ -143,8 +143,28 @@ export async function injectAssociativeRecall(
     const facts = readFacts(memoryRoot)
     if (facts.length === 0) return
 
-    const provider = options?.provider ?? createDefaultProvider()
-    const recalled = await recallFactsForQuery(query, facts, provider, options)
+    let recalled: RecalledFact[]
+    try {
+      const provider = options?.provider ?? createDefaultProvider()
+      recalled = await recallFactsForQuery(query, facts, provider, options)
+    } catch {
+      // Embeddings unavailable — fall back to substring matching
+      const lowerQuery = query.toLowerCase()
+      const topK = options?.topK ?? DEFAULT_TOP_K
+      recalled = facts
+        .filter((fact) => fact.text.toLowerCase().includes(lowerQuery))
+        .slice(0, topK)
+        .map((fact) => ({ ...fact, score: 1 }))
+      if (recalled.length > 0) {
+        emitNervesEvent({
+          level: "warn",
+          component: "mind",
+          event: "mind.associative_recall_fallback",
+          message: "embeddings unavailable, used substring fallback",
+          meta: { matchCount: recalled.length },
+        })
+      }
+    }
     if (recalled.length === 0) return
 
     const recallSection = recalled
