@@ -306,14 +306,16 @@ describe("hatch flow", () => {
     cleanup.push(tempCwd)
 
     const homeDir = os.homedir()
-    const sourceDir = path.join(homeDir, "AgentBundles", "AdoptionSpecialist.ouro", "psyche", "identities")
+    const specialistBundleDir = path.join(homeDir, "AgentBundles", "AdoptionSpecialist.ouro")
+    const sourceDir = path.join(specialistBundleDir, "psyche", "identities")
     fs.mkdirSync(sourceDir, { recursive: true })
     fs.writeFileSync(path.join(sourceDir, "python.md"), "# Python\n", "utf-8")
 
     const agentName = `DefaultsBot-${Date.now()}`
     const bundleRoot = path.join(homeDir, "AgentBundles", `${agentName}.ouro`)
     const secretsDir = path.join(homeDir, ".agentsecrets", agentName)
-    cleanup.push(bundleRoot, secretsDir)
+    const specialistSecretsDir = path.join(homeDir, ".agentsecrets", "AdoptionSpecialist")
+    cleanup.push(bundleRoot, secretsDir, specialistBundleDir, specialistSecretsDir)
 
     const originalCwd = process.cwd()
     try {
