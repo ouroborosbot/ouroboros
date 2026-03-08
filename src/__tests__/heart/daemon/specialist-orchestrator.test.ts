@@ -404,6 +404,47 @@ describe("runAdoptionSpecialist", () => {
     expect(mockRunSpecialistSession).toHaveBeenCalledTimes(1)
   })
 
+  it("passes inputController hooks and flushMarkdown when readline has inputController", async () => {
+    mockRunSpecialistSession.mockResolvedValue({ hatchedAgentName: null })
+
+    const { runAdoptionSpecialist } = await import("../../../heart/daemon/specialist-orchestrator")
+    const mockCtrl = { suppress: vi.fn(), restore: vi.fn() }
+    const mockFlushMarkdown = vi.fn()
+    const deps = makeDeps({
+      createReadline: () => ({
+        question: vi.fn().mockResolvedValue("test input"),
+        close: vi.fn(),
+        inputController: mockCtrl,
+      }),
+      callbacks: {
+        onModelStart: vi.fn(),
+        onModelStreamStart: vi.fn(),
+        onTextChunk: vi.fn(),
+        onReasoningChunk: vi.fn(),
+        onToolStart: vi.fn(),
+        onToolEnd: vi.fn(),
+        onError: vi.fn(),
+        flushMarkdown: mockFlushMarkdown,
+      },
+    })
+
+    await runAdoptionSpecialist(deps)
+
+    const sessionDeps = mockRunSpecialistSession.mock.calls[0][0]
+    // suppressInput, restoreInput, writePrompt should be defined (truthy ctrl branch)
+    expect(sessionDeps.suppressInput).toBeDefined()
+    expect(sessionDeps.restoreInput).toBeDefined()
+    expect(sessionDeps.writePrompt).toBeDefined()
+    expect(sessionDeps.flushMarkdown).toBe(mockFlushMarkdown)
+
+    // Invoke them to cover the lambda bodies
+    sessionDeps.suppressInput(() => {})
+    expect(mockCtrl.suppress).toHaveBeenCalled()
+    sessionDeps.restoreInput()
+    expect(mockCtrl.restore).toHaveBeenCalled()
+    sessionDeps.writePrompt()
+  })
+
   it("wires execTool lambda to execSpecialistTool with correct deps", async () => {
     // Capture the session deps to invoke the execTool lambda
     mockRunSpecialistSession.mockImplementation(async (sessionDeps: any) => {

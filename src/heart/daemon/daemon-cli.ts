@@ -538,22 +538,25 @@ export function discoverExistingCredentials(secretsRoot: string): DiscoveredCred
   })
 }
 
-/* v8 ignore next 79 -- integration: interactive terminal specialist session @preserve */
+/* v8 ignore next 95 -- integration: interactive terminal specialist session @preserve */
 async function defaultRunAdoptionSpecialist(): Promise<string | null> {
-  const readline = await import("readline/promises")
+  const readlineModule = await import("readline")
+  const readlinePromises = await import("readline/promises")
+  const { createCliCallbacks, InputController } = await import("../../senses/cli")
 
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-  const prompt = async (q: string) => {
-    const answer = await rl.question(q)
+  // Phase 1: cold CLI — collect provider/credentials with a simple readline
+  const coldRl = readlinePromises.createInterface({ input: process.stdin, output: process.stdout })
+  const coldPrompt = async (q: string) => {
+    const answer = await coldRl.question(q)
     return answer.trim()
   }
+
+  let providerRaw: AgentProvider
+  let credentials: HatchCredentialsInput = {}
 
   try {
     const secretsRoot = path.join(os.homedir(), ".agentsecrets")
     const discovered = discoverExistingCredentials(secretsRoot)
-
-    let providerRaw: AgentProvider
-    let credentials: HatchCredentialsInput = {}
 
     if (discovered.length > 0) {
       process.stdout.write("\n🐍 welcome to ouro! let's hatch your first agent.\n")
@@ -563,55 +566,56 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
         process.stdout.write(`  ${i + 1}. ${unique[i].provider} (from ${unique[i].agentName})\n`)
       }
       process.stdout.write("\n")
-      const choice = await prompt("use one of these? enter number, or 'new' for a different key: ")
+      const choice = await coldPrompt("use one of these? enter number, or 'new' for a different key: ")
 
       const idx = parseInt(choice, 10) - 1
       if (idx >= 0 && idx < unique.length) {
         providerRaw = unique[idx].provider
         credentials = unique[idx].credentials
       } else {
-        const pRaw = await prompt("provider (anthropic/azure/minimax/openai-codex): ")
+        const pRaw = await coldPrompt("provider (anthropic/azure/minimax/openai-codex): ")
         if (!isAgentProvider(pRaw)) {
           process.stdout.write("unknown provider. run `ouro hatch` to try again.\n")
-          rl.close()
+          coldRl.close()
           return null
         }
         providerRaw = pRaw
-        if (providerRaw === "anthropic") credentials.setupToken = await prompt("API key: ")
-        if (providerRaw === "openai-codex") credentials.oauthAccessToken = await prompt("OAuth token: ")
-        if (providerRaw === "minimax") credentials.apiKey = await prompt("API key: ")
+        if (providerRaw === "anthropic") credentials.setupToken = await coldPrompt("API key: ")
+        if (providerRaw === "openai-codex") credentials.oauthAccessToken = await coldPrompt("OAuth token: ")
+        if (providerRaw === "minimax") credentials.apiKey = await coldPrompt("API key: ")
         if (providerRaw === "azure") {
-          credentials.apiKey = await prompt("API key: ")
-          credentials.endpoint = await prompt("endpoint: ")
-          credentials.deployment = await prompt("deployment: ")
+          credentials.apiKey = await coldPrompt("API key: ")
+          credentials.endpoint = await coldPrompt("endpoint: ")
+          credentials.deployment = await coldPrompt("deployment: ")
         }
       }
     } else {
       process.stdout.write("\n🐍 welcome to ouro! let's hatch your first agent.\n")
       process.stdout.write("i need an API key to power our conversation.\n\n")
-      const pRaw = await prompt("provider (anthropic/azure/minimax/openai-codex): ")
+      const pRaw = await coldPrompt("provider (anthropic/azure/minimax/openai-codex): ")
       if (!isAgentProvider(pRaw)) {
         process.stdout.write("unknown provider. run `ouro hatch` to try again.\n")
-        rl.close()
+        coldRl.close()
         return null
       }
       providerRaw = pRaw
-      if (providerRaw === "anthropic") credentials.setupToken = await prompt("API key: ")
-      if (providerRaw === "openai-codex") credentials.oauthAccessToken = await prompt("OAuth token: ")
-      if (providerRaw === "minimax") credentials.apiKey = await prompt("API key: ")
+      if (providerRaw === "anthropic") credentials.setupToken = await coldPrompt("API key: ")
+      if (providerRaw === "openai-codex") credentials.oauthAccessToken = await coldPrompt("OAuth token: ")
+      if (providerRaw === "minimax") credentials.apiKey = await coldPrompt("API key: ")
       if (providerRaw === "azure") {
-        credentials.apiKey = await prompt("API key: ")
-        credentials.endpoint = await prompt("endpoint: ")
-        credentials.deployment = await prompt("deployment: ")
+        credentials.apiKey = await coldPrompt("API key: ")
+        credentials.endpoint = await coldPrompt("endpoint: ")
+        credentials.deployment = await coldPrompt("deployment: ")
       }
     }
 
-    rl.close()
+    coldRl.close()
     process.stdout.write("\n")
 
-    // Locate the bundled AdoptionSpecialist.ouro shipped with the npm package
+    // Phase 2: warm specialist session — full CLI experience with markdown, spinners, input control
     const bundleSourceDir = path.resolve(__dirname, "..", "..", "..", "AdoptionSpecialist.ouro")
     const bundlesRoot = getAgentBundlesRoot()
+    const cliCallbacks = createCliCallbacks()
 
     return await runSpecialistOrchestrator({
       bundleSourceDir,
@@ -621,21 +625,18 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
       credentials,
       humanName: os.userInfo().username,
       createReadline: () => {
-        const rl2 = readline.createInterface({ input: process.stdin, output: process.stdout })
-        return { question: (q: string) => rl2.question(q), close: () => rl2.close() }
+        const rl2 = readlineModule.createInterface({ input: process.stdin, output: process.stdout, terminal: true })
+        const ctrl = new InputController(rl2)
+        return {
+          question: (q: string) => new Promise<string>((resolve) => rl2.question(q, resolve)),
+          close: () => rl2.close(),
+          inputController: ctrl,
+        }
       },
-      callbacks: {
-        onModelStart: () => {},
-        onModelStreamStart: () => {},
-        onTextChunk: (text: string) => process.stdout.write(text),
-        onReasoningChunk: () => {},
-        onToolStart: () => {},
-        onToolEnd: () => {},
-        onError: (err: Error) => process.stderr.write(`error: ${err.message}\n`),
-      },
+      callbacks: cliCallbacks,
     })
   } catch {
-    rl.close()
+    coldRl.close()
     return null
   }
 }
