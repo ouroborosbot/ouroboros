@@ -42,7 +42,7 @@ describe("installOuroCommand", () => {
     expect(result.installed).toBe(true)
     expect(result.scriptPath).toBe("/home/test/.local/bin/ouro")
     expect(written["/home/test/.local/bin/ouro"]).toContain("#!/bin/sh")
-    expect(written["/home/test/.local/bin/ouro"]).toContain("npx --yes @ouro.bot/cli")
+    expect(written["/home/test/.local/bin/ouro"]).toContain("npx --yes @ouro.bot/cli@latest")
     expect(chmoded["/home/test/.local/bin/ouro"]).toBe(0o755)
     expect(mkdirCalls).toContain("/home/test/.local/bin")
   })
