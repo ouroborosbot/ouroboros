@@ -1,6 +1,6 @@
 # Doing: Daemon-Managed Senses And BlueBubbles Status
 
-**Status**: READY_FOR_EXECUTION
+**Status**: in-progress
 **Execution Mode**: direct
 **Created**: 2026-03-08 09:32
 **Planning**: ./2026-03-08-0834-planning-daemon-bluebubbles-sense-status.md
@@ -52,7 +52,7 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 
 **CRITICAL: Every unit header MUST start with status emoji (⬜ for new units).**
 
-### ⬜ Unit 0: Setup/Research
+### ✅ Unit 0: Setup/Research
 **What**: Capture the current daemon/status baseline, record the current Slugger bundle relocation candidates (`/Users/arimendelow/.Trash/AgentBundles/slugger.ouro` and `/Users/arimendelow/AgentBundles--backup/slugger.ouro` as of validation), and save the `~/.openclaw` BlueBubbles source values that will inform the live Slugger config update.
 **Output**: Baseline notes and command output artifacts under `./2026-03-08-0834-doing-daemon-bluebubbles-sense-status/`.
 **Acceptance**: Artifact notes identify the current `ouro status` baseline, the discovered temporary Slugger bundle candidates, the rule for choosing the live bundle path during execution, and the BlueBubbles source values from `~/.openclaw`.
@@ -124,3 +124,4 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 ## Progress Log
 - 2026-03-08 09:32 Created from planning doc
 - 2026-03-08 09:34 Completed quality pass and marked doc READY_FOR_EXECUTION
+- 2026-03-08 16:56 Unit 0 complete: captured current daemon/status baseline, discovered Slugger bundle relocation candidates, and recorded BlueBubbles source values from `~/.openclaw`
