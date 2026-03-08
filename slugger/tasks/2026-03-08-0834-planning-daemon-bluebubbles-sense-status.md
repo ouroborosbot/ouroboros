@@ -58,6 +58,7 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 - `ouro status` should use an `Overview` section, a channel-first `Senses` grid, and a separate `Workers` section so external senses and background workers are not conflated.
 - The system prompt should keep the current channel explicit and add a lightweight available-senses summary, but it should not become a setup/how-to surface.
 - The agent should still be able to help set up other senses when asked, using truthful sense/status/config context rather than embedding full setup docs in every prompt.
+- One shared sense-truth model should drive both human-facing status and agent-facing setup help, so the product has a single source of truth for sense availability and readiness.
 
 ## Context / References
 - Current daemon CLI parsing and `ouro up` / `ouro status`: `/Users/arimendelow/Projects/ouroboros-agent-harness-daemon-status/src/heart/daemon/daemon-cli.ts`
@@ -83,9 +84,17 @@ Prompt UX preview to target:
 - do not include operational setup instructions in the base system prompt
 - make sense setup help available through truthful config/status context when explicitly asked
 
+Sense product model to target:
+- each sense should have a stable human/agent-facing state such as `disabled`, `needs_config`, `ready`, `running`, `manual`, or `error`
+- `ouro status` should render those states for humans in the `Senses` grid
+- the agent should reason from the same states when asked what is available or how to enable a sense
+- setup help should answer in terms of current truth: whether the sense is enabled, whether required config is present, whether the daemon manages it, and what the next missing step is
+- the product should avoid teaching the agent stale generic setup lore when it can instead report the actual local state
+
 ## Progress Log
 - 2026-03-08 08:35 Created
 - 2026-03-08 08:35 Decided to use `agent.json` `senses` enablement without a separate `autoStart` flag
 - 2026-03-08 08:35 Decided status should show all available senses, including disabled ones, and kept temporary bundle relocation out of runtime scope
 - 2026-03-08 08:35 Locked status UX to `Overview / Senses / Workers` and added prompt-level available-senses visibility
 - 2026-03-08 08:50 Kept the base prompt concise while requiring truthful help for enabling additional senses on request
+- 2026-03-08 08:55 Chose a shared sense-truth model so status UX and agent setup help are driven by the same product states
