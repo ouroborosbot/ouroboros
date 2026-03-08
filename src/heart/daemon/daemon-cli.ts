@@ -556,7 +556,7 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
     let credentials: HatchCredentialsInput = {}
 
     if (discovered.length > 0) {
-      process.stdout.write("\nwelcome to ouro. let's get you set up.\n")
+      process.stdout.write("\n🐍 welcome to ouro! let's hatch your first agent.\n")
       process.stdout.write("i found existing API credentials:\n\n")
       const unique = [...new Map(discovered.map((d) => [`${d.provider}`, d])).values()]
       for (let i = 0; i < unique.length; i++) {
@@ -587,7 +587,7 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
         }
       }
     } else {
-      process.stdout.write("\nwelcome to ouro. let's get you set up.\n")
+      process.stdout.write("\n🐍 welcome to ouro! let's hatch your first agent.\n")
       process.stdout.write("i need an API key to power our conversation.\n\n")
       const pRaw = await prompt("provider (anthropic/azure/minimax/openai-codex): ")
       if (!isAgentProvider(pRaw)) {

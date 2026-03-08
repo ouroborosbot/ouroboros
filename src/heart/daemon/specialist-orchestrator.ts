@@ -139,6 +139,7 @@ export async function runAdoptionSpecialist(
       readline,
       callbacks,
       signal,
+      kickoffMessage: "hi, i just ran ouro for the first time",
     })
 
     return result.hatchedAgentName
