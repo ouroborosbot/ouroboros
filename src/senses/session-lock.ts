@@ -1,4 +1,5 @@
 import * as fs from "fs"
+import { emitNervesEvent } from "../nerves/runtime"
 
 export class SessionLockError extends Error {
   readonly agentName: string
@@ -65,6 +66,7 @@ export function acquireSessionLock(lockPath: string, agentName: string, deps: Se
       // Stale lock — remove and retry
       try { deps.unlinkSync(lockPath) } catch { /* ignore */ }
       if (!tryWrite()) throw new SessionLockError(agentName)
+      emitNervesEvent({ component: "senses", event: "senses.session_lock_stolen", message: "stole stale session lock from dead process", meta: { agentName, existingPid } })
       return makeRelease(lockPath, deps)
     }
 

@@ -1,4 +1,5 @@
 import * as os from "os"
+import { emitNervesEvent } from "../../nerves/runtime"
 import type { ScheduledTaskJob } from "./task-scheduler"
 
 export interface OsCronManager {
@@ -142,6 +143,8 @@ export class LaunchdCronManager implements OsCronManager {
       this.deps.writeFile(fullPath, xml)
       try { this.deps.exec(`launchctl load "${fullPath}"`) } catch { /* best effort */ }
     }
+
+    emitNervesEvent({ component: "daemon", event: "daemon.os_cron_synced", message: "synced OS cron entries", meta: { platform: "darwin", jobCount: jobs.length } })
   }
 
   removeAll(): void {
