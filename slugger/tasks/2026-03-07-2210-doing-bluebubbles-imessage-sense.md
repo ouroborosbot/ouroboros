@@ -51,7 +51,7 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 **Output**: Production support for a `bluebubbles` sense with explicit capabilities and fail-fast config loading.
 **Acceptance**: Unit 1a tests pass, build is clean, and no unrelated channels regress.
 
-### ⬜ Unit 2a: BlueBubbles Message Model — Tests
+### ✅ Unit 2a: BlueBubbles Message Model — Tests
 **What**: Add failing tests for a pure BlueBubbles normalization layer using the live payload shapes we captured. Cover `new-message`, `updated-message`, reply threading via `threadOriginatorGuid`, associated-message mutations for reactions, edit/unsend/update payloads, group vs DM identity, and OG-card/media attachment shapes.
 **Output**: Fixture-backed failing tests for the sense’s core message model.
 **Acceptance**: Tests fail red against the missing normalization/runtime code and cover every observed primitive that materially affects UX/AX.
@@ -103,3 +103,4 @@ Implement a first-class `bluebubbles` sense for the harness that preserves the B
 - 2026-03-07 22:15 Created from planning doc
 - 2026-03-07 22:24 Unit 1a complete: added failing channel/config/prompt/tool-safety tests and captured red output
 - 2026-03-07 22:26 Unit 1b complete: wired bluebubbles into channel types, config, prompt behavior, and remote tool safety
+- 2026-03-07 22:40 Unit 2a complete: added fixture-backed red tests for message, thread, group, reaction, edit, unsend, and read-state normalization
