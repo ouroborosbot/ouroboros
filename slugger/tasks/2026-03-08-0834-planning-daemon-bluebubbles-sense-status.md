@@ -41,8 +41,7 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 - Edge cases: null, empty, boundary values
 
 ## Open Questions
-- [ ] Should `ouro status` show only daemon-managed senses, or also include configured-but-disabled senses for visibility?
-- [ ] What temporary agent-bundle location is active during your parallel first-run testing, and does this task need any runtime path accommodation beyond keeping secrets in `~/.agentsecrets`?
+- [ ] What is Slugger's current temporary bundle location for the implementation-time `agent.json` edit?
 
 ## Decisions Made
 - This work is owned on a `slugger/...` branch.
@@ -51,6 +50,8 @@ Make the daemon own Slugger's external senses, including BlueBubbles, so `ouro u
 - `ouro up` / `ouro status` are the daemon UX surfaces this task must improve.
 - `agent.json` should gain a `senses` block for daemon-managed sense enablement.
 - V1 should use `enabled` only; if a sense is enabled, `ouro up` should bring it up. No separate `autoStart` flag in scope.
+- `ouro status` should show the full available-senses list, including disabled senses, so the surface supports discovery and configuration visibility.
+- The temporary Slugger bundle move is an implementation-time editing concern, not a reason to add bundle-path configurability to the daemon/runtime.
 
 ## Context / References
 - Current daemon CLI parsing and `ouro up` / `ouro status`: `/Users/arimendelow/Projects/ouroboros-agent-harness-daemon-status/src/heart/daemon/daemon-cli.ts`
@@ -68,3 +69,4 @@ Current daemon status is process-first, not sense-first. It reports `name/channe
 ## Progress Log
 - 2026-03-08 08:35 Created
 - 2026-03-08 08:35 Decided to use `agent.json` `senses` enablement without a separate `autoStart` flag
+- 2026-03-08 08:35 Decided status should show all available senses, including disabled ones, and kept temporary bundle relocation out of runtime scope
