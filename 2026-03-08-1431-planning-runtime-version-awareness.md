@@ -90,3 +90,4 @@ Minimal scratchpad. Implementation details go in doing doc.
 - 2026-03-08 14:32 Created
 - 2026-03-08 14:35 Decided: bundle-meta.json in bundle root (unified runtime + schema versioning)
 - 2026-03-08 14:42 Expanded scope: holistic versioning strategy, daemon auto-update, AX-first changelog design, JSON format confirmed
+- 2026-03-08 14:44 Decided: hybrid prompt injection -- version always in runtime info, changelog transient on update only
