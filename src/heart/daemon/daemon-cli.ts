@@ -623,7 +623,7 @@ function defaultListDiscoveredAgents(): string[] {
 
 async function defaultLinkFriendIdentity(command: Extract<OuroCliCommand, { kind: "friend.link" }>): Promise<string> {
   const fp = path.join(getAgentBundlesRoot(), `${command.agent}.ouro`, "friends")
-  const friendStore = new FileFriendStore(fp, fp)
+  const friendStore = new FileFriendStore(fp)
   const current = await friendStore.get(command.friendId)
   if (!current) {
     return `friend not found: ${command.friendId}`

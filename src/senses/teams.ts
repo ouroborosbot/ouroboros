@@ -20,7 +20,6 @@ import { accumulateFriendTokens } from "../mind/friends/tokens"
 import { createTurnCoordinator } from "../heart/turn-coordinator"
 import { getAgentRoot, getAgentName } from "../heart/identity"
 import * as http from "http"
-import * as os from "os"
 import * as path from "path"
 import { enforceTrustGate } from "./trust-gate"
 
@@ -405,14 +404,11 @@ export async function withConversationLock(convId: string, fn: () => Promise<voi
 // are deleted while the process is alive.
 function getFriendStore(): InstanceType<typeof FileFriendStore> {
   // On Azure App Service, os.homedir() returns /root which is ephemeral.
-  // Use /home (persistent storage) when WEBSITE_SITE_NAME is set (Azure indicator).
-  const homeBase = process.env.WEBSITE_SITE_NAME ? "/home" : os.homedir()
-  // Agent knowledge must survive deploys (--clean true wipes wwwroot).
-  const agentKnowledgePath = process.env.WEBSITE_SITE_NAME
-    ? path.join(homeBase, ".agentstate", getAgentName(), "friends-knowledge")
+  // Use /home/.agentstate/ (persistent) when WEBSITE_SITE_NAME is set.
+  const friendsPath = process.env.WEBSITE_SITE_NAME
+    ? path.join("/home", ".agentstate", getAgentName(), "friends")
     : path.join(getAgentRoot(), "friends")
-  const piiBridgePath = path.join(homeBase, ".agentstate", getAgentName(), "friends")
-  return new FileFriendStore(agentKnowledgePath, piiBridgePath)
+  return new FileFriendStore(friendsPath)
 }
 
 // Context from the Teams activity that carries OAuth tokens and signin ability

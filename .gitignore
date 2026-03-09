@@ -5,5 +5,3 @@ coverage/
 manifest.zip
 manifest.*.zip
 .azure/
-ouroboros/manifest-deployed/
-ouroboros/manifest-cdx/

@@ -5,8 +5,8 @@
 
 set -euo pipefail
 
-ORG="does-this-work"
-PROJECT="Very Important Work"
+ORG="${ADO_ORG:?Set ADO_ORG}"
+PROJECT="${ADO_PROJECT:?Set ADO_PROJECT}"
 
 echo "=== Fetching ADO token..."
 ADO_TOKEN=$(az account get-access-token --resource 499b84ac-1321-427f-aa17-267ca6975798 --query accessToken -o tsv)

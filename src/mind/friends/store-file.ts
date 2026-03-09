@@ -1,45 +1,22 @@
 // FileFriendStore -- filesystem adapter for FriendStore.
-// Splits friend records across two backends by PII boundary:
-// - Agent knowledge (agentKnowledgePath): id, name, toolPreferences, notes, createdAt, updatedAt, schemaVersion
-// - PII bridge (piiBridgePath): id, externalIds, tenantMemberships, schemaVersion
+// Stores each friend as one unified JSON file in bundle `friends/`.
 
 import * as fs from "fs"
 import * as fsPromises from "fs/promises"
 import * as path from "path"
 import { emitNervesEvent } from "../../nerves/runtime"
 import type { FriendStore } from "./store"
-import type { FriendRecord } from "./types"
+import type { FriendRecord, TrustLevel } from "./types"
 
-// Agent knowledge fields written to {agentKnowledgePath}/{id}.json
-interface AgentKnowledgeData {
-  id: string
-  name: string
-  toolPreferences: Record<string, string>
-  notes: Record<string, { value: string, savedAt: string }>
-  totalTokens: number
-  createdAt: string
-  updatedAt: string
-  schemaVersion: number
-}
-
-// PII bridge fields written to {piiBridgePath}/{id}.json
-interface PiiBridgeData {
-  id: string
-  externalIds: FriendRecord["externalIds"]
-  tenantMemberships: string[]
-  schemaVersion: number
-}
+const DEFAULT_ROLE = "friend"
+const DEFAULT_TRUST_LEVEL: TrustLevel = "friend"
 
 export class FileFriendStore implements FriendStore {
-  private readonly agentKnowledgePath: string
-  private readonly piiBridgePath: string
+  private readonly friendsPath: string
 
-  constructor(agentKnowledgePath: string, piiBridgePath: string) {
-    this.agentKnowledgePath = agentKnowledgePath
-    this.piiBridgePath = piiBridgePath
-    // Auto-create directories on construction
-    fs.mkdirSync(agentKnowledgePath, { recursive: true })
-    fs.mkdirSync(piiBridgePath, { recursive: true })
+  constructor(friendsPath: string) {
+    this.friendsPath = friendsPath
+    fs.mkdirSync(friendsPath, { recursive: true })
     emitNervesEvent({
       component: "friends",
       event: "friends.store_init",
@@ -49,52 +26,20 @@ export class FileFriendStore implements FriendStore {
   }
 
   async get(id: string): Promise<FriendRecord | null> {
-    // Read agent knowledge (required)
-    const agentData = await this.readJson<AgentKnowledgeData>(
-      path.join(this.agentKnowledgePath, `${id}.json`),
-    )
-    if (!agentData) return null
-
-    // Read PII bridge (optional -- defaults to empty arrays)
-    const piiData = await this.readJson<PiiBridgeData>(
-      path.join(this.piiBridgePath, `${id}.json`),
-    )
-
-    return this.merge(agentData, piiData)
+    const record = await this.readJson(path.join(this.friendsPath, `${id}.json`))
+    if (!record) return null
+    return this.normalize(record)
   }
 
   async put(id: string, record: FriendRecord): Promise<void> {
-    // Split into agent knowledge and PII bridge
-    const agentData: AgentKnowledgeData = {
-      id: record.id,
-      name: record.name,
-      toolPreferences: record.toolPreferences,
-      notes: record.notes,
-      totalTokens: record.totalTokens,
-      createdAt: record.createdAt,
-      updatedAt: record.updatedAt,
-      schemaVersion: record.schemaVersion,
-    }
-
-    const piiData: PiiBridgeData = {
-      id: record.id,
-      externalIds: record.externalIds,
-      tenantMemberships: record.tenantMemberships,
-      schemaVersion: record.schemaVersion,
-    }
-
-    // Write to both backends
-    await Promise.all([
-      this.writeJson(path.join(this.agentKnowledgePath, `${id}.json`), agentData),
-      this.writeJson(path.join(this.piiBridgePath, `${id}.json`), piiData),
-    ])
+    await this.writeJson(
+      path.join(this.friendsPath, `${id}.json`),
+      this.normalize(record),
+    )
   }
 
   async delete(id: string): Promise<void> {
-    await Promise.all([
-      this.removeFile(path.join(this.agentKnowledgePath, `${id}.json`)),
-      this.removeFile(path.join(this.piiBridgePath, `${id}.json`)),
-    ])
+    await this.removeFile(path.join(this.friendsPath, `${id}.json`))
   }
 
   async findByExternalId(
@@ -102,22 +47,20 @@ export class FileFriendStore implements FriendStore {
     externalId: string,
     tenantId?: string,
   ): Promise<FriendRecord | null> {
-    // Scan PII bridge directory for matching external ID
     let entries: string[]
     try {
-      entries = await fsPromises.readdir(this.piiBridgePath)
+      entries = await fsPromises.readdir(this.friendsPath)
     } catch {
       return null
     }
 
     for (const entry of entries) {
       if (!entry.endsWith(".json")) continue
-      const piiData = await this.readJson<PiiBridgeData>(
-        path.join(this.piiBridgePath, entry),
-      )
-      if (!piiData) continue
+      const raw = await this.readJson(path.join(this.friendsPath, entry))
+      if (!raw) continue
+      const record = this.normalize(raw)
 
-      const match = piiData.externalIds.some(
+      const match = record.externalIds.some(
         (ext) =>
           ext.provider === provider &&
           ext.externalId === externalId &&
@@ -125,52 +68,85 @@ export class FileFriendStore implements FriendStore {
       )
 
       if (match) {
-        // Found match -- read agent knowledge and merge
-        const agentData = await this.readJson<AgentKnowledgeData>(
-          path.join(this.agentKnowledgePath, `${piiData.id}.json`),
-        )
-        if (!agentData) continue
-        return this.merge(agentData, piiData)
+        return record
       }
     }
 
     return null
   }
 
-  private merge(
-    agentData: AgentKnowledgeData,
-    piiData: PiiBridgeData | null,
-  ): FriendRecord {
+  async hasAnyFriends(): Promise<boolean> {
+    let entries: string[]
+    try {
+      entries = await fsPromises.readdir(this.friendsPath)
+    } catch {
+      return false
+    }
+
+    return entries.some((entry) => entry.endsWith(".json"))
+  }
+
+  private normalize(raw: FriendRecord): FriendRecord {
+    const trustLevel = raw.trustLevel
+    const normalizedTrustLevel: TrustLevel =
+      trustLevel === "family" ||
+      trustLevel === "friend" ||
+      trustLevel === "acquaintance" ||
+      trustLevel === "stranger"
+        ? trustLevel
+        : DEFAULT_TRUST_LEVEL
+
     return {
-      id: agentData.id,
-      name: agentData.name,
-      toolPreferences: agentData.toolPreferences,
-      notes: agentData.notes,
-      totalTokens: agentData.totalTokens ?? 0,
-      createdAt: agentData.createdAt,
-      updatedAt: agentData.updatedAt,
-      schemaVersion: agentData.schemaVersion,
-      externalIds: piiData?.externalIds ?? [],
-      tenantMemberships: piiData?.tenantMemberships ?? [],
+      id: raw.id,
+      name: raw.name,
+      role: typeof raw.role === "string" && raw.role.trim() ? raw.role : DEFAULT_ROLE,
+      trustLevel: normalizedTrustLevel,
+      connections: Array.isArray(raw.connections)
+        ? raw.connections
+            .filter(
+              (connection): connection is { name: string; relationship: string } => (
+                typeof connection === "object" &&
+                connection !== null &&
+                typeof (connection as { name?: unknown }).name === "string" &&
+                typeof (connection as { relationship?: unknown }).relationship === "string"
+              ),
+            )
+            .map((connection) => ({
+              name: connection.name,
+              relationship: connection.relationship,
+            }))
+        : [],
+      externalIds: Array.isArray(raw.externalIds) ? raw.externalIds : [],
+      tenantMemberships: Array.isArray(raw.tenantMemberships) ? raw.tenantMemberships : [],
+      toolPreferences: raw.toolPreferences && typeof raw.toolPreferences === "object"
+        ? raw.toolPreferences
+        : {},
+      notes: raw.notes && typeof raw.notes === "object" ? raw.notes : {},
+      totalTokens: typeof raw.totalTokens === "number" ? raw.totalTokens : 0,
+      createdAt: typeof raw.createdAt === "string" ? raw.createdAt : new Date().toISOString(),
+      updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : new Date().toISOString(),
+      schemaVersion: typeof raw.schemaVersion === "number" ? raw.schemaVersion : 1,
     }
   }
 
-  private async readJson<T>(filePath: string): Promise<T | null> {
+  private async readJson(filePath: string): Promise<FriendRecord | null> {
     try {
       const raw = await fsPromises.readFile(filePath, "utf-8")
       try {
-        return JSON.parse(raw) as T
+        const parsed = JSON.parse(raw)
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          return null
+        }
+        return parsed as FriendRecord
       } catch {
-        // Corrupted JSON
         return null
       }
     } catch {
-      // File not found or other error
       return null
     }
   }
 
-  private async writeJson(filePath: string, data: unknown): Promise<void> {
+  private async writeJson(filePath: string, data: FriendRecord): Promise<void> {
     await fsPromises.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8")
   }
 

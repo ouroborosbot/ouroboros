@@ -356,7 +356,7 @@ export async function main(agentName?: string, options?: { pasteDebounceMs?: num
 
   // Resolve context kernel (identity + channel) for CLI
   const friendsPath = path.join(getAgentRoot(), "friends")
-  const friendStore = new FileFriendStore(friendsPath, friendsPath)
+  const friendStore = new FileFriendStore(friendsPath)
   const username = os.userInfo().username
   const hostname = os.hostname()
   const localExternalId = `${username}@${hostname}`
