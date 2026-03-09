@@ -54,7 +54,7 @@ const defaultDeps: RuntimeDeps = {
   accumulateFriendTokens,
   createClient: () => createBlueBubblesClient(),
   recordMutation: recordBlueBubblesMutation,
-  createFriendStore: () => new FileFriendStore(path.join(getAgentRoot(), "friends")),
+  createFriendStore: () => { const p = path.join(getAgentRoot(), "friends"); return new FileFriendStore(p, p) },
   createFriendResolver: (store, params) => new FriendResolver(store, params),
   createServer: http.createServer,
 }
