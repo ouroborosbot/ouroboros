@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Deploy Ouroboros to Azure App Service
-# Usage: bash scripts/deploy-azure.sh
+# Usage: bash scripts/teams-sense/deploy-azure.sh
 #
 # Required env vars (or edit defaults below):
 #   AZURE_SUBSCRIPTION, AZURE_RG, AZURE_LOCATION, APP_NAME, BOT_NAME, MI_NAME
@@ -45,7 +45,7 @@ echo "==> Configuring startup command"
 az webapp config set \
   --name "$APP_NAME" \
   --resource-group "$RG" \
-  --startup-file "bash scripts/startup.sh"
+  --startup-file "bash scripts/teams-sense/startup.sh"
 
 echo "==> Enabling always-on"
 az webapp config set \
@@ -73,6 +73,6 @@ echo "Done! App Service deployed."
 echo "Messaging endpoint: https://${APP_NAME}.azurewebsites.net/api/messages"
 echo ""
 echo "Remaining steps:"
-echo "  1. Set secrets: bash scripts/set-app-secrets.sh"
+echo "  1. Set secrets: bash scripts/teams-sense/set-app-secrets.sh"
 echo "  2. Upload manifest zip to Teams Admin Center"
 echo "  3. Message @Ouroboros in Teams"

@@ -10,7 +10,7 @@ set -euo pipefail
 #   TEAMS_CLIENT_ID, TEAMS_TENANT_ID
 #   Optional: TEAMS_CLIENT_SECRET (for client-secret auth), TEAMS_MI_CLIENT_ID (for managed identity)
 #
-# Usage: bash scripts/set-app-secrets.sh
+# Usage: bash scripts/teams-sense/set-app-secrets.sh
 
 SUB="${AZURE_SUBSCRIPTION:?Set AZURE_SUBSCRIPTION}"
 RG="${AZURE_RG:?Set AZURE_RG}"
