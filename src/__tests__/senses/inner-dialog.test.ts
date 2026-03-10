@@ -96,7 +96,16 @@ describe("inner dialog runtime", () => {
     fs.writeFileSync(path.join(agentRoot, "psyche", "ASPIRATIONS.md"), "Keep improving the harness.", "utf8")
 
     mockBuildSystem.mockReset().mockResolvedValue("system prompt")
-    mockRunAgent.mockReset()
+    mockRunAgent.mockReset().mockImplementation(async (_messages: any, callbacks: any) => {
+      callbacks?.onModelStart?.()
+      callbacks?.onModelStreamStart?.()
+      callbacks?.onTextChunk?.("inner-dialog text chunk")
+      callbacks?.onReasoningChunk?.("inner-dialog reasoning chunk")
+      callbacks?.onToolStart?.("memory_search")
+      callbacks?.onToolEnd?.("memory_search", true)
+      callbacks?.onError?.(new Error("inner-dialog synthetic callback error"))
+      return { usage: undefined }
+    })
     mockSessionPath.mockReset().mockReturnValue(sessionFile)
     mockLoadSession.mockReset().mockReturnValue(null)
     mockPostTurn.mockReset().mockImplementation(() => {})
@@ -644,6 +653,26 @@ describe("inner dialog runtime", () => {
     expect(result.messages).toBeDefined()
   })
 
+  it("returns empty messages and fallback sessionPath when pipeline returns undefined", async () => {
+    mockHandleInboundTurn.mockResolvedValueOnce({
+      resolvedContext: { friend: { id: "self" }, channel: innerCapabilities },
+      gateResult: { allowed: false, reason: "stranger_silent_drop" },
+      usage: undefined,
+      sessionPath: undefined,
+      messages: undefined,
+    })
+
+    const result = await runInnerDialogTurn({
+      reason: "boot",
+      instincts: [{ id: "heartbeat", prompt: "Instinct: check in.", enabled: true }],
+      now: () => new Date("2026-03-06T12:00:00.000Z"),
+    })
+
+    expect(result.messages).toEqual([])
+    expect(result.sessionPath).toBe(sessionFile)
+    expect(result.usage).toBeUndefined()
+  })
+
   it("provides a friendResolver that resolves to a self-referencing context", async () => {
     await runInnerDialogTurn({
       reason: "boot",
@@ -658,7 +687,7 @@ describe("inner dialog runtime", () => {
     expect(resolved.channel).toEqual(expect.objectContaining({ senseType: "internal" }))
   })
 
-  it("provides a no-op friendStore (no token accumulation for inner dialog)", async () => {
+  it("provides a no-op friendStore with all methods returning safe defaults", async () => {
     await runInnerDialogTurn({
       reason: "boot",
       instincts: [{ id: "heartbeat", prompt: "Instinct: check in.", enabled: true }],
@@ -666,8 +695,14 @@ describe("inner dialog runtime", () => {
     })
 
     const input = mockHandleInboundTurn.mock.calls[0][0]
-    // The friend store should be present but token accumulation is effectively a no-op
-    expect(input.friendStore).toBeDefined()
+    const store = input.friendStore
+    expect(store).toBeDefined()
+
+    // Exercise all store methods to verify no-op behavior
+    expect(await store.get("any")).toBeNull()
+    await expect(store.put("any", {} as any)).resolves.toBeUndefined()
+    await expect(store.delete("any")).resolves.toBeUndefined()
+    expect(await store.findByExternalId("local", "any")).toBeNull()
   })
 
   it("passes signal through to pipeline when provided", async () => {
