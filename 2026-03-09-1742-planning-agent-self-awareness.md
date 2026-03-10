@@ -1,6 +1,6 @@
 # Planning: Full Agent Self-Awareness
 
-**Status**: drafting
+**Status**: approved
 **Created**: 2026-03-09 17:44
 
 ## Goal
@@ -62,8 +62,11 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - [ ] `link_friend_identity` tool available from trusted context (CLI at family/friend trust) -- merges external IDs (iMessage handle, AAD ID) into an existing friend record
 - [ ] `link_friend_identity` handles orphaned duplicates -- if linking reveals a separate friend record for the same person on another channel, merges records and deletes the orphan
 - [ ] `link_friend_identity` is NOT available from untrusted context (strangers, acquaintances) or group chats
-- [ ] When tools are gated by trust/context, system prompt explains what's blocked, why (trust level, group chat), and how to fix (e.g., "ask Ari to link your iMessage identity from CLI", "move to a 1:1 conversation")
-- [ ] Tool restriction messaging differentiates between closed-sense-stranger ("I can see limited tools because we haven't met before -- ask someone I trust to vouch for you") and group-chat restrictions ("some tools are only available in 1:1 -- DM me for that")
+- [ ] Tool restriction prompt uses two independent gates: trust level gate (stranger/acquaintance = restricted regardless of 1:1 or group) and group chat gate (group = restricted regardless of trust)
+- [ ] Low-trust friend in 1:1: prompt lists restricted tools with reason "{name} has trust level {level} -- elevated trust required" and suggests asking primary to upgrade
+- [ ] Trusted friend in group chat: prompt lists restricted tools with reason "group chat context -- local tools restricted to prevent cross-conversation interference" and suggests moving to 1:1
+- [ ] Low-trust friend in group chat: both trust and group restrictions shown
+- [ ] Trusted friend in 1:1: no restriction prompt section injected
 - [ ] During onboarding/hatch, adoption specialist offers to collect phone number and/or Teams handle for the initial friend record
 - [ ] Collected contact info is linked to the initial friend record's externalIds during `complete_adoption`
 - [ ] 100% test coverage on all new code
@@ -103,7 +106,12 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - The `"inner"` type already exists in the Channel union in types.ts — no type changes needed
 - **Open vs. closed senses (G1)**: iMessage is an open sense -- anyone can text you, so the stranger gate must hard-reject unknown senders (no message delivered, no agent turn, no token spend). Teams is a closed sense -- the platform vets who can reach the bot, so strangers should be allowed at the lowest trust level with restricted tools. This classification should live in channel capabilities or sense config, not be hardcoded per-sense. The current stranger gate in iMessage correctly hard-rejects, but needs to be generalized so new senses can declare their openness.
 - **`link_friend_identity` tool (G2)**: manual identity linking from trusted context. Flow: Ari (CLI, family trust) says "link my iMessage -- my number is +1234567890" -> agent calls `link_friend_identity(friendId="a519c5bb-...", provider="imessage-handle", externalId="+1234567890")` -> merges into Ari's friend record externalIds array. Next iMessage from that number resolves to Ari with family trust, not a stranger. Also handles orphan cleanup: if a separate friend record already existed for "+1234567890" (from a previous iMessage where the agent treated them as a stranger before being hard-rejected, or from a Teams interaction), merge that record into Ari's and delete the orphan. Only callable from trusted context -- family/friend trust level, 1:1 conversation (not group chat). This is the bridge between open and closed senses: once linked, the person is recognized everywhere.
-- **Tool restriction awareness in system prompt (G3)**: when tools are gated (trust level too low, group chat), the system prompt should explain what's blocked and how to fix it. Different messaging for different contexts: closed-sense stranger ("I can see you but some of my tools are restricted until we build trust -- ask someone I know to vouch for you from a trusted channel"), group chat restrictions ("some tools are only available in 1:1 conversations -- send me a direct message"). The agent shouldn't be confused about why it can't do things -- it should understand the trust model and guide people naturally.
+- **Tool restriction awareness in system prompt (G3, REVISED)**: two independent gates, not conflated. (1) **Trust level gate**: stranger/acquaintance = restricted tools, regardless of 1:1 or group. (2) **Group chat gate**: group chat = restricted tools, regardless of trust level (prevent cross-conversation interference). Both can apply simultaneously. Prompt injection format per case:
+  - **Low-trust friend in 1:1** (closed sense like Teams): `restricted tools: shell, read_file, write_file, git_commit, gh_cli / reason: {friend.name} has trust level "{trustLevel}" -- elevated trust required for local tool access. / if appropriate, i can suggest they ask my primary to upgrade their trust level.`
+  - **Trusted friend in group chat**: `restricted tools: shell, read_file, write_file, git_commit, gh_cli / reason: group chat context -- local tools restricted to prevent cross-conversation interference. / i can suggest moving to a 1:1 conversation for full access.`
+  - **Low-trust friend in group chat**: both reasons apply, both shown.
+  - **Trusted friend in 1:1**: no restrictions, no prompt section needed.
+  The agent shouldn't be confused about why it can't do things -- it should understand the trust model and guide people naturally.
 - **Onboarding contact collection (G4)**: during hatch/adoption, the adoption specialist offers to collect the creator's phone number and/or Teams handle. "Want me to recognize you on iMessage too? What's your number?" This gets linked to the initial friend record via externalIds during `complete_adoption`, so the creator is recognized across all channels from day one. Optional -- if they decline, the agent just won't recognize them on other channels until `link_friend_identity` is used later.
 - **Implementation order for G section**: G1 (open/closed classification) -> G3 (tool restriction awareness) -> G2 (link_friend_identity tool) -> G4 (onboarding contact collection). G1 establishes the framework, G3 makes the agent aware of restrictions, G2 gives the mechanism to resolve them, G4 streamlines first-time setup.
 
