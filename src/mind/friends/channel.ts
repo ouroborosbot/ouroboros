@@ -62,3 +62,19 @@ export function getChannelCapabilities(channel: string): ChannelCapabilities {
   })
   return CHANNEL_CAPABILITIES[channel] ?? DEFAULT_CAPABILITIES
 }
+
+/**
+ * Returns channel names whose senseType is "open" or "closed" -- i.e. channels
+ * that are always-on (daemon-managed) rather than interactive or internal.
+ */
+export function getAlwaysOnSenseNames(): string[] {
+  emitNervesEvent({
+    component: "channels",
+    event: "channel.always_on_lookup",
+    message: "always-on sense names lookup",
+    meta: {},
+  })
+  return Object.entries(CHANNEL_CAPABILITIES)
+    .filter(([, cap]) => cap.senseType === "open" || cap.senseType === "closed")
+    .map(([channel]) => channel)
+}

@@ -12,6 +12,7 @@ import { startUpdateChecker, stopUpdateChecker } from "./update-checker"
 import { performStagedRestart } from "./staged-restart"
 import { execSync, spawnSync } from "child_process"
 import { drainPending } from "../../mind/pending"
+import { getAlwaysOnSenseNames } from "../../mind/friends/channel"
 
 export interface DaemonCronJobSummary {
   id: string
@@ -345,8 +346,8 @@ export class OuroDaemon {
     }
   }
 
-  /** Drains per-sense pending dirs for always-on senses (BB and Teams) across all agents. */
-  private static readonly ALWAYS_ON_SENSES = new Set(["bluebubbles", "teams"])
+  /** Drains per-sense pending dirs for always-on senses across all agents. */
+  private static readonly ALWAYS_ON_SENSES = new Set(getAlwaysOnSenseNames())
 
   private async drainPendingSenseMessages(): Promise<void> {
     if (!fs.existsSync(this.bundlesRoot)) return
