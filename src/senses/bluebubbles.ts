@@ -477,7 +477,8 @@ export async function handleBlueBubblesEvent(
 
   const store = resolvedDeps.createFriendStore()
   const resolver = resolvedDeps.createFriendResolver(store, resolveFriendParams(event))
-  const context = await resolver.resolve()
+  const baseContext = await resolver.resolve()
+  const context = { ...baseContext, isGroupChat: event.chat.isGroup }
   const replyTarget = createReplyTargetController(event)
 
   const friendId = context.friend.id

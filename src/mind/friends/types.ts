@@ -95,4 +95,6 @@ export interface ChannelCapabilities {
 export interface ResolvedContext {
   readonly friend: FriendRecord
   readonly channel: ChannelCapabilities
+  /** Whether the current conversation is a group chat (vs 1:1). Default false. */
+  readonly isGroupChat?: boolean
 }

@@ -573,11 +573,7 @@ export function channelNatureSection(capabilities: ChannelCapabilities): string 
 
 export function mixedTrustGroupSection(context?: ResolvedContext): string {
   if (!context?.friend || !isRemoteChannel(context.channel?.channel)) return ""
-  const externalIds = context.friend.externalIds ?? []
-  const inGroup = externalIds.some((eid) =>
-    eid.externalId.startsWith("group:") || eid.provider === "teams-conversation",
-  )
-  if (!inGroup) return ""
+  if (!context.isGroupChat) return ""
   return "## mixed trust group\nin this group chat, my capabilities depend on who's talking. some people here have full trust, others don't — i adjust what i can do based on who's asking."
 }
 

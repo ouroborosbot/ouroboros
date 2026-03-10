@@ -2706,14 +2706,12 @@ describe("mixedTrustGroupSection", () => {
     }
   }
 
-  it("returns mixed trust text for group chat with acquaintance on remote channel", async () => {
+  it("returns mixed trust text when isGroupChat is true on remote channel", async () => {
     const { mixedTrustGroupSection } = await import("../../mind/prompt")
     const ctx = {
-      friend: makeFriendForGroup({
-        trustLevel: "acquaintance",
-        externalIds: [{ provider: "imessage-handle" as const, externalId: "group:abc", linkedAt: "2026-01-01T00:00:00.000Z" }],
-      }),
+      friend: makeFriendForGroup({ trustLevel: "acquaintance" }),
       channel: makeChannelCaps("bluebubbles", "open"),
+      isGroupChat: true,
     }
     const result = mixedTrustGroupSection(ctx as any)
     expect(result).not.toBe("")
@@ -2723,7 +2721,21 @@ describe("mixedTrustGroupSection", () => {
     expect(result).toMatch(/\bi\b/)
   })
 
-  it("returns empty for 1:1 context (not a group)", async () => {
+  it("returns empty for 1:1 context even when friend has group externalIds", async () => {
+    const { mixedTrustGroupSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: makeFriendForGroup({
+        trustLevel: "acquaintance",
+        externalIds: [{ provider: "imessage-handle" as const, externalId: "group:abc", linkedAt: "2026-01-01T00:00:00.000Z" }],
+      }),
+      channel: makeChannelCaps("bluebubbles", "open"),
+      isGroupChat: false,
+    }
+    const result = mixedTrustGroupSection(ctx as any)
+    expect(result).toBe("")
+  })
+
+  it("returns empty for 1:1 context (isGroupChat not set)", async () => {
     const { mixedTrustGroupSection } = await import("../../mind/prompt")
     const ctx = {
       friend: makeFriendForGroup({ trustLevel: "acquaintance" }),
@@ -2733,14 +2745,12 @@ describe("mixedTrustGroupSection", () => {
     expect(result).toBe("")
   })
 
-  it("returns empty for CLI context", async () => {
+  it("returns empty for CLI context even when isGroupChat is true", async () => {
     const { mixedTrustGroupSection } = await import("../../mind/prompt")
     const ctx = {
-      friend: makeFriendForGroup({
-        trustLevel: "acquaintance",
-        externalIds: [{ provider: "local" as const, externalId: "group:abc", linkedAt: "2026-01-01T00:00:00.000Z" }],
-      }),
+      friend: makeFriendForGroup({ trustLevel: "acquaintance" }),
       channel: makeChannelCaps("cli", "local"),
+      isGroupChat: true,
     }
     const result = mixedTrustGroupSection(ctx as any)
     expect(result).toBe("")
@@ -2751,15 +2761,6 @@ describe("mixedTrustGroupSection", () => {
     expect(mixedTrustGroupSection(undefined)).toBe("")
   })
 
-  it("returns empty when friend has no externalIds", async () => {
-    const { mixedTrustGroupSection } = await import("../../mind/prompt")
-    const friend = makeFriendForGroup({ trustLevel: "acquaintance" })
-    ;(friend as any).externalIds = undefined
-    const ctx = { friend, channel: makeChannelCaps("bluebubbles", "open") }
-    const result = mixedTrustGroupSection(ctx as any)
-    expect(result).toBe("")
-  })
-
   it("buildSystem includes mixed trust section for group chat on remote channel", async () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
@@ -2768,11 +2769,9 @@ describe("mixedTrustGroupSection", () => {
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const ctx = {
-      friend: makeFriendForGroup({
-        trustLevel: "acquaintance",
-        externalIds: [{ provider: "imessage-handle" as const, externalId: "group:abc", linkedAt: "2026-01-01T00:00:00.000Z" }],
-      }),
+      friend: makeFriendForGroup({ trustLevel: "acquaintance" }),
       channel: makeChannelCaps("bluebubbles", "open"),
+      isGroupChat: true,
     }
     const result = await buildSystem("bluebubbles", undefined, ctx as any)
     expect(result).toMatch(/group/i)
