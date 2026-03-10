@@ -4,7 +4,20 @@ import * as net from "net"
 import * as os from "os"
 import * as path from "path"
 
+// Stable temp root for pending dir tests (created once, cleaned per-test)
+const pendingTmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "daemon-pending-root-"))
+
+vi.mock("../../../mind/pending", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../../mind/pending")>()
+  return {
+    ...original,
+    getPendingDir: (agentName: string, friendId: string, channel: string, key: string) =>
+      path.join(pendingTmpRoot, agentName, "pending", friendId, channel, key),
+  }
+})
+
 import { OuroDaemon } from "../../../heart/daemon/daemon"
+import type { PendingMessage } from "../../../mind/pending"
 
 function tmpSocketPath(name: string): string {
   return path.join(os.tmpdir(), `${name}-${Date.now()}-${Math.random().toString(16).slice(2)}.sock`)
@@ -484,5 +497,114 @@ describe("daemon command plane branches", () => {
     expect(router.send).not.toHaveBeenCalled()
 
     fs.rmSync(bundlesRoot, { recursive: true, force: true })
+  })
+
+  it("writes a pending file to target agent's inner dialog pending dir on message.send", async () => {
+    const socketPath = tmpSocketPath("daemon-pending-write")
+    const { daemon } = make(socketPath)
+
+    await daemon.handleCommand({
+      kind: "message.send",
+      from: "slugger",
+      to: "ouroboros",
+      content: "hey ouroboros",
+    })
+
+    // getPendingDir is mocked: pendingTmpRoot/ouroboros/pending/self/inner/dialog
+    const pendingDir = path.join(pendingTmpRoot, "ouroboros", "pending", "self", "inner", "dialog")
+    expect(fs.existsSync(pendingDir)).toBe(true)
+
+    const files = fs.readdirSync(pendingDir)
+    expect(files).toHaveLength(1)
+    expect(files[0]).toMatch(/^\d+.*\.json$/)
+
+    const content = JSON.parse(fs.readFileSync(path.join(pendingDir, files[0]), "utf-8")) as PendingMessage
+    expect(content.from).toBe("slugger")
+    expect(content.content).toBe("hey ouroboros")
+    expect(content.timestamp).toBeTypeOf("number")
+
+    fs.rmSync(path.join(pendingTmpRoot, "ouroboros"), { recursive: true, force: true })
+  })
+
+  it("pending file matches PendingMessage schema with optional fields", async () => {
+    const socketPath = tmpSocketPath("daemon-pending-schema")
+    const { daemon } = make(socketPath)
+
+    await daemon.handleCommand({
+      kind: "message.send",
+      from: "agent-a",
+      to: "agent-b",
+      content: "inter-agent message",
+      sessionId: "session-42",
+      taskRef: "task-99",
+    })
+
+    const pendingDir = path.join(pendingTmpRoot, "agent-b", "pending", "self", "inner", "dialog")
+    const files = fs.readdirSync(pendingDir)
+    const content = JSON.parse(fs.readFileSync(path.join(pendingDir, files[0]), "utf-8")) as PendingMessage
+
+    // Required fields
+    expect(content.from).toBe("agent-a")
+    expect(content.content).toBe("inter-agent message")
+    expect(content.timestamp).toBeTypeOf("number")
+
+    // PendingMessage only has: from, content, timestamp, friendId?, channel?, key?
+    // sessionId and taskRef from the command should NOT leak into pending file
+    const keys = Object.keys(content)
+    for (const key of keys) {
+      expect(["from", "friendId", "channel", "key", "content", "timestamp"]).toContain(key)
+    }
+
+    fs.rmSync(path.join(pendingTmpRoot, "agent-b"), { recursive: true, force: true })
+  })
+
+  it("pending file uses timestamp-based filename for chronological ordering", async () => {
+    const socketPath = tmpSocketPath("daemon-pending-filename")
+    const { daemon } = make(socketPath)
+
+    const now = Date.now()
+    await daemon.handleCommand({
+      kind: "message.send",
+      from: "agent-x",
+      to: "agent-y",
+      content: "first",
+    })
+
+    const pendingDir = path.join(pendingTmpRoot, "agent-y", "pending", "self", "inner", "dialog")
+    const files = fs.readdirSync(pendingDir)
+    expect(files).toHaveLength(1)
+
+    // Filename should start with a timestamp (numeric)
+    const filename = files[0]
+    const timestampPart = parseInt(filename.split("-")[0], 10)
+    expect(timestampPart).toBeGreaterThanOrEqual(now - 5000)
+    expect(timestampPart).toBeLessThanOrEqual(now + 5000)
+
+    fs.rmSync(path.join(pendingTmpRoot, "agent-y"), { recursive: true, force: true })
+  })
+
+  it("pending write does not break message.send when pending dir write fails", async () => {
+    const socketPath = tmpSocketPath("daemon-pending-write-fail")
+
+    // Make the pending dir path unwritable by creating a file where the dir should be
+    const blockPath = path.join(pendingTmpRoot, "target-agent", "pending", "self", "inner")
+    fs.mkdirSync(path.dirname(blockPath), { recursive: true })
+    fs.writeFileSync(blockPath, "not-a-directory")
+
+    const { daemon, router } = make(socketPath)
+
+    // message.send should still succeed even if pending write fails
+    const result = await daemon.handleCommand({
+      kind: "message.send",
+      from: "sender",
+      to: "target-agent",
+      content: "should still queue",
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.message).toContain("queued message")
+    expect(router.send).toHaveBeenCalled()
+
+    fs.rmSync(path.join(pendingTmpRoot, "target-agent"), { recursive: true, force: true })
   })
 })
