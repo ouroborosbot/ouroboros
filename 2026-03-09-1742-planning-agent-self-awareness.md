@@ -1,7 +1,7 @@
 # Planning: Full Agent Self-Awareness
 
 **Status**: drafting
-**Created**: (pending first commit)
+**Created**: 2026-03-09 17:44
 
 ## Goal
 Give agents full and proper self-awareness — the same level of awareness a person has about their own body. This includes understanding where/how they're running, how to modify their own bundle, the relationship between bundle and harness, fixing inner dialog so it feels like genuine inner dialog, and fixing cross-session communication so inner dialog and conversations can properly interact.
@@ -90,3 +90,4 @@ The send_message tool already writes to the correct pending dir path when called
 For inter-agent messages (C2), the daemon currently writes to `FileMessageRouter`'s JSONL inbox and sends an IPC poke. The simplest fix is to have the daemon ALSO write a pending file to the target agent's inner dialog pending dir when routing a message, so C1's drain picks it up automatically.
 
 ## Progress Log
+- 2026-03-09 17:44 Created planning doc from user's detailed task description and codebase verification
