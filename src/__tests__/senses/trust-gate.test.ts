@@ -420,19 +420,30 @@ describe("trust gate", () => {
     it("treats array stranger-replies payload as empty and uses default now timestamp", () => {
       fs.writeFileSync(path.join(bundleRoot, "stranger-replies.json"), "[]", "utf8")
 
-      const result = enforceTrustGate(makeInput({
+      // Explicitly omit `now` to exercise the default Date fallback
+      const input = makeInput({
         bundleRoot,
         senseType: "open",
         channel: "bluebubbles",
         provider: "imessage-handle",
         externalId: "stranger-array-state",
         friend: makeFriend({ trustLevel: "stranger" }),
-      }))
+      })
+      delete (input as any).now
+
+      const result = enforceTrustGate(input)
 
       expect(result.allowed).toBe(false)
       if (!result.allowed) {
         expect(result.reason).toBe("stranger_first_reply")
       }
+
+      // Verify the timestamp was generated (not from our fixture)
+      const repliesPath = path.join(bundleRoot, "stranger-replies.json")
+      const state = JSON.parse(fs.readFileSync(repliesPath, "utf8"))
+      const timestamps = Object.values(state) as string[]
+      expect(timestamps).toHaveLength(1)
+      expect(timestamps[0]).toMatch(/^20\d\d-/)
     })
 
     it("defaults trustLevel to friend when not set", () => {
@@ -444,6 +455,30 @@ describe("trust gate", () => {
         friend: makeFriend({ trustLevel: undefined }),
       }))
       expect(result).toEqual({ allowed: true })
+    })
+
+    it("still blocks acquaintance when bundleRoot points to an existing file (pending notice fails)", () => {
+      const invalidBundleRoot = path.join(os.tmpdir(), `trust-gate-acq-invalid-${Date.now()}.txt`)
+      fs.writeFileSync(invalidBundleRoot, "occupied", "utf8")
+
+      try {
+        const result = enforceTrustGate(makeInput({
+          bundleRoot: invalidBundleRoot,
+          senseType: "open",
+          channel: "bluebubbles",
+          provider: "imessage-handle",
+          friend: makeFriend({ trustLevel: "acquaintance" }),
+          isGroupChat: false,
+          hasExistingGroupWithFamily: false,
+        }))
+
+        expect(result.allowed).toBe(false)
+        if (!result.allowed) {
+          expect(result.reason).toBe("acquaintance_1on1_no_group")
+        }
+      } finally {
+        fs.unlinkSync(invalidBundleRoot)
+      }
     })
 
     it("still blocks stranger when bundleRoot points to an existing file", () => {
@@ -601,6 +636,52 @@ describe("trust gate error branches (module mocks)", () => {
       event: "senses.trust_gate_error",
       message: "failed to write inner pending notice",
       component: "senses",
+    }))
+  })
+
+  it("still blocks acquaintance when inner pending notice write fails with non-Error", async () => {
+    vi.resetModules()
+    const emitNervesEvent = vi.fn()
+
+    vi.doMock("fs", () => ({
+      existsSync: vi.fn(() => false),
+      readFileSync: vi.fn(() => ""),
+      writeFileSync: vi.fn((p: string) => {
+        if (typeof p === "string" && p.includes("pending")) {
+          throw "acquaintance pending write failed"
+        }
+      }),
+      mkdirSync: vi.fn(),
+      appendFileSync: vi.fn(),
+    }))
+    vi.doMock("../../heart/identity", () => ({ getAgentRoot: () => "/mock/bundle" }))
+    vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
+
+    const { enforceTrustGate: dynamicGate } = await import("../../senses/trust-gate")
+    const result = dynamicGate({
+      provider: "imessage-handle",
+      externalId: "acq-pending-fail",
+      channel: "bluebubbles",
+      senseType: "open",
+      isGroupChat: false,
+      groupHasFamilyMember: false,
+      hasExistingGroupWithFamily: false,
+      friend: makeFriend({ trustLevel: "acquaintance" }),
+      now: () => new Date("2026-03-07T01:08:00.000Z"),
+    })
+
+    expect(result.allowed).toBe(false)
+    if (!result.allowed) {
+      expect(result.reason).toBe("acquaintance_1on1_no_group")
+    }
+    expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
+      level: "error",
+      event: "senses.trust_gate_error",
+      message: "failed to write inner pending notice",
+      component: "senses",
+      meta: expect.objectContaining({
+        reason: "acquaintance pending write failed",
+      }),
     }))
   })
 })
