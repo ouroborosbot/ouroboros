@@ -19,6 +19,7 @@ const mockHandleInboundTurn = vi.fn()
 vi.mock("../../heart/core", () => ({
   runAgent: (...args: any[]) => mockRunAgent(...args),
   createSummarize: () => vi.fn(),
+  repairOrphanedToolCalls: vi.fn(),
 }))
 
 vi.mock("../../mind/prompt", () => ({
