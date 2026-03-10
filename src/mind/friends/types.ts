@@ -70,10 +70,19 @@ export interface FriendRecord {
   schemaVersion: number
 }
 
+// -- Sense Type --
+// Classifies how a channel is exposed to the outside world.
+// "open" = anyone can reach the agent (e.g. iMessage/BlueBubbles)
+// "closed" = org-gated, only authenticated users (e.g. Teams)
+// "local" = direct terminal access (CLI)
+// "internal" = agent-internal (inner dialog)
+export type SenseType = "open" | "closed" | "local" | "internal"
+
 // -- Channel Capabilities --
 // What a channel supports: integrations, formatting, streaming, message limits
 export interface ChannelCapabilities {
   channel: Channel
+  senseType: SenseType
   availableIntegrations: Integration[]
   supportsMarkdown: boolean
   supportsStreaming: boolean

@@ -7,6 +7,7 @@ import type { ChannelCapabilities } from "./types"
 const CHANNEL_CAPABILITIES: Record<string, ChannelCapabilities> = {
   cli: {
     channel: "cli",
+    senseType: "local",
     availableIntegrations: [],
     supportsMarkdown: false,
     supportsStreaming: true,
@@ -15,6 +16,7 @@ const CHANNEL_CAPABILITIES: Record<string, ChannelCapabilities> = {
   },
   teams: {
     channel: "teams",
+    senseType: "closed",
     availableIntegrations: ["ado", "graph", "github"],
     supportsMarkdown: true,
     supportsStreaming: true,
@@ -23,6 +25,7 @@ const CHANNEL_CAPABILITIES: Record<string, ChannelCapabilities> = {
   },
   bluebubbles: {
     channel: "bluebubbles",
+    senseType: "open",
     availableIntegrations: [],
     supportsMarkdown: false,
     supportsStreaming: false,
@@ -31,6 +34,7 @@ const CHANNEL_CAPABILITIES: Record<string, ChannelCapabilities> = {
   },
   inner: {
     channel: "inner",
+    senseType: "internal",
     availableIntegrations: [],
     supportsMarkdown: false,
     supportsStreaming: true,
@@ -41,6 +45,7 @@ const CHANNEL_CAPABILITIES: Record<string, ChannelCapabilities> = {
 
 const DEFAULT_CAPABILITIES: ChannelCapabilities = {
   channel: "cli",
+  senseType: "local",
   availableIntegrations: [],
   supportsMarkdown: false,
   supportsStreaming: false,
