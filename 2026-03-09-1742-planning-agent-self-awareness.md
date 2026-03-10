@@ -206,3 +206,4 @@ CLI: "I've been thinking about what you said about deploys --
 - 2026-03-09 17:44 Created planning doc from user's detailed task description and codebase verification
 - 2026-03-09 17:51 Added key decisions: no session-start case, bidirectional inner-dialog <-> conversation loop, fix injection format (no fake turns), daemon writes to pending dir, updated implementation order and completion criteria
 - 2026-03-09 17:53 Added decision: loop starts from either direction (inner-dialog-initiated OR conversation-initiated), updated completion criteria and prompt guidance to cover both, added conversation-initiated example flow
+- 2026-03-09 18:16 Added decision: channel-agnostic send_message with smart routing (C6) -- agent says "tell Ari this" without specifying channel, system routes via CLI liveness check then always-on channel recency. Updated completion criteria, implementation order, verified session lock mechanism for CLI liveness detection
