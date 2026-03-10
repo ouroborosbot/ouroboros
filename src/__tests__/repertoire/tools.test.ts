@@ -776,6 +776,7 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
     const { getToolsForChannel, tools } = await import("../../repertoire/tools")
     const teamsCaps = {
       channel: "teams" as const,
+      senseType: "closed" as const,
       availableIntegrations: ["ado" as const, "graph" as const],
       supportsMarkdown: true,
       supportsStreaming: true,
@@ -823,6 +824,7 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
     const { getToolsForChannel, tools } = await import("../../repertoire/tools")
     const caps = {
       channel: "teams" as const,
+      senseType: "closed" as const,
       availableIntegrations: ["graph" as const],
       supportsMarkdown: true,
       supportsStreaming: true,
@@ -852,6 +854,7 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
     const { getToolsForChannel, tools } = await import("../../repertoire/tools")
     const caps = {
       channel: "teams" as const,
+      senseType: "closed" as const,
       availableIntegrations: ["ado" as const],
       supportsMarkdown: true,
       supportsStreaming: true,
@@ -882,6 +885,7 @@ describe("getToolsForChannel with ChannelCapabilities", () => {
 describe("getToolsForChannel with toolPreferences", () => {
   const teamsCaps = {
     channel: "teams" as const,
+    senseType: "closed" as const,
     availableIntegrations: ["ado" as const, "graph" as const],
     supportsMarkdown: true,
     supportsStreaming: true,
@@ -1279,6 +1283,7 @@ describe("ToolContext shape", () => {
         },
         channel: {
           channel: "teams" as const,
+          senseType: "closed" as const,
           availableIntegrations: ["ado" as const, "graph" as const],
           supportsMarkdown: true,
           supportsStreaming: true,
@@ -1810,7 +1815,7 @@ describe("ado_mutate without authority checks (authority removed)", () => {
       signin: vi.fn(),
       context: {
         friend: { id: "id", name: "test", externalIds: [], tenantMemberships: [], toolPreferences: {}, notes: {}, createdAt: "", updatedAt: "", schemaVersion: 1 },
-        channel: { channel: "teams" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
+        channel: { channel: "teams" as const, senseType: "closed" as const, availableIntegrations: ["ado" as const, "graph" as const], supportsMarkdown: true, supportsStreaming: true, supportsRichCards: true, maxMessageLength: 28000 },
       },
     }
 
@@ -1956,6 +1961,7 @@ describe("getToolsForChannel includes docs tools", () => {
     const { getToolsForChannel, tools } = await import("../../repertoire/tools")
     const teamsCaps = {
       channel: "teams" as const,
+      senseType: "closed" as const,
       availableIntegrations: ["ado" as const, "graph" as const],
       supportsMarkdown: true,
       supportsStreaming: true,
@@ -2569,6 +2575,7 @@ describe("github tool registration", () => {
     const { getToolsForChannel } = await import("../../repertoire/tools")
     const teamsCaps = {
       channel: "teams" as const,
+      senseType: "closed" as const,
       availableIntegrations: ["ado" as const, "graph" as const, "github" as const],
       supportsMarkdown: true,
       supportsStreaming: true,

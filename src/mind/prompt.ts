@@ -403,7 +403,9 @@ function toolsSection(channel: Channel, options?: BuildSystemOptions, context?: 
 const RESTRICTED_TOOLS = ["shell", "read_file", "write_file", "edit_file", "glob", "grep"]
 
 function isRemoteChannel(channel?: string): boolean {
-  return channel === "teams" || channel === "bluebubbles"
+  if (!channel) return false
+  const caps = getChannelCapabilities(channel)
+  return caps.senseType !== "local" && caps.senseType !== "internal"
 }
 
 function isSharedContext(friend: ResolvedContext["friend"]): boolean {

@@ -18,7 +18,8 @@ const allDefinitions: ToolDefinition[] = [...baseToolDefinitions, ...bluebubbles
 const REMOTE_BLOCKED_LOCAL_TOOLS = new Set(["shell", "read_file", "write_file", "edit_file", "glob", "grep"]);
 
 function isRemoteChannel(capabilities?: ChannelCapabilities): boolean {
-  return capabilities?.channel === "teams" || capabilities?.channel === "bluebubbles";
+  const senseType = capabilities?.senseType
+  return senseType !== undefined && senseType !== "local" && senseType !== "internal"
 }
 
 function isTrustedRemoteContext(context?: Pick<ResolvedContext, "friend" | "channel">): boolean {

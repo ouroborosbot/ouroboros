@@ -2105,6 +2105,7 @@ describe("buildSystem with context", () => {
       },
       channel: {
         channel: "bluebubbles" as const,
+        senseType: "open" as const,
         availableIntegrations: [],
         supportsMarkdown: false,
         supportsStreaming: false,
@@ -2437,6 +2438,12 @@ describe("toolRestrictionSection", () => {
   it("returns empty string when context is undefined", async () => {
     const { toolRestrictionSection } = await import("../../mind/prompt")
     expect(toolRestrictionSection(undefined)).toBe("")
+  })
+
+  it("returns empty string when context.channel is undefined", async () => {
+    const { toolRestrictionSection } = await import("../../mind/prompt")
+    const ctx = { friend: makeFriend({ trustLevel: "stranger" }), channel: undefined }
+    expect(toolRestrictionSection(ctx as any)).toBe("")
   })
 
   it("handles friend with no externalIds (undefined fallback)", async () => {
