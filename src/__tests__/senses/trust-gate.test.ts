@@ -223,7 +223,7 @@ describe("trust gate", () => {
       expect(files.length).toBeGreaterThanOrEqual(1)
 
       const content = JSON.parse(fs.readFileSync(path.join(innerPendingDir, files[0]), "utf-8"))
-      expect(content.from).toBe("trust-gate")
+      expect(content.from).toBe("instinct")
       expect(content.content).toContain("stranger")
     })
 
@@ -373,7 +373,7 @@ describe("trust gate", () => {
       expect(files.length).toBeGreaterThanOrEqual(1)
 
       const content = JSON.parse(fs.readFileSync(path.join(innerPendingDir, files[0]), "utf-8"))
-      expect(content.from).toBe("trust-gate")
+      expect(content.from).toBe("instinct")
       expect(content.content).toContain("acquaintance")
     })
   })

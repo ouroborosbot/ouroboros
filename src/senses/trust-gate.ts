@@ -93,7 +93,7 @@ function writeInnerPendingNotice(
   const filePath = path.join(innerPendingDir, fileName)
 
   const payload = {
-    from: "trust-gate",
+    from: "instinct",
     content: noticeContent,
     timestamp: Date.now(),
     at: nowIso,
