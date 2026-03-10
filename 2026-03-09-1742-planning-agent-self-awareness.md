@@ -37,8 +37,8 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - [ ] System prompt includes bundle vs. harness explanation with directory layout
 - [ ] System prompt includes self-evolution guide replacing the one-liner
 - [ ] `runtimeInfoSection` includes process type (cli session / inner dialog / teams handler / bluebubbles handler) and daemon status
-- [ ] Inner dialog prompt includes guidance for the full bidirectional loop: surfacing thoughts to conversations via send_message, and processing conversation outcomes that come back
-- [ ] External channel prompts include guidance for the full bidirectional loop: weaving inner thoughts naturally ("oh, i was thinking about..."), and noting outcomes back to inner dialog to keep thinking current
+- [ ] Inner dialog prompt includes guidance for the full bidirectional loop: surfacing thoughts to conversations via send_message, and processing conversation outcomes / deeper-thinking requests that come back
+- [ ] External channel prompts include guidance for the full bidirectional loop: weaving inner thoughts naturally ("oh, i was thinking about..."), noting outcomes back to inner dialog to keep thinking current, AND noting things that need deeper thought to inner dialog for later processing
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -58,9 +58,9 @@ Give agents full and proper self-awareness — the same level of awareness a per
 
 ## Decisions Made
 - **No "session start" case**: sessions are persistent (daemon keeps them alive via `ouro up`). There is no meaningful "fresh session" anymore. Inner dialog notes are injected as context for the agent's next response in an active conversation. The agent weaves them naturally ("oh hey, I was thinking about..."). No "speak first" logic needed.
-- **Bidirectional inner dialog <-> conversation loop**: cross-session communication is a continuous loop, not a one-way pipe. Inner dialog surfaces thoughts via pending -> CLI agent weaves them naturally -> user responds -> CLI agent notes outcome back to inner dialog via send_message -> inner dialog processes it and continues thinking -> maybe spawns new thoughts to surface later. Both directions must feel instinctive.
+- **Bidirectional inner dialog <-> conversation loop**: cross-session communication is a continuous loop, not a one-way pipe, and the loop can start from EITHER direction. (1) Inner-dialog-initiated: inner dialog surfaces thoughts via pending -> CLI agent weaves them naturally -> user responds -> CLI agent notes outcome back to inner dialog -> inner dialog processes and continues thinking. (2) Conversation-initiated: someone says something that needs deeper thought -> CLI agent notes it to inner dialog -> inner dialog processes deeply, explores options -> surfaces conclusions back in next CLI response. This mirrors how humans think -- sometimes you decide to bring something up, sometimes someone says something and you chew on it and come back later with a considered answer. Both directions must feel equally natural and instinctive. The agent shouldn't think of these as "sending messages to myself" -- it should feel like "thinking about it" and "bringing up what I was thinking."
 - **Fix injection format**: the current fake-conversation-turn approach (injecting as user+assistant message pairs) is wrong. Inner dialog notes must arrive as context the agent sees but hasn't spoken yet. The agent should perceive them as "a thought I had" not "something I already said." Exact format TBD (see open questions).
-- **Prompt guidance for the loop**: inner dialog prompt teaches surfacing thoughts and processing outcomes. External prompt teaches weaving inner thoughts naturally and noting outcomes back. Both sides close the loop.
+- **Prompt guidance for the loop**: inner dialog prompt teaches surfacing thoughts and processing conversation outcomes / deeper-thinking requests that come back. External prompt teaches weaving inner thoughts naturally, noting outcomes back, AND noting things that need deeper thought to inner dialog. The loop can start from either side. Framing should feel like "thinking about it" and "bringing up what I was thinking" -- not "sending messages to myself."
 - **Implementation order**: C1+C2 (plumbing) -> C3 (injection format fix) -> B (inner dialog reformation) -> A (bundle/harness) -> D (self-evolution) -> E (process awareness) -> C4 (loop prompt guidance)
 - **Daemon writes to pending dir** for inter-agent messages (not polling) — simpler, unifies intra-agent and inter-agent delivery through one drain mechanism
 - Inner dialog channel capabilities: same as CLI defaults (no markdown, streaming, rich cards, no integrations) — inner dialog is silent/headless, capabilities don't matter much
@@ -104,7 +104,9 @@ sessionMessages.push({ role: "assistant", content: msg.content })
 ```
 This is wrong for self-messages: it makes the agent think it already said the content (but the user never saw it), and "[proactive message from slugger]" doesn't make sense when Slugger IS the agent. The new approach must inject inner dialog notes as context the agent sees but hasn't spoken yet, so it can weave them naturally into its next response.
 
-### Example bidirectional loop flow
+### Example bidirectional loop flows
+
+**Loop starting from inner dialog:**
 ```
 Inner dialog: "I should ask Ari about the rollback plan"
     -> (pending note to CLI)
@@ -114,6 +116,18 @@ Ari: "we'll use blue-green with automatic failover"
 Inner dialog: "Ari wants blue-green with auto failover.
               That changes the task scope -- update the plan."
     -> (continues thinking autonomously)
+```
+
+**Loop starting from conversation:**
+```
+Ari: "I'm not sure the current deploy strategy is right for production"
+    -> CLI agent notes to inner dialog: "Ari wants to rethink the deploy strategy"
+    -> CLI responds: "that's a good point -- let me think about that"
+Inner dialog picks it up, explores options, weighs tradeoffs
+    -> (pending note to CLI)
+CLI: "I've been thinking about what you said about deploys --
+      blue-green with auto failover would handle the rollback concern
+      and we could keep the zero-downtime guarantee..."
 ```
 
 ## Progress Log
