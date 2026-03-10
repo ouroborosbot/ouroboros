@@ -271,4 +271,169 @@ describe("daemon startup sense pending drain", () => {
 
     fs.rmSync(bundlesRoot, { recursive: true, force: true })
   })
+
+  it("tolerates unreadable pending root directory", async () => {
+    const socketPath = tmpSocketPath("startup-unreadable-root")
+    const bundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "startup-drain-"))
+
+    // Create the pending root as a file (not a directory) so readdirSync fails
+    const pendingRoot = path.join(bundlesRoot, "slugger.ouro", "state", "pending")
+    fs.mkdirSync(path.join(bundlesRoot, "slugger.ouro", "state"), { recursive: true })
+    fs.writeFileSync(pendingRoot, "not-a-dir", "utf-8")
+
+    const { daemon, router } = make(socketPath, bundlesRoot)
+    await daemon.start()
+    await daemon.stop()
+
+    expect(router.send).not.toHaveBeenCalled()
+
+    fs.rmSync(bundlesRoot, { recursive: true, force: true })
+  })
+
+  it("tolerates unreadable friend directory", async () => {
+    const socketPath = tmpSocketPath("startup-unreadable-friend")
+    const bundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "startup-drain-"))
+
+    // Create pending root as directory, but make a friend entry be a file
+    const pendingRoot = path.join(bundlesRoot, "slugger.ouro", "state", "pending")
+    fs.mkdirSync(pendingRoot, { recursive: true })
+    // Create a real friend dir that is unreadable by making it a symlink to nowhere
+    const friendDir = path.join(pendingRoot, "friend-broken")
+    fs.mkdirSync(friendDir, { recursive: true })
+    // Put a file where the channel dir listing would look
+    fs.writeFileSync(path.join(friendDir, "bluebubbles"), "not-a-dir", "utf-8")
+
+    // Also create a valid one
+    writePendingMessage(bundlesRoot, "slugger", "friend-ok", "bluebubbles", "chat-1", {
+      from: "dave",
+      content: "still works",
+      timestamp: 1710000005000,
+    })
+
+    const { daemon, router } = make(socketPath, bundlesRoot)
+    await daemon.start()
+    await daemon.stop()
+
+    // The broken friend dir should be skipped, valid one still routed
+    expect(router.send).toHaveBeenCalledWith(expect.objectContaining({
+      from: "dave",
+      content: "still works",
+    }))
+
+    fs.rmSync(bundlesRoot, { recursive: true, force: true })
+  })
+
+  it("tolerates unreadable friend directory (chmod 000)", async () => {
+    const socketPath = tmpSocketPath("startup-unreadable-friend-chmod")
+    const bundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "startup-drain-"))
+
+    // Create a friend dir and make it unreadable
+    const friendDir = path.join(bundlesRoot, "slugger.ouro", "state", "pending", "friend-locked")
+    fs.mkdirSync(friendDir, { recursive: true })
+    fs.chmodSync(friendDir, 0o000)
+
+    const { daemon, router } = make(socketPath, bundlesRoot)
+    await daemon.start()
+    await daemon.stop()
+
+    expect(router.send).not.toHaveBeenCalled()
+
+    // Restore permissions for cleanup
+    fs.chmodSync(friendDir, 0o755)
+    fs.rmSync(bundlesRoot, { recursive: true, force: true })
+  })
+
+  it("tolerates unreadable channel key directory (chmod 000)", async () => {
+    const socketPath = tmpSocketPath("startup-unreadable-channel-chmod")
+    const bundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "startup-drain-"))
+
+    // Create a BB channel dir and make it unreadable
+    const channelDir = path.join(bundlesRoot, "slugger.ouro", "state", "pending", "friend-z", "bluebubbles")
+    fs.mkdirSync(channelDir, { recursive: true })
+    fs.chmodSync(channelDir, 0o000)
+
+    const { daemon, router } = make(socketPath, bundlesRoot)
+    await daemon.start()
+    await daemon.stop()
+
+    expect(router.send).not.toHaveBeenCalled()
+
+    // Restore permissions for cleanup
+    fs.chmodSync(channelDir, 0o755)
+    fs.rmSync(bundlesRoot, { recursive: true, force: true })
+  })
+
+  it("tolerates router.send failure during sense drain", async () => {
+    const socketPath = tmpSocketPath("startup-router-failure")
+    const bundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "startup-drain-"))
+
+    writePendingMessage(bundlesRoot, "slugger", "friend-fail", "teams", "conv-fail", {
+      from: "eve",
+      content: "will fail to route",
+      timestamp: 1710000006000,
+    })
+    writePendingMessage(bundlesRoot, "slugger", "friend-ok", "bluebubbles", "chat-ok", {
+      from: "frank",
+      content: "will succeed",
+      timestamp: 1710000007000,
+    })
+
+    const { daemon, router } = make(socketPath, bundlesRoot)
+    // Make router.send fail on first call, succeed on second
+    router.send
+      .mockRejectedValueOnce(new Error("router down"))
+      .mockResolvedValueOnce({ id: "msg-2", queuedAt: "2026-03-10T00:00:00.000Z" })
+
+    await daemon.start()
+    await daemon.stop()
+
+    // Both messages should have been attempted
+    expect(router.send).toHaveBeenCalledTimes(2)
+    // Second one should still succeed despite first failing
+    expect(router.send).toHaveBeenCalledWith(expect.objectContaining({
+      from: "frank",
+      content: "will succeed",
+    }))
+
+    fs.rmSync(bundlesRoot, { recursive: true, force: true })
+  })
+
+  it("skips non-directory entries at each level of the pending tree", async () => {
+    const socketPath = tmpSocketPath("startup-skip-files")
+    const bundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "startup-drain-"))
+
+    // Put a file at the friendId level (should be skipped)
+    const pendingRoot = path.join(bundlesRoot, "slugger.ouro", "state", "pending")
+    fs.mkdirSync(pendingRoot, { recursive: true })
+    fs.writeFileSync(path.join(pendingRoot, "stray-file.txt"), "not a dir", "utf-8")
+
+    // Put a file at the key level inside a channel dir (should be skipped)
+    const channelDir = path.join(pendingRoot, "friend-q", "bluebubbles")
+    fs.mkdirSync(channelDir, { recursive: true })
+    fs.writeFileSync(path.join(channelDir, "stray-key-file.txt"), "not a dir", "utf-8")
+
+    // Also add a valid message to confirm the skip doesn't break processing
+    writePendingMessage(bundlesRoot, "slugger", "friend-q", "bluebubbles", "chat-valid", {
+      from: "grace",
+      content: "valid msg",
+      timestamp: 1710000008000,
+    })
+
+    const { daemon, router } = make(socketPath, bundlesRoot)
+    await daemon.start()
+    await daemon.stop()
+
+    // Only the valid message should be routed
+    expect(router.send).toHaveBeenCalledTimes(1)
+    expect(router.send).toHaveBeenCalledWith(expect.objectContaining({
+      from: "grace",
+      content: "valid msg",
+    }))
+
+    // Stray files should still exist (not deleted)
+    expect(fs.existsSync(path.join(pendingRoot, "stray-file.txt"))).toBe(true)
+    expect(fs.existsSync(path.join(channelDir, "stray-key-file.txt"))).toBe(true)
+
+    fs.rmSync(bundlesRoot, { recursive: true, force: true })
+  })
 })
