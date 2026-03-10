@@ -11,7 +11,7 @@ Give agents full and proper self-awareness — the same level of awareness a per
 ### In Scope
 - **A. Bundle vs. Harness awareness** — new system prompt section explaining what the bundle is, what the harness is, directory layout ("body map"), and where state/secrets live
 - **B. Inner dialog reformation** — wire up `"inner"` channel properly (channel capabilities, buildSystem path, runAgent channel arg), create dedicated system prompt path that strips friend context/onboarding/greeting but adds metacognitive framing, reframe bootstrap/instinct user messages as first-person awareness instead of external commands
-- **C. Cross-session plumbing, bidirectional loop, smart routing, and proactive outreach** — C1: inner dialog drains its own pending dir before each turn (fixes CLI-to-inner-dialog). C2: daemon writes inter-agent messages to inner dialog's pending dir (fixes inter-agent-to-inner-dialog). C3: fix injection format so inner dialog notes arrive as context the agent sees but hasn't spoken yet (not fake conversation turns). C4: prompt guidance for the full bidirectional inner-dialog-to-conversation loop in both directions. C5: proactive outreach via external channels -- BB and Teams senses poll their pending dirs and send outbound messages via their existing APIs. C6: channel-agnostic `send_message` with smart routing -- agent says "tell Ari this" and the system picks the best channel.
+- **C. Cross-session plumbing, bidirectional loop, smart routing, and proactive outreach** — C1: inner dialog drains its own pending dir before each turn (fixes CLI-to-inner-dialog). C2: daemon writes inter-agent messages to inner dialog's pending dir (fixes inter-agent-to-inner-dialog). C3: fix injection format so inner dialog notes arrive as context the agent sees but hasn't spoken yet (not fake conversation turns). C4: prompt guidance for the full bidirectional inner-dialog-to-conversation loop in both directions. C5: proactive outreach via external channels -- BB and Teams senses poll their pending dirs and send outbound messages via their existing APIs (BB proactive send needs wiring: resolveChatGuidForIdentifier + sendText). C6: channel-agnostic `send_message` with smart routing and name resolution -- agent says "tell Ari this" and the system resolves the name, picks the best channel, and routes.
 - **D. Self-evolution guide** — replace the single line "i can read and modify my own source code" with structured guidance on which psyche files to evolve and when, what tools to use for structured data, and what the runtime manages (don't touch)
 - **E. Process awareness** — add process type and daemon status to runtimeInfoSection
 - **F. Human inner dialog mapping validation** — ensure all 6 human-inner-dialog equivalents work after fixes
@@ -40,16 +40,18 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - [ ] `runtimeInfoSection` includes process type (cli session / inner dialog / teams handler / bluebubbles handler) and daemon status
 - [ ] Inner dialog prompt includes guidance for the full bidirectional loop: surfacing thoughts to conversations via send_message, and processing conversation outcomes / deeper-thinking requests that come back
 - [ ] External channel prompts include guidance for the full bidirectional loop: weaving inner thoughts naturally ("oh, i was thinking about..."), noting outcomes back to inner dialog to keep thinking current, AND noting things that need deeper thought to inner dialog for later processing
+- [ ] `send_message` accepts friend name (not just UUID) -- system resolves name to friendId by scanning friend records
+- [ ] `send_message(friend="self")` routes to inner dialog pending dir
 - [ ] `send_message` tool `channel` parameter is optional -- when omitted, system does smart routing
 - [ ] Smart routing: checks for active CLI session (via session lock liveness) first, then picks most recently used always-on channel (BB/Teams), then falls back to channel-agnostic queue
 - [ ] Smart routing avoids dual-delivery -- one delivery, best channel
 - [ ] When `channel` IS specified in `send_message`, it is used directly (backward compat)
-- [ ] BlueBubbles sense periodically polls its pending dir and sends outbound messages via the BB API (sendText)
-- [ ] Teams sense periodically polls its pending dir and sends outbound messages via the Bot Framework
+- [ ] When friendId UUID is used directly in `send_message`, it works without name resolution (backward compat)
+- [ ] BlueBubbles sense periodically polls its pending dir and sends outbound messages via BB API (resolveChatGuidForIdentifier to get chatGuid from iMessage handle, then sendText)
+- [ ] Teams sense periodically polls its pending dir and sends outbound messages via the Bot Framework (same API as `teams_send_message` tool)
 - [ ] Proactive outreach respects trust level -- only sends to friends with trust level "family" or "friend" (no strangers, no acquaintances)
 - [ ] Proactive outreach only sends to 1:1 conversations (no group chats)
 - [ ] Proactive outreach looks up the friend's external address (iMessage handle, AAD ID) from the friend record's externalIds
-- [ ] Teams proactive outreach uses existing Bot Framework 1:1 conversation creation (same API as `teams_send_message` tool)
 - [ ] Inner dialog prompt guidance includes cross-channel awareness (review recent sessions across all channels during heartbeat/thinking)
 - [ ] External channel prompt guidance includes checking other channels for context when relevant (via `query_session`)
 - [ ] 100% test coverage on all new code
@@ -74,12 +76,14 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - **Bidirectional inner dialog <-> conversation loop**: cross-session communication is a continuous loop, not a one-way pipe, and the loop can start from EITHER direction. (1) Inner-dialog-initiated: inner dialog surfaces thoughts via pending -> CLI agent weaves them naturally -> user responds -> CLI agent notes outcome back to inner dialog -> inner dialog processes and continues thinking. (2) Conversation-initiated: someone says something that needs deeper thought -> CLI agent notes it to inner dialog -> inner dialog processes deeply, explores options -> surfaces conclusions back in next CLI response. This mirrors how humans think -- sometimes you decide to bring something up, sometimes someone says something and you chew on it and come back later with a considered answer. Both directions must feel equally natural and instinctive. The agent shouldn't think of these as "sending messages to myself" -- it should feel like "thinking about it" and "bringing up what I was thinking."
 - **Fix injection format**: the current fake-conversation-turn approach (injecting as user+assistant message pairs) is wrong. Inner dialog notes must arrive as context the agent sees but hasn't spoken yet. The agent should perceive them as "a thought I had" not "something I already said." Exact format TBD (see open questions).
 - **Prompt guidance for the loop**: inner dialog prompt teaches surfacing thoughts and processing conversation outcomes / deeper-thinking requests that come back. External prompt teaches weaving inner thoughts naturally, noting outcomes back, AND noting things that need deeper thought to inner dialog. The loop can start from either side. Framing should feel like "thinking about it" and "bringing up what I was thinking" -- not "sending messages to myself."
-- **Implementation order**: C1+C2 (plumbing) -> C3 (injection format fix) -> C6 (smart routing) -> C5 (proactive outreach via BB/Teams) -> B (inner dialog reformation) -> A (bundle/harness) -> D (self-evolution) -> E (process awareness) -> C4 (loop prompt guidance)
-- **Channel-agnostic `send_message` with smart routing (C6)**: agent calls `send_message(friendId, content)` with NO channel. System routes: (1) is there an active CLI session with this friend right now? (liveness check via session lock, not recency) -> inject as context. (2) No active CLI -> pick the most recently used always-on channel (iMessage vs Teams, whichever the friend last messaged on -- recency IS the right signal for always-on channels). (3) Nothing available -> queue for next interaction. This avoids dual-delivery: one delivery, best channel. When `channel` IS specified, use it directly (backward compat). CLI liveness detected via session lock file (PID alive check). Session recency detected via session file mtime.
-- **Proactive outreach via external channels (C5)**: each sense process polls its own pending dir and sends outbound via its existing API. ~20 lines of real code per sense. No new daemon commands, no new IPC, no new protocols. Guards: only send to friends with trust level "family" or "friend", only 1:1 (no group chats). Essential for iMessage AX -- friends text each other unprompted.
+- **Implementation order**: C1 (inner dialog drains pending) -> C3 (CLI injection format fix) -> C6 (send_message name resolution + smart routing) -> C5 (sense processes drain pending) -> B (inner dialog reformation) -> A (bundle/harness) -> D (self-evolution) -> E (process awareness) -> C4 (loop prompt guidance). C2 (daemon writes to pending dir) can be done alongside C1 or deferred.
+- **send_message accepts friend name, not just UUID (C6)**: inner dialog has NO friend context -- no ResolvedContext, no friend list, no IDs. When it thinks "tell Ari about X," it can't call send_message because it doesn't know Ari's friendId UUID. Fix: `send_message` accepts a `friend` parameter that can be a name OR a UUID. System resolves name to friendId by scanning friend records (new `findByName` method on FriendStore, same scan pattern as existing `findByExternalId`). `send_message(friend="self")` routes to inner dialog pending dir. When friendId UUID is used, it works directly (backward compat).
+- **Channel-agnostic `send_message` with smart routing (C6)**: agent calls `send_message(friend="Ari", content="...")` with NO channel. System routes: (1) is there an active CLI session with this friend right now? (liveness check via session lock, not recency) -> inject as context. (2) No active CLI -> pick the most recently used always-on channel (iMessage vs Teams, whichever the friend last messaged on -- recency IS the right signal for always-on channels). (3) Nothing available -> queue for next interaction. This avoids dual-delivery: one delivery, best channel. When `channel` IS specified, use it directly (backward compat). CLI liveness detected via session lock file (PID alive check). Session recency detected via session file mtime.
+- **Proactive outreach via external channels (C5)**: each sense process polls its own pending dir and sends outbound via its existing API. Guards: only send to friends with trust level "family" or "friend", only 1:1 (no group chats). Essential for iMessage AX -- friends text each other unprompted.
+- **BB proactive send needs wiring (CORRECTION)**: there is NO existing `bluebubbles_send_message` tool (unlike Teams which has `teams_send_message`). All BB sends currently require a `chatGuid` from an incoming webhook event. However, the pieces ARE there: `resolveChatGuidForIdentifier()` already exists in bluebubbles-client.ts (queries `/api/v1/chat/query` to find a chatGuid from an iMessage handle), and `sendText()` sends via `POST /api/v1/message/text`. BB proactive send flow: look up friend's iMessage handle from friend record externalIds -> call `resolveChatGuidForIdentifier()` to get chatGuid -> call `sendText()`. It's wiring existing pieces together, not new API work.
+- **Teams proactive messaging uses existing API**: `teams_send_message` tool already exists (tools-teams.ts lines 204-252), creates 1:1 conversations with `isGroup: false` via Bot Framework API, uses AAD object ID from friend record externalIds. Teams sense pending drain uses the SAME Bot Framework API -- no new proactive messaging infrastructure needed.
 - **iMessage-specific AX**: proactive texts are natural (friends text unprompted). Inner dialog thoughts should be split into short messages for phone (not one wall of text). Timing doesn't matter -- iMessage is inherently async. Don't proactively text strangers or group chats.
 - **Cross-channel continuity via prompt guidance + inner dialog, NOT automatic injection**: friend identity is already unified across channels (same friendId via externalIds array). `query_session` already works cross-channel. Active sessions summary shows metadata. No automatic cross-channel content injection -- would be expensive and noisy. Instead: (1) inner dialog proactively reviews recent sessions across all channels during heartbeat/thinking, keeping its awareness current across the full cross-channel picture. (2) CLI/Teams/BB prompts guide agent to check other recent sessions via `query_session` when context seems relevant. (3) Inner dialog surfaces cross-channel insights when it detects connections across conversations.
-- **Teams proactive messaging uses existing API**: `teams_send_message` tool already exists (tools-teams.ts lines 204-252), creates 1:1 conversations with `isGroup: false` via Bot Framework API, uses AAD object ID from friend record externalIds. Teams sense pending drain uses the SAME Bot Framework API -- no new proactive messaging infrastructure needed. Both BB and Teams follow identical pending drain pattern: periodic poll -> look up friend's external ID -> send via existing API -> delete pending file.
 - **Daemon writes to pending dir** for inter-agent messages (not polling) — simpler, unifies intra-agent and inter-agent delivery through one drain mechanism
 - Inner dialog channel capabilities: same as CLI defaults (no markdown, streaming, rich cards, no integrations) — inner dialog is silent/headless, capabilities don't matter much
 - Token budget: ~370 tokens added to external prompts (anatomy + self-evolution + process awareness), inner dialog likely net-neutral or saves tokens by stripping unused friend/onboarding sections
@@ -97,10 +101,13 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - `src/heart/daemon/message-router.ts` — FileMessageRouter (inter-agent JSONL inbox)
 - `src/repertoire/tools-base.ts` — send_message tool (writes to pending dir, line 728-772)
 - `src/senses/bluebubbles.ts` — BB event handler (handleBlueBubblesEvent, friend resolution via imessage-handle provider)
-- `src/senses/bluebubbles-client.ts` — BB client with sendText(chat, text) for outbound messages
+- `src/senses/bluebubbles-client.ts` — BB client: sendText(), resolveChatGuidForIdentifier() (resolves iMessage handle to chatGuid via `/api/v1/chat/query`), resolveChatGuid()
+- `src/senses/bluebubbles-model.ts` — BlueBubblesChatRef, BlueBubblesSendTarget types
 - `src/senses/teams.ts` — Teams handler (handleTeamsMessage, sendMessage callback from bot framework ctx.send)
 - `src/senses/session-lock.ts` — session lock mechanism (acquireSessionLock writes PID to `{sessPath}.lock`, used for CLI liveness detection)
 - `src/repertoire/tools-teams.ts` — `teams_send_message` tool (lines 204-252, creates 1:1 Bot Framework conversation with `isGroup: false`, uses AAD object ID)
+- `src/mind/friends/store.ts` — FriendStore interface (get, put, delete, findByExternalId -- NO findByName yet)
+- `src/mind/friends/store-file.ts` — FileFriendStore (scans friend JSON files, normalize pattern -- name resolution will follow same scan pattern as findByExternalId)
 
 ### Verified current state
 - `buildSystem("cli")` is called by inner dialog at line 174 of inner-dialog.ts — confirmed
@@ -114,8 +121,11 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - Daemon's `message.send` writes to router JSONL inbox + sends IPC `{ type: "message" }` to worker, but worker just runs a generic instinct turn without delivering content — confirmed
 - send_message tool writes to `~/.agentstate/{agent}/pending/{friendId}/{channel}/{key}/` — confirmed, so `send_message(friendId="self", channel="inner", key="dialog")` would write to the right place IF inner dialog drained it
 - BB client has `sendText(params: { chat, text, replyToMessageGuid? })` — confirmed, existing send infrastructure
+- BB client has `resolveChatGuidForIdentifier(config, channelConfig, chatIdentifier)` — confirmed, queries `/api/v1/chat/query` to resolve iMessage handle to chatGuid. Already used internally by `resolveChatGuid()`.
+- BB `sendText` error message literally says "BlueBubbles send currently requires chat.chatGuid from the inbound event." — confirmed, but `resolveChatGuidForIdentifier` can provide the chatGuid from an iMessage handle without an inbound event
 - BB resolves friends via `imessage-handle` provider, externalId is the iMessage handle (phone/email) — confirmed
 - BB distinguishes group vs 1:1 via `event.chat.isGroup` — confirmed, group chats use `group:` prefixed externalId
+- NO `bluebubbles_send_message` tool exists (unlike Teams which has `teams_send_message`) — confirmed, BB proactive send requires new wiring
 - Teams handler receives `sendMessage` callback from bot framework (`ctx.send`) — confirmed, existing send infrastructure
 - Teams resolves friends via `aad` provider, externalId is the AAD user ID — confirmed
 - Neither BB nor Teams sense processes currently drain any pending dir — confirmed, they only respond to inbound messages
@@ -124,6 +134,9 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - `teams_send_message` tool exists at tools-teams.ts lines 204-252 — confirmed: creates 1:1 conversation with `isGroup: false`, uses AAD object ID, Bot Framework `conversations.create` + `activities.create` API
 - `query_session` tool exists at tools-base.ts line 678 — confirmed: works cross-channel (friendId + channel param), already supports reading any session including bluebubbles/teams from CLI
 - Friend identity is unified across channels — same friendId resolved via externalIds array with provider-specific entries (aad, local, imessage-handle) — confirmed via FriendResolver and FileFriendStore
+- FriendStore has NO `findByName` method — only `get(id)`, `put(id, record)`, `delete(id)`, `findByExternalId(provider, externalId)`, `hasAnyFriends()` — confirmed, name resolution requires new method
+- FileFriendStore scans all friend JSON files in `findByExternalId` — `findByName` would follow the exact same pattern (readdir + match on record.name) — confirmed
+- Inner dialog gets NO friend context — no ResolvedContext passed, no friend list, no friendId UUIDs available — confirmed, inner dialog cannot currently address friends by UUID
 
 ## Notes
 The send_message tool already writes to the correct pending dir path when called with `friendId="self", channel="inner", key="dialog"`. The missing piece is that `runInnerDialogTurn` never calls `drainPending` on that dir. Fix C1 is literally: call `drainPending(getPendingDir(agentName, "self", "inner", "dialog"))` early in `runInnerDialogTurn` and inject the results the same way the existing `drainInbox` callback does. This single fix enables CLI-to-inner-dialog communication.
@@ -156,8 +169,20 @@ When `send_message` is called without a `channel`:
 
 Key insight: CLI liveness is binary (session lock alive = reachable, otherwise not). Always-on channel selection uses recency as the tiebreaker (both are always reachable if the sense is running, so pick whichever the friend last interacted on).
 
-### Teams proactive messaging (C5 implementation detail)
-`teams_send_message` already implements the full proactive messaging flow: create 1:1 conversation with `isGroup: false` via Bot Framework API, then send activity. Teams sense pending drain uses the exact same API pattern. The conversations API is accessed through `ctx.botApi.conversations` which is available in the Teams sense process context. Both BB and Teams follow the identical pattern for C5: periodic poll -> look up friend's external ID from friend record -> send via existing API -> delete pending file.
+### Complete plumbing inventory
+
+| Piece | Status | Work needed |
+|---|---|---|
+| `send_message` accepts friend name | **Missing** | Add name -> friendId resolution (new `findByName` on FriendStore) |
+| `send_message` channel-agnostic routing | **Missing** | CLI liveness check + always-on recency |
+| `send_message(friend="self")` -> inner dialog | **Missing** | Route to inner dialog pending dir |
+| Inner dialog drains its pending dir | **Missing** | C1 -- add drainPending() at turn start |
+| CLI pending injection as context (not fake turns) | **Missing** | C3 -- change injection format |
+| BB proactive send | **Missing** | Wire resolveChatGuidForIdentifier() + sendText() in pending drain |
+| Teams proactive send API | **Exists** | teams_send_message already has the Bot Framework API |
+| BB sense polls pending dir | **Missing** | Periodic check + send via BB API |
+| Teams sense polls pending dir | **Missing** | Periodic check + send via Bot Framework |
+| Inner dialog knows friends exist | **Missing** | Name-based send_message resolves this |
 
 ### C5 proactive outreach mechanism
 Each sense process adds a periodic check (every few seconds):
@@ -167,52 +192,60 @@ Each sense process adds a periodic check (every few seconds):
 4. Send via the channel's existing API
 5. Delete pending file
 
-### Example smart-routed iMessage proactive outreach flow
-```
-2:35 PM - Ari texts: "what do you think about adding a health endpoint to the daemon?"
-Slugger: "ooh ya that could be useful. let me chew on it"
-  -> notes to inner dialog
+**BB proactive send flow (wiring existing pieces):**
+1. Look up friend's iMessage handle from friend record externalIds (provider: "imessage-handle")
+2. Call existing `resolveChatGuidForIdentifier(config, channelConfig, handle)` to get chatGuid
+3. Call existing `sendText({ chat: { chatGuid, isGroup: false, ... }, text })` with that chatGuid
 
-3:00 PM - Inner dialog heartbeat
-  -> picks up the note, reads daemon code, forms opinion
-  -> calls send_message(friendId=ari, content="thought about the health endpoint...")
-  -> smart routing: is Ari in CLI right now? no (closed window)
-  -> smart routing: which always-on channel most recent? iMessage (texted 30 min ago)
+**Teams proactive send flow (uses existing API):**
+`teams_send_message` already implements the full proactive messaging flow: create 1:1 conversation with `isGroup: false` via Bot Framework API, then send activity. Teams sense pending drain uses the exact same API pattern.
+
+### Traced loop mechanics
+
+**Starting the loop: CLI -> inner dialog**
+```
+Ari: "we might need to rethink the deploy strategy"
+Slugger (CLI): "ya, let me think about it"
+  -> calls send_message(friend="self", content="Ari wants to rethink deploy strategy. Explore alternatives.")
+  -> writes to ~/.agentstate/slugger/pending/self/inner/dialog/{ts}.json
+  -> inner dialog drains on next heartbeat (C1)
+  -> sees the note, thinks about it, forms opinion
+```
+
+**Closing the loop: inner dialog -> Ari (iMessage)**
+```
+Inner dialog: "staged process handoff > stop+start. Tell Ari."
+  -> calls send_message(friend="Ari", content="thought about daemon restarts...")
+  -> name resolution: "Ari" -> friendId UUID (scans friend records)
+  -> smart routing: CLI active? no -> most recent always-on? iMessage
   -> writes to BB pending dir
-
-3:05 PM - BB sense polls pending, finds outbound message
+  -> BB sense polls pending, finds it
   -> looks up Ari's iMessage handle from friend record
-  -> sends via BlueBubbles API
-  -> Ari's phone buzzes with a text from Slugger
-
-Ari: "ya do it"
-Slugger creates task. Loop complete.
+  -> resolves chatGuid via resolveChatGuidForIdentifier()
+  -> sends via sendText()
+  -> Ari's phone buzzes
 ```
 
-### Example bidirectional loop flows
-
-**Loop starting from inner dialog:**
+**Closing the loop: inner dialog -> Ari (CLI active)**
 ```
-Inner dialog: "I should ask Ari about the rollback plan"
-    -> (pending note to CLI)
-CLI: "oh hey -- was thinking about that deploy. what's your rollback plan?"
-Ari: "we'll use blue-green with automatic failover"
-    -> (send_message to self/inner)
-Inner dialog: "Ari wants blue-green with auto failover.
-              That changes the task scope -- update the plan."
-    -> (continues thinking autonomously)
+Inner dialog: "tell Ari about the rollback concern"
+  -> calls send_message(friend="Ari", content="rollback plan doesn't cover DB migration")
+  -> smart routing: CLI active? yes -> writes to CLI pending dir
+  -> CLI drains on next turn
+  -> injected as context (NOT fake conversation turns -- C3 fix)
+  -> Slugger sees inner thought alongside user's message
+  -> naturally weaves in: "btw, was thinking about the rollback plan..."
 ```
 
 **Loop starting from conversation:**
 ```
 Ari: "I'm not sure the current deploy strategy is right for production"
-    -> CLI agent notes to inner dialog: "Ari wants to rethink the deploy strategy"
-    -> CLI responds: "that's a good point -- let me think about that"
+  -> CLI agent notes to inner dialog: send_message(friend="self", content="Ari wants to rethink the deploy strategy")
+  -> CLI responds: "that's a good point -- let me think about that"
 Inner dialog picks it up, explores options, weighs tradeoffs
-    -> (pending note to CLI)
-CLI: "I've been thinking about what you said about deploys --
-      blue-green with auto failover would handle the rollback concern
-      and we could keep the zero-downtime guarantee..."
+  -> send_message(friend="Ari", content="I've been thinking about deploys...")
+  -> smart routing picks best channel
+  -> delivered to Ari wherever they are
 ```
 
 ## Progress Log
