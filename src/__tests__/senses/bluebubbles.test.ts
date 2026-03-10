@@ -89,7 +89,10 @@ vi.mock("../../mind/friends/store-file", () => ({
     this.delete = vi.fn()
     this.findByExternalId = (...args: any[]) => mocks.findByExternalId(...args)
     this.hasAnyFriends = vi.fn().mockResolvedValue(true)
-    this.listAll = (...args: any[]) => mocks.listAll(...args)
+    Object.defineProperty(this, "listAll", {
+      get: () => mocks.listAll ? (...args: any[]) => mocks.listAll(...args) : undefined,
+      configurable: true,
+    })
   }),
 }))
 
@@ -2315,6 +2318,152 @@ describe("BlueBubbles sense runtime", () => {
     expect(input.hasExistingGroupWithFamily).toBe(false)
   })
 
+  it("sets hasExistingGroupWithFamily=false for acquaintance with no group externalIds", async () => {
+    const acquaintanceFriend = {
+      id: "acq-no-groups",
+      name: "NoGroupAcq",
+      trustLevel: "acquaintance" as const,
+      externalIds: [
+        { provider: "imessage-handle" as const, externalId: "ari@mendelow.me", linkedAt: "2026-01-01" },
+      ],
+      tenantMemberships: [],
+      toolPreferences: {},
+      notes: {},
+      totalTokens: 0,
+      createdAt: "2026-01-01",
+      updatedAt: "2026-01-01",
+      schemaVersion: 1,
+    }
+
+    mocks.resolveContext.mockResolvedValueOnce({
+      friend: acquaintanceFriend,
+      channel: defaultFriendContext.channel,
+    })
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(dmTopLevelPayload)
+
+    expect(mocks.handleInboundTurn).toHaveBeenCalledTimes(1)
+    const input = mocks.handleInboundTurn.mock.calls[0][0]
+    expect(input.hasExistingGroupWithFamily).toBe(false)
+    // listAll should NOT be called when acquaintance has no group externalIds
+    expect(mocks.listAll).not.toHaveBeenCalled()
+  })
+
+  it("sets hasExistingGroupWithFamily=false for acquaintance with undefined externalIds", async () => {
+    const acquaintanceFriend = {
+      id: "acq-undef-eids",
+      name: "NoExternalIds",
+      trustLevel: "acquaintance" as const,
+      externalIds: undefined as any,
+      tenantMemberships: [],
+      toolPreferences: {},
+      notes: {},
+      totalTokens: 0,
+      createdAt: "2026-01-01",
+      updatedAt: "2026-01-01",
+      schemaVersion: 1,
+    }
+
+    mocks.resolveContext.mockResolvedValueOnce({
+      friend: acquaintanceFriend,
+      channel: defaultFriendContext.channel,
+    })
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(dmTopLevelPayload)
+
+    expect(mocks.handleInboundTurn).toHaveBeenCalledTimes(1)
+    const input = mocks.handleInboundTurn.mock.calls[0][0]
+    expect(input.hasExistingGroupWithFamily).toBe(false)
+  })
+
+  it("sets hasExistingGroupWithFamily=false when family member has undefined externalIds", async () => {
+    const acquaintanceFriend = {
+      id: "acq-uuid",
+      name: "SomeAcquaintance",
+      trustLevel: "acquaintance" as const,
+      externalIds: [
+        { provider: "imessage-handle" as const, externalId: "ari@mendelow.me", linkedAt: "2026-01-01" },
+        { provider: "imessage-handle" as const, externalId: "group:shared-group", linkedAt: "2026-01-01" },
+      ],
+      tenantMemberships: [],
+      toolPreferences: {},
+      notes: {},
+      totalTokens: 0,
+      createdAt: "2026-01-01",
+      updatedAt: "2026-01-01",
+      schemaVersion: 1,
+    }
+
+    mocks.resolveContext.mockResolvedValueOnce({
+      friend: acquaintanceFriend,
+      channel: defaultFriendContext.channel,
+    })
+
+    // Family member has undefined externalIds
+    mocks.listAll.mockResolvedValueOnce([
+      acquaintanceFriend,
+      {
+        id: "family-uuid",
+        name: "FamilyMember",
+        trustLevel: "family",
+        externalIds: undefined as any,
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        totalTokens: 0,
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+    ])
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(dmTopLevelPayload)
+
+    expect(mocks.handleInboundTurn).toHaveBeenCalledTimes(1)
+    const input = mocks.handleInboundTurn.mock.calls[0][0]
+    expect(input.hasExistingGroupWithFamily).toBe(false)
+  })
+
+  it("sets hasExistingGroupWithFamily=false when store has no listAll method", async () => {
+    const acquaintanceFriend = {
+      id: "acq-no-listall",
+      name: "AcqNoListAll",
+      trustLevel: "acquaintance" as const,
+      externalIds: [
+        { provider: "imessage-handle" as const, externalId: "ari@mendelow.me", linkedAt: "2026-01-01" },
+        { provider: "imessage-handle" as const, externalId: "group:some-group", linkedAt: "2026-01-01" },
+      ],
+      tenantMemberships: [],
+      toolPreferences: {},
+      notes: {},
+      totalTokens: 0,
+      createdAt: "2026-01-01",
+      updatedAt: "2026-01-01",
+      schemaVersion: 1,
+    }
+
+    mocks.resolveContext.mockResolvedValueOnce({
+      friend: acquaintanceFriend,
+      channel: defaultFriendContext.channel,
+    })
+
+    // Temporarily remove listAll from the mock to simulate a store without it
+    const originalListAll = mocks.listAll
+    mocks.listAll = undefined as any
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(dmTopLevelPayload)
+
+    mocks.listAll = originalListAll
+
+    expect(mocks.handleInboundTurn).toHaveBeenCalledTimes(1)
+    const input = mocks.handleInboundTurn.mock.calls[0][0]
+    expect(input.hasExistingGroupWithFamily).toBe(false)
+  })
+
   it("sets hasExistingGroupWithFamily=false for non-acquaintance (friend trust level)", async () => {
     // Friend trust level should skip the check entirely
     const bluebubbles = await import("../../senses/bluebubbles")
@@ -2325,6 +2474,18 @@ describe("BlueBubbles sense runtime", () => {
     expect(input.hasExistingGroupWithFamily).toBe(false)
     // listAll should NOT have been called for non-acquaintance
     expect(mocks.listAll).not.toHaveBeenCalled()
+  })
+
+  it("sets groupHasFamilyMember=false for DM (not a group chat)", async () => {
+    const bluebubbles = await import("../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(dmTopLevelPayload)
+
+    expect(mocks.handleInboundTurn).toHaveBeenCalledTimes(1)
+    const input = mocks.handleInboundTurn.mock.calls[0][0]
+    expect(input.isGroupChat).toBe(false)
+    expect(input.groupHasFamilyMember).toBe(false)
+    // findByExternalId should NOT be called for DMs
+    expect(mocks.findByExternalId).not.toHaveBeenCalled()
   })
 
   it("sends auto-reply via BB API when trust gate rejects with autoReply (stranger first contact)", async () => {
