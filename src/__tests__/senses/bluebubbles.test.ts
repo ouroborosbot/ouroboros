@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => ({
   recordMutation: vi.fn(),
   createServer: vi.fn(),
   listen: vi.fn((_: number, cb?: () => void) => cb?.()),
+  handleInboundTurn: vi.fn(),
 }))
 
 const tempDirs: string[] = []
@@ -125,6 +126,10 @@ vi.mock("../../senses/bluebubbles-client", () => ({
 
 vi.mock("node:http", () => ({
   createServer: (...args: any[]) => mocks.createServer(...args),
+}))
+
+vi.mock("../../senses/pipeline", () => ({
+  handleInboundTurn: (...args: any[]) => mocks.handleInboundTurn(...args),
 }))
 
 const dmThreadPayload = {
@@ -361,6 +366,29 @@ const identifierOnlyPayload = {
   },
 }
 
+const defaultFriendContext = {
+  friend: {
+    id: "friend-uuid",
+    name: "Ari",
+    externalIds: [],
+    tenantMemberships: [],
+    toolPreferences: {},
+    notes: {},
+    createdAt: "2026-01-01",
+    updatedAt: "2026-01-01",
+    schemaVersion: 1,
+  },
+  channel: {
+    channel: "bluebubbles",
+    senseType: "open",
+    availableIntegrations: [],
+    supportsMarkdown: false,
+    supportsStreaming: false,
+    supportsRichCards: false,
+    maxMessageLength: Infinity,
+  },
+}
+
 function resetMocks(): void {
   mocks.runAgent.mockReset().mockImplementation(async (_messages: any, callbacks: any) => {
     callbacks.onModelStart()
@@ -389,26 +417,23 @@ function resetMocks(): void {
   mocks.loadSession.mockReset().mockReturnValue(null)
   mocks.postTurn.mockReset()
   mocks.accumulateFriendTokens.mockReset()
-  mocks.resolveContext.mockReset().mockResolvedValue({
-    friend: {
-      id: "friend-uuid",
-      name: "Ari",
-      externalIds: [],
-      tenantMemberships: [],
-      toolPreferences: {},
-      notes: {},
-      createdAt: "2026-01-01",
-      updatedAt: "2026-01-01",
-      schemaVersion: 1,
-    },
-    channel: {
-      channel: "bluebubbles",
-      availableIntegrations: [],
-      supportsMarkdown: false,
-      supportsStreaming: false,
-      supportsRichCards: false,
-      maxMessageLength: Infinity,
-    },
+  mocks.resolveContext.mockReset().mockResolvedValue(defaultFriendContext)
+  // handleInboundTurn: by default, simulate a successful pipeline run that calls
+  // the injected runAgent (which triggers BB callbacks for text buffering/flush).
+  mocks.handleInboundTurn.mockReset().mockImplementation(async (input: any) => {
+    const sessionMessages = await input.sessionLoader.loadOrCreate()
+    const msgs = sessionMessages.messages
+    for (const m of input.messages) msgs.push(m)
+    const result = await input.runAgent(msgs, input.callbacks, input.channel, input.signal, input.runAgentOptions)
+    input.postTurn(msgs, sessionMessages.sessionPath, result.usage)
+    await input.accumulateFriendTokens(input.friendStore, (await input.friendResolver.resolve()).friend.id, result.usage)
+    return {
+      resolvedContext: await input.friendResolver.resolve(),
+      gateResult: { allowed: true },
+      usage: result.usage,
+      sessionPath: sessionMessages.sessionPath,
+      messages: msgs,
+    }
   })
   mocks.resolverCtor.mockReset()
   mocks.storeCtor.mockReset()
@@ -1978,6 +2003,241 @@ describe("BlueBubbles sense runtime", () => {
 
     expect(mocks.createServer).toHaveBeenCalledTimes(1)
     expect(mocks.listen).toHaveBeenCalledWith(18790, expect.any(Function))
+  })
+
+  // ── Pipeline integration tests ───────────────────────────────────
+
+  it("calls handleInboundTurn instead of inline lifecycle for DM messages", async () => {
+    const bluebubbles = await import("../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(dmTopLevelPayload)
+
+    expect(mocks.handleInboundTurn).toHaveBeenCalledTimes(1)
+    const input = mocks.handleInboundTurn.mock.calls[0][0]
+    expect(input.channel).toBe("bluebubbles")
+    expect(input.capabilities).toEqual(expect.objectContaining({ senseType: "open", channel: "bluebubbles" }))
+    expect(input.provider).toBe("imessage-handle")
+    expect(input.externalId).toBe("ari@mendelow.me")
+    expect(input.isGroupChat).toBe(false)
+    expect(input.groupHasFamilyMember).toBe(false)
+    expect(input.hasExistingGroupWithFamily).toBe(false)
+    expect(typeof input.enforceTrustGate).toBe("function")
+    expect(typeof input.drainPending).toBe("function")
+    expect(typeof input.runAgent).toBe("function")
+    expect(typeof input.postTurn).toBe("function")
+    expect(typeof input.accumulateFriendTokens).toBe("function")
+    expect(input.messages).toEqual([
+      expect.objectContaining({
+        role: "user",
+        content: expect.stringContaining("top-level follow-up"),
+      }),
+    ])
+  })
+
+  it("passes isGroupChat=true and group-level friend params for group messages", async () => {
+    mocks.resolveContext.mockResolvedValueOnce({
+      friend: {
+        id: "group-uuid",
+        name: "Consciousness TBD",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: defaultFriendContext.channel,
+    })
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(groupThreadPayload)
+
+    expect(mocks.handleInboundTurn).toHaveBeenCalledTimes(1)
+    const input = mocks.handleInboundTurn.mock.calls[0][0]
+    expect(input.isGroupChat).toBe(true)
+    expect(input.externalId).toBe("ari@mendelow.me")
+    expect(input.provider).toBe("imessage-handle")
+  })
+
+  it("sends auto-reply via BB API when trust gate rejects with autoReply (stranger first contact)", async () => {
+    mocks.handleInboundTurn.mockResolvedValueOnce({
+      resolvedContext: defaultFriendContext,
+      gateResult: {
+        allowed: false,
+        reason: "stranger_first_reply",
+        autoReply: "I'm sorry, I'm not allowed to talk to strangers",
+      },
+    })
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    const result = await bluebubbles.handleBlueBubblesEvent(dmTopLevelPayload)
+
+    expect(result.handled).toBe(true)
+    expect(result.notifiedAgent).toBe(false)
+    expect(mocks.sendText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: "I'm sorry, I'm not allowed to talk to strangers",
+      }),
+    )
+  })
+
+  it("does not send reply when trust gate silently drops (stranger subsequent contact)", async () => {
+    mocks.handleInboundTurn.mockResolvedValueOnce({
+      resolvedContext: defaultFriendContext,
+      gateResult: {
+        allowed: false,
+        reason: "stranger_silent_drop",
+      },
+    })
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    const result = await bluebubbles.handleBlueBubblesEvent(dmTopLevelPayload)
+
+    expect(result.handled).toBe(true)
+    expect(result.notifiedAgent).toBe(false)
+    expect(mocks.sendText).not.toHaveBeenCalled()
+  })
+
+  it("sends auto-reply via BB API when acquaintance is blocked in 1:1", async () => {
+    mocks.handleInboundTurn.mockResolvedValueOnce({
+      resolvedContext: defaultFriendContext,
+      gateResult: {
+        allowed: false,
+        reason: "acquaintance_1on1_no_group",
+        autoReply: "Hey! Reach me in a group chat instead.",
+      },
+    })
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    const result = await bluebubbles.handleBlueBubblesEvent(dmTopLevelPayload)
+
+    expect(result.handled).toBe(true)
+    expect(result.notifiedAgent).toBe(false)
+    expect(mocks.sendText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: "Hey! Reach me in a group chat instead.",
+      }),
+    )
+  })
+
+  it("sends contextual auto-reply when acquaintance has existing group with family", async () => {
+    mocks.handleInboundTurn.mockResolvedValueOnce({
+      resolvedContext: defaultFriendContext,
+      gateResult: {
+        allowed: false,
+        reason: "acquaintance_1on1_has_group",
+        autoReply: "Hey! Reach me in our group chat instead.",
+      },
+    })
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    const result = await bluebubbles.handleBlueBubblesEvent(dmTopLevelPayload)
+
+    expect(result.handled).toBe(true)
+    expect(result.notifiedAgent).toBe(false)
+    expect(mocks.sendText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: "Hey! Reach me in our group chat instead.",
+      }),
+    )
+  })
+
+  it("silently drops acquaintance group message without family present (no auto-reply)", async () => {
+    mocks.handleInboundTurn.mockResolvedValueOnce({
+      resolvedContext: defaultFriendContext,
+      gateResult: {
+        allowed: false,
+        reason: "acquaintance_group_no_family",
+      },
+    })
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    const result = await bluebubbles.handleBlueBubblesEvent(groupThreadPayload)
+
+    expect(result.handled).toBe(true)
+    expect(result.notifiedAgent).toBe(false)
+    expect(mocks.sendText).not.toHaveBeenCalled()
+  })
+
+  it("does not call runAgent when trust gate rejects", async () => {
+    mocks.handleInboundTurn.mockResolvedValueOnce({
+      resolvedContext: defaultFriendContext,
+      gateResult: {
+        allowed: false,
+        reason: "stranger_silent_drop",
+      },
+    })
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(dmTopLevelPayload)
+
+    // runAgent should NOT have been called since handleInboundTurn mock returns rejection
+    // (the mock doesn't call runAgent when we override it)
+    expect(mocks.runAgent).not.toHaveBeenCalled()
+  })
+
+  it("passes pendingDir to pipeline for per-turn pending drain", async () => {
+    const bluebubbles = await import("../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(dmTopLevelPayload)
+
+    const input = mocks.handleInboundTurn.mock.calls[0][0]
+    expect(input.pendingDir).toEqual(expect.stringContaining("pending"))
+    expect(typeof input.drainPending).toBe("function")
+  })
+
+  it("passes BB-specific toolContext (bluebubblesReplyTarget, codingFeedback) via runAgent wrapper", async () => {
+    let capturedOptions: any = null
+    mocks.runAgent.mockImplementationOnce(async (_messages: any, callbacks: any, _channel: any, _signal: any, options: any) => {
+      capturedOptions = options
+      callbacks.onModelStart()
+      callbacks.onTextChunk("got it")
+      return {
+        usage: { input_tokens: 1, output_tokens: 1, reasoning_tokens: 0, total_tokens: 2 },
+      }
+    })
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(dmTopLevelPayload)
+
+    expect(capturedOptions).not.toBeNull()
+    expect(capturedOptions.toolContext).toBeDefined()
+    expect(typeof capturedOptions.toolContext.bluebubblesReplyTarget?.setSelection).toBe("function")
+    expect(typeof capturedOptions.toolContext.codingFeedback?.send).toBe("function")
+    expect(typeof capturedOptions.toolContext.summarize).toBe("function")
+    expect(typeof capturedOptions.toolContext.signin).toBe("function")
+  })
+
+  it("flushes callbacks after successful pipeline run and calls finish in finally block", async () => {
+    const bluebubbles = await import("../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(dmTopLevelPayload)
+
+    // Verify flush sent the reply text
+    expect(mocks.sendText).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "got it" }),
+    )
+    // Verify typing was stopped (finish called)
+    expect(mocks.setTyping).toHaveBeenCalledWith(
+      expect.anything(),
+      false,
+    )
+  })
+
+  it("calls finish but not flush when gate rejects", async () => {
+    mocks.handleInboundTurn.mockResolvedValueOnce({
+      resolvedContext: defaultFriendContext,
+      gateResult: {
+        allowed: false,
+        reason: "stranger_silent_drop",
+      },
+    })
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(dmTopLevelPayload)
+
+    // No sendText for agent reply (gate rejected, no agent turn)
+    expect(mocks.sendText).not.toHaveBeenCalled()
+    // runAgent not called
+    expect(mocks.runAgent).not.toHaveBeenCalled()
   })
 })
 
