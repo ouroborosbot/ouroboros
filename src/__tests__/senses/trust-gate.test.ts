@@ -179,6 +179,103 @@ describe("trust gate", () => {
 
 })
 
+describe("trust gate open/closed sense classification", () => {
+  let bundleRoot: string
+
+  beforeEach(() => {
+    bundleRoot = fs.mkdtempSync(path.join(os.tmpdir(), "trust-gate-openness-"))
+  })
+
+  it("hard-rejects strangers on open senses (first contact gets auto-reply, no agent turn)", () => {
+    const result = enforceTrustGate({
+      bundleRoot,
+      provider: "imessage-handle",
+      externalId: "stranger@icloud.com",
+      channel: "bluebubbles",
+      friend: makeFriend({ trustLevel: "stranger" }),
+      senseOpenness: "open",
+      now: () => new Date("2026-03-10T01:00:00.000Z"),
+    })
+
+    expect(result.allowed).toBe(false)
+    expect(result.reason).toBe("stranger_first_reply")
+    expect(result.autoReply).toBe(STRANGER_AUTO_REPLY)
+  })
+
+  it("silently drops subsequent stranger messages on open senses", () => {
+    // First contact
+    enforceTrustGate({
+      bundleRoot,
+      provider: "imessage-handle",
+      externalId: "stranger@icloud.com",
+      channel: "bluebubbles",
+      friend: makeFriend({ trustLevel: "stranger" }),
+      senseOpenness: "open",
+      now: () => new Date("2026-03-10T01:00:00.000Z"),
+    })
+
+    // Second contact
+    const result = enforceTrustGate({
+      bundleRoot,
+      provider: "imessage-handle",
+      externalId: "stranger@icloud.com",
+      channel: "bluebubbles",
+      friend: makeFriend({ trustLevel: "stranger" }),
+      senseOpenness: "open",
+      now: () => new Date("2026-03-10T01:01:00.000Z"),
+    })
+
+    expect(result.allowed).toBe(false)
+    expect(result.reason).toBe("stranger_silent_drop")
+  })
+
+  it("allows strangers on closed senses with restriction flag", () => {
+    const result = enforceTrustGate({
+      bundleRoot,
+      provider: "aad",
+      externalId: "aad-stranger-closed",
+      tenantId: "tenant-1",
+      channel: "teams",
+      friend: makeFriend({ trustLevel: "stranger" }),
+      senseOpenness: "closed",
+      now: () => new Date("2026-03-10T01:02:00.000Z"),
+    })
+
+    expect(result.allowed).toBe(true)
+    expect(result.restricted).toBe(true)
+  })
+
+  it("does not restrict non-strangers on closed senses", () => {
+    const result = enforceTrustGate({
+      bundleRoot,
+      provider: "aad",
+      externalId: "aad-friend",
+      channel: "teams",
+      friend: makeFriend({ trustLevel: "friend" }),
+      senseOpenness: "closed",
+      now: () => new Date("2026-03-10T01:03:00.000Z"),
+    })
+
+    expect(result.allowed).toBe(true)
+    expect(result).not.toHaveProperty("restricted")
+  })
+
+  it("defaults to open behavior when senseOpenness is not provided (backward compat)", () => {
+    const result = enforceTrustGate({
+      bundleRoot,
+      provider: "aad",
+      externalId: "aad-stranger-no-openness",
+      channel: "teams",
+      friend: makeFriend({ trustLevel: "stranger" }),
+      now: () => new Date("2026-03-10T01:04:00.000Z"),
+    })
+
+    // Without senseOpenness, existing behavior (hard-reject) should remain
+    expect(result.allowed).toBe(false)
+    expect(result.reason).toBe("stranger_first_reply")
+  })
+})
+
 describe("trust gate error branches (module mocks)", () => {
   it("still blocks stranger input when reply-state persistence fails", async () => {
     vi.resetModules()

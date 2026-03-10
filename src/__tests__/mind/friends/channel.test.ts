@@ -89,4 +89,29 @@ describe("getChannelCapabilities", () => {
     expect(innerCaps.channel).toBe("inner")
     expect(unknownCaps.channel).toBe("cli") // fallback
   })
+
+  it("bluebubbles sense is classified as open", () => {
+    const caps = getChannelCapabilities("bluebubbles")
+    expect(caps.senseOpenness).toBe("open")
+  })
+
+  it("teams sense is classified as closed", () => {
+    const caps = getChannelCapabilities("teams")
+    expect(caps.senseOpenness).toBe("closed")
+  })
+
+  it("cli sense is classified as closed", () => {
+    const caps = getChannelCapabilities("cli")
+    expect(caps.senseOpenness).toBe("closed")
+  })
+
+  it("inner sense is classified as closed", () => {
+    const caps = getChannelCapabilities("inner")
+    expect(caps.senseOpenness).toBe("closed")
+  })
+
+  it("default capabilities for unknown channel are closed", () => {
+    const caps = getChannelCapabilities("slack" as any)
+    expect(caps.senseOpenness).toBe("closed")
+  })
 })
