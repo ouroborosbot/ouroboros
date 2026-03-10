@@ -94,6 +94,53 @@ function resolveFriendParams(event: BlueBubblesNormalizedEvent): FriendResolverP
   }
 }
 
+/**
+ * Check if any participant in a group chat is a known family member.
+ * Looks up each participant handle in the friend store.
+ */
+async function checkGroupHasFamilyMember(
+  store: FileFriendStore,
+  event: BlueBubblesNormalizedEvent,
+): Promise<boolean> {
+  if (!event.chat.isGroup) return false
+  for (const handle of event.chat.participantHandles ?? []) {
+    const friend = await store.findByExternalId("imessage-handle", handle)
+    if (friend?.trustLevel === "family") return true
+  }
+  return false
+}
+
+/**
+ * Check if an acquaintance shares any group chat with a family member.
+ * Compares group-prefixed externalIds between the acquaintance and all family members.
+ */
+async function checkHasExistingGroupWithFamily(
+  store: FileFriendStore,
+  senderFriend: FriendRecord,
+): Promise<boolean> {
+  const trustLevel = senderFriend.trustLevel ?? "friend"
+  if (trustLevel !== "acquaintance") return false
+
+  const acquaintanceGroups = new Set(
+    (senderFriend.externalIds ?? [])
+      .filter((eid) => eid.externalId.startsWith("group:"))
+      .map((eid) => eid.externalId),
+  )
+  if (acquaintanceGroups.size === 0) return false
+
+  const allFriends = await (store.listAll?.() ?? Promise.resolve([]))
+  for (const friend of allFriends) {
+    if (friend.trustLevel !== "family") continue
+    const friendGroups = (friend.externalIds ?? [])
+      .filter((eid) => eid.externalId.startsWith("group:"))
+      .map((eid) => eid.externalId)
+    for (const group of friendGroups) {
+      if (acquaintanceGroups.has(group)) return true
+    }
+  }
+  return false
+}
+
 function extractMessageText(content: OpenAI.ChatCompletionMessageParam["content"] | undefined): string {
   if (typeof content === "string") return content
   if (!Array.isArray(content)) return ""
@@ -524,6 +571,12 @@ export async function handleBlueBubblesEvent(
   const bbCapabilities = getChannelCapabilities("bluebubbles")
   const pendingDir = getPendingDir(resolvedDeps.getAgentName(), friendId, "bluebubbles", event.chat.sessionKey)
 
+  // ── Compute trust gate context for group/acquaintance rules ─────
+  const groupHasFamilyMember = await checkGroupHasFamilyMember(store, event)
+  const hasExistingGroupWithFamily = event.chat.isGroup
+    ? false
+    : await checkHasExistingGroupWithFamily(store, context.friend)
+
   // ── Call shared pipeline ──────────────────────────────────────────
 
   try {
@@ -539,8 +592,8 @@ export async function handleBlueBubblesEvent(
       provider: "imessage-handle",
       externalId: event.sender.externalId || event.sender.rawId,
       isGroupChat: event.chat.isGroup,
-      groupHasFamilyMember: false,
-      hasExistingGroupWithFamily: false,
+      groupHasFamilyMember,
+      hasExistingGroupWithFamily,
       enforceTrustGate,
       drainPending,
       runAgent: (msgs, cb, channel, sig, opts) => resolvedDeps.runAgent(msgs, cb, channel, sig, {
@@ -816,6 +869,7 @@ export async function drainAndSendPendingBlueBubbles(
       isGroup: false,
       sessionKey: friendId,
       sendTarget: { kind: "chat_identifier", value: handle },
+      participantHandles: [],
     }
 
     try {

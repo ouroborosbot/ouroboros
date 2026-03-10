@@ -198,7 +198,7 @@ describe("pipeline integration — full UX/AX scenarios", () => {
       const files = fs.readdirSync(innerPendingDir)
       expect(files.length).toBeGreaterThanOrEqual(1)
       const notice = JSON.parse(fs.readFileSync(path.join(innerPendingDir, files[0]), "utf-8"))
-      expect(notice.from).toBe("trust-gate")
+      expect(notice.from).toBe("instinct")
       expect(notice.content).toContain("stranger")
     })
   })
@@ -296,7 +296,7 @@ describe("pipeline integration — full UX/AX scenarios", () => {
       const files = fs.readdirSync(innerPendingDir)
       expect(files.length).toBeGreaterThanOrEqual(1)
       const notice = JSON.parse(fs.readFileSync(path.join(innerPendingDir, files[0]), "utf-8"))
-      expect(notice.from).toBe("trust-gate")
+      expect(notice.from).toBe("instinct")
       expect(notice.content).toContain("acquaintance")
     })
 
