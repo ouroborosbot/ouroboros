@@ -4,7 +4,7 @@ import { getProviderDisplayLabel } from "../heart/core";
 import { finalAnswerTool, getToolsForChannel } from "../repertoire/tools";
 import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName, getAgentSecretsPath, loadAgentConfig, type SenseName } from "../heart/identity";
-import type { Channel, ResolvedContext } from "./friends/types";
+import type { Channel, ChannelCapabilities, ResolvedContext } from "./friends/types";
 import { getChannelCapabilities } from "./friends/channel";
 import { emitNervesEvent } from "../nerves/runtime";
 import { backfillBundleMeta, getPackageVersion, getChangelogPath } from "./bundle-manifest";
@@ -561,6 +561,26 @@ export function loopOrientationSection(channel: Channel): string {
 when something deserves more thought than the moment allows, i can note it to myself and come back later with a considered answer.`
 }
 
+export function channelNatureSection(capabilities: ChannelCapabilities): string {
+  const { senseType } = capabilities
+  if (senseType === "local" || senseType === "internal") return ""
+  if (senseType === "open") {
+    return "## channel nature\nthis is an open channel — anyone with my number can reach me here. i may hear from people i don't know."
+  }
+  // closed
+  return "## channel nature\nthis is an org-gated channel — i know everyone here is already part of the organization."
+}
+
+export function mixedTrustGroupSection(context?: ResolvedContext): string {
+  if (!context?.friend || !isRemoteChannel(context.channel?.channel)) return ""
+  const externalIds = context.friend.externalIds ?? []
+  const inGroup = externalIds.some((eid) =>
+    eid.externalId.startsWith("group:") || eid.provider === "teams-conversation",
+  )
+  if (!inGroup) return ""
+  return "## mixed trust group\nin this group chat, my capabilities depend on who's talking. some people here have full trust, others don't — i adjust what i can do based on who's asking."
+}
+
 export async function buildSystem(channel: Channel = "cli", options?: BuildSystemOptions, context?: ResolvedContext): Promise<string> {
   emitNervesEvent({
     event: "mind.step_start",
@@ -582,10 +602,12 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     metacognitiveFramingSection(channel),
     loopOrientationSection(channel),
     runtimeInfoSection(channel),
+    channelNatureSection(getChannelCapabilities(channel)),
     providerSection(),
     dateSection(),
     toolsSection(channel, options, context),
     toolRestrictionSection(context),
+    mixedTrustGroupSection(context),
     skillsSection(),
     taskBoardSection(),
     buildSessionSummary({
