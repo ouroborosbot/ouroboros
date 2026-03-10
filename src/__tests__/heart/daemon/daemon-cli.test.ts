@@ -4088,6 +4088,29 @@ describe("--agent flag parsing for identity-dependent commands", () => {
     })
   })
 
+  it("parses task create with both --type and --agent flags", () => {
+    expect(parseOuroCommand(["task", "create", "My Task", "--type", "feature", "--agent", "slugger"])).toEqual({
+      kind: "task.create",
+      title: "My Task",
+      type: "feature",
+      agent: "slugger",
+    })
+  })
+
+  it("parses friend create without --agent flag", () => {
+    expect(parseOuroCommand(["friend", "create", "--name", "Dave"])).toEqual({
+      kind: "friend.create",
+      name: "Dave",
+    })
+  })
+
+  it("parses friend create with --trust but no value (ignores incomplete flag)", () => {
+    expect(parseOuroCommand(["friend", "create", "--name", "Eve", "--trust"])).toEqual({
+      kind: "friend.create",
+      name: "Eve",
+    })
+  })
+
   it("rejects friend create without --name", () => {
     expect(() => parseOuroCommand(["friend", "create", "--agent", "slugger"])).toThrow("Usage")
   })
