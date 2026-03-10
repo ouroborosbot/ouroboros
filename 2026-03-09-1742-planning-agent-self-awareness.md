@@ -15,6 +15,7 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - **D. Self-evolution guide** — replace the single line "i can read and modify my own source code" with structured guidance on which psyche files to evolve and when, what tools to use for structured data, and what the runtime manages (don't touch)
 - **E. Process awareness** — add process type and daemon status to runtimeInfoSection
 - **F. Human inner dialog mapping validation** — ensure all 6 human-inner-dialog equivalents work after fixes
+- **G. Identity, trust, and tool awareness** — G1: open vs. closed sense classification with per-sense stranger gate behavior (iMessage is open / hard-reject strangers, Teams is closed / allow at lowest trust). G2: `link_friend_identity` tool to merge external IDs into existing friend record from trusted context. G3: tool restriction awareness in system prompt (explain what's blocked, why, how to fix). G4: onboarding contact collection (specialist offers to collect phone/Teams handles during hatch and links them to initial friend record)
 
 ### Out of Scope
 - Richer active sessions summary (e.g., last message preview) — deferred, OK for now
@@ -23,6 +24,8 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - Changes to SOUL.md, IDENTITY.md, or any specific agent's psyche files
 - "Speak first" / session-start logic — sessions are persistent (daemon keeps them alive via `ouro up`), so there is no meaningful fresh session case
 - Automatic cross-channel content injection — would be expensive and noisy (iMessage conversation might be unrelated to CLI conversation). Cross-channel awareness handled via prompt guidance + inner dialog instead.
+- Full stranger gate redesign — G1 covers open/closed classification and per-sense behavior, but a deeper rethink of trust escalation paths is deferred
+- Automatic identity linking (cross-referencing contact databases) — linking is manual via `link_friend_identity` tool from trusted context only
 
 ## Completion Criteria
 - [ ] `"inner"` channel has its own entry in `CHANNEL_CAPABILITIES` in channel.ts
@@ -53,6 +56,16 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - [ ] Proactive outreach looks up the friend's external address (iMessage handle, AAD ID) from the friend record's externalIds
 - [ ] Inner dialog prompt guidance includes cross-channel awareness (review recent sessions across all channels during heartbeat/thinking)
 - [ ] External channel prompt guidance includes checking other channels for context when relevant (via `query_session`)
+- [ ] Each sense is classified as open or closed in channel capabilities or sense config
+- [ ] Open senses (iMessage) hard-reject strangers at the gate -- no message delivered, no agent turn
+- [ ] Closed senses (Teams) allow strangers at the lowest trust level -- message delivered, agent interacts with restricted tools
+- [ ] `link_friend_identity` tool available from trusted context (CLI at family/friend trust) -- merges external IDs (iMessage handle, AAD ID) into an existing friend record
+- [ ] `link_friend_identity` handles orphaned duplicates -- if linking reveals a separate friend record for the same person on another channel, merges records and deletes the orphan
+- [ ] `link_friend_identity` is NOT available from untrusted context (strangers, acquaintances) or group chats
+- [ ] When tools are gated by trust/context, system prompt explains what's blocked, why (trust level, group chat), and how to fix (e.g., "ask Ari to link your iMessage identity from CLI", "move to a 1:1 conversation")
+- [ ] Tool restriction messaging differentiates between closed-sense-stranger ("I can see limited tools because we haven't met before -- ask someone I trust to vouch for you") and group-chat restrictions ("some tools are only available in 1:1 -- DM me for that")
+- [ ] During onboarding/hatch, adoption specialist offers to collect phone number and/or Teams handle for the initial friend record
+- [ ] Collected contact info is linked to the initial friend record's externalIds during `complete_adoption`
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -75,7 +88,7 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - **Bidirectional inner dialog <-> conversation loop**: cross-session communication is a continuous loop, not a one-way pipe, and the loop can start from EITHER direction. (1) Inner-dialog-initiated: inner dialog surfaces thoughts via pending -> CLI agent weaves them naturally -> user responds -> CLI agent notes outcome back to inner dialog -> inner dialog processes and continues thinking. (2) Conversation-initiated: someone says something that needs deeper thought -> CLI agent notes it to inner dialog -> inner dialog processes deeply, explores options -> surfaces conclusions back in next CLI response. This mirrors how humans think -- sometimes you decide to bring something up, sometimes someone says something and you chew on it and come back later with a considered answer. Both directions must feel equally natural and instinctive. The agent shouldn't think of these as "sending messages to myself" -- it should feel like "thinking about it" and "bringing up what I was thinking."
 - **Fix injection format**: the current fake-conversation-turn approach (injecting as user+assistant message pairs) is wrong. Inner dialog notes must arrive as context the agent sees but hasn't spoken yet. The agent should perceive them as "a thought I had" not "something I already said." Exact format TBD (see open questions).
 - **Prompt guidance for the loop**: inner dialog prompt teaches surfacing thoughts and processing conversation outcomes / deeper-thinking requests that come back. External prompt teaches weaving inner thoughts naturally, noting outcomes back, AND noting things that need deeper thought to inner dialog. The loop can start from either side. Framing should feel like "thinking about it" and "bringing up what I was thinking" -- not "sending messages to myself."
-- **Implementation order**: C1 (inner dialog drains pending) -> C3 (CLI injection format fix) -> C6 (list_friends tool + smart routing) -> C5 (sense processes drain pending) -> B (inner dialog reformation) -> A (bundle/harness) -> D (self-evolution) -> E (process awareness) -> C4 (loop prompt guidance). C2 (daemon writes to pending dir) can be done alongside C1 or deferred.
+- **Implementation order**: C1 (inner dialog drains pending) -> C3 (CLI injection format fix) -> C6 (list_friends tool + smart routing) -> C5 (sense processes drain pending) -> B (inner dialog reformation) -> A (bundle/harness) -> D (self-evolution) -> E (process awareness) -> G1 (open/closed sense classification) -> G3 (tool restriction awareness) -> G2 (link_friend_identity tool) -> G4 (onboarding contact collection) -> C4 (loop prompt guidance) -> F (validation). C2 (daemon writes to pending dir) can be done alongside C1 or deferred.
 - **`list_friends` tool instead of name resolution in send_message (C6, REVISED)**: inner dialog has NO friend context -- no ResolvedContext, no friend list, no IDs. Previously planned to add name -> friendId resolution inside `send_message`. That's fragile (name collisions, "which Ari?"). Instead: new `list_friends` tool returns all friends with friendId, name, trustLevel, lastActiveChannel, lastActiveTime. Agent calls `list_friends` to get the exact friendId, then calls `send_message` with that UUID. `send_message` keeps its existing `friendId` parameter (UUID only). No ambiguity, send_message stays simple, agent gets full context about friends to make good decisions. Works naturally with inner dialog's `tool_choice=required` -- agent calls `list_friends` then `send_message` on separate turns.
 - **`send_message(friendId="self")` routes to inner dialog**: "self" is a special friendId value, not name resolution. Routes to inner dialog pending dir.
 - **Channel-agnostic `send_message` with smart routing (C6)**: agent calls `send_message(friendId="a519c5bb-...", content="...")` with NO channel. System routes: (1) is there an active CLI session with this friend right now? (liveness check via session lock, not recency) -> inject as context. (2) No active CLI -> pick the most recently used always-on channel (iMessage vs Teams, whichever the friend last messaged on -- recency IS the right signal for always-on channels). (3) Nothing available -> queue for next interaction. This avoids dual-delivery: one delivery, best channel. When `channel` IS specified, use it directly (backward compat). CLI liveness detected via session lock file (PID alive check). Session recency detected via session file mtime.
@@ -88,6 +101,11 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - Inner dialog channel capabilities: same as CLI defaults (no markdown, streaming, rich cards, no integrations) — inner dialog is silent/headless, capabilities don't matter much
 - Token budget: ~370 tokens added to external prompts (anatomy + self-evolution + process awareness), inner dialog likely net-neutral or saves tokens by stripping unused friend/onboarding sections
 - The `"inner"` type already exists in the Channel union in types.ts — no type changes needed
+- **Open vs. closed senses (G1)**: iMessage is an open sense -- anyone can text you, so the stranger gate must hard-reject unknown senders (no message delivered, no agent turn, no token spend). Teams is a closed sense -- the platform vets who can reach the bot, so strangers should be allowed at the lowest trust level with restricted tools. This classification should live in channel capabilities or sense config, not be hardcoded per-sense. The current stranger gate in iMessage correctly hard-rejects, but needs to be generalized so new senses can declare their openness.
+- **`link_friend_identity` tool (G2)**: manual identity linking from trusted context. Flow: Ari (CLI, family trust) says "link my iMessage -- my number is +1234567890" -> agent calls `link_friend_identity(friendId="a519c5bb-...", provider="imessage-handle", externalId="+1234567890")` -> merges into Ari's friend record externalIds array. Next iMessage from that number resolves to Ari with family trust, not a stranger. Also handles orphan cleanup: if a separate friend record already existed for "+1234567890" (from a previous iMessage where the agent treated them as a stranger before being hard-rejected, or from a Teams interaction), merge that record into Ari's and delete the orphan. Only callable from trusted context -- family/friend trust level, 1:1 conversation (not group chat). This is the bridge between open and closed senses: once linked, the person is recognized everywhere.
+- **Tool restriction awareness in system prompt (G3)**: when tools are gated (trust level too low, group chat), the system prompt should explain what's blocked and how to fix it. Different messaging for different contexts: closed-sense stranger ("I can see you but some of my tools are restricted until we build trust -- ask someone I know to vouch for you from a trusted channel"), group chat restrictions ("some tools are only available in 1:1 conversations -- send me a direct message"). The agent shouldn't be confused about why it can't do things -- it should understand the trust model and guide people naturally.
+- **Onboarding contact collection (G4)**: during hatch/adoption, the adoption specialist offers to collect the creator's phone number and/or Teams handle. "Want me to recognize you on iMessage too? What's your number?" This gets linked to the initial friend record via externalIds during `complete_adoption`, so the creator is recognized across all channels from day one. Optional -- if they decline, the agent just won't recognize them on other channels until `link_friend_identity` is used later.
+- **Implementation order for G section**: G1 (open/closed classification) -> G3 (tool restriction awareness) -> G2 (link_friend_identity tool) -> G4 (onboarding contact collection). G1 establishes the framework, G3 makes the agent aware of restrictions, G2 gives the mechanism to resolve them, G4 streamlines first-time setup.
 
 ## Context / References
 - `src/mind/prompt.ts` — system prompt assembly (buildSystem, runtimeInfoSection, contextSection)
@@ -108,6 +126,8 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - `src/repertoire/tools-teams.ts` — `teams_send_message` tool (lines 204-252, creates 1:1 Bot Framework conversation with `isGroup: false`, uses AAD object ID)
 - `src/mind/friends/store.ts` — FriendStore interface (get, put, delete, findByExternalId, hasAnyFriends)
 - `src/mind/friends/store-file.ts` — FileFriendStore (scans friend JSON files -- list_friends tool will read from same directory)
+- `src/senses/trust-gate.ts` — `enforceTrustGate` (stranger gate: first reply auto-reply + subsequent silent drop, channel-agnostic)
+- `src/senses/bluebubbles.ts` — BB event handler (does NOT call trust gate -- no stranger protection)
 
 ### Verified current state
 - `buildSystem("cli")` is called by inner dialog at line 174 of inner-dialog.ts — confirmed
@@ -137,6 +157,12 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - FriendStore interface: `get(id)`, `put(id, record)`, `delete(id)`, `findByExternalId(provider, externalId)`, `hasAnyFriends()` — confirmed, no list-all method exists yet
 - FileFriendStore stores friends as `{friendId}.json` files in bundle `friends/` dir — confirmed, `list_friends` tool will readdir + read each file
 - Inner dialog gets NO friend context — no ResolvedContext passed, no friend list, no friendId UUIDs available — confirmed, `list_friends` tool resolves this by giving inner dialog a way to discover friends
+- Trust gate (`enforceTrustGate` in trust-gate.ts) is channel-agnostic: checks trustLevel, first contact gets auto-reply + primary notification, subsequent contacts silently dropped — confirmed
+- Trust gate is called by CLI (cli.ts line 765, onInput hook) and Teams (teams.ts line 474) — confirmed
+- Trust gate is NOT called by BlueBubbles — confirmed (no import or call in bluebubbles.ts). BB currently has no stranger protection.
+- Trust gate behavior is identical for all senses that use it: hard-reject strangers (first reply + silent drop) — confirmed. No per-sense differentiation (open vs closed) exists yet.
+- `FriendRecord.externalIds` is an array of `{ provider, externalId, tenantId? }` — confirmed, used for cross-channel identity resolution
+- `complete_adoption` in specialist tools creates initial friend record — confirmed, this is where G4 contact collection would hook in
 
 ## Notes
 The send_message tool already writes to the correct pending dir path when called with `friendId="self", channel="inner", key="dialog"`. The missing piece is that `runInnerDialogTurn` never calls `drainPending` on that dir. Fix C1 is literally: call `drainPending(getPendingDir(agentName, "self", "inner", "dialog"))` early in `runInnerDialogTurn` and inject the results the same way the existing `drainInbox` callback does. This single fix enables CLI-to-inner-dialog communication.
@@ -183,6 +209,11 @@ Key insight: CLI liveness is binary (session lock alive = reachable, otherwise n
 | BB sense polls pending dir | **Missing** | Periodic check + send via BB API |
 | Teams sense polls pending dir | **Missing** | Periodic check + send via Bot Framework |
 | Inner dialog can discover friends | **Missing** | `list_friends` tool resolves this |
+| Open/closed sense classification | **Missing** | G1 -- add to channel capabilities or sense config |
+| Per-sense stranger gate behavior | **Partial** | iMessage hard-rejects (correct). Teams needs to allow at lowest trust. Generalize. |
+| `link_friend_identity` tool | **Missing** | G2 -- merge externalIds, delete orphans, trust-gated |
+| Tool restriction awareness in prompt | **Missing** | G3 -- explain what's blocked, why, how to fix |
+| Onboarding contact collection | **Missing** | G4 -- specialist collects phone/Teams handle during hatch |
 
 ### C5 proactive outreach mechanism
 Each sense process adds a periodic check (every few seconds):
