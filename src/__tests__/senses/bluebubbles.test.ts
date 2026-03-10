@@ -35,6 +35,10 @@ const mocks = vi.hoisted(() => ({
   createServer: vi.fn(),
   listen: vi.fn((_: number, cb?: () => void) => cb?.()),
   handleInboundTurn: vi.fn(),
+  getChannelCapabilities: vi.fn(),
+  getPendingDir: vi.fn(),
+  drainPending: vi.fn(),
+  enforceTrustGate: vi.fn(),
 }))
 
 const tempDirs: string[] = []
@@ -130,6 +134,19 @@ vi.mock("node:http", () => ({
 
 vi.mock("../../senses/pipeline", () => ({
   handleInboundTurn: (...args: any[]) => mocks.handleInboundTurn(...args),
+}))
+
+vi.mock("../../mind/friends/channel", () => ({
+  getChannelCapabilities: (...args: any[]) => mocks.getChannelCapabilities(...args),
+}))
+
+vi.mock("../../mind/pending", () => ({
+  getPendingDir: (...args: any[]) => mocks.getPendingDir(...args),
+  drainPending: (...args: any[]) => mocks.drainPending(...args),
+}))
+
+vi.mock("../../senses/trust-gate", () => ({
+  enforceTrustGate: (...args: any[]) => mocks.enforceTrustGate(...args),
 }))
 
 const dmThreadPayload = {
@@ -418,17 +435,43 @@ function resetMocks(): void {
   mocks.postTurn.mockReset()
   mocks.accumulateFriendTokens.mockReset()
   mocks.resolveContext.mockReset().mockResolvedValue(defaultFriendContext)
+  mocks.getChannelCapabilities.mockReset().mockReturnValue({
+    channel: "bluebubbles",
+    senseType: "open",
+    availableIntegrations: [],
+    supportsMarkdown: false,
+    supportsStreaming: false,
+    supportsRichCards: false,
+    maxMessageLength: Infinity,
+  })
+  mocks.getPendingDir.mockReset().mockReturnValue("/tmp/pending/friend-uuid/bluebubbles/session")
+  mocks.drainPending.mockReset().mockReturnValue([])
+  mocks.enforceTrustGate.mockReset().mockReturnValue({ allowed: true })
   // handleInboundTurn: by default, simulate a successful pipeline run that calls
   // the injected runAgent (which triggers BB callbacks for text buffering/flush).
+  // Mirrors the real pipeline: resolves friend, builds toolContext with context/friendStore,
+  // calls injected runAgent, postTurn, and accumulateFriendTokens.
   mocks.handleInboundTurn.mockReset().mockImplementation(async (input: any) => {
+    const resolvedContext = await input.friendResolver.resolve()
     const sessionMessages = await input.sessionLoader.loadOrCreate()
     const msgs = sessionMessages.messages
     for (const m of input.messages) msgs.push(m)
-    const result = await input.runAgent(msgs, input.callbacks, input.channel, input.signal, input.runAgentOptions)
+    // Mirror pipeline: merge context and friendStore into runAgentOptions.toolContext
+    const existingToolContext = input.runAgentOptions?.toolContext
+    const pipelineOpts = {
+      ...input.runAgentOptions,
+      toolContext: {
+        signin: async () => undefined,
+        ...existingToolContext,
+        context: resolvedContext,
+        friendStore: input.friendStore,
+      },
+    }
+    const result = await input.runAgent(msgs, input.callbacks, input.channel, input.signal, pipelineOpts)
     input.postTurn(msgs, sessionMessages.sessionPath, result.usage)
-    await input.accumulateFriendTokens(input.friendStore, (await input.friendResolver.resolve()).friend.id, result.usage)
+    await input.accumulateFriendTokens(input.friendStore, resolvedContext.friend.id, result.usage)
     return {
-      resolvedContext: await input.friendResolver.resolve(),
+      resolvedContext,
       gateResult: { allowed: true },
       usage: result.usage,
       sessionPath: sessionMessages.sessionPath,
