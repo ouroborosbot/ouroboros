@@ -1289,7 +1289,7 @@ describe("ToolContext shape", () => {
     }
     // Teams context should deny local file operations
     const result = await execTool("read_file", { path: "/tmp/test.txt" }, ctx)
-    expect(result).toContain("I can't do that from here")
+    expect(result).toContain("I can't do that")
   })
 
   it("ToolContext does NOT have adoOrganizations field", async () => {

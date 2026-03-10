@@ -21,17 +21,10 @@ function isRemoteChannel(capabilities?: ChannelCapabilities): boolean {
   return capabilities?.channel === "teams" || capabilities?.channel === "bluebubbles";
 }
 
-function isSharedRemoteContext(friend: ResolvedContext["friend"]): boolean {
-  const externalIds = friend.externalIds ?? [];
-  return externalIds.some((externalId) =>
-    externalId.externalId.startsWith("group:") || externalId.provider === "teams-conversation",
-  );
-}
-
 function isTrustedRemoteContext(context?: Pick<ResolvedContext, "friend" | "channel">): boolean {
   if (!context?.friend || !isRemoteChannel(context.channel)) return false;
   const trustLevel = context.friend.trustLevel ?? "stranger";
-  return trustLevel !== "stranger" && !isSharedRemoteContext(context.friend);
+  return trustLevel === "friend" || trustLevel === "family";
 }
 
 function shouldBlockLocalTools(
@@ -43,7 +36,7 @@ function shouldBlockLocalTools(
 }
 
 function blockedLocalToolMessage(): string {
-  return "I can't do that from here because I'm talking to multiple people in a shared remote channel, and local shell/file/git/gh operations could let conversations interfere with each other. Ask me for a remote-safe alternative (Graph/ADO/web), or run that operation from CLI.";
+  return "I can't do that because my trust level with you isn't high enough for local shell/file operations. Ask me for a remote-safe alternative (Graph/ADO/web), or run that operation from CLI.";
 }
 
 function baseToolsForCapabilities(
