@@ -7,7 +7,7 @@ import { getAgentName, getAgentRoot } from "../heart/identity"
 import { loadSession, postTurn, type UsageData } from "../mind/context"
 import { buildSystem } from "../mind/prompt"
 import { findNonCanonicalBundlePaths } from "../mind/bundle-manifest"
-import { drainPending, getPendingDir } from "../mind/pending"
+import { drainPending, getInnerDialogPendingDir, INNER_DIALOG_PENDING } from "../mind/pending"
 import { getChannelCapabilities } from "../mind/friends/channel"
 import { enforceTrustGate } from "./trust-gate"
 import { accumulateFriendTokens } from "../mind/friends/tokens"
@@ -147,7 +147,7 @@ function createInnerDialogCallbacks(): ChannelCallbacks {
 }
 
 export function innerDialogSessionPath(): string {
-  return sessionPath("self", "inner", "dialog")
+  return sessionPath(INNER_DIALOG_PENDING.friendId, INNER_DIALOG_PENDING.channel, INNER_DIALOG_PENDING.key)
 }
 
 // Self-referencing friend record for inner dialog (agent talking to itself).
@@ -224,7 +224,7 @@ export async function runInnerDialogTurn(options?: RunInnerDialogTurnOptions): P
 
   // ── Session loader: wraps existing session logic ──────────────────
   const innerCapabilities = getChannelCapabilities("inner")
-  const pendingDir = getPendingDir(getAgentName(), "self", "inner", "dialog")
+  const pendingDir = getInnerDialogPendingDir(getAgentName())
   const selfFriend = createSelfFriend(getAgentName())
   const selfContext: ResolvedContext = { friend: selfFriend, channel: innerCapabilities }
 

@@ -13,6 +13,7 @@ const mockGetAgentRoot = vi.fn()
 const mockGetAgentName = vi.fn()
 const mockDrainPending = vi.fn()
 const mockGetPendingDir = vi.fn()
+const mockGetInnerDialogPendingDir = vi.fn()
 const mockHandleInboundTurn = vi.fn()
 const mockGetChannelCapabilities = vi.fn()
 const mockEnforceTrustGate = vi.fn()
@@ -43,6 +44,8 @@ vi.mock("../../heart/identity", () => ({
 vi.mock("../../mind/pending", () => ({
   drainPending: (...args: any[]) => mockDrainPending(...args),
   getPendingDir: (...args: any[]) => mockGetPendingDir(...args),
+  getInnerDialogPendingDir: (...args: any[]) => mockGetInnerDialogPendingDir(...args),
+  INNER_DIALOG_PENDING: { friendId: "self", channel: "inner", key: "dialog" },
 }))
 
 vi.mock("../../nerves/runtime", () => ({
@@ -113,6 +116,7 @@ describe("inner dialog runtime", () => {
     mockGetAgentName.mockReset().mockReturnValue("test-agent")
     mockDrainPending.mockReset().mockReturnValue([])
     mockGetPendingDir.mockReset().mockReturnValue("/tmp/fake-pending-dir")
+    mockGetInnerDialogPendingDir.mockReset().mockReturnValue("/tmp/fake-pending-dir")
     mockGetChannelCapabilities.mockReset().mockReturnValue(innerCapabilities)
     mockEnforceTrustGate.mockReset().mockReturnValue({ allowed: true })
     mockAccumulateFriendTokens.mockReset().mockResolvedValue(undefined)
@@ -344,7 +348,7 @@ describe("inner dialog runtime", () => {
   })
 
   it("passes pending dir for self/inner/dialog to pipeline", async () => {
-    mockGetPendingDir.mockReturnValue("/tmp/pending/test-agent/self/inner/dialog")
+    mockGetInnerDialogPendingDir.mockReturnValue("/tmp/pending/test-agent/self/inner/dialog")
 
     await runInnerDialogTurn({
       reason: "boot",
@@ -352,7 +356,7 @@ describe("inner dialog runtime", () => {
       now: () => new Date("2026-03-09T10:00:00.000Z"),
     })
 
-    expect(mockGetPendingDir).toHaveBeenCalledWith("test-agent", "self", "inner", "dialog")
+    expect(mockGetInnerDialogPendingDir).toHaveBeenCalledWith("test-agent")
     const input = mockHandleInboundTurn.mock.calls[0][0]
     expect(input.pendingDir).toBe("/tmp/pending/test-agent/self/inner/dialog")
   })

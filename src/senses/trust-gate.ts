@@ -3,6 +3,7 @@ import * as path from "path"
 import { getAgentRoot } from "../heart/identity"
 import { emitNervesEvent } from "../nerves/runtime"
 import type { Channel, FriendRecord, IdentityProvider, SenseType } from "../mind/friends/types"
+import { INNER_DIALOG_PENDING } from "../mind/pending"
 
 // TODO: agent should pre-configure auto-reply voice
 // This is a canned reply; in future the agent should compose their own first-contact message
@@ -88,7 +89,7 @@ function writeInnerPendingNotice(
   noticeContent: string,
   nowIso: string,
 ): void {
-  const innerPendingDir = path.join(bundleRoot, "state", "pending", "self", "inner", "dialog")
+  const innerPendingDir = path.join(bundleRoot, "state", "pending", INNER_DIALOG_PENDING.friendId, INNER_DIALOG_PENDING.channel, INNER_DIALOG_PENDING.key)
   const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`
   const filePath = path.join(innerPendingDir, fileName)
 
