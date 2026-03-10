@@ -296,26 +296,41 @@ describe("inner dialog runtime", () => {
   })
 
   it("does not call runAgent directly — pipeline handles it", async () => {
+    // Use a non-call-through pipeline mock so mockRunAgent is only called if inner-dialog
+    // invokes it directly (not through the pipeline's input.runAgent pass-through)
+    mockHandleInboundTurn.mockResolvedValueOnce({
+      resolvedContext: { friend: { id: "self" }, channel: innerCapabilities },
+      gateResult: { allowed: true },
+      usage: undefined,
+      sessionPath: sessionFile,
+      messages: [{ role: "system", content: "system prompt" }],
+    })
+
     await runInnerDialogTurn({
       reason: "boot",
       instincts: [{ id: "heartbeat", prompt: "Instinct: check in.", enabled: true }],
       now: () => new Date("2026-03-06T12:00:00.000Z"),
     })
 
-    // runAgent is only called by the mock pipeline implementation (via input.runAgent),
-    // not directly by inner-dialog
     expect(mockRunAgent).not.toHaveBeenCalled()
   })
 
   it("does not call postTurn directly — pipeline handles it", async () => {
+    // Use a non-call-through pipeline mock
+    mockHandleInboundTurn.mockResolvedValueOnce({
+      resolvedContext: { friend: { id: "self" }, channel: innerCapabilities },
+      gateResult: { allowed: true },
+      usage: undefined,
+      sessionPath: sessionFile,
+      messages: [{ role: "system", content: "system prompt" }],
+    })
+
     await runInnerDialogTurn({
       reason: "boot",
       instincts: [{ id: "heartbeat", prompt: "Instinct: check in.", enabled: true }],
       now: () => new Date("2026-03-06T12:00:00.000Z"),
     })
 
-    // postTurn is only called by the mock pipeline implementation (via input.postTurn),
-    // not directly by inner-dialog
     expect(mockPostTurn).not.toHaveBeenCalled()
   })
 
@@ -420,6 +435,15 @@ describe("inner dialog runtime", () => {
   })
 
   it("session loader returns system prompt on fresh session", async () => {
+    // Use non-call-through mock to prevent session mutation before inspection
+    mockHandleInboundTurn.mockResolvedValueOnce({
+      resolvedContext: { friend: { id: "self" }, channel: innerCapabilities },
+      gateResult: { allowed: true },
+      usage: undefined,
+      sessionPath: sessionFile,
+      messages: [],
+    })
+
     await runInnerDialogTurn({
       reason: "boot",
       instincts: [{ id: "heartbeat", prompt: "Instinct: check in.", enabled: true }],
@@ -439,6 +463,15 @@ describe("inner dialog runtime", () => {
       { role: "assistant", content: "I was working on tasks." },
     ]
     mockLoadSession.mockReturnValue({ messages: existingMessages })
+
+    // Use non-call-through mock to prevent session mutation before inspection
+    mockHandleInboundTurn.mockResolvedValueOnce({
+      resolvedContext: { friend: { id: "self" }, channel: innerCapabilities },
+      gateResult: { allowed: true },
+      usage: undefined,
+      sessionPath: sessionFile,
+      messages: [],
+    })
 
     await runInnerDialogTurn({
       reason: "heartbeat",
