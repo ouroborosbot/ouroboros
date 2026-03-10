@@ -784,6 +784,7 @@ export async function main(agentName?: string, options?: { pasteDebounceMs?: num
           provider: "local",
           externalId: localExternalId,
           channel: "cli",
+          senseOpenness: "closed",
         })
         if (!trustGate.allowed) {
           return {

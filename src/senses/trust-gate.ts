@@ -2,7 +2,7 @@ import * as fs from "fs"
 import * as path from "path"
 import { getAgentRoot } from "../heart/identity"
 import { emitNervesEvent } from "../nerves/runtime"
-import type { Channel, FriendRecord, IdentityProvider } from "../mind/friends/types"
+import type { Channel, FriendRecord, IdentityProvider, SenseOpenness } from "../mind/friends/types"
 
 export const STRANGER_AUTO_REPLY = "I'm sorry, I'm not allowed to talk to strangers"
 
@@ -16,12 +16,14 @@ export interface TrustGateInput {
   externalId: string
   tenantId?: string
   channel: Channel
+  senseOpenness?: SenseOpenness
   bundleRoot?: string
   now?: () => Date
 }
 
 export type TrustGateResult =
   | { allowed: true }
+  | { allowed: true; restricted: true }
   | { allowed: false; reason: "stranger_first_reply"; autoReply: string }
   | { allowed: false; reason: "stranger_silent_drop" }
 
@@ -76,6 +78,22 @@ export function enforceTrustGate(input: TrustGateInput): TrustGateResult {
     return { allowed: true }
   }
 
+  // Closed senses allow strangers through with restricted tools
+  const openness = input.senseOpenness ?? "open"
+  if (openness === "closed") {
+    emitNervesEvent({
+      component: "senses",
+      event: "senses.trust_gate",
+      message: "stranger allowed on closed sense with restriction",
+      meta: {
+        channel: input.channel,
+        provider: input.provider,
+      },
+    })
+    return { allowed: true, restricted: true }
+  }
+
+  // Open senses hard-reject strangers
   const bundleRoot = input.bundleRoot ?? getAgentRoot()
   const repliesPath = path.join(bundleRoot, "stranger-replies.json")
   const nowIso = (input.now ?? (() => new Date()))().toISOString()

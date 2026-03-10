@@ -23,6 +23,7 @@ import { createBlueBubblesClient, type BlueBubblesClient } from "./bluebubbles-c
 import { recordBlueBubblesMutation } from "./bluebubbles-mutation-log"
 import { findObsoleteBlueBubblesThreadSessions } from "./bluebubbles-session-cleanup"
 import { createDebugActivityController } from "./debug-activity"
+import { enforceTrustGate } from "./trust-gate"
 
 type BlueBubblesCallbacks = ChannelCallbacks & {
   flush(): Promise<void>
@@ -49,6 +50,7 @@ interface RuntimeDeps {
   createFriendStore: () => FileFriendStore
   createFriendResolver: (store: FileFriendStore, params: FriendResolverParams) => FriendResolver
   createServer: typeof http.createServer
+  enforceTrustGate: typeof enforceTrustGate
 }
 
 interface BlueBubblesReplyTargetController {
@@ -69,6 +71,7 @@ const defaultDeps: RuntimeDeps = {
   createFriendStore: () => new FileFriendStore(path.join(getAgentRoot(), "friends")),
   createFriendResolver: (store, params) => new FriendResolver(store, params),
   createServer: http.createServer,
+  enforceTrustGate,
 }
 
 function resolveFriendParams(event: BlueBubblesNormalizedEvent): FriendResolverParams {
@@ -472,6 +475,25 @@ export async function handleBlueBubblesEvent(
   const store = resolvedDeps.createFriendStore()
   const resolver = resolvedDeps.createFriendResolver(store, resolveFriendParams(event))
   const context = await resolver.resolve()
+
+  const friendParams = resolveFriendParams(event)
+  const trustGate = resolvedDeps.enforceTrustGate({
+    friend: context.friend,
+    provider: friendParams.provider,
+    externalId: friendParams.externalId,
+    channel: "bluebubbles",
+    senseOpenness: "open",
+  })
+  if (!trustGate.allowed) {
+    if (trustGate.reason === "stranger_first_reply") {
+      await client.sendText({
+        chat: event.chat,
+        text: trustGate.autoReply,
+      })
+    }
+    return { handled: true, notifiedAgent: false, kind: event.kind }
+  }
+
   const replyTarget = createReplyTargetController(event)
   const toolContext = {
     signin: async () => undefined,

@@ -70,10 +70,16 @@ export interface FriendRecord {
   schemaVersion: number
 }
 
+// -- Sense Openness --
+// "open" = anyone can message (e.g. iMessage) -- strangers hard-rejected
+// "closed" = only known identities can reach (e.g. Teams tenant, local CLI) -- strangers allowed at lowest trust with restricted tools
+export type SenseOpenness = "open" | "closed"
+
 // -- Channel Capabilities --
 // What a channel supports: integrations, formatting, streaming, message limits
 export interface ChannelCapabilities {
   channel: Channel
+  senseOpenness: SenseOpenness
   availableIntegrations: Integration[]
   supportsMarkdown: boolean
   supportsStreaming: boolean

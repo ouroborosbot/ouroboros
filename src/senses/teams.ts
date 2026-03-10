@@ -475,6 +475,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
       externalId,
       tenantId: teamsContext?.tenantId,
       channel: "teams",
+      senseOpenness: "closed",
     })
     if (!trustGate.allowed) {
       if (trustGate.reason === "stranger_first_reply") {
