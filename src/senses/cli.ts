@@ -784,6 +784,10 @@ export async function main(agentName?: string, options?: { pasteDebounceMs?: num
           provider: "local",
           externalId: localExternalId,
           channel: "cli",
+          senseType: "local",
+          isGroupChat: false,
+          groupHasFamilyMember: false,
+          hasExistingGroupWithFamily: false,
         })
         if (!trustGate.allowed) {
           return {
