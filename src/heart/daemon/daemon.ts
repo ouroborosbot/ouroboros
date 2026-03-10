@@ -11,6 +11,8 @@ import { getPackageVersion } from "../../mind/bundle-manifest"
 import { startUpdateChecker, stopUpdateChecker } from "./update-checker"
 import { performStagedRestart } from "./staged-restart"
 import { execSync, spawnSync } from "child_process"
+import { getPendingDir } from "../../mind/pending"
+import type { PendingMessage } from "../../mind/pending"
 
 export interface DaemonCronJobSummary {
   id: string
@@ -460,6 +462,22 @@ export class OuroDaemon {
           taskRef: command.taskRef,
         })
         this.processManager.sendToAgent?.(command.to, { type: "message" })
+
+        // Write pending file for target agent's inner dialog to pick up
+        try {
+          const pendingDir = getPendingDir(command.to, "self", "inner", "dialog")
+          fs.mkdirSync(pendingDir, { recursive: true })
+          const pending: PendingMessage = {
+            from: command.from,
+            content: command.content,
+            timestamp: Date.now(),
+          }
+          const filename = `${pending.timestamp}-${Math.random().toString(36).slice(2, 8)}.json`
+          fs.writeFileSync(path.join(pendingDir, filename), JSON.stringify(pending), "utf-8")
+        } catch {
+          // Pending write is best-effort — don't break message routing
+        }
+
         return { ok: true, message: `queued message ${receipt.id}`, data: receipt }
       }
       case "message.poll": {

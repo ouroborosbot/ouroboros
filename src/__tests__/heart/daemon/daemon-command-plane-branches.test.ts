@@ -506,12 +506,12 @@ describe("daemon command plane branches", () => {
     await daemon.handleCommand({
       kind: "message.send",
       from: "slugger",
-      to: "ouroboros",
-      content: "hey ouroboros",
+      to: "pending-write-target",
+      content: "hey there",
     })
 
-    // getPendingDir is mocked: pendingTmpRoot/ouroboros/pending/self/inner/dialog
-    const pendingDir = path.join(pendingTmpRoot, "ouroboros", "pending", "self", "inner", "dialog")
+    // getPendingDir is mocked: pendingTmpRoot/pending-write-target/pending/self/inner/dialog
+    const pendingDir = path.join(pendingTmpRoot, "pending-write-target", "pending", "self", "inner", "dialog")
     expect(fs.existsSync(pendingDir)).toBe(true)
 
     const files = fs.readdirSync(pendingDir)
@@ -520,10 +520,10 @@ describe("daemon command plane branches", () => {
 
     const content = JSON.parse(fs.readFileSync(path.join(pendingDir, files[0]), "utf-8")) as PendingMessage
     expect(content.from).toBe("slugger")
-    expect(content.content).toBe("hey ouroboros")
+    expect(content.content).toBe("hey there")
     expect(content.timestamp).toBeTypeOf("number")
 
-    fs.rmSync(path.join(pendingTmpRoot, "ouroboros"), { recursive: true, force: true })
+    fs.rmSync(path.join(pendingTmpRoot, "pending-write-target"), { recursive: true, force: true })
   })
 
   it("pending file matches PendingMessage schema with optional fields", async () => {
