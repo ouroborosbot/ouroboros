@@ -1981,6 +1981,114 @@ describe("BlueBubbles sense runtime", () => {
   })
 })
 
+describe("BlueBubbles trust gate (open sense)", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    resetMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    for (const dir of tempDirs.splice(0)) {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it("blocks stranger on first contact and sends auto-reply", async () => {
+    mocks.resolveContext.mockReset().mockResolvedValue({
+      friend: {
+        id: "stranger-uuid",
+        name: "Unknown",
+        trustLevel: "stranger",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "bluebubbles",
+        senseOpenness: "open",
+        availableIntegrations: [],
+        supportsMarkdown: false,
+        supportsStreaming: false,
+        supportsRichCards: false,
+        maxMessageLength: Infinity,
+      },
+    })
+
+    const bundleRoot = makeTempDir()
+    const mockGate = vi.fn().mockReturnValue({
+      allowed: false,
+      reason: "stranger_first_reply",
+      autoReply: "I'm sorry, I'm not allowed to talk to strangers",
+    })
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    const result = await bluebubbles.handleBlueBubblesEvent(dmTopLevelPayload, {
+      enforceTrustGate: mockGate,
+    })
+
+    expect(mockGate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "bluebubbles",
+        senseOpenness: "open",
+      }),
+    )
+    expect(result.handled).toBe(true)
+    expect(result.notifiedAgent).toBe(false)
+    expect(mocks.sendText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: "I'm sorry, I'm not allowed to talk to strangers",
+      }),
+    )
+    expect(mocks.runAgent).not.toHaveBeenCalled()
+  })
+
+  it("silently drops subsequent stranger messages without auto-reply", async () => {
+    mocks.resolveContext.mockReset().mockResolvedValue({
+      friend: {
+        id: "stranger-uuid",
+        name: "Unknown",
+        trustLevel: "stranger",
+        externalIds: [],
+        tenantMemberships: [],
+        toolPreferences: {},
+        notes: {},
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+        schemaVersion: 1,
+      },
+      channel: {
+        channel: "bluebubbles",
+        senseOpenness: "open",
+        availableIntegrations: [],
+        supportsMarkdown: false,
+        supportsStreaming: false,
+        supportsRichCards: false,
+        maxMessageLength: Infinity,
+      },
+    })
+
+    const mockGate = vi.fn().mockReturnValue({
+      allowed: false,
+      reason: "stranger_silent_drop",
+    })
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    const result = await bluebubbles.handleBlueBubblesEvent(dmTopLevelPayload, {
+      enforceTrustGate: mockGate,
+    })
+
+    expect(result.handled).toBe(true)
+    expect(result.notifiedAgent).toBe(false)
+    expect(mocks.sendText).not.toHaveBeenCalled()
+    expect(mocks.runAgent).not.toHaveBeenCalled()
+  })
+})
+
 describe("drainAndSendPendingBlueBubbles", () => {
   let pendingRoot: string
 
