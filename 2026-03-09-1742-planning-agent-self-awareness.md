@@ -22,6 +22,7 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - New tools for self-awareness (the existing tools are sufficient)
 - Changes to SOUL.md, IDENTITY.md, or any specific agent's psyche files
 - "Speak first" / session-start logic — sessions are persistent (daemon keeps them alive via `ouro up`), so there is no meaningful fresh session case
+- Automatic cross-channel content injection — would be expensive and noisy (iMessage conversation might be unrelated to CLI conversation). Cross-channel awareness handled via prompt guidance + inner dialog instead.
 
 ## Completion Criteria
 - [ ] `"inner"` channel has its own entry in `CHANNEL_CAPABILITIES` in channel.ts
@@ -48,6 +49,9 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - [ ] Proactive outreach respects trust level -- only sends to friends with trust level "family" or "friend" (no strangers, no acquaintances)
 - [ ] Proactive outreach only sends to 1:1 conversations (no group chats)
 - [ ] Proactive outreach looks up the friend's external address (iMessage handle, AAD ID) from the friend record's externalIds
+- [ ] Teams proactive outreach uses existing Bot Framework 1:1 conversation creation (same API as `teams_send_message` tool)
+- [ ] Inner dialog prompt guidance includes cross-channel awareness (review recent sessions across all channels during heartbeat/thinking)
+- [ ] External channel prompt guidance includes checking other channels for context when relevant (via `query_session`)
 - [ ] 100% test coverage on all new code
 - [ ] All tests pass
 - [ ] No warnings
@@ -74,6 +78,8 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - **Channel-agnostic `send_message` with smart routing (C6)**: agent calls `send_message(friendId, content)` with NO channel. System routes: (1) is there an active CLI session with this friend right now? (liveness check via session lock, not recency) -> inject as context. (2) No active CLI -> pick the most recently used always-on channel (iMessage vs Teams, whichever the friend last messaged on -- recency IS the right signal for always-on channels). (3) Nothing available -> queue for next interaction. This avoids dual-delivery: one delivery, best channel. When `channel` IS specified, use it directly (backward compat). CLI liveness detected via session lock file (PID alive check). Session recency detected via session file mtime.
 - **Proactive outreach via external channels (C5)**: each sense process polls its own pending dir and sends outbound via its existing API. ~20 lines of real code per sense. No new daemon commands, no new IPC, no new protocols. Guards: only send to friends with trust level "family" or "friend", only 1:1 (no group chats). Essential for iMessage AX -- friends text each other unprompted.
 - **iMessage-specific AX**: proactive texts are natural (friends text unprompted). Inner dialog thoughts should be split into short messages for phone (not one wall of text). Timing doesn't matter -- iMessage is inherently async. Don't proactively text strangers or group chats.
+- **Cross-channel continuity via prompt guidance + inner dialog, NOT automatic injection**: friend identity is already unified across channels (same friendId via externalIds array). `query_session` already works cross-channel. Active sessions summary shows metadata. No automatic cross-channel content injection -- would be expensive and noisy. Instead: (1) inner dialog proactively reviews recent sessions across all channels during heartbeat/thinking, keeping its awareness current across the full cross-channel picture. (2) CLI/Teams/BB prompts guide agent to check other recent sessions via `query_session` when context seems relevant. (3) Inner dialog surfaces cross-channel insights when it detects connections across conversations.
+- **Teams proactive messaging uses existing API**: `teams_send_message` tool already exists (tools-teams.ts lines 204-252), creates 1:1 conversations with `isGroup: false` via Bot Framework API, uses AAD object ID from friend record externalIds. Teams sense pending drain uses the SAME Bot Framework API -- no new proactive messaging infrastructure needed. Both BB and Teams follow identical pending drain pattern: periodic poll -> look up friend's external ID -> send via existing API -> delete pending file.
 - **Daemon writes to pending dir** for inter-agent messages (not polling) — simpler, unifies intra-agent and inter-agent delivery through one drain mechanism
 - Inner dialog channel capabilities: same as CLI defaults (no markdown, streaming, rich cards, no integrations) — inner dialog is silent/headless, capabilities don't matter much
 - Token budget: ~370 tokens added to external prompts (anatomy + self-evolution + process awareness), inner dialog likely net-neutral or saves tokens by stripping unused friend/onboarding sections
@@ -94,6 +100,7 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - `src/senses/bluebubbles-client.ts` — BB client with sendText(chat, text) for outbound messages
 - `src/senses/teams.ts` — Teams handler (handleTeamsMessage, sendMessage callback from bot framework ctx.send)
 - `src/senses/session-lock.ts` — session lock mechanism (acquireSessionLock writes PID to `{sessPath}.lock`, used for CLI liveness detection)
+- `src/repertoire/tools-teams.ts` — `teams_send_message` tool (lines 204-252, creates 1:1 Bot Framework conversation with `isGroup: false`, uses AAD object ID)
 
 ### Verified current state
 - `buildSystem("cli")` is called by inner dialog at line 174 of inner-dialog.ts — confirmed
@@ -114,6 +121,9 @@ Give agents full and proper self-awareness — the same level of awareness a per
 - Neither BB nor Teams sense processes currently drain any pending dir — confirmed, they only respond to inbound messages
 - CLI session lock: `acquireSessionLock` writes PID to `{sessPath}.lock` with `flag: "wx"` (exclusive create), checks `isProcessAlive` for stale locks — confirmed, can be used for CLI liveness detection by smart routing
 - Session files live at `~/.agentstate/{agent}/sessions/{friendId}/{channel}/{key}.json` — mtime can be used for recency ranking among always-on channels
+- `teams_send_message` tool exists at tools-teams.ts lines 204-252 — confirmed: creates 1:1 conversation with `isGroup: false`, uses AAD object ID, Bot Framework `conversations.create` + `activities.create` API
+- `query_session` tool exists at tools-base.ts line 678 — confirmed: works cross-channel (friendId + channel param), already supports reading any session including bluebubbles/teams from CLI
+- Friend identity is unified across channels — same friendId resolved via externalIds array with provider-specific entries (aad, local, imessage-handle) — confirmed via FriendResolver and FileFriendStore
 
 ## Notes
 The send_message tool already writes to the correct pending dir path when called with `friendId="self", channel="inner", key="dialog"`. The missing piece is that `runInnerDialogTurn` never calls `drainPending` on that dir. Fix C1 is literally: call `drainPending(getPendingDir(agentName, "self", "inner", "dialog"))` early in `runInnerDialogTurn` and inject the results the same way the existing `drainInbox` callback does. This single fix enables CLI-to-inner-dialog communication.
@@ -145,6 +155,9 @@ When `send_message` is called without a `channel`:
 4. If no senses running -> write to a channel-agnostic pending queue for next interaction.
 
 Key insight: CLI liveness is binary (session lock alive = reachable, otherwise not). Always-on channel selection uses recency as the tiebreaker (both are always reachable if the sense is running, so pick whichever the friend last interacted on).
+
+### Teams proactive messaging (C5 implementation detail)
+`teams_send_message` already implements the full proactive messaging flow: create 1:1 conversation with `isGroup: false` via Bot Framework API, then send activity. Teams sense pending drain uses the exact same API pattern. The conversations API is accessed through `ctx.botApi.conversations` which is available in the Teams sense process context. Both BB and Teams follow the identical pattern for C5: periodic poll -> look up friend's external ID from friend record -> send via existing API -> delete pending file.
 
 ### C5 proactive outreach mechanism
 Each sense process adds a periodic check (every few seconds):
