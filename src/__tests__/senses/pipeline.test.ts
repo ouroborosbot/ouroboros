@@ -260,6 +260,39 @@ describe("handleInboundTurn", () => {
       const allContent = messagesArg.map(m => typeof m.content === "string" ? m.content : "").join("\n")
       expect(allContent).toContain("someone tried to reach you")
     })
+
+    it("does not modify messages when pending exists but input.messages is empty", async () => {
+      const pendingMsgs: PendingMessage[] = [
+        { from: "system", content: "a pending notice", timestamp: 1000 },
+      ]
+      const input = makeInput({
+        messages: [] as ChatCompletionMessageParam[],
+        drainPending: vi.fn().mockReturnValue(pendingMsgs),
+      })
+
+      await handleInboundTurn(input)
+
+      // runAgent should still be called -- just with session messages and no user messages appended
+      expect(input.runAgent).toHaveBeenCalledTimes(1)
+    })
+
+    it("does not modify first message when pending exists but first message is not user role", async () => {
+      const pendingMsgs: PendingMessage[] = [
+        { from: "system", content: "a pending notice", timestamp: 1000 },
+      ]
+      const input = makeInput({
+        messages: [{ role: "assistant", content: "I'm an assistant message" }] as ChatCompletionMessageParam[],
+        drainPending: vi.fn().mockReturnValue(pendingMsgs),
+      })
+
+      await handleInboundTurn(input)
+
+      // The assistant message should be appended unchanged (no pending prepended)
+      const runAgentCall = (input.runAgent as ReturnType<typeof vi.fn>).mock.calls[0]
+      const msgs = runAgentCall[0] as ChatCompletionMessageParam[]
+      const assistantMsg = msgs.find(m => m.role === "assistant" && typeof m.content === "string" && m.content === "I'm an assistant message")
+      expect(assistantMsg).toBeTruthy()
+    })
   })
 
   // Step 5: runAgent
