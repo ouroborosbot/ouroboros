@@ -104,11 +104,17 @@ export function buildInstinctUserMessage(
 }
 
 export function readTaskFile(agentRoot: string, taskId: string): string {
-  try {
-    return fs.readFileSync(path.join(agentRoot, "tasks", `${taskId}.md`), "utf8").trim()
-  } catch {
-    return ""
+  // Task files live in collection subdirectories (one-shots, ongoing, habits).
+  // Try each collection, then fall back to root tasks/ for legacy layout.
+  const collections = ["one-shots", "ongoing", "habits", ""]
+  for (const collection of collections) {
+    try {
+      return fs.readFileSync(path.join(agentRoot, "tasks", collection, `${taskId}.md`), "utf8").trim()
+    } catch {
+      // not in this collection — try next
+    }
   }
+  return ""
 }
 
 export function buildTaskTriggeredMessage(taskId: string, taskContent: string, checkpoint?: string): string {

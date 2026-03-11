@@ -283,8 +283,27 @@ describe("inner dialog runtime", () => {
     expect(content).toContain("Do standup.")
   })
 
+  it("finds task file by stem across collection subdirectories", () => {
+    const habitsDir = path.join(agentRoot, "tasks", "habits")
+    fs.mkdirSync(habitsDir, { recursive: true })
+    fs.writeFileSync(path.join(habitsDir, "2026-0311-0900-daily-standup.md"), "---\ntype: habit\n---\nDo standup.", "utf8")
+
+    // Scheduler sends bare stem, not collection-prefixed path
+    const content = readTaskFile(agentRoot, "2026-0311-0900-daily-standup")
+    expect(content).toContain("Do standup.")
+  })
+
+  it("finds task in one-shots collection by stem", () => {
+    const dir = path.join(agentRoot, "tasks", "one-shots")
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, "2026-0312-0900-remind-ari.md"), "---\ntype: one-shot\n---\nRemind Ari about PR.", "utf8")
+
+    const content = readTaskFile(agentRoot, "2026-0312-0900-remind-ari")
+    expect(content).toContain("Remind Ari about PR.")
+  })
+
   it("returns empty string when task file does not exist", () => {
-    expect(readTaskFile(agentRoot, "habits/nonexistent")).toBe("")
+    expect(readTaskFile(agentRoot, "nonexistent-task")).toBe("")
   })
 
   // ── Checkpoint derivation tests ──────────────────────────────────

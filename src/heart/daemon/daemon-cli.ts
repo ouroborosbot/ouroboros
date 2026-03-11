@@ -56,7 +56,7 @@ export type OuroCliCommand =
   | { kind: "whoami"; agent?: string }
   | { kind: "session.list"; agent?: string }
   | { kind: "thoughts"; agent?: string; last?: number; json?: boolean }
-  | { kind: "reminder.create"; title: string; body: string; scheduledAt?: string; cadence?: string; category?: string; agent?: string }
+  | { kind: "reminder.create"; title: string; body: string; scheduledAt?: string; cadence?: string; category?: string; requester?: string; agent?: string }
   | { kind: "friend.list"; agent?: string }
   | { kind: "friend.show"; friendId: string; agent?: string }
   | { kind: "friend.create"; name: string; trustLevel?: string; agent?: string }
@@ -613,6 +613,7 @@ function parseReminderCommand(args: string[]): OuroCliCommand {
     let scheduledAt: string | undefined
     let cadence: string | undefined
     let category: string | undefined
+    let requester: string | undefined
 
     for (let i = 1; i < rest.length; i++) {
       if (rest[i] === "--body" && rest[i + 1]) {
@@ -627,6 +628,9 @@ function parseReminderCommand(args: string[]): OuroCliCommand {
       } else if (rest[i] === "--category" && rest[i + 1]) {
         category = rest[i + 1]
         i += 1
+      } else if (rest[i] === "--requester" && rest[i + 1]) {
+        requester = rest[i + 1]
+        i += 1
       }
     }
 
@@ -640,6 +644,7 @@ function parseReminderCommand(args: string[]): OuroCliCommand {
       ...(scheduledAt ? { scheduledAt } : {}),
       ...(cadence ? { cadence } : {}),
       ...(category ? { category } : {}),
+      ...(requester ? { requester } : {}),
       ...(agent ? { agent } : {}),
     }
   }
@@ -1499,6 +1504,7 @@ function executeReminderCommand(command: ReminderCliCommand, taskMod: TaskModule
       body: command.body,
       scheduledAt: command.scheduledAt,
       cadence: command.cadence,
+      requester: command.requester,
     })
     return `created: ${created}`
   } catch (error) {

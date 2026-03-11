@@ -246,6 +246,15 @@ describe("ouro CLI parsing", () => {
       cadence: "30m",
       agent: "slugger",
     })
+
+    // ouro reminder create with --requester flag
+    expect(parseOuroCommand(["reminder", "create", "PR Review", "--body", "Check PR #47", "--at", "2026-03-12T09:00:00.000Z", "--requester", "arimendelow/cli"])).toEqual({
+      kind: "reminder.create",
+      title: "PR Review",
+      body: "Check PR #47",
+      scheduledAt: "2026-03-12T09:00:00.000Z",
+      requester: "arimendelow/cli",
+    })
   })
 
   it("rejects malformed reminder subcommands", () => {
@@ -3542,6 +3551,17 @@ describe("ouro reminder CLI execution", () => {
     const deps = makeDeps()
     const result = await runOuroCli(["reminder", "create", "Broken", "--body", "This will fail", "--at", "2026-03-10T17:00:00.000Z"], deps)
     expect(result).toContain("error: scheduler exploded")
+  })
+
+  it("ouro reminder create passes requester to task module", async () => {
+    mockTaskModule.createTask.mockReturnValueOnce("/mock/tasks/one-shots/remind.md")
+    const deps = makeDeps()
+    await runOuroCli(["reminder", "create", "PR Review", "--body", "Check PR #47", "--at", "2026-03-12T09:00:00.000Z", "--requester", "arimendelow/cli"], deps)
+    expect(mockTaskModule.createTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requester: "arimendelow/cli",
+      }),
+    )
   })
 
   it("ouro reminder create surfaces non-Error exceptions", async () => {
