@@ -557,6 +557,30 @@ describe("normalizeBlueBubblesEvent", () => {
     ])
   })
 
+  it("falls back to id field when participant has no address and skips empty entries", async () => {
+    const { normalizeBlueBubblesEvent } = await import("../../senses/bluebubbles-model")
+    const payload = {
+      type: "new-message",
+      data: {
+        guid: "PART-ID-FALLBACK-001",
+        isFromMe: false,
+        dateCreated: 1710000000000,
+        text: "hi",
+        chats: [{
+          guid: "iMessage;+;chat001",
+          style: 43,
+          participants: [
+            { id: "alice@example.com" },
+            { id: "+1 555 999 8888" },
+            { other: "no-address-or-id" },
+          ],
+        }],
+      },
+    }
+    const result = normalizeBlueBubblesEvent(payload)
+    expect(result.chat.participantHandles).toEqual(["alice@example.com", "+15559998888"])
+  })
+
   it("returns empty participantHandles when chat has no participants", async () => {
     const { normalizeBlueBubblesEvent } = await import("../../senses/bluebubbles-model")
     const result = normalizeBlueBubblesEvent(dmOgPayload)
