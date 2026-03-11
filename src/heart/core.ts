@@ -370,9 +370,6 @@ export async function runAgent(
 
   await injectAssociativeRecall(messages);
 
-  // kickCount and lastKickReason preserved but unused while kick detection is disabled.
-  // let kickCount = 0;
-  // let lastKickReason: KickReason | null = null;
   let done = false;
   let lastUsage: UsageData | undefined;
   let overflowRetried = false;
@@ -441,24 +438,9 @@ export async function runAgent(
         (msg as AssistantMessageWithReasoning)._reasoning_items = reasoningItems;
       }
       if (!result.toolCalls.length) {
-        // Kick detection is disabled while tool_choice: required + final_answer
-        // is the primary loop control mechanism. The model should never reach
-        // this path (tool_choice: required forces a tool call), but if it does,
-        // accept the response as-is rather than risk false-positive kicks.
-        //
-        // Preserved for future use — re-enable by uncommenting:
-        // const kick = detectKick(result.content, options);
-        // if (kick) {
-        //   kickCount++;
-        //   lastKickReason = kick.reason;
-        //   callbacks.onKick?.();
-        //   const kickContent = result.content
-        //     ? result.content + "\n\n" + kick.message
-        //     : kick.message;
-        //   messages.push({ role: "assistant", content: kickContent });
-        //   providerRuntime.resetTurnState(messages);
-        //   continue;
-        // }
+        // No tool calls — accept response as-is.
+        // (Kick detection disabled; tool_choice: required + final_answer
+        // is the primary loop control. See src/heart/kicks.ts to re-enable.)
         messages.push(msg);
         done = true;
       } else {
