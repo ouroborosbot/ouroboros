@@ -53,7 +53,7 @@ export type OuroCliCommand =
   | { kind: "task.sessions"; agent?: string }
   | { kind: "whoami"; agent?: string }
   | { kind: "session.list"; agent?: string }
-  | { kind: "reminder.create"; title: string; body: string; scheduledAt?: string; cadence?: string; category?: string }
+  | { kind: "reminder.create"; title: string; body: string; scheduledAt?: string; cadence?: string; category?: string; agent?: string }
   | { kind: "friend.list"; agent?: string }
   | { kind: "friend.show"; friendId: string; agent?: string }
   | { kind: "friend.create"; name: string; trustLevel?: string; agent?: string }
@@ -325,7 +325,7 @@ function usage(): string {
     "  ouro task update <id> <status> [--agent <name>]",
     "  ouro task show <id> [--agent <name>]",
     "  ouro task actionable|deps|sessions [--agent <name>]",
-    "  ouro reminder create <title> --body <body> [--at <iso>] [--cadence <interval>] [--category <category>]",
+    "  ouro reminder create <title> --body <body> [--at <iso>] [--cadence <interval>] [--category <category>] [--agent <name>]",
     "  ouro friend list [--agent <name>]",
     "  ouro friend show <id> [--agent <name>]",
     "  ouro friend create --name <name> [--trust <level>] [--agent <name>]",
@@ -596,7 +596,8 @@ function parseTaskCommand(args: string[]): OuroCliCommand {
 }
 
 function parseReminderCommand(args: string[]): OuroCliCommand {
-  const [sub, ...rest] = args
+  const { agent, rest: cleaned } = extractAgentFlag(args)
+  const [sub, ...rest] = cleaned
   if (!sub) throw new Error(`Usage\n${usage()}`)
 
   if (sub === "create") {
@@ -634,6 +635,7 @@ function parseReminderCommand(args: string[]): OuroCliCommand {
       ...(scheduledAt ? { scheduledAt } : {}),
       ...(cadence ? { cadence } : {}),
       ...(category ? { category } : {}),
+      ...(agent ? { agent } : {}),
     }
   }
 

@@ -236,6 +236,15 @@ describe("ouro CLI parsing", () => {
       body: "Morning alarm",
       scheduledAt: "2026-03-11T08:00:00.000Z",
     })
+
+    // ouro reminder create --agent slugger <title> --body <body> --cadence <cadence>
+    expect(parseOuroCommand(["reminder", "create", "--agent", "slugger", "Heartbeat", "--body", "Run heartbeat", "--cadence", "30m"])).toEqual({
+      kind: "reminder.create",
+      title: "Heartbeat",
+      body: "Run heartbeat",
+      cadence: "30m",
+      agent: "slugger",
+    })
   })
 
   it("rejects malformed reminder subcommands", () => {
