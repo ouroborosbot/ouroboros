@@ -2385,7 +2385,7 @@ describe("toolRestrictionSection", () => {
     expect(result).toMatch(/trust|know.*well/i)
   })
 
-  it("trusted friend in group chat includes group reason", async () => {
+  it("trusted friend in group chat returns empty — tool access is trust-level only", async () => {
     const { toolRestrictionSection } = await import("../../mind/prompt")
     const ctx = {
       friend: makeFriend({
@@ -2395,12 +2395,10 @@ describe("toolRestrictionSection", () => {
       channel: makeChannel("teams"),
     }
     const result = toolRestrictionSection(ctx as any)
-    expect(result).toContain("shell")
-    // Group reason
-    expect(result).toMatch(/group|shared/i)
+    expect(result).toBe("")
   })
 
-  it("low-trust friend in group chat includes both reasons", async () => {
+  it("low-trust friend in group chat includes trust reason only", async () => {
     const { toolRestrictionSection } = await import("../../mind/prompt")
     const ctx = {
       friend: makeFriend({
@@ -2410,9 +2408,8 @@ describe("toolRestrictionSection", () => {
       channel: makeChannel("teams"),
     }
     const result = toolRestrictionSection(ctx as any)
-    // Both reasons present
     expect(result).toMatch(/trust|know.*well/i)
-    expect(result).toMatch(/group|shared/i)
+    expect(result).not.toMatch(/group|shared/i)
   })
 
   it("trusted friend in 1:1 returns empty string", async () => {
@@ -2446,16 +2443,13 @@ describe("toolRestrictionSection", () => {
     expect(toolRestrictionSection(ctx as any)).toBe("")
   })
 
-  it("handles friend with no externalIds (undefined fallback)", async () => {
+  it("low-trust friend with no externalIds still gets restriction", async () => {
     const { toolRestrictionSection } = await import("../../mind/prompt")
     const friend = makeFriend({ trustLevel: "stranger" })
-    // Force externalIds to undefined to trigger ?? [] branch
     ;(friend as any).externalIds = undefined
     const ctx = { friend, channel: makeChannel("teams") }
     const result = toolRestrictionSection(ctx as any)
-    // Should still work (trust gate triggers, group gate doesn't since no externalIds)
     expect(result).toMatch(/trust|know.*well/i)
-    expect(result).not.toMatch(/group|shared/i)
   })
 
   it("uses first-person voice", async () => {
