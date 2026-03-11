@@ -41,7 +41,7 @@ describe("subagent installer detectCliBinary", () => {
     expect(result.codexInstalled).toBe(0)
     expect(result.notes).toEqual(expect.arrayContaining([
       "claude CLI not found; skipping subagent install",
-      "codex CLI not found; skipping subagent install",
+      "codex CLI/config not found; skipping subagent install",
     ]))
   })
 })
