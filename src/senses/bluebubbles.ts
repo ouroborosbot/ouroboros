@@ -9,7 +9,7 @@ import { loadSession, postTurn } from "../mind/context"
 import { accumulateFriendTokens } from "../mind/friends/tokens"
 import { FriendResolver, type FriendResolverParams } from "../mind/friends/resolver"
 import { FileFriendStore } from "../mind/friends/store-file"
-import type { FriendRecord } from "../mind/friends/types"
+import { TRUSTED_LEVELS, type FriendRecord } from "../mind/friends/types"
 import { getChannelCapabilities } from "../mind/friends/channel"
 import { getPendingDir, drainPending } from "../mind/pending"
 import { buildSystem } from "../mind/prompt"
@@ -730,7 +730,6 @@ export interface DrainAndSendPendingResult {
   failed: number
 }
 
-const PROACTIVE_SEND_ALLOWED_TRUST: ReadonlySet<string> = new Set(["family", "friend"])
 
 function findImessageHandle(friend: FriendRecord): string | undefined {
   for (const ext of friend.externalIds) {
@@ -838,7 +837,7 @@ export async function drainAndSendPendingBlueBubbles(
       continue
     }
 
-    if (!PROACTIVE_SEND_ALLOWED_TRUST.has(friend.trustLevel ?? "stranger")) {
+    if (!TRUSTED_LEVELS.has(friend.trustLevel ?? "stranger")) {
       result.skipped++
       try { fs.unlinkSync(filePath) } catch { /* ignore */ }
       emitNervesEvent({

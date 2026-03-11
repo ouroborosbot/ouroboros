@@ -5,7 +5,7 @@ import { teamsToolDefinitions, summarizeTeamsArgs } from "./tools-teams";
 import { bluebubblesToolDefinitions } from "./tools-bluebubbles";
 import { adoSemanticToolDefinitions } from "./ado-semantic";
 import { githubToolDefinitions, summarizeGithubArgs } from "./tools-github";
-import type { ChannelCapabilities, ResolvedContext } from "../mind/friends/types";
+import { isTrustedLevel, type ChannelCapabilities, type ResolvedContext } from "../mind/friends/types";
 import { isRemoteChannel } from "../mind/friends/channel";
 import { emitNervesEvent } from "../nerves/runtime";
 
@@ -21,8 +21,7 @@ export const REMOTE_BLOCKED_LOCAL_TOOLS = new Set(["shell", "read_file", "write_
 
 function isTrustedRemoteContext(context?: Pick<ResolvedContext, "friend" | "channel">): boolean {
   if (!context?.friend || !isRemoteChannel(context.channel)) return false;
-  const trustLevel = context.friend.trustLevel ?? "friend";
-  return trustLevel === "friend" || trustLevel === "family";
+  return isTrustedLevel(context.friend.trustLevel);
 }
 
 function shouldBlockLocalTools(

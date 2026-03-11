@@ -4,7 +4,7 @@ import { getProviderDisplayLabel } from "../heart/core";
 import { finalAnswerTool, getToolsForChannel, REMOTE_BLOCKED_LOCAL_TOOLS } from "../repertoire/tools";
 import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName, getAgentSecretsPath, loadAgentConfig, type SenseName } from "../heart/identity";
-import type { Channel, ChannelCapabilities, ResolvedContext } from "./friends/types";
+import { isTrustedLevel, type Channel, type ChannelCapabilities, type ResolvedContext } from "./friends/types";
 import { getChannelCapabilities, isRemoteChannel } from "./friends/channel";
 import { emitNervesEvent } from "../nerves/runtime";
 import { backfillBundleMeta, getPackageVersion, getChangelogPath } from "./bundle-manifest";
@@ -403,8 +403,7 @@ function toolsSection(channel: Channel, options?: BuildSystemOptions, context?: 
 export function toolRestrictionSection(context?: ResolvedContext): string {
   if (!context?.friend || !isRemoteChannel(context.channel)) return ""
 
-  const trustLevel = context.friend.trustLevel ?? "friend"
-  if (trustLevel === "family" || trustLevel === "friend") return ""
+  if (isTrustedLevel(context.friend.trustLevel)) return ""
 
   const toolList = [...REMOTE_BLOCKED_LOCAL_TOOLS].join(", ")
   return `## restricted tools

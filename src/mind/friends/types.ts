@@ -45,6 +45,14 @@ export interface ExternalId {
 
 export type TrustLevel = "family" | "friend" | "acquaintance" | "stranger"
 
+/** Trust levels that grant full tool access and proactive send capability. */
+export const TRUSTED_LEVELS: ReadonlySet<TrustLevel> = new Set(["family", "friend"])
+
+/** Whether a trust level grants full access (family or friend). Defaults to "friend" for legacy records. */
+export function isTrustedLevel(trustLevel?: TrustLevel): boolean {
+  return TRUSTED_LEVELS.has(trustLevel ?? "friend")
+}
+
 export interface FriendConnection {
   name: string
   relationship: string

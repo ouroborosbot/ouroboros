@@ -16,7 +16,7 @@ import { createCommandRegistry, registerDefaultCommands, parseSlashCommand } fro
 import { createTraceId } from "../nerves"
 import { emitNervesEvent } from "../nerves/runtime"
 import { FileFriendStore } from "../mind/friends/store-file"
-import type { FriendRecord } from "../mind/friends/types"
+import { TRUSTED_LEVELS, type FriendRecord } from "../mind/friends/types"
 import type { FriendStore } from "../mind/friends/store"
 import { FriendResolver } from "../mind/friends/resolver"
 import { accumulateFriendTokens } from "../mind/friends/tokens"
@@ -773,7 +773,6 @@ export interface TeamsBotApi {
   conversations: unknown
 }
 
-const TEAMS_PROACTIVE_ALLOWED_TRUST: ReadonlySet<string> = new Set(["family", "friend"])
 
 function findAadObjectId(friend: FriendRecord): { aadObjectId: string; tenantId?: string } | undefined {
   for (const ext of friend.externalIds) {
@@ -884,7 +883,7 @@ export async function drainAndSendPendingTeams(
       continue
     }
 
-    if (!TEAMS_PROACTIVE_ALLOWED_TRUST.has(friend.trustLevel ?? "stranger")) {
+    if (!TRUSTED_LEVELS.has(friend.trustLevel ?? "stranger")) {
       result.skipped++
       try { fs.unlinkSync(filePath) } catch { /* ignore */ }
       emitNervesEvent({

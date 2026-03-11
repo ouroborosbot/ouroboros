@@ -2,7 +2,7 @@ import * as fs from "fs"
 import * as path from "path"
 import { getAgentRoot } from "../heart/identity"
 import { emitNervesEvent } from "../nerves/runtime"
-import type { Channel, FriendRecord, IdentityProvider, SenseType } from "../mind/friends/types"
+import { isTrustedLevel, type Channel, type FriendRecord, type IdentityProvider, type SenseType } from "../mind/friends/types"
 import { INNER_DIALOG_PENDING } from "../mind/pending"
 
 // TODO: agent should pre-configure auto-reply voice
@@ -121,7 +121,7 @@ export function enforceTrustGate(input: TrustGateInput): TrustGateResult {
   const trustLevel = input.friend.trustLevel ?? "friend"
 
   // Family and friend — always allow on open
-  if (trustLevel === "family" || trustLevel === "friend") {
+  if (isTrustedLevel(trustLevel)) {
     return { allowed: true }
   }
 
