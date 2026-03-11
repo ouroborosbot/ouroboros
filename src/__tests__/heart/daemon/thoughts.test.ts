@@ -75,6 +75,113 @@ describe("thoughts", () => {
       expect(turns[0].response).toBe("found something interesting.")
     })
 
+    it("extracts response from final_answer tool call when content is null", () => {
+      const sessionPath = tmpSessionFile([
+        { role: "system", content: "system prompt" },
+        { role: "user", content: "waking up.\n\nwhat needs my attention?" },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            { id: "tc_1", type: "function", function: { name: "shell", arguments: "{\"command\":\"ls\"}" } },
+          ],
+        },
+        { role: "tool", tool_call_id: "tc_1", content: "file1 file2" },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            { id: "tc_2", type: "function", function: { name: "final_answer", arguments: "{\"answer\":\"checked the files. all good.\"}" } },
+          ],
+        },
+      ])
+
+      const turns = parseInnerDialogSession(sessionPath)
+
+      expect(turns).toHaveLength(1)
+      expect(turns[0].response).toBe("checked the files. all good.")
+      expect(turns[0].tools).toEqual(["shell"])
+    })
+
+    it("excludes final_answer from tool names list", () => {
+      const sessionPath = tmpSessionFile([
+        { role: "system", content: "system prompt" },
+        { role: "user", content: "waking up.\n\nwhat needs my attention?" },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            { id: "tc_1", type: "function", function: { name: "memory_search", arguments: "{}" } },
+          ],
+        },
+        { role: "tool", tool_call_id: "tc_1", content: "results" },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            { id: "tc_2", type: "function", function: { name: "final_answer", arguments: "{\"answer\":\"done\"}" } },
+          ],
+        },
+      ])
+
+      const turns = parseInnerDialogSession(sessionPath)
+      expect(turns[0].tools).toEqual(["memory_search"])
+      expect(turns[0].tools).not.toContain("final_answer")
+    })
+
+    it("extracts final_answer when mixed with other tool calls in same message", () => {
+      const sessionPath = tmpSessionFile([
+        { role: "system", content: "system prompt" },
+        { role: "user", content: "waking up.\n\nwhat needs my attention?" },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            { id: "tc_1", type: "function", function: { name: "memory_save", arguments: "{}" } },
+            { id: "tc_2", type: "function", function: { name: "final_answer", arguments: "{\"answer\":\"saved and done.\"}" } },
+          ],
+        },
+      ])
+
+      const turns = parseInnerDialogSession(sessionPath)
+      expect(turns[0].response).toBe("saved and done.")
+      expect(turns[0].tools).toEqual(["memory_save"])
+    })
+
+    it("handles final_answer with malformed arguments", () => {
+      const sessionPath = tmpSessionFile([
+        { role: "system", content: "system prompt" },
+        { role: "user", content: "waking up.\n\nwhat needs my attention?" },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            { id: "tc_1", type: "function", function: { name: "final_answer", arguments: "not json" } },
+          ],
+        },
+      ])
+
+      const turns = parseInnerDialogSession(sessionPath)
+      expect(turns[0].response).toBe("")
+    })
+
+    it("handles final_answer with missing arguments field", () => {
+      const sessionPath = tmpSessionFile([
+        { role: "system", content: "system prompt" },
+        { role: "user", content: "waking up.\n\nwhat needs my attention?" },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            { id: "tc_1", type: "function", function: { name: "final_answer" } },
+          ],
+        },
+      ])
+
+      const turns = parseInnerDialogSession(sessionPath)
+      expect(turns[0].response).toBe("")
+    })
+
     it("returns empty array for nonexistent file", () => {
       expect(parseInnerDialogSession("/tmp/nonexistent-dialog.json")).toEqual([])
     })

@@ -44,11 +44,29 @@ function extractToolNames(messages: Array<{ role: string; tool_calls?: Array<{ f
   for (const msg of messages) {
     if (msg.role === "assistant" && Array.isArray(msg.tool_calls)) {
       for (const tc of msg.tool_calls) {
-        if (tc.function?.name) names.push(tc.function.name)
+        if (tc.function?.name && tc.function.name !== "final_answer") names.push(tc.function.name)
       }
     }
   }
   return names
+}
+
+/** Extract text from a final_answer tool call's arguments. */
+function extractFinalAnswer(messages: Array<{ role: string; tool_calls?: Array<{ function?: { name?: string; arguments?: string } }> }>): string {
+  for (let k = messages.length - 1; k >= 0; k--) {
+    const msg = messages[k]
+    if (msg.role !== "assistant" || !Array.isArray(msg.tool_calls)) continue
+    for (const tc of msg.tool_calls) {
+      if (tc.function?.name !== "final_answer") continue
+      try {
+        const parsed = JSON.parse(tc.function.arguments ?? "{}")
+        if (typeof parsed.answer === "string" && parsed.answer.trim()) return parsed.answer.trim()
+      } catch {
+        // malformed arguments — skip
+      }
+    }
+  }
+  return ""
 }
 
 export function parseInnerDialogSession(sessionPath: string): ThoughtTurn[] {
@@ -102,10 +120,13 @@ export function parseInnerDialogSession(sessionPath: string): ThoughtTurn[] {
       j++
     }
 
-    // Find the last assistant text response in this turn
+    // Find the last assistant text response in this turn.
+    // With tool_choice="required", the response may be inside a final_answer tool call.
     const assistantMsgs = turnMessages.filter((m) => m.role === "assistant")
     const lastAssistant = assistantMsgs.reverse().find((m) => contentToText(m.content).trim().length > 0)
-    const response = lastAssistant ? contentToText(lastAssistant.content).trim() : ""
+    const response = lastAssistant
+      ? contentToText(lastAssistant.content).trim()
+      : extractFinalAnswer(turnMessages)
     const tools = extractToolNames(turnMessages)
 
     turns.push({
