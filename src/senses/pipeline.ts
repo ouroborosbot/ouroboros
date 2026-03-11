@@ -154,10 +154,20 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
     // If there are inbound user messages, prepend pending to the first one
     if (input.messages.length > 0) {
       const firstMsg = input.messages[0]
-      if (firstMsg.role === "user" && typeof firstMsg.content === "string") {
-        input.messages[0] = {
-          ...firstMsg,
-          content: `## pending messages\n${pendingSection}\n\n${firstMsg.content}`,
+      if (firstMsg.role === "user") {
+        if (typeof firstMsg.content === "string") {
+          input.messages[0] = {
+            ...firstMsg,
+            content: `## pending messages\n${pendingSection}\n\n${firstMsg.content}`,
+          }
+        } else {
+          input.messages[0] = {
+            ...firstMsg,
+            content: [
+              { type: "text" as const, text: `## pending messages\n${pendingSection}\n\n` },
+              ...firstMsg.content,
+            ],
+          }
         }
       }
     }

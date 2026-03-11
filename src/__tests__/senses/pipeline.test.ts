@@ -276,6 +276,33 @@ describe("handleInboundTurn", () => {
       expect(input.runAgent).toHaveBeenCalledTimes(1)
     })
 
+    it("prepends pending to multimodal (array) content without losing parts", async () => {
+      const pendingMsgs: PendingMessage[] = [
+        { from: "instinct", content: "someone reached out", timestamp: 1000 },
+      ]
+      const multimodalContent = [
+        { type: "text" as const, text: "hello" },
+        { type: "image_url" as const, image_url: { url: "https://example.com/img.png" } },
+      ]
+      const input = makeInput({
+        messages: [{ role: "user", content: multimodalContent }] as ChatCompletionMessageParam[],
+        drainPending: vi.fn().mockReturnValue(pendingMsgs),
+      })
+
+      await handleInboundTurn(input)
+
+      const runAgentCall = (input.runAgent as ReturnType<typeof vi.fn>).mock.calls[0]
+      const msgs = runAgentCall[0] as ChatCompletionMessageParam[]
+      const userMsg = msgs.find(m => m.role === "user" && Array.isArray(m.content))
+      expect(userMsg).toBeTruthy()
+      const parts = (userMsg as any).content as Array<{ type: string; text?: string }>
+      // Pending text part prepended, original parts preserved
+      expect(parts[0].type).toBe("text")
+      expect(parts[0].text).toContain("someone reached out")
+      expect(parts[1]).toEqual({ type: "text", text: "hello" })
+      expect(parts[2]).toEqual({ type: "image_url", image_url: { url: "https://example.com/img.png" } })
+    })
+
     it("does not modify first message when pending exists but first message is not user role", async () => {
       const pendingMsgs: PendingMessage[] = [
         { from: "system", content: "a pending notice", timestamp: 1000 },
