@@ -6,6 +6,7 @@ import { bluebubblesToolDefinitions } from "./tools-bluebubbles";
 import { adoSemanticToolDefinitions } from "./ado-semantic";
 import { githubToolDefinitions, summarizeGithubArgs } from "./tools-github";
 import type { ChannelCapabilities, ResolvedContext } from "../mind/friends/types";
+import { isRemoteChannel } from "../mind/friends/channel";
 import { emitNervesEvent } from "../nerves/runtime";
 
 // Re-export types and constants used by the rest of the codebase
@@ -15,12 +16,8 @@ export { teamsTools } from "./tools-teams";
 
 // All tool definitions in a single registry
 const allDefinitions: ToolDefinition[] = [...baseToolDefinitions, ...bluebubblesToolDefinitions, ...teamsToolDefinitions, ...adoSemanticToolDefinitions, ...githubToolDefinitions];
-const REMOTE_BLOCKED_LOCAL_TOOLS = new Set(["shell", "read_file", "write_file", "edit_file", "glob", "grep"]);
-
-function isRemoteChannel(capabilities?: ChannelCapabilities): boolean {
-  const senseType = capabilities?.senseType
-  return senseType !== undefined && senseType !== "local" && senseType !== "internal"
-}
+/** Tool names blocked for untrusted remote contexts. Shared with prompt.ts for restriction messaging. */
+export const REMOTE_BLOCKED_LOCAL_TOOLS = new Set(["shell", "read_file", "write_file", "edit_file", "glob", "grep"]);
 
 function isTrustedRemoteContext(context?: Pick<ResolvedContext, "friend" | "channel">): boolean {
   if (!context?.friend || !isRemoteChannel(context.channel)) return false;

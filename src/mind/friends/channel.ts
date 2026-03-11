@@ -63,6 +63,12 @@ export function getChannelCapabilities(channel: string): ChannelCapabilities {
   return CHANNEL_CAPABILITIES[channel] ?? DEFAULT_CAPABILITIES
 }
 
+/** Whether the channel is remote (open or closed) vs local/internal. */
+export function isRemoteChannel(capabilities?: ChannelCapabilities): boolean {
+  const senseType = capabilities?.senseType
+  return senseType !== undefined && senseType !== "local" && senseType !== "internal"
+}
+
 /**
  * Returns channel names whose senseType is "open" or "closed" -- i.e. channels
  * that are always-on (daemon-managed) rather than interactive or internal.

@@ -2358,8 +2358,10 @@ describe("toolRestrictionSection", () => {
   }
 
   function makeChannel(channel: string) {
+    const senseTypes: Record<string, string> = { cli: "local", teams: "closed", bluebubbles: "open", inner: "internal" }
     return {
       channel,
+      senseType: senseTypes[channel] ?? "local",
       availableIntegrations: [] as any[],
       supportsMarkdown: false,
       supportsStreaming: true,
@@ -2440,6 +2442,14 @@ describe("toolRestrictionSection", () => {
   it("returns empty string when context.channel is undefined", async () => {
     const { toolRestrictionSection } = await import("../../mind/prompt")
     const ctx = { friend: makeFriend({ trustLevel: "stranger" }), channel: undefined }
+    expect(toolRestrictionSection(ctx as any)).toBe("")
+  })
+
+  it("treats undefined trustLevel as friend (backward compat — no restriction)", async () => {
+    const { toolRestrictionSection } = await import("../../mind/prompt")
+    const friend = makeFriend({})
+    delete (friend as any).trustLevel
+    const ctx = { friend, channel: makeChannel("teams") }
     expect(toolRestrictionSection(ctx as any)).toBe("")
   })
 

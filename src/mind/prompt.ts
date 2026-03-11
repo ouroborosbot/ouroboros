@@ -1,11 +1,11 @@
 import * as fs from "fs";
 import * as path from "path";
 import { getProviderDisplayLabel } from "../heart/core";
-import { finalAnswerTool, getToolsForChannel } from "../repertoire/tools";
+import { finalAnswerTool, getToolsForChannel, REMOTE_BLOCKED_LOCAL_TOOLS } from "../repertoire/tools";
 import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName, getAgentSecretsPath, loadAgentConfig, type SenseName } from "../heart/identity";
 import type { Channel, ChannelCapabilities, ResolvedContext } from "./friends/types";
-import { getChannelCapabilities } from "./friends/channel";
+import { getChannelCapabilities, isRemoteChannel } from "./friends/channel";
 import { emitNervesEvent } from "../nerves/runtime";
 import { backfillBundleMeta, getPackageVersion, getChangelogPath } from "./bundle-manifest";
 import type { BundleMeta } from "./bundle-manifest";
@@ -400,21 +400,13 @@ function toolsSection(channel: Channel, options?: BuildSystemOptions, context?: 
   return `## my tools\n${list}`;
 }
 
-const RESTRICTED_TOOLS = ["shell", "read_file", "write_file", "edit_file", "glob", "grep"]
-
-function isRemoteChannel(channel?: string): boolean {
-  if (!channel) return false
-  const caps = getChannelCapabilities(channel)
-  return caps.senseType !== "local" && caps.senseType !== "internal"
-}
-
 export function toolRestrictionSection(context?: ResolvedContext): string {
-  if (!context?.friend || !isRemoteChannel(context.channel?.channel)) return ""
+  if (!context?.friend || !isRemoteChannel(context.channel)) return ""
 
   const trustLevel = context.friend.trustLevel ?? "friend"
   if (trustLevel === "family" || trustLevel === "friend") return ""
 
-  const toolList = RESTRICTED_TOOLS.join(", ")
+  const toolList = [...REMOTE_BLOCKED_LOCAL_TOOLS].join(", ")
   return `## restricted tools
 some of my tools are unavailable right now: ${toolList}
 
@@ -556,7 +548,7 @@ export function channelNatureSection(capabilities: ChannelCapabilities): string 
 }
 
 export function mixedTrustGroupSection(context?: ResolvedContext): string {
-  if (!context?.friend || !isRemoteChannel(context.channel?.channel)) return ""
+  if (!context?.friend || !isRemoteChannel(context.channel)) return ""
   if (!context.isGroupChat) return ""
   return "## mixed trust group\nin this group chat, my capabilities depend on who's talking. some people here have full trust, others don't — i adjust what i can do based on who's asking."
 }
