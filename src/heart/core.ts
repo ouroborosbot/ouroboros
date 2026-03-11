@@ -8,9 +8,6 @@ import { execTool, summarizeArgs, finalAnswerTool, getToolsForChannel, isConfirm
 import type { ToolContext } from "../repertoire/tools";
 import { getChannelCapabilities } from "../mind/friends/channel";
 import type { AssistantMessageWithReasoning, ResponseItem } from "./streaming";
-// Kick detection preserved but disabled — see comment in agent loop below.
-// import { detectKick } from "./kicks";
-// import type { KickReason } from "./kicks";
 import { emitNervesEvent } from "../nerves/runtime";
 import type { TurnResult } from "./streaming";
 import type { UsageData } from "../mind/context";
