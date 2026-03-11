@@ -7,8 +7,9 @@
         "Removed dead backward-compat re-exports from core.ts (tools, streaming, prompt, kicks) — consumers already import from the canonical modules.",
         "Removed dead exports: baseToolHandlers, teamsToolHandlers, teamsTools, __internal (token-estimate), TASK_STEM_PATTERN, checkAndRecord403 no-op and METHOD_TO_ACTION.",
         "Consolidated duplicate sanitizeKey (config.ts + bluebubbles-mutation-log.ts) and slugify (hatch-flow.ts + tasks/index.ts) into shared exports from config.ts.",
-        "Replaced 6 as-any casts in context.ts with proper TypeScript narrowing via role checks.",
-        "Cleaned up stale TODO in trust-gate.ts and unused ToolHandler import in tools-teams.ts."
+        "Replaced all as-any casts in source with proper TypeScript narrowing or Record<string, unknown> — only 2 SDK-required casts remain.",
+        "Removed unnecessary as-unknown-as casts on readdirSync (4 locations) and spawner double-cast.",
+        "Cleaned up commented-out kick detection code, stale TODOs, misplaced imports, and unused type imports."
       ]
     },
     {
