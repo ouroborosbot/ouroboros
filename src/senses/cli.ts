@@ -778,14 +778,12 @@ export async function main(agentName?: string, options?: { pasteDebounceMs?: num
       pasteDebounceMs,
       messages: sessionMessages,
       runTurn: async (messages, userInput, callbacks, signal) => {
-        // Append user message to the shared messages array
-        messages.push({ role: "user", content: userInput })
-
         // Run the full per-turn pipeline: resolve -> gate -> session -> drain -> runAgent -> postTurn -> tokens
+        // User message passed via input.messages so the pipeline can prepend pending messages to it.
         const result = await handleInboundTurn({
           channel: "cli",
           capabilities: cliCapabilities,
-          messages: [],  // user message already appended to session messages above
+          messages: [{ role: "user", content: userInput }],
           callbacks,
           friendResolver: { resolve: () => Promise.resolve(resolvedContext) },
           sessionLoader: { loadOrCreate: () => Promise.resolve({ messages, sessionPath: sessPath }) },
