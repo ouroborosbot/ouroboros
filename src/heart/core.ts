@@ -142,17 +142,6 @@ export function getProviderDisplayLabel(): string {
   return providerLabelBuilders[getProvider()]();
 }
 
-// Re-export tools, execTool, summarizeArgs from ./tools for backward compat
-export { tools, execTool, summarizeArgs, getToolsForChannel } from "../repertoire/tools";
-export type { ToolContext } from "../repertoire/tools";
-// Re-export streaming functions for backward compat
-export { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "./streaming";
-export type { TurnResult } from "./streaming";
-
-// Re-export prompt functions for backward compat
-export { buildSystem } from "../mind/prompt";
-export type { Channel } from "../mind/prompt";
-
 export interface ChannelCallbacks {
   onModelStart(): void;
   onModelStreamStart(): void;
@@ -177,9 +166,6 @@ export interface RunAgentOptions {
   tools?: OpenAI.ChatCompletionFunctionTool[];
   execTool?: (name: string, args: Record<string, string>, ctx?: ToolContext) => Promise<string>;
 }
-
-// Re-export kick utilities for backward compat
-export { hasToolIntent } from "./kicks";
 
 
 function upsertSystemPrompt(

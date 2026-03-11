@@ -99,8 +99,3 @@ export function estimateTokensForMessages(msgs: OpenAI.ChatCompletionMessagePara
   for (const msg of msgs) total += estimateTokensForMessage(msg)
   return total
 }
-
-export const __internal = {
-  CHARS_PER_TOKEN,
-  PER_MESSAGE_OVERHEAD_TOKENS,
-}
