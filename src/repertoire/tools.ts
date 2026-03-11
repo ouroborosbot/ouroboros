@@ -24,7 +24,7 @@ function isRemoteChannel(capabilities?: ChannelCapabilities): boolean {
 
 function isTrustedRemoteContext(context?: Pick<ResolvedContext, "friend" | "channel">): boolean {
   if (!context?.friend || !isRemoteChannel(context.channel)) return false;
-  const trustLevel = context.friend.trustLevel ?? "stranger";
+  const trustLevel = context.friend.trustLevel ?? "friend";
   return trustLevel === "friend" || trustLevel === "family";
 }
 

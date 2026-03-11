@@ -411,7 +411,7 @@ function isRemoteChannel(channel?: string): boolean {
 export function toolRestrictionSection(context?: ResolvedContext): string {
   if (!context?.friend || !isRemoteChannel(context.channel?.channel)) return ""
 
-  const trustLevel = context.friend.trustLevel ?? "stranger"
+  const trustLevel = context.friend.trustLevel ?? "friend"
   if (trustLevel === "family" || trustLevel === "friend") return ""
 
   const toolList = RESTRICTED_TOOLS.join(", ")

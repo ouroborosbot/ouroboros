@@ -145,6 +145,32 @@ describe("remote channel tool safety", () => {
     expect(names).toContain("read_file")
   })
 
+  it("treats undefined trustLevel as friend (backward compat — legacy friends keep tool access)", () => {
+    const tools = getToolsForChannel(
+      getChannelCapabilities("bluebubbles"),
+      undefined,
+      {
+        friend: {
+          id: "friend-legacy",
+          name: "Legacy Friend",
+          // trustLevel intentionally omitted — pre-trust-level friend records
+          externalIds: [],
+          tenantMemberships: [],
+          toolPreferences: {},
+          notes: {},
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          schemaVersion: 1,
+        } as any,
+        channel: getChannelCapabilities("bluebubbles"),
+      },
+    )
+    const names = tools.map((t) => t.function.name)
+
+    expect(names).toContain("shell")
+    expect(names).toContain("read_file")
+  })
+
   it("allows local tools for family in teams conversations (trust-level only)", () => {
     const tools = getToolsForChannel(
       getChannelCapabilities("teams"),
@@ -202,6 +228,7 @@ describe("remote channel tool safety", () => {
         friend: {
           id: "friend-1",
           name: "Test Friend",
+          trustLevel: "stranger",
           externalIds: [],
           tenantMemberships: [],
           toolPreferences: {},
