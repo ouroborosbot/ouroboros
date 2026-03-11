@@ -1,6 +1,7 @@
 import * as fs from "fs"
+import * as os from "os"
 import * as path from "path"
-import { describe, expect, it, vi } from "vitest"
+import { afterAll, describe, expect, it, vi } from "vitest"
 
 import {
   discoverExistingCredentials,
@@ -284,6 +285,31 @@ describe("ouro CLI parsing", () => {
 
     // ouro session list
     expect(parseOuroCommand(["session", "list"])).toEqual({ kind: "session.list" })
+  })
+
+  it("parses thoughts command", () => {
+    expect(parseOuroCommand(["thoughts"])).toEqual({ kind: "thoughts" })
+  })
+
+  it("parses thoughts command with --last flag", () => {
+    expect(parseOuroCommand(["thoughts", "--last", "5"])).toEqual({ kind: "thoughts", last: 5 })
+  })
+
+  it("parses thoughts command with --json flag", () => {
+    expect(parseOuroCommand(["thoughts", "--json"])).toEqual({ kind: "thoughts", json: true })
+  })
+
+  it("parses thoughts command with --agent flag", () => {
+    expect(parseOuroCommand(["thoughts", "--agent", "slugger"])).toEqual({ kind: "thoughts", agent: "slugger" })
+  })
+
+  it("parses thoughts command with all flags", () => {
+    expect(parseOuroCommand(["thoughts", "--agent", "slugger", "--last", "20", "--json"])).toEqual({
+      kind: "thoughts",
+      agent: "slugger",
+      last: 20,
+      json: true,
+    })
   })
 
   it("rejects malformed session subcommands", () => {
@@ -4335,5 +4361,103 @@ describe("--agent flag CLI execution", () => {
 
     expect(result).toContain("Ari")
     expect(mockFriendStore.get).toHaveBeenCalledWith("friend-1")
+  })
+})
+
+describe("ouro thoughts CLI execution", () => {
+  function makeDeps(overrides?: Partial<OuroCliDeps>): OuroCliDeps {
+    return {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      ...overrides,
+    }
+  }
+
+  const testAgentName = `thoughts-test-${Date.now()}`
+  const agentBundlesRoot = path.join(os.homedir(), "AgentBundles")
+  const testAgentRoot = path.join(agentBundlesRoot, `${testAgentName}.ouro`)
+  const sessionDir = path.join(testAgentRoot, "state", "sessions", "self", "inner")
+  const sessionFile = path.join(sessionDir, "dialog.json")
+
+  function writeSessionFile(messages: unknown[]): void {
+    fs.mkdirSync(sessionDir, { recursive: true })
+    fs.writeFileSync(sessionFile, JSON.stringify({ version: 1, messages }))
+  }
+
+  afterAll(() => {
+    fs.rmSync(testAgentRoot, { recursive: true, force: true })
+  })
+
+  it("returns formatted thoughts with --agent", async () => {
+    writeSessionFile([
+      { role: "system", content: "system prompt" },
+      { role: "user", content: "waking up.\n\nwhat needs my attention?" },
+      { role: "assistant", content: "checking in. all looks good." },
+    ])
+    const deps = makeDeps()
+    const result = await runOuroCli(["thoughts", "--agent", testAgentName], deps)
+
+    expect(result).toContain("boot")
+    expect(result).toContain("checking in. all looks good.")
+    expect(deps.writeStdout).toHaveBeenCalled()
+  })
+
+  it("returns raw JSON with --json flag", async () => {
+    writeSessionFile([
+      { role: "system", content: "system prompt" },
+      { role: "user", content: "waking up.\n\nwhat needs my attention?" },
+      { role: "assistant", content: "hello from inner dialog." },
+    ])
+    const deps = makeDeps()
+    const result = await runOuroCli(["thoughts", "--agent", testAgentName, "--json"], deps)
+
+    expect(result).toContain("\"version\":1")
+    expect(result).toContain("hello from inner dialog.")
+  })
+
+  it("limits turns with --last flag", async () => {
+    writeSessionFile([
+      { role: "system", content: "system prompt" },
+      { role: "user", content: "waking up.\n\nwhat needs my attention?" },
+      { role: "assistant", content: "first response." },
+      { role: "user", content: "...time passing. anything stirring?" },
+      { role: "assistant", content: "second response." },
+      { role: "user", content: "...time passing. anything stirring?" },
+      { role: "assistant", content: "third response." },
+    ])
+    const deps = makeDeps()
+    const result = await runOuroCli(["thoughts", "--agent", testAgentName, "--last", "1"], deps)
+
+    expect(result).toContain("third response.")
+    expect(result).not.toContain("first response.")
+    expect(result).not.toContain("second response.")
+  })
+
+  it("returns no-activity message for nonexistent agent", async () => {
+    const deps = makeDeps()
+    const result = await runOuroCli(["thoughts", "--agent", "nonexistent-agent-xyzzy"], deps)
+
+    expect(result).toContain("no inner dialog activity")
+  })
+
+  it("returns no-session message for --json with nonexistent agent", async () => {
+    const deps = makeDeps()
+    const result = await runOuroCli(["thoughts", "--agent", "nonexistent-agent-xyzzy", "--json"], deps)
+
+    expect(result).toContain("no inner dialog session found")
+  })
+
+  it("returns error message when no --agent and no agent context", async () => {
+    const deps = makeDeps()
+    const result = await runOuroCli(["thoughts"], deps)
+
+    expect(result).toContain("error")
+    expect(result).toContain("--agent")
   })
 })

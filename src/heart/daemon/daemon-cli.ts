@@ -33,6 +33,7 @@ import { applyPendingUpdates, registerUpdateHook } from "./update-hooks"
 import { bundleMetaHook } from "./hooks/bundle-meta"
 import { getPackageVersion } from "../../mind/bundle-manifest"
 import { getTaskModule } from "../../repertoire/tasks"
+import { parseInnerDialogSession, formatThoughtTurns, getInnerDialogSessionPath } from "./thoughts"
 import type { TaskModule } from "../../repertoire/tasks/types"
 import { syncGlobalOuroBotWrapper as defaultSyncGlobalOuroBotWrapper } from "./ouro-bot-global-installer"
 import { writeLaunchAgentPlist, type LaunchdWriteDeps } from "./launchd"
@@ -54,6 +55,7 @@ export type OuroCliCommand =
   | { kind: "task.sessions"; agent?: string }
   | { kind: "whoami"; agent?: string }
   | { kind: "session.list"; agent?: string }
+  | { kind: "thoughts"; agent?: string; last?: number; json?: boolean }
   | { kind: "reminder.create"; title: string; body: string; scheduledAt?: string; cadence?: string; category?: string; agent?: string }
   | { kind: "friend.list"; agent?: string }
   | { kind: "friend.show"; friendId: string; agent?: string }
@@ -331,6 +333,7 @@ function usage(): string {
     "  ouro friend list [--agent <name>]",
     "  ouro friend show <id> [--agent <name>]",
     "  ouro friend create --name <name> [--trust <level>] [--agent <name>]",
+    "  ouro thoughts [--last <n>] [--json] [--agent <name>]",
     "  ouro friend link <agent> --friend <id> --provider <p> --external-id <eid>",
     "  ouro friend unlink <agent> --friend <id> --provider <p> --external-id <eid>",
     "  ouro whoami [--agent <name>]",
@@ -654,6 +657,20 @@ function parseSessionCommand(args: string[]): OuroCliCommand {
   throw new Error(`Usage\n${usage()}`)
 }
 
+function parseThoughtsCommand(args: string[]): OuroCliCommand {
+  const { agent, rest: cleaned } = extractAgentFlag(args)
+  let last: number | undefined
+  let json = false
+  for (let i = 0; i < cleaned.length; i++) {
+    if (cleaned[i] === "--last" && i + 1 < cleaned.length) {
+      last = Number.parseInt(cleaned[i + 1], 10)
+      i++
+    }
+    if (cleaned[i] === "--json") json = true
+  }
+  return { kind: "thoughts", ...(agent ? { agent } : {}), ...(last ? { last } : {}), ...(json ? { json } : {}) }
+}
+
 function parseFriendCommand(args: string[]): OuroCliCommand {
   const { agent, rest: cleaned } = extractAgentFlag(args)
   const [sub, ...rest] = cleaned
@@ -711,6 +728,7 @@ export function parseOuroCommand(args: string[]): OuroCliCommand {
     return { kind: "whoami", ...(agent ? { agent } : {}) }
   }
   if (head === "session") return parseSessionCommand(args.slice(1))
+  if (head === "thoughts") return parseThoughtsCommand(args.slice(1))
   if (head === "chat") {
     if (!second) throw new Error(`Usage\n${usage()}`)
     return { kind: "chat.connect", agent: second }
@@ -1178,7 +1196,8 @@ export function createDefaultOuroCliDeps(socketPath = "/tmp/ouroboros-daemon.soc
   }
 }
 
-function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "hatch.start" } | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand>): DaemonCommand {
+type ThoughtsCliCommand = Extract<OuroCliCommand, { kind: "thoughts" }>
+function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "hatch.start" } | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand>): DaemonCommand {
   return command
 }
 
@@ -1688,6 +1707,34 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       return message
     }
     /* v8 ignore stop */
+  }
+
+  // ── thoughts (local, no daemon socket needed) ──
+  if (command.kind === "thoughts") {
+    try {
+      const agentName = command.agent ?? getAgentName()
+      const agentRoot = path.join(getAgentBundlesRoot(), `${agentName}.ouro`)
+      const sessionFilePath = getInnerDialogSessionPath(agentRoot)
+      if (command.json) {
+        try {
+          const raw = fs.readFileSync(sessionFilePath, "utf-8")
+          deps.writeStdout(raw)
+          return raw
+        } catch {
+          const message = "no inner dialog session found"
+          deps.writeStdout(message)
+          return message
+        }
+      }
+      const turns = parseInnerDialogSession(sessionFilePath)
+      const message = formatThoughtTurns(turns, command.last ?? 10)
+      deps.writeStdout(message)
+      return message
+    } catch {
+      const message = "error: no agent context — use --agent <name> to specify"
+      deps.writeStdout(message)
+      return message
+    }
   }
 
   // ── session list (local, no daemon socket needed) ──
