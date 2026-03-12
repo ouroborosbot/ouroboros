@@ -312,12 +312,21 @@ describe("ouro CLI parsing", () => {
     expect(parseOuroCommand(["thoughts", "--agent", "slugger"])).toEqual({ kind: "thoughts", agent: "slugger" })
   })
 
+  it("parses thoughts command with --follow flag", () => {
+    expect(parseOuroCommand(["thoughts", "--follow"])).toEqual({ kind: "thoughts", follow: true })
+  })
+
+  it("parses thoughts command with -f shorthand", () => {
+    expect(parseOuroCommand(["thoughts", "-f"])).toEqual({ kind: "thoughts", follow: true })
+  })
+
   it("parses thoughts command with all flags", () => {
-    expect(parseOuroCommand(["thoughts", "--agent", "slugger", "--last", "20", "--json"])).toEqual({
+    expect(parseOuroCommand(["thoughts", "--agent", "slugger", "--last", "20", "--json", "--follow"])).toEqual({
       kind: "thoughts",
       agent: "slugger",
       last: 20,
       json: true,
+      follow: true,
     })
   })
 
@@ -4479,5 +4488,25 @@ describe("ouro thoughts CLI execution", () => {
 
     expect(result).toContain("error")
     expect(result).toContain("--agent")
+  })
+
+  it("enters follow mode and resolves on SIGINT", async () => {
+    writeSessionFile([
+      { role: "system", content: "system prompt" },
+      { role: "user", content: "waking up.\n\nwhat needs my attention?" },
+      { role: "assistant", content: "checking in." },
+    ])
+    const deps = makeDeps()
+
+    // Schedule SIGINT to fire shortly after follow mode starts
+    const timer = setTimeout(() => process.emit("SIGINT", "SIGINT"), 50)
+
+    const result = await runOuroCli(["thoughts", "--agent", testAgentName, "--follow"], deps)
+    clearTimeout(timer)
+
+    // Should have printed follow banner
+    const calls = (deps.writeStdout as ReturnType<typeof vi.fn>).mock.calls.map((c: unknown[]) => c[0])
+    expect(calls.some((c: string) => c.includes("following"))).toBe(true)
+    expect(result).toContain("boot")
   })
 })

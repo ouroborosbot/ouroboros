@@ -33,7 +33,7 @@ import { applyPendingUpdates, registerUpdateHook } from "./update-hooks"
 import { bundleMetaHook } from "./hooks/bundle-meta"
 import { getPackageVersion } from "../../mind/bundle-manifest"
 import { getTaskModule } from "../../repertoire/tasks"
-import { parseInnerDialogSession, formatThoughtTurns, getInnerDialogSessionPath } from "./thoughts"
+import { parseInnerDialogSession, formatThoughtTurns, getInnerDialogSessionPath, followThoughts } from "./thoughts"
 import type { TaskModule } from "../../repertoire/tasks/types"
 import { syncGlobalOuroBotWrapper as defaultSyncGlobalOuroBotWrapper } from "./ouro-bot-global-installer"
 import { writeLaunchAgentPlist, type LaunchdWriteDeps } from "./launchd"
@@ -55,7 +55,7 @@ export type OuroCliCommand =
   | { kind: "task.sessions"; agent?: string }
   | { kind: "whoami"; agent?: string }
   | { kind: "session.list"; agent?: string }
-  | { kind: "thoughts"; agent?: string; last?: number; json?: boolean }
+  | { kind: "thoughts"; agent?: string; last?: number; json?: boolean; follow?: boolean }
   | { kind: "reminder.create"; title: string; body: string; scheduledAt?: string; cadence?: string; category?: string; requester?: string; agent?: string }
   | { kind: "friend.list"; agent?: string }
   | { kind: "friend.show"; friendId: string; agent?: string }
@@ -333,7 +333,7 @@ function usage(): string {
     "  ouro friend list [--agent <name>]",
     "  ouro friend show <id> [--agent <name>]",
     "  ouro friend create --name <name> [--trust <level>] [--agent <name>]",
-    "  ouro thoughts [--last <n>] [--json] [--agent <name>]",
+    "  ouro thoughts [--last <n>] [--json] [--follow] [--agent <name>]",
     "  ouro friend link <agent> --friend <id> --provider <p> --external-id <eid>",
     "  ouro friend unlink <agent> --friend <id> --provider <p> --external-id <eid>",
     "  ouro whoami [--agent <name>]",
@@ -666,14 +666,16 @@ function parseThoughtsCommand(args: string[]): OuroCliCommand {
   const { agent, rest: cleaned } = extractAgentFlag(args)
   let last: number | undefined
   let json = false
+  let follow = false
   for (let i = 0; i < cleaned.length; i++) {
     if (cleaned[i] === "--last" && i + 1 < cleaned.length) {
       last = Number.parseInt(cleaned[i + 1], 10)
       i++
     }
     if (cleaned[i] === "--json") json = true
+    if (cleaned[i] === "--follow" || cleaned[i] === "-f") follow = true
   }
-  return { kind: "thoughts", ...(agent ? { agent } : {}), ...(last ? { last } : {}), ...(json ? { json } : {}) }
+  return { kind: "thoughts", ...(agent ? { agent } : {}), ...(last ? { last } : {}), ...(json ? { json } : {}), ...(follow ? { follow } : {}) }
 }
 
 function parseFriendCommand(args: string[]): OuroCliCommand {
@@ -1735,6 +1737,20 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       const turns = parseInnerDialogSession(sessionFilePath)
       const message = formatThoughtTurns(turns, command.last ?? 10)
       deps.writeStdout(message)
+      if (command.follow) {
+        deps.writeStdout("\n\n--- following (ctrl+c to stop) ---\n")
+        /* v8 ignore start -- callback tested via followThoughts unit tests @preserve */
+        const stop = followThoughts(sessionFilePath, (formatted) => {
+          deps.writeStdout("\n" + formatted)
+        })
+        /* v8 ignore stop */
+        // Block until process exit; cleanup watcher on SIGINT/SIGTERM
+        return new Promise<string>((resolve) => {
+          const cleanup = () => { stop(); resolve(message) }
+          process.once("SIGINT", cleanup)
+          process.once("SIGTERM", cleanup)
+        })
+      }
       return message
     } catch {
       const message = "error: no agent context — use --agent <name> to specify"

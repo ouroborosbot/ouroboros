@@ -178,3 +178,41 @@ export function formatThoughtTurns(turns: ThoughtTurn[], lastN: number): string 
 export function getInnerDialogSessionPath(agentRoot: string): string {
   return path.join(agentRoot, "state", "sessions", "self", "inner", "dialog.json")
 }
+
+/**
+ * Watch a session file and emit new turns as they appear.
+ * Returns a cleanup function that stops the watcher.
+ */
+export function followThoughts(
+  sessionPath: string,
+  onNewTurns: (formatted: string) => void,
+  pollIntervalMs = 1000,
+): () => void {
+  let displayedCount = parseInnerDialogSession(sessionPath).length
+
+  emitNervesEvent({
+    component: "daemon",
+    event: "daemon.thoughts_follow_start",
+    message: "started following inner dialog session",
+    meta: { sessionPath, initialTurns: displayedCount },
+  })
+
+  fs.watchFile(sessionPath, { interval: pollIntervalMs }, () => {
+    const turns = parseInnerDialogSession(sessionPath)
+    if (turns.length > displayedCount) {
+      const newTurns = turns.slice(displayedCount)
+      onNewTurns(formatThoughtTurns(newTurns, 0))
+      displayedCount = turns.length
+    }
+  })
+
+  return () => {
+    fs.unwatchFile(sessionPath)
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.thoughts_follow_stop",
+      message: "stopped following inner dialog session",
+      meta: { sessionPath, totalTurns: displayedCount },
+    })
+  }
+}

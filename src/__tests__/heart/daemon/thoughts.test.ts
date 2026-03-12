@@ -7,7 +7,7 @@ vi.mock("../../../nerves/runtime", () => ({
   emitNervesEvent: vi.fn(),
 }))
 
-import { parseInnerDialogSession, formatThoughtTurns, getInnerDialogSessionPath } from "../../../heart/daemon/thoughts"
+import { parseInnerDialogSession, formatThoughtTurns, getInnerDialogSessionPath, followThoughts } from "../../../heart/daemon/thoughts"
 
 describe("thoughts", () => {
   function tmpSessionFile(messages: unknown[]): string {
@@ -359,6 +359,120 @@ describe("thoughts", () => {
     it("returns correct path", () => {
       const result = getInnerDialogSessionPath("/home/agent/slugger.ouro")
       expect(result).toBe("/home/agent/slugger.ouro/state/sessions/self/inner/dialog.json")
+    })
+  })
+
+  describe("followThoughts", () => {
+    it("calls onNewTurns when session file is updated with new turns", async () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-test-"))
+      const sessionPath = path.join(dir, "dialog.json")
+
+      // Start with one turn
+      fs.writeFileSync(sessionPath, JSON.stringify({
+        version: 1,
+        messages: [
+          { role: "system", content: "system" },
+          { role: "user", content: "waking up.\n\nwhat needs my attention?" },
+          { role: "assistant", content: "first thought." },
+        ],
+      }))
+
+      const received: string[] = []
+      const stop = followThoughts(sessionPath, (formatted) => {
+        received.push(formatted)
+      }, 100)
+
+      // Add a second turn
+      fs.writeFileSync(sessionPath, JSON.stringify({
+        version: 1,
+        messages: [
+          { role: "system", content: "system" },
+          { role: "user", content: "waking up.\n\nwhat needs my attention?" },
+          { role: "assistant", content: "first thought." },
+          { role: "user", content: "...time passing. anything stirring?" },
+          { role: "assistant", content: "second thought." },
+        ],
+      }))
+
+      // Wait for poll to detect the change
+      await new Promise((resolve) => setTimeout(resolve, 300))
+
+      stop()
+      expect(received.length).toBeGreaterThanOrEqual(1)
+      expect(received[0]).toContain("second thought.")
+      expect(received[0]).not.toContain("first thought.")
+
+      fs.rmSync(dir, { recursive: true, force: true })
+    })
+
+    it("does not call onNewTurns when turn count stays the same", async () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-test-"))
+      const sessionPath = path.join(dir, "dialog.json")
+
+      const data = JSON.stringify({
+        version: 1,
+        messages: [
+          { role: "system", content: "system" },
+          { role: "user", content: "waking up.\n\nwhat needs my attention?" },
+          { role: "assistant", content: "same thought." },
+        ],
+      })
+      fs.writeFileSync(sessionPath, data)
+
+      const received: string[] = []
+      const stop = followThoughts(sessionPath, (formatted) => {
+        received.push(formatted)
+      }, 100)
+
+      // Touch the file without adding turns
+      fs.writeFileSync(sessionPath, data)
+
+      await new Promise((resolve) => setTimeout(resolve, 300))
+
+      stop()
+      expect(received).toHaveLength(0)
+
+      fs.rmSync(dir, { recursive: true, force: true })
+    })
+
+    it("returns cleanup function that stops watching", async () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-test-"))
+      const sessionPath = path.join(dir, "dialog.json")
+
+      fs.writeFileSync(sessionPath, JSON.stringify({
+        version: 1,
+        messages: [
+          { role: "system", content: "system" },
+          { role: "user", content: "waking up.\n\nwhat needs my attention?" },
+          { role: "assistant", content: "initial." },
+        ],
+      }))
+
+      const received: string[] = []
+      const stop = followThoughts(sessionPath, (formatted) => {
+        received.push(formatted)
+      }, 100)
+
+      // Stop immediately
+      stop()
+
+      // Add a new turn after stopping
+      fs.writeFileSync(sessionPath, JSON.stringify({
+        version: 1,
+        messages: [
+          { role: "system", content: "system" },
+          { role: "user", content: "waking up.\n\nwhat needs my attention?" },
+          { role: "assistant", content: "initial." },
+          { role: "user", content: "...time passing. anything stirring?" },
+          { role: "assistant", content: "should not appear." },
+        ],
+      }))
+
+      await new Promise((resolve) => setTimeout(resolve, 300))
+
+      expect(received).toHaveLength(0)
+
+      fs.rmSync(dir, { recursive: true, force: true })
     })
   })
 })
