@@ -231,6 +231,7 @@ export function summarizeArgs(name: string, args: Record<string, string>): strin
   if (name === "coding_send_input") return summarizeKeyValues(args, ["sessionId", "input"]);
   if (name === "coding_kill") return summarizeKeyValues(args, ["sessionId"]);
   if (name === "bluebubbles_set_reply_target") return summarizeKeyValues(args, ["target", "threadOriginatorGuid"]);
+  if (name === "set_reasoning_effort") return summarizeKeyValues(args, ["level"]);
   if (name === "claude") return summarizeKeyValues(args, ["prompt"]);
   if (name === "web_search") return summarizeKeyValues(args, ["query"]);
   if (name === "memory_search") return summarizeKeyValues(args, ["query"]);
