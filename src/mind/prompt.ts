@@ -416,6 +416,14 @@ function delegationHintSection(options?: BuildSystemOptions): string {
   return lines.join("\n")
 }
 
+function reasoningEffortSection(options?: BuildSystemOptions): string {
+  if (!options?.providerCapabilities?.has("reasoning-effort")) return "";
+  const levels = options.supportedReasoningEfforts ?? [];
+  const levelList = levels.length > 0 ? levels.join(", ") : "varies by model";
+  return `## reasoning effort
+i can adjust my own reasoning depth using the set_reasoning_effort tool. i use higher effort for complex analysis and lower effort for simple tasks. available levels: ${levelList}.`;
+}
+
 function toolBehaviorSection(options?: BuildSystemOptions): string {
   if (!(options?.toolChoiceRequired ?? true)) return "";
   return `## tool behavior
@@ -547,6 +555,7 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     providerSection(),
     dateSection(),
     toolsSection(channel, options, context),
+    reasoningEffortSection(options),
     toolRestrictionSection(context),
     mixedTrustGroupSection(context),
     skillsSection(),

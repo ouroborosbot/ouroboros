@@ -424,7 +424,12 @@ export async function runAgent(
   // so turn execution remains consistent and non-fatal.
   if (channel) {
     try {
-      const refreshed = await buildSystem(channel, options, currentContext);
+      const buildSystemOptions = {
+        ...options,
+        providerCapabilities: providerRuntime.capabilities,
+        supportedReasoningEfforts: providerRuntime.supportedReasoningEfforts,
+      };
+      const refreshed = await buildSystem(channel, buildSystemOptions, currentContext);
       upsertSystemPrompt(messages, refreshed);
     } catch (error) {
       const hadExistingSystemPrompt = messages[0]?.role === "system" && typeof messages[0].content === "string";
