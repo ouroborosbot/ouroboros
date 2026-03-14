@@ -552,6 +552,14 @@ export async function runAgent(
       if (thinkingItems.length > 0) {
         (msg as unknown as Record<string, unknown>)._thinking_blocks = thinkingItems;
       }
+      // Phase annotation for Codex provider
+      const hasPhaseAnnotation = providerRuntime.capabilities.has("phase-annotation");
+      const isSoleFinalAnswer = result.toolCalls.length === 1 && result.toolCalls[0].name === "final_answer";
+
+      if (hasPhaseAnnotation) {
+        (msg as AssistantMessageWithReasoning).phase = isSoleFinalAnswer ? "final_answer" : "commentary";
+      }
+
       if (!result.toolCalls.length) {
         // No tool calls — accept response as-is.
         // (Kick detection disabled; tool_choice: required + final_answer
@@ -560,7 +568,6 @@ export async function runAgent(
         done = true;
       } else {
         // Check for final_answer sole call: intercept before tool execution
-        const isSoleFinalAnswer = result.toolCalls.length === 1 && result.toolCalls[0].name === "final_answer";
         if (isSoleFinalAnswer) {
           // Extract answer from the tool call arguments.
           // Supports: {"answer":"text","intent":"..."} or "text" (JSON string).
