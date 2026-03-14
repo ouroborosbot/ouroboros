@@ -546,6 +546,12 @@ export async function runAgent(
       if (reasoningItems.length > 0) {
         (msg as AssistantMessageWithReasoning)._reasoning_items = reasoningItems;
       }
+      // Store thinking blocks (Anthropic) on the assistant message for round-tripping
+      const thinkingItems = result.outputItems.filter((item) =>
+        "type" in item && (item.type === "thinking" || item.type === "redacted_thinking"));
+      if (thinkingItems.length > 0) {
+        (msg as unknown as Record<string, unknown>)._thinking_blocks = thinkingItems;
+      }
       if (!result.toolCalls.length) {
         // No tool calls — accept response as-is.
         // (Kick detection disabled; tool_choice: required + final_answer

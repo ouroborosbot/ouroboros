@@ -99,7 +99,7 @@ function parseToolCallInput(argumentsJson: string): Record<string, unknown> {
   }
 }
 
-function toAnthropicMessages(
+export function toAnthropicMessages(
   messages: OpenAI.ChatCompletionMessageParam[],
 ): { system?: string; messages: Array<Record<string, unknown>> } {
   let system: string | undefined;
@@ -125,6 +125,17 @@ function toAnthropicMessages(
     if (msg.role === "assistant") {
       const assistant = msg as OpenAI.ChatCompletionAssistantMessageParam;
       const blocks: Array<Record<string, unknown>> = [];
+      // Restore thinking blocks before text/tool_use blocks
+      const thinkingBlocks = (assistant as unknown as Record<string, unknown>)._thinking_blocks as AnthropicThinkingBlock[] | undefined;
+      if (thinkingBlocks) {
+        for (const tb of thinkingBlocks) {
+          if (tb.type === "thinking") {
+            blocks.push({ type: "thinking", thinking: tb.thinking, signature: tb.signature });
+          } else {
+            blocks.push({ type: "redacted_thinking", data: tb.data });
+          }
+        }
+      }
       const text = toAnthropicTextContent(assistant.content);
       if (text) {
         blocks.push({ type: "text", text });
