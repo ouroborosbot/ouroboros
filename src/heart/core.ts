@@ -456,6 +456,7 @@ export async function runAgent(
   let completion: CompletionMetadata | undefined;
   let sawSteeringFollowUp = false;
   let mustResolveBeforeHandoffActive = options?.mustResolveBeforeHandoff === true;
+  let currentReasoningEffort = "medium";
 
   // Prevent MaxListenersExceeded warning — each iteration adds a listener
   try { require("events").setMaxListeners(50, signal); } catch { /* unsupported */ }
@@ -467,6 +468,15 @@ export async function runAgent(
     currentContext,
     providerRuntime.capabilities,
   );
+  // Augment tool context with reasoning effort controls from provider
+  const augmentedToolContext: ToolContext | undefined = options?.toolContext
+    ? {
+        ...options.toolContext,
+        supportedReasoningEfforts: providerRuntime.supportedReasoningEfforts,
+        setReasoningEffort: (level: string) => { currentReasoningEffort = level; },
+      }
+    : undefined;
+
   // Rebase provider-owned turn state from canonical messages at user-turn start.
   // This prevents stale provider caches from replaying prior-turn context.
   providerRuntime.resetTurnState(messages);
@@ -512,6 +522,7 @@ export async function runAgent(
         signal,
         traceId,
         toolChoiceRequired,
+        reasoningEffort: currentReasoningEffort,
       });
 
       // Track usage from the latest API call
@@ -632,7 +643,7 @@ export async function runAgent(
           let success: boolean;
           try {
             const execToolFn = options?.execTool ?? execTool;
-            toolResult = await execToolFn(tc.name, args, options?.toolContext);
+            toolResult = await execToolFn(tc.name, args, augmentedToolContext ?? options?.toolContext);
             success = true;
           } catch (e) {
             toolResult = `error: ${e}`;
