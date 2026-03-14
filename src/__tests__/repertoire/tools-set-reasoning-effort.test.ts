@@ -121,4 +121,20 @@ describe("set_reasoning_effort tool", () => {
     const result = await def!.handler({ level: "high" })
     expect(result).toContain("not available")
   })
+
+  it("handler handles empty level argument", async () => {
+    emitTestEvent("set_reasoning_effort empty level")
+    const { baseToolDefinitions } = await import("../../repertoire/tools-base")
+    const def = baseToolDefinitions.find(d => d.tool.function.name === "set_reasoning_effort")
+    expect(def).toBeDefined()
+    const setter = vi.fn()
+    const ctx = {
+      supportedReasoningEfforts: ["low", "medium", "high"] as readonly string[],
+      setReasoningEffort: setter,
+      signin: async () => undefined,
+    }
+    const result = await def!.handler({}, ctx as any)
+    expect(setter).not.toHaveBeenCalled()
+    expect(result).toContain("invalid")
+  })
 })

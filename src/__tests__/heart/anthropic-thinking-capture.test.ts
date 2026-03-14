@@ -209,4 +209,54 @@ describe("Anthropic thinking block capture during streaming", () => {
     expect(result.toolCalls).toHaveLength(1)
     expect(result.toolCalls[0].name).toBe("shell")
   })
+
+  it("handles redacted_thinking with missing data field", async () => {
+    emitTestEvent("handles redacted_thinking missing data")
+    streamEvents = [
+      { type: "content_block_start", index: 0, content_block: { type: "redacted_thinking" } },
+      { type: "content_block_stop", index: 0 },
+      { type: "content_block_start", index: 1, content_block: { type: "text", text: "" } },
+      { type: "content_block_delta", index: 1, delta: { type: "text_delta", text: "ok" } },
+      { type: "content_block_stop", index: 1 },
+      { type: "message_delta", usage: { input_tokens: 5, output_tokens: 3 } },
+    ]
+
+    const runtime = await createRuntime()
+    const result = await runtime.streamTurn({
+      messages: [{ role: "user", content: "hi" }],
+      activeTools: [],
+      callbacks: noopCallbacks,
+    })
+
+    expect(result.outputItems).toHaveLength(1)
+    expect((result.outputItems[0] as any).data).toBe("")
+  })
+
+  it("handles signature_delta with missing signature field and orphan index", async () => {
+    emitTestEvent("handles signature_delta edge cases")
+    streamEvents = [
+      { type: "content_block_start", index: 0, content_block: { type: "thinking" } },
+      { type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: "think" } },
+      { type: "content_block_delta", index: 0, delta: { type: "signature_delta" } },
+      // Orphan signature_delta for an index that has no thinking block
+      { type: "content_block_delta", index: 99, delta: { type: "signature_delta", signature: "orphan" } },
+      { type: "content_block_stop", index: 0 },
+      { type: "content_block_start", index: 1, content_block: { type: "text", text: "" } },
+      { type: "content_block_delta", index: 1, delta: { type: "text_delta", text: "ok" } },
+      { type: "content_block_stop", index: 1 },
+      { type: "message_delta", usage: { input_tokens: 5, output_tokens: 3 } },
+    ]
+
+    const runtime = await createRuntime()
+    const result = await runtime.streamTurn({
+      messages: [{ role: "user", content: "hi" }],
+      activeTools: [],
+      callbacks: noopCallbacks,
+    })
+
+    expect(result.outputItems).toHaveLength(1)
+    const block = result.outputItems[0] as any
+    expect(block.type).toBe("thinking")
+    expect(block.signature).toBe("")
+  })
 })

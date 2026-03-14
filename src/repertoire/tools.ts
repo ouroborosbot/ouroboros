@@ -57,22 +57,15 @@ function applyPreference(tool: OpenAI.ChatCompletionFunctionTool, pref: string):
   };
 }
 
-// Find a tool definition by name across all registries (including dynamically added tools).
-function findToolDefinition(name: string): ToolDefinition | undefined {
-  // Check the combined registry first (covers teams, ado, github, bluebubbles)
-  const fromAll = allDefinitions.find((d) => d.tool.function.name === name);
-  if (fromAll) return fromAll;
-  // Check baseToolDefinitions directly for tools added after module load
-  return baseToolDefinitions.find((d) => d.tool.function.name === name);
-}
-
 // Filter out tools whose requiredCapability is not in the provider's capability set.
+// Uses baseToolDefinitions at call time so dynamically-added tools are included.
+// Only base tools can have requiredCapability (integration tools do not).
 function filterByCapability(
   toolList: OpenAI.ChatCompletionFunctionTool[],
   providerCapabilities?: ReadonlySet<ProviderCapability>,
 ): OpenAI.ChatCompletionFunctionTool[] {
   return toolList.filter((tool) => {
-    const def = findToolDefinition(tool.function.name);
+    const def = baseToolDefinitions.find((d) => d.tool.function.name === tool.function.name);
     if (!def?.requiredCapability) return true;
     return providerCapabilities?.has(def.requiredCapability) === true;
   });

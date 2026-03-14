@@ -103,4 +103,32 @@ describe("system prompt reasoning effort section", () => {
     const system = await buildSystem("cli")
     expect(system).not.toContain("set_reasoning_effort")
   })
+
+  it("shows 'varies by model' when supportedReasoningEfforts is undefined", async () => {
+    emitTestEvent("prompt reasoning effort varies by model")
+    const config = await import("../../heart/config")
+    config.resetConfigCache()
+    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { resetPsycheCache, buildSystem } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const system = await buildSystem("cli", {
+      providerCapabilities: new Set(["reasoning-effort"]),
+      // No supportedReasoningEfforts provided
+    })
+    expect(system).toContain("varies by model")
+  })
+
+  it("shows 'varies by model' when supportedReasoningEfforts is empty", async () => {
+    emitTestEvent("prompt reasoning effort empty levels")
+    const config = await import("../../heart/config")
+    config.resetConfigCache()
+    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    const { resetPsycheCache, buildSystem } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const system = await buildSystem("cli", {
+      providerCapabilities: new Set(["reasoning-effort"]),
+      supportedReasoningEfforts: [],
+    })
+    expect(system).toContain("varies by model")
+  })
 })
