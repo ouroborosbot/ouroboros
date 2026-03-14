@@ -388,6 +388,7 @@ export function createAnthropicProviderRuntime(): ProviderRuntime {
     id: "anthropic",
     model: anthropicConfig.model,
     client,
+    capabilities: new Set(),
     resetTurnState(_messages: OpenAI.ChatCompletionMessageParam[]): void {
       // Anthropic request payload is derived from canonical messages each turn.
     },

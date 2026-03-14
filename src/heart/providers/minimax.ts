@@ -27,6 +27,7 @@ export function createMinimaxProviderRuntime(): ProviderRuntime {
     id: "minimax",
     model: minimaxConfig.model,
     client,
+    capabilities: new Set(),
     resetTurnState(_messages: OpenAI.ChatCompletionMessageParam[]): void {
       // No provider-owned turn state for chat-completions providers.
     },

@@ -32,6 +32,7 @@ export function createAzureProviderRuntime(): ProviderRuntime {
     id: "azure",
     model: azureConfig.modelName,
     client,
+    capabilities: new Set(),
     resetTurnState(messages: OpenAI.ChatCompletionMessageParam[]): void {
       const { instructions, input } = toResponsesInput(messages);
       nativeInput = input;

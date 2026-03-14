@@ -25,6 +25,8 @@ import type { DelegationDecision } from "./delegation";
 
 export type ProviderId = "azure" | "anthropic" | "minimax" | "openai-codex";
 
+export type ProviderCapability = "reasoning-effort" | "phase-annotation";
+
 export interface CompletionMetadata {
   answer: string;
   intent: "complete" | "blocked" | "direct_reply";
@@ -34,6 +36,8 @@ export interface ProviderRuntime {
   id: ProviderId;
   model: string;
   client: unknown;
+  capabilities: ReadonlySet<ProviderCapability>;
+  supportedReasoningEfforts?: readonly string[];
   streamTurn(request: ProviderTurnRequest): Promise<TurnResult>;
   appendToolOutput(callId: string, output: string): void;
   resetTurnState(messages: OpenAI.ChatCompletionMessageParam[]): void;
@@ -46,6 +50,7 @@ export interface ProviderTurnRequest {
   signal?: AbortSignal;
   traceId?: string;
   toolChoiceRequired?: boolean;
+  reasoningEffort?: string;
 }
 
 interface ProviderRegistry {
