@@ -1,9 +1,10 @@
 import OpenAI, { AzureOpenAI } from "openai";
 import { getAzureConfig } from "../config";
 import { emitNervesEvent } from "../../nerves/runtime";
-import type { ProviderRuntime, ProviderTurnRequest } from "../core";
+import type { ProviderCapability, ProviderRuntime, ProviderTurnRequest } from "../core";
 import type { ResponseItem, TurnResult } from "../streaming";
 import { streamResponsesApi, toResponsesInput, toResponsesTools } from "../streaming";
+import { getModelCapabilities } from "../model-capabilities";
 
 export function createAzureProviderRuntime(): ProviderRuntime {
   emitNervesEvent({
@@ -18,6 +19,10 @@ export function createAzureProviderRuntime(): ProviderRuntime {
       "provider 'azure' is selected in agent.json but providers.azure is incomplete in secrets.json.",
     );
   }
+  const modelCaps = getModelCapabilities(azureConfig.modelName);
+  const capabilities = new Set<ProviderCapability>();
+  if (modelCaps.reasoningEffort) capabilities.add("reasoning-effort");
+
   const client = new AzureOpenAI({
     apiKey: azureConfig.apiKey,
     endpoint: azureConfig.endpoint.replace(/\/openai.*$/, ""),
@@ -32,7 +37,8 @@ export function createAzureProviderRuntime(): ProviderRuntime {
     id: "azure",
     model: azureConfig.modelName,
     client,
-    capabilities: new Set(),
+    capabilities,
+    supportedReasoningEfforts: modelCaps.reasoningEffort,
     resetTurnState(messages: OpenAI.ChatCompletionMessageParam[]): void {
       const { instructions, input } = toResponsesInput(messages);
       nativeInput = input;

@@ -4,9 +4,10 @@ import { getAnthropicConfig } from "../config";
 import { getAgentName, getAgentSecretsPath } from "../identity";
 import type { UsageData } from "../../mind/context";
 import { emitNervesEvent } from "../../nerves/runtime";
-import type { ProviderRuntime, ProviderTurnRequest } from "../core";
+import type { ProviderCapability, ProviderRuntime, ProviderTurnRequest } from "../core";
 import { FinalAnswerStreamer } from "../streaming";
 import type { TurnResult } from "../streaming";
+import { getModelCapabilities } from "../model-capabilities";
 
 const ANTHROPIC_SETUP_TOKEN_PREFIX = "sk-ant-oat01-";
 const ANTHROPIC_SETUP_TOKEN_MIN_LENGTH = 80;
@@ -375,6 +376,10 @@ export function createAnthropicProviderRuntime(): ProviderRuntime {
       ),
     );
   }
+  const modelCaps = getModelCapabilities(anthropicConfig.model);
+  const capabilities = new Set<ProviderCapability>();
+  if (modelCaps.reasoningEffort) capabilities.add("reasoning-effort");
+
   const credential = resolveAnthropicSetupTokenCredential();
   const client = new Anthropic({
     authToken: credential.token,
@@ -388,7 +393,8 @@ export function createAnthropicProviderRuntime(): ProviderRuntime {
     id: "anthropic",
     model: anthropicConfig.model,
     client,
-    capabilities: new Set(),
+    capabilities,
+    supportedReasoningEfforts: modelCaps.reasoningEffort,
     resetTurnState(_messages: OpenAI.ChatCompletionMessageParam[]): void {
       // Anthropic request payload is derived from canonical messages each turn.
     },
