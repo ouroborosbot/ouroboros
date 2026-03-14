@@ -55,7 +55,7 @@ export function createAzureProviderRuntime(): ProviderRuntime {
         input: nativeInput,
         instructions: nativeInstructions,
         tools: toResponsesTools(request.activeTools),
-        reasoning: { effort: "medium", summary: "detailed" },
+        reasoning: { effort: request.reasoningEffort ?? "medium", summary: "detailed" },
         stream: true,
         store: false,
         include: ["reasoning.encrypted_content"],
