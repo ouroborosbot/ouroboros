@@ -9,6 +9,10 @@ import { FinalAnswerStreamer } from "../streaming";
 import type { TurnResult } from "../streaming";
 import { getModelCapabilities } from "../model-capabilities";
 
+export type AnthropicThinkingBlock =
+  | { type: "thinking"; thinking: string; signature: string }
+  | { type: "redacted_thinking"; data: string };
+
 const ANTHROPIC_SETUP_TOKEN_PREFIX = "sk-ant-oat01-";
 const ANTHROPIC_SETUP_TOKEN_MIN_LENGTH = 80;
 const ANTHROPIC_OAUTH_BETA_HEADER =
@@ -267,6 +271,8 @@ async function streamAnthropicMessages(
   let streamStarted = false;
   let usage: UsageData | undefined;
   const toolCalls = new Map<number, { id: string; name: string; arguments: string }>();
+  const thinkingBlocks = new Map<number, { type: "thinking"; thinking: string; signature: string }>();
+  const redactedBlocks = new Map<number, { type: "redacted_thinking"; data: string }>();
   const answerStreamer = new FinalAnswerStreamer(request.callbacks);
 
   try {
@@ -275,8 +281,12 @@ async function streamAnthropicMessages(
       const eventType = String(event.type ?? "");
       if (eventType === "content_block_start") {
         const block = event.content_block as Record<string, unknown> | undefined;
-        if (block?.type === "tool_use") {
-          const index = Number(event.index);
+        const index = Number(event.index);
+        if (block?.type === "thinking") {
+          thinkingBlocks.set(index, { type: "thinking", thinking: "", signature: "" });
+        } else if (block?.type === "redacted_thinking") {
+          redactedBlocks.set(index, { type: "redacted_thinking", data: String(block.data ?? "") });
+        } else if (block?.type === "tool_use") {
           const rawInput = block.input;
           const input = rawInput && typeof rawInput === "object"
             ? JSON.stringify(rawInput)
@@ -314,7 +324,17 @@ async function streamAnthropicMessages(
             request.callbacks.onModelStreamStart();
             streamStarted = true;
           }
-          request.callbacks.onReasoningChunk(String(delta?.thinking ?? ""));
+          const thinkingText = String(delta?.thinking ?? "");
+          request.callbacks.onReasoningChunk(thinkingText);
+          const thinkingIndex = Number(event.index);
+          const thinkingBlock = thinkingBlocks.get(thinkingIndex);
+          if (thinkingBlock) thinkingBlock.thinking += thinkingText;
+          continue;
+        }
+        if (deltaType === "signature_delta") {
+          const sigIndex = Number(event.index);
+          const sigBlock = thinkingBlocks.get(sigIndex);
+          if (sigBlock) sigBlock.signature += String(delta?.signature ?? "");
           continue;
         }
         if (deltaType === "input_json_delta") {
@@ -355,10 +375,18 @@ async function streamAnthropicMessages(
     throw withAnthropicAuthGuidance(error);
   }
 
+  // Collect all thinking blocks (regular + redacted) sorted by index to preserve ordering
+  const allThinkingIndices = [...thinkingBlocks.keys(), ...redactedBlocks.keys()].sort((a, b) => a - b);
+  const outputItems: AnthropicThinkingBlock[] = allThinkingIndices.map((idx) => {
+    const tb = thinkingBlocks.get(idx);
+    if (tb) return tb;
+    return redactedBlocks.get(idx)!;
+  });
+
   return {
     content,
     toolCalls: [...toolCalls.values()],
-    outputItems: [],
+    outputItems,
     usage,
     finalAnswerStreamed: answerStreamer.streamed,
   };

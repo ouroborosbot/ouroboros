@@ -10,11 +10,14 @@ export interface UsageData {
 }
 
 // Azure Responses API item types (SDK doesn't export these)
+// Anthropic thinking block types are also included for cross-provider compatibility
 export type ResponseItem =
   | { type: "reasoning"; id: string; summary: { text: string; type: string }[]; encrypted_content?: string }
   | { type: "message"; id?: string; role: "assistant"; content: { type: string; text: string }[] }
   | { type: "function_call"; call_id: string; name: string; arguments: string; status: string }
   | { type: "function_call_output"; call_id: string; output: string }
+  | { type: "thinking"; thinking: string; signature: string }
+  | { type: "redacted_thinking"; data: string }
   | { role: "user"; content: string | Array<Record<string, unknown>> }
   | { role: "assistant"; content: string };
 
