@@ -62,6 +62,7 @@ export interface ToolDefinition {
   handler: ToolHandler;
   integration?: Integration;
   confirmationRequired?: boolean;
+  requiredCapability?: import("../heart/core").ProviderCapability;
 }
 
 // Tracks which file paths have been read via read_file in this session.

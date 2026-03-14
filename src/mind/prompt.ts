@@ -330,7 +330,7 @@ function dateSection(): string {
 }
 
 function toolsSection(channel: Channel, options?: BuildSystemOptions, context?: ResolvedContext): string {
-  const channelTools = getToolsForChannel(getChannelCapabilities(channel), undefined, context);
+  const channelTools = getToolsForChannel(getChannelCapabilities(channel), undefined, context, options?.providerCapabilities);
   const activeTools = (options?.toolChoiceRequired ?? true) ? [...channelTools, finalAnswerTool] : channelTools;
   const list = activeTools
     .map((t) => `- ${t.function.name}: ${t.function.description}`)
@@ -389,6 +389,8 @@ export interface BuildSystemOptions {
   hasQueuedFollowUp?: boolean;
   activeWorkFrame?: ActiveWorkFrame;
   delegationDecision?: DelegationDecision;
+  providerCapabilities?: ReadonlySet<import("../heart/core").ProviderCapability>;
+  supportedReasoningEfforts?: readonly string[];
 }
 
 function bridgeContextSection(options?: BuildSystemOptions): string {
