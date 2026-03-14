@@ -238,11 +238,14 @@ async function streamAnthropicMessages(
   const { system, messages } = toAnthropicMessages(request.messages);
   const anthropicTools = toAnthropicTools(request.activeTools);
 
+  const modelCaps = getModelCapabilities(model);
+  const maxTokens = modelCaps.maxOutputTokens ?? 16384;
   const params: Record<string, unknown> = {
     model,
-    max_tokens: 4096,
+    max_tokens: maxTokens,
     messages,
     stream: true,
+    thinking: { type: "adaptive", effort: request.reasoningEffort ?? "medium" },
   };
   if (system) params.system = system;
   if (anthropicTools.length > 0) params.tools = anthropicTools;
