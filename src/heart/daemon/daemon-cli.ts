@@ -818,6 +818,7 @@ function defaultEnsureDaemonBootPersistence(socketPath: string): void {
     entryPath,
     socketPath,
     logDir,
+    envPath: process.env.PATH,
   })
 }
 
