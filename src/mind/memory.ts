@@ -49,6 +49,7 @@ export interface EntityIndexEntry {
 export type EntityIndex = Record<string, EntityIndexEntry>;
 
 const DEDUP_THRESHOLD = 0.6;
+const SEMANTIC_DEDUP_THRESHOLD = 0.95;
 const ENTITY_TOKEN = /[a-z0-9]+/g;
 const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
 
@@ -184,14 +185,30 @@ function appendDailyFact(dailyDir: string, fact: MemoryFact): void {
   fs.appendFileSync(dayPath, `${JSON.stringify(fact)}\n`, "utf8");
 }
 
-export function appendFactsWithDedup(stores: MemoryStorePaths, incoming: MemoryFact[]): MemoryWriteResult {
+export interface AppendFactsOptions {
+  semanticThreshold?: number;
+}
+
+export function appendFactsWithDedup(stores: MemoryStorePaths, incoming: MemoryFact[], options?: AppendFactsOptions): MemoryWriteResult {
   const existing = readExistingFacts(stores.factsPath);
   const all = [...existing];
   let added = 0;
   let skipped = 0;
+  const semanticThreshold = options?.semanticThreshold;
 
   for (const fact of incoming) {
-    const duplicate = all.some((prior) => overlapScore(prior.text, fact.text) > DEDUP_THRESHOLD);
+    const duplicate = all.some((prior) => {
+      if (overlapScore(prior.text, fact.text) > DEDUP_THRESHOLD) return true;
+      if (
+        semanticThreshold !== undefined &&
+        fact.embedding.length > 0 &&
+        prior.embedding.length > 0 &&
+        fact.embedding.length === prior.embedding.length
+      ) {
+        return cosineSimilarity(fact.embedding, prior.embedding) > semanticThreshold;
+      }
+      return false;
+    });
     if (duplicate) {
       skipped++;
       continue;
@@ -285,7 +302,7 @@ export async function saveMemoryFact(options: SaveMemoryFactOptions): Promise<Me
     embedding,
   };
 
-  return appendFactsWithDedup(stores, [fact]);
+  return appendFactsWithDedup(stores, [fact], { semanticThreshold: SEMANTIC_DEDUP_THRESHOLD });
 }
 
 export interface BackfillEmbeddingsResult {
