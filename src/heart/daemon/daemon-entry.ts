@@ -45,7 +45,7 @@ const processManager = new DaemonProcessManager({
     channel: "inner-dialog",
     autoStart: true,
   })),
-  existsSync: (p) => fs.existsSync(p),
+  existsSync: fs.existsSync,
 })
 
 const scheduler = new TaskDrivenScheduler({
