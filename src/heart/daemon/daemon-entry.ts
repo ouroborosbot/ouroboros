@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import * as path from "path"
 import { DaemonProcessManager } from "./process-manager"
 import { OuroDaemon } from "./daemon"
 import { emitNervesEvent } from "../../nerves/runtime"
@@ -8,6 +9,8 @@ import { TaskDrivenScheduler } from "./task-scheduler"
 import { configureDaemonRuntimeLogger } from "./runtime-logging"
 import { DaemonSenseManager } from "./sense-manager"
 import { listEnabledBundleAgents } from "./agent-discovery"
+import { getRepoRoot } from "../identity"
+import { detectRuntimeMode } from "./runtime-mode"
 
 function parseSocketPath(argv: string[]): string {
   const socketIndex = argv.indexOf("--socket")
@@ -22,11 +25,14 @@ const socketPath = parseSocketPath(process.argv)
 
 configureDaemonRuntimeLogger("daemon")
 
+const entryPath = path.resolve(__dirname, "daemon-entry.js")
+const mode = detectRuntimeMode(getRepoRoot())
+
 emitNervesEvent({
   component: "daemon",
   event: "daemon.entry_start",
   message: "starting daemon entrypoint",
-  meta: { socketPath },
+  meta: { socketPath, entryPath, mode },
 })
 
 const managedAgents = listEnabledBundleAgents()
