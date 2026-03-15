@@ -822,6 +822,17 @@ function defaultEnsureDaemonBootPersistence(socketPath: string): void {
   }
 
   const entryPath = path.join(getRepoRoot(), "dist", "heart", "daemon", "daemon-entry.js")
+
+  if (!fs.existsSync(entryPath)) {
+    emitNervesEvent({
+      level: "warn",
+      component: "daemon",
+      event: "daemon.entry_path_missing",
+      message: "entryPath does not exist on disk — plist may point to a stale location. Run 'ouro daemon install' from the correct location.",
+      meta: { entryPath },
+    })
+  }
+
   const logDir = path.join(homeDir, ".agentstate", "daemon", "logs")
   writeLaunchAgentPlist(launchdDeps, {
     nodePath: process.execPath,
