@@ -823,6 +823,7 @@ function defaultEnsureDaemonBootPersistence(socketPath: string): void {
 
   const entryPath = path.join(getRepoRoot(), "dist", "heart", "daemon", "daemon-entry.js")
 
+  /* v8 ignore next -- covered via mock in daemon-cli-defaults.test.ts; v8 on CI attributes the real fs.existsSync branch to the non-mock load @preserve */
   if (!fs.existsSync(entryPath)) {
     emitNervesEvent({
       level: "warn",
