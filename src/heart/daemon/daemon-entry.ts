@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import * as fs from "fs"
 import * as path from "path"
 import { DaemonProcessManager } from "./process-manager"
 import { OuroDaemon } from "./daemon"
@@ -44,6 +45,7 @@ const processManager = new DaemonProcessManager({
     channel: "inner-dialog",
     autoStart: true,
   })),
+  existsSync: (p) => fs.existsSync(p),
 })
 
 const scheduler = new TaskDrivenScheduler({
