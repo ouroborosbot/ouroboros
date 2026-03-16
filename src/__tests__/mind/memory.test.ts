@@ -745,6 +745,34 @@ describe("memory write path", () => {
     expect(result).toEqual({ total: 1, backfilled: 0, failed: 1 });
   });
 
+  it("saveMemoryFact deduplicates paraphrased facts via semantic threshold", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "memory-save-semantic-dedup-"));
+    const nearIdenticalVector = [0.9, 0.1, 0.05];
+    let callCount = 0;
+
+    const result1 = await saveMemoryFact({
+      memoryRoot: root,
+      text: "the project deadline is next friday",
+      source: "tool:memory_save",
+      idFactory: () => `sem-save-${++callCount}`,
+      embeddingProvider: { embed: async () => [nearIdenticalVector] },
+    });
+    expect(result1).toEqual({ added: 1, skipped: 0 });
+
+    const result2 = await saveMemoryFact({
+      memoryRoot: root,
+      text: "deliverable is due by end of week",
+      source: "tool:memory_save",
+      idFactory: () => `sem-save-${++callCount}`,
+      embeddingProvider: { embed: async () => [nearIdenticalVector] },
+    });
+    expect(result2).toEqual({ added: 0, skipped: 1 });
+
+    const factsPath = path.join(root, "facts.jsonl");
+    const stored = fs.readFileSync(factsPath, "utf8").trim().split("\n");
+    expect(stored).toHaveLength(1);
+  });
+
   it("searchMemoryFacts falls back when default OpenAI embedding payload is malformed", async () => {
     vi.resetModules();
     vi.doMock("../../heart/config", async () => {
