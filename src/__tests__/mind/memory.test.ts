@@ -3,7 +3,6 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import {
-  __memoryTestUtils,
   appendFactsWithDedup,
   backfillEmbeddings,
   ensureMemoryStorePaths,
@@ -11,6 +10,7 @@ import {
   searchMemoryFacts,
   type MemoryFact,
 } from "../../mind/memory";
+import { cosineSimilarity } from "../../mind/associative-recall";
 import { baseToolDefinitions } from "../../repertoire/tools-base";
 
 describe("memory write path", () => {
@@ -138,7 +138,6 @@ describe("memory write path", () => {
   });
 
   it("covers cosineSimilarity edge cases used by semantic scoring", () => {
-    const { cosineSimilarity } = __memoryTestUtils;
     expect(cosineSimilarity([], [1])).toBe(0);
     expect(cosineSimilarity([1], [])).toBe(0);
     expect(cosineSimilarity([1], [1, 2])).toBe(0);
