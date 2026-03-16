@@ -201,8 +201,8 @@ export function appendFactsWithDedup(stores: MemoryStorePaths, incoming: MemoryF
       if (overlapScore(prior.text, fact.text) > DEDUP_THRESHOLD) return true;
       if (
         semanticThreshold !== undefined &&
-        fact.embedding.length > 0 &&
-        prior.embedding.length > 0 &&
+        Array.isArray(fact.embedding) && fact.embedding.length > 0 &&
+        Array.isArray(prior.embedding) && prior.embedding.length > 0 &&
         fact.embedding.length === prior.embedding.length
       ) {
         return cosineSimilarity(fact.embedding, prior.embedding) > semanticThreshold;
