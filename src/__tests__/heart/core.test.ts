@@ -3659,7 +3659,7 @@ describe("anthropic setup-token provider contract", () => {
         (c: any[]) => c[0]?.event === "engine.provider_init_error",
       )?.[0]?.message ?? ""
       expect(msg).toContain("model/setupToken is incomplete")
-      expect(msg).toContain("claude setup-token")
+      expect(msg).toContain("ouro auth --agent testagent")
       expect(msg).toContain("/tmp/.agentsecrets/testagent/secrets.json")
       expect(msg).toContain("providers.anthropic.setupToken")
     } finally {
