@@ -87,6 +87,22 @@ describe("ouro CLI parsing", () => {
     })
   })
 
+  it("parses auth commands and rejects malformed auth input", () => {
+    expect(parseOuroCommand(["auth", "--agent", "slugger"])).toEqual({
+      kind: "auth.run",
+      agent: "slugger",
+    })
+
+    expect(parseOuroCommand(["auth", "--agent", "slugger", "--provider", "openai-codex"])).toEqual({
+      kind: "auth.run",
+      agent: "slugger",
+      provider: "openai-codex",
+    })
+
+    expect(() => parseOuroCommand(["auth"])).toThrow("ouro auth --agent <name> [--provider <provider>]")
+    expect(() => parseOuroCommand(["auth", "--agent", "slugger", "--provider", "not-real"])).toThrow("Usage")
+  })
+
   it("parses chat, message, and poke commands", () => {
     expect(parseOuroCommand(["chat", "slugger"])).toEqual({
       kind: "chat.connect",
@@ -530,6 +546,105 @@ describe("ouro CLI execution", () => {
     expect(installSubagents).toHaveBeenCalledTimes(1)
     expect(deps.startDaemonProcess).toHaveBeenCalledWith("/tmp/ouro-test.sock")
     expect(deps.sendCommand).not.toHaveBeenCalled()
+  })
+
+  it("runs `auth` locally with provider autodetected from agent.json", async () => {
+    const agentName = `auth-local-${Date.now()}`
+    const agentRoot = path.join(os.homedir(), "AgentBundles", `${agentName}.ouro`)
+    fs.mkdirSync(agentRoot, { recursive: true })
+    fs.writeFileSync(
+      path.join(agentRoot, "agent.json"),
+      JSON.stringify({
+        version: 1,
+        enabled: true,
+        provider: "anthropic",
+        phrases: {
+          thinking: ["working"],
+          tool: ["running tool"],
+          followup: ["processing"],
+        },
+      }, null, 2) + "\n",
+      "utf-8",
+    )
+
+    const runAuthFlow = vi.fn(async () => ({ message: `authenticated ${agentName} with anthropic` }))
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, message: "unexpected daemon call" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      runAuthFlow,
+    } as OuroCliDeps & {
+      runAuthFlow: typeof runAuthFlow
+    }
+
+    try {
+      const result = await runOuroCli(["auth", "--agent", agentName], deps)
+
+      expect(result).toBe(`authenticated ${agentName} with anthropic`)
+      expect(runAuthFlow).toHaveBeenCalledWith(expect.objectContaining({
+        agentName,
+        provider: "anthropic",
+      }))
+      expect(deps.sendCommand).not.toHaveBeenCalled()
+    } finally {
+      fs.rmSync(agentRoot, { recursive: true, force: true })
+    }
+  })
+
+  it("switches the agent provider after explicit auth override succeeds", async () => {
+    const agentName = `auth-switch-${Date.now()}`
+    const agentRoot = path.join(os.homedir(), "AgentBundles", `${agentName}.ouro`)
+    const agentConfigPath = path.join(agentRoot, "agent.json")
+    fs.mkdirSync(agentRoot, { recursive: true })
+    fs.writeFileSync(
+      agentConfigPath,
+      JSON.stringify({
+        version: 1,
+        enabled: true,
+        provider: "anthropic",
+        phrases: {
+          thinking: ["working"],
+          tool: ["running tool"],
+          followup: ["processing"],
+        },
+      }, null, 2) + "\n",
+      "utf-8",
+    )
+
+    const runAuthFlow = vi.fn(async () => ({ message: `authenticated ${agentName} with openai-codex` }))
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, message: "unexpected daemon call" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => true),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      runAuthFlow,
+    } as OuroCliDeps & {
+      runAuthFlow: typeof runAuthFlow
+    }
+
+    try {
+      const result = await runOuroCli(["auth", "--agent", agentName, "--provider", "openai-codex"], deps)
+
+      expect(result).toBe(`authenticated ${agentName} with openai-codex`)
+      expect(runAuthFlow).toHaveBeenCalledWith(expect.objectContaining({
+        agentName,
+        provider: "openai-codex",
+      }))
+      const updated = JSON.parse(fs.readFileSync(agentConfigPath, "utf-8")) as { provider: string }
+      expect(updated.provider).toBe("openai-codex")
+      expect(deps.sendCommand).not.toHaveBeenCalled()
+    } finally {
+      fs.rmSync(agentRoot, { recursive: true, force: true })
+    }
   })
 
   it("is idempotent for `up` when daemon already running", async () => {
