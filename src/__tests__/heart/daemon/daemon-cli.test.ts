@@ -93,6 +93,11 @@ describe("ouro CLI parsing", () => {
       agent: "slugger",
     })
 
+    expect(parseOuroCommand(["auth", "--agent", "slugger", "--note", "ignored"])).toEqual({
+      kind: "auth.run",
+      agent: "slugger",
+    })
+
     expect(parseOuroCommand(["auth", "--agent", "slugger", "--provider", "openai-codex"])).toEqual({
       kind: "auth.run",
       agent: "slugger",
@@ -644,6 +649,57 @@ describe("ouro CLI execution", () => {
       expect(deps.sendCommand).not.toHaveBeenCalled()
     } finally {
       fs.rmSync(agentRoot, { recursive: true, force: true })
+    }
+  })
+
+  it("uses the default runtime auth flow when no auth runner is injected", async () => {
+    vi.resetModules()
+
+    const defaultRunRuntimeAuthFlow = vi.fn(async () => ({
+      message: "authenticated slugger with minimax",
+    }))
+    const readAgentConfigForAgent = vi.fn(() => ({
+      config: { provider: "minimax" },
+    }))
+    const writeAgentProviderSelection = vi.fn()
+
+    vi.doMock("../../../heart/daemon/auth-flow", async () => {
+      const actual = await vi.importActual<typeof import("../../../heart/daemon/auth-flow")>("../../../heart/daemon/auth-flow")
+      return {
+        ...actual,
+        runRuntimeAuthFlow: defaultRunRuntimeAuthFlow,
+        readAgentConfigForAgent,
+        writeAgentProviderSelection,
+      }
+    })
+
+    try {
+      const { runOuroCli: runFreshOuroCli } = await import("../../../heart/daemon/daemon-cli")
+      const deps: OuroCliDeps = {
+        socketPath: "/tmp/ouro-test.sock",
+        sendCommand: vi.fn(async () => ({ ok: true, message: "unexpected daemon call" })),
+        startDaemonProcess: vi.fn(async () => ({ pid: 1 })),
+        writeStdout: vi.fn(),
+        checkSocketAlive: vi.fn(async () => true),
+        cleanupStaleSocket: vi.fn(),
+        fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+        installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+        promptInput: vi.fn(async () => ""),
+      }
+
+      const result = await runFreshOuroCli(["auth", "--agent", "slugger"], deps)
+
+      expect(result).toBe("authenticated slugger with minimax")
+      expect(readAgentConfigForAgent).toHaveBeenCalledWith("slugger")
+      expect(defaultRunRuntimeAuthFlow).toHaveBeenCalledWith({
+        agentName: "slugger",
+        provider: "minimax",
+        promptInput: deps.promptInput,
+      })
+      expect(writeAgentProviderSelection).not.toHaveBeenCalled()
+    } finally {
+      vi.doUnmock("../../../heart/daemon/auth-flow")
+      vi.resetModules()
     }
   })
 

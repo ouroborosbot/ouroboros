@@ -185,7 +185,6 @@ describe("listTargetSessionCandidates", () => {
       messages: [{ role: "user", content: "bluebubbles target" }],
     })
     writeJson(path.join(sessionsDir, "friend-3", "teams", "group-thread.json"), {
-      state: { lastFriendActivityAt: recentIso(4) },
       messages: [{ role: "user", content: "teams target" }],
     })
 
