@@ -3840,6 +3840,180 @@ describe("anthropic setup-token provider contract", () => {
     expect(Array.isArray((params as any).tools)).toBe(true)
   })
 
+  it("preserves Anthropic thinking signatures and redacted thinking blocks in output order", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: Date.now() + 60_000,
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-opus-4-6",
+          setupToken: makeAnthropicSetupToken(),
+        },
+      },
+    })
+
+    mockAnthropicMessagesCreate.mockResolvedValue(makeAnthropicEventStream([
+      {
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "thinking" },
+      },
+      {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "thinking_delta", thinking: "reasoning body" },
+      },
+      {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "signature_delta", signature: "sig_123" },
+      },
+      {
+        type: "content_block_start",
+        index: 1,
+        content_block: { type: "redacted_thinking", data: "ciphertext" },
+      },
+    ]))
+
+    const reasoningChunk = vi.fn()
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    const result = await runtime.streamTurn({
+      messages: [{ role: "user", content: "hi" }],
+      activeTools: [],
+      callbacks: {
+        onModelStart: vi.fn(),
+        onModelStreamStart: vi.fn(),
+        onTextChunk: vi.fn(),
+        onReasoningChunk: reasoningChunk,
+        onToolStart: vi.fn(),
+        onToolEnd: vi.fn(),
+        onError: vi.fn(),
+      },
+      signal: new AbortController().signal,
+    })
+
+    expect(reasoningChunk).toHaveBeenCalledWith("reasoning body")
+    expect(result.outputItems).toEqual([
+      { type: "thinking", thinking: "reasoning body", signature: "sig_123" },
+      { type: "redacted_thinking", data: "ciphertext" },
+    ])
+  })
+
+  it("restores persisted Anthropic thinking blocks before text and tool blocks", async () => {
+    const { toAnthropicMessages } = await import("../../heart/providers/anthropic")
+
+    const result = toAnthropicMessages([
+      {
+        role: "assistant",
+        content: "visible text",
+        tool_calls: [
+          {
+            id: "call0",
+            type: "function",
+            function: { name: "read_file", arguments: "{\"path\":\"notes.md\"}" },
+          },
+        ],
+        _thinking_blocks: [
+          { type: "thinking", thinking: "private chain", signature: "sig_abc" },
+          { type: "redacted_thinking", data: "opaque_blob" },
+        ],
+      } as any,
+    ])
+
+    expect(result).toEqual({
+      system: undefined,
+      messages: [
+        {
+          role: "assistant",
+          content: [
+            { type: "thinking", thinking: "private chain", signature: "sig_abc" },
+            { type: "redacted_thinking", data: "opaque_blob" },
+            { type: "text", text: "visible text" },
+            {
+              type: "tool_use",
+              id: "call0",
+              name: "read_file",
+              input: { path: "notes.md" },
+            },
+          ],
+        },
+      ],
+    })
+  })
+
+  it("uses Anthropic fallback defaults for unknown models and empty thinking payload fields", async () => {
+    vi.resetModules()
+    vi.mocked(execSync).mockReturnValue(JSON.stringify({
+      claudeAiOauth: {
+        accessToken: makeAnthropicSetupToken(),
+        expiresAt: Date.now() + 60_000,
+      },
+    }) as any)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupConfig({
+      providers: {
+        anthropic: {
+          model: "claude-unknown-preview",
+          setupToken: makeAnthropicSetupToken(),
+        },
+      },
+    })
+
+    mockAnthropicMessagesCreate.mockResolvedValue(makeAnthropicEventStream([
+      {
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "thinking" },
+      },
+      {
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "signature_delta" },
+      },
+      {
+        type: "content_block_delta",
+        index: 99,
+        delta: { type: "signature_delta", signature: "ignored" },
+      },
+      {
+        type: "content_block_start",
+        index: 1,
+        content_block: { type: "redacted_thinking" },
+      },
+    ]))
+
+    const core = await import("../../heart/core")
+    const runtime = (core as any).createProviderRegistry().resolve()
+    const result = await runtime.streamTurn({
+      messages: [{ role: "user", content: "hi" }],
+      activeTools: [],
+      callbacks: {
+        onModelStart: vi.fn(),
+        onModelStreamStart: vi.fn(),
+        onTextChunk: vi.fn(),
+        onReasoningChunk: vi.fn(),
+        onToolStart: vi.fn(),
+        onToolEnd: vi.fn(),
+        onError: vi.fn(),
+      },
+      signal: new AbortController().signal,
+    })
+
+    const [params] = mockAnthropicMessagesCreate.mock.calls[0]
+    expect((params as any).max_tokens).toBe(16384)
+    expect(result.outputItems).toEqual([
+      { type: "thinking", thinking: "", signature: "" },
+      { type: "redacted_thinking", data: "" },
+    ])
+  })
+
   it("handles Anthropic tool argument merge/reset/fallback delta paths", async () => {
     vi.resetModules()
     vi.mocked(execSync).mockReturnValue(JSON.stringify({
