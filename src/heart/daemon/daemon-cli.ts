@@ -1211,8 +1211,24 @@ async function resolveHatchInput(command: Extract<OuroCliCommand, { kind: "hatch
   }
 
   const credentials: HatchCredentialsInput = { ...(command.credentials ?? {}) }
+  if (providerRaw === "anthropic" && !credentials.setupToken && deps.runAuthFlow) {
+    const result = await deps.runAuthFlow({
+      agentName,
+      provider: "anthropic",
+      promptInput: prompt,
+    })
+    Object.assign(credentials, result.credentials)
+  }
   if (providerRaw === "anthropic" && !credentials.setupToken && prompt) {
     credentials.setupToken = await prompt("Anthropic setup-token: ")
+  }
+  if (providerRaw === "openai-codex" && !credentials.oauthAccessToken && deps.runAuthFlow) {
+    const result = await deps.runAuthFlow({
+      agentName,
+      provider: "openai-codex",
+      promptInput: prompt,
+    })
+    Object.assign(credentials, result.credentials)
   }
   if (providerRaw === "openai-codex" && !credentials.oauthAccessToken && prompt) {
     credentials.oauthAccessToken = await prompt("OpenAI Codex OAuth token: ")

@@ -54,14 +54,14 @@ interface SecretsTemplate {
 const DEFAULT_SECRETS_TEMPLATE: SecretsTemplate = {
   providers: {
     azure: {
-      modelName: "",
+      modelName: "gpt-4o-mini",
       apiKey: "",
       endpoint: "",
       deployment: "",
       apiVersion: "2025-04-01-preview",
     },
     minimax: {
-      model: "",
+      model: "minimax-text-01",
       apiKey: "",
     },
     anthropic: {
@@ -105,11 +105,17 @@ export interface RuntimeAuthDeps {
   spawnSync?: typeof defaultSpawnSync
 }
 
+export interface ProviderSecretsDeps {
+  homeDir?: string
+  secretsRoot?: string
+}
+
 export interface RuntimeAuthResult {
   agentName: string
   provider: AgentProvider
   message: string
   secretsPath: string
+  credentials: HatchCredentialsInput
 }
 
 function deepMerge<T>(defaults: T, partial: Record<string, unknown>): T {
@@ -184,8 +190,17 @@ export function writeAgentProviderSelection(
   return configPath
 }
 
-function loadAgentSecrets(agentName: string, homeDir: string): { secretsPath: string; secrets: SecretsTemplate } {
-  const secretsPath = getAgentSecretsPath(agentName).replace(os.homedir(), homeDir)
+function resolveAgentSecretsPath(agentName: string, deps: ProviderSecretsDeps = {}): string {
+  if (deps.secretsRoot) return path.join(deps.secretsRoot, agentName, "secrets.json")
+  const homeDir = deps.homeDir ?? os.homedir()
+  return getAgentSecretsPath(agentName).replace(os.homedir(), homeDir)
+}
+
+export function loadAgentSecrets(
+  agentName: string,
+  deps: ProviderSecretsDeps = {},
+): { secretsPath: string; secrets: SecretsTemplate } {
+  const secretsPath = resolveAgentSecretsPath(agentName, deps)
   const secretsDir = path.dirname(secretsPath)
   fs.mkdirSync(secretsDir, { recursive: true })
 
@@ -205,6 +220,18 @@ function loadAgentSecrets(agentName: string, homeDir: string): { secretsPath: st
 
 function writeSecrets(secretsPath: string, secrets: SecretsTemplate): void {
   fs.writeFileSync(secretsPath, `${JSON.stringify(secrets, null, 2)}\n`, "utf8")
+}
+
+export function writeProviderCredentials(
+  agentName: string,
+  provider: AgentProvider,
+  credentials: HatchCredentialsInput,
+  deps: ProviderSecretsDeps = {},
+): { secretsPath: string; secrets: SecretsTemplate } {
+  const { secretsPath, secrets } = loadAgentSecrets(agentName, deps)
+  applyCredentials(secrets, provider, credentials)
+  writeSecrets(secretsPath, secrets)
+  return { secretsPath, secrets }
 }
 
 function readCodexAccessToken(homeDir: string): string {
@@ -238,7 +265,7 @@ function validateAnthropicToken(token: string): string {
   return trimmed
 }
 
-async function collectCredentials(
+export async function collectRuntimeAuthCredentials(
   input: RuntimeAuthInput,
   deps: RuntimeAuthDeps,
 ): Promise<HatchCredentialsInput> {
@@ -339,10 +366,8 @@ export async function runRuntimeAuthFlow(
   })
 
   const homeDir = deps.homeDir ?? os.homedir()
-  const credentials = await collectCredentials(input, deps)
-  const { secretsPath, secrets } = loadAgentSecrets(input.agentName, homeDir)
-  applyCredentials(secrets, input.provider, credentials)
-  writeSecrets(secretsPath, secrets)
+  const credentials = await collectRuntimeAuthCredentials(input, deps)
+  const { secretsPath } = writeProviderCredentials(input.agentName, input.provider, credentials, { homeDir })
 
   emitNervesEvent({
     component: "daemon",
@@ -356,5 +381,6 @@ export async function runRuntimeAuthFlow(
     provider: input.provider,
     secretsPath,
     message: `authenticated ${input.agentName} with ${input.provider}`,
+    credentials,
   }
 }
