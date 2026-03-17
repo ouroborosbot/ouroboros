@@ -118,6 +118,14 @@ export interface RuntimeAuthResult {
   credentials: HatchCredentialsInput
 }
 
+export interface HatchCredentialResolutionInput {
+  agentName: string
+  provider: AgentProvider
+  credentials?: HatchCredentialsInput
+  promptInput?: (question: string) => Promise<string>
+  runAuthFlow?: (input: RuntimeAuthInput) => Promise<RuntimeAuthResult>
+}
+
 function deepMerge<T>(defaults: T, partial: Record<string, unknown>): T {
   const result = { ...(defaults as Record<string, unknown>) }
   for (const key of Object.keys(partial)) {
@@ -330,6 +338,49 @@ export async function collectRuntimeAuthCredentials(
     throw new Error("Azure API key, endpoint, and deployment are required.")
   }
   return { apiKey, endpoint, deployment }
+}
+
+export async function resolveHatchCredentials(
+  input: HatchCredentialResolutionInput,
+): Promise<HatchCredentialsInput> {
+  const prompt = input.promptInput
+  const credentials: HatchCredentialsInput = { ...(input.credentials ?? {}) }
+
+  if (input.provider === "anthropic" && !credentials.setupToken && input.runAuthFlow) {
+    const result = await input.runAuthFlow({
+      agentName: input.agentName,
+      provider: "anthropic",
+      promptInput: prompt,
+    })
+    Object.assign(credentials, result.credentials)
+  }
+  if (input.provider === "anthropic" && !credentials.setupToken && prompt) {
+    credentials.setupToken = await prompt("Anthropic setup-token: ")
+  }
+
+  if (input.provider === "openai-codex" && !credentials.oauthAccessToken && input.runAuthFlow) {
+    const result = await input.runAuthFlow({
+      agentName: input.agentName,
+      provider: "openai-codex",
+      promptInput: prompt,
+    })
+    Object.assign(credentials, result.credentials)
+  }
+  if (input.provider === "openai-codex" && !credentials.oauthAccessToken && prompt) {
+    credentials.oauthAccessToken = await prompt("OpenAI Codex OAuth token: ")
+  }
+
+  if (input.provider === "minimax" && !credentials.apiKey && prompt) {
+    credentials.apiKey = await prompt("MiniMax API key: ")
+  }
+
+  if (input.provider === "azure") {
+    if (!credentials.apiKey && prompt) credentials.apiKey = await prompt("Azure API key: ")
+    if (!credentials.endpoint && prompt) credentials.endpoint = await prompt("Azure endpoint: ")
+    if (!credentials.deployment && prompt) credentials.deployment = await prompt("Azure deployment: ")
+  }
+
+  return credentials
 }
 
 function applyCredentials(

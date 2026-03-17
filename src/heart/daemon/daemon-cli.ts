@@ -40,6 +40,7 @@ import { writeLaunchAgentPlist, type LaunchdWriteDeps } from "./launchd"
 import { DEFAULT_DAEMON_SOCKET_PATH, sendDaemonCommand, checkDaemonSocketAlive } from "./socket-client"
 import { listSessionActivity } from "../session-activity"
 import {
+  resolveHatchCredentials,
   readAgentConfigForAgent,
   runRuntimeAuthFlow as defaultRunRuntimeAuthFlow,
   writeAgentProviderSelection,
@@ -1210,37 +1211,13 @@ async function resolveHatchInput(command: Extract<OuroCliCommand, { kind: "hatch
     throw new Error(`Usage\n${usage()}`)
   }
 
-  const credentials: HatchCredentialsInput = { ...(command.credentials ?? {}) }
-  if (providerRaw === "anthropic" && !credentials.setupToken && deps.runAuthFlow) {
-    const result = await deps.runAuthFlow({
-      agentName,
-      provider: "anthropic",
-      promptInput: prompt,
-    })
-    Object.assign(credentials, result.credentials)
-  }
-  if (providerRaw === "anthropic" && !credentials.setupToken && prompt) {
-    credentials.setupToken = await prompt("Anthropic setup-token: ")
-  }
-  if (providerRaw === "openai-codex" && !credentials.oauthAccessToken && deps.runAuthFlow) {
-    const result = await deps.runAuthFlow({
-      agentName,
-      provider: "openai-codex",
-      promptInput: prompt,
-    })
-    Object.assign(credentials, result.credentials)
-  }
-  if (providerRaw === "openai-codex" && !credentials.oauthAccessToken && prompt) {
-    credentials.oauthAccessToken = await prompt("OpenAI Codex OAuth token: ")
-  }
-  if (providerRaw === "minimax" && !credentials.apiKey && prompt) {
-    credentials.apiKey = await prompt("MiniMax API key: ")
-  }
-  if (providerRaw === "azure") {
-    if (!credentials.apiKey && prompt) credentials.apiKey = await prompt("Azure API key: ")
-    if (!credentials.endpoint && prompt) credentials.endpoint = await prompt("Azure endpoint: ")
-    if (!credentials.deployment && prompt) credentials.deployment = await prompt("Azure deployment: ")
-  }
+  const credentials = await resolveHatchCredentials({
+    agentName,
+    provider: providerRaw,
+    credentials: command.credentials,
+    promptInput: prompt,
+    runAuthFlow: deps.runAuthFlow,
+  })
 
   return {
     agentName,

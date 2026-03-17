@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { emitNervesEvent } from "../../../nerves/runtime"
 import {
   readAgentConfigForAgent,
+  resolveHatchCredentials,
+  writeProviderCredentials,
   runRuntimeAuthFlow,
   writeAgentProviderSelection,
 } from "../../../heart/daemon/auth-flow"
@@ -481,5 +483,108 @@ describe("runtime auth flow", () => {
         homeDir,
       }),
     ).rejects.toThrow("Failed to read secrets config")
+  })
+
+  it("defaults provider secret writes to os.homedir when no deps are provided", () => {
+    emitTestEvent("write provider credentials default path")
+    const agentName = `DirectWriteBot-${Date.now()}`
+    cleanup.push(path.join(os.homedir(), ".agentsecrets", agentName))
+
+    const result = writeProviderCredentials(agentName, "minimax", { apiKey: "direct-minimax-key" })
+
+    expect(result.secretsPath).toBe(path.join(os.homedir(), ".agentsecrets", agentName, "secrets.json"))
+    expect(readSecrets(os.homedir(), agentName).providers.minimax.apiKey).toBe("direct-minimax-key")
+  })
+
+  it("uses shared runtime auth to resolve missing anthropic hatch credentials", async () => {
+    emitTestEvent("shared anthropic hatch credentials")
+    const promptInput = vi.fn(async () => "unexpected")
+    const runAuthFlow = vi.fn(async () => ({
+      agentName: "SharedAnthropic",
+      provider: "anthropic",
+      message: "authenticated SharedAnthropic with anthropic",
+      secretsPath: "/tmp/shared-anthropic.json",
+      credentials: {
+        setupToken: `sk-ant-oat01-${"b".repeat(90)}`,
+      },
+    }))
+
+    const credentials = await resolveHatchCredentials({
+      agentName: "SharedAnthropic",
+      provider: "anthropic",
+      promptInput,
+      runAuthFlow,
+    })
+
+    expect(runAuthFlow).toHaveBeenCalledWith({
+      agentName: "SharedAnthropic",
+      provider: "anthropic",
+      promptInput,
+    })
+    expect(promptInput).not.toHaveBeenCalledWith("Anthropic setup-token: ")
+    expect(credentials).toEqual({
+      setupToken: `sk-ant-oat01-${"b".repeat(90)}`,
+    })
+  })
+
+  it("falls back to direct hatch prompts when shared auth is unavailable", async () => {
+    emitTestEvent("fallback hatch prompts")
+    const promptInput = vi.fn(async (question: string) => {
+      if (question === "Anthropic setup-token: ") return `sk-ant-oat01-${"c".repeat(90)}`
+      if (question === "OpenAI Codex OAuth token: ") return "oauth-hatch-token"
+      return ""
+    })
+
+    const anthropic = await resolveHatchCredentials({
+      agentName: "PromptAnthropic",
+      provider: "anthropic",
+      promptInput,
+    })
+    const codex = await resolveHatchCredentials({
+      agentName: "PromptCodex",
+      provider: "openai-codex",
+      promptInput,
+    })
+
+    expect(anthropic).toEqual({
+      setupToken: `sk-ant-oat01-${"c".repeat(90)}`,
+    })
+    expect(codex).toEqual({
+      oauthAccessToken: "oauth-hatch-token",
+    })
+  })
+
+  it("fills minimax and azure hatch prompts without overwriting provided values", async () => {
+    emitTestEvent("prompt remaining hatch credentials")
+    const promptInput = vi.fn(async (question: string) => {
+      if (question === "MiniMax API key: ") return "minimax-from-prompt"
+      if (question === "Azure endpoint: ") return "https://prompt.azure.test"
+      if (question === "Azure deployment: ") return "prompt-deployment"
+      return ""
+    })
+
+    const minimax = await resolveHatchCredentials({
+      agentName: "PromptMini",
+      provider: "minimax",
+      promptInput,
+    })
+    const azure = await resolveHatchCredentials({
+      agentName: "PromptAzure",
+      provider: "azure",
+      credentials: {
+        apiKey: "existing-api-key",
+      },
+      promptInput,
+    })
+
+    expect(minimax).toEqual({
+      apiKey: "minimax-from-prompt",
+    })
+    expect(azure).toEqual({
+      apiKey: "existing-api-key",
+      endpoint: "https://prompt.azure.test",
+      deployment: "prompt-deployment",
+    })
+    expect(promptInput).not.toHaveBeenCalledWith("Azure API key: ")
   })
 })
