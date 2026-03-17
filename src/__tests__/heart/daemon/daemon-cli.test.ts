@@ -1540,6 +1540,132 @@ describe("ouro CLI execution", () => {
     })
   })
 
+  it("uses the shared anthropic auth flow for hatch when runtime auth is available", async () => {
+    const runHatchFlow = vi.fn(async () => ({
+      bundleRoot: "/tmp/AgentBundles/ClaudeSprout.ouro",
+      selectedIdentity: "medusa.md",
+      specialistSecretsPath: "/tmp/.agentsecrets/AdoptionSpecialist/secrets.json",
+      hatchlingSecretsPath: "/tmp/.agentsecrets/ClaudeSprout/secrets.json",
+    }))
+    const runAuthFlow = vi.fn(async () => ({
+      agentName: "ClaudeSprout",
+      provider: "anthropic",
+      message: "authenticated ClaudeSprout with anthropic",
+      secretsPath: "/tmp/.agentsecrets/ClaudeSprout/secrets.json",
+      credentials: {
+        setupToken: `sk-ant-oat01-${"a".repeat(90)}`,
+      },
+    } as any))
+    const promptInput = vi.fn(async () => "unexpected")
+
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, message: "unexpected sendCommand call" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 111 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
+      runHatchFlow,
+      runAuthFlow,
+      promptInput,
+    } as OuroCliDeps & {
+      runHatchFlow: typeof runHatchFlow
+      runAuthFlow: typeof runAuthFlow
+      promptInput: typeof promptInput
+    }
+
+    await runOuroCli([
+      "hatch",
+      "--agent",
+      "ClaudeSprout",
+      "--human",
+      "Ari",
+      "--provider",
+      "anthropic",
+    ], deps)
+
+    expect(runAuthFlow).toHaveBeenCalledWith({
+      agentName: "ClaudeSprout",
+      provider: "anthropic",
+      promptInput,
+    })
+    expect(promptInput).not.toHaveBeenCalledWith("Anthropic setup-token: ")
+    expect(runHatchFlow).toHaveBeenCalledWith({
+      agentName: "ClaudeSprout",
+      humanName: "Ari",
+      provider: "anthropic",
+      credentials: {
+        setupToken: `sk-ant-oat01-${"a".repeat(90)}`,
+      },
+    })
+  })
+
+  it("uses the shared codex auth flow for hatch when runtime auth is available", async () => {
+    const runHatchFlow = vi.fn(async () => ({
+      bundleRoot: "/tmp/AgentBundles/CodexSprout.ouro",
+      selectedIdentity: "python.md",
+      specialistSecretsPath: "/tmp/.agentsecrets/AdoptionSpecialist/secrets.json",
+      hatchlingSecretsPath: "/tmp/.agentsecrets/CodexSprout/secrets.json",
+    }))
+    const runAuthFlow = vi.fn(async () => ({
+      agentName: "CodexSprout",
+      provider: "openai-codex",
+      message: "authenticated CodexSprout with openai-codex",
+      secretsPath: "/tmp/.agentsecrets/CodexSprout/secrets.json",
+      credentials: {
+        oauthAccessToken: "oauth-token-abc",
+      },
+    } as any))
+    const promptInput = vi.fn(async () => "unexpected")
+
+    const deps = {
+      socketPath: "/tmp/ouro-test.sock",
+      sendCommand: vi.fn(async () => ({ ok: true, message: "unexpected sendCommand call" })),
+      startDaemonProcess: vi.fn(async () => ({ pid: 222 })),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(async () => false),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(() => "/tmp/pending.jsonl"),
+      installSubagents: vi.fn(async () => ({ claudeInstalled: 0, codexInstalled: 0, notes: [] })),
+      registerOuroBundleType: vi.fn(async () => ({ attempted: true, registered: true })),
+      runHatchFlow,
+      runAuthFlow,
+      promptInput,
+    } as OuroCliDeps & {
+      runHatchFlow: typeof runHatchFlow
+      runAuthFlow: typeof runAuthFlow
+      promptInput: typeof promptInput
+    }
+
+    await runOuroCli([
+      "hatch",
+      "--agent",
+      "CodexSprout",
+      "--human",
+      "Ari",
+      "--provider",
+      "openai-codex",
+    ], deps)
+
+    expect(runAuthFlow).toHaveBeenCalledWith({
+      agentName: "CodexSprout",
+      provider: "openai-codex",
+      promptInput,
+    })
+    expect(promptInput).not.toHaveBeenCalledWith("OpenAI Codex OAuth token: ")
+    expect(runHatchFlow).toHaveBeenCalledWith({
+      agentName: "CodexSprout",
+      humanName: "Ari",
+      provider: "openai-codex",
+      credentials: {
+        oauthAccessToken: "oauth-token-abc",
+      },
+    })
+  })
+
   it("throws usage when hatch input cannot resolve required values", async () => {
     const deps: OuroCliDeps = {
       socketPath: "/tmp/ouro-test.sock",
