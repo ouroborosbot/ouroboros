@@ -3,7 +3,6 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import {
-  __memoryTestUtils,
   appendFactsWithDedup,
   backfillEmbeddings,
   ensureMemoryStorePaths,
@@ -11,6 +10,7 @@ import {
   searchMemoryFacts,
   type MemoryFact,
 } from "../../mind/memory";
+import { cosineSimilarity } from "../../mind/associative-recall";
 import { baseToolDefinitions } from "../../repertoire/tools-base";
 
 describe("memory write path", () => {
@@ -138,7 +138,6 @@ describe("memory write path", () => {
   });
 
   it("covers cosineSimilarity edge cases used by semantic scoring", () => {
-    const { cosineSimilarity } = __memoryTestUtils;
     expect(cosineSimilarity([], [1])).toBe(0);
     expect(cosineSimilarity([1], [])).toBe(0);
     expect(cosineSimilarity([1], [1, 2])).toBe(0);
@@ -744,6 +743,34 @@ describe("memory write path", () => {
     });
 
     expect(result).toEqual({ total: 1, backfilled: 0, failed: 1 });
+  });
+
+  it("saveMemoryFact deduplicates paraphrased facts via semantic threshold", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "memory-save-semantic-dedup-"));
+    const nearIdenticalVector = [0.9, 0.1, 0.05];
+    let callCount = 0;
+
+    const result1 = await saveMemoryFact({
+      memoryRoot: root,
+      text: "the project deadline is next friday",
+      source: "tool:memory_save",
+      idFactory: () => `sem-save-${++callCount}`,
+      embeddingProvider: { embed: async () => [nearIdenticalVector] },
+    });
+    expect(result1).toEqual({ added: 1, skipped: 0 });
+
+    const result2 = await saveMemoryFact({
+      memoryRoot: root,
+      text: "deliverable is due by end of week",
+      source: "tool:memory_save",
+      idFactory: () => `sem-save-${++callCount}`,
+      embeddingProvider: { embed: async () => [nearIdenticalVector] },
+    });
+    expect(result2).toEqual({ added: 0, skipped: 1 });
+
+    const factsPath = path.join(root, "facts.jsonl");
+    const stored = fs.readFileSync(factsPath, "utf8").trim().split("\n");
+    expect(stored).toHaveLength(1);
   });
 
   it("searchMemoryFacts falls back when default OpenAI embedding payload is malformed", async () => {

@@ -74,8 +74,8 @@ function writeJson(filePath: string, value: unknown): void {
   fs.writeFileSync(filePath, JSON.stringify(value, null, 2))
 }
 
-function isoMinutesAgo(minutes: number): string {
-  return new Date(Date.now() - minutes * 60 * 1000).toISOString()
+function recentIso(minutesAgo: number): string {
+  return new Date(Date.now() - minutesAgo * 60 * 1000).toISOString()
 }
 
 async function loadTargetResolutionModule(): Promise<TargetResolutionModule> {
@@ -104,25 +104,25 @@ describe("listTargetSessionCandidates", () => {
     writeJson(path.join(friendsDir, "friend-1.json"), { name: "Ari" })
     writeJson(path.join(friendsDir, "friend-2.json"), { name: "Project Group" })
     writeJson(path.join(sessionsDir, "friend-1", "cli", "current.json"), {
-      state: { lastFriendActivityAt: isoMinutesAgo(8) },
+      state: { lastFriendActivityAt: recentIso(6) },
       messages: [{ role: "user", content: "current chat" }],
     })
     writeJson(path.join(sessionsDir, "friend-1", "bluebubbles", "chat-any.json"), {
-      state: { lastFriendActivityAt: isoMinutesAgo(7) },
+      state: { lastFriendActivityAt: recentIso(5) },
       messages: [
         { role: "user", content: "tell the group the plan changed" },
         { role: "assistant", content: "i can carry that over" },
       ],
     })
     writeJson(path.join(sessionsDir, "friend-2", "teams", "group-thread.json"), {
-      state: { lastFriendActivityAt: isoMinutesAgo(6) },
+      state: { lastFriendActivityAt: recentIso(4) },
       messages: [
         { role: "user", content: "we need the latest update" },
         { role: "assistant", content: "waiting for the relay" },
       ],
     })
     writeJson(path.join(sessionsDir, "self", "inner", "dialog.json"), {
-      state: { lastFriendActivityAt: isoMinutesAgo(5) },
+      state: { lastFriendActivityAt: recentIso(3) },
       messages: [{ role: "assistant", content: "private thought" }],
     })
 
@@ -181,11 +181,11 @@ describe("listTargetSessionCandidates", () => {
     writeJson(path.join(friendsDir, "friend-1.json"), { name: "Ari" })
     writeJson(path.join(friendsDir, "friend-3.json"), { name: "Project Crew" })
     writeJson(path.join(sessionsDir, "friend-1", "bluebubbles", "chat-any.json"), {
-      state: { lastFriendActivityAt: isoMinutesAgo(7) },
+      state: { lastFriendActivityAt: recentIso(5) },
       messages: [{ role: "user", content: "bluebubbles target" }],
     })
     writeJson(path.join(sessionsDir, "friend-3", "teams", "group-thread.json"), {
-      state: { lastFriendActivityAt: isoMinutesAgo(6) },
+      state: { lastFriendActivityAt: recentIso(4) },
       messages: [{ role: "user", content: "teams target" }],
     })
 
@@ -229,15 +229,15 @@ describe("listTargetSessionCandidates", () => {
     writeJson(path.join(friendsDir, "friend-cli-newer.json"), { name: "CLI Newer" })
     writeJson(path.join(friendsDir, "friend-cli-older.json"), { name: "CLI Older" })
     writeJson(path.join(sessionsDir, "friend-cli-newer", "cli", "alpha.json"), {
-      state: { lastFriendActivityAt: isoMinutesAgo(5) },
+      state: { lastFriendActivityAt: recentIso(3) },
       messages: [{ role: "user", content: "newer cli target" }],
     })
     writeJson(path.join(sessionsDir, "friend-cli-older", "cli", "beta.json"), {
-      state: { lastFriendActivityAt: isoMinutesAgo(9) },
+      state: { lastFriendActivityAt: recentIso(7) },
       messages: [{ role: "user", content: "older cli target" }],
     })
     writeJson(path.join(sessionsDir, "missing-friend", "cli", "mystery.json"), {
-      state: { lastFriendActivityAt: isoMinutesAgo(7) },
+      state: { lastFriendActivityAt: recentIso(5) },
       messages: [{ role: "user", content: "unknown cli target" }],
     })
 
@@ -300,11 +300,11 @@ describe("listTargetSessionCandidates", () => {
     writeJson(path.join(friendsDir, "friend-1.json"), { name: "Ari" })
     writeJson(path.join(friendsDir, "friend-2.json"), { name: "Ops Room" })
     writeJson(path.join(sessionsDir, "friend-1", "teams", "chat-a.json"), {
-      state: { lastFriendActivityAt: isoMinutesAgo(6) },
+      state: { lastFriendActivityAt: recentIso(4) },
       messages: [{ role: "user", content: "anything here is ignored by the mock" }],
     })
     writeJson(path.join(sessionsDir, "friend-2", "teams", "chat-b.json"), {
-      state: { lastFriendActivityAt: isoMinutesAgo(7) },
+      state: { lastFriendActivityAt: recentIso(5) },
       messages: [{ role: "user", content: "still ignored by the mock" }],
     })
 
