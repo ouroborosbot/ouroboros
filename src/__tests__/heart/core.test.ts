@@ -3623,9 +3623,12 @@ describe("anthropic setup-token provider contract", () => {
         (c: any[]) => c[0]?.event === "engine.provider_init_error",
       )?.[0]?.message ?? ""
       expect(msg).toContain("no setup-token credential was found")
-      expect(msg).toContain("claude setup-token")
+      expect(msg).toContain("ouro auth --agent testagent")
       expect(msg).toContain("/tmp/.agentsecrets/testagent/secrets.json")
       expect(msg).toContain("providers.anthropic.setupToken")
+      expect(msg).toContain("retry the failed ouro command or reconnect this session")
+      expect(msg).not.toContain("npm run auth:claude-setup-token")
+      expect(msg).not.toContain("--provider")
     } finally {
       mockExit.mockRestore()
     }
@@ -4000,7 +4003,7 @@ describe("anthropic setup-token provider contract", () => {
         activeTools: [],
         callbacks,
       }),
-    ).rejects.toThrow("claude setup-token")
+    ).rejects.toThrow(/ouro auth --agent testagent[\s\S]*retry the failed ouro command or reconnect this session/)
   })
 
   it("wraps Anthropic auth failures from streaming events with setup-token guidance", async () => {
@@ -4353,7 +4356,10 @@ describe("openai-codex oauth provider contract", () => {
       expect(msg).toContain("openai-codex")
       expect(msg).toContain("oauthAccessToken")
       expect(msg).toContain("secrets.json")
-      expect(msg).toContain("codex login")
+      expect(msg).toContain("ouro auth --agent testagent")
+      expect(msg).toContain("retry the failed ouro command or reconnect this session")
+      expect(msg).not.toContain("npm run auth:openai-codex")
+      expect(msg).not.toContain("--provider")
     } finally {
       mockExit.mockRestore()
     }
@@ -4393,7 +4399,7 @@ describe("openai-codex oauth provider contract", () => {
         activeTools: [],
         callbacks,
       }),
-    ).rejects.toThrow(/OpenAI Codex authentication failed[\s\S]*codex login/)
+    ).rejects.toThrow(/OpenAI Codex authentication failed[\s\S]*ouro auth --agent testagent[\s\S]*retry the failed ouro command or reconnect this session/)
   })
 
   it("wraps openai-codex auth failures detected from error message markers", async () => {
