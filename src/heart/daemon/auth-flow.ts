@@ -142,7 +142,7 @@ function readJsonRecord(filePath: string, label: string): Record<string, unknown
     }
     return parsed as Record<string, unknown>
   } catch (error) {
-    throw new Error(`Failed to read ${label} at ${filePath}: ${error instanceof Error ? error.message : String(error)}`)
+    throw new Error(`Failed to read ${label} at ${filePath}: ${String(error)}`)
   }
 }
 
@@ -193,7 +193,7 @@ function loadAgentSecrets(agentName: string, homeDir: string): { secretsPath: st
   try {
     onDisk = readJsonRecord(secretsPath, "secrets config")
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
+    const message = (error as Error).message
     if (!message.includes("ENOENT")) throw error
   }
 
@@ -311,20 +311,20 @@ function applyCredentials(
   credentials: HatchCredentialsInput,
 ): void {
   if (provider === "anthropic") {
-    secrets.providers.anthropic.setupToken = credentials.setupToken?.trim() ?? ""
+    secrets.providers.anthropic.setupToken = credentials.setupToken!.trim()
     return
   }
   if (provider === "openai-codex") {
-    secrets.providers["openai-codex"].oauthAccessToken = credentials.oauthAccessToken?.trim() ?? ""
+    secrets.providers["openai-codex"].oauthAccessToken = credentials.oauthAccessToken!.trim()
     return
   }
   if (provider === "minimax") {
-    secrets.providers.minimax.apiKey = credentials.apiKey?.trim() ?? ""
+    secrets.providers.minimax.apiKey = credentials.apiKey!.trim()
     return
   }
-  secrets.providers.azure.apiKey = credentials.apiKey?.trim() ?? ""
-  secrets.providers.azure.endpoint = credentials.endpoint?.trim() ?? ""
-  secrets.providers.azure.deployment = credentials.deployment?.trim() ?? ""
+  secrets.providers.azure.apiKey = credentials.apiKey!.trim()
+  secrets.providers.azure.endpoint = credentials.endpoint!.trim()
+  secrets.providers.azure.deployment = credentials.deployment!.trim()
 }
 
 export async function runRuntimeAuthFlow(
