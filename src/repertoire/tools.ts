@@ -1,5 +1,5 @@
 import type OpenAI from "openai";
-import { baseToolDefinitions } from "./tools-base";
+import { baseToolDefinitions, editFileReadTracker } from "./tools-base";
 import type { ToolContext, ToolDefinition } from "./tools-base";
 import { teamsToolDefinitions, summarizeTeamsArgs } from "./tools-teams";
 import { bluebubblesToolDefinitions } from "./tools-bluebubbles";
@@ -8,6 +8,16 @@ import { githubToolDefinitions, summarizeGithubArgs } from "./tools-github";
 import type { ChannelCapabilities, ResolvedContext } from "../mind/friends/types";
 import { emitNervesEvent } from "../nerves/runtime";
 import type { ProviderCapability } from "../heart/core";
+import { guardInvocation } from "./guardrails";
+import { getAgentRoot } from "../heart/identity";
+
+function safeGetAgentRoot(): string | undefined {
+  try {
+    return getAgentRoot()
+  } catch {
+    return undefined
+  }
+}
 
 // Re-export types and constants used by the rest of the codebase
 export { tools, finalAnswerTool } from "./tools-base";
@@ -123,6 +133,24 @@ export async function execTool(name: string, args: Record<string, string>, ctx?:
       meta: { name },
     });
     return `unknown: ${name}`;
+  }
+
+  // Guardrail check: structural + trust-level
+  const guardContext = {
+    readPaths: editFileReadTracker,
+    trustLevel: ctx?.context?.friend?.trustLevel,
+    agentRoot: safeGetAgentRoot(),
+  }
+  const guardResult = guardInvocation(name, args, guardContext)
+  if (!guardResult.allowed) {
+    emitNervesEvent({
+      level: "warn",
+      event: "tool.guardrail_block",
+      component: "tools",
+      message: "guardrail blocked tool execution",
+      meta: { name, reason: guardResult.reason },
+    });
+    return guardResult.reason
   }
 
   try {
