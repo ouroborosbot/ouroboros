@@ -92,12 +92,14 @@ describe("createAzureTokenProvider", () => {
     const { createAzureTokenProvider } = await import("../../../heart/providers/azure")
     const tokenProvider = createAzureTokenProvider("c404d5a9-1234-5678-abcd-ef0123456789")
 
-    expect(mockDefaultAzureCredentialCtor).toHaveBeenCalledWith({
-      managedIdentityClientId: "c404d5a9-1234-5678-abcd-ef0123456789",
-    })
+    // Credential is created lazily on first call (dynamic import)
+    expect(mockDefaultAzureCredentialCtor).not.toHaveBeenCalled()
 
     const token = await tokenProvider()
     expect(token).toBe("test-token-123")
+    expect(mockDefaultAzureCredentialCtor).toHaveBeenCalledWith({
+      managedIdentityClientId: "c404d5a9-1234-5678-abcd-ef0123456789",
+    })
     expect(mockGetToken).toHaveBeenCalledWith("https://cognitiveservices.azure.com/.default")
   })
 
@@ -108,10 +110,9 @@ describe("createAzureTokenProvider", () => {
     const { createAzureTokenProvider } = await import("../../../heart/providers/azure")
     const tokenProvider = createAzureTokenProvider()
 
-    expect(mockDefaultAzureCredentialCtor).toHaveBeenCalledWith(undefined)
-
     const token = await tokenProvider()
     expect(token).toBe("local-dev-token")
+    expect(mockDefaultAzureCredentialCtor).toHaveBeenCalledWith(undefined)
   })
 
   it("creates DefaultAzureCredential without options when client ID is empty string", async () => {
@@ -121,10 +122,9 @@ describe("createAzureTokenProvider", () => {
     const { createAzureTokenProvider } = await import("../../../heart/providers/azure")
     const tokenProvider = createAzureTokenProvider("")
 
-    expect(mockDefaultAzureCredentialCtor).toHaveBeenCalledWith(undefined)
-
     const token = await tokenProvider()
     expect(token).toBe("local-dev-token-2")
+    expect(mockDefaultAzureCredentialCtor).toHaveBeenCalledWith(undefined)
   })
 
   it("throws with clear error message including original error when getToken fails", async () => {
@@ -220,6 +220,11 @@ describe("createAzureProviderRuntime", () => {
     const ctorArgs = mockAzureOpenAICtor.mock.calls[0][0]
     expect(ctorArgs.apiKey).toBeUndefined()
     expect(typeof ctorArgs.azureADTokenProvider).toBe("function")
+    // Credential is created lazily on first token call, not at provider init
+    expect(mockDefaultAzureCredentialCtor).not.toHaveBeenCalled()
+    // Trigger lazy init and verify
+    mockGetToken.mockResolvedValue({ token: "lazy-token" })
+    await ctorArgs.azureADTokenProvider()
     expect(mockDefaultAzureCredentialCtor).toHaveBeenCalledWith({
       managedIdentityClientId: "c404d5a9-test",
     })
@@ -248,7 +253,9 @@ describe("createAzureProviderRuntime", () => {
     const ctorArgs = mockAzureOpenAICtor.mock.calls[0][0]
     expect(ctorArgs.apiKey).toBeUndefined()
     expect(typeof ctorArgs.azureADTokenProvider).toBe("function")
-    // Should use default credential (no managedIdentityClientId)
+    // Credential is created lazily — trigger it and verify default chain (no managedIdentityClientId)
+    mockGetToken.mockResolvedValue({ token: "lazy-token-2" })
+    await ctorArgs.azureADTokenProvider()
     expect(mockDefaultAzureCredentialCtor).toHaveBeenCalledWith(undefined)
   })
 

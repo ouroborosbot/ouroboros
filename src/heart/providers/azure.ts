@@ -1,5 +1,4 @@
 import OpenAI, { AzureOpenAI } from "openai";
-import { DefaultAzureCredential } from "@azure/identity";
 import { getAzureConfig } from "../config";
 import { emitNervesEvent } from "../../nerves/runtime";
 import type { ProviderCapability, ProviderRuntime, ProviderTurnRequest } from "../core";
@@ -9,14 +8,22 @@ import { getModelCapabilities } from "../model-capabilities";
 
 const COGNITIVE_SERVICES_SCOPE = "https://cognitiveservices.azure.com/.default";
 
+// @azure/identity is imported dynamically (below) rather than at the top level
+// because it's a heavy package (~30+ transitive deps) and we only need it when
+// using the managed-identity auth path. API-key users and other providers
+// shouldn't pay the cold-start cost.
 export function createAzureTokenProvider(managedIdentityClientId?: string): () => Promise<string> {
-  const credentialOptions = managedIdentityClientId
-    ? { managedIdentityClientId }
-    : undefined;
-  const credential = new DefaultAzureCredential(credentialOptions);
+  let credential: { getToken(scope: string): Promise<{ token: string }> } | null = null;
 
   return async (): Promise<string> => {
     try {
+      if (!credential) {
+        const { DefaultAzureCredential } = await import("@azure/identity");
+        const credentialOptions = managedIdentityClientId
+          ? { managedIdentityClientId }
+          : undefined;
+        credential = new DefaultAzureCredential(credentialOptions);
+      }
       const tokenResponse = await credential.getToken(COGNITIVE_SERVICES_SCOPE);
       return tokenResponse.token;
     } catch (err: unknown) {
