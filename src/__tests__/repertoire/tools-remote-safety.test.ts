@@ -224,3 +224,140 @@ describe("remote channel tool safety — post-guardrail model", () => {
     }
   })
 })
+
+describe("execTool guardrail wiring", () => {
+  it("execTool calls guardInvocation and returns reason when blocked", async () => {
+    // edit_file without prior read should be blocked by structural guardrail
+    const ctx = {
+      signin: async () => undefined,
+      context: {
+        friend: {
+          id: "friend-1",
+          name: "Test",
+          trustLevel: "family",
+          externalIds: [],
+          tenantMemberships: [],
+          toolPreferences: {},
+          notes: {},
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          schemaVersion: 1,
+        },
+        channel: getChannelCapabilities("teams"),
+      },
+    } as unknown as ToolContext
+
+    const result = await execTool("edit_file", { path: "/some/unread/file.ts", old_string: "x", new_string: "y" }, ctx)
+    // Should get a guardrail block reason, not a handler error
+    expect(result).toMatch(/read.*file/i)
+  })
+
+  it("execTool allows tool when guardInvocation returns allowed", async () => {
+    const filePath = path.join(os.tmpdir(), `guardrail-test-${Date.now()}.txt`)
+    fs.writeFileSync(filePath, "original content", "utf8")
+
+    const ctx = {
+      signin: async () => undefined,
+      context: {
+        friend: {
+          id: "friend-1",
+          name: "Test",
+          trustLevel: "family",
+          externalIds: [],
+          tenantMemberships: [],
+          toolPreferences: {},
+          notes: {},
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          schemaVersion: 1,
+        },
+        channel: getChannelCapabilities("cli"),
+      },
+    } as unknown as ToolContext
+
+    try {
+      // First read the file (populates editFileReadTracker via handler)
+      await execTool("read_file", { path: filePath }, ctx)
+      // Now edit should work
+      const result = await execTool("edit_file", { path: filePath, old_string: "original", new_string: "modified" }, ctx)
+      expect(result).not.toMatch(/read.*file.*first/i)
+    } finally {
+      fs.unlinkSync(filePath)
+    }
+  })
+
+  it("execTool emits nerves event when guardrail blocks", async () => {
+    // We can verify indirectly: the block message should be returned
+    const ctx = {
+      signin: async () => undefined,
+      context: {
+        friend: {
+          id: "friend-1",
+          name: "Test",
+          trustLevel: "acquaintance",
+          externalIds: [],
+          tenantMemberships: [],
+          toolPreferences: {},
+          notes: {},
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          schemaVersion: 1,
+        },
+        channel: getChannelCapabilities("teams"),
+      },
+    } as unknown as ToolContext
+
+    // Acquaintance trying npm install should be trust-blocked
+    const result = await execTool("shell", { command: "npm install" }, ctx)
+    expect(result).toMatch(/friend|vouch|closer/i)
+  })
+
+  it("trust level flows from ctx.context.friend.trustLevel into guard context", async () => {
+    // stranger trying shell mutation should be blocked
+    const ctx = {
+      signin: async () => undefined,
+      context: {
+        friend: {
+          id: "friend-1",
+          name: "Stranger",
+          trustLevel: "stranger",
+          externalIds: [],
+          tenantMemberships: [],
+          toolPreferences: {},
+          notes: {},
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          schemaVersion: 1,
+        },
+        channel: getChannelCapabilities("teams"),
+      },
+    } as unknown as ToolContext
+
+    const result = await execTool("shell", { command: "git commit -m test" }, ctx)
+    expect(result).toMatch(/friend|vouch|closer/i)
+  })
+
+  it("destructive shell blocked even for trusted friend (structural guardrail)", async () => {
+    const ctx = {
+      signin: async () => undefined,
+      context: {
+        friend: {
+          id: "friend-1",
+          name: "Family",
+          trustLevel: "family",
+          externalIds: [],
+          tenantMemberships: [],
+          toolPreferences: {},
+          notes: {},
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          schemaVersion: 1,
+        },
+        channel: getChannelCapabilities("cli"),
+      },
+    } as unknown as ToolContext
+
+    const result = await execTool("shell", { command: "rm -rf /" }, ctx)
+    expect(result).toMatch(/dangerous/i)
+  })
+})
