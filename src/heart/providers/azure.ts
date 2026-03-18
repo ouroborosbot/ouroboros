@@ -1,10 +1,31 @@
 import OpenAI, { AzureOpenAI } from "openai";
+import { DefaultAzureCredential } from "@azure/identity";
 import { getAzureConfig } from "../config";
 import { emitNervesEvent } from "../../nerves/runtime";
 import type { ProviderCapability, ProviderRuntime, ProviderTurnRequest } from "../core";
 import type { ResponseItem, TurnResult } from "../streaming";
 import { streamResponsesApi, toResponsesInput, toResponsesTools } from "../streaming";
 import { getModelCapabilities } from "../model-capabilities";
+
+const COGNITIVE_SERVICES_SCOPE = "https://cognitiveservices.azure.com/.default";
+
+export function createAzureTokenProvider(managedIdentityClientId?: string): () => Promise<string> {
+  const credentialOptions = managedIdentityClientId
+    ? { managedIdentityClientId }
+    : undefined;
+  const credential = new DefaultAzureCredential(credentialOptions);
+
+  return async (): Promise<string> => {
+    try {
+      const tokenResponse = await credential.getToken(COGNITIVE_SERVICES_SCOPE);
+      return tokenResponse.token;
+    } catch {
+      throw new Error(
+        "Azure OpenAI authentication failed. Either set providers.azure.apiKey in secrets.json, or run 'az login' to authenticate with your Azure account.",
+      );
+    }
+  };
+}
 
 export function createAzureProviderRuntime(): ProviderRuntime {
   emitNervesEvent({
