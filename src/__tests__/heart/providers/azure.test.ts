@@ -127,15 +127,33 @@ describe("createAzureTokenProvider", () => {
     expect(token).toBe("local-dev-token-2")
   })
 
-  it("throws with clear error message when getToken fails", async () => {
-    emitTestEvent("throws with clear error message when getToken fails")
+  it("throws with clear error message including original error when getToken fails", async () => {
+    emitTestEvent("throws with clear error message including original error when getToken fails")
     mockGetToken.mockRejectedValue(new Error("CredentialUnavailableError"))
 
     const { createAzureTokenProvider } = await import("../../../heart/providers/azure")
     const tokenProvider = createAzureTokenProvider()
 
     await expect(tokenProvider()).rejects.toThrow(
-      "Azure OpenAI authentication failed. Either set providers.azure.apiKey in secrets.json, or run 'az login' to authenticate with your Azure account.",
+      /Azure OpenAI authentication failed: CredentialUnavailableError/,
+    )
+    await expect(tokenProvider()).rejects.toThrow(
+      /az login/,
+    )
+    await expect(tokenProvider()).rejects.toThrow(
+      /managedIdentityClientId/,
+    )
+  })
+
+  it("includes non-Error thrown values in the error message", async () => {
+    emitTestEvent("includes non-Error thrown values in the error message")
+    mockGetToken.mockRejectedValue("raw string failure")
+
+    const { createAzureTokenProvider } = await import("../../../heart/providers/azure")
+    const tokenProvider = createAzureTokenProvider()
+
+    await expect(tokenProvider()).rejects.toThrow(
+      /Azure OpenAI authentication failed: raw string failure/,
     )
   })
 })

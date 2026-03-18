@@ -19,9 +19,14 @@ export function createAzureTokenProvider(managedIdentityClientId?: string): () =
     try {
       const tokenResponse = await credential.getToken(COGNITIVE_SERVICES_SCOPE);
       return tokenResponse.token;
-    } catch {
+    } catch (err: unknown) {
+      const detail = err instanceof Error ? err.message : String(err);
       throw new Error(
-        "Azure OpenAI authentication failed. Either set providers.azure.apiKey in secrets.json, or run 'az login' to authenticate with your Azure account.",
+        `Azure OpenAI authentication failed: ${detail}\n` +
+        "To fix this, either:\n" +
+        "  1. Set providers.azure.apiKey in secrets.json, or\n" +
+        "  2. Run 'az login' to authenticate with your Azure account (for local dev), or\n" +
+        "  3. Attach a managed identity to your App Service and set providers.azure.managedIdentityClientId in secrets.json (for deployed environments)",
       );
     }
   };
