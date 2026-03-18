@@ -11,6 +11,7 @@ import { isIdentityProvider, type IdentityProvider, type TrustLevel } from "../.
 import type { DaemonCommand, DaemonResponse } from "./daemon"
 import { registerOuroBundleUti as defaultRegisterOuroBundleUti } from "./ouro-uti"
 import { installOuroCommand as defaultInstallOuroCommand, type OuroPathInstallResult } from "./ouro-path-installer"
+import { ensureSkillManagement as defaultEnsureSkillManagement } from "./skill-management-installer"
 import {
   runHatchFlow as defaultRunHatchFlow,
   type HatchCredentialsInput,
@@ -90,6 +91,7 @@ export interface OuroCliDeps {
   registerOuroBundleType?: () => Promise<unknown> | unknown
   installOuroCommand?: () => OuroPathInstallResult
   syncGlobalOuroBotWrapper?: () => Promise<unknown> | unknown
+  ensureSkillManagement?: () => Promise<void>
   ensureDaemonBootPersistence?: (socketPath: string) => Promise<void> | void
   startChat?: (agentName: string) => Promise<void>
   tailLogs?: (options?: { follow?: boolean; lines?: number; agentFilter?: string }) => () => void
@@ -1193,6 +1195,7 @@ export function createDefaultOuroCliDeps(socketPath = DEFAULT_DAEMON_SOCKET_PATH
     registerOuroBundleType: defaultRegisterOuroBundleUti,
     installOuroCommand: defaultInstallOuroCommand,
     syncGlobalOuroBotWrapper: defaultSyncGlobalOuroBotWrapper,
+    ensureSkillManagement: defaultEnsureSkillManagement,
     ensureDaemonBootPersistence: defaultEnsureDaemonBootPersistence,
     /* v8 ignore next 3 -- integration: launches interactive CLI session @preserve */
     startChat: async (agentName: string) => {
@@ -1290,6 +1293,21 @@ async function performSystemSetup(deps: OuroCliDeps): Promise<void> {
         component: "daemon",
         event: "daemon.system_setup_ouro_bot_wrapper_error",
         message: "failed to sync global ouro.bot wrapper",
+        meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
+      })
+    }
+  }
+
+  // Ensure skill-management skill is available
+  if (deps.ensureSkillManagement) {
+    try {
+      await deps.ensureSkillManagement()
+    } catch (error) {
+      emitNervesEvent({
+        level: "warn",
+        component: "daemon",
+        event: "daemon.system_setup_skill_management_error",
+        message: "failed to ensure skill-management skill",
         meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
       })
     }
