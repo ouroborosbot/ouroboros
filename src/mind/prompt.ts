@@ -4,7 +4,7 @@ import { getProviderDisplayLabel } from "../heart/core";
 import { finalAnswerTool, getToolsForChannel } from "../repertoire/tools";
 import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName, getAgentSecretsPath, loadAgentConfig, type SenseName } from "../heart/identity";
-import { type Channel, type ChannelCapabilities, type ResolvedContext } from "./friends/types";
+import { isTrustedLevel, type Channel, type ChannelCapabilities, type ResolvedContext } from "./friends/types";
 import { describeTrustContext } from "./friends/trust-explanation";
 import { getChannelCapabilities, isRemoteChannel } from "./friends/channel";
 import { emitNervesEvent } from "../nerves/runtime";
@@ -339,9 +339,26 @@ function toolsSection(channel: Channel, options?: BuildSystemOptions, context?: 
   return `## my tools\n${list}`;
 }
 
-export function toolRestrictionSection(_context?: ResolvedContext): string {
-  // Placeholder — will be rewritten in Unit 5 with trust-aware capability messaging.
-  return ""
+export function toolRestrictionSection(context?: ResolvedContext): string {
+  if (!context?.friend || !isRemoteChannel(context.channel)) return ""
+
+  if (isTrustedLevel(context.friend.trustLevel)) return ""
+
+  return `## tool guardrails
+i always have all my tools available. some operations may be guardrailed based on how well i know someone.
+
+if something i try is blocked, i'll get a clear reason — i relay it warmly, not as a policy error.
+
+what's always open:
+- read-only operations (reading files, searching, exploring)
+- ouro self-introspection (whoami, changelog)
+
+what needs a closer relationship:
+- writing or editing files outside my home
+- running shell commands that modify things
+- network access and installations
+
+i adjust naturally based on trust — no need to explain the system unless asked.`
 }
 
 function trustContextSection(context?: ResolvedContext): string {
