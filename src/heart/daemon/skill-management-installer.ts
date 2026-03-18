@@ -14,9 +14,12 @@ export async function ensureSkillManagement(): Promise<void> {
     return
   }
 
+  console.log("installing skill-management from ouroboros-skills...")
+
   try {
     const response = await fetch(SKILL_MANAGEMENT_URL)
     if (!response.ok) {
+      console.error(`✗ failed to fetch skill-management (HTTP ${response.status})`)
       emitNervesEvent({
         level: "warn",
         component: "daemon",
@@ -30,7 +33,9 @@ export async function ensureSkillManagement(): Promise<void> {
     const content = await response.text()
     fs.mkdirSync(skillsDir, { recursive: true })
     fs.writeFileSync(targetPath, content, "utf-8")
+    console.log("✓ installed skill-management")
   } catch (error) {
+    console.error(`✗ failed to install skill-management: ${error instanceof Error ? error.message : String(error)}`)
     emitNervesEvent({
       level: "warn",
       component: "daemon",
