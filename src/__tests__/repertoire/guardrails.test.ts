@@ -193,4 +193,37 @@ describe("guardInvocation — structural guardrails", () => {
       expect(result.reason).toMatch(/dangerous/i)
     }
   })
+
+  // --- edge cases: missing/empty args ---
+
+  it("edit_file with empty path and empty readPaths is blocked", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("edit_file", {}, { readPaths: new Set() })
+    expect(result.allowed).toBe(false)
+  })
+
+  it("write_file with empty path and no file on disk is allowed (new file)", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("write_file", {}, { readPaths: new Set() })
+    expect(result.allowed).toBe(true)
+  })
+
+  it("shell with empty command is allowed (not destructive)", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", {}, { readPaths: new Set() })
+    expect(result.allowed).toBe(true)
+  })
+
+  it("unknown tool names pass structural guardrails", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("some_custom_tool", { anything: "value" }, { readPaths: new Set() })
+    expect(result.allowed).toBe(true)
+  })
+
+  it("shell with tee to protected path is blocked", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "echo x | tee .git/config" }, { readPaths: new Set() })
+    expect(result.allowed).toBe(false)
+  })
 })

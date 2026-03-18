@@ -96,9 +96,6 @@ function checkDestructiveShellPatterns(toolName: string, args: Record<string, st
 }
 
 function checkProtectedPaths(toolName: string, args: Record<string, string>): GuardResult {
-  // Read-only access to protected paths is fine
-  if (READ_ONLY_TOOLS.has(toolName)) return { allowed: true }
-
   if (toolName === "write_file" || toolName === "edit_file") {
     const filePath = args.path || ""
     if (isProtectedPath(filePath)) {
