@@ -1,10 +1,10 @@
 import * as fs from "fs";
 import * as path from "path";
 import { getProviderDisplayLabel } from "../heart/core";
-import { finalAnswerTool, getToolsForChannel, REMOTE_BLOCKED_LOCAL_TOOLS } from "../repertoire/tools";
+import { finalAnswerTool, getToolsForChannel } from "../repertoire/tools";
 import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName, getAgentSecretsPath, loadAgentConfig, type SenseName } from "../heart/identity";
-import { isTrustedLevel, type Channel, type ChannelCapabilities, type ResolvedContext } from "./friends/types";
+import { type Channel, type ChannelCapabilities, type ResolvedContext } from "./friends/types";
 import { describeTrustContext } from "./friends/trust-explanation";
 import { getChannelCapabilities, isRemoteChannel } from "./friends/channel";
 import { emitNervesEvent } from "../nerves/runtime";
@@ -339,16 +339,9 @@ function toolsSection(channel: Channel, options?: BuildSystemOptions, context?: 
   return `## my tools\n${list}`;
 }
 
-export function toolRestrictionSection(context?: ResolvedContext): string {
-  if (!context?.friend || !isRemoteChannel(context.channel)) return ""
-
-  if (isTrustedLevel(context.friend.trustLevel)) return ""
-
-  const toolList = [...REMOTE_BLOCKED_LOCAL_TOOLS].join(", ")
-  return `## restricted tools
-some of my tools are unavailable right now: ${toolList}
-
-i don't know this person well enough yet to run local operations on their behalf. i can suggest remote-safe alternatives or ask them to run it from CLI.`
+export function toolRestrictionSection(_context?: ResolvedContext): string {
+  // Placeholder — will be rewritten in Unit 5 with trust-aware capability messaging.
+  return ""
 }
 
 function trustContextSection(context?: ResolvedContext): string {

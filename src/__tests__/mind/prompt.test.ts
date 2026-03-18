@@ -2759,51 +2759,20 @@ describe("toolRestrictionSection", () => {
     }
   }
 
-  it("low-trust friend in 1:1 remote channel includes trust reason and tool list", async () => {
+  // toolRestrictionSection returns empty string as a placeholder (Unit 0).
+  // It will be rewritten with trust-aware content in Unit 5.
+
+  it("returns empty string for low-trust friend on remote channel (placeholder)", async () => {
     const { toolRestrictionSection } = await import("../../mind/prompt")
     const ctx = {
       friend: makeFriend({ trustLevel: "stranger" }),
       channel: makeChannel("teams"),
     }
     const result = toolRestrictionSection(ctx as any)
-    expect(result).toContain("shell")
-    expect(result).toContain("read_file")
-    expect(result).toContain("write_file")
-    expect(result).toContain("edit_file")
-    expect(result).toContain("glob")
-    expect(result).toContain("grep")
-    // Trust reason
-    expect(result).toMatch(/trust|know.*well/i)
-  })
-
-  it("trusted friend in group chat returns empty — tool access is trust-level only", async () => {
-    const { toolRestrictionSection } = await import("../../mind/prompt")
-    const ctx = {
-      friend: makeFriend({
-        trustLevel: "friend",
-        externalIds: [{ provider: "teams-conversation" as any, externalId: "group:abc", linkedAt: "2026-01-01T00:00:00.000Z" }],
-      }),
-      channel: makeChannel("teams"),
-    }
-    const result = toolRestrictionSection(ctx as any)
     expect(result).toBe("")
   })
 
-  it("low-trust friend in group chat includes trust reason only", async () => {
-    const { toolRestrictionSection } = await import("../../mind/prompt")
-    const ctx = {
-      friend: makeFriend({
-        trustLevel: "stranger",
-        externalIds: [{ provider: "teams-conversation" as any, externalId: "group:abc", linkedAt: "2026-01-01T00:00:00.000Z" }],
-      }),
-      channel: makeChannel("teams"),
-    }
-    const result = toolRestrictionSection(ctx as any)
-    expect(result).toMatch(/trust|know.*well/i)
-    expect(result).not.toMatch(/group|shared/i)
-  })
-
-  it("trusted friend in 1:1 returns empty string", async () => {
+  it("returns empty string for trusted friend on remote channel", async () => {
     const { toolRestrictionSection } = await import("../../mind/prompt")
     const ctx = {
       friend: makeFriend({ trustLevel: "friend" }),
@@ -2826,39 +2795,6 @@ describe("toolRestrictionSection", () => {
   it("returns empty string when context is undefined", async () => {
     const { toolRestrictionSection } = await import("../../mind/prompt")
     expect(toolRestrictionSection(undefined)).toBe("")
-  })
-
-  it("returns empty string when context.channel is undefined", async () => {
-    const { toolRestrictionSection } = await import("../../mind/prompt")
-    const ctx = { friend: makeFriend({ trustLevel: "stranger" }), channel: undefined }
-    expect(toolRestrictionSection(ctx as any)).toBe("")
-  })
-
-  it("treats undefined trustLevel as friend (backward compat — no restriction)", async () => {
-    const { toolRestrictionSection } = await import("../../mind/prompt")
-    const friend = makeFriend({})
-    delete (friend as any).trustLevel
-    const ctx = { friend, channel: makeChannel("teams") }
-    expect(toolRestrictionSection(ctx as any)).toBe("")
-  })
-
-  it("low-trust friend with no externalIds still gets restriction", async () => {
-    const { toolRestrictionSection } = await import("../../mind/prompt")
-    const friend = makeFriend({ trustLevel: "stranger" })
-    ;(friend as any).externalIds = undefined
-    const ctx = { friend, channel: makeChannel("teams") }
-    const result = toolRestrictionSection(ctx as any)
-    expect(result).toMatch(/trust|know.*well/i)
-  })
-
-  it("uses first-person voice", async () => {
-    const { toolRestrictionSection } = await import("../../mind/prompt")
-    const ctx = {
-      friend: makeFriend({ trustLevel: "stranger" }),
-      channel: makeChannel("bluebubbles"),
-    }
-    const result = toolRestrictionSection(ctx as any)
-    expect(result).toMatch(/\bi\b/i)
   })
 })
 
