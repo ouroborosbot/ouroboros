@@ -4924,6 +4924,62 @@ describe("ouro changelog command", () => {
     }
   })
 
+  it("runOuroCli changelog --from with no matching entries returns empty message", async () => {
+    const changelogData = [
+      { version: "0.1.0", date: "2026-03-01", changes: ["initial release"] },
+    ]
+    const tmpFile = path.join(os.tmpdir(), `changelog-empty-${Date.now()}.json`)
+    fs.writeFileSync(tmpFile, JSON.stringify(changelogData))
+
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(),
+      installSubagents: vi.fn(),
+      getChangelogPath: () => tmpFile,
+    }
+
+    try {
+      const result = await runOuroCli(["changelog", "--from", "9.9.9"], deps)
+      expect(result).toContain("no changelog entries found")
+    } finally {
+      fs.unlinkSync(tmpFile)
+    }
+  })
+
+  it("runOuroCli changelog with entries that have no date or changes", async () => {
+    const changelogData = [
+      { version: "0.1.0" },
+    ]
+    const tmpFile = path.join(os.tmpdir(), `changelog-minimal-${Date.now()}.json`)
+    fs.writeFileSync(tmpFile, JSON.stringify(changelogData))
+
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(),
+      installSubagents: vi.fn(),
+      getChangelogPath: () => tmpFile,
+    }
+
+    try {
+      const result = await runOuroCli(["changelog"], deps)
+      expect(result).toContain("0.1.0")
+      // No date or changes, so output should be minimal
+      expect(result).not.toContain("(")
+    } finally {
+      fs.unlinkSync(tmpFile)
+    }
+  })
+
   it("runOuroCli changelog returns message when changelog file missing", async () => {
     const deps: OuroCliDeps = {
       socketPath: "/tmp/test.sock",
