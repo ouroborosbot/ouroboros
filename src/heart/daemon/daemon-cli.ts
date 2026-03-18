@@ -11,7 +11,6 @@ import { isIdentityProvider, type IdentityProvider, type TrustLevel } from "../.
 import type { DaemonCommand, DaemonResponse } from "./daemon"
 import { registerOuroBundleUti as defaultRegisterOuroBundleUti } from "./ouro-uti"
 import { installOuroCommand as defaultInstallOuroCommand, type OuroPathInstallResult } from "./ouro-path-installer"
-import { installSubagentsForAvailableCli, type SubagentInstallResult } from "./subagent-installer"
 import {
   runHatchFlow as defaultRunHatchFlow,
   type HatchCredentialsInput,
@@ -83,7 +82,6 @@ export interface OuroCliDeps {
   checkSocketAlive: (socketPath: string) => Promise<boolean>
   cleanupStaleSocket: (socketPath: string) => void
   fallbackPendingMessage: (command: Extract<DaemonCommand, { kind: "message.send" }>) => string
-  installSubagents: () => Promise<SubagentInstallResult>
   listDiscoveredAgents?: () => Promise<string[]> | string[]
   runHatchFlow?: (input: HatchFlowInput) => Promise<HatchFlowResult>
   runAdoptionSpecialist?: () => Promise<string | null>
@@ -902,12 +900,6 @@ function defaultEnsureDaemonBootPersistence(socketPath: string): void {
   })
 }
 
-async function defaultInstallSubagents(): Promise<SubagentInstallResult> {
-  return installSubagentsForAvailableCli({
-    repoRoot: getRepoRoot(),
-  })
-}
-
 async function defaultPromptInput(question: string): Promise<string> {
   const readline = await import("readline/promises")
   const rl = readline.createInterface({
@@ -1193,7 +1185,6 @@ export function createDefaultOuroCliDeps(socketPath = DEFAULT_DAEMON_SOCKET_PATH
     checkSocketAlive: checkDaemonSocketAlive,
     cleanupStaleSocket: defaultCleanupStaleSocket,
     fallbackPendingMessage: defaultFallbackPendingMessage,
-    installSubagents: defaultInstallSubagents,
     listDiscoveredAgents: defaultListDiscoveredAgents,
     runHatchFlow: defaultRunHatchFlow,
     promptInput: defaultPromptInput,
@@ -1302,19 +1293,6 @@ async function performSystemSetup(deps: OuroCliDeps): Promise<void> {
         meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
       })
     }
-  }
-
-  // Install subagents (claude/codex skills)
-  try {
-    await deps.installSubagents()
-  } catch (error) {
-    emitNervesEvent({
-      level: "warn",
-      component: "daemon",
-      event: "daemon.subagent_install_error",
-      message: "subagent auto-install failed",
-      meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
-    })
   }
 
   // Register .ouro bundle type (UTI on macOS)
