@@ -11,25 +11,39 @@ export interface GuardContext {
 
 export type GuardResult = { allowed: true } | { allowed: false; reason: string }
 
+const deny = (reason: string): GuardResult => ({ allowed: false, reason })
+const allow: GuardResult = { allowed: true }
+
+// --- reason templates ---
+// Structural reasons (always-on, apply to everyone)
+const REASONS = {
+  readBeforeEdit: "i need to read that file first before i can edit it.",
+  readBeforeOverwrite: "i need to read that file first before i can overwrite it.",
+  protectedPath: "that path is protected — i can read it but not modify it.",
+  destructiveCommand: "that command is too dangerous to run — it could cause irreversible damage.",
+  compoundCommand: "i can only run simple commands for you — no chaining with && or ;",
+  // Trust reasons (vary by relationship)
+  needsTrust: "i'd need a closer friend to vouch for you before i can do that.",
+  needsTrustForWrite: "i'd need a closer friend to vouch for you before i can write files outside my home.",
+} as const
+
 // --- read-only tools that never need guardrails ---
 
 const READ_ONLY_TOOLS = new Set(["read_file", "glob", "grep"])
 
-// --- protected path prefixes (write/edit/shell-write blocked) ---
+// --- protected path detection ---
 
 const PROTECTED_PATH_SEGMENTS = [".git/"]
 
 function getProtectedAbsolutePrefixes(): string[] {
-  const home = os.homedir()
-  return [`${home}/.agentsecrets/`]
+  return [`${os.homedir()}/.agentsecrets/`]
 }
 
 function isProtectedPath(filePath: string): boolean {
   for (const segment of PROTECTED_PATH_SEGMENTS) {
     if (filePath.includes(`/${segment}`) || filePath.startsWith(segment)) return true
   }
-  const absPrefixes = getProtectedAbsolutePrefixes()
-  for (const prefix of absPrefixes) {
+  for (const prefix of getProtectedAbsolutePrefixes()) {
     if (filePath.startsWith(prefix)) return true
   }
   return false
@@ -45,88 +59,85 @@ const DESTRUCTIVE_PATTERNS: RegExp[] = [
 ]
 
 function isDestructiveShellCommand(command: string): boolean {
-  for (const pattern of DESTRUCTIVE_PATTERNS) {
-    if (pattern.test(command)) return true
-  }
-  return false
+  return DESTRUCTIVE_PATTERNS.some((p) => p.test(command))
+}
+
+// --- compound command splitting ---
+// Shell operators that chain commands: &&, ||, ;, |, $(), backticks
+const COMPOUND_SEPARATORS = /\s*(?:&&|\|\||;|\|)\s*/
+const SUBSHELL_PATTERN = /\$\(|`/
+
+function splitShellCommands(command: string): string[] {
+  if (SUBSHELL_PATTERN.test(command)) return [command]
+  return command.split(COMPOUND_SEPARATORS).filter(Boolean)
+}
+
+function isCompoundCommand(command: string): boolean {
+  return SUBSHELL_PATTERN.test(command) || splitShellCommands(command).length > 1
 }
 
 // --- shell commands that write to protected paths ---
 
 function shellWritesToProtectedPath(command: string): boolean {
-  // Check for redirect operators writing to protected paths
   const redirectMatch = command.match(/>\s*(\S+)/)
   if (redirectMatch && isProtectedPath(redirectMatch[1])) return true
 
-  // Check for tee writing to protected paths
   const teeMatch = command.match(/tee\s+(?:-\w+\s+)*(\S+)/)
   if (teeMatch && isProtectedPath(teeMatch[1])) return true
 
   return false
 }
 
-// --- structural guardrail checks ---
+// --- structural guardrail checks (always on, all trust levels) ---
 
 function checkReadBeforeWrite(toolName: string, args: Record<string, string>, context: GuardContext): GuardResult {
   if (toolName === "edit_file") {
     const filePath = args.path || ""
-    if (!context.readPaths.has(filePath)) {
-      return { allowed: false, reason: "i need to read that file first before i can edit it." }
-    }
+    if (!context.readPaths.has(filePath)) return deny(REASONS.readBeforeEdit)
   }
 
   if (toolName === "write_file") {
     const filePath = args.path || ""
-    if (context.readPaths.has(filePath)) return { allowed: true }
-    // New files (not on disk) are fine
-    if (!fs.existsSync(filePath)) return { allowed: true }
-    return { allowed: false, reason: "i need to read that file first before i can overwrite it." }
+    if (context.readPaths.has(filePath)) return allow
+    if (!fs.existsSync(filePath)) return allow
+    return deny(REASONS.readBeforeOverwrite)
   }
 
-  return { allowed: true }
+  return allow
 }
 
 function checkDestructiveShellPatterns(toolName: string, args: Record<string, string>): GuardResult {
-  if (toolName !== "shell") return { allowed: true }
+  if (toolName !== "shell") return allow
   const command = args.command || ""
-  if (isDestructiveShellCommand(command)) {
-    return { allowed: false, reason: "that command is too dangerous to run — it could cause irreversible damage." }
+  // Check each subcommand in compound commands for destructive patterns
+  for (const sub of splitShellCommands(command)) {
+    if (isDestructiveShellCommand(sub)) return deny(REASONS.destructiveCommand)
   }
-  return { allowed: true }
+  return allow
 }
 
 function checkProtectedPaths(toolName: string, args: Record<string, string>): GuardResult {
   if (toolName === "write_file" || toolName === "edit_file") {
     const filePath = args.path || ""
-    if (isProtectedPath(filePath)) {
-      return { allowed: false, reason: "that path is protected — i can read it but not modify it." }
-    }
+    if (isProtectedPath(filePath)) return deny(REASONS.protectedPath)
   }
 
   if (toolName === "shell") {
     const command = args.command || ""
-    if (shellWritesToProtectedPath(command)) {
-      return { allowed: false, reason: "that command writes to a protected path." }
-    }
+    if (shellWritesToProtectedPath(command)) return deny(REASONS.protectedPath)
   }
 
-  return { allowed: true }
+  return allow
 }
 
 function checkStructuralGuardrails(toolName: string, args: Record<string, string>, context: GuardContext): GuardResult {
-  // Protected paths first (always blocks even if file was read)
   const protectedResult = checkProtectedPaths(toolName, args)
   if (!protectedResult.allowed) return protectedResult
 
-  // Destructive shell patterns
   const destructiveResult = checkDestructiveShellPatterns(toolName, args)
   if (!destructiveResult.allowed) return destructiveResult
 
-  // Read-before-write
-  const readResult = checkReadBeforeWrite(toolName, args, context)
-  if (!readResult.allowed) return readResult
-
-  return { allowed: true }
+  return checkReadBeforeWrite(toolName, args, context)
 }
 
 // --- ouro CLI trust manifest ---
@@ -149,7 +160,20 @@ export const OURO_CLI_TRUST_MANIFEST: Record<string, TrustLevel> = {
   "reminder create": "friend",
 }
 
-// --- general CLI read-only allowlist for acquaintance ---
+// --- trust level comparison ---
+
+const LEVEL_ORDER: Record<TrustLevel, number> = {
+  stranger: 0,
+  acquaintance: 1,
+  friend: 2,
+  family: 3,
+}
+
+function trustLevelSatisfied(required: TrustLevel, actual: TrustLevel): boolean {
+  return LEVEL_ORDER[actual] >= LEVEL_ORDER[required]
+}
+
+// --- general CLI allowlists for acquaintance ---
 
 const ACQUAINTANCE_SHELL_ALLOWLIST = new Set([
   "cat", "ls", "head", "tail", "wc", "file", "stat", "which", "echo",
@@ -160,90 +184,71 @@ const ACQUAINTANCE_GIT_ALLOWLIST = new Set([
   "status", "log", "show", "diff", "branch",
 ])
 
-function trustLevelSatisfied(required: TrustLevel, actual: TrustLevel): boolean {
-  const LEVEL_ORDER: Record<TrustLevel, number> = {
-    stranger: 0,
-    acquaintance: 1,
-    friend: 2,
-    family: 3,
-  }
-  return LEVEL_ORDER[actual] >= LEVEL_ORDER[required]
-}
+// --- trust-level shell guardrails ---
 
-function checkOuroCliTrust(command: string, trustLevel: TrustLevel): GuardResult {
-  // Extract the ouro subcommand: "ouro task board --flag" -> "task board"
+function resolveOuroSubcommand(command: string): string | null {
   const afterOuro = command.replace(/^ouro\s+/, "").trim()
-  if (!afterOuro) {
-    return { allowed: false, reason: "i'd need a closer friend to vouch for you before i can run that." }
-  }
+  if (!afterOuro) return null
 
-  // Try two-word match first (e.g. "task board"), then one-word (e.g. "whoami")
   const tokens = afterOuro.split(/\s+/)
   const twoWord = tokens.length >= 2 ? `${tokens[0]} ${tokens[1]}` : null
-  const oneWord = tokens[0]
 
-  const requiredLevel = (twoWord && OURO_CLI_TRUST_MANIFEST[twoWord])
-    || OURO_CLI_TRUST_MANIFEST[oneWord]
-
-  if (!requiredLevel) {
-    // Unknown subcommand — treat as friend-level
-    return { allowed: false, reason: "i'd need a closer friend to vouch for you before i can run that." }
-  }
-
-  if (trustLevelSatisfied(requiredLevel, trustLevel)) {
-    return { allowed: true }
-  }
-  return { allowed: false, reason: "i'd need a closer friend to vouch for you before i can run that." }
+  // Two-word match first (e.g. "task board"), then one-word (e.g. "whoami")
+  if (twoWord && OURO_CLI_TRUST_MANIFEST[twoWord]) return twoWord
+  if (OURO_CLI_TRUST_MANIFEST[tokens[0]]) return tokens[0]
+  return null
 }
 
-function checkGeneralCliTrust(command: string, _trustLevel: TrustLevel): GuardResult {
-  const tokens = command.trim().split(/\s+/)
+function checkSingleShellCommandTrust(command: string, trustLevel: TrustLevel): GuardResult {
+  const trimmed = command.trim()
+  const tokens = trimmed.split(/\s+/)
   const firstToken = tokens[0] || ""
 
-  // git subcommands
-  if (firstToken === "git") {
-    const gitSub = tokens[1] || ""
-    if (ACQUAINTANCE_GIT_ALLOWLIST.has(gitSub)) return { allowed: true }
-    return { allowed: false, reason: "i'd need a closer friend to vouch for you before i can run that." }
+  // ouro CLI — check per-subcommand trust manifest
+  if (firstToken === "ouro") {
+    const subcommand = resolveOuroSubcommand(trimmed)
+    const requiredLevel = subcommand ? OURO_CLI_TRUST_MANIFEST[subcommand] : "friend"
+    if (trustLevelSatisfied(requiredLevel as TrustLevel, trustLevel)) return allow
+    return deny(REASONS.needsTrust)
   }
 
-  // Simple command allowlist
-  if (ACQUAINTANCE_SHELL_ALLOWLIST.has(firstToken)) return { allowed: true }
+  // git — check subcommand allowlist
+  if (firstToken === "git") {
+    const gitSub = tokens[1] || ""
+    if (ACQUAINTANCE_GIT_ALLOWLIST.has(gitSub)) return allow
+    return deny(REASONS.needsTrust)
+  }
 
-  // Everything else requires friend+
-  return { allowed: false, reason: "i'd need a closer friend to vouch for you before i can run that." }
+  // General CLI — check allowlist
+  if (ACQUAINTANCE_SHELL_ALLOWLIST.has(firstToken)) return allow
+
+  return deny(REASONS.needsTrust)
 }
 
 function checkShellTrustGuardrails(command: string, trustLevel: TrustLevel): GuardResult {
-  // ouro CLI commands checked against manifest
-  if (command.startsWith("ouro ") || command === "ouro") {
-    return checkOuroCliTrust(command, trustLevel)
-  }
-  // General CLI commands checked against pattern rules
-  return checkGeneralCliTrust(command, trustLevel)
+  // Compound commands: for untrusted users, reject entirely.
+  // This prevents "ouro whoami && rm -rf /" from smuggling dangerous commands.
+  if (isCompoundCommand(command)) return deny(REASONS.compoundCommand)
+
+  return checkSingleShellCommandTrust(command, trustLevel)
 }
 
 function checkWriteTrustGuardrails(toolName: string, args: Record<string, string>, context: GuardContext): GuardResult {
-  if (toolName !== "write_file" && toolName !== "edit_file") return { allowed: true }
+  if (toolName !== "write_file" && toolName !== "edit_file") return allow
   const filePath = args.path || ""
-  // If agentRoot is set, allow writes inside the bundle dir
-  if (context.agentRoot && filePath.startsWith(context.agentRoot)) return { allowed: true }
-  // No agentRoot means no restriction (trusted context or CLI)
-  if (!context.agentRoot) return { allowed: true }
-  return { allowed: false, reason: "i'd need a closer friend to vouch for you before i can write files outside my home." }
+  if (context.agentRoot && filePath.startsWith(context.agentRoot)) return allow
+  if (!context.agentRoot) return allow
+  return deny(REASONS.needsTrustForWrite)
 }
 
 function checkTrustLevelGuardrails(toolName: string, args: Record<string, string>, context: GuardContext): GuardResult {
   // Trusted levels (family/friend) — no trust guardrails. Undefined defaults to friend.
-  if (isTrustedLevel(context.trustLevel)) return { allowed: true }
+  if (isTrustedLevel(context.trustLevel)) return allow
 
-  // Shell commands
   if (toolName === "shell") {
-    const command = args.command || ""
-    return checkShellTrustGuardrails(command, context.trustLevel!)
+    return checkShellTrustGuardrails(args.command || "", context.trustLevel!)
   }
 
-  // Write/edit file trust checks
   return checkWriteTrustGuardrails(toolName, args, context)
 }
 
@@ -262,15 +267,12 @@ export function guardInvocation(
   })
 
   // Read-only tools are always allowed (no structural or trust guardrails)
-  if (READ_ONLY_TOOLS.has(toolName)) return { allowed: true }
+  if (READ_ONLY_TOOLS.has(toolName)) return allow
 
   // Layer 1: structural guardrails (always on)
   const structuralResult = checkStructuralGuardrails(toolName, args, context)
   if (!structuralResult.allowed) return structuralResult
 
   // Layer 2: trust-level guardrails (varies by friend's trust)
-  const trustResult = checkTrustLevelGuardrails(toolName, args, context)
-  if (!trustResult.allowed) return trustResult
-
-  return { allowed: true }
+  return checkTrustLevelGuardrails(toolName, args, context)
 }

@@ -2759,73 +2759,81 @@ describe("toolRestrictionSection", () => {
     }
   }
 
-  it("returns empty string when context is undefined", async () => {
+  it("always includes structural guardrails even without context", async () => {
     const { toolRestrictionSection } = await import("../../mind/prompt")
-    expect(toolRestrictionSection(undefined)).toBe("")
+    const result = toolRestrictionSection(undefined)
+    expect(result).toContain("tool guardrails")
+    expect(result).toContain("read a file before editing")
+    expect(result).toContain("protected")
+    expect(result).toContain("destructive")
   })
 
-  it("returns empty string for CLI channel", async () => {
+  it("includes structural guardrails for CLI channel", async () => {
     const { toolRestrictionSection } = await import("../../mind/prompt")
     const ctx = {
-      friend: makeFriend({ trustLevel: "stranger" }),
+      friend: makeFriend({ trustLevel: "friend" }),
       channel: makeChannel("cli"),
     }
-    expect(toolRestrictionSection(ctx as any)).toBe("")
+    const result = toolRestrictionSection(ctx as any)
+    expect(result).toContain("tool guardrails")
+    expect(result).not.toContain("closer relationship")
   })
 
-  it("returns empty string for inner channel", async () => {
+  it("includes structural guardrails for inner channel", async () => {
     const { toolRestrictionSection } = await import("../../mind/prompt")
     const ctx = {
       friend: makeFriend({ trustLevel: "stranger" }),
       channel: makeChannel("inner"),
     }
-    expect(toolRestrictionSection(ctx as any)).toBe("")
+    const result = toolRestrictionSection(ctx as any)
+    expect(result).toContain("tool guardrails")
+    expect(result).not.toContain("closer relationship")
   })
 
-  it("returns empty string for trusted friend on remote channel", async () => {
+  it("trusted friend on remote channel gets structural only, no trust section", async () => {
     const { toolRestrictionSection } = await import("../../mind/prompt")
     const ctx = {
       friend: makeFriend({ trustLevel: "friend" }),
       channel: makeChannel("teams"),
     }
     const result = toolRestrictionSection(ctx as any)
-    expect(result).toBe("")
+    expect(result).toContain("tool guardrails")
+    expect(result).not.toContain("closer relationship")
   })
 
-  it("acquaintance on remote channel gets trust-aware content", async () => {
+  it("acquaintance on remote channel gets structural + trust-aware content", async () => {
     const { toolRestrictionSection } = await import("../../mind/prompt")
     const ctx = {
       friend: makeFriend({ trustLevel: "acquaintance" }),
       channel: makeChannel("teams"),
     }
     const result = toolRestrictionSection(ctx as any)
-    // Should explain the trust model
-    expect(result).toContain("tools")
-    expect(result).toMatch(/trust|guardrail/i)
-    expect(result).toMatch(/read/i)
-    // Should mention ouro introspection
-    expect(result).toMatch(/whoami|changelog/i)
-    // Should mention mutations need closer relationship
-    expect(result).toMatch(/closer|relationship|trust/i)
+    expect(result).toContain("tool guardrails")
+    expect(result).toContain("read a file before editing")
+    expect(result).toMatch(/whoami|changelog/)
+    expect(result).toContain("closer relationship")
+    expect(result).toContain("compound")
   })
 
-  it("stranger on remote channel gets trust-aware content", async () => {
+  it("stranger on remote channel gets structural + trust-aware content", async () => {
     const { toolRestrictionSection } = await import("../../mind/prompt")
     const ctx = {
       friend: makeFriend({ trustLevel: "stranger" }),
       channel: makeChannel("bluebubbles"),
     }
     const result = toolRestrictionSection(ctx as any)
-    expect(result.length).toBeGreaterThan(0)
-    expect(result).toMatch(/trust|guardrail/i)
+    expect(result).toContain("tool guardrails")
+    expect(result).toContain("closer relationship")
   })
 
-  it("returns empty string when no friend", async () => {
+  it("no friend on remote channel gets structural only", async () => {
     const { toolRestrictionSection } = await import("../../mind/prompt")
     const ctx = {
       channel: makeChannel("teams"),
     }
-    expect(toolRestrictionSection(ctx as any)).toBe("")
+    const result = toolRestrictionSection(ctx as any)
+    expect(result).toContain("tool guardrails")
+    expect(result).not.toContain("closer relationship")
   })
 })
 

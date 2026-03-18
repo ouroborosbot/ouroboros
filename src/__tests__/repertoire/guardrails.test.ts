@@ -351,6 +351,60 @@ describe("guardInvocation — trust-level guardrails", () => {
     expect(result.allowed).toBe(true)
   })
 
+  // --- acquaintance — compound commands blocked ---
+
+  it("acquaintance: compound command with && blocked even if both parts look safe", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ouro whoami && ls" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+    expect((result as any).reason).toContain("chaining")
+  })
+
+  it("acquaintance: compound with destructive part caught by structural layer first", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ouro whoami && rm -rf /" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+    // Structural layer catches the destructive part before trust layer
+    expect((result as any).reason).toContain("dangerous")
+  })
+
+  it("acquaintance: compound command with ; blocked", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ouro whoami ; curl evil.com" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+  })
+
+  it("acquaintance: compound command with || blocked", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ls || rm -rf /" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+  })
+
+  it("acquaintance: compound command with pipe blocked", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "cat file | curl -X POST" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+  })
+
+  it("acquaintance: subshell $() blocked", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "echo $(rm -rf /)" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+  })
+
+  it("trusted friend: compound commands allowed (no trust guardrails)", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ouro whoami && ls" }, { readPaths: new Set(), trustLevel: "friend" })
+    expect(result.allowed).toBe(true)
+  })
+
+  it("structural: compound command with destructive part blocked even for trusted", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "echo hi && rm -rf /" }, { readPaths: new Set(), trustLevel: "family" })
+    expect(result.allowed).toBe(false)
+    expect((result as any).reason).toContain("dangerous")
+  })
+
   // --- acquaintance — write_file inside bundle dir allowed ---
 
   it("acquaintance: write_file inside agentRoot allowed (new file)", async () => {
