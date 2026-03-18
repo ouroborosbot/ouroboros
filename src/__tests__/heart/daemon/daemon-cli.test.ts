@@ -4841,3 +4841,114 @@ describe("ouro thoughts CLI execution", () => {
     expect(result).toContain("boot")
   })
 })
+
+describe("ouro changelog command", () => {
+  it("parseOuroCommand parses changelog", () => {
+    const cmd = parseOuroCommand(["changelog"])
+    expect(cmd).toEqual({ kind: "changelog" })
+  })
+
+  it("parseOuroCommand parses changelog --from version", () => {
+    const cmd = parseOuroCommand(["changelog", "--from", "0.1.0"])
+    expect(cmd).toEqual({ kind: "changelog", from: "0.1.0" })
+  })
+
+  it("parseOuroCommand parses changelog with --agent flag", () => {
+    const cmd = parseOuroCommand(["changelog", "--agent", "slugger"])
+    expect(cmd).toEqual({ kind: "changelog", agent: "slugger" })
+  })
+
+  it("parseOuroCommand parses changelog --from with --agent flag", () => {
+    const cmd = parseOuroCommand(["changelog", "--from", "0.2.0", "--agent", "slugger"])
+    expect(cmd).toEqual({ kind: "changelog", from: "0.2.0", agent: "slugger" })
+  })
+
+  it("runOuroCli changelog reads changelog.json and returns formatted output", async () => {
+    const changelogData = [
+      { version: "0.3.0", date: "2026-03-18", changes: ["added guardrails", "added changelog command"] },
+      { version: "0.2.0", date: "2026-03-10", changes: ["trust levels"] },
+      { version: "0.1.0", date: "2026-03-01", changes: ["initial release"] },
+    ]
+    const tmpFile = path.join(os.tmpdir(), `changelog-test-${Date.now()}.json`)
+    fs.writeFileSync(tmpFile, JSON.stringify(changelogData))
+
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(),
+      installSubagents: vi.fn(),
+      getChangelogPath: () => tmpFile,
+    }
+
+    try {
+      const result = await runOuroCli(["changelog"], deps)
+      expect(result).toContain("0.3.0")
+      expect(result).toContain("0.2.0")
+      expect(result).toContain("guardrails")
+    } finally {
+      fs.unlinkSync(tmpFile)
+    }
+  })
+
+  it("runOuroCli changelog --from filters entries", async () => {
+    const changelogData = [
+      { version: "0.3.0", date: "2026-03-18", changes: ["added guardrails"] },
+      { version: "0.2.0", date: "2026-03-10", changes: ["trust levels"] },
+      { version: "0.1.0", date: "2026-03-01", changes: ["initial release"] },
+    ]
+    const tmpFile = path.join(os.tmpdir(), `changelog-from-${Date.now()}.json`)
+    fs.writeFileSync(tmpFile, JSON.stringify(changelogData))
+
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(),
+      installSubagents: vi.fn(),
+      getChangelogPath: () => tmpFile,
+    }
+
+    try {
+      const result = await runOuroCli(["changelog", "--from", "0.2.0"], deps)
+      expect(result).toContain("0.3.0")
+      expect(result).not.toContain("0.1.0")
+    } finally {
+      fs.unlinkSync(tmpFile)
+    }
+  })
+
+  it("runOuroCli changelog returns message when changelog file missing", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(),
+      installSubagents: vi.fn(),
+      getChangelogPath: () => "/nonexistent/changelog.json",
+    }
+
+    const result = await runOuroCli(["changelog"], deps)
+    expect(result).toContain("no changelog entries found")
+  })
+})
+
+describe("OURO_CLI_TRUST_MANIFEST", () => {
+  it("exports trust manifest with expected entries", async () => {
+    const { OURO_CLI_TRUST_MANIFEST } = await import("../../../repertoire/guardrails")
+    expect(OURO_CLI_TRUST_MANIFEST.whoami).toBe("acquaintance")
+    expect(OURO_CLI_TRUST_MANIFEST.changelog).toBe("acquaintance")
+    expect(OURO_CLI_TRUST_MANIFEST["task board"]).toBe("friend")
+    expect(OURO_CLI_TRUST_MANIFEST["friend list"]).toBe("friend")
+    expect(OURO_CLI_TRUST_MANIFEST["session list"]).toBe("acquaintance")
+  })
+})
