@@ -188,6 +188,7 @@ const ACQUAINTANCE_GIT_ALLOWLIST = new Set([
 
 function resolveOuroSubcommand(command: string): string | null {
   const afterOuro = command.replace(/^ouro\s+/, "").trim()
+  /* v8 ignore next -- bare "ouro" is caught upstream by checkShellTrustGuardrails @preserve */
   if (!afterOuro) return null
 
   const tokens = afterOuro.split(/\s+/)

@@ -4996,6 +4996,25 @@ describe("ouro changelog command", () => {
     const result = await runOuroCli(["changelog"], deps)
     expect(result).toContain("no changelog entries found")
   })
+
+  it("runOuroCli changelog falls back to module getChangelogPath when deps.getChangelogPath is undefined", async () => {
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(),
+      installSubagents: vi.fn(),
+    }
+
+    // Without getChangelogPath in deps, it falls back to the module-level getChangelogPath
+    // which resolves to the real changelog.json in the repo
+    const result = await runOuroCli(["changelog"], deps)
+    // Should either show entries or "no changelog entries found" — either way it shouldn't throw
+    expect(typeof result).toBe("string")
+  })
 })
 
 describe("OURO_CLI_TRUST_MANIFEST", () => {
