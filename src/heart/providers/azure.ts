@@ -42,7 +42,7 @@ export function createAzureTokenProvider(managedIdentityClientId?: string): () =
 export function createAzureProviderRuntime(): ProviderRuntime {
   const azureConfig = getAzureConfig();
   const useApiKey = !!azureConfig.apiKey;
-  const authMethod = useApiKey ? "api-key" : "managed-identity";
+  const authMethod = useApiKey ? "key" : "managed-identity";
 
   emitNervesEvent({
     component: "engine",

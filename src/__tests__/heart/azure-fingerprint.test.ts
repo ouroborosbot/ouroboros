@@ -119,7 +119,7 @@ describe("azure provider fingerprint includes managedIdentityClientId", () => {
   })
 
   it("fingerprint with apiKey and empty managedIdentityClientId differs from empty apiKey with managedIdentityClientId", async () => {
-    emitTestEvent("fingerprint apiKey vs managedIdentityClientId")
+    emitTestEvent("fingerprint key-auth vs managedIdentityClientId")
 
     const config = await import("../../heart/config")
     config.resetConfigCache()

@@ -167,7 +167,7 @@ describe("createAzureProviderRuntime", () => {
   })
 
   it("uses apiKey when present and non-empty (existing behavior)", async () => {
-    emitTestEvent("uses apiKey when present and non-empty")
+    emitTestEvent("uses key auth when present and non-empty")
 
     const config = await import("../../../heart/config")
     config.resetConfigCache()
@@ -326,7 +326,7 @@ describe("createAzureProviderRuntime", () => {
     expect(emitSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         event: "engine.provider_init",
-        meta: expect.objectContaining({ authMethod: "api-key" }),
+        meta: expect.objectContaining({ authMethod: "key" }),
       }),
     )
   })
