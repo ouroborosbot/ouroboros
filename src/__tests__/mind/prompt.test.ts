@@ -2759,17 +2759,27 @@ describe("toolRestrictionSection", () => {
     }
   }
 
-  // toolRestrictionSection returns empty string as a placeholder (Unit 0).
-  // It will be rewritten with trust-aware content in Unit 5.
+  it("returns empty string when context is undefined", async () => {
+    const { toolRestrictionSection } = await import("../../mind/prompt")
+    expect(toolRestrictionSection(undefined)).toBe("")
+  })
 
-  it("returns empty string for low-trust friend on remote channel (placeholder)", async () => {
+  it("returns empty string for CLI channel", async () => {
     const { toolRestrictionSection } = await import("../../mind/prompt")
     const ctx = {
       friend: makeFriend({ trustLevel: "stranger" }),
-      channel: makeChannel("teams"),
+      channel: makeChannel("cli"),
     }
-    const result = toolRestrictionSection(ctx as any)
-    expect(result).toBe("")
+    expect(toolRestrictionSection(ctx as any)).toBe("")
+  })
+
+  it("returns empty string for inner channel", async () => {
+    const { toolRestrictionSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: makeFriend({ trustLevel: "stranger" }),
+      channel: makeChannel("inner"),
+    }
+    expect(toolRestrictionSection(ctx as any)).toBe("")
   })
 
   it("returns empty string for trusted friend on remote channel", async () => {
@@ -2782,19 +2792,40 @@ describe("toolRestrictionSection", () => {
     expect(result).toBe("")
   })
 
-  it("returns empty string for CLI channel regardless of trust", async () => {
+  it("acquaintance on remote channel gets trust-aware content", async () => {
+    const { toolRestrictionSection } = await import("../../mind/prompt")
+    const ctx = {
+      friend: makeFriend({ trustLevel: "acquaintance" }),
+      channel: makeChannel("teams"),
+    }
+    const result = toolRestrictionSection(ctx as any)
+    // Should explain the trust model
+    expect(result).toContain("tools")
+    expect(result).toMatch(/trust|guardrail/i)
+    expect(result).toMatch(/read/i)
+    // Should mention ouro introspection
+    expect(result).toMatch(/whoami|changelog/i)
+    // Should mention mutations need closer relationship
+    expect(result).toMatch(/closer|relationship|trust/i)
+  })
+
+  it("stranger on remote channel gets trust-aware content", async () => {
     const { toolRestrictionSection } = await import("../../mind/prompt")
     const ctx = {
       friend: makeFriend({ trustLevel: "stranger" }),
-      channel: makeChannel("cli"),
+      channel: makeChannel("bluebubbles"),
     }
     const result = toolRestrictionSection(ctx as any)
-    expect(result).toBe("")
+    expect(result.length).toBeGreaterThan(0)
+    expect(result).toMatch(/trust|guardrail/i)
   })
 
-  it("returns empty string when context is undefined", async () => {
+  it("returns empty string when no friend", async () => {
     const { toolRestrictionSection } = await import("../../mind/prompt")
-    expect(toolRestrictionSection(undefined)).toBe("")
+    const ctx = {
+      channel: makeChannel("teams"),
+    }
+    expect(toolRestrictionSection(ctx as any)).toBe("")
   })
 })
 
