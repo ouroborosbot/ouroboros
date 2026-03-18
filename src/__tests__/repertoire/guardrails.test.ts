@@ -227,3 +227,332 @@ describe("guardInvocation — structural guardrails", () => {
     expect(result.allowed).toBe(false)
   })
 })
+
+describe("guardInvocation — trust-level guardrails", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+  })
+
+  const agentRoot = "/Users/test/AgentBundles/ouro.ouro"
+
+  // --- trusted (family/friend) — Layer 2 is no-op ---
+
+  it("friend trust level: shell mutation allowed (Layer 2 no-op)", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "npm install" }, { readPaths: new Set(), trustLevel: "friend" })
+    expect(result.allowed).toBe(true)
+  })
+
+  it("family trust level: shell mutation allowed (Layer 2 no-op)", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "npm install" }, { readPaths: new Set(), trustLevel: "family" })
+    expect(result.allowed).toBe(true)
+  })
+
+  // --- acquaintance — shell read-only allowed ---
+
+  it("acquaintance: cat allowed (read-only)", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "cat foo.txt" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(true)
+  })
+
+  it("acquaintance: ls allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ls -la" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(true)
+  })
+
+  it("acquaintance: git status allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "git status" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(true)
+  })
+
+  it("acquaintance: git log allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "git log --oneline" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(true)
+  })
+
+  it("acquaintance: head/tail/wc allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    expect(guardInvocation("shell", { command: "head -5 file.txt" }, { readPaths: new Set(), trustLevel: "acquaintance" }).allowed).toBe(true)
+    expect(guardInvocation("shell", { command: "tail -10 file.txt" }, { readPaths: new Set(), trustLevel: "acquaintance" }).allowed).toBe(true)
+    expect(guardInvocation("shell", { command: "wc -l file.txt" }, { readPaths: new Set(), trustLevel: "acquaintance" }).allowed).toBe(true)
+  })
+
+  // --- acquaintance — shell mutations blocked ---
+
+  it("acquaintance: git commit blocked", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "git commit -m 'x'" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+  })
+
+  it("acquaintance: npm install blocked", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "npm install" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+  })
+
+  it("acquaintance: rm blocked", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "rm file.txt" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+  })
+
+  it("acquaintance: mv blocked", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "mv a.txt b.txt" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+  })
+
+  // --- acquaintance — shell network blocked ---
+
+  it("acquaintance: curl blocked", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "curl https://example.com" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+  })
+
+  it("acquaintance: wget blocked", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "wget https://example.com" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+  })
+
+  // --- acquaintance — unrecognized commands blocked ---
+
+  it("acquaintance: unrecognized command blocked", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "foobar --something" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+  })
+
+  // --- acquaintance — ouro CLI trust ---
+
+  it("acquaintance: ouro whoami allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ouro whoami" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(true)
+  })
+
+  it("acquaintance: ouro task board blocked (needs friend)", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ouro task board" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+  })
+
+  it("acquaintance: ouro changelog allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ouro changelog" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(true)
+  })
+
+  // --- acquaintance — write_file inside bundle dir allowed ---
+
+  it("acquaintance: write_file inside agentRoot allowed (new file)", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("write_file", { path: `${agentRoot}/state/foo.json` }, {
+      readPaths: new Set(),
+      trustLevel: "acquaintance",
+      agentRoot,
+    })
+    expect(result.allowed).toBe(true)
+  })
+
+  // --- acquaintance — write_file outside bundle dir blocked ---
+
+  it("acquaintance: write_file outside agentRoot blocked", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("write_file", { path: "/tmp/some-file.txt" }, {
+      readPaths: new Set(),
+      trustLevel: "acquaintance",
+      agentRoot,
+    })
+    expect(result.allowed).toBe(false)
+  })
+
+  // --- acquaintance — read_file/glob/grep always allowed ---
+
+  it("acquaintance: read_file always allowed (no trust guardrails on reads)", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("read_file", { path: "/anything" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(true)
+  })
+
+  it("acquaintance: glob always allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("glob", { pattern: "**/*" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(true)
+  })
+
+  it("acquaintance: grep always allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("grep", { pattern: "foo", path: "." }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(true)
+  })
+
+  // --- layer ordering: structural blocks before trust ---
+
+  it("structural blocks before trust check (edit_file without read)", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("edit_file", { path: "/some/file" }, {
+      readPaths: new Set(),
+      trustLevel: "family",
+    })
+    expect(result.allowed).toBe(false)
+    if (!result.allowed) {
+      // Structural tone, not trust tone
+      expect(result.reason).toMatch(/read/i)
+      expect(result.reason).not.toMatch(/friend|vouch/i)
+    }
+  })
+
+  // --- reason strings for trust blocks ---
+
+  it("trust block reasons use relational tone", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "npm install" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+    if (!result.allowed) {
+      expect(result.reason).toMatch(/trusted|friend|vouch|closer/i)
+    }
+  })
+
+  // --- no trust level (undefined) → treated as trusted ---
+
+  it("undefined trustLevel treated as trusted (friend default)", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "npm install" }, { readPaths: new Set() })
+    expect(result.allowed).toBe(true)
+  })
+
+  // --- stranger trust level ---
+
+  it("stranger: shell mutation blocked", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "npm install" }, { readPaths: new Set(), trustLevel: "stranger" })
+    expect(result.allowed).toBe(false)
+  })
+
+  // --- acquaintance edit_file inside bundle dir allowed ---
+
+  it("acquaintance: edit_file inside agentRoot allowed (with prior read)", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const filePath = `${agentRoot}/state/foo.json`
+    const result = guardInvocation("edit_file", { path: filePath }, {
+      readPaths: new Set([filePath]),
+      trustLevel: "acquaintance",
+      agentRoot,
+    })
+    expect(result.allowed).toBe(true)
+  })
+
+  // --- acquaintance edit_file outside bundle dir blocked ---
+
+  it("acquaintance: edit_file outside agentRoot blocked (even with prior read)", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const filePath = "/tmp/some-file.txt"
+    const result = guardInvocation("edit_file", { path: filePath }, {
+      readPaths: new Set([filePath]),
+      trustLevel: "acquaintance",
+      agentRoot,
+    })
+    expect(result.allowed).toBe(false)
+  })
+
+  // --- ouro CLI with --agent flag ---
+
+  it("acquaintance: ouro session list allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ouro session list" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(true)
+  })
+
+  it("acquaintance: ouro friend list blocked (needs friend trust)", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ouro friend list" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+  })
+
+  // --- ouro CLI trust manifest export ---
+
+  it("exports OURO_CLI_TRUST_MANIFEST with expected entries", async () => {
+    const { OURO_CLI_TRUST_MANIFEST } = await import("../../repertoire/guardrails")
+    expect(OURO_CLI_TRUST_MANIFEST.whoami).toBe("acquaintance")
+    expect(OURO_CLI_TRUST_MANIFEST.changelog).toBe("acquaintance")
+    expect(OURO_CLI_TRUST_MANIFEST["session list"]).toBe("acquaintance")
+    expect(OURO_CLI_TRUST_MANIFEST["task board"]).toBe("friend")
+    expect(OURO_CLI_TRUST_MANIFEST["friend list"]).toBe("friend")
+    expect(OURO_CLI_TRUST_MANIFEST["reminder create"]).toBe("friend")
+  })
+
+  // --- additional read-only shell commands for acquaintance ---
+
+  it("acquaintance: echo allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    expect(guardInvocation("shell", { command: "echo hello" }, { readPaths: new Set(), trustLevel: "acquaintance" }).allowed).toBe(true)
+  })
+
+  it("acquaintance: pwd allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    expect(guardInvocation("shell", { command: "pwd" }, { readPaths: new Set(), trustLevel: "acquaintance" }).allowed).toBe(true)
+  })
+
+  it("acquaintance: git diff allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    expect(guardInvocation("shell", { command: "git diff HEAD" }, { readPaths: new Set(), trustLevel: "acquaintance" }).allowed).toBe(true)
+  })
+
+  it("acquaintance: git branch allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    expect(guardInvocation("shell", { command: "git branch" }, { readPaths: new Set(), trustLevel: "acquaintance" }).allowed).toBe(true)
+  })
+
+  it("acquaintance: git show allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    expect(guardInvocation("shell", { command: "git show HEAD" }, { readPaths: new Set(), trustLevel: "acquaintance" }).allowed).toBe(true)
+  })
+
+  it("acquaintance: date/uname/whoami/which allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const ctx = { readPaths: new Set<string>(), trustLevel: "acquaintance" as const }
+    expect(guardInvocation("shell", { command: "date" }, ctx).allowed).toBe(true)
+    expect(guardInvocation("shell", { command: "uname -a" }, ctx).allowed).toBe(true)
+    expect(guardInvocation("shell", { command: "whoami" }, ctx).allowed).toBe(true)
+    expect(guardInvocation("shell", { command: "which node" }, ctx).allowed).toBe(true)
+  })
+
+  it("acquaintance: stat/file allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const ctx = { readPaths: new Set<string>(), trustLevel: "acquaintance" as const }
+    expect(guardInvocation("shell", { command: "stat foo.txt" }, ctx).allowed).toBe(true)
+    expect(guardInvocation("shell", { command: "file foo.txt" }, ctx).allowed).toBe(true)
+  })
+
+  it("acquaintance: env/printenv allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const ctx = { readPaths: new Set<string>(), trustLevel: "acquaintance" as const }
+    expect(guardInvocation("shell", { command: "env" }, ctx).allowed).toBe(true)
+    expect(guardInvocation("shell", { command: "printenv HOME" }, ctx).allowed).toBe(true)
+  })
+
+  // --- empty/missing ouro subcommand ---
+
+  it("acquaintance: bare ouro command blocked (unrecognized subcommand)", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ouro" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+  })
+
+  it("acquaintance: unknown ouro subcommand blocked", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ouro unknown-cmd" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+  })
+})
