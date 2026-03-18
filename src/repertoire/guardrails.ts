@@ -1,6 +1,6 @@
 import * as fs from "node:fs"
 import * as os from "node:os"
-import type { TrustLevel } from "../mind/friends/types"
+import { isTrustedLevel, type TrustLevel } from "../mind/friends/types"
 import { emitNervesEvent } from "../nerves/runtime"
 
 export interface GuardContext {
@@ -129,6 +129,124 @@ function checkStructuralGuardrails(toolName: string, args: Record<string, string
   return { allowed: true }
 }
 
+// --- ouro CLI trust manifest ---
+
+/** Minimum trust level required for each ouro CLI subcommand. */
+export const OURO_CLI_TRUST_MANIFEST: Record<string, TrustLevel> = {
+  whoami: "acquaintance",
+  changelog: "acquaintance",
+  "session list": "acquaintance",
+  "task board": "friend",
+  "task create": "friend",
+  "task update": "friend",
+  "task show": "friend",
+  "task actionable": "friend",
+  "task deps": "friend",
+  "task sessions": "friend",
+  "friend list": "friend",
+  "friend show": "friend",
+  "friend create": "friend",
+  "reminder create": "friend",
+}
+
+// --- general CLI read-only allowlist for acquaintance ---
+
+const ACQUAINTANCE_SHELL_ALLOWLIST = new Set([
+  "cat", "ls", "head", "tail", "wc", "file", "stat", "which", "echo",
+  "pwd", "env", "printenv", "whoami", "date", "uname",
+])
+
+const ACQUAINTANCE_GIT_ALLOWLIST = new Set([
+  "status", "log", "show", "diff", "branch",
+])
+
+function trustLevelSatisfied(required: TrustLevel, actual: TrustLevel): boolean {
+  const LEVEL_ORDER: Record<TrustLevel, number> = {
+    stranger: 0,
+    acquaintance: 1,
+    friend: 2,
+    family: 3,
+  }
+  return LEVEL_ORDER[actual] >= LEVEL_ORDER[required]
+}
+
+function checkOuroCliTrust(command: string, trustLevel: TrustLevel): GuardResult {
+  // Extract the ouro subcommand: "ouro task board --flag" -> "task board"
+  const afterOuro = command.replace(/^ouro\s+/, "").trim()
+  if (!afterOuro) {
+    return { allowed: false, reason: "i'd need a closer friend to vouch for you before i can run that." }
+  }
+
+  // Try two-word match first (e.g. "task board"), then one-word (e.g. "whoami")
+  const tokens = afterOuro.split(/\s+/)
+  const twoWord = tokens.length >= 2 ? `${tokens[0]} ${tokens[1]}` : null
+  const oneWord = tokens[0]
+
+  const requiredLevel = (twoWord && OURO_CLI_TRUST_MANIFEST[twoWord])
+    || OURO_CLI_TRUST_MANIFEST[oneWord]
+
+  if (!requiredLevel) {
+    // Unknown subcommand — treat as friend-level
+    return { allowed: false, reason: "i'd need a closer friend to vouch for you before i can run that." }
+  }
+
+  if (trustLevelSatisfied(requiredLevel, trustLevel)) {
+    return { allowed: true }
+  }
+  return { allowed: false, reason: "i'd need a closer friend to vouch for you before i can run that." }
+}
+
+function checkGeneralCliTrust(command: string, _trustLevel: TrustLevel): GuardResult {
+  const tokens = command.trim().split(/\s+/)
+  const firstToken = tokens[0] || ""
+
+  // git subcommands
+  if (firstToken === "git") {
+    const gitSub = tokens[1] || ""
+    if (ACQUAINTANCE_GIT_ALLOWLIST.has(gitSub)) return { allowed: true }
+    return { allowed: false, reason: "i'd need a closer friend to vouch for you before i can run that." }
+  }
+
+  // Simple command allowlist
+  if (ACQUAINTANCE_SHELL_ALLOWLIST.has(firstToken)) return { allowed: true }
+
+  // Everything else requires friend+
+  return { allowed: false, reason: "i'd need a closer friend to vouch for you before i can run that." }
+}
+
+function checkShellTrustGuardrails(command: string, trustLevel: TrustLevel): GuardResult {
+  // ouro CLI commands checked against manifest
+  if (command.startsWith("ouro ") || command === "ouro") {
+    return checkOuroCliTrust(command, trustLevel)
+  }
+  // General CLI commands checked against pattern rules
+  return checkGeneralCliTrust(command, trustLevel)
+}
+
+function checkWriteTrustGuardrails(toolName: string, args: Record<string, string>, context: GuardContext): GuardResult {
+  if (toolName !== "write_file" && toolName !== "edit_file") return { allowed: true }
+  const filePath = args.path || ""
+  // If agentRoot is set, allow writes inside the bundle dir
+  if (context.agentRoot && filePath.startsWith(context.agentRoot)) return { allowed: true }
+  // No agentRoot means no restriction (trusted context or CLI)
+  if (!context.agentRoot) return { allowed: true }
+  return { allowed: false, reason: "i'd need a closer friend to vouch for you before i can write files outside my home." }
+}
+
+function checkTrustLevelGuardrails(toolName: string, args: Record<string, string>, context: GuardContext): GuardResult {
+  // Trusted levels (family/friend) — no trust guardrails. Undefined defaults to friend.
+  if (isTrustedLevel(context.trustLevel)) return { allowed: true }
+
+  // Shell commands
+  if (toolName === "shell") {
+    const command = args.command || ""
+    return checkShellTrustGuardrails(command, context.trustLevel!)
+  }
+
+  // Write/edit file trust checks
+  return checkWriteTrustGuardrails(toolName, args, context)
+}
+
 // --- main entry point ---
 
 export function guardInvocation(
@@ -150,7 +268,9 @@ export function guardInvocation(
   const structuralResult = checkStructuralGuardrails(toolName, args, context)
   if (!structuralResult.allowed) return structuralResult
 
-  // Layer 2: trust-level guardrails (added in Unit 2)
+  // Layer 2: trust-level guardrails (varies by friend's trust)
+  const trustResult = checkTrustLevelGuardrails(toolName, args, context)
+  if (!trustResult.allowed) return trustResult
 
   return { allowed: true }
 }
