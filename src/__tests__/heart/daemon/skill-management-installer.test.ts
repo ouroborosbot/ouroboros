@@ -148,4 +148,31 @@ describe("ensureSkillManagement", () => {
 
     vi.unstubAllGlobals()
   })
+
+  it("handles non-Error thrown values in the catch branch", async () => {
+    const existsSync = vi.fn(() => false)
+    const writeFileSync = vi.fn()
+    const mkdirSync = vi.fn()
+    vi.doMock("fs", () => ({ existsSync, writeFileSync, mkdirSync }))
+    vi.doMock("../../../heart/identity", () => ({
+      getAgentRoot: () => "/mock/agent",
+    }))
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../../nerves/runtime", () => ({ emitNervesEvent }))
+
+    const mockFetch = vi.fn(async () => { throw "string error value" })
+    vi.stubGlobal("fetch", mockFetch)
+
+    const { ensureSkillManagement } = await import("../../../heart/daemon/skill-management-installer")
+    await ensureSkillManagement()
+
+    expect(emitNervesEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: "warn",
+        meta: expect.objectContaining({ error: "string error value" }),
+      }),
+    )
+
+    vi.unstubAllGlobals()
+  })
 })
