@@ -28,14 +28,18 @@ export function createAzureTokenProvider(managedIdentityClientId?: string): () =
 }
 
 export function createAzureProviderRuntime(): ProviderRuntime {
+  const azureConfig = getAzureConfig();
+  const useApiKey = !!azureConfig.apiKey;
+  const authMethod = useApiKey ? "api-key" : "managed-identity";
+
   emitNervesEvent({
     component: "engine",
     event: "engine.provider_init",
     message: "azure provider init",
-    meta: { provider: "azure" },
+    meta: { provider: "azure", authMethod },
   });
-  const azureConfig = getAzureConfig();
-  if (!(azureConfig.apiKey && azureConfig.endpoint && azureConfig.deployment && azureConfig.modelName)) {
+
+  if (!(azureConfig.endpoint && azureConfig.deployment && azureConfig.modelName)) {
     throw new Error(
       "provider 'azure' is selected in agent.json but providers.azure is incomplete in secrets.json.",
     );
@@ -44,14 +48,22 @@ export function createAzureProviderRuntime(): ProviderRuntime {
   const capabilities = new Set<ProviderCapability>();
   if (modelCaps.reasoningEffort) capabilities.add("reasoning-effort");
 
-  const client = new AzureOpenAI({
-    apiKey: azureConfig.apiKey,
+  const clientOptions: Record<string, unknown> = {
     endpoint: azureConfig.endpoint.replace(/\/openai.*$/, ""),
     deployment: azureConfig.deployment,
     apiVersion: azureConfig.apiVersion,
     timeout: 30000,
     maxRetries: 0,
-  });
+  };
+
+  if (useApiKey) {
+    clientOptions.apiKey = azureConfig.apiKey;
+  } else {
+    const managedIdentityClientId = azureConfig.managedIdentityClientId || undefined;
+    clientOptions.azureADTokenProvider = createAzureTokenProvider(managedIdentityClientId);
+  }
+
+  const client = new AzureOpenAI(clientOptions as ConstructorParameters<typeof AzureOpenAI>[0]);
   let nativeInput: ResponseItem[] | null = null;
   let nativeInstructions = "";
   return {
