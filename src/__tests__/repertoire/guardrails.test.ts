@@ -550,9 +550,69 @@ describe("guardInvocation — trust-level guardrails", () => {
     expect(result.allowed).toBe(false)
   })
 
+  it("acquaintance: ouro with trailing space blocked (empty subcommand)", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ouro   " }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+  })
+
   it("acquaintance: unknown ouro subcommand blocked", async () => {
     const { guardInvocation } = await import("../../repertoire/guardrails")
     const result = guardInvocation("shell", { command: "ouro unknown-cmd" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+  })
+
+  // --- edge cases: write_file trust without agentRoot ---
+
+  it("acquaintance: write_file without agentRoot allowed (no restriction baseline)", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("write_file", { path: "/tmp/file.txt" }, {
+      readPaths: new Set(),
+      trustLevel: "acquaintance",
+      // agentRoot intentionally omitted
+    })
+    expect(result.allowed).toBe(true)
+  })
+
+  // --- edge case: non-write/edit tool hitting trust check ---
+
+  it("acquaintance: unknown non-shell non-write tool passes trust check", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("list_skills", {}, {
+      readPaths: new Set(),
+      trustLevel: "acquaintance",
+    })
+    expect(result.allowed).toBe(true)
+  })
+
+  // --- edge case: shell with empty command for acquaintance ---
+
+  it("acquaintance: shell with empty command blocked (unrecognized)", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", {}, {
+      readPaths: new Set(),
+      trustLevel: "acquaintance",
+    })
+    expect(result.allowed).toBe(false)
+  })
+
+  // --- edge case: write_file with empty path for acquaintance ---
+
+  it("acquaintance: bare git command blocked", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "git" }, { readPaths: new Set(), trustLevel: "acquaintance" })
+    expect(result.allowed).toBe(false)
+  })
+
+  it("acquaintance: write_file with empty path inside agentRoot check", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("write_file", {}, {
+      readPaths: new Set(),
+      trustLevel: "acquaintance",
+      agentRoot: "/Users/test/AgentBundles/ouro.ouro",
+    })
     expect(result.allowed).toBe(false)
   })
 })
