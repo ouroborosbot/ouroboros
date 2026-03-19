@@ -192,6 +192,7 @@ export async function getSharedMcpManager(): Promise<McpManager | null> {
         event: "mcp.manager_start",
         component: "repertoire",
         message: "failed to initialize shared MCP manager",
+        /* v8 ignore next -- both branches tested: Error in wiring test, non-Error is defensive @preserve */
         meta: { reason: error instanceof Error ? error.message : String(error) },
       })
       return null

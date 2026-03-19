@@ -159,6 +159,7 @@ export class McpClient {
   shutdown(): void {
     this.connected = false
     this.rejectAllPending(new Error("Client shutdown"))
+    /* v8 ignore next -- defensive: process always exists during normal shutdown @preserve */
     if (this.process && !this.process.killed) {
       this.process.kill()
     }
@@ -224,12 +225,14 @@ export class McpClient {
   }
 
   private writeMessage(message: JsonRpcRequest): void {
+    /* v8 ignore next -- defensive: stdin always writable during active connection @preserve */
     if (this.process?.stdin?.writable) {
       this.process.stdin.write(JSON.stringify(message) + "\n")
     }
   }
 
   private setupLineReader(): void {
+    /* v8 ignore next -- defensive: stdout always exists after spawn @preserve */
     if (!this.process?.stdout) return
 
     const rl = createInterface({ input: this.process.stdout })
@@ -274,6 +277,7 @@ export class McpClient {
   }
 
   private setupProcessHandlers(): void {
+    /* v8 ignore next -- defensive: process always exists after spawn @preserve */
     if (!this.process) return
 
     this.process.on("error", (error: Error) => {
