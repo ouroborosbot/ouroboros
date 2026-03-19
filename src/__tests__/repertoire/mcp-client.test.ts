@@ -8,24 +8,31 @@ vi.mock("child_process", () => ({
 import { spawn } from "child_process"
 import type { ChildProcess } from "child_process"
 
-function createMockProcess(): ChildProcess & {
+interface MockProcess extends EventEmitter {
   _stdout: PassThrough
   _stderr: PassThrough
-  _stdin: PassThrough
-} {
-  const proc = new EventEmitter() as ChildProcess & {
-    _stdout: PassThrough
-    _stderr: PassThrough
-    _stdin: PassThrough
-    pid: number
-    killed: boolean
-  }
+  stdout: PassThrough
+  stderr: PassThrough
+  stdin: { writable: boolean; write: ReturnType<typeof vi.fn> }
+  pid: number
+  killed: boolean
+  kill: ReturnType<typeof vi.fn>
+  stdinWrites: string[]
+}
+
+function createMockProcess(): MockProcess {
+  const proc = new EventEmitter() as MockProcess
   proc._stdout = new PassThrough()
   proc._stderr = new PassThrough()
-  proc._stdin = new PassThrough()
   proc.stdout = proc._stdout
   proc.stderr = proc._stderr
-  proc.stdin = proc._stdin
+  proc.stdinWrites = []
+  proc.stdin = {
+    writable: true,
+    write: vi.fn((data: string) => {
+      proc.stdinWrites.push(data)
+    }),
+  }
   proc.pid = 12345
   proc.killed = false
   proc.kill = vi.fn(() => {
@@ -36,12 +43,47 @@ function createMockProcess(): ChildProcess & {
   return proc
 }
 
-function sendResponse(proc: ReturnType<typeof createMockProcess>, response: Record<string, unknown>): void {
+function sendResponse(proc: MockProcess, response: Record<string, unknown>): void {
   proc._stdout.write(JSON.stringify(response) + "\n")
 }
 
+/** Get the last JSON-RPC request written to stdin */
+function lastStdinRequest(proc: MockProcess): Record<string, unknown> {
+  const writes = proc.stdinWrites
+  const lastWrite = writes[writes.length - 1]
+  return JSON.parse(lastWrite) as Record<string, unknown>
+}
+
+/** Get all JSON-RPC requests written to stdin as parsed objects */
+function allStdinRequests(proc: MockProcess): Array<Record<string, unknown>> {
+  return proc.stdinWrites.map(w => JSON.parse(w) as Record<string, unknown>)
+}
+
+async function connectClient(McpClient: typeof import("../../repertoire/mcp-client").McpClient, proc: MockProcess, config?: Record<string, unknown>) {
+  const client = new McpClient(config ?? { command: "server" })
+  const connectPromise = client.connect()
+  await tick()
+
+  const initReq = lastStdinRequest(proc)
+  sendResponse(proc, {
+    jsonrpc: "2.0",
+    id: initReq.id,
+    result: {
+      protocolVersion: "2024-11-05",
+      serverInfo: { name: "test", version: "1.0" },
+      capabilities: { tools: {} },
+    },
+  })
+  await connectPromise
+  return client
+}
+
+async function tick(ms = 10) {
+  await new Promise(resolve => setTimeout(resolve, ms))
+}
+
 describe("McpClient", () => {
-  let mockProc: ReturnType<typeof createMockProcess>
+  let mockProc: MockProcess
 
   beforeEach(() => {
     vi.resetModules()
@@ -64,20 +106,14 @@ describe("McpClient", () => {
       const client = new McpClient({ command: "my-server", args: ["--port", "3000"], env: { TOKEN: "abc" } })
 
       const connectPromise = client.connect()
+      await tick()
 
-      // Wait for the initialize request to be written
-      await new Promise(resolve => setTimeout(resolve, 10))
-
-      // Read what was written to stdin
-      const written = mockProc._stdin.read()
-      expect(written).toBeTruthy()
-      const request = JSON.parse(written.toString())
+      const request = lastStdinRequest(mockProc)
       expect(request.method).toBe("initialize")
       expect(request.jsonrpc).toBe("2.0")
-      expect(request.params.protocolVersion).toBeDefined()
-      expect(request.params.clientInfo).toBeDefined()
+      expect((request.params as Record<string, unknown>).protocolVersion).toBeDefined()
+      expect((request.params as Record<string, unknown>).clientInfo).toBeDefined()
 
-      // Send back initialize response
       sendResponse(mockProc, {
         jsonrpc: "2.0",
         id: request.id,
@@ -90,7 +126,11 @@ describe("McpClient", () => {
 
       await connectPromise
 
-      // Verify spawn was called with correct args
+      // Verify an "initialized" notification was sent after init response
+      const requests = allStdinRequests(mockProc)
+      const initialized = requests.find(r => r.method === "initialized")
+      expect(initialized).toBeDefined()
+
       expect(spawn).toHaveBeenCalledWith("my-server", ["--port", "3000"], expect.objectContaining({
         env: expect.objectContaining({ TOKEN: "abc" }),
         stdio: ["pipe", "pipe", "pipe"],
@@ -101,28 +141,12 @@ describe("McpClient", () => {
   describe("listTools", () => {
     it("sends tools/list and returns tools (single page, no cursor)", async () => {
       const { McpClient } = await getMcpClient()
-      const client = new McpClient({ command: "server" })
-
-      const connectPromise = client.connect()
-      await new Promise(resolve => setTimeout(resolve, 10))
-
-      // Complete handshake
-      const initReq = JSON.parse(mockProc._stdin.read().toString())
-      sendResponse(mockProc, {
-        jsonrpc: "2.0",
-        id: initReq.id,
-        result: {
-          protocolVersion: "2024-11-05",
-          serverInfo: { name: "test", version: "1.0" },
-          capabilities: { tools: {} },
-        },
-      })
-      await connectPromise
+      const client = await connectClient(McpClient, mockProc)
 
       const listPromise = client.listTools()
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await tick()
 
-      const listReq = JSON.parse(mockProc._stdin.read().toString())
+      const listReq = lastStdinRequest(mockProc)
       expect(listReq.method).toBe("tools/list")
 
       sendResponse(mockProc, {
@@ -145,27 +169,13 @@ describe("McpClient", () => {
 
     it("handles pagination with cursor loop", async () => {
       const { McpClient } = await getMcpClient()
-      const client = new McpClient({ command: "server" })
-
-      const connectPromise = client.connect()
-      await new Promise(resolve => setTimeout(resolve, 10))
-      const initReq = JSON.parse(mockProc._stdin.read().toString())
-      sendResponse(mockProc, {
-        jsonrpc: "2.0",
-        id: initReq.id,
-        result: {
-          protocolVersion: "2024-11-05",
-          serverInfo: { name: "test", version: "1.0" },
-          capabilities: { tools: {} },
-        },
-      })
-      await connectPromise
+      const client = await connectClient(McpClient, mockProc)
 
       const listPromise = client.listTools()
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await tick()
 
       // First page with cursor
-      const req1 = JSON.parse(mockProc._stdin.read().toString())
+      const req1 = lastStdinRequest(mockProc)
       sendResponse(mockProc, {
         jsonrpc: "2.0",
         id: req1.id,
@@ -175,11 +185,11 @@ describe("McpClient", () => {
         },
       })
 
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await tick()
 
       // Second page without cursor
-      const req2 = JSON.parse(mockProc._stdin.read().toString())
-      expect(req2.params.cursor).toBe("page2")
+      const req2 = lastStdinRequest(mockProc)
+      expect((req2.params as Record<string, unknown>).cursor).toBe("page2")
       sendResponse(mockProc, {
         jsonrpc: "2.0",
         id: req2.id,
@@ -196,25 +206,11 @@ describe("McpClient", () => {
 
     it("returns cached tools on subsequent calls", async () => {
       const { McpClient } = await getMcpClient()
-      const client = new McpClient({ command: "server" })
-
-      const connectPromise = client.connect()
-      await new Promise(resolve => setTimeout(resolve, 10))
-      const initReq = JSON.parse(mockProc._stdin.read().toString())
-      sendResponse(mockProc, {
-        jsonrpc: "2.0",
-        id: initReq.id,
-        result: {
-          protocolVersion: "2024-11-05",
-          serverInfo: { name: "test", version: "1.0" },
-          capabilities: { tools: {} },
-        },
-      })
-      await connectPromise
+      const client = await connectClient(McpClient, mockProc)
 
       const listPromise = client.listTools()
-      await new Promise(resolve => setTimeout(resolve, 10))
-      const listReq = JSON.parse(mockProc._stdin.read().toString())
+      await tick()
+      const listReq = lastStdinRequest(mockProc)
       sendResponse(mockProc, {
         jsonrpc: "2.0",
         id: listReq.id,
@@ -224,39 +220,27 @@ describe("McpClient", () => {
       })
       await listPromise
 
+      const writeCountBefore = mockProc.stdinWrites.length
+
       // Second call should return cached result without new request
       const cached = await client.listTools()
       expect(cached).toEqual([{ name: "tool1", description: "Tool 1", inputSchema: { type: "object" } }])
+      expect(mockProc.stdinWrites.length).toBe(writeCountBefore)
     })
   })
 
   describe("callTool", () => {
     it("sends tools/call and returns the result", async () => {
       const { McpClient } = await getMcpClient()
-      const client = new McpClient({ command: "server" })
-
-      // Connect
-      const connectPromise = client.connect()
-      await new Promise(resolve => setTimeout(resolve, 10))
-      const initReq = JSON.parse(mockProc._stdin.read().toString())
-      sendResponse(mockProc, {
-        jsonrpc: "2.0",
-        id: initReq.id,
-        result: {
-          protocolVersion: "2024-11-05",
-          serverInfo: { name: "test", version: "1.0" },
-          capabilities: { tools: {} },
-        },
-      })
-      await connectPromise
+      const client = await connectClient(McpClient, mockProc)
 
       const callPromise = client.callTool("get_items", { query: "test" })
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await tick()
 
-      const callReq = JSON.parse(mockProc._stdin.read().toString())
+      const callReq = lastStdinRequest(mockProc)
       expect(callReq.method).toBe("tools/call")
-      expect(callReq.params.name).toBe("get_items")
-      expect(callReq.params.arguments).toEqual({ query: "test" })
+      expect((callReq.params as Record<string, unknown>).name).toBe("get_items")
+      expect((callReq.params as Record<string, unknown>).arguments).toEqual({ query: "test" })
 
       sendResponse(mockProc, {
         jsonrpc: "2.0",
@@ -274,57 +258,24 @@ describe("McpClient", () => {
 
     it("enforces timeout on tools/call", async () => {
       const { McpClient } = await getMcpClient()
-      const client = new McpClient({ command: "server" })
+      const client = await connectClient(McpClient, mockProc)
 
-      // Connect
-      const connectPromise = client.connect()
-      await new Promise(resolve => setTimeout(resolve, 10))
-      const initReq = JSON.parse(mockProc._stdin.read().toString())
-      sendResponse(mockProc, {
-        jsonrpc: "2.0",
-        id: initReq.id,
-        result: {
-          protocolVersion: "2024-11-05",
-          serverInfo: { name: "test", version: "1.0" },
-          capabilities: { tools: {} },
-        },
-      })
-      await connectPromise
-
-      // Use a very short timeout (50ms) and never respond
-      vi.useFakeTimers()
+      // Use a very short timeout and never respond
       const callPromise = client.callTool("slow_tool", {}, 50)
 
-      await vi.advanceTimersByTimeAsync(60)
-
       await expect(callPromise).rejects.toThrow(/timeout/i)
-      vi.useRealTimers()
     })
   })
 
   describe("JSON-RPC error handling", () => {
     it("rejects with error when server returns JSON-RPC error", async () => {
       const { McpClient } = await getMcpClient()
-      const client = new McpClient({ command: "server" })
-
-      const connectPromise = client.connect()
-      await new Promise(resolve => setTimeout(resolve, 10))
-      const initReq = JSON.parse(mockProc._stdin.read().toString())
-      sendResponse(mockProc, {
-        jsonrpc: "2.0",
-        id: initReq.id,
-        result: {
-          protocolVersion: "2024-11-05",
-          serverInfo: { name: "test", version: "1.0" },
-          capabilities: { tools: {} },
-        },
-      })
-      await connectPromise
+      const client = await connectClient(McpClient, mockProc)
 
       const callPromise = client.callTool("bad_tool", {})
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await tick()
 
-      const callReq = JSON.parse(mockProc._stdin.read().toString())
+      const callReq = lastStdinRequest(mockProc)
       sendResponse(mockProc, {
         jsonrpc: "2.0",
         id: callReq.id,
@@ -338,77 +289,37 @@ describe("McpClient", () => {
   describe("process crash detection", () => {
     it("sets state to disconnected on process close", async () => {
       const { McpClient } = await getMcpClient()
-      const client = new McpClient({ command: "server" })
-
-      const connectPromise = client.connect()
-      await new Promise(resolve => setTimeout(resolve, 10))
-      const initReq = JSON.parse(mockProc._stdin.read().toString())
-      sendResponse(mockProc, {
-        jsonrpc: "2.0",
-        id: initReq.id,
-        result: {
-          protocolVersion: "2024-11-05",
-          serverInfo: { name: "test", version: "1.0" },
-          capabilities: { tools: {} },
-        },
-      })
-      await connectPromise
+      const client = await connectClient(McpClient, mockProc)
 
       expect(client.isConnected()).toBe(true)
 
-      // Simulate process crash
+      // Simulate process crash (disable kill mock so close doesn't come from kill)
+      mockProc.kill = vi.fn(() => true)
       mockProc.emit("close", 1)
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await tick()
 
       expect(client.isConnected()).toBe(false)
     })
 
     it("rejects pending requests when process crashes", async () => {
       const { McpClient } = await getMcpClient()
-      const client = new McpClient({ command: "server" })
-
-      const connectPromise = client.connect()
-      await new Promise(resolve => setTimeout(resolve, 10))
-      const initReq = JSON.parse(mockProc._stdin.read().toString())
-      sendResponse(mockProc, {
-        jsonrpc: "2.0",
-        id: initReq.id,
-        result: {
-          protocolVersion: "2024-11-05",
-          serverInfo: { name: "test", version: "1.0" },
-          capabilities: { tools: {} },
-        },
-      })
-      await connectPromise
+      const client = await connectClient(McpClient, mockProc)
 
       const callPromise = client.callTool("some_tool", {})
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await tick()
 
-      // Crash the process without responding
+      // Crash the process without responding (override kill to not emit close again)
+      mockProc.kill = vi.fn(() => true)
       mockProc.emit("close", 1)
 
-      await expect(callPromise).rejects.toThrow(/disconnected|crash|close/i)
+      await expect(callPromise).rejects.toThrow(/close/i)
     })
   })
 
   describe("shutdown", () => {
     it("kills the process gracefully", async () => {
       const { McpClient } = await getMcpClient()
-      const client = new McpClient({ command: "server" })
-
-      const connectPromise = client.connect()
-      await new Promise(resolve => setTimeout(resolve, 10))
-      const initReq = JSON.parse(mockProc._stdin.read().toString())
-      sendResponse(mockProc, {
-        jsonrpc: "2.0",
-        id: initReq.id,
-        result: {
-          protocolVersion: "2024-11-05",
-          serverInfo: { name: "test", version: "1.0" },
-          capabilities: { tools: {} },
-        },
-      })
-      await connectPromise
+      const client = await connectClient(McpClient, mockProc)
 
       client.shutdown()
 
@@ -423,14 +334,14 @@ describe("McpClient", () => {
       const client = new McpClient({ command: "server" })
 
       const connectPromise = client.connect()
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await tick()
 
       // Send garbage first
       mockProc._stdout.write("not json at all\n")
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await tick()
 
       // Then send valid initialize response
-      const initReq = JSON.parse(mockProc._stdin.read().toString())
+      const initReq = lastStdinRequest(mockProc)
       sendResponse(mockProc, {
         jsonrpc: "2.0",
         id: initReq.id,
@@ -449,33 +360,19 @@ describe("McpClient", () => {
   describe("concurrent request ID matching", () => {
     it("routes responses to correct pending requests by ID", async () => {
       const { McpClient } = await getMcpClient()
-      const client = new McpClient({ command: "server" })
-
-      const connectPromise = client.connect()
-      await new Promise(resolve => setTimeout(resolve, 10))
-      const initReq = JSON.parse(mockProc._stdin.read().toString())
-      sendResponse(mockProc, {
-        jsonrpc: "2.0",
-        id: initReq.id,
-        result: {
-          protocolVersion: "2024-11-05",
-          serverInfo: { name: "test", version: "1.0" },
-          capabilities: { tools: {} },
-        },
-      })
-      await connectPromise
+      const client = await connectClient(McpClient, mockProc)
 
       // Fire two concurrent requests
       const call1 = client.callTool("tool_a", { x: 1 })
       const call2 = client.callTool("tool_b", { y: 2 })
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await tick()
 
-      // Read both requests
-      const allData = mockProc._stdin.read()?.toString() ?? ""
-      const lines = allData.split("\n").filter(Boolean)
-      expect(lines).toHaveLength(2)
-      const req1 = JSON.parse(lines[0])
-      const req2 = JSON.parse(lines[1])
+      // Find the two callTool requests (skip init + initialized)
+      const requests = allStdinRequests(mockProc)
+      const toolCallRequests = requests.filter(r => r.method === "tools/call")
+      expect(toolCallRequests).toHaveLength(2)
+      const req1 = toolCallRequests[0]
+      const req2 = toolCallRequests[1]
 
       // Respond to second request first (out of order)
       sendResponse(mockProc, {
@@ -501,7 +398,7 @@ describe("McpClient", () => {
       const client = new McpClient({ command: "nonexistent-binary" })
 
       const connectPromise = client.connect()
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await tick()
 
       // Simulate spawn error
       mockProc.emit("error", new Error("spawn ENOENT"))
