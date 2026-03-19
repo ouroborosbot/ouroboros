@@ -33,6 +33,7 @@ import { applyPendingUpdates, registerUpdateHook } from "./update-hooks"
 import { bundleMetaHook } from "./hooks/bundle-meta"
 import { getChangelogPath, getPackageVersion } from "../../mind/bundle-manifest"
 import { getTaskModule } from "../../repertoire/tasks"
+import type { McpManager } from "../../repertoire/mcp-manager"
 import { parseInnerDialogSession, formatThoughtTurns, getInnerDialogSessionPath, followThoughts } from "./thoughts"
 import type { TaskModule } from "../../repertoire/tasks/types"
 import { syncGlobalOuroBotWrapper as defaultSyncGlobalOuroBotWrapper } from "./ouro-bot-global-installer"
@@ -74,6 +75,8 @@ export type OuroCliCommand =
   | { kind: "friend.link"; agent: string; friendId: string; provider: IdentityProvider; externalId: string }
   | { kind: "friend.unlink"; agent: string; friendId: string; provider: IdentityProvider; externalId: string }
   | { kind: "changelog"; from?: string; agent?: string }
+  | { kind: "mcp.list" }
+  | { kind: "mcp.call"; server: string; tool: string; args?: string }
   | { kind: "hatch.start"; agentName?: string; humanName?: string; provider?: AgentProvider; credentials?: HatchCredentialsInput; migrationPath?: string }
 
 export interface OuroCliDeps {
@@ -101,6 +104,7 @@ export interface OuroCliDeps {
   whoamiInfo?: () => { agentName: string; homePath: string; bonesVersion: string }
   scanSessions?: () => Promise<SessionEntry[]>
   getChangelogPath?: () => string
+  mcpManager?: McpManager
 }
 
 export interface SessionEntry {
@@ -383,6 +387,8 @@ function usage(): string {
     "  ouro friend unlink <agent> --friend <id> --provider <p> --external-id <eid>",
     "  ouro whoami [--agent <name>]",
     "  ouro session list [--agent <name>]",
+    "  ouro mcp list",
+    "  ouro mcp call <server> <tool> [--args '{...}']",
   ].join("\n")
 }
 
@@ -784,6 +790,26 @@ function parseFriendCommand(args: string[]): OuroCliCommand {
   throw new Error(`Usage\n${usage()}`)
 }
 
+function parseMcpCommand(args: string[]): OuroCliCommand {
+  const [sub, ...rest] = args
+  if (!sub) throw new Error(`Usage\n${usage()}`)
+
+  if (sub === "list") return { kind: "mcp.list" }
+
+  if (sub === "call") {
+    const server = rest[0]
+    const tool = rest[1]
+    if (!server || !tool) throw new Error(`Usage\n${usage()}`)
+
+    const argsIdx = rest.indexOf("--args")
+    const mcpArgs = argsIdx !== -1 && rest[argsIdx + 1] ? rest[argsIdx + 1] : undefined
+
+    return { kind: "mcp.call", server, tool, ...(mcpArgs ? { args: mcpArgs } : {}) }
+  }
+
+  throw new Error(`Usage\n${usage()}`)
+}
+
 export function parseOuroCommand(args: string[]): OuroCliCommand {
   const [head, second] = args
   if (!head) return { kind: "daemon.up" }
@@ -797,6 +823,7 @@ export function parseOuroCommand(args: string[]): OuroCliCommand {
   if (head === "task") return parseTaskCommand(args.slice(1))
   if (head === "reminder") return parseReminderCommand(args.slice(1))
   if (head === "friend") return parseFriendCommand(args.slice(1))
+  if (head === "mcp") return parseMcpCommand(args.slice(1))
   if (head === "whoami") {
     const { agent } = extractAgentFlag(args.slice(1))
     return { kind: "whoami", ...(agent ? { agent } : {}) }
@@ -1234,7 +1261,8 @@ export function createDefaultOuroCliDeps(socketPath = DEFAULT_DAEMON_SOCKET_PATH
 type ThoughtsCliCommand = Extract<OuroCliCommand, { kind: "thoughts" }>
 type AuthCliCommand = Extract<OuroCliCommand, { kind: "auth.run" }>
 type ChangelogCliCommand = Extract<OuroCliCommand, { kind: "changelog" }>
-function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "hatch.start" } | AuthCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand>): DaemonCommand {
+type McpCliCommand = Extract<OuroCliCommand, { kind: "mcp.list" } | { kind: "mcp.call" }>
+function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "hatch.start" } | AuthCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand | McpCliCommand>): DaemonCommand {
   return command
 }
 
@@ -1664,6 +1692,44 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   if (command.kind === "daemon.logs" && deps.tailLogs) {
     deps.tailLogs()
     return ""
+  }
+
+  // ── mcp subcommands (local, no daemon socket needed) ──
+  if (command.kind === "mcp.list") {
+    if (!deps.mcpManager) {
+      const message = "no MCP servers configured (add mcpServers to agent.json)"
+      deps.writeStdout(message)
+      return message
+    }
+    const allTools = deps.mcpManager.listAllTools()
+    if (allTools.length === 0) {
+      const message = "no tools available from connected MCP servers"
+      deps.writeStdout(message)
+      return message
+    }
+    const lines: string[] = []
+    for (const entry of allTools) {
+      lines.push(`[${entry.server}]`)
+      for (const tool of entry.tools) {
+        lines.push(`  ${tool.name}: ${tool.description}`)
+      }
+    }
+    const message = lines.join("\n")
+    deps.writeStdout(message)
+    return message
+  }
+
+  if (command.kind === "mcp.call") {
+    if (!deps.mcpManager) {
+      const message = "no MCP servers configured (add mcpServers to agent.json)"
+      deps.writeStdout(message)
+      return message
+    }
+    const parsedArgs = command.args ? JSON.parse(command.args) as Record<string, unknown> : {}
+    const result = await deps.mcpManager.callTool(command.server, command.tool, parsedArgs)
+    const text = result.content.map(c => c.text).join("\n")
+    deps.writeStdout(text)
+    return text
   }
 
   // ── task subcommands (local, no daemon socket needed) ──
