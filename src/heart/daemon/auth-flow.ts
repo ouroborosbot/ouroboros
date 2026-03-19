@@ -291,6 +291,43 @@ export async function collectRuntimeAuthCredentials(
   const spawnSync = deps.spawnSync ?? defaultSpawnSync
   const homeDir = deps.homeDir ?? os.homedir()
 
+  if (input.provider === "github-copilot") {
+    let token = process.env.GH_TOKEN?.trim() || ""
+    if (!token) {
+      const result = spawnSync("gh", ["auth", "token"], { encoding: "utf8" })
+      token = (result.status === 0 && result.stdout ? result.stdout.trim() : "")
+    }
+    if (!token) {
+      emitNervesEvent({
+        component: "daemon",
+        event: "daemon.auth_gh_login_start",
+        message: "starting gh auth login for runtime auth",
+        meta: { agentName: input.agentName },
+      })
+      const loginResult = spawnSync("gh", ["auth", "login"], { stdio: "inherit" })
+      if (loginResult.status !== 0) {
+        throw new Error("'gh auth login' failed. Install the GitHub CLI (gh) and try again.")
+      }
+      const retryResult = spawnSync("gh", ["auth", "token"], { encoding: "utf8" })
+      token = (retryResult.status === 0 && retryResult.stdout ? retryResult.stdout.trim() : "")
+      if (!token) {
+        throw new Error("gh auth login completed but no token was found. Run `gh auth login` and try again.")
+      }
+    }
+    const response = await fetch("https://api.github.com/copilot_internal/user", {
+      headers: { Authorization: `token ${token}` },
+    })
+    if (!response.ok) {
+      throw new Error(`GitHub Copilot endpoint discovery failed (HTTP ${response.status}). Ensure your GitHub account has Copilot access.`)
+    }
+    const body = await response.json() as { endpoints?: { api?: string } }
+    const baseUrl = body?.endpoints?.api
+    if (!baseUrl) {
+      throw new Error("GitHub Copilot endpoint discovery returned no endpoints.api. Ensure your GitHub account has Copilot access.")
+    }
+    return { githubToken: token, baseUrl }
+  }
+
   if (input.provider === "openai-codex") {
     let token = readCodexAccessToken(homeDir)
     if (!token) {
@@ -357,6 +394,15 @@ export async function resolveHatchCredentials(
   const prompt = input.promptInput
   const credentials: HatchCredentialsInput = { ...(input.credentials ?? {}) }
 
+  if (input.provider === "github-copilot" && !credentials.githubToken && input.runAuthFlow) {
+    const result = await input.runAuthFlow({
+      agentName: input.agentName,
+      provider: "github-copilot",
+      promptInput: prompt,
+    })
+    Object.assign(credentials, result.credentials)
+  }
+
   if (input.provider === "anthropic" && !credentials.setupToken && input.runAuthFlow) {
     const result = await input.runAuthFlow({
       agentName: input.agentName,
@@ -401,6 +447,11 @@ function applyCredentials(
 ): void {
   if (provider === "anthropic") {
     secrets.providers.anthropic.setupToken = credentials.setupToken!.trim()
+    return
+  }
+  if (provider === "github-copilot") {
+    secrets.providers["github-copilot"].githubToken = credentials.githubToken!.trim()
+    secrets.providers["github-copilot"].baseUrl = credentials.baseUrl!.trim()
     return
   }
   if (provider === "openai-codex") {

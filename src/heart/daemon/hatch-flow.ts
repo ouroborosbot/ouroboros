@@ -18,6 +18,8 @@ export interface HatchCredentialsInput {
   apiKey?: string
   endpoint?: string
   deployment?: string
+  githubToken?: string
+  baseUrl?: string
 }
 
 export interface HatchFlowInput {
