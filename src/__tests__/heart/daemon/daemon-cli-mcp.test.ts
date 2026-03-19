@@ -57,17 +57,17 @@ describe("ouro mcp CLI parsing", () => {
   })
 })
 
-describe("ouro mcp CLI execution", () => {
-  let mockMcpManager: {
-    listAllTools: ReturnType<typeof vi.fn>
-    callTool: ReturnType<typeof vi.fn>
-    start: ReturnType<typeof vi.fn>
-    shutdown: ReturnType<typeof vi.fn>
-  }
+describe("ouro mcp CLI execution (daemon-routed)", () => {
+  let sendCommand: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
-    mockMcpManager = {
-      listAllTools: vi.fn().mockReturnValue([
+    sendCommand = vi.fn()
+  })
+
+  it("'mcp list' sends command through daemon socket and formats output", async () => {
+    sendCommand.mockResolvedValue({
+      ok: true,
+      data: [
         {
           server: "ado",
           tools: [
@@ -80,54 +80,76 @@ describe("ouro mcp CLI execution", () => {
             { name: "send_mail", description: "Send mail", inputSchema: { type: "object" } },
           ],
         },
-      ]),
-      callTool: vi.fn().mockResolvedValue({
-        content: [{ type: "text", text: "tool result here" }],
-      }),
-      start: vi.fn().mockResolvedValue(undefined),
-      shutdown: vi.fn(),
-    }
-  })
-
-  it("'mcp list' calls listAllTools and formats output", async () => {
-    const deps = createMockDeps({ mcpManager: mockMcpManager as never })
+      ],
+    })
+    const deps = createMockDeps({ sendCommand })
 
     const result = await runOuroCli(["mcp", "list"], deps)
 
-    expect(mockMcpManager.listAllTools).toHaveBeenCalled()
-    expect(result).toContain("ado")
+    expect(sendCommand).toHaveBeenCalledWith("/tmp/ouro-test.sock", { kind: "mcp.list" })
+    expect(result).toContain("[ado]")
     expect(result).toContain("get_items")
-    expect(result).toContain("mail")
+    expect(result).toContain("[mail]")
     expect(result).toContain("send_mail")
   })
 
-  it("'mcp call' calls callTool and prints result", async () => {
-    const deps = createMockDeps({ mcpManager: mockMcpManager as never })
+  it("'mcp call' sends command through daemon socket and prints result", async () => {
+    sendCommand.mockResolvedValue({
+      ok: true,
+      data: {
+        content: [{ type: "text", text: "tool result here" }],
+      },
+    })
+    const deps = createMockDeps({ sendCommand })
 
     const result = await runOuroCli(["mcp", "call", "ado", "get_items", "--args", '{"query":"test"}'], deps)
 
-    expect(mockMcpManager.callTool).toHaveBeenCalledWith("ado", "get_items", { query: "test" })
+    expect(sendCommand).toHaveBeenCalledWith("/tmp/ouro-test.sock", {
+      kind: "mcp.call",
+      server: "ado",
+      tool: "get_items",
+      args: '{"query":"test"}',
+    })
     expect(result).toContain("tool result here")
   })
 
-  it("'mcp call' without args passes empty object", async () => {
-    const deps = createMockDeps({ mcpManager: mockMcpManager as never })
+  it("'mcp call' without args sends command without args field", async () => {
+    sendCommand.mockResolvedValue({
+      ok: true,
+      data: {
+        content: [{ type: "text", text: "no args result" }],
+      },
+    })
+    const deps = createMockDeps({ sendCommand })
 
     await runOuroCli(["mcp", "call", "ado", "get_items"], deps)
 
-    expect(mockMcpManager.callTool).toHaveBeenCalledWith("ado", "get_items", {})
+    expect(sendCommand).toHaveBeenCalledWith("/tmp/ouro-test.sock", {
+      kind: "mcp.call",
+      server: "ado",
+      tool: "get_items",
+    })
   })
 
-  it("'mcp list' with no mcpManager returns helpful error", async () => {
-    const deps = createMockDeps()
+  it("'mcp list' with daemon error shows helpful message", async () => {
+    sendCommand.mockResolvedValue({
+      ok: true,
+      data: [],
+      message: "no MCP servers configured",
+    })
+    const deps = createMockDeps({ sendCommand })
 
     const result = await runOuroCli(["mcp", "list"], deps)
 
     expect(result).toContain("no MCP servers configured")
   })
 
-  it("'mcp call' with no mcpManager returns helpful error", async () => {
-    const deps = createMockDeps()
+  it("'mcp call' with daemon error shows error message", async () => {
+    sendCommand.mockResolvedValue({
+      ok: false,
+      error: "no MCP servers configured",
+    })
+    const deps = createMockDeps({ sendCommand })
 
     const result = await runOuroCli(["mcp", "call", "ado", "get_items"], deps)
 
@@ -135,11 +157,33 @@ describe("ouro mcp CLI execution", () => {
   })
 
   it("'mcp list' with empty tools shows appropriate message", async () => {
-    mockMcpManager.listAllTools.mockReturnValue([])
-    const deps = createMockDeps({ mcpManager: mockMcpManager as never })
+    sendCommand.mockResolvedValue({
+      ok: true,
+      data: [],
+    })
+    const deps = createMockDeps({ sendCommand })
 
     const result = await runOuroCli(["mcp", "list"], deps)
 
     expect(result).toContain("no tools")
+  })
+
+  it("'mcp list' when daemon unavailable shows startup hint", async () => {
+    sendCommand.mockRejectedValue(new Error("connect ENOENT"))
+    const deps = createMockDeps({ sendCommand })
+
+    const result = await runOuroCli(["mcp", "list"], deps)
+
+    expect(result).toContain("daemon unavailable")
+    expect(result).toContain("ouro up")
+  })
+
+  it("'mcp call' when daemon unavailable shows startup hint", async () => {
+    sendCommand.mockRejectedValue(new Error("connect ENOENT"))
+    const deps = createMockDeps({ sendCommand })
+
+    const result = await runOuroCli(["mcp", "call", "ado", "get_items"], deps)
+
+    expect(result).toContain("daemon unavailable")
   })
 })

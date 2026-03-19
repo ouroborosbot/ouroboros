@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { parseOuroCommand, runOuroCli, type OuroCliDeps } from "../../heart/daemon/daemon-cli"
 import { mcpToolsSection, bodyMapSection } from "../../mind/prompt"
 import { OURO_CLI_TRUST_MANIFEST } from "../../repertoire/guardrails"
@@ -16,59 +16,67 @@ function createMockDeps(overrides: Partial<OuroCliDeps> = {}): OuroCliDeps {
   }
 }
 
-function createMockMcpManager(tools: Array<{ server: string; tools: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> }> = []) {
-  return {
-    listAllTools: vi.fn().mockReturnValue(tools),
-    callTool: vi.fn().mockResolvedValue({
-      content: [{ type: "text", text: "integration result" }],
-    }),
-    start: vi.fn().mockResolvedValue(undefined),
-    shutdown: vi.fn(),
-  }
-}
-
 describe("MCP integration — full flow", () => {
-  describe("ouro mcp list end-to-end (parse -> run -> output)", () => {
-    it("parses and runs mcp list with configured servers", async () => {
-      const mockManager = createMockMcpManager([
-        {
-          server: "ado",
-          tools: [
-            { name: "get_items", description: "Get work items", inputSchema: { type: "object" } },
-          ],
-        },
-      ])
+  describe("ouro mcp list end-to-end (parse -> daemon -> output)", () => {
+    it("parses and runs mcp list through daemon socket", async () => {
+      const sendCommand = vi.fn().mockResolvedValue({
+        ok: true,
+        data: [
+          {
+            server: "ado",
+            tools: [
+              { name: "get_items", description: "Get work items", inputSchema: { type: "object" } },
+            ],
+          },
+        ],
+      })
 
       const command = parseOuroCommand(["mcp", "list"])
       expect(command.kind).toBe("mcp.list")
 
-      const deps = createMockDeps({ mcpManager: mockManager as never })
+      const deps = createMockDeps({ sendCommand })
       const result = await runOuroCli(["mcp", "list"], deps)
 
+      expect(sendCommand).toHaveBeenCalledWith("/tmp/ouro-test.sock", { kind: "mcp.list" })
       expect(result).toContain("ado")
       expect(result).toContain("get_items")
       expect(deps.writeStdout).toHaveBeenCalledWith(expect.stringContaining("ado"))
     })
   })
 
-  describe("ouro mcp call end-to-end (parse -> run -> output)", () => {
-    it("parses and runs mcp call with args", async () => {
-      const mockManager = createMockMcpManager()
+  describe("ouro mcp call end-to-end (parse -> daemon -> output)", () => {
+    it("parses and runs mcp call through daemon socket", async () => {
+      const sendCommand = vi.fn().mockResolvedValue({
+        ok: true,
+        data: {
+          content: [{ type: "text", text: "integration result" }],
+        },
+      })
 
       const command = parseOuroCommand(["mcp", "call", "ado", "get_items", "--args", '{"query":"test"}'])
       expect(command.kind).toBe("mcp.call")
 
-      const deps = createMockDeps({ mcpManager: mockManager as never })
+      const deps = createMockDeps({ sendCommand })
       const result = await runOuroCli(["mcp", "call", "ado", "get_items", "--args", '{"query":"test"}'], deps)
 
-      expect(mockManager.callTool).toHaveBeenCalledWith("ado", "get_items", { query: "test" })
+      expect(sendCommand).toHaveBeenCalledWith("/tmp/ouro-test.sock", {
+        kind: "mcp.call",
+        server: "ado",
+        tool: "get_items",
+        args: '{"query":"test"}',
+      })
       expect(result).toContain("integration result")
     })
   })
 
   describe("agent without mcpServers", () => {
-    it("ouro mcp list returns 'no servers configured' message", async () => {
-      const deps = createMockDeps()
+    it("ouro mcp list returns 'no servers configured' message via daemon", async () => {
+      const sendCommand = vi.fn().mockResolvedValue({
+        ok: true,
+        data: [],
+        message: "no MCP servers configured",
+      })
+      const deps = createMockDeps({ sendCommand })
 
       const result = await runOuroCli(["mcp", "list"], deps)
 

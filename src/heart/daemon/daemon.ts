@@ -14,7 +14,7 @@ import { performStagedRestart } from "./staged-restart"
 import { execSync, spawnSync } from "child_process"
 import { drainPending } from "../../mind/pending"
 import { getAlwaysOnSenseNames } from "../../mind/friends/channel"
-import { shutdownSharedMcpManager } from "../../repertoire/mcp-manager"
+import { getSharedMcpManager, shutdownSharedMcpManager } from "../../repertoire/mcp-manager"
 
 export interface DaemonCronJobSummary {
   id: string
@@ -93,6 +93,8 @@ export type DaemonCommand =
   | { kind: "task.poke"; agent: string; taskId: string }
   | { kind: "message.send"; from: string; to: string; content: string; priority?: string; sessionId?: string; taskRef?: string }
   | { kind: "message.poll"; agent: string }
+  | { kind: "mcp.list" }
+  | { kind: "mcp.call"; server: string; tool: string; args?: string }
   | { kind: "hatch.start" }
 
 export interface DaemonResponse {
@@ -255,6 +257,11 @@ export class OuroDaemon {
         })
       },
       /* v8 ignore stop */
+    })
+
+    // Pre-initialize MCP connections so they're ready for the first command (non-blocking)
+    getSharedMcpManager().catch(() => {
+      // Errors are logged inside getSharedMcpManager; no-op if no servers configured
     })
 
     await this.processManager.startAutoStartAgents()
@@ -600,6 +607,26 @@ export class OuroDaemon {
           ok: true,
           message: `queued poke ${receipt.id}`,
           data: receipt,
+        }
+      }
+      case "mcp.list": {
+        const mcpManager = await getSharedMcpManager()
+        if (!mcpManager) {
+          return { ok: true, data: [], message: "no MCP servers configured" }
+        }
+        return { ok: true, data: mcpManager.listAllTools() }
+      }
+      case "mcp.call": {
+        const mcpCallManager = await getSharedMcpManager()
+        if (!mcpCallManager) {
+          return { ok: false, error: "no MCP servers configured" }
+        }
+        try {
+          const parsedArgs = command.args ? JSON.parse(command.args) as Record<string, unknown> : {}
+          const result = await mcpCallManager.callTool(command.server, command.tool, parsedArgs)
+          return { ok: true, data: result }
+        } catch (error) {
+          return { ok: false, error: error instanceof Error ? error.message : String(error) }
         }
       }
       case "hatch.start":

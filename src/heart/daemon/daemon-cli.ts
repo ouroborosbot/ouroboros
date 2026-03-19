@@ -33,7 +33,6 @@ import { applyPendingUpdates, registerUpdateHook } from "./update-hooks"
 import { bundleMetaHook } from "./hooks/bundle-meta"
 import { getChangelogPath, getPackageVersion } from "../../mind/bundle-manifest"
 import { getTaskModule } from "../../repertoire/tasks"
-import { getSharedMcpManager, type McpManager } from "../../repertoire/mcp-manager"
 import { parseInnerDialogSession, formatThoughtTurns, getInnerDialogSessionPath, followThoughts } from "./thoughts"
 import type { TaskModule } from "../../repertoire/tasks/types"
 import { syncGlobalOuroBotWrapper as defaultSyncGlobalOuroBotWrapper } from "./ouro-bot-global-installer"
@@ -104,7 +103,6 @@ export interface OuroCliDeps {
   whoamiInfo?: () => { agentName: string; homePath: string; bonesVersion: string }
   scanSessions?: () => Promise<SessionEntry[]>
   getChangelogPath?: () => string
-  mcpManager?: McpManager
 }
 
 export interface SessionEntry {
@@ -1258,11 +1256,36 @@ export function createDefaultOuroCliDeps(socketPath = DEFAULT_DAEMON_SOCKET_PATH
   }
 }
 
+type McpListCliCommand = Extract<OuroCliCommand, { kind: "mcp.list" }>
+type McpCallCliCommand = Extract<OuroCliCommand, { kind: "mcp.call" }>
+
+function formatMcpResponse(command: McpListCliCommand | McpCallCliCommand, response: DaemonResponse): string {
+  if (command.kind === "mcp.list") {
+    const allTools = response.data as Array<{ server: string; tools: Array<{ name: string; description: string }> }> | undefined
+    if (!allTools || allTools.length === 0) {
+      return response.message ?? "no tools available from connected MCP servers"
+    }
+    const lines: string[] = []
+    for (const entry of allTools) {
+      lines.push(`[${entry.server}]`)
+      for (const tool of entry.tools) {
+        lines.push(`  ${tool.name}: ${tool.description}`)
+      }
+    }
+    return lines.join("\n")
+  }
+  // mcp.call
+  const result = response.data as { content: Array<{ type: string; text: string }> } | undefined
+  if (!result) {
+    return response.message ?? "no result"
+  }
+  return result.content.map((c) => c.text).join("\n")
+}
+
 type ThoughtsCliCommand = Extract<OuroCliCommand, { kind: "thoughts" }>
 type AuthCliCommand = Extract<OuroCliCommand, { kind: "auth.run" }>
 type ChangelogCliCommand = Extract<OuroCliCommand, { kind: "changelog" }>
-type McpCliCommand = Extract<OuroCliCommand, { kind: "mcp.list" } | { kind: "mcp.call" }>
-function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "hatch.start" } | AuthCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand | McpCliCommand>): DaemonCommand {
+function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "hatch.start" } | AuthCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand>): DaemonCommand {
   return command
 }
 
@@ -1694,46 +1717,25 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     return ""
   }
 
-  // ── mcp subcommands (local, no daemon socket needed) ──
-  if (command.kind === "mcp.list") {
-    /* v8 ignore next 2 -- production default: requires full identity setup @preserve */
-    const manager = deps.mcpManager ?? await getSharedMcpManager()
-    if (!manager) {
-      const message = "no MCP servers configured (add mcpServers to agent.json)"
+  // ── mcp subcommands (routed through daemon socket) ──
+  if (command.kind === "mcp.list" || command.kind === "mcp.call") {
+    const daemonCommand = toDaemonCommand(command)
+    let response: DaemonResponse
+    try {
+      response = await deps.sendCommand(deps.socketPath, daemonCommand)
+    } catch {
+      const message = "daemon unavailable — start with `ouro up` first"
       deps.writeStdout(message)
       return message
     }
-    const allTools = manager.listAllTools()
-    if (allTools.length === 0) {
-      const message = "no tools available from connected MCP servers"
+    if (!response.ok) {
+      const message = response.error ?? "unknown error"
       deps.writeStdout(message)
       return message
     }
-    const lines: string[] = []
-    for (const entry of allTools) {
-      lines.push(`[${entry.server}]`)
-      for (const tool of entry.tools) {
-        lines.push(`  ${tool.name}: ${tool.description}`)
-      }
-    }
-    const message = lines.join("\n")
+    const message = formatMcpResponse(command, response)
     deps.writeStdout(message)
     return message
-  }
-
-  if (command.kind === "mcp.call") {
-    /* v8 ignore next 2 -- production default: requires full identity setup @preserve */
-    const manager = deps.mcpManager ?? await getSharedMcpManager()
-    if (!manager) {
-      const message = "no MCP servers configured (add mcpServers to agent.json)"
-      deps.writeStdout(message)
-      return message
-    }
-    const parsedArgs = command.args ? JSON.parse(command.args) as Record<string, unknown> : {}
-    const result = await manager.callTool(command.server, command.tool, parsedArgs)
-    const text = result.content.map(c => c.text).join("\n")
-    deps.writeStdout(text)
-    return text
   }
 
   // ── task subcommands (local, no daemon socket needed) ──
