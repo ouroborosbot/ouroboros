@@ -1,6 +1,6 @@
 import { McpClient } from "./mcp-client"
 import type { McpToolInfo } from "./mcp-client"
-import type { McpServerConfig } from "../heart/identity"
+import { loadAgentConfig, type McpServerConfig } from "../heart/identity"
 import { emitNervesEvent } from "../nerves/runtime"
 
 interface ServerEntry {
@@ -156,4 +156,60 @@ export class McpManager {
       newEntry.consecutiveFailures = entry.consecutiveFailures
     }
   }
+}
+
+let _sharedManager: McpManager | null = null
+let _sharedManagerPromise: Promise<McpManager | null> | null = null
+
+/**
+ * Get or create a shared McpManager instance from the agent's config.
+ * Returns null if no mcpServers are configured.
+ * Safe to call from multiple senses — will only create one instance.
+ */
+export async function getSharedMcpManager(): Promise<McpManager | null> {
+  if (_sharedManager) return _sharedManager
+  if (_sharedManagerPromise) return _sharedManagerPromise
+
+  _sharedManagerPromise = (async () => {
+    try {
+      const config = loadAgentConfig()
+      const servers = config.mcpServers
+      if (!servers || Object.keys(servers).length === 0) return null
+
+      const manager = new McpManager()
+      await manager.start(servers)
+      _sharedManager = manager
+      return manager
+    } catch (error) {
+      emitNervesEvent({
+        level: "error",
+        event: "mcp.manager_start",
+        component: "repertoire",
+        message: "failed to initialize shared MCP manager",
+        meta: { reason: error instanceof Error ? error.message : String(error) },
+      })
+      return null
+    } finally {
+      _sharedManagerPromise = null
+    }
+  })()
+
+  return _sharedManagerPromise
+}
+
+/**
+ * Shut down the shared MCP manager and clear the singleton.
+ * Called during daemon/agent shutdown.
+ */
+export function shutdownSharedMcpManager(): void {
+  if (_sharedManager) {
+    _sharedManager.shutdown()
+    _sharedManager = null
+  }
+}
+
+/** Reset for testing only */
+export function resetSharedMcpManager(): void {
+  _sharedManager = null
+  _sharedManagerPromise = null
 }
