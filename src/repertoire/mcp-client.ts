@@ -81,6 +81,7 @@ export class McpClient {
         message: "MCP server connection failed",
         meta: {
           command: this.config.command,
+          /* v8 ignore next -- defensive: spawn errors are always Error instances @preserve */
           reason: error instanceof Error ? error.message : String(error),
         },
       })
@@ -149,6 +150,7 @@ export class McpClient {
         message: `MCP tool call failed: ${name}`,
         meta: {
           tool: name,
+          /* v8 ignore next -- defensive: callTool errors are always Error instances @preserve */
           reason: error instanceof Error ? error.message : String(error),
         },
       })
