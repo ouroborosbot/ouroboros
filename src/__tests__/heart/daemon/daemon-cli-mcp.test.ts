@@ -168,6 +168,40 @@ describe("ouro mcp CLI execution (daemon-routed)", () => {
     expect(result).toContain("no tools")
   })
 
+  it("'mcp call' with ok response but no data shows fallback message", async () => {
+    sendCommand.mockResolvedValue({
+      ok: true,
+      message: "completed",
+    })
+    const deps = createMockDeps({ sendCommand })
+
+    const result = await runOuroCli(["mcp", "call", "ado", "get_items"], deps)
+
+    expect(result).toBe("completed")
+  })
+
+  it("'mcp call' with ok response, no data, and no message shows 'no result'", async () => {
+    sendCommand.mockResolvedValue({
+      ok: true,
+    })
+    const deps = createMockDeps({ sendCommand })
+
+    const result = await runOuroCli(["mcp", "call", "ado", "get_items"], deps)
+
+    expect(result).toBe("no result")
+  })
+
+  it("'mcp call' with error response and no error message shows 'unknown error'", async () => {
+    sendCommand.mockResolvedValue({
+      ok: false,
+    })
+    const deps = createMockDeps({ sendCommand })
+
+    const result = await runOuroCli(["mcp", "call", "ado", "get_items"], deps)
+
+    expect(result).toBe("unknown error")
+  })
+
   it("'mcp list' when daemon unavailable shows startup hint", async () => {
     sendCommand.mockRejectedValue(new Error("connect ENOENT"))
     const deps = createMockDeps({ sendCommand })
