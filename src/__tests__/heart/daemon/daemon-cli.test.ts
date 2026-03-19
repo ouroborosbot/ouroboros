@@ -87,6 +87,21 @@ describe("ouro CLI parsing", () => {
     })
   })
 
+  it("strips leading --agent flag and parses underlying command", () => {
+    expect(parseOuroCommand(["--agent", "ouroboros", "status"])).toEqual({
+      kind: "daemon.status",
+    })
+    expect(parseOuroCommand(["--agent", "ouroboros", "mcp", "list"])).toEqual({
+      kind: "mcp.list",
+    })
+    expect(parseOuroCommand(["--agent", "ouroboros", "whoami"])).toEqual({
+      kind: "whoami",
+    })
+    expect(parseOuroCommand(["--agent", "ouroboros"])).toEqual({
+      kind: "daemon.up",
+    })
+  })
+
   it("parses auth commands and rejects malformed auth input", () => {
     expect(parseOuroCommand(["auth", "--agent", "slugger"])).toEqual({
       kind: "auth.run",
