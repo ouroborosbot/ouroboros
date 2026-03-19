@@ -75,7 +75,12 @@ else
   echo "Harness up to date (v$INSTALLED_VERSION)"
 fi
 
-# --- 5. Start the bot ---
+# --- 5. Add ouro CLI to PATH so the agent can use it via shell ---
+# Symlink into /usr/local/bin (already on PATH for all processes)
+# rather than modifying PATH which Oryx's startup wrapper may not preserve
+ln -sf "$HARNESS_DIR/node_modules/.bin/ouro" /usr/local/bin/ouro
+
+# --- 6. Start the bot ---
 if [ ! -f "$ENTRY" ]; then
   echo "ERROR: teams-entry.js not found at $ENTRY"
   exit 1
