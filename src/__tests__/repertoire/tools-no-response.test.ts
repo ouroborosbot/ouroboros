@@ -51,9 +51,9 @@ describe("noResponseTool", () => {
     expect(noResponseTool.function.name).toBe("no_response")
   })
 
-  it("has a description mentioning group chat and declining to respond", async () => {
+  it("has a description mentioning group chat and staying silent", async () => {
     const { noResponseTool } = await import("../../repertoire/tools-base")
-    expect(noResponseTool.function.description).toMatch(/decline/i)
+    expect(noResponseTool.function.description).toMatch(/silent/i)
     expect(noResponseTool.function.description).toMatch(/group chat/i)
   })
 

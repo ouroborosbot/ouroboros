@@ -1153,7 +1153,7 @@ export const noResponseTool: OpenAI.ChatCompletionFunctionTool = {
   type: "function",
   function: {
     name: "no_response",
-    description: "decline to respond in this group chat. use when the message is not directed at you, does not need your input, or is a reaction/tapback. must be the only tool call in the turn.",
+    description: "stay silent in this group chat — the moment doesn't call for a response. must be the only tool call in the turn.",
     parameters: {
       type: "object",
       properties: {

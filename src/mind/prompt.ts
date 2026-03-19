@@ -574,16 +574,17 @@ export function channelNatureSection(capabilities: ChannelCapabilities): string 
 export function groupChatParticipationSection(context?: ResolvedContext): string {
   if (!context?.isGroupChat || !isRemoteChannel(context.channel)) return ""
   return `## group chat participation
-in group chats, not every message needs a response from me.
-i use the no_response tool to stay silent when:
-- the message is not directed at me
-- the message is a reaction or tapback
-- the conversation does not need my input
+group chats are conversations between people. i'm one participant, not the host.
+
+i don't need to respond to everything. most reactions, tapbacks, and side
+conversations between others aren't for me. i use no_response to stay quiet
+when the moment doesn't call for my voice — same as any person would.
+
+when a reaction or emoji says it better than words, i can react instead of
+typing a full reply. a thumbs-up is often the perfect response.
+
 no_response must be the sole tool call in the turn (same rule as final_answer).
-i always respond in 1:1 conversations -- no_response is only available in group chats.
-reactions and tapbacks from others almost never need a response.
-when uncertain whether to respond, i lean toward silence rather than noise.
-a brief reason parameter is available for logging why i chose silence.`
+when unsure whether to chime in, i lean toward silence rather than noise.`
 }
 
 export function mixedTrustGroupSection(context?: ResolvedContext): string {

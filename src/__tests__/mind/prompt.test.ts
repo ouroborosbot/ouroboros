@@ -3254,9 +3254,9 @@ describe("groupChatParticipationSection", () => {
     // Must mention reactions/tapbacks
     expect(result).toMatch(/reaction|tapback/i)
     // Must mention silence or not responding
-    expect(result).toMatch(/silent|silence/i)
-    // Must mention the reason parameter
-    expect(result).toMatch(/reason/i)
+    expect(result).toMatch(/silent|silence|quiet/i)
+    // Must mention no_response
+    expect(result).toMatch(/no_response/)
     // Must mention sole tool call rule
     expect(result).toMatch(/only tool call|sole/i)
   })
