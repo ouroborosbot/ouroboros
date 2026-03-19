@@ -314,6 +314,15 @@ describe("no_response tool in runAgent", () => {
   })
 
   it("emits a nerves event when no_response is used", async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
+
+    const emitNervesEvent = vi.fn()
+    vi.doMock("../../nerves/runtime", () => ({
+      emitNervesEvent,
+    }))
+
     mockCreate.mockReturnValue(
       makeStream([
         makeChunk(undefined, [
@@ -322,10 +331,10 @@ describe("no_response tool in runAgent", () => {
       ])
     )
 
-    const { emitNervesEvent } = await import("../../nerves/runtime")
+    const core = await import("../../heart/core")
     const callbacks = makeCallbacks()
     const messages: any[] = [{ role: "system", content: "test" }]
-    await runAgent(messages, callbacks, undefined, undefined, {
+    await core.runAgent(messages, callbacks, undefined, undefined, {
       toolChoiceRequired: true,
       toolContext: {
         signin: async () => undefined,
@@ -334,9 +343,8 @@ describe("no_response tool in runAgent", () => {
     })
 
     // Check that emitNervesEvent was called with the no_response event
-    const emitCalls = vi.mocked(emitNervesEvent).mock.calls
-    const noResponseEvent = emitCalls.find(
-      (call) => call[0].event === "engine.no_response"
+    const noResponseEvent = emitNervesEvent.mock.calls.find(
+      (call: any[]) => call[0].event === "engine.no_response"
     )
     expect(noResponseEvent).toBeDefined()
     expect(noResponseEvent![0].component).toBe("engine")
