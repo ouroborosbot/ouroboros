@@ -1,17 +1,16 @@
 import { describe, it, expect, vi, afterEach } from "vitest"
-import { resetSharedMcpManager } from "../../repertoire/mcp-manager"
 
 /**
  * Tests for MCP Manager wiring into production code paths:
  * 1. daemon.ts handleCommand routes mcp.list/mcp.call to shared manager
  * 2. daemon.ts stop() calls shutdownSharedMcpManager()
  * 3. CLI routes mcp commands through daemon socket (not locally)
+ * 4. Shared singleton lifecycle (create, shutdown, cleanup)
  */
 
 describe("MCP Manager wiring", () => {
   afterEach(() => {
     vi.restoreAllMocks()
-    resetSharedMcpManager()
   })
 
   describe("daemon stop calls shutdownSharedMcpManager", () => {
@@ -43,6 +42,56 @@ describe("MCP Manager wiring", () => {
       expect(shutdownSpy).toHaveBeenCalledOnce()
 
       vi.doUnmock("../../repertoire/mcp-manager")
+    })
+  })
+
+  describe("getSharedMcpManager singleton", () => {
+    it("creates manager when mcpServers configured and shutdown cleans up", async () => {
+      vi.resetModules()
+
+      const mockConnect = vi.fn().mockResolvedValue(undefined)
+      const mockListTools = vi.fn().mockResolvedValue([])
+      const mockShutdown = vi.fn()
+      const mockOnClose = vi.fn()
+
+      // Must use a real class/function for `new McpClient()` to work
+      vi.doMock("../../repertoire/mcp-client", () => ({
+        McpClient: class MockMcpClient {
+          connect = mockConnect
+          listTools = mockListTools
+          callTool = vi.fn()
+          shutdown = mockShutdown
+          isConnected = vi.fn(() => true)
+          onClose = mockOnClose
+        },
+      }))
+
+      vi.doMock("../../heart/identity", () => ({
+        loadAgentConfig: () => ({
+          mcpServers: { calc: { command: "echo", args: ["test"] } },
+        }),
+        getAgentRoot: () => "/tmp/test",
+        getAgentName: () => "test",
+      }))
+
+      // Now import — picks up mocks
+      const mod = await import("../../repertoire/mcp-manager")
+
+      const manager = await mod.getSharedMcpManager()
+      expect(manager).not.toBeNull()
+      expect(mockConnect).toHaveBeenCalledOnce()
+
+      // Verify shutdown cleans up
+      mod.shutdownSharedMcpManager()
+      expect(mockShutdown).toHaveBeenCalledOnce()
+
+      // Second shutdown is a no-op
+      mod.shutdownSharedMcpManager()
+      expect(mockShutdown).toHaveBeenCalledOnce()
+
+      mod.resetSharedMcpManager()
+      vi.doUnmock("../../repertoire/mcp-client")
+      vi.doUnmock("../../heart/identity")
     })
   })
 
