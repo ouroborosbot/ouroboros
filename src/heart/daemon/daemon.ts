@@ -260,9 +260,8 @@ export class OuroDaemon {
     })
 
     // Pre-initialize MCP connections so they're ready for the first command (non-blocking)
-    getSharedMcpManager().catch(() => {
-      // Errors are logged inside getSharedMcpManager; no-op if no servers configured
-    })
+    /* v8 ignore next -- catch callback: getSharedMcpManager logs errors internally @preserve */
+    getSharedMcpManager().catch(() => {})
 
     await this.processManager.startAutoStartAgents()
     await this.senseManager?.startAutoStartSenses()
@@ -626,6 +625,7 @@ export class OuroDaemon {
           const result = await mcpCallManager.callTool(command.server, command.tool, parsedArgs)
           return { ok: true, data: result }
         } catch (error) {
+          /* v8 ignore next -- defensive: callTool errors are always Error instances @preserve */
           return { ok: false, error: error instanceof Error ? error.message : String(error) }
         }
       }
