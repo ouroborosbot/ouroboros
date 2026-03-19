@@ -392,6 +392,76 @@ describe("McpClient", () => {
     })
   })
 
+  describe("disconnected client", () => {
+    it("rejects callTool when client is not connected", async () => {
+      const { McpClient } = await getMcpClient()
+      const client = new McpClient({ command: "server" })
+
+      // Never connect, just try to call
+      await expect(client.callTool("tool", {})).rejects.toThrow(/disconnect/i)
+    })
+
+    it("rejects listTools when client is not connected", async () => {
+      const { McpClient } = await getMcpClient()
+      const client = new McpClient({ command: "server" })
+
+      await expect(client.listTools()).rejects.toThrow(/disconnect/i)
+    })
+  })
+
+  describe("notification messages (no id)", () => {
+    it("ignores JSON-RPC notifications from server", async () => {
+      const { McpClient } = await getMcpClient()
+      const client = await connectClient(McpClient, mockProc)
+
+      // Send a notification (no id field) — should be silently ignored
+      sendResponse(mockProc, {
+        jsonrpc: "2.0",
+        method: "notifications/progress",
+        params: { progress: 50 },
+      } as unknown as Record<string, unknown>)
+
+      await tick()
+
+      // Client should still be connected and functional
+      expect(client.isConnected()).toBe(true)
+    })
+
+    it("ignores responses with unknown request IDs", async () => {
+      const { McpClient } = await getMcpClient()
+      const client = await connectClient(McpClient, mockProc)
+
+      // Send a response with an ID that was never requested
+      sendResponse(mockProc, {
+        jsonrpc: "2.0",
+        id: 99999,
+        result: { data: "orphaned" },
+      })
+
+      await tick()
+
+      // Client should still be connected and functional
+      expect(client.isConnected()).toBe(true)
+    })
+  })
+
+  describe("onClose callback", () => {
+    it("invokes onClose callback when process exits", async () => {
+      const { McpClient } = await getMcpClient()
+      const client = await connectClient(McpClient, mockProc)
+
+      const onClose = vi.fn()
+      client.onClose(onClose)
+
+      // Override kill to not emit close
+      mockProc.kill = vi.fn(() => true)
+      mockProc.emit("close", 0)
+      await tick()
+
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+  })
+
   describe("error event on process error", () => {
     it("handles process error event", async () => {
       const { McpClient } = await getMcpClient()
