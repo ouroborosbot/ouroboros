@@ -8,6 +8,7 @@ import { isTrustedLevel, type Channel, type ChannelCapabilities, type ResolvedCo
 import { describeTrustContext } from "./friends/trust-explanation";
 import { getChannelCapabilities, isRemoteChannel } from "./friends/channel";
 import { emitNervesEvent } from "../nerves/runtime";
+import type { McpManager } from "../repertoire/mcp-manager";
 import { backfillBundleMeta, getPackageVersion, getChangelogPath } from "./bundle-manifest";
 import type { BundleMeta } from "./bundle-manifest";
 import { getFirstImpressions } from "./first-impressions";
@@ -174,7 +175,26 @@ my bones give me the \`ouro\` cli:
   ouro friend show <id>  everything i know about someone
   ouro session list      my open conversations right now
   ouro reminder create   remind myself about something later
+  ouro mcp list          list connected mcp servers and their tools
+  ouro mcp call          call a tool on an mcp server
   ouro --help            the full list`
+}
+
+export function mcpToolsSection(mcpManager?: McpManager): string {
+  if (!mcpManager) return "";
+  const allTools = mcpManager.listAllTools();
+  if (allTools.length === 0) return "";
+
+  const lines: string[] = [
+    `## mcp tools (use ouro mcp call <server> <tool> --args '{...}')`,
+  ];
+  for (const entry of allTools) {
+    lines.push(`### ${entry.server}`);
+    for (const tool of entry.tools) {
+      lines.push(`- ${tool.name}: ${tool.description}`);
+    }
+  }
+  return lines.join("\n");
 }
 
 function readBundleMeta(): BundleMeta | null {
@@ -437,6 +457,7 @@ export interface BuildSystemOptions {
   delegationDecision?: DelegationDecision;
   providerCapabilities?: ReadonlySet<import("../heart/core").ProviderCapability>;
   supportedReasoningEfforts?: readonly string[];
+  mcpManager?: McpManager;
 }
 
 function bridgeContextSection(options?: BuildSystemOptions): string {
@@ -601,6 +622,7 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     providerSection(),
     dateSection(),
     toolsSection(channel, options, context),
+    mcpToolsSection(options?.mcpManager),
     reasoningEffortSection(options),
     toolRestrictionSection(context),
     trustContextSection(context),
