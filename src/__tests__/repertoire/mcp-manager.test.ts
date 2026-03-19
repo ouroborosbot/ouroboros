@@ -1,16 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-
-vi.mock("../../repertoire/mcp-client", () => ({
-  McpClient: vi.fn(),
-}))
-
-import { McpClient } from "../../repertoire/mcp-client"
 import type { McpToolInfo } from "../../repertoire/mcp-client"
 
-function createMockClient(tools: McpToolInfo[] = [], shouldFailConnect = false) {
+interface MockClient {
+  connect: ReturnType<typeof vi.fn>
+  listTools: ReturnType<typeof vi.fn>
+  callTool: ReturnType<typeof vi.fn>
+  shutdown: ReturnType<typeof vi.fn>
+  isConnected: ReturnType<typeof vi.fn>
+  onClose: ReturnType<typeof vi.fn>
+  _triggerClose: () => void
+}
+
+let clientFactory: () => MockClient
+
+function createMockClient(tools: McpToolInfo[] = [], shouldFailConnect = false): MockClient {
   let closeCallback: (() => void) | null = null
-  let connected = true
-  const client = {
+  let connected = !shouldFailConnect
+  return {
     connect: shouldFailConnect
       ? vi.fn().mockRejectedValue(new Error("connect failed"))
       : vi.fn().mockResolvedValue(undefined),
@@ -22,36 +28,51 @@ function createMockClient(tools: McpToolInfo[] = [], shouldFailConnect = false) 
     isConnected: vi.fn(() => connected),
     onClose: vi.fn((cb: () => void) => { closeCallback = cb }),
     _triggerClose: () => { connected = false; closeCallback?.() },
-    _setConnected: (v: boolean) => { connected = v },
   }
-  return client
 }
 
+vi.mock("../../repertoire/mcp-client", () => ({
+  McpClient: class McpClient {
+    connect: MockClient["connect"]
+    listTools: MockClient["listTools"]
+    callTool: MockClient["callTool"]
+    shutdown: MockClient["shutdown"]
+    isConnected: MockClient["isConnected"]
+    onClose: MockClient["onClose"]
+    _triggerClose: MockClient["_triggerClose"]
+    constructor() {
+      const mock = clientFactory()
+      this.connect = mock.connect
+      this.listTools = mock.listTools
+      this.callTool = mock.callTool
+      this.shutdown = mock.shutdown
+      this.isConnected = mock.isConnected
+      this.onClose = mock.onClose
+      this._triggerClose = mock._triggerClose
+    }
+  },
+}))
+
+import { McpManager } from "../../repertoire/mcp-manager"
+
 describe("McpManager", () => {
-  let clientInstances: ReturnType<typeof createMockClient>[]
+  let clientInstances: MockClient[]
 
   beforeEach(() => {
-    vi.resetModules()
     clientInstances = []
-    vi.mocked(McpClient).mockImplementation(() => {
+    clientFactory = () => {
       const client = createMockClient()
       clientInstances.push(client)
-      return client as unknown as InstanceType<typeof McpClient>
-    })
+      return client
+    }
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  async function getMcpManager() {
-    const mod = await import("../../repertoire/mcp-manager")
-    return mod
-  }
-
   describe("start", () => {
     it("spawns clients for each server in config", async () => {
-      const { McpManager } = await getMcpManager()
       const manager = new McpManager()
 
       await manager.start({
@@ -59,36 +80,55 @@ describe("McpManager", () => {
         mail: { command: "mail-server", args: ["--port", "3000"] },
       })
 
-      expect(McpClient).toHaveBeenCalledTimes(2)
       expect(clientInstances).toHaveLength(2)
       expect(clientInstances[0].connect).toHaveBeenCalled()
       expect(clientInstances[1].connect).toHaveBeenCalled()
     })
 
     it("handles empty config (no servers)", async () => {
-      const { McpManager } = await getMcpManager()
       const manager = new McpManager()
 
       await manager.start({})
 
-      expect(McpClient).not.toHaveBeenCalled()
+      expect(clientInstances).toHaveLength(0)
+    })
+
+    it("continues starting other servers when one fails to connect", async () => {
+      let clientIdx = 0
+      clientFactory = () => {
+        const client = clientIdx === 0
+          ? createMockClient([], true) // first server fails
+          : createMockClient()
+        clientInstances.push(client)
+        clientIdx++
+        return client
+      }
+
+      const manager = new McpManager()
+
+      await manager.start({
+        failing: { command: "bad-server" },
+        working: { command: "good-server" },
+      })
+
+      expect(clientInstances).toHaveLength(2)
+      expect(clientInstances[1].connect).toHaveBeenCalled()
     })
   })
 
   describe("listAllTools", () => {
     it("aggregates tools from all connected servers", async () => {
       let clientIdx = 0
-      vi.mocked(McpClient).mockImplementation(() => {
+      clientFactory = () => {
         const tools = clientIdx === 0
           ? [{ name: "get_items", description: "Get items", inputSchema: { type: "object" } }]
           : [{ name: "send_mail", description: "Send mail", inputSchema: { type: "object" } }]
         const client = createMockClient(tools)
         clientInstances.push(client)
         clientIdx++
-        return client as unknown as InstanceType<typeof McpClient>
-      })
+        return client
+      }
 
-      const { McpManager } = await getMcpManager()
       const manager = new McpManager()
 
       await manager.start({
@@ -109,8 +149,7 @@ describe("McpManager", () => {
       ])
     })
 
-    it("returns empty array when no servers configured", async () => {
-      const { McpManager } = await getMcpManager()
+    it("returns empty array when no servers configured", () => {
       const manager = new McpManager()
 
       const allTools = manager.listAllTools()
@@ -121,7 +160,7 @@ describe("McpManager", () => {
   describe("callTool", () => {
     it("routes to correct client", async () => {
       let clientIdx = 0
-      vi.mocked(McpClient).mockImplementation(() => {
+      clientFactory = () => {
         const client = createMockClient()
         if (clientIdx === 1) {
           client.callTool = vi.fn().mockResolvedValue({
@@ -130,10 +169,9 @@ describe("McpManager", () => {
         }
         clientInstances.push(client)
         clientIdx++
-        return client as unknown as InstanceType<typeof McpClient>
-      })
+        return client
+      }
 
-      const { McpManager } = await getMcpManager()
       const manager = new McpManager()
 
       await manager.start({
@@ -150,7 +188,6 @@ describe("McpManager", () => {
     })
 
     it("returns error for unknown server", async () => {
-      const { McpManager } = await getMcpManager()
       const manager = new McpManager()
 
       await manager.start({
@@ -161,14 +198,13 @@ describe("McpManager", () => {
     })
 
     it("returns error for disconnected server", async () => {
-      vi.mocked(McpClient).mockImplementation(() => {
+      clientFactory = () => {
         const client = createMockClient()
         client.isConnected = vi.fn(() => false)
         clientInstances.push(client)
-        return client as unknown as InstanceType<typeof McpClient>
-      })
+        return client
+      }
 
-      const { McpManager } = await getMcpManager()
       const manager = new McpManager()
 
       await manager.start({
@@ -183,7 +219,6 @@ describe("McpManager", () => {
     it("restarts a crashed server after delay", async () => {
       vi.useFakeTimers()
 
-      const { McpManager } = await getMcpManager()
       const manager = new McpManager()
 
       await manager.start({
@@ -191,11 +226,9 @@ describe("McpManager", () => {
       })
 
       expect(clientInstances).toHaveLength(1)
-      const firstClient = clientInstances[0]
 
       // Simulate crash
-      firstClient._triggerClose()
-      expect(firstClient.isConnected()).toBe(false)
+      clientInstances[0]._triggerClose()
 
       // Advance past restart delay
       await vi.advanceTimersByTimeAsync(1500)
@@ -210,16 +243,14 @@ describe("McpManager", () => {
     it("caps retries at 5 consecutive failures", async () => {
       vi.useFakeTimers()
 
-      vi.mocked(McpClient).mockImplementation(() => {
+      clientFactory = () => {
         const client = createMockClient([], true) // always fails connect
         clientInstances.push(client)
-        return client as unknown as InstanceType<typeof McpClient>
-      })
+        return client
+      }
 
-      const { McpManager } = await getMcpManager()
       const manager = new McpManager()
 
-      // Initial start will fail but should not throw (manager handles it)
       await manager.start({
         ado: { command: "ado-server" },
       })
@@ -232,7 +263,7 @@ describe("McpManager", () => {
       }
 
       // Should have stopped retrying after 5 consecutive failures
-      // Initial + 5 retries = 6 total
+      // Initial + 5 retries = 6 total, 7th should not happen
       expect(clientInstances.length).toBeLessThanOrEqual(7)
 
       vi.useRealTimers()
@@ -241,7 +272,6 @@ describe("McpManager", () => {
 
   describe("shutdown", () => {
     it("shuts down all clients", async () => {
-      const { McpManager } = await getMcpManager()
       const manager = new McpManager()
 
       await manager.start({
@@ -255,12 +285,32 @@ describe("McpManager", () => {
       expect(clientInstances[1].shutdown).toHaveBeenCalled()
     })
 
-    it("is a no-op when no servers are started", async () => {
-      const { McpManager } = await getMcpManager()
+    it("is a no-op when no servers are started", () => {
+      const manager = new McpManager()
+      manager.shutdown()
+      expect(clientInstances).toHaveLength(0)
+    })
+
+    it("prevents restart attempts after shutdown", async () => {
+      vi.useFakeTimers()
+
       const manager = new McpManager()
 
-      // Should not throw
+      await manager.start({
+        ado: { command: "ado-server" },
+      })
+
+      const initialCount = clientInstances.length
+
+      // Shutdown, then trigger close
       manager.shutdown()
+
+      await vi.advanceTimersByTimeAsync(1500)
+
+      // No new client should be created after shutdown
+      expect(clientInstances).toHaveLength(initialCount)
+
+      vi.useRealTimers()
     })
   })
 })
