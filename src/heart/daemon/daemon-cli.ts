@@ -33,7 +33,7 @@ import { applyPendingUpdates, registerUpdateHook } from "./update-hooks"
 import { bundleMetaHook } from "./hooks/bundle-meta"
 import { getChangelogPath, getPackageVersion } from "../../mind/bundle-manifest"
 import { getTaskModule } from "../../repertoire/tasks"
-import type { McpManager } from "../../repertoire/mcp-manager"
+import { getSharedMcpManager, type McpManager } from "../../repertoire/mcp-manager"
 import { parseInnerDialogSession, formatThoughtTurns, getInnerDialogSessionPath, followThoughts } from "./thoughts"
 import type { TaskModule } from "../../repertoire/tasks/types"
 import { syncGlobalOuroBotWrapper as defaultSyncGlobalOuroBotWrapper } from "./ouro-bot-global-installer"
@@ -1696,12 +1696,14 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
   // ── mcp subcommands (local, no daemon socket needed) ──
   if (command.kind === "mcp.list") {
-    if (!deps.mcpManager) {
+    /* v8 ignore next 2 -- production default: requires full identity setup @preserve */
+    const manager = deps.mcpManager ?? await getSharedMcpManager()
+    if (!manager) {
       const message = "no MCP servers configured (add mcpServers to agent.json)"
       deps.writeStdout(message)
       return message
     }
-    const allTools = deps.mcpManager.listAllTools()
+    const allTools = manager.listAllTools()
     if (allTools.length === 0) {
       const message = "no tools available from connected MCP servers"
       deps.writeStdout(message)
@@ -1720,13 +1722,15 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   }
 
   if (command.kind === "mcp.call") {
-    if (!deps.mcpManager) {
+    /* v8 ignore next 2 -- production default: requires full identity setup @preserve */
+    const manager = deps.mcpManager ?? await getSharedMcpManager()
+    if (!manager) {
       const message = "no MCP servers configured (add mcpServers to agent.json)"
       deps.writeStdout(message)
       return message
     }
     const parsedArgs = command.args ? JSON.parse(command.args) as Record<string, unknown> : {}
-    const result = await deps.mcpManager.callTool(command.server, command.tool, parsedArgs)
+    const result = await manager.callTool(command.server, command.tool, parsedArgs)
     const text = result.content.map(c => c.text).join("\n")
     deps.writeStdout(text)
     return text

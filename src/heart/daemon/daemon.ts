@@ -14,6 +14,7 @@ import { performStagedRestart } from "./staged-restart"
 import { execSync, spawnSync } from "child_process"
 import { drainPending } from "../../mind/pending"
 import { getAlwaysOnSenseNames } from "../../mind/friends/channel"
+import { shutdownSharedMcpManager } from "../../repertoire/mcp-manager"
 
 export interface DaemonCronJobSummary {
   id: string
@@ -450,6 +451,7 @@ export class OuroDaemon {
     })
 
     stopUpdateChecker()
+    shutdownSharedMcpManager()
     this.scheduler.stop?.()
     await this.processManager.stopAll()
     await this.senseManager?.stopAll()
