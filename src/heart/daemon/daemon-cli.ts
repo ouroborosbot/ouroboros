@@ -809,7 +809,13 @@ function parseMcpCommand(args: string[]): OuroCliCommand {
 }
 
 export function parseOuroCommand(args: string[]): OuroCliCommand {
+  // When --agent is the first token (e.g., ["--agent", "ouroboros", "mcp", "list"]),
+  // skip past it so the command dispatch sees the actual command.
+  // Subcommand parsers still call extractAgentFlag internally for their own args.
   const [head, second] = args
+  if (head === "--agent" && second) {
+    return parseOuroCommand(args.slice(2))
+  }
   if (!head) return { kind: "daemon.up" }
 
   if (head === "up") return { kind: "daemon.up" }
