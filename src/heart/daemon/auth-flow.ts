@@ -30,6 +30,11 @@ interface SecretsTemplate {
       model: string
       oauthAccessToken: string
     }
+    "github-copilot": {
+      model: string
+      githubToken: string
+      baseUrl: string
+    }
   }
   teams: {
     clientId: string
@@ -71,6 +76,11 @@ const DEFAULT_SECRETS_TEMPLATE: SecretsTemplate = {
     "openai-codex": {
       model: "gpt-5.4",
       oauthAccessToken: "",
+    },
+    "github-copilot": {
+      model: "claude-sonnet-4.6",
+      githubToken: "",
+      baseUrl: "",
     },
   },
   teams: {
@@ -171,7 +181,8 @@ export function readAgentConfigForAgent(
     provider !== "azure" &&
     provider !== "anthropic" &&
     provider !== "minimax" &&
-    provider !== "openai-codex"
+    provider !== "openai-codex" &&
+    provider !== "github-copilot"
   ) {
     throw new Error(`agent.json at ${configPath} has unsupported provider '${String(provider)}'`)
   }

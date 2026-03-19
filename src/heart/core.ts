@@ -3,6 +3,7 @@ import {
   getAnthropicConfig,
   getAzureConfig,
   getContextConfig,
+  getGithubCopilotConfig,
   getMinimaxConfig,
   getOpenAICodexConfig,
 } from "./config";
@@ -23,11 +24,12 @@ import { createAnthropicProviderRuntime } from "./providers/anthropic";
 import { createAzureProviderRuntime } from "./providers/azure";
 import { createMinimaxProviderRuntime } from "./providers/minimax";
 import { createOpenAICodexProviderRuntime } from "./providers/openai-codex";
+import { createGithubCopilotProviderRuntime } from "./providers/github-copilot";
 import type { SteeringFollowUpEffect } from "../senses/continuity";
 import type { ActiveWorkFrame } from "./active-work";
 import type { DelegationDecision } from "./delegation";
 
-export type ProviderId = "azure" | "anthropic" | "minimax" | "openai-codex";
+export type ProviderId = "azure" | "anthropic" | "minimax" | "openai-codex" | "github-copilot";
 
 export type ProviderCapability = "reasoning-effort" | "phase-annotation";
 
@@ -82,6 +84,10 @@ function getProviderRuntimeFingerprint(): string {
       const { model, oauthAccessToken } = getOpenAICodexConfig();
       return JSON.stringify({ provider, model, oauthAccessToken });
     }
+    case "github-copilot": {
+      const { model, githubToken, baseUrl } = getGithubCopilotConfig();
+      return JSON.stringify({ provider, model, githubToken, baseUrl });
+    }
   }
 }
 
@@ -91,6 +97,7 @@ export function createProviderRegistry(): ProviderRegistry {
     anthropic: createAnthropicProviderRuntime,
     minimax: createMinimaxProviderRuntime,
     "openai-codex": createOpenAICodexProviderRuntime,
+    "github-copilot": createGithubCopilotProviderRuntime,
   };
 
   return {
@@ -180,6 +187,7 @@ export function getProviderDisplayLabel(): string {
     anthropic: () => `anthropic (${getAnthropicConfig().model || "unknown"})`,
     minimax: () => `minimax (${getMinimaxConfig().model || "unknown"})`,
     "openai-codex": () => `openai codex (${getOpenAICodexConfig().model || "unknown"})`,
+    "github-copilot": () => `github copilot (${getGithubCopilotConfig().model || "unknown"})`,
   };
   return providerLabelBuilders[provider]();
 }

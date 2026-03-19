@@ -533,7 +533,7 @@ function parseLinkCommand(args: string[], kind: "friend.link" | "friend.unlink" 
 }
 
 function isAgentProvider(value: unknown): value is AgentProvider {
-  return value === "azure" || value === "anthropic" || value === "minimax" || value === "openai-codex"
+  return value === "azure" || value === "anthropic" || value === "minimax" || value === "openai-codex" || value === "github-copilot"
 }
 
 function parseHatchCommand(args: string[]): OuroCliCommand {
@@ -593,7 +593,7 @@ function parseHatchCommand(args: string[]): OuroCliCommand {
   }
 
   if (providerRaw && !isAgentProvider(providerRaw)) {
-    throw new Error("Unknown provider. Use azure|anthropic|minimax|openai-codex.")
+    throw new Error("Unknown provider. Use azure|anthropic|minimax|openai-codex|github-copilot.")
   }
   const provider = providerRaw && isAgentProvider(providerRaw) ? providerRaw : undefined
 
@@ -1056,6 +1056,7 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
       anthropic: "claude-opus-4-6",
       minimax: "MiniMax-Text-01",
       "openai-codex": "gpt-5.4",
+      "github-copilot": "claude-sonnet-4.6",
       azure: "",
     }
 
@@ -1077,7 +1078,7 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
         credentials = unique[idx].credentials
         providerConfig = unique[idx].providerConfig
       } else {
-        const pRaw = await coldPrompt("provider (anthropic/azure/minimax/openai-codex): ")
+        const pRaw = await coldPrompt("provider (anthropic/azure/minimax/openai-codex/github-copilot): ")
         if (!isAgentProvider(pRaw)) {
           process.stdout.write("unknown provider. run `ouro hatch` to try again.\n")
           coldRl.close()
@@ -1097,7 +1098,7 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
     } else {
       process.stdout.write(`\n\ud83d\udc0d welcome to ouroboros! ${hatchVerb}\n`)
       process.stdout.write("i need an API key to power our conversation.\n\n")
-      const pRaw = await coldPrompt("provider (anthropic/azure/minimax/openai-codex): ")
+      const pRaw = await coldPrompt("provider (anthropic/azure/minimax/openai-codex/github-copilot): ")
       if (!isAgentProvider(pRaw)) {
         process.stdout.write("unknown provider. run `ouro hatch` to try again.\n")
         coldRl.close()
@@ -1297,7 +1298,7 @@ async function resolveHatchInput(command: Extract<OuroCliCommand, { kind: "hatch
   const prompt = deps.promptInput
   const agentName = command.agentName ?? (prompt ? await prompt("Hatchling name: ") : "")
   const humanName = command.humanName ?? (prompt ? await prompt("Your name: ") : os.userInfo().username)
-  const providerRaw = command.provider ?? (prompt ? await prompt("Provider (azure|anthropic|minimax|openai-codex): ") : "")
+  const providerRaw = command.provider ?? (prompt ? await prompt("Provider (azure|anthropic|minimax|openai-codex|github-copilot): ") : "")
 
   if (!agentName || !humanName || !isAgentProvider(providerRaw)) {
     throw new Error(`Usage\n${usage()}`)
