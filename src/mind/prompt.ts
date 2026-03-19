@@ -571,6 +571,21 @@ export function channelNatureSection(capabilities: ChannelCapabilities): string 
   return "## channel nature\nthis is an org-gated channel — i know everyone here is already part of the organization."
 }
 
+export function groupChatParticipationSection(context?: ResolvedContext): string {
+  if (!context?.isGroupChat || !isRemoteChannel(context.channel)) return ""
+  return `## group chat participation
+in group chats, not every message needs a response from me.
+i use the no_response tool to stay silent when:
+- the message is not directed at me
+- the message is a reaction or tapback
+- the conversation does not need my input
+no_response must be the sole tool call in the turn (same rule as final_answer).
+i always respond in 1:1 conversations -- no_response is only available in group chats.
+reactions and tapbacks from others almost never need a response.
+when uncertain whether to respond, i lean toward silence rather than noise.
+a brief reason parameter is available for logging why i chose silence.`
+}
+
 export function mixedTrustGroupSection(context?: ResolvedContext): string {
   if (!context?.friend || !isRemoteChannel(context.channel)) return ""
   if (!context.isGroupChat) return ""
@@ -606,6 +621,7 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     toolRestrictionSection(context),
     trustContextSection(context),
     mixedTrustGroupSection(context),
+    groupChatParticipationSection(context),
     skillsSection(),
     taskBoardSection(),
     activeWorkSection(options),
