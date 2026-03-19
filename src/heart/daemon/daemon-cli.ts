@@ -812,6 +812,10 @@ export function parseOuroCommand(args: string[]): OuroCliCommand {
   const [head, second] = args
   if (!head) return { kind: "daemon.up" }
 
+  if (head === "--agent" && second) {
+    return parseOuroCommand(args.slice(2))
+  }
+
   if (head === "up") return { kind: "daemon.up" }
   if (head === "stop" || head === "down") return { kind: "daemon.stop" }
   if (head === "status") return { kind: "daemon.status" }
