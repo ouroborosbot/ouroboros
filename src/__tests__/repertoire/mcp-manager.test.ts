@@ -93,6 +93,24 @@ describe("McpManager", () => {
       expect(clientInstances).toHaveLength(0)
     })
 
+    it("logs non-Error exceptions when connect fails", async () => {
+      clientFactory = () => {
+        const client = createMockClient()
+        client.connect = vi.fn().mockRejectedValue("string-error")
+        clientInstances.push(client)
+        return client
+      }
+
+      const manager = new McpManager()
+
+      // Should not throw, should log the error
+      await manager.start({
+        ado: { command: "ado-server" },
+      })
+
+      expect(clientInstances).toHaveLength(1)
+    })
+
     it("continues starting other servers when one fails to connect", async () => {
       let clientIdx = 0
       clientFactory = () => {
@@ -300,10 +318,12 @@ describe("McpManager", () => {
         ado: { command: "ado-server" },
       })
 
+      const firstClient = clientInstances[0]
       const initialCount = clientInstances.length
 
-      // Shutdown, then trigger close
+      // Shutdown sets shuttingDown flag, then trigger close callback to test the guard
       manager.shutdown()
+      firstClient._triggerClose()
 
       await vi.advanceTimersByTimeAsync(1500)
 
