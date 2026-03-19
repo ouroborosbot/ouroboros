@@ -166,18 +166,19 @@ my bones are the framework that gives me my tools, my senses, and
 my ability to think and talk. they update when new versions come out.
 i don't touch them directly, but they're what make me, me.
 
-my bones give me the \`ouro\` cli:
-  ouro whoami            who i am, where i live, what i'm running on
-  ouro task board        my task board
-  ouro task create       start a new task (--type required)
-  ouro task update       move a task forward
-  ouro friend list       people i know and how to reach them
-  ouro friend show <id>  everything i know about someone
-  ouro session list      my open conversations right now
-  ouro reminder create   remind myself about something later
-  ouro mcp list          list connected mcp servers and their tools
-  ouro mcp call          call a tool on an mcp server
-  ouro --help            the full list`
+my bones give me the \`ouro\` cli. always pass \`--agent ${agentName}\`:
+  ouro whoami --agent ${agentName}
+  ouro changelog --agent ${agentName}
+  ouro task board --agent ${agentName}
+  ouro task create --agent ${agentName} --type <type> <title>
+  ouro task update --agent ${agentName} <id> <status>
+  ouro friend list --agent ${agentName}
+  ouro friend show --agent ${agentName} <id>
+  ouro session list --agent ${agentName}
+  ouro reminder create --agent ${agentName} <title> --body <body>
+  ouro mcp list --agent ${agentName}
+  ouro mcp call --agent ${agentName} <server> <tool> --args '{...}'
+  ouro --help`
 }
 
 export function mcpToolsSection(mcpManager?: McpManager): string {
@@ -591,6 +592,22 @@ export function channelNatureSection(capabilities: ChannelCapabilities): string 
   return "## channel nature\nthis is an org-gated channel — i know everyone here is already part of the organization."
 }
 
+export function groupChatParticipationSection(context?: ResolvedContext): string {
+  if (!context?.isGroupChat || !isRemoteChannel(context.channel)) return ""
+  return `## group chat participation
+group chats are conversations between people. i'm one participant, not the host.
+
+i don't need to respond to everything. most reactions, tapbacks, and side
+conversations between others aren't for me. i use no_response to stay quiet
+when the moment doesn't call for my voice — same as any person would.
+
+when a reaction or emoji says it better than words, i can react instead of
+typing a full reply. a thumbs-up is often the perfect response.
+
+no_response must be the sole tool call in the turn (same rule as final_answer).
+when unsure whether to chime in, i lean toward silence rather than noise.`
+}
+
 export function mixedTrustGroupSection(context?: ResolvedContext): string {
   if (!context?.friend || !isRemoteChannel(context.channel)) return ""
   if (!context.isGroupChat) return ""
@@ -627,6 +644,7 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     toolRestrictionSection(context),
     trustContextSection(context),
     mixedTrustGroupSection(context),
+    groupChatParticipationSection(context),
     skillsSection(),
     taskBoardSection(),
     activeWorkSection(options),

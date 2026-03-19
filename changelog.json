@@ -2,6 +2,14 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.68",
+      "changes": [
+        "New no_response tool lets agents stay silent in group chats when the moment doesn't call for a reply — reactions, side conversations, and tapbacks no longer trigger unwanted responses.",
+        "Group chat participation prompt teaches agents to be intentional participants, comfortable with silence, and to prefer reactions over full text replies when appropriate.",
+        "System prompt includes --agent flag in all ouro CLI examples for non-daemon deployments. Azure startup symlinks ouro CLI into /usr/local/bin."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.66",
       "changes": [
         "The ouro PATH shim now uses npx --prefer-online to always check the npm registry before using cached packages. Prevents stale npx cache from serving old runtime versions on ouro up."
