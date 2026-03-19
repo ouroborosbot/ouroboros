@@ -95,6 +95,62 @@ describe("MCP Manager wiring", () => {
     })
   })
 
+  describe("getSharedMcpManager error path", () => {
+    it("returns null and logs when loadAgentConfig throws", async () => {
+      vi.resetModules()
+
+      vi.doMock("../../repertoire/mcp-client", () => ({
+        McpClient: class MockMcpClient {},
+      }))
+
+      vi.doMock("../../heart/identity", () => ({
+        loadAgentConfig: () => { throw new Error("no agent root") },
+        getAgentRoot: () => { throw new Error("no agent root") },
+        getAgentName: () => "test",
+      }))
+
+      const mod = await import("../../repertoire/mcp-manager")
+      const manager = await mod.getSharedMcpManager()
+      expect(manager).toBeNull()
+
+      mod.resetSharedMcpManager()
+      vi.doUnmock("../../repertoire/mcp-client")
+      vi.doUnmock("../../heart/identity")
+    })
+
+    it("returns cached manager on second call", async () => {
+      vi.resetModules()
+
+      vi.doMock("../../repertoire/mcp-client", () => ({
+        McpClient: class MockMcpClient {
+          connect = vi.fn().mockResolvedValue(undefined)
+          listTools = vi.fn().mockResolvedValue([])
+          callTool = vi.fn()
+          shutdown = vi.fn()
+          isConnected = vi.fn(() => true)
+          onClose = vi.fn()
+        },
+      }))
+
+      vi.doMock("../../heart/identity", () => ({
+        loadAgentConfig: () => ({
+          mcpServers: { calc: { command: "echo", args: ["test"] } },
+        }),
+        getAgentRoot: () => "/tmp/test",
+        getAgentName: () => "test",
+      }))
+
+      const mod = await import("../../repertoire/mcp-manager")
+      const first = await mod.getSharedMcpManager()
+      const second = await mod.getSharedMcpManager()
+      expect(first).toBe(second)
+
+      mod.resetSharedMcpManager()
+      vi.doUnmock("../../repertoire/mcp-client")
+      vi.doUnmock("../../heart/identity")
+    })
+  })
+
   describe("CLI routes mcp commands through daemon socket", () => {
     it("mcp list goes through sendCommand, not local mcpManager", async () => {
       const { runOuroCli } = await import("../../heart/daemon/daemon-cli")
