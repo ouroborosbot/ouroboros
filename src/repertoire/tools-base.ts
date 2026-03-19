@@ -1149,6 +1149,20 @@ export const baseToolDefinitions: ToolDefinition[] = [
 
 export const tools: OpenAI.ChatCompletionFunctionTool[] = baseToolDefinitions.map((d) => d.tool);
 
+export const noResponseTool: OpenAI.ChatCompletionFunctionTool = {
+  type: "function",
+  function: {
+    name: "no_response",
+    description: "decline to respond in this group chat. use when the message is not directed at you, does not need your input, or is a reaction/tapback. must be the only tool call in the turn.",
+    parameters: {
+      type: "object",
+      properties: {
+        reason: { type: "string", description: "brief reason for staying silent (for logging)" },
+      },
+    },
+  },
+};
+
 export const finalAnswerTool: OpenAI.ChatCompletionFunctionTool = {
   type: "function",
   function: {
