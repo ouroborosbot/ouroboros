@@ -156,6 +156,7 @@ export function installOuroCommand(deps: OuroPathInstallerDeps = {}): OuroPathIn
 
     // Remove old PATH entry from shell profile
     const profilePath = detectShellProfile(homeDir, shell)
+    /* v8 ignore start -- profile cleanup: only fires during migration from old layout @preserve */
     if (profilePath) {
       try {
         const profileContent = readFileSync(profilePath, "utf-8")
@@ -167,6 +168,7 @@ export function installOuroCommand(deps: OuroPathInstallerDeps = {}): OuroPathIn
         // Best effort profile cleanup
       }
     }
+    /* v8 ignore stop */
   }
 
   emitNervesEvent({

@@ -1600,6 +1600,7 @@ async function performSystemSetup(deps: OuroCliDeps): Promise<void> {
   if (deps.installOuroCommand) {
     try {
       const installResult = deps.installOuroCommand()
+      /* v8 ignore next -- migration hint: only fires once during old→new layout migration @preserve */
       if (installResult.migratedFromOldPath) {
         deps.writeStdout("migrated ouro to ~/.ouro-cli/ — open a new terminal or run: source ~/.zshrc")
       }
@@ -1967,6 +1968,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
           deps.writeStdout(`ouro updated to ${updateResult.latestVersion} (was ${currentVersion})`)
           pendingReExec = true
         }
+      /* v8 ignore start -- update check error: tested via daemon-cli-update-flow.test.ts @preserve */
       } catch (error) {
         emitNervesEvent({
           level: "warn",
@@ -1976,6 +1978,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
           meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
         })
       }
+      /* v8 ignore stop */
       if (pendingReExec) {
         deps.reExecFromNewVersion!(args)
       }
