@@ -315,7 +315,7 @@ export async function collectRuntimeAuthCredentials(
       }
     }
     const response = await fetch("https://api.github.com/copilot_internal/user", {
-      headers: { Authorization: `token ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
     if (!response.ok) {
       throw new Error(`GitHub Copilot endpoint discovery failed (HTTP ${response.status}). Ensure your GitHub account has Copilot access.`)

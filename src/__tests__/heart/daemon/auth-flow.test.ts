@@ -614,7 +614,7 @@ describe("github-copilot auth flow", () => {
         "https://api.github.com/copilot_internal/user",
         expect.objectContaining({
           headers: expect.objectContaining({
-            Authorization: "token ghp_from_env",
+            Authorization: "Bearer ghp_from_env",
           }),
         }),
       )

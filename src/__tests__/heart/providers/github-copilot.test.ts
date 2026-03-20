@@ -194,9 +194,6 @@ describe("createGithubCopilotProviderRuntime", () => {
       expect.objectContaining({
         apiKey: "ghp_test123",
         baseURL: "https://api.copilot.example.com",
-        defaultHeaders: expect.objectContaining({
-          Authorization: "token ghp_test123",
-        }),
       }),
     )
   })

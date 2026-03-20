@@ -60,9 +60,6 @@ export function createGithubCopilotProviderRuntime(): ProviderRuntime {
   const client = new OpenAI({
     apiKey: config.githubToken,
     baseURL: config.baseUrl,
-    defaultHeaders: {
-      Authorization: `token ${config.githubToken}`,
-    },
     timeout: 30000,
     maxRetries: 0,
   });
