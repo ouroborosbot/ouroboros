@@ -77,6 +77,7 @@ function removeOldPathBlock(content: string, oldBinDir: string): string {
       // Skip both lines (comment + export)
       i += 2
       // Also skip trailing blank line if present
+      /* v8 ignore next -- edge: trailing blank line presence varies @preserve */
       if (i < lines.length && lines[i].trim() === "") i++
       continue
     }
