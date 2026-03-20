@@ -24,6 +24,9 @@ export interface InnerDialogStatus {
   wake: string
   processing: string
   surfaced: string
+  origin?: { friendId: string; channel: string; key: string }
+  contentSnippet?: string
+  obligationPending?: boolean
 }
 
 export interface InnerDialogRuntimeState {
@@ -138,8 +141,25 @@ export function formatSurfacedValue(text: string, maxLength = 120): string {
   return `"${firstLine.slice(0, maxLength - 3)}..."`
 }
 
+function extractEnrichedFields(
+  pendingMessages: Array<Pick<PendingMessage, "content" | "timestamp" | "from" | "delegatedFrom" | "obligationStatus">>,
+): Pick<InnerDialogStatus, "origin" | "contentSnippet" | "obligationPending"> {
+  const delegated = pendingMessages.find((msg) => msg.delegatedFrom)
+  if (!delegated?.delegatedFrom) return {}
+  const snippet = delegated.content.length > 80 ? delegated.content.slice(0, 77) + "..." : delegated.content
+  return {
+    origin: {
+      friendId: delegated.delegatedFrom.friendId,
+      channel: delegated.delegatedFrom.channel,
+      key: delegated.delegatedFrom.key,
+    },
+    contentSnippet: snippet,
+    ...(delegated.obligationStatus === "pending" ? { obligationPending: true } : {}),
+  }
+}
+
 export function deriveInnerDialogStatus(
-  pendingMessages: Array<Pick<PendingMessage, "content" | "timestamp" | "from">>,
+  pendingMessages: Array<Pick<PendingMessage, "content" | "timestamp" | "from" | "delegatedFrom" | "obligationStatus">>,
   turns: ThoughtTurn[],
   runtimeState?: InnerDialogRuntimeState | null,
 ): InnerDialogStatus {
@@ -150,6 +170,7 @@ export function deriveInnerDialogStatus(
         wake: "queued behind active turn",
         processing: "pending",
         surfaced: "nothing yet",
+        ...extractEnrichedFields(pendingMessages),
       }
     }
 
@@ -167,6 +188,7 @@ export function deriveInnerDialogStatus(
       wake: "awaiting inner session",
       processing: "pending",
       surfaced: "nothing yet",
+      ...extractEnrichedFields(pendingMessages),
     }
   }
 
@@ -192,12 +214,22 @@ export function deriveInnerDialogStatus(
 }
 
 export function formatInnerDialogStatus(status: InnerDialogStatus): string {
-  return [
+  const lines = [
     `queue: ${status.queue}`,
     `wake: ${status.wake}`,
     `processing: ${status.processing}`,
     `surfaced: ${status.surfaced}`,
-  ].join("\n")
+  ]
+  if (status.origin) {
+    lines.push(`origin: ${status.origin.friendId}/${status.origin.channel}/${status.origin.key}`)
+  }
+  if (status.contentSnippet) {
+    lines.push(`asked: ${status.contentSnippet}`)
+  }
+  if (status.obligationPending) {
+    lines.push("obligation: pending")
+  }
+  return lines.join("\n")
 }
 
 /** Extract text from a final_answer tool call's arguments. */

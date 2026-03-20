@@ -35,6 +35,9 @@ export interface ActiveWorkFrame {
   inner: {
     status: "idle" | "running"
     hasPending: boolean
+    origin?: { friendId: string; channel: string; key: string }
+    contentSnippet?: string
+    obligationPending?: boolean
   }
   bridges: BridgeRecord[]
   taskPressure: {
@@ -236,7 +239,14 @@ export function formatActiveWorkFrame(frame: ActiveWorkFrame): string {
 
   const innerStatus = frame.inner?.status ?? "idle"
   const innerHasPending = frame.inner?.hasPending === true
-  lines.push(`inner status: ${innerStatus}${innerHasPending ? " (pending queued)" : ""}`)
+  const innerOriginSuffix = frame.inner?.origin
+    ? ` from ${frame.inner.origin.friendId}/${frame.inner.origin.channel}/${frame.inner.origin.key}`
+    : ""
+  const innerObligationSuffix = frame.inner?.obligationPending ? " (return expected)" : ""
+  lines.push(`inner status: ${innerStatus}${innerOriginSuffix}${innerObligationSuffix}${!innerOriginSuffix && innerHasPending ? " (pending queued)" : ""}`)
+  if (frame.inner?.contentSnippet) {
+    lines.push(`inner asked: "${frame.inner.contentSnippet}"`)
+  }
 
   if ((frame.taskPressure?.liveTaskNames ?? []).length > 0) {
     lines.push(`live tasks: ${frame.taskPressure.liveTaskNames.join(", ")}`)
