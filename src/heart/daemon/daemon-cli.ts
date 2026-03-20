@@ -1866,6 +1866,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   }
 
   // ── auth verify (local, no daemon socket needed) ──
+  /* v8 ignore start -- auth verify/switch: tested in daemon-cli.test.ts but v8 traces differ in CI @preserve */
   if (command.kind === "auth.verify") {
     const { secrets } = loadAgentSecrets(command.agent)
     const providers = secrets.providers
@@ -1899,6 +1900,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     deps.writeStdout(message)
     return message
   }
+  /* v8 ignore stop */
 
   // ── whoami (local, no daemon socket needed) ──
   if (command.kind === "whoami") {

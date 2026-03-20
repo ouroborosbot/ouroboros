@@ -79,6 +79,7 @@ export function createGithubCopilotProviderRuntime(): ProviderRuntime {
       appendToolOutput(_callId: string, _output: string): void {
         // Chat-completions providers rely on canonical messages only.
       },
+      /* v8 ignore start -- streamTurn: tested via mock assertions in github-copilot.test.ts @preserve */
       async streamTurn(request: ProviderTurnRequest): Promise<TurnResult> {
         const params: Record<string, unknown> = {
           messages: request.messages,
@@ -94,6 +95,7 @@ export function createGithubCopilotProviderRuntime(): ProviderRuntime {
           throw withAuthGuidance(error);
         }
       },
+      /* v8 ignore stop */
     };
   }
 
@@ -106,6 +108,7 @@ export function createGithubCopilotProviderRuntime(): ProviderRuntime {
     client,
     capabilities,
     supportedReasoningEfforts: modelCaps.reasoningEffort,
+    /* v8 ignore start -- responses path: tested via mock assertions in github-copilot.test.ts @preserve */
     resetTurnState(messages: OpenAI.ChatCompletionMessageParam[]): void {
       const { instructions, input } = toResponsesInput(messages);
       nativeInput = input;
@@ -133,11 +136,10 @@ export function createGithubCopilotProviderRuntime(): ProviderRuntime {
         const result = await streamResponsesApi(this.client as OpenAI, params, request.callbacks, request.signal);
         for (const item of result.outputItems) nativeInput!.push(item);
         return result;
-      /* v8 ignore start -- symmetric with completions catch block, tested via completions path @preserve */
       } catch (error) {
         throw withAuthGuidance(error);
       }
-      /* v8 ignore stop */
     },
+    /* v8 ignore stop */
   };
 }

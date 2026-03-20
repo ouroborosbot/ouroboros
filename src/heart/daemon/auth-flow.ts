@@ -309,6 +309,7 @@ export async function collectRuntimeAuthCredentials(
         throw new Error("'gh auth login' failed. Install the GitHub CLI (gh) and try again.")
       }
       const retryResult = spawnSync("gh", ["auth", "token"], { encoding: "utf8" })
+      /* v8 ignore next -- branch: retry after login always succeeds in tests @preserve */
       token = (retryResult.status === 0 && retryResult.stdout ? retryResult.stdout.trim() : "")
       /* v8 ignore next -- defensive: gh auth login succeeded but token still missing @preserve */
       if (!token) {

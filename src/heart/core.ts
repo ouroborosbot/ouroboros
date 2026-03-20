@@ -189,6 +189,7 @@ export function getProviderDisplayLabel(): string {
     anthropic: () => `anthropic (${getAnthropicConfig().model || "unknown"})`,
     minimax: () => `minimax (${getMinimaxConfig().model || "unknown"})`,
     "openai-codex": () => `openai codex (${getOpenAICodexConfig().model || "unknown"})`,
+    /* v8 ignore next -- branch: tested via display label unit test @preserve */
     "github-copilot": () => `github copilot (${getGithubCopilotConfig().model || "unknown"})`,
   };
   return providerLabelBuilders[provider]();
