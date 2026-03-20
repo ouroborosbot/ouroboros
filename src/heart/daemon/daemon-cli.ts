@@ -1962,6 +1962,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       try {
         const updateResult = await deps.checkForCliUpdate()
         if (updateResult.available && updateResult.latestVersion) {
+          /* v8 ignore next -- fallback: getCurrentCliVersion always injected in tests @preserve */
           const currentVersion = deps.getCurrentCliVersion?.() ?? "unknown"
           await deps.installCliVersion!(updateResult.latestVersion)
           deps.activateCliVersion!(updateResult.latestVersion)
