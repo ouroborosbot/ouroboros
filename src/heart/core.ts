@@ -279,6 +279,18 @@ export function getFinalAnswerRetryError(
   delegationDecision?: DelegationDecision,
   sawSendMessageSelf?: boolean,
 ): string {
+  if (delegationDecision?.target === "delegate-inward" && !sawSendMessageSelf) {
+    emitNervesEvent({
+      event: "engine.delegation_adherence_rejected",
+      component: "engine",
+      message: "delegation adherence check rejected final_answer",
+      meta: {
+        target: delegationDecision.target,
+        reasons: delegationDecision.reasons,
+      },
+    });
+    return "you mentioned going inward but haven't routed anything to inner dialog yet -- send_message(self) will get that started";
+  }
   if (mustResolveBeforeHandoff && !intent) {
     return "your final_answer is missing required intent. when you must keep going until done or blocked, call final_answer again with answer plus intent=complete, blocked, or direct_reply.";
   }
@@ -510,6 +522,7 @@ export async function runAgent(
   let sawSteeringFollowUp = false;
   let mustResolveBeforeHandoffActive = options?.mustResolveBeforeHandoff === true;
   let currentReasoningEffort = "medium";
+  let sawSendMessageSelf = false;
 
   // Prevent MaxListenersExceeded warning — each iteration adds a listener
   try { require("events").setMaxListeners(50, signal); } catch { /* unsupported */ }
@@ -665,7 +678,7 @@ export async function runAgent(
             // malformed. Clear any partial streamed text or noise, then push the
             // assistant msg + error tool result and let the model try again.
             callbacks.onClearText?.();
-            const retryError = getFinalAnswerRetryError(mustResolveBeforeHandoffActive, intent, sawSteeringFollowUp);
+            const retryError = getFinalAnswerRetryError(mustResolveBeforeHandoffActive, intent, sawSteeringFollowUp, options?.delegationDecision, sawSendMessageSelf);
             messages.push(msg);
             messages.push({ role: "tool", tool_call_id: result.toolCalls[0].id, content: retryError });
             providerRuntime.appendToolOutput(result.toolCalls[0].id, retryError);
@@ -719,6 +732,9 @@ export async function runAgent(
             args = JSON.parse(tc.arguments);
           } catch {
             /* ignore */
+          }
+          if (tc.name === "send_message" && args.friendId === "self") {
+            sawSendMessageSelf = true;
           }
           const argSummary = summarizeArgs(tc.name, args);
           // Confirmation check for mutate tools
