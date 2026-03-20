@@ -16,6 +16,7 @@ import { getTaskModule } from "../repertoire/tasks";
 import { listSessionActivity, type SessionActivityQuery } from "../heart/session-activity";
 import { formatActiveWorkFrame, type ActiveWorkFrame } from "../heart/active-work";
 import type { DelegationDecision } from "../heart/delegation";
+import { deriveCommitments } from "../heart/commitments";
 
 // Lazy-loaded psyche text cache
 let _psycheCache: {
@@ -532,6 +533,15 @@ i should keep the different sides aligned. what i learn here may matter there, a
   return ""
 }
 
+export function commitmentsSection(options?: BuildSystemOptions): string {
+  if (!options?.activeWorkFrame) return ""
+  const job = options.activeWorkFrame.inner?.job
+  if (!job) return ""
+  const commitments = deriveCommitments(options.activeWorkFrame, job)
+  if (commitments.committedTo.length === 0) return ""
+  return `## my commitments\n${commitments.committedTo.map((c) => `- ${c}`).join("\n")}`
+}
+
 const DELEGATION_REASON_PROSE_HINT: Record<import("../heart/delegation").DelegationReason, string> = {
   explicit_reflection: "something here calls for reflection",
   cross_session: "this touches other conversations i'm in",
@@ -725,6 +735,7 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     taskBoardSection(),
     activeWorkSection(options),
     centerOfGravitySteeringSection(channel, options),
+    commitmentsSection(options),
     delegationHintSection(options),
     bridgeContextSection(options),
     buildSessionSummary({
