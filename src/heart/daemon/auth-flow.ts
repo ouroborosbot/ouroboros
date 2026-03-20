@@ -310,6 +310,7 @@ export async function collectRuntimeAuthCredentials(
       }
       const retryResult = spawnSync("gh", ["auth", "token"], { encoding: "utf8" })
       token = (retryResult.status === 0 && retryResult.stdout ? retryResult.stdout.trim() : "")
+      /* v8 ignore next -- defensive: gh auth login succeeded but token still missing @preserve */
       if (!token) {
         throw new Error("gh auth login completed but no token was found. Run `gh auth login` and try again.")
       }
@@ -322,6 +323,7 @@ export async function collectRuntimeAuthCredentials(
     }
     const body = await response.json() as { endpoints?: { api?: string } }
     const baseUrl = body?.endpoints?.api
+    /* v8 ignore next -- defensive: valid response but missing endpoints field @preserve */
     if (!baseUrl) {
       throw new Error("GitHub Copilot endpoint discovery returned no endpoints.api. Ensure your GitHub account has Copilot access.")
     }

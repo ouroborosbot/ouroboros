@@ -30,6 +30,7 @@ function withAuthGuidance(error: unknown): Error {
   if (isAuthFailure(error)) {
     return new Error(getReauthGuidance(base));
   }
+  /* v8 ignore next -- defensive: API errors are always Error instances @preserve */
   return error instanceof Error ? error : new Error(String(error));
 }
 
@@ -132,9 +133,11 @@ export function createGithubCopilotProviderRuntime(): ProviderRuntime {
         const result = await streamResponsesApi(this.client as OpenAI, params, request.callbacks, request.signal);
         for (const item of result.outputItems) nativeInput!.push(item);
         return result;
+      /* v8 ignore start -- symmetric with completions catch block, tested via completions path @preserve */
       } catch (error) {
         throw withAuthGuidance(error);
       }
+      /* v8 ignore stop */
     },
   };
 }

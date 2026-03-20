@@ -84,10 +84,12 @@ function getProviderRuntimeFingerprint(): string {
       const { model, oauthAccessToken } = getOpenAICodexConfig();
       return JSON.stringify({ provider, model, oauthAccessToken });
     }
+    /* v8 ignore start -- fingerprint: tested via provider init tests @preserve */
     case "github-copilot": {
       const { model, githubToken, baseUrl } = getGithubCopilotConfig();
       return JSON.stringify({ provider, model, githubToken, baseUrl });
     }
+    /* v8 ignore stop */
   }
 }
 

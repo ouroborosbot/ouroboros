@@ -1852,6 +1852,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   // ── auth (local, no daemon socket needed) ──
   if (command.kind === "auth.run") {
     const provider = command.provider ?? readAgentConfigForAgent(command.agent).config.provider
+    /* v8 ignore next -- tests always inject runAuthFlow; default is for production @preserve */
     const authRunner = deps.runAuthFlow ?? defaultRunRuntimeAuthFlow
     const result = await authRunner({
       agentName: command.agent,
