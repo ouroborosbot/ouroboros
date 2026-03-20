@@ -38,6 +38,7 @@ import type { TaskModule } from "../../repertoire/tasks/types"
 import { syncGlobalOuroBotWrapper as defaultSyncGlobalOuroBotWrapper } from "./ouro-bot-global-installer"
 import { installLaunchAgent, type LaunchdDeps } from "./launchd"
 import { DEFAULT_DAEMON_SOCKET_PATH, sendDaemonCommand, checkDaemonSocketAlive } from "./socket-client"
+import type { CheckForUpdateResult } from "./update-checker"
 import { listSessionActivity } from "../session-activity"
 import {
   loadAgentSecrets,
@@ -111,6 +112,11 @@ export interface OuroCliDeps {
   scanSessions?: () => Promise<SessionEntry[]>
   getChangelogPath?: () => string
   fetchImpl?: typeof fetch
+  checkForCliUpdate?: () => Promise<CheckForUpdateResult>
+  installCliVersion?: (version: string) => Promise<void>
+  activateCliVersion?: (version: string) => void
+  getCurrentCliVersion?: () => string | null
+  reExecFromNewVersion?: (args: string[]) => never
 }
 
 export interface SessionEntry {
@@ -1936,6 +1942,32 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   })
 
   if (command.kind === "daemon.up") {
+    // ── versioned CLI update check ──
+    if (deps.checkForCliUpdate) {
+      let pendingReExec = false
+      try {
+        const updateResult = await deps.checkForCliUpdate()
+        if (updateResult.available && updateResult.latestVersion) {
+          const currentVersion = deps.getCurrentCliVersion?.() ?? "unknown"
+          await deps.installCliVersion!(updateResult.latestVersion)
+          deps.activateCliVersion!(updateResult.latestVersion)
+          deps.writeStdout(`ouro updated to ${updateResult.latestVersion} (was ${currentVersion})`)
+          pendingReExec = true
+        }
+      } catch (error) {
+        emitNervesEvent({
+          level: "warn",
+          component: "daemon",
+          event: "daemon.cli_update_check_error",
+          message: "CLI update check failed",
+          meta: { error: error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error) },
+        })
+      }
+      if (pendingReExec) {
+        deps.reExecFromNewVersion!(args)
+      }
+    }
+
     await performSystemSetup(deps)
 
     if (deps.ensureDaemonBootPersistence) {
