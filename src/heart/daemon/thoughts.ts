@@ -512,6 +512,18 @@ export function readInnerDialogStatus(sessionPath: string, pendingDir: string, r
   return deriveInnerDialogStatus(pendingMessages, turns, runtimeState)
 }
 
+export function readInnerDialogRawData(sessionPath: string, pendingDir: string): {
+  pendingMessages: PendingMessage[]
+  turns: ThoughtTurn[]
+  runtimeState: InnerDialogRuntimeState | null
+} {
+  const runtimePath = getInnerDialogRuntimeStatePath(sessionPath)
+  const pendingMessages = readPendingMessagesForStatus(pendingDir)
+  const turns = parseInnerDialogSession(sessionPath)
+  const runtimeState = readInnerDialogRuntimeState(runtimePath)
+  return { pendingMessages, turns, runtimeState }
+}
+
 /**
  * Watch a session file and emit new turns as they appear.
  * Returns a cleanup function that stops the watcher.

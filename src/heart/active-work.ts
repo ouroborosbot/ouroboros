@@ -3,6 +3,7 @@ import { emitNervesEvent } from "../nerves/runtime"
 import type { BoardResult } from "../repertoire/tasks/types"
 import { bridgeStateLabel } from "./bridges/state-machine"
 import type { BridgeRecord } from "./bridges/store"
+import type { InnerJob } from "./daemon/thoughts"
 import type { SessionActivityRecord } from "./session-activity"
 import { formatTargetSessionCandidates, type TargetSessionCandidate } from "./target-resolution"
 
@@ -38,6 +39,7 @@ export interface ActiveWorkFrame {
     origin?: { friendId: string; channel: string; key: string }
     contentSnippet?: string
     obligationPending?: boolean
+    job: InnerJob
   }
   bridges: BridgeRecord[]
   taskPressure: {
