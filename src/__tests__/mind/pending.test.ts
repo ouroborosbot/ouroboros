@@ -334,6 +334,29 @@ describe("drainDeferredReturns", () => {
   })
 })
 
+describe("queuePendingMessage", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it("writes a pending message to the queue directory", async () => {
+    const { queuePendingMessage } = await import("../../mind/pending")
+    const dir = "/mock/pending/self/inner/dialog"
+
+    queuePendingMessage(dir, {
+      from: "testagent",
+      content: "a thought",
+      timestamp: 1709900001,
+    })
+
+    expect(fs.mkdirSync).toHaveBeenCalledWith(dir, { recursive: true })
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      expect.stringMatching(/1709900001-.+\.json$/),
+      expect.stringContaining("a thought"),
+    )
+  })
+})
+
 describe("mode on PendingMessage", () => {
   beforeEach(() => {
     vi.resetModules()
