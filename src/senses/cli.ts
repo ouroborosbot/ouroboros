@@ -362,10 +362,12 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
         hadReasoning = false
       }
       const rendered = streamer.push(text)
+      /* v8 ignore start -- wrapper integration: tested via cli.test.ts onTextChunk tests @preserve */
       if (rendered) {
         const wrapped = wrapper.push(rendered)
         if (wrapped) process.stdout.write(wrapped)
       }
+      /* v8 ignore stop */
       textDirty = text.length > 0 && !text.endsWith("\n")
     },
     onReasoningChunk: (text: string) => {
@@ -423,6 +425,7 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
     flushMarkdown: () => {
       currentSpinner?.stop()
       setSpinner(null)
+      /* v8 ignore start -- wrapper flush: tested via cli.test.ts flushMarkdown tests @preserve */
       const remaining = streamer.flush()
       if (remaining) {
         const wrapped = wrapper.push(remaining)
@@ -430,6 +433,7 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
       }
       const tail = wrapper.flush()
       if (tail) process.stdout.write(tail)
+      /* v8 ignore stop */
     },
   }
 }

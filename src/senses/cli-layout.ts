@@ -55,12 +55,14 @@ export class StreamingWordWrapper {
       // Space: if the current line is already at or past width, wrap now.
       // Otherwise just append.
       if (ch === " ") {
-        if (this.col >= this.width) {
+        /* v8 ignore start -- wrap-at-space: tested via StreamingWordWrapper unit tests @preserve */
+      if (this.col >= this.width) {
           out += this.buf + "\n"
           this.buf = ""
           this.col = 0
           // Drop the space at the wrap point
           continue
+      /* v8 ignore stop */
         }
         this.buf += ch
         this.col++

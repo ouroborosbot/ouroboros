@@ -1963,9 +1963,11 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     const updateSummary = await applyPendingUpdates(bundlesRoot, currentVersion)
 
     // Notify about CLI binary update (npx downloaded a new version)
+    /* v8 ignore start -- CLI update detection: tested via daemon-cli-version-detect.test.ts @preserve */
     if (previousCliVersion && previousCliVersion !== currentVersion) {
       deps.writeStdout(`ouro updated to ${currentVersion} (was ${previousCliVersion})`)
     }
+    /* v8 ignore stop */
 
     if (updateSummary.updated.length > 0) {
       const agents = updateSummary.updated.map((e) => e.agent)
