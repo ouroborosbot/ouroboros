@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { getProviderDisplayLabel } from "../heart/core";
+import { buildChangelogCommand } from "../heart/daemon/ouro-version-manager";
 import { finalAnswerTool, getToolsForChannel } from "../repertoire/tools";
 import { listSkills } from "../repertoire/skills";
 import { getAgentRoot, getAgentName, getAgentSecretsPath, loadAgentConfig, type SenseName } from "../heart/identity";
@@ -253,6 +254,10 @@ export function runtimeInfoSection(channel: Channel): string {
   const bundleMeta = readBundleMeta()
   if (bundleMeta?.previousRuntimeVersion && bundleMeta.previousRuntimeVersion !== currentVersion) {
     lines.push(`previously: ${bundleMeta.previousRuntimeVersion}`)
+    const changelogCommand = buildChangelogCommand(bundleMeta.previousRuntimeVersion, currentVersion)
+    if (changelogCommand) {
+      lines.push(`if i'm closing a self-fix loop, i should tell them i updated and review changes with \`${changelogCommand}\`.`)
+    }
   }
 
   lines.push(`changelog available at: ${getChangelogPath()}`);
