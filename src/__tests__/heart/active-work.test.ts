@@ -1432,3 +1432,104 @@ describe("delegation router", () => {
     expect(rendered).not.toContain("inner asked:")
   })
 })
+
+describe("ActiveWorkFrame.inner with InnerJob", () => {
+  it("buildActiveWorkFrame preserves job field from inner input", async () => {
+    const { buildActiveWorkFrame } = await import("../../heart/active-work")
+
+    const idleJob = {
+      status: "idle" as const,
+      content: null,
+      origin: null,
+      mode: "reflect" as const,
+      obligationStatus: null,
+      surfacedResult: null,
+      queuedAt: null,
+      startedAt: null,
+      surfacedAt: null,
+    }
+
+    const frame = buildActiveWorkFrame({
+      currentSession: {
+        friendId: "friend-1",
+        channel: "cli",
+        key: "session",
+        sessionPath: "/tmp/state/sessions/friend-1/cli/session.json",
+      },
+      mustResolveBeforeHandoff: false,
+      inner: { status: "idle", hasPending: false, job: idleJob },
+      bridges: [],
+      taskBoard: {
+        compact: "",
+        activeBridges: [],
+        byStatus: {
+          drafting: [],
+          processing: [],
+          validating: [],
+          collaborating: [],
+          paused: [],
+          blocked: [],
+          done: [],
+        },
+      },
+      friendActivity: [],
+    })
+
+    expect(frame.inner.job).toEqual(idleJob)
+    expect(frame.inner.job.status).toBe("idle")
+  })
+
+  it("buildActiveWorkFrame preserves running InnerJob with origin", async () => {
+    const { buildActiveWorkFrame } = await import("../../heart/active-work")
+
+    const runningJob = {
+      status: "running" as const,
+      content: "think about naming conventions",
+      origin: { friendId: "alex", channel: "teams", key: "session1" },
+      mode: "plan" as const,
+      obligationStatus: "pending" as const,
+      surfacedResult: null,
+      queuedAt: 1000,
+      startedAt: "2026-01-01T00:00:00Z",
+      surfacedAt: null,
+    }
+
+    const frame = buildActiveWorkFrame({
+      currentSession: {
+        friendId: "friend-1",
+        channel: "cli",
+        key: "session",
+        sessionPath: "/tmp/state/sessions/friend-1/cli/session.json",
+      },
+      mustResolveBeforeHandoff: false,
+      inner: {
+        status: "running",
+        hasPending: false,
+        origin: { friendId: "alex", channel: "teams", key: "session1" },
+        contentSnippet: "think about naming conventions",
+        obligationPending: true,
+        job: runningJob,
+      },
+      bridges: [],
+      taskBoard: {
+        compact: "",
+        activeBridges: [],
+        byStatus: {
+          drafting: [],
+          processing: [],
+          validating: [],
+          collaborating: [],
+          paused: [],
+          blocked: [],
+          done: [],
+        },
+      },
+      friendActivity: [],
+    })
+
+    expect(frame.inner.job).toEqual(runningJob)
+    expect(frame.inner.job.status).toBe("running")
+    expect(frame.inner.job.origin).toEqual({ friendId: "alex", channel: "teams", key: "session1" })
+    expect(frame.inner.job.mode).toBe("plan")
+  })
+})

@@ -334,6 +334,47 @@ describe("drainDeferredReturns", () => {
   })
 })
 
+describe("mode on PendingMessage", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it("preserves mode through drain when present in pending file", async () => {
+    const { drainPending } = await import("../../mind/pending")
+    const dir = "/mock/pending/self/inner/dialog"
+
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readdirSync).mockReturnValue(["1709900001-abc.json"] as any)
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      from: "testagent",
+      content: "think about naming",
+      timestamp: 1709900001,
+      mode: "plan",
+    }))
+
+    const result = drainPending(dir)
+
+    expect(result[0].mode).toBe("plan")
+  })
+
+  it("does not default mode when absent in pending file", async () => {
+    const { drainPending } = await import("../../mind/pending")
+    const dir = "/mock/pending/self/inner/dialog"
+
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readdirSync).mockReturnValue(["1709900001-abc.json"] as any)
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      from: "testagent",
+      content: "just a message",
+      timestamp: 1709900001,
+    }))
+
+    const result = drainPending(dir)
+
+    expect(result[0].mode).toBeUndefined()
+  })
+})
+
 describe("obligationStatus on PendingMessage", () => {
   beforeEach(() => {
     vi.resetModules()
