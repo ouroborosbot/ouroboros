@@ -86,6 +86,7 @@ export type OuroCliCommand =
   | { kind: "config.models"; agent: string }
   | { kind: "hatch.start"; agentName?: string; humanName?: string; provider?: AgentProvider; credentials?: HatchCredentialsInput; migrationPath?: string }
   | { kind: "rollback"; version?: string }
+  | { kind: "versions" }
 
 export interface OuroCliDeps {
   socketPath: string
@@ -410,6 +411,7 @@ function usage(): string {
     "  ouro mcp list",
     "  ouro mcp call <server> <tool> [--args '{...}']",
     "  ouro rollback [<version>]",
+    "  ouro versions",
   ].join("\n")
 }
 
@@ -1042,6 +1044,7 @@ export function parseOuroCommand(args: string[]): OuroCliCommand {
 
   if (head === "up") return { kind: "daemon.up" }
   if (head === "rollback") return { kind: "rollback", ...(second ? { version: second } : {}) }
+  if (head === "versions") return { kind: "versions" }
   if (head === "stop" || head === "down") return { kind: "daemon.stop" }
   if (head === "status") return { kind: "daemon.status" }
   if (head === "logs") return { kind: "daemon.logs" }
@@ -1544,7 +1547,8 @@ type ChangelogCliCommand = Extract<OuroCliCommand, { kind: "changelog" }>
 type ConfigModelCliCommand = Extract<OuroCliCommand, { kind: "config.model" }>
 type ConfigModelsCliCommand = Extract<OuroCliCommand, { kind: "config.models" }>
 type RollbackCliCommand = Extract<OuroCliCommand, { kind: "rollback" }>
-function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "hatch.start" } | AuthCliCommand | AuthVerifyCliCommand | AuthSwitchCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand | ConfigModelCliCommand | ConfigModelsCliCommand | RollbackCliCommand>): DaemonCommand {
+type VersionsCliCommand = Extract<OuroCliCommand, { kind: "versions" }>
+function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "hatch.start" } | AuthCliCommand | AuthVerifyCliCommand | AuthSwitchCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand | ConfigModelCliCommand | ConfigModelsCliCommand | RollbackCliCommand | VersionsCliCommand>): DaemonCommand {
   return command
 }
 
@@ -2059,6 +2063,27 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     }
 
     const message = `rolled back to ${command.version} (was ${currentVersion})`
+    deps.writeStdout(message)
+    return message
+  }
+
+  // ── versions command (local, no daemon socket needed) ──
+  if (command.kind === "versions") {
+    const versions = deps.listCliVersions?.() ?? []
+    if (versions.length === 0) {
+      const message = "no versions installed"
+      deps.writeStdout(message)
+      return message
+    }
+    const current = deps.getCurrentCliVersion?.()
+    const previous = deps.getPreviousCliVersion?.()
+    const lines = versions.map((v) => {
+      let line = v
+      if (v === current) line += " * current"
+      if (v === previous) line += " (previous)"
+      return line
+    })
+    const message = lines.join("\n")
     deps.writeStdout(message)
     return message
   }
