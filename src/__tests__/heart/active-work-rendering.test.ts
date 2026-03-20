@@ -80,6 +80,36 @@ describe("formatActiveWorkFrame (selfhood framing)", () => {
     expect(result).toContain("i still owe them an answer")
   })
 
+  it("renders running inner job without origin", () => {
+    const result = formatActiveWorkFrame(makeFrame({
+      inner: {
+        status: "running",
+        hasPending: false,
+        job: makeIdleJob({
+          status: "running",
+          origin: null,
+        }),
+      },
+    }))
+    expect(result).toContain("thinking through something privately right now.")
+    expect(result).not.toContain("asked about something")
+  })
+
+  it("renders surfaced inner job without surfacedResult", () => {
+    const result = formatActiveWorkFrame(makeFrame({
+      inner: {
+        status: "idle",
+        hasPending: false,
+        job: makeIdleJob({
+          status: "surfaced",
+          surfacedResult: null,
+        }),
+      },
+    }))
+    expect(result).toContain("finished thinking about something privately")
+    expect(result).not.toContain("what i came to:")
+  })
+
   it("renders queued inner job with content snippet", () => {
     const result = formatActiveWorkFrame(makeFrame({
       inner: {

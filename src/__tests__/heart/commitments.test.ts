@@ -147,6 +147,48 @@ describe("deriveCommitments", () => {
     expect(result.completionCriteria.length).toBeGreaterThanOrEqual(2)
   })
 
+  it("running inner job without content omits content suffix", () => {
+    const result = deriveCommitments(makeFrame(), makeIdleJob({ status: "running", content: null }))
+    const entry = result.committedTo.find(c => c.includes("thinking through"))
+    expect(entry).toBe("i'm thinking through something privately")
+  })
+
+  it("bridge without summary uses objective", () => {
+    const result = deriveCommitments(
+      makeFrame({
+        bridges: [{
+          id: "b1", objective: "the-objective", summary: "", lifecycle: "active", runtime: "idle",
+          createdAt: "", updatedAt: "", attachedSessions: [],
+        }],
+      }),
+      makeIdleJob(),
+    )
+    expect(result.committedTo).toContain("i have shared work: the-objective")
+  })
+
+  it("pending obligation with friendId only (no friendName)", () => {
+    const result = deriveCommitments(
+      makeFrame(),
+      makeIdleJob({ obligationStatus: "pending", origin: { friendId: "uuid-123", channel: "cli", key: "s1" } }),
+    )
+    expect(result.completionCriteria).toContain("bring my answer back to uuid-123")
+  })
+
+  it("pending obligation with no origin at all", () => {
+    const result = deriveCommitments(
+      makeFrame(),
+      makeIdleJob({ obligationStatus: "pending", origin: null }),
+    )
+    expect(result.completionCriteria).toContain("bring my answer back to them")
+  })
+
+  it("no taskPressure property uses empty fallback", () => {
+    const frame = makeFrame()
+    delete (frame as any).taskPressure
+    const result = deriveCommitments(frame, makeIdleJob())
+    expect(result.safeToIgnore).toContain("no active tasks to track")
+  })
+
   it("emits nerves event reference", () => {
     expect(emitNervesEvent).toBeDefined()
   })
