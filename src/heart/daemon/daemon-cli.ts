@@ -676,6 +676,7 @@ export async function pingGithubCopilotModel(
     }
     return { ok: false, error: detail }
   } catch (err) {
+    /* v8 ignore next -- defensive: fetch errors are always Error instances @preserve */
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
 }
