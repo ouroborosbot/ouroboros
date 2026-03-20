@@ -8398,3 +8398,59 @@ describe("repairOrphanedToolCalls", () => {
     expect(messages[3].content).toContain("interrupted")
   })
 })
+
+describe("getFinalAnswerRetryError delegation adherence", () => {
+  it("rejects with orientation message when delegation target is delegate-inward but no send_message(self) was called", async () => {
+    const { getFinalAnswerRetryError } = await import("../../heart/core")
+    const result = getFinalAnswerRetryError(
+      false,
+      undefined,
+      false,
+      { target: "delegate-inward", reasons: ["explicit_reflection"], outwardClosureRequired: true },
+      false,
+    )
+    expect(result).toContain("you mentioned going inward")
+    expect(result).toContain("send_message(self)")
+  })
+
+  it("does NOT reject when delegation target is delegate-inward and send_message(self) WAS called", async () => {
+    const { getFinalAnswerRetryError } = await import("../../heart/core")
+    const result = getFinalAnswerRetryError(
+      false,
+      undefined,
+      false,
+      { target: "delegate-inward", reasons: ["explicit_reflection"], outwardClosureRequired: true },
+      true,
+    )
+    expect(result).not.toContain("you mentioned going inward")
+    expect(result).not.toContain("send_message(self)")
+  })
+
+  it("does NOT fire delegation adherence check when target is fast-path", async () => {
+    const { getFinalAnswerRetryError } = await import("../../heart/core")
+    const result = getFinalAnswerRetryError(
+      false,
+      undefined,
+      false,
+      { target: "fast-path", reasons: [], outwardClosureRequired: false },
+      false,
+    )
+    expect(result).not.toContain("you mentioned going inward")
+  })
+
+  it("uses AX-oriented tone in the delegation adherence message", async () => {
+    const { getFinalAnswerRetryError } = await import("../../heart/core")
+    const result = getFinalAnswerRetryError(
+      false,
+      undefined,
+      false,
+      { target: "delegate-inward", reasons: ["cross_session"], outwardClosureRequired: true },
+      false,
+    )
+    // AX tone: orienting, not punishing
+    expect(result).toContain("send_message(self) will get that started")
+    expect(result).not.toContain("error")
+    expect(result).not.toContain("rejected")
+    expect(result).not.toContain("invalid")
+  })
+})

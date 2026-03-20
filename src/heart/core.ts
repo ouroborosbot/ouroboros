@@ -272,10 +272,12 @@ function parseFinalAnswerPayload(argumentsText: string): { answer?: string; inte
   }
 }
 
-function getFinalAnswerRetryError(
+export function getFinalAnswerRetryError(
   mustResolveBeforeHandoff: boolean,
   intent: FinalAnswerIntent | undefined,
   sawSteeringFollowUp: boolean,
+  delegationDecision?: DelegationDecision,
+  sawSendMessageSelf?: boolean,
 ): string {
   if (mustResolveBeforeHandoff && !intent) {
     return "your final_answer is missing required intent. when you must keep going until done or blocked, call final_answer again with answer plus intent=complete, blocked, or direct_reply.";
