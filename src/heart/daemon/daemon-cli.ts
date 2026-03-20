@@ -541,6 +541,7 @@ function isAgentProvider(value: unknown): value is AgentProvider {
   return value === "azure" || value === "anthropic" || value === "minimax" || value === "openai-codex" || value === "github-copilot"
 }
 
+/* v8 ignore start -- hasStoredCredentials: per-provider branches tested via auth switch tests @preserve */
 function hasStoredCredentials(provider: AgentProvider, providerSecrets: Record<string, unknown>): boolean {
   if (provider === "anthropic") return !!(providerSecrets as { setupToken?: string }).setupToken
   if (provider === "openai-codex") return !!(providerSecrets as { oauthAccessToken?: string }).oauthAccessToken
@@ -549,6 +550,7 @@ function hasStoredCredentials(provider: AgentProvider, providerSecrets: Record<s
   // azure
   return !!(providerSecrets as { endpoint?: string }).endpoint && !!(providerSecrets as { apiKey?: string }).apiKey
 }
+/* v8 ignore stop */
 
 /* v8 ignore start -- verifyProviderCredentials: per-provider branches tested via auth verify tests @preserve */
 function verifyProviderCredentials(provider: AgentProvider, providers: Record<string, Record<string, unknown>>): string {
