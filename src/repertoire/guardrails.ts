@@ -71,10 +71,6 @@ function splitShellCommands(command: string): string[] {
   return command.split(COMPOUND_SEPARATORS).filter(Boolean)
 }
 
-function isCompoundCommand(command: string): boolean {
-  return SUBSHELL_PATTERN.test(command) || splitShellCommands(command).length > 1
-}
-
 // --- shell commands that write to protected paths ---
 
 function shellWritesToProtectedPath(command: string): boolean {

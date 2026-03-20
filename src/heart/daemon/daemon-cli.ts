@@ -1420,7 +1420,8 @@ type AuthCliCommand = Extract<OuroCliCommand, { kind: "auth.run" }>
 type AuthVerifyCliCommand = Extract<OuroCliCommand, { kind: "auth.verify" }>
 type AuthSwitchCliCommand = Extract<OuroCliCommand, { kind: "auth.switch" }>
 type ChangelogCliCommand = Extract<OuroCliCommand, { kind: "changelog" }>
-function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "hatch.start" } | AuthCliCommand | AuthVerifyCliCommand | AuthSwitchCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand>): DaemonCommand {
+type ConfigModelCliCommand = Extract<OuroCliCommand, { kind: "config.model" }>
+function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "hatch.start" } | AuthCliCommand | AuthVerifyCliCommand | AuthSwitchCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand | ConfigModelCliCommand>): DaemonCommand {
   return command
 }
 
