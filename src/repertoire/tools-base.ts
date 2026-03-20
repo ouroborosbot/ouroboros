@@ -963,11 +963,23 @@ export const baseToolDefinitions: ToolDefinition[] = [
         key,
         content,
         timestamp: now,
-        ...(delegatedFrom ? { delegatedFrom } : {}),
+        ...(delegatedFrom ? { delegatedFrom, obligationStatus: "pending" as const } : {}),
       }
 
       if (isSelf) {
         writePendingEnvelope(pendingDir, envelope)
+        if (delegatedFrom) {
+          emitNervesEvent({
+            event: "repertoire.obligation_created",
+            component: "repertoire",
+            message: "obligation created for inner dialog delegation",
+            meta: {
+              friendId: delegatedFrom.friendId,
+              channel: delegatedFrom.channel,
+              key: delegatedFrom.key,
+            },
+          })
+        }
         let wakeResponse: { ok: boolean } | null = null
         try {
           wakeResponse = await requestInnerWake(agentName)

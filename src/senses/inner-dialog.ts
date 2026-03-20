@@ -316,6 +316,18 @@ async function routeDelegatedCompletion(
   }
 
   const delegatedFrom = delegated.delegatedFrom
+  if (delegated.obligationStatus === "pending") {
+    emitNervesEvent({
+      event: "senses.obligation_fulfilled",
+      component: "senses",
+      message: "obligation fulfilled via delegated completion",
+      meta: {
+        friendId: delegatedFrom.friendId,
+        channel: delegatedFrom.channel,
+        key: delegatedFrom.key,
+      },
+    })
+  }
   const outboundEnvelope: PendingMessage = {
     from: agentName,
     friendId: delegatedFrom.friendId,
