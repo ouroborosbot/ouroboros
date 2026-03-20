@@ -21,7 +21,6 @@ const REASONS = {
   readBeforeOverwrite: "i need to read that file first before i can overwrite it.",
   protectedPath: "that path is protected — i can read it but not modify it.",
   destructiveCommand: "that command is too dangerous to run — it could cause irreversible damage.",
-  compoundCommand: "i can only run simple commands for you — no chaining with && or ;",
   // Trust reasons (vary by relationship)
   needsTrust: "i'd need a closer friend to vouch for you before i can do that.",
   needsTrustForWrite: "i'd need a closer friend to vouch for you before i can write files outside my home.",
@@ -232,11 +231,19 @@ function checkSingleShellCommandTrust(command: string, trustLevel: TrustLevel): 
 }
 
 function checkShellTrustGuardrails(command: string, trustLevel: TrustLevel): GuardResult {
-  // Compound commands: for untrusted users, reject entirely.
-  // This prevents "ouro whoami && rm -rf /" from smuggling dangerous commands.
-  if (isCompoundCommand(command)) return deny(REASONS.compoundCommand)
+  // Subshell patterns ($(), backticks) can't be reliably split — check as single command
+  if (SUBSHELL_PATTERN.test(command)) {
+    return checkSingleShellCommandTrust(command, trustLevel)
+  }
 
-  return checkSingleShellCommandTrust(command, trustLevel)
+  // Compound commands: check each subcommand individually
+  const subcommands = splitShellCommands(command)
+  if (subcommands.length === 0) return checkSingleShellCommandTrust(command, trustLevel)
+  for (const sub of subcommands) {
+    const result = checkSingleShellCommandTrust(sub, trustLevel)
+    if (!result.allowed) return result
+  }
+  return allow
 }
 
 function checkWriteTrustGuardrails(toolName: string, args: Record<string, string>, context: GuardContext): GuardResult {
