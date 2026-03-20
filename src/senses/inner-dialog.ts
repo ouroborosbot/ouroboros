@@ -28,6 +28,7 @@ import type { FriendStore } from "../mind/friends/store"
 import { createBridgeManager } from "../heart/bridges/manager"
 import { findFreshestFriendSession, listSessionActivity, type SessionActivityRecord } from "../heart/session-activity"
 import { sendProactiveBlueBubblesMessageToSession } from "./bluebubbles"
+import { findPendingObligationForOrigin, fulfillObligation } from "../heart/obligations"
 
 export interface InnerDialogInstinct {
   id: string
@@ -335,6 +336,19 @@ async function routeDelegatedCompletion(
 
   const delegatedFrom = enrichDelegatedFromWithBridge(delegated.delegatedFrom)
   if (delegated.obligationStatus === "pending") {
+    // Fulfill the persistent obligation in the store
+    try {
+      const pending = findPendingObligationForOrigin(agentRoot, {
+        friendId: delegatedFrom.friendId,
+        channel: delegatedFrom.channel,
+        key: delegatedFrom.key,
+      })
+      if (pending) {
+        fulfillObligation(agentRoot, pending.id)
+      }
+    } catch {
+      /* v8 ignore next -- defensive: obligation store read failure should not break delivery @preserve */
+    }
     emitNervesEvent({
       event: "senses.obligation_fulfilled",
       component: "senses",
