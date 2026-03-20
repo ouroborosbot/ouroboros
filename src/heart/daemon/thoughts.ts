@@ -36,6 +36,20 @@ export interface InnerDialogRuntimeState {
   lastCompletedAt?: string
 }
 
+export type InnerJobStatus = "idle" | "queued" | "running" | "surfaced" | "returned" | "abandoned"
+
+export interface InnerJob {
+  status: InnerJobStatus
+  content: string | null
+  origin: { friendId: string; channel: string; key: string; friendName?: string } | null
+  mode: "reflect" | "plan" | "relay"
+  obligationStatus: "pending" | "fulfilled" | null
+  surfacedResult: string | null
+  queuedAt: number | null
+  startedAt: string | null
+  surfacedAt: string | null
+}
+
 function contentToText(content: unknown): string {
   if (typeof content === "string") return content
   if (!Array.isArray(content)) return ""
@@ -210,6 +224,108 @@ export function deriveInnerDialogStatus(
     wake: "completed",
     processing: "processed",
     surfaced: formatSurfacedValue(latestProcessedPendingTurn.response),
+  }
+}
+
+export function deriveInnerJob(
+  pendingMessages: Array<Pick<PendingMessage, "content" | "timestamp" | "from" | "delegatedFrom" | "obligationStatus"> & { mode?: "reflect" | "plan" | "relay" }>,
+  turns: ThoughtTurn[],
+  runtimeState?: InnerDialogRuntimeState | null,
+): InnerJob {
+  const isRunning = runtimeState?.status === "running"
+  const delegated = pendingMessages.find((msg) => msg.delegatedFrom)
+  const enriched = extractEnrichedFields(pendingMessages)
+  const pendingMode = delegated && "mode" in delegated && delegated.mode ? delegated.mode : "reflect"
+
+  const origin = enriched.origin ?? null
+  const content = delegated?.content ?? null
+  const obligationStatus = delegated?.obligationStatus ?? null
+  const queuedAt = delegated?.timestamp ?? null
+
+  if (isRunning) {
+    emitNervesEvent({
+      component: "engine",
+      event: "engine.inner_job_derive",
+      message: "derived inner job state",
+      meta: { status: "running", mode: pendingMode, hasOrigin: origin !== null, hasObligation: obligationStatus !== null },
+    })
+    return {
+      status: "running",
+      content,
+      origin,
+      mode: pendingMode,
+      obligationStatus,
+      surfacedResult: null,
+      queuedAt,
+      startedAt: runtimeState?.startedAt ?? null,
+      surfacedAt: null,
+    }
+  }
+
+  if (pendingMessages.length > 0) {
+    emitNervesEvent({
+      component: "engine",
+      event: "engine.inner_job_derive",
+      message: "derived inner job state",
+      meta: { status: "queued", mode: pendingMode, hasOrigin: origin !== null, hasObligation: obligationStatus !== null },
+    })
+    return {
+      status: "queued",
+      content,
+      origin,
+      mode: pendingMode,
+      obligationStatus,
+      surfacedResult: null,
+      queuedAt,
+      startedAt: null,
+      surfacedAt: null,
+    }
+  }
+
+  // No pending, not running -- check for surfaced result
+  const latestProcessedPendingTurn = [...turns]
+    .reverse()
+    .find((turn) => extractPendingPromptMessages(turn.prompt).length > 0)
+
+  if (latestProcessedPendingTurn) {
+    const surfacedResult = extractThoughtResponseFromMessages([
+      { role: "assistant", content: latestProcessedPendingTurn.response },
+    ])
+    emitNervesEvent({
+      component: "engine",
+      event: "engine.inner_job_derive",
+      message: "derived inner job state",
+      meta: { status: "surfaced", mode: "reflect", hasOrigin: false, hasObligation: false },
+    })
+    return {
+      status: "surfaced",
+      content: null,
+      origin: null,
+      mode: "reflect",
+      obligationStatus: null,
+      surfacedResult: surfacedResult || null,
+      queuedAt: null,
+      startedAt: null,
+      surfacedAt: null,
+    }
+  }
+
+  emitNervesEvent({
+    component: "engine",
+    event: "engine.inner_job_derive",
+    message: "derived inner job state",
+    meta: { status: "idle", mode: "reflect", hasOrigin: false, hasObligation: false },
+  })
+  return {
+    status: "idle",
+    content: null,
+    origin: null,
+    mode: "reflect",
+    obligationStatus: null,
+    surfacedResult: null,
+    queuedAt: null,
+    startedAt: null,
+    surfacedAt: null,
   }
 }
 
