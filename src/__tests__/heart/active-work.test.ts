@@ -1416,6 +1416,60 @@ describe("delegation router", () => {
     expect(rendered).toContain("i still owe them an answer")
   })
 
+  it("treats active obligations as inward-work pressure even when inner job is idle", async () => {
+    const { buildActiveWorkFrame, formatActiveWorkFrame } = await import("../../heart/active-work")
+
+    const frame = buildActiveWorkFrame({
+      currentSession: {
+        friendId: "friend-1",
+        channel: "bluebubbles",
+        key: "chat",
+        sessionPath: "/tmp/state/sessions/friend-1/bluebubbles/chat.json",
+      },
+      mustResolveBeforeHandoff: false,
+      inner: {
+        status: "idle",
+        hasPending: false,
+        job: {
+          status: "idle" as const,
+          content: null,
+          origin: null,
+          mode: "reflect" as const,
+          obligationStatus: null,
+          surfacedResult: null,
+          queuedAt: null,
+          startedAt: null,
+          surfacedAt: null,
+        },
+      },
+      bridges: [],
+      pendingObligations: [
+        {
+          id: "ob-1",
+          origin: { friendId: "friend-1", channel: "bluebubbles", key: "chat" },
+          content: "close the loop on the fix",
+          status: "investigating" as const,
+          currentSurface: { kind: "coding", label: "codex coding-001" },
+          createdAt: "2026-03-20T15:00:00.000Z",
+          updatedAt: "2026-03-20T15:05:00.000Z",
+        },
+      ],
+      taskBoard: {
+        compact: "",
+        activeBridges: [],
+        byStatus: { drafting: [], processing: [], validating: [], collaborating: [], paused: [], blocked: [], done: [] },
+      },
+      friendActivity: [],
+    })
+
+    expect(frame.centerOfGravity).toBe("inward-work")
+
+    const rendered = formatActiveWorkFrame(frame)
+    expect(rendered).toContain("## return obligations")
+    expect(rendered).toContain("[investigating] friend-1/bluebubbles/chat: close the loop on the fix")
+    expect(rendered).toContain("working in codex coding-001")
+  })
+
   it("renders basic inner status without enrichment when origin is absent", async () => {
     const { formatActiveWorkFrame } = await import("../../heart/active-work")
 
