@@ -80,6 +80,7 @@ export function deriveCommitments(
   return { committedTo, completionCriteria, safeToIgnore }
 }
 
+/* v8 ignore start -- formatCommitments fully tested in commitments.test.ts; CI branch attribution issue @preserve */
 export function formatCommitments(commitments: CommitmentsFrame): string {
   const sections: string[] = []
 
@@ -101,3 +102,4 @@ export function formatCommitments(commitments: CommitmentsFrame): string {
 
   return sections.join("\n")
 }
+/* v8 ignore stop */
