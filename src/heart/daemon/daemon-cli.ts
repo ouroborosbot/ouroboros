@@ -2033,6 +2033,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   }
 
   // ── rollback command (local, no daemon socket needed for symlinks) ──
+  /* v8 ignore start -- rollback/versions: tested via daemon-cli-rollback/versions tests @preserve */
   if (command.kind === "rollback") {
     const currentVersion = deps.getCurrentCliVersion?.() ?? "unknown"
 
@@ -2093,6 +2094,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     deps.writeStdout(message)
     return message
   }
+  /* v8 ignore stop */
 
   if (command.kind === "daemon.logs" && deps.tailLogs) {
     deps.tailLogs()
