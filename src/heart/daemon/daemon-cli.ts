@@ -85,6 +85,7 @@ export type OuroCliCommand =
   | { kind: "config.model"; agent: string; modelName: string }
   | { kind: "config.models"; agent: string }
   | { kind: "hatch.start"; agentName?: string; humanName?: string; provider?: AgentProvider; credentials?: HatchCredentialsInput; migrationPath?: string }
+  | { kind: "rollback"; version?: string }
 
 export interface OuroCliDeps {
   socketPath: string
@@ -117,6 +118,8 @@ export interface OuroCliDeps {
   activateCliVersion?: (version: string) => void
   getCurrentCliVersion?: () => string | null
   reExecFromNewVersion?: (args: string[]) => never
+  getPreviousCliVersion?: () => string | null
+  listCliVersions?: () => string[]
 }
 
 export interface SessionEntry {
@@ -406,6 +409,7 @@ function usage(): string {
     "  ouro session list [--agent <name>]",
     "  ouro mcp list",
     "  ouro mcp call <server> <tool> [--args '{...}']",
+    "  ouro rollback [<version>]",
   ].join("\n")
 }
 
@@ -1037,6 +1041,7 @@ export function parseOuroCommand(args: string[]): OuroCliCommand {
   }
 
   if (head === "up") return { kind: "daemon.up" }
+  if (head === "rollback") return { kind: "rollback", ...(second ? { version: second } : {}) }
   if (head === "stop" || head === "down") return { kind: "daemon.stop" }
   if (head === "status") return { kind: "daemon.status" }
   if (head === "logs") return { kind: "daemon.logs" }
@@ -1538,7 +1543,8 @@ type AuthSwitchCliCommand = Extract<OuroCliCommand, { kind: "auth.switch" }>
 type ChangelogCliCommand = Extract<OuroCliCommand, { kind: "changelog" }>
 type ConfigModelCliCommand = Extract<OuroCliCommand, { kind: "config.model" }>
 type ConfigModelsCliCommand = Extract<OuroCliCommand, { kind: "config.models" }>
-function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "hatch.start" } | AuthCliCommand | AuthVerifyCliCommand | AuthSwitchCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand | ConfigModelCliCommand | ConfigModelsCliCommand>): DaemonCommand {
+type RollbackCliCommand = Extract<OuroCliCommand, { kind: "rollback" }>
+function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "hatch.start" } | AuthCliCommand | AuthVerifyCliCommand | AuthSwitchCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand | ConfigModelCliCommand | ConfigModelsCliCommand | RollbackCliCommand>): DaemonCommand {
   return command
 }
 
@@ -2014,6 +2020,47 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     const daemonResult = await ensureDaemonRunning(deps)
     deps.writeStdout(daemonResult.message)
     return daemonResult.message
+  }
+
+  // ── rollback command (local, no daemon socket needed for symlinks) ──
+  if (command.kind === "rollback") {
+    const currentVersion = deps.getCurrentCliVersion?.() ?? "unknown"
+
+    if (command.version) {
+      // Rollback to a specific version
+      const installed = deps.listCliVersions?.() ?? []
+      if (!installed.includes(command.version)) {
+        try {
+          await deps.installCliVersion!(command.version)
+        } catch (error) {
+          const message = `failed to install version ${command.version}: ${error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error)}`
+          deps.writeStdout(message)
+          return message
+        }
+      }
+      deps.activateCliVersion!(command.version)
+    } else {
+      // Rollback to previous version
+      const previousVersion = deps.getPreviousCliVersion?.()
+      if (!previousVersion) {
+        const message = "no previous version to roll back to"
+        deps.writeStdout(message)
+        return message
+      }
+      deps.activateCliVersion!(previousVersion)
+      command = { ...command, version: previousVersion }
+    }
+
+    // Stop daemon (non-fatal if not running)
+    try {
+      await deps.sendCommand(deps.socketPath, { kind: "daemon.stop" })
+    } catch {
+      // Daemon may not be running — that's fine
+    }
+
+    const message = `rolled back to ${command.version} (was ${currentVersion})`
+    deps.writeStdout(message)
+    return message
   }
 
   if (command.kind === "daemon.logs" && deps.tailLogs) {
