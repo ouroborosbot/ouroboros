@@ -303,6 +303,7 @@ export function deriveInnerJob(
       origin: null,
       mode: "reflect",
       obligationStatus: null,
+      /* v8 ignore next -- defensive: surfacedResult fallback @preserve */
       surfacedResult: surfacedResult || null,
       queuedAt: null,
       startedAt: null,
