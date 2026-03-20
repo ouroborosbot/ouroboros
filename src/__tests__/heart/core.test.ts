@@ -8491,3 +8491,100 @@ describe("getFinalAnswerRetryError delegation adherence", () => {
     expect(result).toContain("you mentioned going inward")
   })
 })
+
+describe("sawSendMessageSelf turn loop tracking", () => {
+  let runAgent: (
+    messages: any[],
+    callbacks: ChannelCallbacks,
+    channel?: string,
+    signal?: AbortSignal,
+    options?: Record<string, unknown>,
+  ) => Promise<{ usage?: any; outcome: string }>
+
+  function makeStream(chunks: any[]) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const chunk of chunks) {
+          yield chunk
+        }
+      },
+    }
+  }
+
+  function makeChunk(content?: string, toolCalls?: any[]) {
+    const delta: any = {}
+    if (content !== undefined) delta.content = content
+    if (toolCalls !== undefined) delta.tool_calls = toolCalls
+    return { choices: [{ delta }] }
+  }
+
+  beforeEach(async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+    await setupMinimax()
+    mockCreate.mockReset()
+    mockResponsesCreate.mockReset()
+
+    const core = await import("../../heart/core")
+    runAgent = core.runAgent
+  })
+
+  it("sets sawSendMessageSelf=true when send_message(friendId:self) is called in the turn loop, allowing subsequent final_answer with delegate-inward", async () => {
+    // First call: agent calls send_message with friendId: "self"
+    // Second call: agent calls final_answer (should succeed, not be rejected)
+    mockCreate
+      .mockReturnValueOnce(
+        makeStream([
+          makeChunk(undefined, [
+            {
+              index: 0,
+              id: "call_sm",
+              function: {
+                name: "send_message",
+                arguments: JSON.stringify({ friendId: "self", channel: "inner", content: "thinking about this" }),
+              },
+            },
+          ]),
+        ]),
+      )
+      .mockReturnValueOnce(
+        makeStream([
+          makeChunk(undefined, [
+            {
+              index: 0,
+              id: "call_fa",
+              function: {
+                name: "final_answer",
+                arguments: JSON.stringify({ answer: "done", intent: "complete" }),
+              },
+            },
+          ]),
+        ]),
+      )
+
+    const customExecTool = vi.fn().mockResolvedValue("message sent")
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    const messages: any[] = [{ role: "user", content: "hello" }]
+    const result = await runAgent(messages, callbacks, undefined, undefined, {
+      execTool: customExecTool,
+      delegationDecision: { target: "delegate-inward", reasons: ["explicit_reflection"], outwardClosureRequired: false },
+    })
+
+    // The agent should complete successfully (final_answer accepted)
+    // If sawSendMessageSelf wasn't set, the final_answer would be rejected and the agent would loop
+    // The fact that it completed with 2 LLM calls (not infinite) proves sawSendMessageSelf was set
+    expect(mockCreate).toHaveBeenCalledTimes(2)
+    expect(customExecTool).toHaveBeenCalledWith("send_message", expect.objectContaining({ friendId: "self" }), undefined)
+    expect(result).toBeDefined()
+  })
+})
