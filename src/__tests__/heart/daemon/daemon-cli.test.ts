@@ -627,8 +627,8 @@ describe("ouro CLI execution", () => {
     }
   })
 
-  it("switches the agent provider after explicit auth override succeeds", async () => {
-    const agentName = `auth-switch-${Date.now()}`
+  it("ouro auth --provider stores credentials without switching provider", async () => {
+    const agentName = `auth-store-${Date.now()}`
     const agentRoot = path.join(os.homedir(), "AgentBundles", `${agentName}.ouro`)
     const agentConfigPath = path.join(agentRoot, "agent.json")
     fs.mkdirSync(agentRoot, { recursive: true })
@@ -670,8 +670,9 @@ describe("ouro CLI execution", () => {
         agentName,
         provider: "openai-codex",
       }))
+      // Behavior change: auth stores credentials but does NOT switch
       const updated = JSON.parse(fs.readFileSync(agentConfigPath, "utf-8")) as { provider: string }
-      expect(updated.provider).toBe("openai-codex")
+      expect(updated.provider).toBe("anthropic")
       expect(deps.sendCommand).not.toHaveBeenCalled()
     } finally {
       fs.rmSync(agentRoot, { recursive: true, force: true })
