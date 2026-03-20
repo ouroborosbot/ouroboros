@@ -481,6 +481,57 @@ function activeWorkSection(options?: BuildSystemOptions): string {
   return formatActiveWorkFrame(options.activeWorkFrame)
 }
 
+export function centerOfGravitySteeringSection(channel: Channel, options?: BuildSystemOptions): string {
+  if (channel === "inner") return ""
+  const frame = options?.activeWorkFrame
+  if (!frame) return ""
+  const cog = frame.centerOfGravity
+  if (cog === "local-turn") return ""
+
+  const job = frame.inner?.job
+
+  if (cog === "inward-work") {
+    if (job?.status === "queued" || job?.status === "running") {
+      const originClause = job.origin
+        ? ` ${job.origin.friendName ?? job.origin.friendId} asked about something and i wanted to give it real thought before responding.`
+        : ""
+      const obligationClause = job.obligationStatus === "pending"
+        ? "\ni still owe them an answer."
+        : ""
+      return `## where my attention is
+i'm thinking through something privately right now.${originClause}${obligationClause}
+
+if this conversation connects to that inner work, i can weave them together.
+if it's separate, i can be fully present here -- my inner work will wait.`
+    }
+
+    if (job?.status === "surfaced") {
+      const originClause = job.origin
+        ? ` this started when ${job.origin.friendName ?? job.origin.friendId} asked about something.`
+        : ""
+      return `## where my attention is
+i've been thinking privately and reached something.${originClause}
+
+i should bring my answer back to the conversation it came from.`
+    }
+
+    // idle + inward-work means mustResolveBeforeHandoff is true but inner is idle
+    return `## where my attention is
+i have unfinished work that needs attention before i move on.
+
+i can take it inward with go_inward to think privately, or address it directly here.`
+  }
+
+  if (cog === "shared-work") {
+    return `## where my attention is
+this work touches multiple conversations -- i'm holding threads across sessions.
+
+i should keep the different sides aligned. what i learn here may matter there, and vice versa.`
+  }
+
+  return ""
+}
+
 function delegationHintSection(options?: BuildSystemOptions): string {
   if (!options?.delegationDecision) return ""
   const lines = [
@@ -656,6 +707,7 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     skillsSection(),
     taskBoardSection(),
     activeWorkSection(options),
+    centerOfGravitySteeringSection(channel, options),
     delegationHintSection(options),
     bridgeContextSection(options),
     buildSessionSummary({
