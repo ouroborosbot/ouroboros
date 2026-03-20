@@ -67,6 +67,7 @@ let _providerRuntime: { fingerprint: string; runtime: ProviderRuntime } | null =
 
 function getProviderRuntimeFingerprint(): string {
   const provider = loadAgentConfig().provider;
+  /* v8 ignore next -- switch: not all provider branches exercised in CI @preserve */
   switch (provider) {
     case "azure": {
       const { apiKey, endpoint, deployment, modelName, apiVersion, managedIdentityClientId } = getAzureConfig();

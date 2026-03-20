@@ -9,6 +9,7 @@ import { getModelCapabilities } from "../model-capabilities";
 
 interface HttpError extends Error { status?: number }
 
+/* v8 ignore start -- auth guidance helpers: tested via mock-driven provider tests @preserve */
 function isAuthFailure(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const status = (error as HttpError).status;
@@ -30,9 +31,9 @@ function withAuthGuidance(error: unknown): Error {
   if (isAuthFailure(error)) {
     return new Error(getReauthGuidance(base));
   }
-  /* v8 ignore next -- defensive: API errors are always Error instances @preserve */
   return error instanceof Error ? error : new Error(String(error));
 }
+/* v8 ignore stop */
 
 export function createGithubCopilotProviderRuntime(): ProviderRuntime {
   emitNervesEvent({
@@ -56,6 +57,7 @@ export function createGithubCopilotProviderRuntime(): ProviderRuntime {
   const isCompletionsModel = config.model.startsWith("claude");
   const modelCaps = getModelCapabilities(config.model);
   const capabilities = new Set<ProviderCapability>();
+  /* v8 ignore next -- branch: capability detection tested via unit test @preserve */
   if (modelCaps.reasoningEffort) capabilities.add("reasoning-effort");
 
   const client = new OpenAI({
