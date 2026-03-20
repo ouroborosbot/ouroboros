@@ -532,15 +532,32 @@ i should keep the different sides aligned. what i learn here may matter there, a
   return ""
 }
 
-function delegationHintSection(options?: BuildSystemOptions): string {
+const DELEGATION_REASON_PROSE_HINT: Record<import("../heart/delegation").DelegationReason, string> = {
+  explicit_reflection: "something here calls for reflection",
+  cross_session: "this touches other conversations i'm in",
+  bridge_state: "there's shared work spanning sessions",
+  task_state: "this relates to tasks i'm tracking",
+  non_fast_path_tool: "this needs more than a simple reply",
+  unresolved_obligation: "i have an unresolved commitment from earlier",
+}
+
+export function delegationHintSection(options?: BuildSystemOptions): string {
   if (!options?.delegationDecision) return ""
-  const lines = [
-    "## delegation hint",
-    `target: ${options.delegationDecision.target}`,
-    `reasons: ${options.delegationDecision.reasons.length > 0 ? options.delegationDecision.reasons.join(", ") : "none"}`,
-    `outward closure: ${options.delegationDecision.outwardClosureRequired ? "required" : "not required"}`,
-  ]
-  return lines.join("\n")
+  if (options.delegationDecision.target === "fast-path") return ""
+
+  const reasons = options.delegationDecision.reasons
+  if (reasons.length === 0) return ""
+
+  const reasonProse = reasons
+    .map((r) => DELEGATION_REASON_PROSE_HINT[r])
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+    .join(". ")
+
+  const closureLine = options.delegationDecision.outwardClosureRequired
+    ? "\ni should make sure to say something outward before going inward."
+    : ""
+
+  return `## what i'm sensing about this conversation\n${reasonProse}.${closureLine}`
 }
 
 function reasoningEffortSection(options?: BuildSystemOptions): string {

@@ -803,11 +803,7 @@ describe("send_message tool", () => {
 
       expect(mockRequestInnerWake).toHaveBeenCalledWith("testagent")
       expect(mockRunInnerDialogTurn).not.toHaveBeenCalled()
-      expect(result).toBe([
-        "inner work: queued",
-        "queued to inner/dialog",
-        "wake: daemon requested",
-      ].join("\n"))
+      expect(result).toBe("i've queued this thought for private attention. it'll come up when my inner dialog is free.")
     })
 
     it("falls back to an immediate inner turn when daemon wake rejects", async () => {

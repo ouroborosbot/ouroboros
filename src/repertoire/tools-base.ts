@@ -179,33 +179,23 @@ function renderCrossChatDeliveryStatus(
   }))
 }
 
-function renderInnerProgressStatus(
+export function renderInnerProgressStatus(
   status: { queue: string; wake: string; processing: string; surfaced: string },
 ): string {
   if (status.processing === "pending") {
-    return renderProgressStory(buildProgressStory({
-      scope: "inner-delegation",
-      phase: "queued",
-      objective: status.queue,
-      outcomeText: `wake: ${status.wake}`,
-    }))
+    return "i've queued this thought for private attention. it'll come up when my inner dialog is free."
   }
 
   if (status.processing === "started") {
-    return renderProgressStory(buildProgressStory({
-      scope: "inner-delegation",
-      phase: "processing",
-      outcomeText: `wake: ${status.wake}`,
-    }))
+    return "i'm working through this privately right now."
   }
 
-  const completedOutcome = normalizeProgressOutcome(status.surfaced) ?? status.surfaced
-  return renderProgressStory(buildProgressStory({
-    scope: "inner-delegation",
-    phase: "completed",
-    objective: null,
-    outcomeText: completedOutcome,
-  }))
+  // processed / completed
+  if (status.surfaced && status.surfaced !== "nothing recent" && status.surfaced !== "no outward result") {
+    return `i thought about this privately and came to something: ${status.surfaced}`
+  }
+
+  return "i thought about this privately. i'll bring it back when the time is right."
 }
 
 export const baseToolDefinitions: ToolDefinition[] = [

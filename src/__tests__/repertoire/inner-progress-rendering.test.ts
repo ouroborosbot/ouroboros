@@ -91,7 +91,7 @@ describe("delegationHintSection (selfhood framing)", () => {
       },
     })
     expect(result).toContain("## what i'm sensing about this conversation")
-    expect(result).toContain("something here calls for reflection")
+    expect(result).toContain("Something here calls for reflection")
   })
 
   it("returns joined prose for multiple reasons", () => {

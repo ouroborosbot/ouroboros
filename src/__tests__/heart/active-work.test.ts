@@ -349,10 +349,9 @@ describe("active work frame", () => {
     })
 
     const rendered = formatActiveWorkFrame(frame)
-    expect(rendered).toContain("## active work")
-    expect(rendered).toContain("center: local-turn")
-    expect(rendered).toContain("obligation: keep Ari aligned across chats")
-    expect(rendered).toContain("freshest friend-facing session: cli/session")
+    expect(rendered).toContain("## what i'm holding")
+    expect(rendered).toContain("i'm in a conversation on")
+    expect(rendered).toContain("i told them i'd keep Ari aligned across chats.")
   })
 
   it("falls back gracefully when formatting a sparse frame with optional runtime sections absent", async () => {
@@ -366,11 +365,9 @@ describe("active work frame", () => {
       bridgeSuggestion: null,
     } as any)
 
-    expect(rendered).toContain("## active work")
-    expect(rendered).toContain("center: local-turn")
-    expect(rendered).toContain("inner status: idle")
-    expect(rendered).not.toContain("live tasks:")
-    expect(rendered).not.toContain("bridges:")
+    expect(rendered).toContain("## what i'm holding")
+    expect(rendered).toContain("not in a conversation right now")
+    expect(rendered).not.toContain("tracking:")
   })
 
   it("surfaces explicit target-candidate detail when the frame already has candidate truth", async () => {
@@ -572,8 +569,7 @@ describe("active work frame", () => {
     })
 
     const rendered = formatActiveWorkFrame(frame)
-    expect(rendered).toContain("suggested bridge: begin -> cli/session")
-    expect(rendered).toContain("bridge objective hint: keep this shared work aligned")
+    expect(rendered).toContain("should connect these threads")
   })
 
   it("can suggest a bridge from live task pressure even when there is no obligation text", async () => {
@@ -741,8 +737,8 @@ describe("active work frame", () => {
     expect(frame.bridgeSuggestion).toBeNull()
 
     const rendered = formatActiveWorkFrame(frame)
-    expect(rendered).toContain("handoff pressure: must resolve before handoff")
-    expect(rendered).toContain("bridges: bridge-1 [active-idle]")
+    expect(rendered).toContain("i told them i'd keep Ari aligned across chats.")
+    expect(rendered).toContain("shared work spanning sessions: bridge-1 [active-idle]")
   })
 
   it("formats sparse inward work without a current session and shows pending inner state cleanly", async () => {
@@ -774,11 +770,8 @@ describe("active work frame", () => {
     expect(frame.friendActivity.freshestForCurrentFriend).toBeNull()
 
     const rendered = formatActiveWorkFrame(frame)
-    expect(rendered).toContain("center: inward-work")
-    expect(rendered).toContain("inner status: idle (pending queued)")
-    expect(rendered).not.toContain("current session:")
-    expect(rendered).not.toContain("freshest friend-facing session:")
-    expect(rendered).not.toContain("obligation:")
+    expect(rendered).toContain("## what i'm holding")
+    expect(rendered).toContain("not in a conversation right now")
   })
 
   it("exports a shared bridge suggestion helper that ignores already-covered sessions and only suggests other live surfaces", async () => {
@@ -936,7 +929,7 @@ describe("active work frame", () => {
         otherLiveSessionsForCurrentFriend: [],
       },
       bridgeSuggestion: suggestion,
-    })).toContain("suggested bridge: attach bridge-1 -> cli/session")
+    })).toContain("relates to bridge bridge-1")
   })
 
   it("refuses to auto-suggest when more than one non-blocked cross-relationship target candidate is live", async () => {
@@ -1400,6 +1393,17 @@ describe("delegation router", () => {
         origin: { friendId: "alice", channel: "bluebubbles", key: "session" },
         contentSnippet: "what should I think about this?",
         obligationPending: true,
+        job: {
+          status: "running" as const,
+          content: "what should I think about this?",
+          origin: { friendId: "alice", channel: "bluebubbles", key: "session" },
+          mode: "reflect" as const,
+          obligationStatus: "pending" as const,
+          surfacedResult: null,
+          queuedAt: null,
+          startedAt: null,
+          surfacedAt: null,
+        },
       },
       bridges: [],
       taskPressure: { compactBoard: "", liveTaskNames: [], activeBridges: [] },
@@ -1407,8 +1411,8 @@ describe("delegation router", () => {
       bridgeSuggestion: null,
     } as any)
 
-    expect(rendered).toContain("inner status: running from alice/bluebubbles/session (return expected)")
-    expect(rendered).toContain('inner asked: "what should I think about this?"')
+    expect(rendered).toContain("thinking through something privately right now")
+    expect(rendered).toContain("i still owe them an answer")
   })
 
   it("renders basic inner status without enrichment when origin is absent", async () => {
@@ -1426,10 +1430,8 @@ describe("delegation router", () => {
       bridgeSuggestion: null,
     } as any)
 
-    expect(rendered).toContain("inner status: idle")
-    expect(rendered).not.toContain("from ")
-    expect(rendered).not.toContain("return expected")
-    expect(rendered).not.toContain("inner asked:")
+    expect(rendered).toContain("## what i'm holding")
+    expect(rendered).toContain("not in a conversation right now")
   })
 })
 
