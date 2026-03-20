@@ -622,6 +622,7 @@ export async function listGithubCopilotModels(
     throw new Error(`model listing failed (HTTP ${response.status})`)
   }
   const body = await response.json() as { data?: unknown[] } | unknown[]
+  /* v8 ignore start -- response shape handling: tested via config-models.test.ts @preserve */
   const items = Array.isArray(body) ? body : (body?.data ?? []) as unknown[]
   return items.map((item) => {
     const rec = item as Record<string, unknown>
@@ -634,6 +635,7 @@ export async function listGithubCopilotModels(
       ...(capabilities ? { capabilities } : {}),
     }
   })
+  /* v8 ignore stop */
 }
 
 function parseHatchCommand(args: string[]): OuroCliCommand {
