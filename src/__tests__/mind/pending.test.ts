@@ -333,3 +333,28 @@ describe("drainDeferredReturns", () => {
     expect(result).toEqual([])
   })
 })
+
+describe("obligationStatus on PendingMessage", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it("preserves obligationStatus through drain when present in pending file", async () => {
+    const { drainPending } = await import("../../mind/pending")
+    const dir = "/mock/pending/self/inner/dialog"
+
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readdirSync).mockReturnValue(["1709900001-abc.json"] as any)
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
+      from: "testagent",
+      content: "think about penguins",
+      timestamp: 1709900001,
+      delegatedFrom: { friendId: "friend-1", channel: "bluebubbles", key: "chat" },
+      obligationStatus: "pending",
+    }))
+
+    const result = drainPending(dir)
+
+    expect(result[0].obligationStatus).toBe("pending")
+  })
+})

@@ -18,6 +18,7 @@ export interface PendingMessage {
   content: string
   timestamp: number
   delegatedFrom?: DelegatedFrom
+  obligationStatus?: "pending" | "fulfilled"
 }
 
 export function getPendingDir(agentName: string, friendId: string, channel: string, key: string): string {
