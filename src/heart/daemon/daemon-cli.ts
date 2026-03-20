@@ -75,6 +75,7 @@ export type OuroCliCommand =
   | { kind: "friend.list"; agent?: string }
   | { kind: "friend.show"; friendId: string; agent?: string }
   | { kind: "friend.create"; name: string; trustLevel?: string; agent?: string }
+  | { kind: "friend.update"; friendId: string; trustLevel: TrustLevel; agent?: string }
   | { kind: "friend.link"; agent: string; friendId: string; provider: IdentityProvider; externalId: string }
   | { kind: "friend.unlink"; agent: string; friendId: string; provider: IdentityProvider; externalId: string }
   | { kind: "changelog"; from?: string; agent?: string }
@@ -389,6 +390,7 @@ function usage(): string {
     "  ouro friend list [--agent <name>]",
     "  ouro friend show <id> [--agent <name>]",
     "  ouro friend create --name <name> [--trust <level>] [--agent <name>]",
+    "  ouro friend update <id> --trust <level> [--agent <name>]",
     "  ouro thoughts [--last <n>] [--json] [--follow] [--agent <name>]",
     "  ouro friend link <agent> --friend <id> --provider <p> --external-id <eid>",
     "  ouro friend unlink <agent> --friend <id> --provider <p> --external-id <eid>",
@@ -866,6 +868,28 @@ function parseFriendCommand(args: string[]): OuroCliCommand {
       kind: "friend.create",
       name,
       ...(trustLevel ? { trustLevel } : {}),
+      ...(agent ? { agent } : {}),
+    }
+  }
+
+  if (sub === "update") {
+    const friendId = rest[0]
+    if (!friendId) throw new Error(`Usage: ouro friend update <id> --trust <level>`)
+    let trustLevel: string | undefined
+    for (let i = 1; i < rest.length; i++) {
+      if (rest[i] === "--trust" && rest[i + 1]) {
+        trustLevel = rest[i + 1]
+        i += 1
+      }
+    }
+    const VALID_TRUST_LEVELS = new Set(["stranger", "acquaintance", "friend", "family"])
+    if (!trustLevel || !VALID_TRUST_LEVELS.has(trustLevel)) {
+      throw new Error(`Usage: ouro friend update <id> --trust <stranger|acquaintance|friend|family>`)
+    }
+    return {
+      kind: "friend.update" as const,
+      friendId,
+      trustLevel: trustLevel as TrustLevel,
       ...(agent ? { agent } : {}),
     }
   }
@@ -1505,7 +1529,7 @@ type TaskCliCommand = Extract<OuroCliCommand,
 >
 
 type ReminderCliCommand = Extract<OuroCliCommand, { kind: "reminder.create" }>
-type FriendCliCommand = Extract<OuroCliCommand, { kind: "friend.list" } | { kind: "friend.show" } | { kind: "friend.create" } | { kind: "friend.link" } | { kind: "friend.unlink" }>
+type FriendCliCommand = Extract<OuroCliCommand, { kind: "friend.list" } | { kind: "friend.show" } | { kind: "friend.create" } | { kind: "friend.update" } | { kind: "friend.link" } | { kind: "friend.unlink" }>
 type WhoamiCliCommand = Extract<OuroCliCommand, { kind: "whoami" }>
 type SessionCliCommand = Extract<OuroCliCommand, { kind: "session.list" }>
 
@@ -1622,6 +1646,19 @@ async function executeFriendCommand(command: FriendCliCommand, store: FriendStor
       schemaVersion: 1,
     })
     return `created: ${id} (${command.name}, ${trustLevel})`
+  }
+
+  if (command.kind === "friend.update") {
+    const current = await store.get(command.friendId)
+    if (!current) return `friend not found: ${command.friendId}`
+    const now = new Date().toISOString()
+    await store.put(command.friendId, {
+      ...current,
+      trustLevel: command.trustLevel,
+      role: command.trustLevel,
+      updatedAt: now,
+    })
+    return `updated: ${command.friendId} → trust=${command.trustLevel}`
   }
 
   if (command.kind === "friend.link") {
@@ -1873,7 +1910,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
   // ── friend subcommands (local, no daemon socket needed) ──
   if (command.kind === "friend.list" || command.kind === "friend.show" || command.kind === "friend.create" ||
-      command.kind === "friend.link" || command.kind === "friend.unlink") {
+      command.kind === "friend.update" || command.kind === "friend.link" || command.kind === "friend.unlink") {
     /* v8 ignore start -- production default: requires full identity setup @preserve */
     let store = deps.friendStore
     if (!store) {

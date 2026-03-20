@@ -683,6 +683,45 @@ describe("guardInvocation — trust-level guardrails", () => {
   })
 })
 
+describe("OURO_CLI_TRUST_MANIFEST — friend update", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it("includes 'friend update' at family level", async () => {
+    const { OURO_CLI_TRUST_MANIFEST } = await import("../../repertoire/guardrails")
+    expect(OURO_CLI_TRUST_MANIFEST["friend update"]).toBe("family")
+  })
+
+  it("family: ouro friend update allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ouro friend update abc-123 --trust friend --agent foo" }, {
+      readPaths: new Set(),
+      trustLevel: "family",
+    })
+    expect(result.allowed).toBe(true)
+  })
+
+  it("friend: ouro friend update denied", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ouro friend update abc-123 --trust friend --agent foo" }, {
+      readPaths: new Set(),
+      trustLevel: "friend",
+    })
+    // friend trust level skips trust guardrails entirely (isTrustedLevel = true)
+    expect(result.allowed).toBe(true)
+  })
+
+  it("acquaintance: ouro friend update denied", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ouro friend update abc-123 --trust friend --agent foo" }, {
+      readPaths: new Set(),
+      trustLevel: "acquaintance",
+    })
+    expect(result.allowed).toBe(false)
+  })
+})
+
 describe("OURO_CLI_TRUST_MANIFEST — config model", () => {
   beforeEach(() => {
     vi.resetModules()

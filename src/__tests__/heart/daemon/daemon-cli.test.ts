@@ -5357,6 +5357,104 @@ describe("ouro changelog command", () => {
   })
 })
 
+describe("ouro friend update", () => {
+  it("parses friend update command", () => {
+    expect(parseOuroCommand(["friend", "update", "friend-123", "--trust", "family", "--agent", "slugger"])).toEqual({
+      kind: "friend.update",
+      friendId: "friend-123",
+      trustLevel: "family",
+      agent: "slugger",
+    })
+  })
+
+  it("parses friend update without --agent", () => {
+    expect(parseOuroCommand(["friend", "update", "friend-123", "--trust", "acquaintance"])).toEqual({
+      kind: "friend.update",
+      friendId: "friend-123",
+      trustLevel: "acquaintance",
+    })
+  })
+
+  it("rejects friend update without id", () => {
+    expect(() => parseOuroCommand(["friend", "update"])).toThrow("Usage")
+  })
+
+  it("rejects friend update without --trust", () => {
+    expect(() => parseOuroCommand(["friend", "update", "friend-123"])).toThrow("Usage")
+  })
+
+  it("rejects friend update with invalid trust level", () => {
+    expect(() => parseOuroCommand(["friend", "update", "friend-123", "--trust", "bestie"])).toThrow("Usage")
+  })
+
+  it("executes friend update and writes trust level", async () => {
+    const now = "2026-03-19T00:00:00.000Z"
+    const existing = {
+      id: "friend-123",
+      name: "Bob",
+      trustLevel: "acquaintance" as const,
+      externalIds: [],
+      tenantMemberships: [],
+      toolPreferences: {},
+      notes: {},
+      totalTokens: 0,
+      createdAt: "2026-03-01T00:00:00.000Z",
+      updatedAt: "2026-03-01T00:00:00.000Z",
+      schemaVersion: 1,
+    }
+    const mockFriendStore = {
+      get: vi.fn(async () => existing),
+      put: vi.fn(),
+      delete: vi.fn(),
+      findByExternalId: vi.fn(),
+      listAll: vi.fn(),
+    }
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(),
+      friendStore: mockFriendStore as any,
+    }
+    const result = await runOuroCli(["friend", "update", "friend-123", "--trust", "family", "--agent", "slugger"], deps)
+    expect(result).toContain("updated")
+    expect(result).toContain("friend-123")
+    expect(result).toContain("family")
+    expect(mockFriendStore.put).toHaveBeenCalledWith(
+      "friend-123",
+      expect.objectContaining({
+        trustLevel: "family",
+        role: "family",
+      }),
+    )
+  })
+
+  it("returns not found for nonexistent friend", async () => {
+    const mockFriendStore = {
+      get: vi.fn(async () => null),
+      put: vi.fn(),
+      delete: vi.fn(),
+      findByExternalId: vi.fn(),
+      listAll: vi.fn(),
+    }
+    const deps: OuroCliDeps = {
+      socketPath: "/tmp/test.sock",
+      sendCommand: vi.fn(),
+      startDaemonProcess: vi.fn(),
+      writeStdout: vi.fn(),
+      checkSocketAlive: vi.fn(),
+      cleanupStaleSocket: vi.fn(),
+      fallbackPendingMessage: vi.fn(),
+      friendStore: mockFriendStore as any,
+    }
+    const result = await runOuroCli(["friend", "update", "no-such-id", "--trust", "friend", "--agent", "slugger"], deps)
+    expect(result).toContain("friend not found")
+  })
+})
+
 describe("ouro config model", () => {
   it("parses config model command", () => {
     expect(parseOuroCommand(["config", "model", "--agent", "slugger", "gpt-5"])).toEqual({
@@ -5400,5 +5498,6 @@ describe("OURO_CLI_TRUST_MANIFEST", () => {
     expect(OURO_CLI_TRUST_MANIFEST["friend list"]).toBe("friend")
     expect(OURO_CLI_TRUST_MANIFEST["session list"]).toBe("acquaintance")
     expect(OURO_CLI_TRUST_MANIFEST["config model"]).toBe("friend")
+    expect(OURO_CLI_TRUST_MANIFEST["friend update"]).toBe("family")
   })
 })
