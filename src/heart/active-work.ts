@@ -324,9 +324,12 @@ export function formatActiveWorkFrame(frame: ActiveWorkFrame): string {
     lines.push("## return obligations")
     for (const obligation of frame.pendingObligations) {
       if (!isOpenObligationStatus(obligation.status)) continue
-      lines.push(
-        `- [${obligation.status}] ${obligation.origin.friendId}/${obligation.origin.channel}/${obligation.origin.key}: ${obligation.content}${formatObligationSurface(obligation)}`,
-      )
+      let obligationLine =
+        `- [${obligation.status}] ${obligation.origin.friendId}/${obligation.origin.channel}/${obligation.origin.key}: ${obligation.content}${formatObligationSurface(obligation)}`
+      if (obligation.latestNote?.trim()) {
+        obligationLine += `\n  latest: ${obligation.latestNote.trim()}`
+      }
+      lines.push(obligationLine)
     }
   }
 

@@ -1785,6 +1785,51 @@ describe("delegation router", () => {
     expect(rendered).not.toContain("(cli notes)")
   })
 
+  it("keeps coding-session completion visibly open when merge or runtime closure is still pending", async () => {
+    const { formatActiveWorkFrame } = await import("../../heart/active-work")
+
+    const rendered = formatActiveWorkFrame({
+      currentSession: null,
+      currentObligation: null,
+      mustResolveBeforeHandoff: false,
+      centerOfGravity: "inward-work",
+      inner: {
+        status: "idle",
+        hasPending: false,
+        job: {
+          status: "idle" as const,
+          content: null,
+          origin: null,
+          mode: "reflect" as const,
+          obligationStatus: null,
+          surfacedResult: null,
+          queuedAt: null,
+          startedAt: null,
+          surfacedAt: null,
+        },
+      },
+      bridges: [],
+      taskPressure: { compactBoard: "", liveTaskNames: [], activeBridges: [] },
+      friendActivity: { freshestForCurrentFriend: null, otherLiveSessionsForCurrentFriend: [] },
+      pendingObligations: [
+        {
+          id: "ob-coding",
+          origin: { friendId: "friend-1", channel: "bluebubbles", key: "chat" },
+          content: "carry the self-fix back",
+          status: "investigating" as const,
+          currentSurface: { kind: "coding", label: "codex coding-001" },
+          latestNote: "coding session completed; merge/update still pending",
+          createdAt: "2026-03-20T16:00:00.000Z",
+          updatedAt: "2026-03-20T16:01:00.000Z",
+        },
+      ],
+      bridgeSuggestion: null,
+    } as any)
+
+    expect(rendered).toContain("[investigating] friend-1/bluebubbles/chat: carry the self-fix back (working in codex coding-001)")
+    expect(rendered).toContain("latest: coding session completed; merge/update still pending")
+  })
+
   it("truncates long surfaced inner results and skips fulfilled obligations in the return block", async () => {
     const { formatActiveWorkFrame } = await import("../../heart/active-work")
     const longResult = "x".repeat(140)
