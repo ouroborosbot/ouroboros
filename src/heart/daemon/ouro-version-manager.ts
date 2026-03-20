@@ -15,11 +15,14 @@ export interface OuroVersionManagerDeps {
 }
 
 export function getOuroCliHome(homeDir?: string): string {
-  return path.join(homeDir ?? os.homedir(), ".ouro-cli")
+  /* v8 ignore next -- dep default: tests always inject @preserve */
+  const home = homeDir ?? os.homedir()
+  return path.join(home, ".ouro-cli")
 }
 
 export function getCurrentVersion(deps: Pick<OuroVersionManagerDeps, "homeDir" | "readlinkSync">): string | null {
   const cliHome = getOuroCliHome(deps.homeDir)
+  /* v8 ignore next -- dep default: tests always inject @preserve */
   const readlinkSync = deps.readlinkSync ?? fs.readlinkSync
   try {
     const target = readlinkSync(path.join(cliHome, "CurrentVersion"))
@@ -31,6 +34,7 @@ export function getCurrentVersion(deps: Pick<OuroVersionManagerDeps, "homeDir" |
 
 export function getPreviousVersion(deps: Pick<OuroVersionManagerDeps, "homeDir" | "readlinkSync">): string | null {
   const cliHome = getOuroCliHome(deps.homeDir)
+  /* v8 ignore next -- dep default: tests always inject @preserve */
   const readlinkSync = deps.readlinkSync ?? fs.readlinkSync
   try {
     const target = readlinkSync(path.join(cliHome, "previous"))
@@ -42,6 +46,7 @@ export function getPreviousVersion(deps: Pick<OuroVersionManagerDeps, "homeDir" 
 
 export function listInstalledVersions(deps: Pick<OuroVersionManagerDeps, "homeDir" | "readdirSync">): string[] {
   const cliHome = getOuroCliHome(deps.homeDir)
+  /* v8 ignore next -- dep default: tests always inject @preserve */
   const readdirSync = deps.readdirSync ?? ((p: string, opts: { withFileTypes: true }) => fs.readdirSync(p, opts))
   try {
     const entries = readdirSync(path.join(cliHome, "versions"), { withFileTypes: true })
@@ -53,8 +58,10 @@ export function listInstalledVersions(deps: Pick<OuroVersionManagerDeps, "homeDi
 
 export function installVersion(version: string, deps: Pick<OuroVersionManagerDeps, "homeDir" | "mkdirSync" | "execSync">): void {
   const cliHome = getOuroCliHome(deps.homeDir)
+  /* v8 ignore start -- dep defaults: tests always inject @preserve */
   const mkdirSync = deps.mkdirSync ?? fs.mkdirSync
   const execSync = deps.execSync ?? ((cmd: string, opts?: { stdio?: string }) => require("child_process").execSync(cmd, opts))
+  /* v8 ignore stop */
   const versionDir = path.join(cliHome, "versions", version)
 
   emitNervesEvent({
@@ -77,10 +84,12 @@ export function installVersion(version: string, deps: Pick<OuroVersionManagerDep
 
 export function activateVersion(version: string, deps: Pick<OuroVersionManagerDeps, "homeDir" | "readlinkSync" | "unlinkSync" | "symlinkSync" | "existsSync">): void {
   const cliHome = getOuroCliHome(deps.homeDir)
+  /* v8 ignore start -- dep defaults: tests always inject @preserve */
   const readlinkSync = deps.readlinkSync ?? fs.readlinkSync
   const unlinkSync = deps.unlinkSync ?? fs.unlinkSync
   const symlinkSync = deps.symlinkSync ?? fs.symlinkSync
   const existsSync = deps.existsSync ?? fs.existsSync
+  /* v8 ignore stop */
   const currentVersionPath = path.join(cliHome, "CurrentVersion")
   const previousPath = path.join(cliHome, "previous")
   const newTarget = path.join(cliHome, "versions", version)
@@ -119,6 +128,7 @@ export function activateVersion(version: string, deps: Pick<OuroVersionManagerDe
 
 export function ensureLayout(deps: Pick<OuroVersionManagerDeps, "homeDir" | "mkdirSync">): void {
   const cliHome = getOuroCliHome(deps.homeDir)
+  /* v8 ignore next -- dep default: tests always inject @preserve */
   const mkdirSync = deps.mkdirSync ?? fs.mkdirSync
 
   mkdirSync(cliHome, { recursive: true })
