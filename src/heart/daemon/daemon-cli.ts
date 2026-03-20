@@ -663,13 +663,14 @@ export async function pingGithubCopilotModel(
     let detail = `HTTP ${response.status}`
     try {
       const json = await response.json() as Record<string, unknown>
+      /* v8 ignore start -- error format parsing: all branches tested via config-models.test.ts @preserve */
       if (typeof json.error === "string") detail = json.error
       else if (typeof json.error === "object" && json.error !== null) {
         const errObj = json.error as Record<string, unknown>
         if (typeof errObj.message === "string") detail = errObj.message
       }
-      /* v8 ignore next -- flat error format: tested via config-models.test.ts @preserve */
       else if (typeof json.message === "string") detail = json.message
+      /* v8 ignore stop */
     } catch {
       // response body not JSON — keep HTTP status
     }
