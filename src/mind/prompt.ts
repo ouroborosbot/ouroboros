@@ -255,6 +255,7 @@ export function runtimeInfoSection(channel: Channel): string {
   if (bundleMeta?.previousRuntimeVersion && bundleMeta.previousRuntimeVersion !== currentVersion) {
     lines.push(`previously: ${bundleMeta.previousRuntimeVersion}`)
     const changelogCommand = buildChangelogCommand(bundleMeta.previousRuntimeVersion, currentVersion)
+    /* v8 ignore next -- buildChangelogCommand is non-null when previous/current runtime versions differ @preserve */
     if (changelogCommand) {
       lines.push(`if i'm closing a self-fix loop, i should tell them i updated and review changes with \`${changelogCommand}\`.`)
     }

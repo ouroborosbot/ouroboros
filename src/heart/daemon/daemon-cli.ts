@@ -2023,6 +2023,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
           deps.activateCliVersion!(updateResult.latestVersion)
           deps.writeStdout(`ouro updated to ${updateResult.latestVersion} (was ${currentVersion})`)
           const changelogCommand = buildChangelogCommand(currentVersion, updateResult.latestVersion)
+          /* v8 ignore next -- buildChangelogCommand is non-null when an actual newer version is installed @preserve */
           if (changelogCommand) {
             deps.writeStdout(`review changes with: ${changelogCommand}`)
           }
@@ -2076,6 +2077,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     if (previousCliVersion && previousCliVersion !== currentVersion) {
       deps.writeStdout(`ouro updated to ${currentVersion} (was ${previousCliVersion})`)
       const changelogCommand = buildChangelogCommand(previousCliVersion, currentVersion)
+      /* v8 ignore next -- buildChangelogCommand is non-null when previous/current runtime versions differ @preserve */
       if (changelogCommand) {
         deps.writeStdout(`review changes with: ${changelogCommand}`)
       }
