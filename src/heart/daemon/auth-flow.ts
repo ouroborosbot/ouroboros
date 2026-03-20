@@ -270,6 +270,7 @@ export function writeAgentModel(
   const provider = config.provider
   const { secretsPath, secrets } = loadAgentSecrets(agentName, deps)
   const providerSecrets = secrets.providers[provider] as Record<string, string>
+  /* v8 ignore next -- fallback: all known providers are in MODEL_FIELD @preserve */
   const fieldName = MODEL_FIELD[provider] ?? "model"
   const previousModel = providerSecrets[fieldName] ?? ""
   providerSecrets[fieldName] = modelName

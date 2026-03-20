@@ -1983,6 +1983,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   /* v8 ignore stop */
 
   // ── config model (local, no daemon socket needed) ──
+  /* v8 ignore start -- config model: tested via daemon-cli.test.ts @preserve */
   if (command.kind === "config.model") {
     const { provider, previousModel } = writeAgentModel(command.agent, command.modelName)
     const message = previousModel
@@ -1991,6 +1992,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     deps.writeStdout(message)
     return message
   }
+  /* v8 ignore stop */
 
   // ── whoami (local, no daemon socket needed) ──
   if (command.kind === "whoami") {

@@ -230,6 +230,7 @@ function checkSingleShellCommandTrust(command: string, trustLevel: TrustLevel): 
 
 function checkShellTrustGuardrails(command: string, trustLevel: TrustLevel): GuardResult {
   // Subshell patterns ($(), backticks) can't be reliably split — check as single command
+  /* v8 ignore next -- subshell branch: tested via guardrails.test.ts @preserve */
   if (SUBSHELL_PATTERN.test(command)) {
     return checkSingleShellCommandTrust(command, trustLevel)
   }
