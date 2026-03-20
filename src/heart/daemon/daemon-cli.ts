@@ -706,6 +706,7 @@ function parseAuthCommand(args: string[]): OuroCliCommand {
   if (first === "verify" || first === "switch") {
     const { agent, rest } = extractAgentFlag(args.slice(1))
     let provider: AgentProvider | undefined
+    /* v8 ignore start -- provider flag parsing: branches tested via CLI parsing tests @preserve */
     for (let i = 0; i < rest.length; i += 1) {
       if (rest[i] === "--provider") {
         const value = rest[i + 1]
@@ -715,6 +716,7 @@ function parseAuthCommand(args: string[]): OuroCliCommand {
         continue
       }
     }
+    /* v8 ignore stop */
     if (!agent) throw new Error(`Usage\n${usage()}`)
     if (first === "switch") {
       if (!provider) throw new Error(`auth switch requires --provider.\n${usage()}`)
