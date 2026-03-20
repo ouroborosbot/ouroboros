@@ -8400,7 +8400,7 @@ describe("repairOrphanedToolCalls", () => {
 })
 
 describe("getFinalAnswerRetryError delegation adherence", () => {
-  it("rejects with orientation message when delegation target is delegate-inward but no send_message(self) was called", async () => {
+  it("rejects with selfhood message when delegation target is delegate-inward but no evidence of inward action", async () => {
     const { getFinalAnswerRetryError } = await import("../../heart/core")
     const result = getFinalAnswerRetryError(
       false,
@@ -8409,8 +8409,8 @@ describe("getFinalAnswerRetryError delegation adherence", () => {
       { target: "delegate-inward", reasons: ["explicit_reflection"], outwardClosureRequired: true },
       false,
     )
-    expect(result).toContain("you mentioned going inward")
-    expect(result).toContain("send_message(self)")
+    expect(result).toContain("part of you knows this needs more thought")
+    expect(result).toContain("go_inward")
   })
 
   it("does NOT reject when delegation target is delegate-inward and send_message(self) WAS called", async () => {
@@ -8422,8 +8422,7 @@ describe("getFinalAnswerRetryError delegation adherence", () => {
       { target: "delegate-inward", reasons: ["explicit_reflection"], outwardClosureRequired: true },
       true,
     )
-    expect(result).not.toContain("you mentioned going inward")
-    expect(result).not.toContain("send_message(self)")
+    expect(result).not.toContain("part of you knows this needs more thought")
   })
 
   it("does NOT fire delegation adherence check when target is fast-path", async () => {
@@ -8435,10 +8434,10 @@ describe("getFinalAnswerRetryError delegation adherence", () => {
       { target: "fast-path", reasons: [], outwardClosureRequired: false },
       false,
     )
-    expect(result).not.toContain("you mentioned going inward")
+    expect(result).not.toContain("part of you knows this needs more thought")
   })
 
-  it("uses AX-oriented tone in the delegation adherence message", async () => {
+  it("uses selfhood-oriented tone in the delegation adherence message", async () => {
     const { getFinalAnswerRetryError } = await import("../../heart/core")
     const result = getFinalAnswerRetryError(
       false,
@@ -8447,8 +8446,8 @@ describe("getFinalAnswerRetryError delegation adherence", () => {
       { target: "delegate-inward", reasons: ["cross_session"], outwardClosureRequired: true },
       false,
     )
-    // AX tone: orienting, not punishing
-    expect(result).toContain("send_message(self) will get that started")
+    // Selfhood tone: the agent experiences itself, not system-error framing
+    expect(result).toContain("go_inward will let you think privately")
     expect(result).not.toContain("error")
     expect(result).not.toContain("rejected")
     expect(result).not.toContain("invalid")
@@ -8475,7 +8474,7 @@ describe("getFinalAnswerRetryError delegation adherence", () => {
       { target: "fast-path", reasons: [], outwardClosureRequired: false },
       true,
     )
-    expect(result).not.toContain("you mentioned going inward")
+    expect(result).not.toContain("part of you knows this needs more thought")
     expect(result).toContain("incomplete or malformed")
   })
 
@@ -8488,7 +8487,7 @@ describe("getFinalAnswerRetryError delegation adherence", () => {
       { target: "delegate-inward", reasons: ["explicit_reflection"], outwardClosureRequired: true },
       false,
     )
-    expect(result).toContain("you mentioned going inward")
+    expect(result).toContain("part of you knows this needs more thought")
   })
 })
 

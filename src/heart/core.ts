@@ -28,6 +28,7 @@ import { createGithubCopilotProviderRuntime } from "./providers/github-copilot";
 import type { SteeringFollowUpEffect } from "../senses/continuity";
 import type { ActiveWorkFrame } from "./active-work";
 import type { DelegationDecision, DelegationReason } from "./delegation";
+import type { InnerJob } from "./daemon/thoughts";
 import { getInnerDialogPendingDir, queuePendingMessage } from "../mind/pending";
 import type { PendingMessage } from "../mind/pending";
 import { getAgentName } from "./identity";
@@ -334,8 +335,12 @@ export function getFinalAnswerRetryError(
   sawSteeringFollowUp: boolean,
   delegationDecision?: DelegationDecision,
   sawSendMessageSelf?: boolean,
+  sawGoInward?: boolean,
+  sawQuerySession?: boolean,
+  innerJob?: InnerJob,
 ): string {
-  if (delegationDecision?.target === "delegate-inward" && !sawSendMessageSelf) {
+  // 1. Delegation adherence: delegate-inward without evidence of inward action
+  if (delegationDecision?.target === "delegate-inward" && !sawSendMessageSelf && !sawGoInward && !sawQuerySession) {
     emitNervesEvent({
       event: "engine.delegation_adherence_rejected",
       component: "engine",
@@ -345,14 +350,21 @@ export function getFinalAnswerRetryError(
         reasons: delegationDecision.reasons,
       },
     });
-    return "you mentioned going inward but haven't routed anything to inner dialog yet -- send_message(self) will get that started";
+    return "you're reaching for a final answer, but part of you knows this needs more thought. take it inward -- go_inward will let you think privately, or send_message(self) if you just want to leave yourself a note.";
   }
+  // 2. Pending obligation not addressed
+  if (innerJob?.obligationStatus === "pending" && !sawSendMessageSelf && !sawGoInward) {
+    return "you're still holding something from an earlier conversation -- someone is waiting for your answer. finish the thought first, or go_inward to keep working on it privately.";
+  }
+  // 3. mustResolveBeforeHandoff + missing intent
   if (mustResolveBeforeHandoff && !intent) {
     return "your final_answer is missing required intent. when you must keep going until done or blocked, call final_answer again with answer plus intent=complete, blocked, or direct_reply.";
   }
+  // 4. mustResolveBeforeHandoff + direct_reply without follow-up
   if (mustResolveBeforeHandoff && intent === "direct_reply" && !sawSteeringFollowUp) {
     return "your final_answer used intent=direct_reply without a newer steering follow-up. continue the unresolved work, or call final_answer again with intent=complete or blocked when appropriate.";
   }
+  // 5. Default malformed fallback
   return "your final_answer was incomplete or malformed. call final_answer again with your complete response.";
 }
 
@@ -580,6 +592,8 @@ export async function runAgent(
   let currentReasoningEffort = "medium";
   let sawSendMessageSelf = false;
   let sawGoInward = false;
+  let sawQuerySession = false;
+  let sawBridgeManage = false;
 
   // Prevent MaxListenersExceeded warning — each iteration adds a listener
   try { require("events").setMaxListeners(50, signal); } catch { /* unsupported */ }
@@ -735,7 +749,7 @@ export async function runAgent(
             // malformed. Clear any partial streamed text or noise, then push the
             // assistant msg + error tool result and let the model try again.
             callbacks.onClearText?.();
-            const retryError = getFinalAnswerRetryError(mustResolveBeforeHandoffActive, intent, sawSteeringFollowUp, options?.delegationDecision, sawSendMessageSelf);
+            const retryError = getFinalAnswerRetryError(mustResolveBeforeHandoffActive, intent, sawSteeringFollowUp, options?.delegationDecision, sawSendMessageSelf, sawGoInward);
             messages.push(msg);
             messages.push({ role: "tool", tool_call_id: result.toolCalls[0].id, content: retryError });
             providerRuntime.appendToolOutput(result.toolCalls[0].id, retryError);
@@ -870,6 +884,8 @@ export async function runAgent(
           if (tc.name === "send_message" && args.friendId === "self") {
             sawSendMessageSelf = true;
           }
+          if (tc.name === "query_session") sawQuerySession = true;
+          if (tc.name === "bridge_manage") sawBridgeManage = true;
           const argSummary = summarizeArgs(tc.name, args);
           // Confirmation check for mutate tools
           if (isConfirmationRequired(tc.name) && !options?.skipConfirmation) {
@@ -962,7 +978,7 @@ export async function runAgent(
     trace_id: traceId,
     component: "engine",
     message: "runAgent turn completed",
-    meta: { done, sawGoInward },
+    meta: { done, sawGoInward, sawQuerySession, sawBridgeManage },
   });
   return { usage: lastUsage, outcome, completion };
 }
