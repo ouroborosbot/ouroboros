@@ -1161,6 +1161,33 @@ export const baseToolDefinitions: ToolDefinition[] = [
 
 export const tools: OpenAI.ChatCompletionFunctionTool[] = baseToolDefinitions.map((d) => d.tool);
 
+export const goInwardTool: OpenAI.ChatCompletionFunctionTool = {
+  type: "function",
+  function: {
+    name: "go_inward",
+    description: "i need to think about this privately. this takes the current thread inward -- i'll sit with it, work through it, or carry it to where it needs to go. must be the only tool call in the turn.",
+    parameters: {
+      type: "object",
+      properties: {
+        content: {
+          type: "string",
+          description: "what i need to think about -- the question, the thread, the thing that needs private attention",
+        },
+        answer: {
+          type: "string",
+          description: "if i want to say something outward before going inward -- an acknowledgment, a 'let me think about that', whatever feels right",
+        },
+        mode: {
+          type: "string",
+          enum: ["reflect", "plan", "relay"],
+          description: "reflect: something to sit with. plan: something to work through. relay: something to carry across.",
+        },
+      },
+      required: ["content"],
+    },
+  },
+};
+
 export const noResponseTool: OpenAI.ChatCompletionFunctionTool = {
   type: "function",
   function: {
