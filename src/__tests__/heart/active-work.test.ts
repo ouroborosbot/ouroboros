@@ -932,7 +932,7 @@ describe("active work frame", () => {
     })).toContain("relates to bridge bridge-1")
   })
 
-  it("refuses to auto-suggest when more than one non-blocked cross-relationship target candidate is live", async () => {
+  it("suggests bridge when multiple non-blocked cross-relationship target candidates are live (picks freshest)", async () => {
     const { buildActiveWorkFrame } = await import("../../heart/active-work")
 
     const frame = buildActiveWorkFrame({
@@ -1011,7 +1011,8 @@ describe("active work frame", () => {
       ],
     } as any)
 
-    expect(frame.bridgeSuggestion).toBeNull()
+    expect(frame.bridgeSuggestion).not.toBeNull()
+    expect(frame.bridgeSuggestion!.kind).toBe("begin-new")
   })
 
   it("ignores blocked and non-friend-facing candidates when evaluating bridge suggestions", async () => {

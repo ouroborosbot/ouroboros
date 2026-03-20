@@ -127,7 +127,7 @@ export function suggestBridgeForActiveWork(input: BridgeSuggestionInput): Bridge
     .sort((a, b) => {
       return b.lastActivityMs - a.lastActivityMs
     })
-  if (!hasSharedObligationPressure(input) || targetCandidates.length !== 1) {
+  if (!hasSharedObligationPressure(input) || targetCandidates.length === 0) {
     return null
   }
   const targetSession = targetCandidates[0]

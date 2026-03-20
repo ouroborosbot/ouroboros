@@ -83,6 +83,7 @@ vi.mock("../../heart/session-activity", () => ({
 vi.mock("../../heart/bridges/manager", () => ({
   createBridgeManager: () => ({
     getBridge: (...args: any[]) => mockGetBridge(...args),
+    findBridgesForSession: () => [],
   }),
 }))
 
