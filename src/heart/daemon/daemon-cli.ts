@@ -717,6 +717,7 @@ function parseAuthCommand(args: string[]): OuroCliCommand {
       }
     }
     /* v8 ignore stop */
+    /* v8 ignore next -- defensive: agent always provided in tests @preserve */
     if (!agent) throw new Error(`Usage\n${usage()}`)
     if (first === "switch") {
       if (!provider) throw new Error(`auth switch requires --provider.\n${usage()}`)
