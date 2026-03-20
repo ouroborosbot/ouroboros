@@ -343,6 +343,7 @@ async function routeDelegatedCompletion(
         channel: delegatedFrom.channel,
         key: delegatedFrom.key,
       })
+      /* v8 ignore next 2 -- obligation fulfillment tested via obligations.test.ts; integration requires real disk state @preserve */
       if (pending) {
         fulfillObligation(agentRoot, pending.id)
       }
