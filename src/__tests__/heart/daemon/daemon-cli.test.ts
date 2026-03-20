@@ -5357,6 +5357,40 @@ describe("ouro changelog command", () => {
   })
 })
 
+describe("ouro config model", () => {
+  it("parses config model command", () => {
+    expect(parseOuroCommand(["config", "model", "--agent", "slugger", "gpt-5"])).toEqual({
+      kind: "config.model",
+      agent: "slugger",
+      modelName: "gpt-5",
+    })
+  })
+
+  it("rejects config model without --agent", () => {
+    expect(() => parseOuroCommand(["config", "model", "gpt-5"])).toThrow("--agent")
+  })
+
+  it("rejects config model without model name", () => {
+    expect(() => parseOuroCommand(["config", "model", "--agent", "slugger"])).toThrow("Usage")
+  })
+
+  it("rejects config without subcommand", () => {
+    expect(() => parseOuroCommand(["config"])).toThrow("Usage")
+  })
+
+  it("rejects config with unknown subcommand", () => {
+    expect(() => parseOuroCommand(["config", "unknown"])).toThrow("Usage")
+  })
+
+  it("parses config model with model name after --agent flag", () => {
+    expect(parseOuroCommand(["config", "model", "--agent", "ouro", "claude-sonnet-4.6"])).toEqual({
+      kind: "config.model",
+      agent: "ouro",
+      modelName: "claude-sonnet-4.6",
+    })
+  })
+})
+
 describe("OURO_CLI_TRUST_MANIFEST", () => {
   it("exports trust manifest with expected entries", async () => {
     const { OURO_CLI_TRUST_MANIFEST } = await import("../../../repertoire/guardrails")
@@ -5365,5 +5399,6 @@ describe("OURO_CLI_TRUST_MANIFEST", () => {
     expect(OURO_CLI_TRUST_MANIFEST["task board"]).toBe("friend")
     expect(OURO_CLI_TRUST_MANIFEST["friend list"]).toBe("friend")
     expect(OURO_CLI_TRUST_MANIFEST["session list"]).toBe("acquaintance")
+    expect(OURO_CLI_TRUST_MANIFEST["config model"]).toBe("friend")
   })
 })

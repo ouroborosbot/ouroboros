@@ -45,6 +45,7 @@ import {
   readAgentConfigForAgent,
   runRuntimeAuthFlow as defaultRunRuntimeAuthFlow,
   writeAgentProviderSelection,
+  writeAgentModel,
   type RuntimeAuthInput,
   type RuntimeAuthResult,
 } from "./auth-flow"
@@ -79,6 +80,7 @@ export type OuroCliCommand =
   | { kind: "changelog"; from?: string; agent?: string }
   | { kind: "mcp.list" }
   | { kind: "mcp.call"; server: string; tool: string; args?: string }
+  | { kind: "config.model"; agent: string; modelName: string }
   | { kind: "hatch.start"; agentName?: string; humanName?: string; provider?: AgentProvider; credentials?: HatchCredentialsInput; migrationPath?: string }
 
 export interface OuroCliDeps {
@@ -370,6 +372,7 @@ function usage(): string {
     "  ouro [up]",
     "  ouro stop|down|status|logs|hatch",
     "  ouro -v|--version",
+    "  ouro config model --agent <name> <model-name>",
     "  ouro auth --agent <name> [--provider <provider>]",
     "  ouro auth verify --agent <name> [--provider <provider>]",
     "  ouro auth switch --agent <name> --provider <provider>",
@@ -873,6 +876,21 @@ function parseFriendCommand(args: string[]): OuroCliCommand {
   throw new Error(`Usage\n${usage()}`)
 }
 
+function parseConfigCommand(args: string[]): OuroCliCommand {
+  const { agent, rest: cleaned } = extractAgentFlag(args)
+  const [sub, ...rest] = cleaned
+  if (!sub) throw new Error(`Usage\n${usage()}`)
+
+  if (sub === "model") {
+    if (!agent) throw new Error("--agent is required for config model")
+    const modelName = rest[0]
+    if (!modelName) throw new Error(`Usage: ouro config model --agent <name> <model-name>`)
+    return { kind: "config.model", agent, modelName }
+  }
+
+  throw new Error(`Usage\n${usage()}`)
+}
+
 function parseMcpCommand(args: string[]): OuroCliCommand {
   const [sub, ...rest] = args
   if (!sub) throw new Error(`Usage\n${usage()}`)
@@ -910,6 +928,7 @@ export function parseOuroCommand(args: string[]): OuroCliCommand {
   if (head === "task") return parseTaskCommand(args.slice(1))
   if (head === "reminder") return parseReminderCommand(args.slice(1))
   if (head === "friend") return parseFriendCommand(args.slice(1))
+  if (head === "config") return parseConfigCommand(args.slice(1))
   if (head === "mcp") return parseMcpCommand(args.slice(1))
   if (head === "whoami") {
     const { agent } = extractAgentFlag(args.slice(1))
@@ -1924,6 +1943,16 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     return message
   }
   /* v8 ignore stop */
+
+  // ── config model (local, no daemon socket needed) ──
+  if (command.kind === "config.model") {
+    const { provider, previousModel } = writeAgentModel(command.agent, command.modelName)
+    const message = previousModel
+      ? `updated ${command.agent} model on ${provider}: ${previousModel} → ${command.modelName}`
+      : `set ${command.agent} model on ${provider}: ${command.modelName}`
+    deps.writeStdout(message)
+    return message
+  }
 
   // ── whoami (local, no daemon socket needed) ──
   if (command.kind === "whoami") {

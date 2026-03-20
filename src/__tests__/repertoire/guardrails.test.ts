@@ -683,6 +683,35 @@ describe("guardInvocation — trust-level guardrails", () => {
   })
 })
 
+describe("OURO_CLI_TRUST_MANIFEST — config model", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it("includes 'config model' at friend level", async () => {
+    const { OURO_CLI_TRUST_MANIFEST } = await import("../../repertoire/guardrails")
+    expect(OURO_CLI_TRUST_MANIFEST["config model"]).toBe("friend")
+  })
+
+  it("friend: ouro config model allowed", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ouro config model --agent foo claude-sonnet-4.6" }, {
+      readPaths: new Set(),
+      trustLevel: "friend",
+    })
+    expect(result.allowed).toBe(true)
+  })
+
+  it("acquaintance: ouro config model denied", async () => {
+    const { guardInvocation } = await import("../../repertoire/guardrails")
+    const result = guardInvocation("shell", { command: "ouro config model --agent foo gpt-5" }, {
+      readPaths: new Set(),
+      trustLevel: "acquaintance",
+    })
+    expect(result.allowed).toBe(false)
+  })
+})
+
 describe("OURO_CLI_TRUST_MANIFEST — MCP entries", () => {
   beforeEach(() => {
     vi.resetModules()
