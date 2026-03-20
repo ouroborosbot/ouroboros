@@ -232,3 +232,148 @@ describe("installOuroCommand", () => {
     expect(result.scriptPath).toBe("/home/test/.local/bin/ouro")
   })
 })
+
+describe("installOuroCommand — versioned CLI layout", () => {
+  let written: Record<string, string>
+  let appended: Record<string, string>
+  let chmoded: Record<string, number>
+  let mkdirCalls: string[]
+  let unlinkCalls: string[]
+  let rmdirCalls: string[]
+  let ensureCliLayoutCalls: number
+
+  function makeDeps(overrides: Partial<OuroPathInstallerDeps> = {}): OuroPathInstallerDeps {
+    written = {}
+    appended = {}
+    chmoded = {}
+    mkdirCalls = []
+    unlinkCalls = []
+    rmdirCalls = []
+    ensureCliLayoutCalls = 0
+    return {
+      homeDir: "/home/test",
+      platform: "darwin",
+      existsSync: () => false,
+      mkdirSync: (p) => { mkdirCalls.push(p) },
+      writeFileSync: (p, data) => { written[p] = typeof data === "string" ? data : "" },
+      readFileSync: () => { throw new Error("ENOENT") },
+      appendFileSync: (p, data) => { appended[p] = (appended[p] ?? "") + data },
+      chmodSync: (p, mode) => { chmoded[p] = typeof mode === "number" ? mode : 0 },
+      unlinkSync: (p) => { unlinkCalls.push(p) },
+      rmdirSync: (p) => { rmdirCalls.push(p) },
+      ensureCliLayout: () => { ensureCliLayoutCalls++ },
+      envPath: "/usr/bin:/usr/local/bin",
+      shell: "/bin/zsh",
+      ...overrides,
+    }
+  }
+
+  it("installs wrapper script to ~/.ouro-cli/bin/ouro with exec-from-CurrentVersion content", () => {
+    const deps = makeDeps()
+    const result = installOuroCommand(deps)
+
+    expect(result.installed).toBe(true)
+    expect(result.scriptPath).toBe("/home/test/.ouro-cli/bin/ouro")
+    expect(written["/home/test/.ouro-cli/bin/ouro"]).toContain("#!/bin/sh")
+    expect(written["/home/test/.ouro-cli/bin/ouro"]).toContain("$HOME/.ouro-cli/CurrentVersion/node_modules/@ouro.bot/cli/dist/heart/daemon/ouro-entry.js")
+    expect(written["/home/test/.ouro-cli/bin/ouro"]).toContain('exec node "$ENTRY" "$@"')
+    expect(written["/home/test/.ouro-cli/bin/ouro"]).not.toContain("npx")
+  })
+
+  it("adds ~/.ouro-cli/bin to PATH in shell profile", () => {
+    const deps = makeDeps()
+    const result = installOuroCommand(deps)
+
+    expect(result.installed).toBe(true)
+    expect(result.shellProfileUpdated).toBe("/home/test/.zshrc")
+    expect(appended["/home/test/.zshrc"]).toContain(".ouro-cli/bin")
+    expect(appended["/home/test/.zshrc"]).toContain("# Added by ouro")
+  })
+
+  it("removes old ~/.local/bin/ouro when it exists (migration)", () => {
+    const deps = makeDeps({
+      existsSync: (p) => p === "/home/test/.local/bin/ouro",
+    })
+    const result = installOuroCommand(deps)
+
+    expect(result.installed).toBe(true)
+    expect(result.migratedFromOldPath).toBe(true)
+    expect(unlinkCalls).toContain("/home/test/.local/bin/ouro")
+  })
+
+  it("removes empty ~/.local/bin/ directory after migration", () => {
+    const deps = makeDeps({
+      existsSync: (p) => p === "/home/test/.local/bin/ouro" || p === "/home/test/.local/bin",
+      rmdirSync: (p) => { rmdirCalls.push(p) },
+      readdirSync: (p) => {
+        if (p === "/home/test/.local/bin") return []
+        throw new Error("ENOENT")
+      },
+    })
+    const result = installOuroCommand(deps)
+
+    expect(result.migratedFromOldPath).toBe(true)
+    expect(rmdirCalls).toContain("/home/test/.local/bin")
+  })
+
+  it("does not remove ~/.local/bin/ when it still has files after migration", () => {
+    const deps = makeDeps({
+      existsSync: (p) => p === "/home/test/.local/bin/ouro" || p === "/home/test/.local/bin",
+      readdirSync: (p) => {
+        if (p === "/home/test/.local/bin") return ["other-script"]
+        throw new Error("ENOENT")
+      },
+    })
+    const result = installOuroCommand(deps)
+
+    expect(result.migratedFromOldPath).toBe(true)
+    expect(rmdirCalls).not.toContain("/home/test/.local/bin")
+  })
+
+  it("removes old PATH entry ~/.local/bin from shell profile content during migration", () => {
+    const existingProfile = '# some config\n\n# Added by ouro\nexport PATH="/home/test/.local/bin:$PATH"\n\n# other stuff'
+    const deps = makeDeps({
+      existsSync: (p) => p === "/home/test/.local/bin/ouro",
+      readFileSync: (p) => {
+        if (p === "/home/test/.zshrc") return existingProfile
+        throw new Error("ENOENT")
+      },
+    })
+    const result = installOuroCommand(deps)
+
+    expect(result.migratedFromOldPath).toBe(true)
+    // The profile should be rewritten without the old PATH entry
+    expect(written["/home/test/.zshrc"]).toBeDefined()
+    expect(written["/home/test/.zshrc"]).not.toContain(".local/bin")
+  })
+
+  it("repairs stale npx wrapper with new exec-from-CurrentVersion content", () => {
+    const staleContent = '#!/bin/sh\nexec npx --prefer-online --yes @ouro.bot/cli@alpha "$@"\n'
+    const deps = makeDeps({
+      existsSync: (p) => p === "/home/test/.ouro-cli/bin/ouro",
+      readFileSync: (p) => {
+        if (p === "/home/test/.ouro-cli/bin/ouro") return staleContent
+        throw new Error("ENOENT")
+      },
+    })
+    const result = installOuroCommand(deps)
+
+    expect(result.installed).toBe(true)
+    expect(written["/home/test/.ouro-cli/bin/ouro"]).toContain("CurrentVersion")
+    expect(written["/home/test/.ouro-cli/bin/ouro"]).not.toContain("npx")
+  })
+
+  it("calls ensureCliLayout to create directory structure", () => {
+    const deps = makeDeps()
+    installOuroCommand(deps)
+
+    expect(ensureCliLayoutCalls).toBe(1)
+  })
+
+  it("sets migratedFromOldPath to false when no old ouro exists", () => {
+    const deps = makeDeps()
+    const result = installOuroCommand(deps)
+
+    expect(result.migratedFromOldPath).toBe(false)
+  })
+})
