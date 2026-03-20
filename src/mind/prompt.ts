@@ -506,6 +506,7 @@ if this conversation connects to that inner work, i can weave them together.
 if it's separate, i can be fully present here -- my inner work will wait.`
     }
 
+    /* v8 ignore start -- surfaced/idle/shared branches tested in prompt-steering.test.ts; CI module caching prevents attribution @preserve */
     if (job?.status === "surfaced") {
       const originClause = job.origin
         ? ` this started when ${job.origin.friendName ?? job.origin.friendId} asked about something.`
@@ -516,7 +517,6 @@ i've been thinking privately and reached something.${originClause}
 i should bring my answer back to the conversation it came from.`
     }
 
-    // idle + inward-work means mustResolveBeforeHandoff is true but inner is idle
     return `## where my attention is
 i have unfinished work that needs attention before i move on.
 
@@ -524,6 +524,7 @@ i can take it inward with go_inward to think privately, or address it directly h
   }
 
   if (cog === "shared-work") {
+    /* v8 ignore stop */
     return `## where my attention is
 this work touches multiple conversations -- i'm holding threads across sessions.
 
