@@ -35,31 +35,38 @@ describe("installOuroCommand", () => {
     vi.clearAllMocks()
   })
 
-  it("installs ouro wrapper script to ~/.local/bin/ouro", () => {
+  it("installs ouro wrapper script to ~/.ouro-cli/bin/ouro", () => {
     const deps = makeDeps()
     const result = installOuroCommand(deps)
 
     expect(result.installed).toBe(true)
-    expect(result.scriptPath).toBe("/home/test/.local/bin/ouro")
-    expect(written["/home/test/.local/bin/ouro"]).toContain("#!/bin/sh")
-    expect(written["/home/test/.local/bin/ouro"]).toContain('exec npx --prefer-online --yes @ouro.bot/cli@alpha "$@"')
-    expect(written["/home/test/.local/bin/ouro"]).not.toContain('exec npx --yes ouro.bot "$@"')
-    expect(chmoded["/home/test/.local/bin/ouro"]).toBe(0o755)
-    expect(mkdirCalls).toContain("/home/test/.local/bin")
+    expect(result.scriptPath).toBe("/home/test/.ouro-cli/bin/ouro")
+    expect(written["/home/test/.ouro-cli/bin/ouro"]).toContain("#!/bin/sh")
+    expect(written["/home/test/.ouro-cli/bin/ouro"]).toContain('exec node "$ENTRY" "$@"')
+    expect(written["/home/test/.ouro-cli/bin/ouro"]).toContain("CurrentVersion")
+    expect(chmoded["/home/test/.ouro-cli/bin/ouro"]).toBe(0o755)
+    expect(mkdirCalls).toContain("/home/test/.ouro-cli/bin")
   })
 
   it("makes script executable with chmod 755", () => {
     const deps = makeDeps()
     installOuroCommand(deps)
-    expect(chmoded["/home/test/.local/bin/ouro"]).toBe(0o755)
+    expect(chmoded["/home/test/.ouro-cli/bin/ouro"]).toBe(0o755)
   })
 
   it("skips if ouro script already exists with correct content", () => {
-    const correctContent = '#!/bin/sh\nexec npx --prefer-online --yes @ouro.bot/cli@alpha "$@"\n'
+    const correctContent = `#!/bin/sh
+ENTRY="$HOME/.ouro-cli/CurrentVersion/node_modules/@ouro.bot/cli/dist/heart/daemon/ouro-entry.js"
+if [ ! -e "$ENTRY" ]; then
+  echo "ouro not installed. Run: npx ouro.bot" >&2
+  exit 1
+fi
+exec node "$ENTRY" "$@"
+`
     const deps = makeDeps({
-      existsSync: (p) => p === "/home/test/.local/bin/ouro",
+      existsSync: (p) => p === "/home/test/.ouro-cli/bin/ouro",
       readFileSync: (p) => {
-        if (p === "/home/test/.local/bin/ouro") return correctContent
+        if (p === "/home/test/.ouro-cli/bin/ouro") return correctContent
         throw new Error("ENOENT")
       },
     })
@@ -73,30 +80,30 @@ describe("installOuroCommand", () => {
   it("repairs ouro script when content is stale", () => {
     const staleContent = '#!/bin/sh\nexec npx --yes ouro.bot "$@"\n'
     const deps = makeDeps({
-      existsSync: (p) => p === "/home/test/.local/bin/ouro",
+      existsSync: (p) => p === "/home/test/.ouro-cli/bin/ouro",
       readFileSync: (p) => {
-        if (p === "/home/test/.local/bin/ouro") return staleContent
+        if (p === "/home/test/.ouro-cli/bin/ouro") return staleContent
         throw new Error("ENOENT")
       },
     })
     const result = installOuroCommand(deps)
 
     expect(result.installed).toBe(true)
-    expect(result.scriptPath).toBe("/home/test/.local/bin/ouro")
-    expect(written["/home/test/.local/bin/ouro"]).toContain('exec npx --prefer-online --yes @ouro.bot/cli@alpha "$@"')
+    expect(result.scriptPath).toBe("/home/test/.ouro-cli/bin/ouro")
+    expect(written["/home/test/.ouro-cli/bin/ouro"]).toContain('exec node "$ENTRY" "$@"')
     expect(result.skippedReason).toBeUndefined()
   })
 
   it("repairs ouro script when content read fails (treats as stale)", () => {
     const deps = makeDeps({
-      existsSync: (p) => p === "/home/test/.local/bin/ouro",
+      existsSync: (p) => p === "/home/test/.ouro-cli/bin/ouro",
       readFileSync: () => { throw new Error("EACCES") },
     })
     const result = installOuroCommand(deps)
 
     // When we can't read existing content, we should overwrite it
     expect(result.installed).toBe(true)
-    expect(written["/home/test/.local/bin/ouro"]).toContain('exec npx --prefer-online --yes @ouro.bot/cli@alpha "$@"')
+    expect(written["/home/test/.ouro-cli/bin/ouro"]).toContain('exec node "$ENTRY" "$@"')
   })
 
   it("skips on Windows", () => {
@@ -107,14 +114,14 @@ describe("installOuroCommand", () => {
     expect(result.skippedReason).toBe("windows")
   })
 
-  it("updates .zshrc when ~/.local/bin is not in PATH and shell is zsh", () => {
+  it("updates .zshrc when ~/.ouro-cli/bin is not in PATH and shell is zsh", () => {
     const deps = makeDeps({ shell: "/bin/zsh" })
     const result = installOuroCommand(deps)
 
     expect(result.installed).toBe(true)
     expect(result.shellProfileUpdated).toBe("/home/test/.zshrc")
     expect(appended["/home/test/.zshrc"]).toContain("export PATH=")
-    expect(appended["/home/test/.zshrc"]).toContain(".local/bin")
+    expect(appended["/home/test/.zshrc"]).toContain(".ouro-cli/bin")
     expect(appended["/home/test/.zshrc"]).toContain("# Added by ouro")
   })
 
@@ -134,8 +141,8 @@ describe("installOuroCommand", () => {
     expect(appended["/home/test/.config/fish/config.fish"]).toContain("set -gx PATH")
   })
 
-  it("does not update shell profile when ~/.local/bin is already in PATH", () => {
-    const deps = makeDeps({ envPath: "/usr/bin:/home/test/.local/bin" })
+  it("does not update shell profile when ~/.ouro-cli/bin is already in PATH", () => {
+    const deps = makeDeps({ envPath: "/usr/bin:/home/test/.ouro-cli/bin" })
     const result = installOuroCommand(deps)
 
     expect(result.installed).toBe(true)
@@ -146,7 +153,7 @@ describe("installOuroCommand", () => {
 
   it("does not duplicate PATH entry if shell profile already contains binDir", () => {
     const deps = makeDeps({
-      readFileSync: () => 'export PATH="/home/test/.local/bin:$PATH"',
+      readFileSync: () => 'export PATH="/home/test/.ouro-cli/bin:$PATH"',
     })
     const result = installOuroCommand(deps)
 
@@ -192,14 +199,14 @@ describe("installOuroCommand", () => {
   })
 
   it("reports pathReady correctly when already-installed and in PATH", () => {
-    const correctContent = '#!/bin/sh\nexec npx --prefer-online --yes @ouro.bot/cli@alpha "$@"\n'
+    const correctContent = `#!/bin/sh\nENTRY="$HOME/.ouro-cli/CurrentVersion/node_modules/@ouro.bot/cli/dist/heart/daemon/ouro-entry.js"\nif [ ! -e "$ENTRY" ]; then\n  echo "ouro not installed. Run: npx ouro.bot" >&2\n  exit 1\nfi\nexec node "$ENTRY" "$@"\n`
     const deps = makeDeps({
-      existsSync: (p) => p === "/home/test/.local/bin/ouro",
+      existsSync: (p) => p === "/home/test/.ouro-cli/bin/ouro",
       readFileSync: (p) => {
-        if (p === "/home/test/.local/bin/ouro") return correctContent
+        if (p === "/home/test/.ouro-cli/bin/ouro") return correctContent
         throw new Error("ENOENT")
       },
-      envPath: "/usr/bin:/home/test/.local/bin",
+      envPath: "/usr/bin:/home/test/.ouro-cli/bin",
     })
     const result = installOuroCommand(deps)
 
@@ -209,11 +216,11 @@ describe("installOuroCommand", () => {
   })
 
   it("reports pathReady false when already-installed but not in PATH", () => {
-    const correctContent = '#!/bin/sh\nexec npx --prefer-online --yes @ouro.bot/cli@alpha "$@"\n'
+    const correctContent = `#!/bin/sh\nENTRY="$HOME/.ouro-cli/CurrentVersion/node_modules/@ouro.bot/cli/dist/heart/daemon/ouro-entry.js"\nif [ ! -e "$ENTRY" ]; then\n  echo "ouro not installed. Run: npx ouro.bot" >&2\n  exit 1\nfi\nexec node "$ENTRY" "$@"\n`
     const deps = makeDeps({
-      existsSync: (p) => p === "/home/test/.local/bin/ouro",
+      existsSync: (p) => p === "/home/test/.ouro-cli/bin/ouro",
       readFileSync: (p) => {
-        if (p === "/home/test/.local/bin/ouro") return correctContent
+        if (p === "/home/test/.ouro-cli/bin/ouro") return correctContent
         throw new Error("ENOENT")
       },
       envPath: "/usr/bin",
@@ -229,7 +236,7 @@ describe("installOuroCommand", () => {
     const result = installOuroCommand(deps)
 
     expect(result.installed).toBe(true)
-    expect(result.scriptPath).toBe("/home/test/.local/bin/ouro")
+    expect(result.scriptPath).toBe("/home/test/.ouro-cli/bin/ouro")
   })
 })
 
@@ -277,7 +284,7 @@ describe("installOuroCommand — versioned CLI layout", () => {
     expect(written["/home/test/.ouro-cli/bin/ouro"]).toContain("#!/bin/sh")
     expect(written["/home/test/.ouro-cli/bin/ouro"]).toContain("$HOME/.ouro-cli/CurrentVersion/node_modules/@ouro.bot/cli/dist/heart/daemon/ouro-entry.js")
     expect(written["/home/test/.ouro-cli/bin/ouro"]).toContain('exec node "$ENTRY" "$@"')
-    expect(written["/home/test/.ouro-cli/bin/ouro"]).not.toContain("npx")
+    expect(written["/home/test/.ouro-cli/bin/ouro"]).not.toContain("exec npx")
   })
 
   it("adds ~/.ouro-cli/bin to PATH in shell profile", () => {
@@ -360,7 +367,7 @@ describe("installOuroCommand — versioned CLI layout", () => {
 
     expect(result.installed).toBe(true)
     expect(written["/home/test/.ouro-cli/bin/ouro"]).toContain("CurrentVersion")
-    expect(written["/home/test/.ouro-cli/bin/ouro"]).not.toContain("npx")
+    expect(written["/home/test/.ouro-cli/bin/ouro"]).not.toContain("exec npx")
   })
 
   it("calls ensureCliLayout to create directory structure", () => {
