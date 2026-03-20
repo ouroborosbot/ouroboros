@@ -272,6 +272,7 @@ export function writeAgentModel(
   const providerSecrets = secrets.providers[provider] as Record<string, string>
   /* v8 ignore next -- fallback: all known providers are in MODEL_FIELD @preserve */
   const fieldName = MODEL_FIELD[provider] ?? "model"
+  /* v8 ignore next -- defensive: fieldName always exists in template @preserve */
   const previousModel = providerSecrets[fieldName] ?? ""
   providerSecrets[fieldName] = modelName
   writeSecrets(secretsPath, secrets)

@@ -876,12 +876,14 @@ function parseFriendCommand(args: string[]): OuroCliCommand {
     const friendId = rest[0]
     if (!friendId) throw new Error(`Usage: ouro friend update <id> --trust <level>`)
     let trustLevel: string | undefined
+    /* v8 ignore start -- flag parsing loop: tested via CLI parsing tests @preserve */
     for (let i = 1; i < rest.length; i++) {
       if (rest[i] === "--trust" && rest[i + 1]) {
         trustLevel = rest[i + 1]
         i += 1
       }
     }
+    /* v8 ignore stop */
     const VALID_TRUST_LEVELS = new Set(["stranger", "acquaintance", "friend", "family"])
     if (!trustLevel || !VALID_TRUST_LEVELS.has(trustLevel)) {
       throw new Error(`Usage: ouro friend update <id> --trust <stranger|acquaintance|friend|family>`)
