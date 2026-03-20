@@ -1354,4 +1354,81 @@ describe("delegation router", () => {
       outwardClosureRequired: false,
     })
   })
+
+  it("passes through enriched inner fields (origin, contentSnippet, obligationPending) from input to frame", async () => {
+    const { buildActiveWorkFrame } = await import("../../heart/active-work")
+
+    const frame = buildActiveWorkFrame({
+      currentSession: null,
+      mustResolveBeforeHandoff: false,
+      inner: {
+        status: "running",
+        hasPending: true,
+        origin: { friendId: "friend-1", channel: "bluebubbles", key: "chat" },
+        contentSnippet: "think about penguins",
+        obligationPending: true,
+      },
+      bridges: [],
+      taskBoard: {
+        compact: "",
+        full: "",
+        byStatus: { drafting: [], processing: [], validating: [], collaborating: [], paused: [], blocked: [], done: [] },
+        actionRequired: [],
+        unresolvedDependencies: [],
+        activeSessions: [],
+        activeBridges: [],
+      },
+      friendActivity: [],
+    })
+
+    expect(frame.inner.origin).toEqual({ friendId: "friend-1", channel: "bluebubbles", key: "chat" })
+    expect(frame.inner.contentSnippet).toBe("think about penguins")
+    expect(frame.inner.obligationPending).toBe(true)
+  })
+
+  it("renders enriched inner status with origin and obligation in formatActiveWorkFrame", async () => {
+    const { formatActiveWorkFrame } = await import("../../heart/active-work")
+
+    const rendered = formatActiveWorkFrame({
+      currentSession: null,
+      currentObligation: null,
+      mustResolveBeforeHandoff: false,
+      centerOfGravity: "inward-work",
+      inner: {
+        status: "running",
+        hasPending: true,
+        origin: { friendId: "alice", channel: "bluebubbles", key: "session" },
+        contentSnippet: "what should I think about this?",
+        obligationPending: true,
+      },
+      bridges: [],
+      taskPressure: { compactBoard: "", liveTaskNames: [], activeBridges: [] },
+      friendActivity: { freshestForCurrentFriend: null, otherLiveSessionsForCurrentFriend: [] },
+      bridgeSuggestion: null,
+    } as any)
+
+    expect(rendered).toContain("inner status: running from alice/bluebubbles/session (return expected)")
+    expect(rendered).toContain('inner asked: "what should I think about this?"')
+  })
+
+  it("renders basic inner status without enrichment when origin is absent", async () => {
+    const { formatActiveWorkFrame } = await import("../../heart/active-work")
+
+    const rendered = formatActiveWorkFrame({
+      currentSession: null,
+      currentObligation: null,
+      mustResolveBeforeHandoff: false,
+      centerOfGravity: "local-turn",
+      inner: { status: "idle", hasPending: false },
+      bridges: [],
+      taskPressure: { compactBoard: "", liveTaskNames: [], activeBridges: [] },
+      friendActivity: { freshestForCurrentFriend: null, otherLiveSessionsForCurrentFriend: [] },
+      bridgeSuggestion: null,
+    } as any)
+
+    expect(rendered).toContain("inner status: idle")
+    expect(rendered).not.toContain("from ")
+    expect(rendered).not.toContain("return expected")
+    expect(rendered).not.toContain("inner asked:")
+  })
 })
