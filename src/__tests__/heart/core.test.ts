@@ -8453,4 +8453,41 @@ describe("getFinalAnswerRetryError delegation adherence", () => {
     expect(result).not.toContain("rejected")
     expect(result).not.toContain("invalid")
   })
+
+  it("falls through to default error when delegationDecision is undefined", async () => {
+    const { getFinalAnswerRetryError } = await import("../../heart/core")
+    const result = getFinalAnswerRetryError(false, undefined, false, undefined, false)
+    expect(result).toContain("incomplete or malformed")
+  })
+
+  it("falls through to default error when sawSendMessageSelf is undefined", async () => {
+    const { getFinalAnswerRetryError } = await import("../../heart/core")
+    const result = getFinalAnswerRetryError(false, undefined, false, undefined, undefined)
+    expect(result).toContain("incomplete or malformed")
+  })
+
+  it("does NOT fire delegation adherence when fast-path with send_message(self) called", async () => {
+    const { getFinalAnswerRetryError } = await import("../../heart/core")
+    const result = getFinalAnswerRetryError(
+      false,
+      undefined,
+      false,
+      { target: "fast-path", reasons: [], outwardClosureRequired: false },
+      true,
+    )
+    expect(result).not.toContain("you mentioned going inward")
+    expect(result).toContain("incomplete or malformed")
+  })
+
+  it("delegation adherence takes priority over mustResolveBeforeHandoff", async () => {
+    const { getFinalAnswerRetryError } = await import("../../heart/core")
+    const result = getFinalAnswerRetryError(
+      true,
+      undefined,
+      false,
+      { target: "delegate-inward", reasons: ["explicit_reflection"], outwardClosureRequired: true },
+      false,
+    )
+    expect(result).toContain("you mentioned going inward")
+  })
 })
