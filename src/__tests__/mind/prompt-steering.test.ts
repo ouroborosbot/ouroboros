@@ -117,6 +117,42 @@ describe("centerOfGravitySteeringSection", () => {
     expect(result).toContain("bring my answer back")
   })
 
+  it("returns steering for inward-work with queued job and no origin", () => {
+    const frame = makeMinimalFrame({
+      centerOfGravity: "inward-work",
+      inner: {
+        status: "idle",
+        hasPending: true,
+        job: makeIdleJob({
+          status: "queued",
+          origin: null,
+          obligationStatus: null,
+        }),
+      },
+    })
+    const result = centerOfGravitySteeringSection("cli", { activeWorkFrame: frame })
+    expect(result).toContain("thinking through something privately")
+    expect(result).not.toContain("asked about something")
+    expect(result).not.toContain("owe them")
+  })
+
+  it("returns steering for inward-work with surfaced job and no origin", () => {
+    const frame = makeMinimalFrame({
+      centerOfGravity: "inward-work",
+      inner: {
+        status: "idle",
+        hasPending: false,
+        job: makeIdleJob({
+          status: "surfaced",
+          origin: null,
+        }),
+      },
+    })
+    const result = centerOfGravitySteeringSection("cli", { activeWorkFrame: frame })
+    expect(result).toContain("been thinking privately and reached something")
+    expect(result).not.toContain("this started when")
+  })
+
   it("returns steering for inward-work with idle job (mustResolveBeforeHandoff)", () => {
     const frame = makeMinimalFrame({
       centerOfGravity: "inward-work",

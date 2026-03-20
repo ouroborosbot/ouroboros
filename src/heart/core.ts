@@ -885,8 +885,9 @@ export async function runAgent(
           if (tc.name === "send_message" && args.friendId === "self") {
             sawSendMessageSelf = true;
           }
-          /* v8 ignore next 2 -- flags tested via truth-check integration tests @preserve */
+          /* v8 ignore next -- flag tested via truth-check integration tests @preserve */
           if (tc.name === "query_session") sawQuerySession = true;
+          /* v8 ignore next -- flag tested via truth-check integration tests @preserve */
           if (tc.name === "bridge_manage") sawBridgeManage = true;
           const argSummary = summarizeArgs(tc.name, args);
           // Confirmation check for mutate tools
