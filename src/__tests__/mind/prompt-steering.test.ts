@@ -221,3 +221,29 @@ describe("centerOfGravitySteeringSection", () => {
     expect(emitNervesEvent).toBeDefined()
   })
 })
+
+describe("obligation steering helpers", () => {
+  it("returns null when no frame is available", async () => {
+    const { findActivePersistentObligation } = await import("../../mind/obligation-steering")
+    expect(findActivePersistentObligation(undefined)).toBeNull()
+  })
+
+  it("returns an empty string when no obligation is active", async () => {
+    const { renderActiveObligationSteering } = await import("../../mind/obligation-steering")
+    expect(renderActiveObligationSteering(null)).toBe("")
+  })
+
+  it("renders active obligation steering even when the work surface is unknown", async () => {
+    const { renderActiveObligationSteering } = await import("../../mind/obligation-steering")
+    const result = renderActiveObligationSteering({
+      id: "ob-1",
+      origin: { friendId: "alex", channel: "bluebubbles", key: "chat" },
+      content: "finish the return loop",
+      status: "waiting_for_merge",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:01:00Z",
+    })
+    expect(result).toContain("already working on something i owe alex")
+    expect(result).not.toContain("right now that work is happening in")
+  })
+})

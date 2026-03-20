@@ -168,6 +168,19 @@ describe("obligations store", () => {
       expect(all[0].latestNote).toBe("checks green, ready to merge")
       expect(all[0].updatedAt).toBeTruthy()
     })
+
+    it("can update note without changing status or surface", () => {
+      const ob = createObligation(tmpDir, { origin: sampleOrigin, content: "keep Ari posted" })
+      advanceObligation(tmpDir, ob.id, {
+        latestNote: "still tracing the issue",
+      })
+
+      const all = readObligations(tmpDir)
+      expect(all[0].status).toBe("pending")
+      expect(all[0].currentSurface).toBeUndefined()
+      expect(all[0].latestNote).toBe("still tracing the issue")
+      expect(all[0].updatedAt).toBeTruthy()
+    })
   })
 
   describe("findPendingObligationForOrigin", () => {

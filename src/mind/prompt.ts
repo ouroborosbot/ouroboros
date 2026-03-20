@@ -17,6 +17,7 @@ import { listSessionActivity, type SessionActivityQuery } from "../heart/session
 import { formatActiveWorkFrame, type ActiveWorkFrame } from "../heart/active-work";
 import type { DelegationDecision } from "../heart/delegation";
 import { deriveCommitments } from "../heart/commitments";
+import { findActivePersistentObligation, renderActiveObligationSteering } from "./obligation-steering";
 
 // Lazy-loaded psyche text cache
 let _psycheCache: {
@@ -492,18 +493,11 @@ export function centerOfGravitySteeringSection(channel: Channel, options?: Build
   if (cog === "local-turn") return ""
 
   const job = frame.inner?.job
-  const activeObligation = (frame.pendingObligations ?? []).find((ob) => ob.status !== "pending" && ob.status !== "fulfilled")
+  const activeObligation = findActivePersistentObligation(frame)
 
   if (cog === "inward-work") {
     if (activeObligation) {
-      const name = activeObligation.origin.friendId
-      const surfaceLine = activeObligation.currentSurface?.label
-        ? `\nright now that work is happening in ${activeObligation.currentSurface.label}.`
-        : ""
-      return `## where my attention is
-i'm already working on something i owe ${name}.${surfaceLine}
-
-i should close that loop before i act like this is a fresh blank turn.`
+      return renderActiveObligationSteering(activeObligation)
     }
 
     if (job?.status === "queued" || job?.status === "running") {
