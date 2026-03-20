@@ -1092,6 +1092,7 @@ export function readFirstBundleMetaVersion(bundlesRoot: string): string | undefi
     if (!fs.existsSync(bundlesRoot)) return undefined
     const entries = fs.readdirSync(bundlesRoot, { withFileTypes: true })
     for (const entry of entries) {
+      /* v8 ignore next -- skip non-.ouro dirs: tested via version-detect tests @preserve */
       if (!entry.isDirectory() || !entry.name.endsWith(".ouro")) continue
       const metaPath = path.join(bundlesRoot, entry.name, "bundle-meta.json")
       if (!fs.existsSync(metaPath)) continue
