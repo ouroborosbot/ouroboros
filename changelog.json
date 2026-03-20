@@ -2,6 +2,17 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.78",
+      "changes": [
+        "New: Versioned CLI directory layout (~/.ouro-cli/) replaces npx-based ouro wrapper. Explicit version management, rollback support, and deterministic updates.",
+        "New: `ouro up` now checks the registry for newer CLI versions, installs them into ~/.ouro-cli/versions/, activates via symlink flip, and re-execs — no more silent npx downloads.",
+        "New: `ouro rollback [<version>]` swaps CurrentVersion/previous symlinks, stops the daemon. With a version arg, installs if needed then activates.",
+        "New: `ouro versions` lists cached CLI versions with * current and (previous) markers.",
+        "Migration: On first run, old ~/.local/bin/ouro wrapper is removed, old PATH entry cleaned from shell profile, new ~/.ouro-cli/bin added to PATH.",
+        "Trust manifest: rollback requires family trust, versions requires acquaintance."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.77",
       "changes": [
         "New: Persistent obligation store (state/obligations/*.json). Obligations survive pending message consumption so the agent always knows what it owes and to whom.",
