@@ -151,3 +151,35 @@ describe("deriveCommitments", () => {
     expect(emitNervesEvent).toBeDefined()
   })
 })
+
+describe("formatCommitments", () => {
+  let formatCommitments: typeof import("../../heart/commitments").formatCommitments
+
+  beforeAll(async () => {
+    const mod = await import("../../heart/commitments")
+    formatCommitments = mod.formatCommitments
+  })
+
+  it("formats non-empty committedTo with headers", () => {
+    const result = formatCommitments({
+      committedTo: ["i told them i'd think about naming"],
+      completionCriteria: ["resolve the current thread"],
+      safeToIgnore: ["no active tasks to track"],
+    })
+    expect(result).toContain("## what i'm holding right now")
+    expect(result).toContain("- i told them i'd think about naming")
+    expect(result).toContain("## what \"done\" looks like")
+    expect(result).toContain("## what i can let go of")
+  })
+
+  it("formats empty committedTo with free-to-be-present message", () => {
+    const result = formatCommitments({
+      committedTo: [],
+      completionCriteria: ["just be present"],
+      safeToIgnore: ["no private thinking"],
+    })
+    expect(result).toContain("free to be present")
+    expect(result).not.toContain("## what i'm holding right now")
+    expect(result).toContain("## what \"done\" looks like")
+  })
+})
