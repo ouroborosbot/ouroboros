@@ -1599,7 +1599,10 @@ async function performSystemSetup(deps: OuroCliDeps): Promise<void> {
   // Install ouro command to PATH (non-blocking)
   if (deps.installOuroCommand) {
     try {
-      deps.installOuroCommand()
+      const installResult = deps.installOuroCommand()
+      if (installResult.migratedFromOldPath) {
+        deps.writeStdout("migrated ouro to ~/.ouro-cli/ — open a new terminal or run: source ~/.zshrc")
+      }
     } catch (error) {
       emitNervesEvent({
         level: "warn",
