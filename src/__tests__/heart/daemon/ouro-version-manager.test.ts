@@ -198,4 +198,42 @@ describe("ouro-version-manager", () => {
       expect(mkdirCalls).toContainEqual({ path: "/Users/test/.ouro-cli/versions", options: { recursive: true } })
     })
   })
+
+  describe("bootstrapCliLayout (integration)", () => {
+    it("creates layout, installs version, and activates it", async () => {
+      const { ensureLayout, installVersion, activateVersion } = await import("../../../heart/daemon/ouro-version-manager")
+      const mkdirCalls: string[] = []
+      const symlinkCalls: Array<{ target: string; path: string }> = []
+
+      const sharedDeps = {
+        homeDir: "/Users/test",
+        mkdirSync: vi.fn().mockImplementation((p: string) => { mkdirCalls.push(p) }),
+        execSync: vi.fn(),
+        readlinkSync: vi.fn().mockImplementation(() => { throw new Error("ENOENT") }),
+        unlinkSync: vi.fn(),
+        symlinkSync: vi.fn().mockImplementation((target: string, p: string) => { symlinkCalls.push({ target, path: p }) }),
+        existsSync: vi.fn().mockReturnValue(false),
+      }
+
+      // 1. Create layout
+      ensureLayout(sharedDeps)
+      expect(mkdirCalls).toContain("/Users/test/.ouro-cli")
+      expect(mkdirCalls).toContain("/Users/test/.ouro-cli/bin")
+      expect(mkdirCalls).toContain("/Users/test/.ouro-cli/versions")
+
+      // 2. Install version
+      installVersion("0.1.0-alpha.80", sharedDeps)
+      expect(sharedDeps.execSync).toHaveBeenCalledWith(
+        expect.stringContaining("npm install --prefix"),
+        expect.anything(),
+      )
+
+      // 3. Activate version
+      activateVersion("0.1.0-alpha.80", sharedDeps)
+      expect(symlinkCalls).toContainEqual({
+        target: "/Users/test/.ouro-cli/versions/0.1.0-alpha.80",
+        path: "/Users/test/.ouro-cli/CurrentVersion",
+      })
+    })
+  })
 })
