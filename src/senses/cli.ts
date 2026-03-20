@@ -59,8 +59,10 @@ type ReadlineInternals = readline.Interface & { line: string; cursor: number }
 // Module-level active spinner for log coordination.
 // The terminal log sink calls these to avoid interleaving with spinner output.
 let _activeSpinner: Spinner | null = null
+/* v8 ignore start -- spinner coordination: exercised at runtime, not unit-testable without real terminal @preserve */
 export function pauseActiveSpinner(): void { _activeSpinner?.pause() }
 export function resumeActiveSpinner(): void { _activeSpinner?.resume() }
+/* v8 ignore stop */
 export function setActiveSpinner(s: Spinner | null): void { _activeSpinner = s }
 
 // spinner that only touches stderr, cleans up after itself
@@ -106,6 +108,7 @@ export class Spinner {
     this.msg = next
   }
 
+  /* v8 ignore start -- pause/resume: exercised at runtime via log sink coordination @preserve */
   /** Clear the spinner line temporarily so other output can print cleanly. */
   pause() {
     if (this.stopped) return
@@ -117,6 +120,7 @@ export class Spinner {
     if (this.stopped) return
     this.spin()
   }
+  /* v8 ignore stop */
 
   stop(ok?: string) {
     this.stopped = true

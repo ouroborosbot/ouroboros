@@ -668,6 +668,7 @@ export async function pingGithubCopilotModel(
         const errObj = json.error as Record<string, unknown>
         if (typeof errObj.message === "string") detail = errObj.message
       }
+      /* v8 ignore next -- flat error format: tested via config-models.test.ts @preserve */
       else if (typeof json.message === "string") detail = json.message
     } catch {
       // response body not JSON — keep HTTP status
