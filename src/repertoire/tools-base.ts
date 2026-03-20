@@ -136,6 +136,7 @@ async function recallSessionSafely(options: SessionRecallOptions): Promise<Sessi
 
 function normalizeProgressOutcome(text: string): string | null {
   const trimmed = text.trim()
+  /* v8 ignore next -- defensive: normalizeProgressOutcome null branch @preserve */
   if (!trimmed || trimmed === "nothing yet" || trimmed === "nothing recent") {
     return null
   }

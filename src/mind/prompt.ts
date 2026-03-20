@@ -530,6 +530,7 @@ this work touches multiple conversations -- i'm holding threads across sessions.
 i should keep the different sides aligned. what i learn here may matter there, and vice versa.`
   }
 
+  /* v8 ignore next -- unreachable: all center-of-gravity modes covered above @preserve */
   return ""
 }
 
