@@ -52,6 +52,7 @@ vi.mock("fs", async () => {
   return {
     ...actual,
     existsSync: mocks.existsSync,
+    readdirSync: vi.fn(() => []),
   }
 })
 
@@ -115,5 +116,18 @@ describe("ouro up runtime-version sync", () => {
     const calls = (deps.writeStdout as ReturnType<typeof vi.fn>).mock.calls.map((call) => call[0])
     expect(calls).toContain("ouro updated to 0.1.0-alpha.92 (was 0.1.0-alpha.91)")
     expect(calls).toContain("review changes with: ouro changelog --from 0.1.0-alpha.91")
+  })
+
+  it("omits changelog hint when buildChangelogCommand returns null", async () => {
+    mocks.buildChangelogCommand.mockReturnValueOnce(null)
+    const deps = makeDeps({
+      checkForCliUpdate: vi.fn(async () => ({ available: false, latestVersion: "0.1.0-alpha.92" })),
+    })
+
+    await runOuroCli(["up"], deps)
+
+    const calls = (deps.writeStdout as ReturnType<typeof vi.fn>).mock.calls.map((call) => call[0])
+    expect(calls).toContain("ouro updated to 0.1.0-alpha.92 (was 0.1.0-alpha.91)")
+    expect(calls).not.toContainEqual(expect.stringContaining("review changes with"))
   })
 })
