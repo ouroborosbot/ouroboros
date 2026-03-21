@@ -165,6 +165,27 @@ describe("coding spawner", () => {
     expect(options.env.PATH).toBe("/Users/test/.ouro-cli/bin:/usr/bin:/bin")
   })
 
+  it("handles missing PATH env var gracefully", () => {
+    const spawnFn = vi.fn(() => new FakeProcess(406))
+
+    spawnCodingProcess(
+      {
+        runner: "claude",
+        workdir: "/Users/test/AgentWorkspaces/ouroboros",
+        prompt: "check runtime",
+        taskRef: "task-path",
+      },
+      {
+        spawnFn,
+        homeDir: "/Users/test",
+        baseEnv: { HOME: "/Users/test" },
+      },
+    )
+
+    const options = spawnFn.mock.calls[0][2] as { env: NodeJS.ProcessEnv }
+    expect(options.env.PATH).toBe("/Users/test/.ouro-cli/bin")
+  })
+
   it("does not duplicate ~/.ouro-cli/bin when already present", () => {
     const spawnFn = vi.fn(() => new FakeProcess(405))
 
