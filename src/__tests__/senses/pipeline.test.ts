@@ -1025,6 +1025,7 @@ describe("handleInboundTurn", () => {
           mustResolveBeforeHandoff: true,
           lastFriendActivityAt: expect.any(String),
         }),
+        undefined,
       )
     })
 
@@ -1054,6 +1055,7 @@ describe("handleInboundTurn", () => {
         expect.objectContaining({
           lastFriendActivityAt: expect.any(String),
         }),
+        undefined,
       )
     })
 
@@ -1076,6 +1078,7 @@ describe("handleInboundTurn", () => {
           mustResolveBeforeHandoff: true,
           lastFriendActivityAt: expect.any(String),
         }),
+        undefined,
       )
     })
 
@@ -1101,6 +1104,7 @@ describe("handleInboundTurn", () => {
         usageData,
         undefined,
         { lastFriendActivityAt: "2026-03-13T20:00:00.000Z" },
+        undefined,
       )
     })
 
@@ -1119,6 +1123,7 @@ describe("handleInboundTurn", () => {
         usageData,
         undefined,
         undefined,
+        undefined,
       )
     })
 
@@ -1135,6 +1140,7 @@ describe("handleInboundTurn", () => {
         expect.any(Array),
         "/tmp/test-session.json",
         usageData,
+        undefined,
         undefined,
         undefined,
       )
@@ -1347,5 +1353,40 @@ describe("handleInboundTurn", () => {
         expect(savedState?.mustResolveBeforeHandoff).toBeUndefined()
       },
     )
+
+    it("threads session orientation through runAgent and postTurn", async () => {
+      const sessionOrientation = {
+        updatedAt: "2026-03-21T09:00:00.000Z",
+        goal: "keep the agent oriented",
+        constraints: ["keep it simple"],
+        progress: ["edit_file src/mind/prompt.ts"],
+        readFiles: ["src/mind/context.ts"],
+        modifiedFiles: ["src/mind/prompt.ts"],
+      }
+      const nextOrientation = {
+        ...sessionOrientation,
+        progress: ["edit_file src/mind/prompt.ts", "read_file src/mind/context.ts"],
+      }
+      const input = makeInput({
+        sessionLoader: {
+          loadOrCreate: vi.fn().mockResolvedValue({
+            messages: [{ role: "system", content: "You are helpful." }],
+            sessionPath: "/tmp/test-session.json",
+            sessionOrientation,
+          }),
+        },
+        postTurn: vi.fn().mockReturnValue(nextOrientation),
+      })
+
+      const result = await handleInboundTurn(input)
+
+      const runAgentCall = (input.runAgent as ReturnType<typeof vi.fn>).mock.calls[0]
+      const runOptions = runAgentCall[4] as RunAgentOptions
+      expect((runOptions as any).sessionOrientation).toEqual(sessionOrientation)
+
+      const postTurnCall = (input.postTurn as ReturnType<typeof vi.fn>).mock.calls[0]
+      expect(postTurnCall[5]).toEqual(sessionOrientation)
+      expect((result as any).sessionOrientation).toEqual(nextOrientation)
+    })
   })
 })
