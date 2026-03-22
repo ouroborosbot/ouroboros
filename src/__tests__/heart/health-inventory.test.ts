@@ -4,15 +4,6 @@ vi.mock("../../nerves/runtime", () => ({
   emitNervesEvent: vi.fn(),
 }))
 
-const mockPingProvider = vi.fn()
-vi.mock("../../heart/provider-ping", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../heart/provider-ping")>()
-  return {
-    ...actual,
-    pingProvider: (...args: any[]) => mockPingProvider(...args),
-  }
-})
-
 const mockLoadAgentSecrets = vi.fn()
 vi.mock("../../heart/daemon/auth-flow", () => ({
   loadAgentSecrets: (...args: any[]) => mockLoadAgentSecrets(...args),
@@ -21,6 +12,8 @@ vi.mock("../../heart/daemon/auth-flow", () => ({
 import { runHealthInventory } from "../../heart/provider-ping"
 
 describe("runHealthInventory", () => {
+  const mockPing = vi.fn()
+
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -37,16 +30,17 @@ describe("runHealthInventory", () => {
         },
       },
     })
-    mockPingProvider
+    mockPing
       .mockResolvedValueOnce({ ok: true }) // anthropic
-      .mockResolvedValueOnce({ ok: false, classification: "auth-failure", message: "bad token" }) // codex
+      .mockResolvedValueOnce({ ok: false, classification: "auth-failure", message: "empty" }) // minimax
+      .mockResolvedValueOnce({ ok: false, classification: "auth-failure", message: "empty" }) // azure
 
-    const result = await runHealthInventory("slugger", "openai-codex")
+    const result = await runHealthInventory("slugger", "openai-codex", { ping: mockPing })
 
-    // Should have pinged anthropic (configured) but NOT codex (current provider)
-    // minimax and azure have empty creds — pingProvider handles that (returns auth-failure)
-    expect(mockPingProvider).toHaveBeenCalled()
-    expect(result.anthropic).toBeDefined()
+    // Should have pinged anthropic, minimax, azure (not openai-codex which is current)
+    expect(mockPing).toHaveBeenCalledTimes(3)
+    expect(result.anthropic).toEqual({ ok: true })
+    expect(result["openai-codex"]).toBeUndefined()
   })
 
   it("excludes current provider from inventory", async () => {
@@ -61,17 +55,15 @@ describe("runHealthInventory", () => {
         },
       },
     })
-    mockPingProvider.mockResolvedValue({ ok: true })
+    mockPing.mockResolvedValue({ ok: true })
 
-    const result = await runHealthInventory("slugger", "anthropic")
+    const result = await runHealthInventory("slugger", "anthropic", { ping: mockPing })
 
-    // Current provider "anthropic" should NOT be in results
     expect(result["anthropic"]).toBeUndefined()
-    // openai-codex should have been pinged
     expect(result["openai-codex"]).toBeDefined()
   })
 
-  it("returns empty map when no other providers are configured", async () => {
+  it("returns results for all non-current providers even with empty creds", async () => {
     mockLoadAgentSecrets.mockReturnValue({
       secretsPath: "/mock/secrets.json",
       secrets: {
@@ -83,12 +75,11 @@ describe("runHealthInventory", () => {
         },
       },
     })
-    mockPingProvider.mockResolvedValue({ ok: false, classification: "auth-failure", message: "empty" })
+    mockPing.mockResolvedValue({ ok: false, classification: "auth-failure", message: "empty" })
 
-    const result = await runHealthInventory("slugger", "openai-codex")
+    const result = await runHealthInventory("slugger", "openai-codex", { ping: mockPing })
 
-    // anthropic, minimax, azure all have empty creds — pingProvider returns auth-failure
-    expect(Object.keys(result).length).toBeGreaterThan(0)
+    expect(Object.keys(result)).toHaveLength(3) // anthropic, minimax, azure
     for (const [, pingResult] of Object.entries(result)) {
       expect((pingResult as any).ok).toBe(false)
     }
@@ -107,14 +98,14 @@ describe("runHealthInventory", () => {
         },
       },
     })
-    mockPingProvider.mockImplementation(async (provider: string) => {
+    mockPing.mockImplementation(async (provider: string) => {
       callOrder.push(`start:${provider}`)
       await new Promise((r) => setTimeout(r, 10))
       callOrder.push(`end:${provider}`)
       return { ok: true }
     })
 
-    await runHealthInventory("slugger", "openai-codex")
+    await runHealthInventory("slugger", "openai-codex", { ping: mockPing })
 
     // Both should start before either ends (parallel)
     const anthropicStart = callOrder.indexOf("start:anthropic")

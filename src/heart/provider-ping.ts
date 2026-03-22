@@ -6,6 +6,7 @@ import type {
   MinimaxProviderConfig,
   OpenAICodexProviderConfig,
 } from "./config"
+import { loadAgentSecrets } from "./daemon/auth-flow"
 import { createAnthropicProviderRuntime } from "./providers/anthropic"
 import { createAzureProviderRuntime } from "./providers/azure"
 import { createMinimaxProviderRuntime } from "./providers/minimax"
@@ -117,4 +118,36 @@ export async function pingProvider(
     })
     return { ok: false, classification, message: err.message }
   }
+}
+
+export type HealthInventoryResult = Partial<Record<AgentProvider, PingResult>>
+
+const PINGABLE_PROVIDERS: AgentProvider[] = ["anthropic", "openai-codex", "azure", "minimax"]
+
+export interface HealthInventoryDeps {
+  ping?: typeof pingProvider
+}
+
+export async function runHealthInventory(
+  agentName: string,
+  currentProvider: AgentProvider,
+  deps: HealthInventoryDeps = {},
+): Promise<HealthInventoryResult> {
+  const ping = deps.ping ?? pingProvider
+  const { secrets } = loadAgentSecrets(agentName)
+  const providers = PINGABLE_PROVIDERS.filter((p) => p !== currentProvider)
+
+  const results = await Promise.all(
+    providers.map(async (provider) => {
+      const config = secrets.providers[provider as keyof typeof secrets.providers]
+      const result = await ping(provider, config as ProviderConfig)
+      return [provider, result] as const
+    }),
+  )
+
+  const inventory: HealthInventoryResult = {}
+  for (const [provider, result] of results) {
+    inventory[provider] = result
+  }
+  return inventory
 }
