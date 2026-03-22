@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import { getAnthropicConfig } from "../config";
+import { getAnthropicConfig, type AnthropicProviderConfig } from "../config";
 import { getAgentName, getAgentSecretsPath } from "../identity";
 import type { UsageData } from "../../mind/context";
 import { emitNervesEvent } from "../../nerves/runtime";
@@ -413,14 +413,14 @@ async function streamAnthropicMessages(
   };
 }
 
-export function createAnthropicProviderRuntime(): ProviderRuntime {
+export function createAnthropicProviderRuntime(config?: AnthropicProviderConfig): ProviderRuntime {
   emitNervesEvent({
     component: "engine",
     event: "engine.provider_init",
     message: "anthropic provider init",
     meta: { provider: "anthropic" },
   });
-  const anthropicConfig = getAnthropicConfig();
+  const anthropicConfig = config ?? getAnthropicConfig();
   if (!(anthropicConfig.model && anthropicConfig.setupToken)) {
     throw new Error(
       getAnthropicReauthGuidance(
