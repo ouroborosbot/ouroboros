@@ -5,7 +5,7 @@
 // Transport-level concerns (BB API calls, Teams cards, readline) stay in sense adapters.
 
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions"
-import type { ChannelCallbacks, CompletionMetadata, RunAgentOptions, RunAgentOutcome } from "../heart/core"
+import type { ChannelCallbacks, CompletionMetadata, ProviderErrorClassification, RunAgentOptions, RunAgentOutcome } from "../heart/core"
 import type { PostTurnHooks, SessionContinuityState, UsageData } from "../mind/context"
 import type { Channel, ChannelCapabilities, IdentityProvider, ResolvedContext } from "../mind/friends/types"
 import type { FriendStore } from "../mind/friends/store"
@@ -26,6 +26,13 @@ import { readInnerDialogRawData, deriveInnerDialogStatus, deriveInnerJob, getInn
 import { getInnerDialogPendingDir } from "../mind/pending"
 import { readPendingObligations } from "../heart/obligations"
 import type { BoardResult } from "../repertoire/tasks/types"
+import { buildFailoverContext, handleFailoverReply, type FailoverContext } from "../heart/provider-failover"
+import { runHealthInventory } from "../heart/provider-ping"
+import { writeAgentProviderSelection } from "../heart/daemon/auth-flow"
+
+export interface FailoverState {
+  pending: FailoverContext | null
+}
 
 // ── Input / Output types ──────────────────────────────────────────
 
@@ -79,7 +86,9 @@ export interface InboundTurnInput {
     channel?: Channel,
     signal?: AbortSignal,
     options?: RunAgentOptions,
-  ) => Promise<{ usage?: UsageData; outcome: RunAgentOutcome; completion?: CompletionMetadata }>
+  ) => Promise<{ usage?: UsageData; outcome: RunAgentOutcome; completion?: CompletionMetadata; error?: Error; errorClassification?: ProviderErrorClassification }>
+  /** In-memory failover state for this session. Channel owns this, pipeline reads/writes it. */
+  failoverState?: FailoverState
   postTurn: (
     messages: ChatCompletionMessageParam[],
     sessPath: string,
@@ -111,6 +120,10 @@ export interface InboundTurnResult {
   messages?: ChatCompletionMessageParam[]
   /** Pending envelopes drained at turn start, including deferred returns. */
   drainedPending?: PendingMessage[]
+  /** If set, the turn errored and this message should be shown to the user for failover. */
+  failoverMessage?: string
+  /** If set, a provider switch was executed via failover reply. */
+  switchedProvider?: string
 }
 
 function emptyTaskBoard(): BoardResult {
@@ -206,6 +219,36 @@ function readInnerWorkState(): ActiveWorkFrame["inner"] {
 // ── Pipeline ──────────────────────────────────────────────────────
 
 export async function handleInboundTurn(input: InboundTurnInput): Promise<InboundTurnResult> {
+  // Step 0: Check for pending failover reply
+  if (input.failoverState?.pending) {
+    const userText = input.messages
+      .filter((m) => m.role === "user")
+      .map((m) => typeof m.content === "string" ? m.content : "")
+      .join(" ")
+      .trim()
+    const failoverAction = handleFailoverReply(userText, input.failoverState.pending)
+    if (failoverAction.action === "switch") {
+      const agentName = input.failoverState.pending.agentName
+      writeAgentProviderSelection(agentName, failoverAction.provider)
+      input.failoverState.pending = null
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.failover_switch",
+        message: `switched provider to ${failoverAction.provider} via failover`,
+        meta: { agentName, provider: failoverAction.provider },
+      })
+      // Resolve friend to build a minimal result — the channel should show confirmation
+      const resolvedContext = await input.friendResolver.resolve()
+      return {
+        resolvedContext,
+        gateResult: { allowed: true },
+        switchedProvider: failoverAction.provider,
+      }
+    }
+    // Dismiss: clear failover and process normally
+    input.failoverState.pending = null
+  }
+
   // Step 1: Resolve friend
   const resolvedContext = await input.friendResolver.resolve()
 
@@ -424,6 +467,44 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
     input.signal,
     runAgentOptions,
   )
+
+  // Step 5b: Failover on terminal error
+  if (result.outcome === "errored" && input.failoverState) {
+    try {
+      const agentName = getAgentName()
+      const currentProvider = (await import("../heart/identity")).loadAgentConfig().provider
+      const classification = result.errorClassification ?? "unknown"
+      const inventory = await runHealthInventory(agentName, currentProvider)
+      const failoverContext = buildFailoverContext(
+        result.error?.message ?? "unknown error",
+        classification,
+        currentProvider,
+        agentName,
+        inventory,
+      )
+      input.failoverState.pending = failoverContext
+      input.postTurn(sessionMessages, session.sessionPath, result.usage)
+      return {
+        resolvedContext,
+        gateResult,
+        usage: result.usage,
+        turnOutcome: result.outcome,
+        sessionPath: session.sessionPath,
+        messages: sessionMessages,
+        drainedPending: pending,
+        failoverMessage: failoverContext.userMessage,
+      }
+    } catch (failoverError) {
+      // Failover sequence failed — fall through to normal post-turn (original error already surfaced via onError)
+      emitNervesEvent({
+        level: "warn",
+        component: "senses",
+        event: "senses.failover_error",
+        message: "failover sequence failed, falling through",
+        meta: { error: failoverError instanceof Error ? failoverError.message : String(failoverError) },
+      })
+    }
+  }
 
   // Step 6: postTurn
   const continuingState = {
