@@ -564,13 +564,35 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
     if (channelConfig.skipConfirmation) agentOptions.skipConfirmation = true
 
     // ── Call shared pipeline ──────────────────────────────────────────
+
+    // Capture terminal errors — failover message replaces the error card if it triggers
+    let capturedTerminalError: Error | null = null
+    const teamsFailoverState = (() => {
+      if (!teamsFailoverStates.has(conversationId)) {
+        teamsFailoverStates.set(conversationId, { pending: null })
+      }
+      return teamsFailoverStates.get(conversationId)!
+    })()
+    /* v8 ignore start -- failover-aware callback wrapper: tested via pipeline integration @preserve */
+    const failoverAwareCallbacks: typeof callbacks = {
+      ...callbacks,
+      onError: (error: Error, severity: "transient" | "terminal") => {
+        if (severity === "terminal" && teamsFailoverState) {
+          capturedTerminalError = error
+          return
+        }
+        callbacks.onError(error, severity)
+      },
+    }
+    /* v8 ignore stop */
+
     const result = await handleInboundTurn({
       channel: "teams",
       sessionKey: conversationId,
       capabilities: teamsCapabilities,
       messages: [{ role: "user" as const, content: currentText }],
       continuityIngressTexts: [currentText],
-      callbacks,
+      callbacks: failoverAwareCallbacks,
       friendResolver: { resolve: () => Promise.resolve(resolvedContext) },
       sessionLoader: {
         loadOrCreate: async () => {
@@ -610,17 +632,14 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
       accumulateFriendTokens,
       signal: controller.signal,
       runAgentOptions: agentOptions,
-      failoverState: (() => {
-        if (!teamsFailoverStates.has(conversationId)) {
-          teamsFailoverStates.set(conversationId, { pending: null })
-        }
-        return teamsFailoverStates.get(conversationId)!
-      })(),
+      failoverState: teamsFailoverState,
     })
 
-    /* v8 ignore start -- failover display: tested via pipeline integration tests, channel just renders @preserve */
+    /* v8 ignore start -- failover display: tested via pipeline integration tests @preserve */
     if (result.failoverMessage) {
       stream.emit(result.failoverMessage)
+    } else if (capturedTerminalError) {
+      callbacks.onError(capturedTerminalError, "terminal")
     }
     if (result.switchedProvider) {
       stream.emit(`switched to ${result.switchedProvider}. your conversation is intact — go ahead whenever you're ready.`)

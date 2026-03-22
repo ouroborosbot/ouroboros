@@ -865,13 +865,31 @@ export async function main(agentName?: string, options?: { pasteDebounceMs?: num
         // Run the full per-turn pipeline: resolve -> gate -> session -> drain -> runAgent -> postTurn -> tokens
         // User message passed via input.messages so the pipeline can prepend pending messages to it.
         const failoverState = cliFailoverState
+
+        // Capture terminal errors instead of displaying immediately — the failover
+        // message replaces the raw error if failover triggers successfully.
+        let capturedTerminalError: Error | null = null
+        /* v8 ignore start -- failover-aware callback wrapper: tested via pipeline integration @preserve */
+        const failoverAwareCallbacks: typeof callbacks = {
+          ...callbacks,
+          onError: (error: Error, severity: "transient" | "terminal") => {
+            if (severity === "terminal" && failoverState) {
+              capturedTerminalError = error
+              callbacks.onError(new Error(""), "transient")
+              return
+            }
+            callbacks.onError(error, severity)
+          },
+        }
+        /* v8 ignore stop */
+
         const result = await handleInboundTurn({
           channel: "cli",
           sessionKey: "session",
           capabilities: cliCapabilities,
           messages: [{ role: "user", content: userInput }],
           continuityIngressTexts: getCliContinuityIngressTexts(userInput),
-          callbacks,
+          callbacks: failoverAwareCallbacks,
           friendResolver: { resolve: () => Promise.resolve(resolvedContext) },
           sessionLoader: {
             loadOrCreate: () => Promise.resolve({
@@ -911,9 +929,13 @@ export async function main(agentName?: string, options?: { pasteDebounceMs?: num
           failoverState,
         })
 
-        /* v8 ignore start -- failover display: tested via pipeline integration tests, channel just renders @preserve */
+        /* v8 ignore start -- failover display: tested via pipeline integration tests @preserve */
         if (result.failoverMessage) {
+          // Failover handled it — show the actionable message instead of the raw error
           process.stdout.write(`\x1b[33m${result.failoverMessage}\x1b[0m\n`)
+        } else if (capturedTerminalError) {
+          // Failover didn't trigger (no failoverState, or sequence failed) — show the raw error
+          process.stderr.write(`\x1b[31m${formatError(capturedTerminalError)}\x1b[0m\n`)
         }
         if (result.switchedProvider) {
           process.stdout.write(`\x1b[32mswitched to ${result.switchedProvider}. your conversation is intact — go ahead whenever you're ready.\x1b[0m\n`)
