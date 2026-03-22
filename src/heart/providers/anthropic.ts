@@ -254,13 +254,6 @@ function isAnthropicAuthFailure(error: unknown): boolean {
   );
 }
 
-function withAnthropicAuthGuidance(error: unknown): Error {
-  const base = error instanceof Error ? error.message : String(error);
-  if (isAnthropicAuthFailure(error)) {
-    return new Error(getAnthropicReauthGuidance(`Anthropic authentication failed (${base}).`));
-  }
-  return error instanceof Error ? error : new Error(String(error));
-}
 
 async function streamAnthropicMessages(
   client: Anthropic,
@@ -292,7 +285,7 @@ async function streamAnthropicMessages(
       request.signal ? { signal: request.signal } : {},
     ) as AsyncIterable<Record<string, unknown>>;
   } catch (error) {
-    throw withAnthropicAuthGuidance(error);
+    throw error instanceof Error ? error : new Error(String(error));
   }
 
   let content = "";
@@ -400,7 +393,7 @@ async function streamAnthropicMessages(
       }
     }
   } catch (error) {
-    throw withAnthropicAuthGuidance(error);
+    throw error instanceof Error ? error : new Error(String(error));
   }
 
   // Collect all thinking blocks (regular + redacted) sorted by index to preserve ordering

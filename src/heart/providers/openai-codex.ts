@@ -76,13 +76,6 @@ function isOpenAICodexAuthFailure(error: unknown): boolean {
   return OPENAI_CODEX_AUTH_FAILURE_MARKERS.some((marker) => lower.includes(marker));
 }
 
-function withOpenAICodexAuthGuidance(error: unknown): Error {
-  const base = error instanceof Error ? error.message : String(error);
-  if (isOpenAICodexAuthFailure(error)) {
-    return new Error(getOpenAICodexReauthGuidance(`OpenAI Codex authentication failed (${base}).`));
-  }
-  return error instanceof Error ? error : new Error(String(error));
-}
 
 function decodeJwtPayload(token: string): JsonRecord | null {
   const parts = token.split(".");
@@ -198,7 +191,7 @@ export function createOpenAICodexProviderRuntime(): ProviderRuntime {
         for (const item of result.outputItems) nativeInput!.push(item);
         return result;
       } catch (error) {
-        throw withOpenAICodexAuthGuidance(error);
+        throw error instanceof Error ? error : new Error(String(error));
       }
     },
     classifyError(error: Error): ProviderErrorClassification {

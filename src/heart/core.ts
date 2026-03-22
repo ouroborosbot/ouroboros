@@ -550,7 +550,7 @@ export async function runAgent(
   channel?: Channel,
   signal?: AbortSignal,
   options?: RunAgentOptions,
-): Promise<{ usage?: UsageData; outcome: RunAgentOutcome; completion?: CompletionMetadata }> {
+): Promise<{ usage?: UsageData; outcome: RunAgentOutcome; completion?: CompletionMetadata; error?: Error; errorClassification?: ProviderErrorClassification }> {
   const providerRuntime = getProviderRuntime();
   const provider = providerRuntime.id;
   const toolChoiceRequired = options?.toolChoiceRequired ?? true;
@@ -615,6 +615,8 @@ export async function runAgent(
   let retryCount = 0;
   let outcome: RunAgentOutcome = "complete";
   let completion: CompletionMetadata | undefined;
+  let terminalError: Error | undefined;
+  let terminalErrorClassification: ProviderErrorClassification | undefined;
   let sawSteeringFollowUp = false;
   let mustResolveBeforeHandoffActive = options?.mustResolveBeforeHandoff === true;
   let currentReasoningEffort = "medium";
@@ -1016,7 +1018,12 @@ export async function runAgent(
       if (isTransientError(e) && retryCount < MAX_RETRIES) {
         retryCount++;
         const delay = RETRY_BASE_MS * Math.pow(2, retryCount - 1);
-        const cause = classifyTransientError(e);
+        let cause: string
+        try {
+          cause = providerRuntime.classifyError(e instanceof Error ? e : new Error(String(e)))
+        } catch {
+          cause = classifyTransientError(e)
+        }
         callbacks.onError(new Error(`${cause}, retrying in ${delay / 1000}s (${retryCount}/${MAX_RETRIES})...`), "transient");
         // Wait with abort support
         const aborted = await new Promise<boolean>((resolve) => {
@@ -1035,14 +1042,20 @@ export async function runAgent(
         providerRuntime.resetTurnState(messages);
         continue;
       }
-      callbacks.onError(e instanceof Error ? e : new Error(String(e)), "terminal");
+      terminalError = e instanceof Error ? e : new Error(String(e));
+      try {
+        terminalErrorClassification = providerRuntime.classifyError(terminalError);
+      } catch {
+        terminalErrorClassification = "unknown";
+      }
+      callbacks.onError(terminalError, "terminal");
       emitNervesEvent({
         level: "error",
         event: "engine.error",
         trace_id: traceId,
         component: "engine",
-        message: e instanceof Error ? e.message : String(e),
-        meta: {},
+        message: terminalError.message,
+        meta: { errorClassification: terminalErrorClassification },
       });
       stripLastToolCalls(messages);
       outcome = "errored";
@@ -1056,5 +1069,10 @@ export async function runAgent(
     message: "runAgent turn completed",
     meta: { done, sawGoInward, sawQuerySession, sawBridgeManage },
   });
-  return { usage: lastUsage, outcome, completion };
+  return {
+    usage: lastUsage,
+    outcome,
+    completion,
+    ...(terminalError ? { error: terminalError, errorClassification: terminalErrorClassification } : {}),
+  };
 }

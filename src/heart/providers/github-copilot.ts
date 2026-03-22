@@ -117,7 +117,7 @@ export function createGithubCopilotProviderRuntime(): ProviderRuntime {
             request.eagerFinalAnswerStreaming,
           );
         } catch (error) {
-          throw withAuthGuidance(error);
+          throw error instanceof Error ? error : new Error(String(error));
         }
       },
       /* v8 ignore stop */
