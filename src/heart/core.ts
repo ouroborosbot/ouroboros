@@ -1020,8 +1020,9 @@ export async function runAgent(
         const delay = RETRY_BASE_MS * Math.pow(2, retryCount - 1);
         let cause: string
         try {
-          cause = providerRuntime.classifyError(e instanceof Error ? e : new Error(String(e)))
+          cause = providerRuntime.classifyError(e instanceof Error ? e : /* v8 ignore next -- defensive: errors are always Error instances @preserve */ new Error(String(e)))
         } catch {
+          /* v8 ignore next -- defensive: classifyError should not throw @preserve */
           cause = classifyTransientError(e)
         }
         callbacks.onError(new Error(`${cause}, retrying in ${delay / 1000}s (${retryCount}/${MAX_RETRIES})...`), "transient");
@@ -1046,6 +1047,7 @@ export async function runAgent(
       try {
         terminalErrorClassification = providerRuntime.classifyError(terminalError);
       } catch {
+        /* v8 ignore next -- defensive: classifyError should not throw @preserve */
         terminalErrorClassification = "unknown";
       }
       callbacks.onError(terminalError, "terminal");

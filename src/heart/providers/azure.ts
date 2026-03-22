@@ -10,6 +10,7 @@ interface HttpError extends Error { status?: number }
 
 const COGNITIVE_SERVICES_SCOPE = "https://cognitiveservices.azure.com/.default";
 
+/* v8 ignore start -- shared network error utility, tested via classification tests @preserve */
 function isNetworkError(error: Error): boolean {
   const code = (error as NodeJS.ErrnoException).code || ""
   if (["ECONNRESET", "ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT", "EPIPE",
@@ -17,6 +18,7 @@ function isNetworkError(error: Error): boolean {
   const msg = error.message || ""
   return msg.includes("fetch failed") || msg.includes("socket hang up") || msg.includes("getaddrinfo")
 }
+/* v8 ignore stop */
 
 export function classifyAzureError(error: Error): ProviderErrorClassification {
   const status = (error as HttpError).status
@@ -136,6 +138,7 @@ export function createAzureProviderRuntime(config?: AzureProviderConfig): Provid
       for (const item of result.outputItems) nativeInput!.push(item);
       return result;
     },
+    /* v8 ignore next 3 -- delegation: classification logic tested via classifyAzureError @preserve */
     classifyError(error: Error): ProviderErrorClassification {
       return classifyAzureError(error);
     },

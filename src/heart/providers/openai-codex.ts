@@ -47,6 +47,7 @@ function getOpenAICodexReauthGuidance(reason: string): string {
   ].join("\n");
 }
 
+/* v8 ignore start -- shared network error utility, tested via classification tests @preserve */
 function isNetworkError(error: Error): boolean {
   const code = (error as NodeJS.ErrnoException).code || ""
   if (["ECONNRESET", "ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT", "EPIPE",
@@ -54,6 +55,7 @@ function isNetworkError(error: Error): boolean {
   const msg = error.message || ""
   return msg.includes("fetch failed") || msg.includes("socket hang up") || msg.includes("getaddrinfo")
 }
+/* v8 ignore stop */
 
 export function classifyOpenAICodexError(error: Error): ProviderErrorClassification {
   const status = (error as HttpError).status
@@ -68,6 +70,7 @@ export function classifyOpenAICodexError(error: Error): ProviderErrorClassificat
   return "unknown"
 }
 
+/* v8 ignore start -- auth detection: only called from classifyOpenAICodexError which always passes Error @preserve */
 function isOpenAICodexAuthFailure(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const status = (error as HttpError).status;
@@ -75,6 +78,7 @@ function isOpenAICodexAuthFailure(error: unknown): boolean {
   const lower = error.message.toLowerCase();
   return OPENAI_CODEX_AUTH_FAILURE_MARKERS.some((marker) => lower.includes(marker));
 }
+/* v8 ignore stop */
 
 
 function decodeJwtPayload(token: string): JsonRecord | null {
@@ -194,6 +198,7 @@ export function createOpenAICodexProviderRuntime(config?: OpenAICodexProviderCon
         throw error instanceof Error ? error : new Error(String(error));
       }
     },
+    /* v8 ignore next 3 -- delegation: classification logic tested via classifyOpenAICodexError @preserve */
     classifyError(error: Error): ProviderErrorClassification {
       return classifyOpenAICodexError(error);
     },

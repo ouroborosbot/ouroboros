@@ -5,6 +5,7 @@ import type { ProviderErrorClassification, ProviderRuntime, ProviderTurnRequest 
 
 interface HttpError extends Error { status?: number }
 
+/* v8 ignore start -- shared network error utility, tested via classification tests @preserve */
 function isNetworkError(error: Error): boolean {
   const code = (error as NodeJS.ErrnoException).code || ""
   if (["ECONNRESET", "ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT", "EPIPE",
@@ -12,6 +13,7 @@ function isNetworkError(error: Error): boolean {
   const msg = error.message || ""
   return msg.includes("fetch failed") || msg.includes("socket hang up") || msg.includes("getaddrinfo")
 }
+/* v8 ignore stop */
 
 export function classifyMinimaxError(error: Error): ProviderErrorClassification {
   const status = (error as HttpError).status

@@ -44,6 +44,25 @@ vi.mock("../../repertoire/coding", async () => {
   }
 })
 
+const mockRunHealthInventory = vi.fn()
+const mockWriteAgentProviderSelection = vi.fn()
+
+vi.mock("../../heart/provider-ping", async () => {
+  const actual = await vi.importActual<typeof import("../../heart/provider-ping")>("../../heart/provider-ping")
+  return {
+    ...actual,
+    runHealthInventory: (...args: any[]) => mockRunHealthInventory(...args),
+  }
+})
+
+vi.mock("../../heart/daemon/auth-flow", async () => {
+  const actual = await vi.importActual<typeof import("../../heart/daemon/auth-flow")>("../../heart/daemon/auth-flow")
+  return {
+    ...actual,
+    writeAgentProviderSelection: (...args: any[]) => mockWriteAgentProviderSelection(...args),
+  }
+})
+
 // ── Test helpers ──────────────────────────────────────────────────
 
 function makeFriend(overrides: Partial<FriendRecord> = {}): FriendRecord {
@@ -1380,6 +1399,137 @@ describe("handleInboundTurn", () => {
         content: expect.stringContaining("## live world-state checkpoint"),
       }))
       expect(typeof userMessage?.content === "string" ? userMessage.content : "").toContain("hello")
+    })
+  })
+
+  describe("provider failover", () => {
+    beforeEach(() => {
+      mockRunHealthInventory.mockReset()
+      mockWriteAgentProviderSelection.mockReset()
+    })
+
+    it("returns failoverMessage when runAgent returns errored outcome", async () => {
+      vi.spyOn(identity, "getAgentName").mockReturnValue("slugger")
+      vi.spyOn(identity, "loadAgentConfig").mockReturnValue({
+        version: 1,
+        enabled: true,
+        provider: "openai-codex",
+        phrases: { thinking: [], tool: [], followup: [] },
+      } as any)
+      mockRunHealthInventory.mockResolvedValue({
+        anthropic: { ok: true },
+      })
+      const failoverState = { pending: null }
+      const input = makeInput({
+        failoverState,
+        runAgent: vi.fn().mockResolvedValue({
+          usage: usageData,
+          outcome: "errored",
+          error: new Error("usage limit exceeded"),
+          errorClassification: "usage-limit",
+        }),
+      })
+
+      const result = await handleInboundTurn(input)
+
+      expect(result.failoverMessage).toBeDefined()
+      expect(result.failoverMessage).toContain("openai-codex")
+      expect(result.failoverMessage).toContain("switch to anthropic")
+      expect(failoverState.pending).not.toBeNull()
+    })
+
+    it("handles failover reply to switch provider", async () => {
+      const failoverState = {
+        pending: {
+          errorSummary: "openai-codex hit its usage limit",
+          classification: "usage-limit" as const,
+          currentProvider: "openai-codex" as const,
+          agentName: "slugger",
+          workingProviders: ["anthropic" as const],
+          unconfiguredProviders: [],
+          userMessage: "switch available",
+        },
+      }
+      const input = makeInput({
+        failoverState,
+        messages: [{ role: "user", content: "switch to anthropic" }],
+      })
+
+      const result = await handleInboundTurn(input)
+
+      expect(result.switchedProvider).toBe("anthropic")
+      expect(mockWriteAgentProviderSelection).toHaveBeenCalledWith("slugger", "anthropic")
+      expect(failoverState.pending).toBeNull()
+    })
+
+    it("dismisses failover on unrelated reply and processes normally", async () => {
+      const failoverState = {
+        pending: {
+          errorSummary: "openai-codex hit its usage limit",
+          classification: "usage-limit" as const,
+          currentProvider: "openai-codex" as const,
+          agentName: "slugger",
+          workingProviders: ["anthropic" as const],
+          unconfiguredProviders: [],
+          userMessage: "switch available",
+        },
+      }
+      const input = makeInput({
+        failoverState,
+        messages: [{ role: "user", content: "never mind, just continue" }],
+      })
+
+      const result = await handleInboundTurn(input)
+
+      expect(result.switchedProvider).toBeUndefined()
+      expect(result.failoverMessage).toBeUndefined()
+      expect(failoverState.pending).toBeNull()
+      // Should have processed normally — runAgent was called
+      expect(result.turnOutcome).toBe("complete")
+    })
+
+    it("falls back to normal error handling when failover sequence throws", async () => {
+      vi.spyOn(identity, "getAgentName").mockReturnValue("slugger")
+      vi.spyOn(identity, "loadAgentConfig").mockReturnValue({
+        version: 1,
+        enabled: true,
+        provider: "openai-codex",
+        phrases: { thinking: [], tool: [], followup: [] },
+      } as any)
+      mockRunHealthInventory.mockRejectedValue(new Error("inventory failed"))
+      const failoverState = { pending: null }
+      const input = makeInput({
+        failoverState,
+        runAgent: vi.fn().mockResolvedValue({
+          usage: usageData,
+          outcome: "errored",
+          error: new Error("server down"),
+          errorClassification: "server-error",
+        }),
+      })
+
+      const result = await handleInboundTurn(input)
+
+      // Should complete without failoverMessage since the sequence failed
+      expect(result.failoverMessage).toBeUndefined()
+      expect(result.turnOutcome).toBe("errored")
+    })
+
+    it("does not trigger failover when failoverState is not provided", async () => {
+      const input = makeInput({
+        runAgent: vi.fn().mockResolvedValue({
+          usage: usageData,
+          outcome: "errored",
+          error: new Error("server down"),
+          errorClassification: "server-error",
+        }),
+      })
+
+      const result = await handleInboundTurn(input)
+
+      expect(result.failoverMessage).toBeUndefined()
+      expect(result.turnOutcome).toBe("errored")
+      expect(mockRunHealthInventory).not.toHaveBeenCalled()
     })
   })
 })
