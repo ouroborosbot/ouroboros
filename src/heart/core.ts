@@ -544,6 +544,15 @@ export function classifyTransientError(err: unknown): string {
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 2000;
 
+const TRANSIENT_RETRY_LABELS: Record<string, string> = {
+  "auth-failure": "auth error",
+  "usage-limit": "usage limit",
+  "rate-limit": "rate limited",
+  "server-error": "server error",
+  "network-error": "network error",
+  "unknown": "error",
+};
+
 export async function runAgent(
   messages: OpenAI.ChatCompletionMessageParam[],
   callbacks: ChannelCallbacks,
@@ -1018,13 +1027,15 @@ export async function runAgent(
       if (isTransientError(e) && retryCount < MAX_RETRIES) {
         retryCount++;
         const delay = RETRY_BASE_MS * Math.pow(2, retryCount - 1);
-        let cause: string
+        let classification: string
         try {
-          cause = providerRuntime.classifyError(e instanceof Error ? e : /* v8 ignore next -- defensive: errors are always Error instances @preserve */ new Error(String(e)))
+          classification = providerRuntime.classifyError(e instanceof Error ? e : /* v8 ignore next -- defensive: errors are always Error instances @preserve */ new Error(String(e)))
         } catch {
           /* v8 ignore next -- defensive: classifyError should not throw @preserve */
-          cause = classifyTransientError(e)
+          classification = classifyTransientError(e)
         }
+        /* v8 ignore next -- defensive: all classifications have labels @preserve */
+        const cause = TRANSIENT_RETRY_LABELS[classification] ?? classification
         callbacks.onError(new Error(`${cause}, retrying in ${delay / 1000}s (${retryCount}/${MAX_RETRIES})...`), "transient");
         // Wait with abort support
         const aborted = await new Promise<boolean>((resolve) => {

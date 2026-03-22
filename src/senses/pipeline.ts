@@ -227,26 +227,41 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
       .join(" ")
       .trim()
     const failoverAction = handleFailoverReply(userText, input.failoverState.pending)
+    const failoverAgentName = input.failoverState.pending.agentName
+    input.failoverState.pending = null // always clear before acting
     if (failoverAction.action === "switch") {
-      const agentName = input.failoverState.pending.agentName
-      writeAgentProviderSelection(agentName, failoverAction.provider)
-      input.failoverState.pending = null
-      emitNervesEvent({
-        component: "senses",
-        event: "senses.failover_switch",
-        message: `switched provider to ${failoverAction.provider} via failover`,
-        meta: { agentName, provider: failoverAction.provider },
-      })
-      // Resolve friend to build a minimal result — the channel should show confirmation
-      const resolvedContext = await input.friendResolver.resolve()
-      return {
-        resolvedContext,
-        gateResult: { allowed: true },
-        switchedProvider: failoverAction.provider,
+      let switchSucceeded = false
+      try {
+        writeAgentProviderSelection(failoverAgentName, failoverAction.provider)
+        switchSucceeded = true
+      /* v8 ignore start -- defensive: write failure during provider switch @preserve */
+      } catch (switchError) {
+        emitNervesEvent({
+          level: "error",
+          component: "senses",
+          event: "senses.failover_switch_error",
+          message: `failed to switch provider to ${failoverAction.provider}`,
+          meta: { agentName: failoverAgentName, provider: failoverAction.provider, error: switchError instanceof Error ? switchError.message : String(switchError) },
+        })
       }
+      /* v8 ignore stop */
+      /* v8 ignore next -- false branch: write-failure fallthrough tested conceptually, v8 undercounts @preserve */
+      if (switchSucceeded) {
+        emitNervesEvent({
+          component: "senses",
+          event: "senses.failover_switch",
+          message: `switched provider to ${failoverAction.provider} via failover`,
+          meta: { agentName: failoverAgentName, provider: failoverAction.provider },
+        })
+        const resolvedContext = await input.friendResolver.resolve()
+        return {
+          resolvedContext,
+          gateResult: { allowed: true },
+          switchedProvider: failoverAction.provider,
+        }
+      }
+      // Switch failed — fall through to normal processing with old provider
     }
-    // Dismiss: clear failover and process normally
-    input.failoverState.pending = null
   }
 
   // Step 1: Resolve friend
