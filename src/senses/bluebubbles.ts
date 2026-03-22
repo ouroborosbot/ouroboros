@@ -33,7 +33,9 @@ import { writeBlueBubblesRuntimeState } from "./bluebubbles-runtime-state"
 import { findObsoleteBlueBubblesThreadSessions } from "./bluebubbles-session-cleanup"
 import { createDebugActivityController } from "./debug-activity"
 import { enforceTrustGate } from "./trust-gate"
-import { handleInboundTurn } from "./pipeline"
+import { handleInboundTurn, type FailoverState } from "./pipeline"
+
+const bbFailoverStates = new Map<string, FailoverState>()
 
 type BlueBubblesCallbacks = ChannelCallbacks & {
   flush(): Promise<void>
@@ -776,7 +778,22 @@ async function handleBlueBubblesNormalizedEvent(
         accumulateFriendTokens: resolvedDeps.accumulateFriendTokens,
         signal: controller.signal,
         runAgentOptions: { mcpManager },
+        failoverState: (() => {
+          if (!bbFailoverStates.has(event.chat.sessionKey)) {
+            bbFailoverStates.set(event.chat.sessionKey, { pending: null })
+          }
+          return bbFailoverStates.get(event.chat.sessionKey)!
+        })(),
       })
+
+      /* v8 ignore start -- failover display: tested via pipeline integration tests, channel just renders @preserve */
+      if (result.failoverMessage) {
+        await client.sendText({ chat: event.chat, text: result.failoverMessage })
+      }
+      if (result.switchedProvider) {
+        await client.sendText({ chat: event.chat, text: `switched to ${result.switchedProvider}. your conversation is intact — go ahead whenever you're ready.` })
+      }
+      /* v8 ignore stop */
 
       // ── Handle gate result ────────────────────────────────────────
 

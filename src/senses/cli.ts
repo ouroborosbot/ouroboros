@@ -851,6 +851,7 @@ export async function main(agentName?: string, options?: { pasteDebounceMs?: num
   const currentAgentName = getAgentName()
   const pendingDir = getPendingDir(currentAgentName, friendId, "cli", "session")
   const summarize = createSummarize()
+  const cliFailoverState: import("./pipeline").FailoverState = { pending: null }
 
   try {
     await runCliSession({
@@ -863,6 +864,7 @@ export async function main(agentName?: string, options?: { pasteDebounceMs?: num
       runTurn: async (messages, userInput, callbacks, signal, toolContext) => {
         // Run the full per-turn pipeline: resolve -> gate -> session -> drain -> runAgent -> postTurn -> tokens
         // User message passed via input.messages so the pipeline can prepend pending messages to it.
+        const failoverState = cliFailoverState
         const result = await handleInboundTurn({
           channel: "cli",
           sessionKey: "session",
@@ -906,7 +908,17 @@ export async function main(agentName?: string, options?: { pasteDebounceMs?: num
             mcpManager,
             toolContext,
           },
+          failoverState,
         })
+
+        /* v8 ignore start -- failover display: tested via pipeline integration tests, channel just renders @preserve */
+        if (result.failoverMessage) {
+          process.stdout.write(`\x1b[33m${result.failoverMessage}\x1b[0m\n`)
+        }
+        if (result.switchedProvider) {
+          process.stdout.write(`\x1b[32mswitched to ${result.switchedProvider}. your conversation is intact — go ahead whenever you're ready.\x1b[0m\n`)
+        }
+        /* v8 ignore stop */
 
         // Handle gate rejection: display auto-reply if present
         if (!result.gateResult.allowed) {

@@ -27,7 +27,9 @@ import { buildProgressStory, renderProgressStory } from "../heart/progress-story
 import * as http from "http"
 import * as path from "path"
 import { enforceTrustGate } from "./trust-gate"
-import { handleInboundTurn } from "./pipeline"
+import { handleInboundTurn, type FailoverState } from "./pipeline"
+
+const teamsFailoverStates = new Map<string, FailoverState>()
 import { drainDeferredReturns, drainPending, getPendingDir } from "../mind/pending"
 import { classifySteeringFollowUpEffect, type SteeringFollowUpEffect } from "./continuity"
 
@@ -608,7 +610,22 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
       accumulateFriendTokens,
       signal: controller.signal,
       runAgentOptions: agentOptions,
+      failoverState: (() => {
+        if (!teamsFailoverStates.has(conversationId)) {
+          teamsFailoverStates.set(conversationId, { pending: null })
+        }
+        return teamsFailoverStates.get(conversationId)!
+      })(),
     })
+
+    /* v8 ignore start -- failover display: tested via pipeline integration tests, channel just renders @preserve */
+    if (result.failoverMessage) {
+      stream.emit(result.failoverMessage)
+    }
+    if (result.switchedProvider) {
+      stream.emit(`switched to ${result.switchedProvider}. your conversation is intact — go ahead whenever you're ready.`)
+    }
+    /* v8 ignore stop */
 
     // ── Handle gate result ────────────────────────────────────────
     if (!result.gateResult.allowed) {
