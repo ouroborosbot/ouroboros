@@ -2,12 +2,29 @@ import OpenAI from "openai";
 import { getGithubCopilotConfig } from "../config";
 import { getAgentName } from "../identity";
 import { emitNervesEvent } from "../../nerves/runtime";
-import type { ProviderCapability, ProviderRuntime, ProviderTurnRequest } from "../core";
+import type { ProviderCapability, ProviderErrorClassification, ProviderRuntime, ProviderTurnRequest } from "../core";
 import type { ResponseItem, TurnResult } from "../streaming";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "../streaming";
 import { getModelCapabilities } from "../model-capabilities";
 
 interface HttpError extends Error { status?: number }
+
+function isNetworkError(error: Error): boolean {
+  const code = (error as NodeJS.ErrnoException).code || ""
+  if (["ECONNRESET", "ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT", "EPIPE",
+       "EAI_AGAIN", "EHOSTUNREACH", "ENETUNREACH", "ECONNABORTED"].includes(code)) return true
+  const msg = error.message || ""
+  return msg.includes("fetch failed") || msg.includes("socket hang up") || msg.includes("getaddrinfo")
+}
+
+export function classifyGithubCopilotError(error: Error): ProviderErrorClassification {
+  const status = (error as HttpError).status
+  if (status === 401 || status === 403) return "auth-failure"
+  if (status === 429) return "rate-limit"
+  if (status && status >= 500) return "server-error"
+  if (isNetworkError(error)) return "network-error"
+  return "unknown"
+}
 
 /* v8 ignore start -- auth guidance helpers: tested via mock-driven provider tests @preserve */
 function isAuthFailure(error: unknown): boolean {
@@ -104,6 +121,9 @@ export function createGithubCopilotProviderRuntime(): ProviderRuntime {
         }
       },
       /* v8 ignore stop */
+      classifyError(error: Error): ProviderErrorClassification {
+        return classifyGithubCopilotError(error);
+      },
     };
   }
 
@@ -155,5 +175,8 @@ export function createGithubCopilotProviderRuntime(): ProviderRuntime {
       }
     },
     /* v8 ignore stop */
+    classifyError(error: Error): ProviderErrorClassification {
+      return classifyGithubCopilotError(error);
+    },
   };
 }

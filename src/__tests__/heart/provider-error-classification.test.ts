@@ -35,9 +35,12 @@ describe("ProviderErrorClassification type", () => {
 
 describe("ProviderRuntime.classifyError", () => {
   it("is a required method on the ProviderRuntime interface", () => {
-    // Type-level assertion: a ProviderRuntime must have classifyError
-    const runtime = {} as ProviderRuntime
-    expect(typeof runtime.classifyError).toBe("function")
+    // Type-level assertion: ProviderRuntime must include classifyError.
+    // If the method were removed from the interface, this assignment would
+    // produce a compile error (classifyError is not optional).
+    type HasClassifyError = ProviderRuntime["classifyError"]
+    const _typeCheck: HasClassifyError = (_err: Error) => "unknown" as ProviderErrorClassification
+    expect(_typeCheck).toBeDefined()
   })
 })
 

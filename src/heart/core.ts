@@ -40,6 +40,14 @@ export type ProviderId = "azure" | "anthropic" | "minimax" | "openai-codex" | "g
 
 export type ProviderCapability = "reasoning-effort" | "phase-annotation";
 
+export type ProviderErrorClassification =
+  | "auth-failure"
+  | "usage-limit"
+  | "rate-limit"
+  | "server-error"
+  | "network-error"
+  | "unknown";
+
 export interface CompletionMetadata {
   answer: string;
   intent: "complete" | "blocked" | "direct_reply";
@@ -54,6 +62,7 @@ export interface ProviderRuntime {
   streamTurn(request: ProviderTurnRequest): Promise<TurnResult>;
   appendToolOutput(callId: string, output: string): void;
   resetTurnState(messages: OpenAI.ChatCompletionMessageParam[]): void;
+  classifyError(error: Error): ProviderErrorClassification;
 }
 
 export interface ProviderTurnRequest {

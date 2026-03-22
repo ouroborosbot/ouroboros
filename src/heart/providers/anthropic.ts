@@ -4,7 +4,7 @@ import { getAnthropicConfig } from "../config";
 import { getAgentName, getAgentSecretsPath } from "../identity";
 import type { UsageData } from "../../mind/context";
 import { emitNervesEvent } from "../../nerves/runtime";
-import type { ProviderCapability, ProviderRuntime, ProviderTurnRequest } from "../core";
+import type { ProviderCapability, ProviderErrorClassification, ProviderRuntime, ProviderTurnRequest } from "../core";
 import { FinalAnswerStreamer } from "../streaming";
 import type { TurnResult } from "../streaming";
 import { getModelCapabilities } from "../model-capabilities";
@@ -222,6 +222,23 @@ function mergeAnthropicToolArguments(current: string, partial: string): string {
   }
 
   return current + partial
+}
+
+function isNetworkError(error: Error): boolean {
+  const code = (error as NodeJS.ErrnoException).code || ""
+  if (["ECONNRESET", "ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT", "EPIPE",
+       "EAI_AGAIN", "EHOSTUNREACH", "ENETUNREACH", "ECONNABORTED"].includes(code)) return true
+  const msg = error.message || ""
+  return msg.includes("fetch failed") || msg.includes("socket hang up") || msg.includes("getaddrinfo")
+}
+
+export function classifyAnthropicError(error: Error): ProviderErrorClassification {
+  const status = (error as HttpError).status
+  if (status === 401 || status === 403 || isAnthropicAuthFailure(error)) return "auth-failure"
+  if (status === 429) return "rate-limit"
+  if (status === 529 || (status && status >= 500)) return "server-error"
+  if (isNetworkError(error)) return "network-error"
+  return "unknown"
 }
 
 function isAnthropicAuthFailure(error: unknown): boolean {
@@ -445,6 +462,9 @@ export function createAnthropicProviderRuntime(): ProviderRuntime {
     },
     streamTurn(request: ProviderTurnRequest): Promise<TurnResult> {
       return streamAnthropicMessages(client, anthropicConfig.model, request);
+    },
+    classifyError(error: Error): ProviderErrorClassification {
+      return classifyAnthropicError(error);
     },
   };
 }
