@@ -152,6 +152,28 @@ describe("pingProvider", () => {
     }
   })
 
+  it("returns auth-failure for empty credentials (github-copilot)", async () => {
+    const result = await pingProvider("github-copilot", {
+      model: "",
+      githubToken: "",
+      baseUrl: "",
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.classification).toBe("auth-failure")
+    }
+  })
+
+  it("returns ok: true when streamTurn succeeds for github-copilot", async () => {
+    mockStreamTurn.mockResolvedValue({ content: "hi", outputItems: [] })
+    const result = await pingProvider("github-copilot", {
+      model: "gpt-5.4",
+      githubToken: "ghp_test123",
+      baseUrl: "https://api.copilot.example.com",
+    })
+    expect(result.ok).toBe(true)
+  })
+
   it("classifies error from streamTurn failure", async () => {
     const err = Object.assign(new Error("auth failed"), { status: 401 })
     mockStreamTurn.mockRejectedValue(err)

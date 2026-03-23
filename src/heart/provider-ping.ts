@@ -3,6 +3,7 @@ import type { AgentProvider } from "./identity"
 import type {
   AnthropicProviderConfig,
   AzureProviderConfig,
+  GithubCopilotProviderConfig,
   MinimaxProviderConfig,
   OpenAICodexProviderConfig,
 } from "./config"
@@ -10,6 +11,7 @@ import { createAnthropicProviderRuntime } from "./providers/anthropic"
 import { createAzureProviderRuntime } from "./providers/azure"
 import { createMinimaxProviderRuntime } from "./providers/minimax"
 import { createOpenAICodexProviderRuntime } from "./providers/openai-codex"
+import { createGithubCopilotProviderRuntime } from "./providers/github-copilot"
 import { loadAgentSecrets } from "./daemon/auth-flow"
 import { emitNervesEvent } from "../nerves/runtime"
 
@@ -20,6 +22,7 @@ export type PingResult =
 type ProviderConfig =
   | AnthropicProviderConfig
   | AzureProviderConfig
+  | GithubCopilotProviderConfig
   | MinimaxProviderConfig
   | OpenAICodexProviderConfig
 
@@ -37,7 +40,11 @@ function hasEmptyCredentials(provider: AgentProvider, config: ProviderConfig): b
       const azure = config as AzureProviderConfig
       return !(azure.apiKey && azure.endpoint && azure.deployment)
     }
-    /* v8 ignore next 2 -- github-copilot ping: not yet wired @preserve */
+    case "github-copilot": {
+      const copilot = config as GithubCopilotProviderConfig
+      return !(copilot.githubToken && copilot.baseUrl)
+    }
+    /* v8 ignore next 2 -- exhaustive: all providers handled above @preserve */
     default:
       return true
   }
@@ -53,7 +60,9 @@ function createRuntimeForPing(provider: AgentProvider, config: ProviderConfig): 
       return createMinimaxProviderRuntime(config as MinimaxProviderConfig)
     case "openai-codex":
       return createOpenAICodexProviderRuntime(config as OpenAICodexProviderConfig)
-    /* v8 ignore next 2 -- github-copilot ping: not yet wired @preserve */
+    case "github-copilot":
+      return createGithubCopilotProviderRuntime(config as GithubCopilotProviderConfig)
+    /* v8 ignore next 2 -- exhaustive: all providers handled above @preserve */
     default:
       throw new Error(`unsupported provider for ping: ${provider}`)
   }
@@ -133,7 +142,7 @@ export interface HealthInventoryDeps {
   ping?: typeof pingProvider
 }
 
-const PINGABLE_PROVIDERS: AgentProvider[] = ["anthropic", "openai-codex", "azure", "minimax"]
+const PINGABLE_PROVIDERS: AgentProvider[] = ["anthropic", "openai-codex", "azure", "minimax", "github-copilot"]
 
 export async function runHealthInventory(
   agentName: string,
