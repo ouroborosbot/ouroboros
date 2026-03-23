@@ -786,14 +786,13 @@ async function handleBlueBubblesNormalizedEvent(
         })(),
       })
 
-      /* v8 ignore start -- failover display: tested via pipeline integration tests, channel just renders @preserve */
+      /* v8 ignore start -- failover display: tested via pipeline integration tests @preserve */
       if (result.failoverMessage) {
         await client.sendText({ chat: event.chat, text: result.failoverMessage })
       }
-      if (result.switchedProvider) {
-        await client.sendText({ chat: event.chat, text: `switched to ${result.switchedProvider}.` })
-      }
       /* v8 ignore stop */
+      // switchedProvider: no separate confirmation — the agent's context message
+      // tells it about the switch, and it acknowledges naturally in its response.
 
       // ── Handle gate result ────────────────────────────────────────
 

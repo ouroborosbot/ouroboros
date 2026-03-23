@@ -641,9 +641,6 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
     } else if (capturedTerminalError) {
       callbacks.onError(capturedTerminalError, "terminal")
     }
-    if (result.switchedProvider) {
-      stream.emit(`switched to ${result.switchedProvider}.`)
-    }
     /* v8 ignore stop */
 
     // ── Handle gate result ────────────────────────────────────────

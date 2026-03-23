@@ -937,9 +937,6 @@ export async function main(agentName?: string, options?: { pasteDebounceMs?: num
           // Failover didn't trigger (no failoverState, or sequence failed) — show the raw error
           process.stderr.write(`\x1b[31m${formatError(capturedTerminalError)}\x1b[0m\n`)
         }
-        if (result.switchedProvider) {
-          process.stdout.write(`\x1b[32mswitched to ${result.switchedProvider}.\x1b[0m\n`)
-        }
         /* v8 ignore stop */
 
         // Handle gate rejection: display auto-reply if present
