@@ -2,6 +2,13 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.126",
+      "changes": [
+        "Fixed Anthropic tool_choice incompatibility with thinking \u2014 uses auto instead of any when thinking is enabled.",
+        "auth verify and auth switch now use pingProvider for real API verification instead of format-only checks. auth switch verifies credentials work before switching."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.125",
       "changes": [
         "Fixed Anthropic tool_choice incompatibility with thinking \u2014 uses auto instead of any when thinking is enabled.",
