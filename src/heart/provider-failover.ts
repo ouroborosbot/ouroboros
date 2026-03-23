@@ -30,13 +30,16 @@ export function buildFailoverContext(
   errorMessage: string,
   classification: ProviderErrorClassification,
   currentProvider: AgentProvider,
+  currentModel: string,
   agentName: string,
   inventory: HealthInventoryResult,
+  providerModels: Partial<Record<AgentProvider, string>>,
 ): FailoverContext {
   const label = CLASSIFICATION_LABELS[classification]
+  const providerWithModel = currentModel ? `${currentProvider} (${currentModel})` : currentProvider
   const errorSummary = errorMessage
-    ? `${currentProvider} ${label} (${errorMessage})`
-    : `${currentProvider} ${label}`
+    ? `${providerWithModel} ${label} (${errorMessage})`
+    : `${providerWithModel} ${label}`
 
   const workingProviders: AgentProvider[] = []
   const unconfiguredProviders: AgentProvider[] = []
@@ -53,8 +56,12 @@ export function buildFailoverContext(
   const lines: string[] = [`${errorSummary}.`]
 
   if (workingProviders.length > 0) {
+    const switchDescriptions = workingProviders.map((p) => {
+      const model = providerModels[p]
+      return model ? `${p} (${model})` : /* v8 ignore next -- defensive: model always present in secrets @preserve */ p
+    })
     const switchOptions = workingProviders.map((p) => `"switch to ${p}"`).join(" or ")
-    lines.push(`these providers are ready to go: ${workingProviders.join(", ")}.`)
+    lines.push(`these providers are ready to go: ${switchDescriptions.join(", ")}.`)
     lines.push(`reply ${switchOptions} to continue.`)
   }
 

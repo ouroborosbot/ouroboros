@@ -46,6 +46,17 @@ vi.mock("../../repertoire/coding", async () => {
 
 const mockRunHealthInventory = vi.fn()
 const mockWriteAgentProviderSelection = vi.fn()
+const mockLoadAgentSecrets = vi.fn().mockReturnValue({
+  secretsPath: "/mock/secrets.json",
+  secrets: {
+    providers: {
+      anthropic: { model: "claude-opus-4-6", setupToken: "valid" },
+      "openai-codex": { model: "gpt-5.4", oauthAccessToken: "valid" },
+      minimax: { model: "", apiKey: "" },
+      azure: { modelName: "", apiKey: "", endpoint: "", deployment: "", apiVersion: "" },
+    },
+  },
+})
 
 vi.mock("../../heart/provider-ping", async () => {
   const actual = await vi.importActual<typeof import("../../heart/provider-ping")>("../../heart/provider-ping")
@@ -60,6 +71,7 @@ vi.mock("../../heart/daemon/auth-flow", async () => {
   return {
     ...actual,
     writeAgentProviderSelection: (...args: any[]) => mockWriteAgentProviderSelection(...args),
+    loadAgentSecrets: (...args: any[]) => mockLoadAgentSecrets(...args),
   }
 })
 
@@ -1464,9 +1476,14 @@ describe("handleInboundTurn", () => {
       expect(failoverState.pending).toBeNull()
       // The pipeline should have auto-retried: runAgent was called on the new provider
       expect(mockRunAgent).toHaveBeenCalledTimes(1)
-      // "switch to anthropic" should NOT be in the messages passed to runAgent
-      const passedMessages = mockRunAgent.mock.calls[0][0]
-      expect(passedMessages.every((m: any) => m.content !== "switch to anthropic")).toBe(true)
+      // "switch to anthropic" should NOT be in the messages passed to runAgent —
+      // replaced with a context message telling the agent about the switch
+      const passedMessages = mockRunAgent.mock.calls[0][0] as Array<{ role: string; content: string }>
+      const lastUserMsg = [...passedMessages].reverse().find((m) => m.role === "user")
+      expect(lastUserMsg?.content).not.toContain("switch to anthropic")
+      expect(lastUserMsg?.content).toContain("provider switch")
+      expect(lastUserMsg?.content).toContain("openai-codex")
+      expect(lastUserMsg?.content).toContain("anthropic")
       // Turn completed successfully on the new provider
       expect(result.turnOutcome).toBe("complete")
     })

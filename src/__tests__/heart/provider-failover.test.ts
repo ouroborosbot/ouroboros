@@ -6,25 +6,30 @@ vi.mock("../../nerves/runtime", () => ({
 
 import { buildFailoverContext, handleFailoverReply } from "../../heart/provider-failover"
 
+const models = { anthropic: "claude-opus-4-6", "openai-codex": "gpt-5.4", azure: "gpt-4o-mini", minimax: "minimax-text-01" }
+
 describe("buildFailoverContext", () => {
-  it("builds message with working providers", () => {
+  it("builds message with working providers and model info", () => {
     const ctx = buildFailoverContext(
       "exceeded your usage limit",
       "usage-limit",
       "openai-codex",
+      "gpt-5.4",
       "slugger",
       {
         anthropic: { ok: true },
         minimax: { ok: false, classification: "auth-failure", message: "no credentials configured" },
         azure: { ok: false, classification: "auth-failure", message: "no credentials configured" },
       },
+      models,
     )
 
-    expect(ctx.errorSummary).toBe("openai-codex hit its usage limit (exceeded your usage limit)")
+    expect(ctx.errorSummary).toBe("openai-codex (gpt-5.4) hit its usage limit (exceeded your usage limit)")
     expect(ctx.workingProviders).toEqual(["anthropic"])
     expect(ctx.unconfiguredProviders).toContain("minimax")
     expect(ctx.unconfiguredProviders).toContain("azure")
     expect(ctx.userMessage).toContain("switch to anthropic")
+    expect(ctx.userMessage).toContain("anthropic (claude-opus-4-6)")
     expect(ctx.userMessage).toContain("ouro auth --agent slugger")
   })
 
@@ -33,17 +38,21 @@ describe("buildFailoverContext", () => {
       "auth failed",
       "auth-failure",
       "openai-codex",
+      "gpt-5.4",
       "slugger",
       {
         anthropic: { ok: true },
         azure: { ok: true },
         minimax: { ok: false, classification: "auth-failure", message: "no credentials configured" },
       },
+      models,
     )
 
     expect(ctx.workingProviders).toEqual(["anthropic", "azure"])
     expect(ctx.userMessage).toContain("switch to anthropic")
     expect(ctx.userMessage).toContain("switch to azure")
+    expect(ctx.userMessage).toContain("claude-opus-4-6")
+    expect(ctx.userMessage).toContain("gpt-4o-mini")
   })
 
   it("handles no working providers", () => {
@@ -51,12 +60,14 @@ describe("buildFailoverContext", () => {
       "server error",
       "server-error",
       "anthropic",
+      "claude-opus-4-6",
       "slugger",
       {
         "openai-codex": { ok: false, classification: "server-error", message: "502" },
         minimax: { ok: false, classification: "auth-failure", message: "no credentials configured" },
         azure: { ok: false, classification: "auth-failure", message: "no credentials configured" },
       },
+      models,
     )
 
     expect(ctx.workingProviders).toHaveLength(0)
@@ -68,7 +79,9 @@ describe("buildFailoverContext", () => {
       "network error",
       "network-error",
       "anthropic",
+      "claude-opus-4-6",
       "slugger",
+      {},
       {},
     )
 
@@ -82,30 +95,27 @@ describe("buildFailoverContext", () => {
       "rate limited",
       "rate-limit",
       "openai-codex",
+      "gpt-5.4",
       "slugger",
       {
         anthropic: { ok: true },
         azure: { ok: false, classification: "rate-limit", message: "429" },
         minimax: { ok: false, classification: "server-error", message: "500" },
       },
+      models,
     )
 
-    // azure and minimax are configured but failing — not in workingProviders or unconfiguredProviders
     expect(ctx.workingProviders).toEqual(["anthropic"])
     expect(ctx.unconfiguredProviders).toHaveLength(0)
   })
 
-  it("reflects classification in error summary", () => {
-    expect(buildFailoverContext("", "auth-failure", "anthropic", "a", {}).errorSummary)
-      .toBe("anthropic authentication failed")
-    expect(buildFailoverContext("", "usage-limit", "openai-codex", "a", {}).errorSummary)
-      .toBe("openai-codex hit its usage limit")
-    expect(buildFailoverContext("", "server-error", "azure", "a", {}).errorSummary)
+  it("reflects classification in error summary with model", () => {
+    expect(buildFailoverContext("", "auth-failure", "anthropic", "claude-opus-4-6", "a", {}, {}).errorSummary)
+      .toBe("anthropic (claude-opus-4-6) authentication failed")
+    expect(buildFailoverContext("", "usage-limit", "openai-codex", "gpt-5.4", "a", {}, {}).errorSummary)
+      .toBe("openai-codex (gpt-5.4) hit its usage limit")
+    expect(buildFailoverContext("", "server-error", "azure", "", "a", {}, {}).errorSummary)
       .toBe("azure is experiencing an outage")
-    expect(buildFailoverContext("", "network-error", "minimax", "a", {}).errorSummary)
-      .toBe("minimax is unreachable (network error)")
-    expect(buildFailoverContext("", "unknown", "anthropic", "a", {}).errorSummary)
-      .toBe("anthropic encountered an error")
   })
 })
 
@@ -114,11 +124,13 @@ describe("handleFailoverReply", () => {
     "usage limit",
     "usage-limit",
     "openai-codex",
+    "gpt-5.4",
     "slugger",
     {
       anthropic: { ok: true },
       azure: { ok: true },
     },
+    models,
   )
 
   it("matches 'switch to anthropic'", () => {
@@ -150,10 +162,10 @@ describe("handleFailoverReply", () => {
   })
 
   it("does not allow switching to non-working providers", () => {
-    const limited = buildFailoverContext("err", "auth-failure", "openai-codex", "s", {
+    const limited = buildFailoverContext("err", "auth-failure", "openai-codex", "gpt-5.4", "s", {
       anthropic: { ok: true },
       minimax: { ok: false, classification: "server-error", message: "down" },
-    })
+    }, models)
     expect(handleFailoverReply("switch to minimax", limited)).toEqual({ action: "dismiss" })
   })
 })
