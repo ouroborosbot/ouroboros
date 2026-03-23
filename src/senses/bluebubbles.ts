@@ -791,7 +791,7 @@ async function handleBlueBubblesNormalizedEvent(
         await client.sendText({ chat: event.chat, text: result.failoverMessage })
       }
       if (result.switchedProvider) {
-        await client.sendText({ chat: event.chat, text: `switched to ${result.switchedProvider}. your conversation is intact — go ahead whenever you're ready.` })
+        await client.sendText({ chat: event.chat, text: `switched to ${result.switchedProvider}.` })
       }
       /* v8 ignore stop */
 

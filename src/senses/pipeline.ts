@@ -89,6 +89,8 @@ export interface InboundTurnInput {
   ) => Promise<{ usage?: UsageData; outcome: RunAgentOutcome; completion?: CompletionMetadata; error?: Error; errorClassification?: ProviderErrorClassification }>
   /** In-memory failover state for this session. Channel owns this, pipeline reads/writes it. */
   failoverState?: FailoverState
+  /** Set by the pipeline during failover switch — signals that a provider switch occurred this turn. */
+  switchedProvider?: string
   postTurn: (
     messages: ChatCompletionMessageParam[],
     sessPath: string,
@@ -245,7 +247,7 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
         })
       }
       /* v8 ignore stop */
-      /* v8 ignore next -- false branch: write-failure fallthrough tested conceptually, v8 undercounts @preserve */
+      /* v8 ignore next -- false branch: write-failure fallthrough @preserve */
       if (switchSucceeded) {
         emitNervesEvent({
           component: "senses",
@@ -253,14 +255,14 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
           message: `switched provider to ${failoverAction.provider} via failover`,
           meta: { agentName: failoverAgentName, provider: failoverAction.provider },
         })
-        const resolvedContext = await input.friendResolver.resolve()
-        return {
-          resolvedContext,
-          gateResult: { allowed: true },
-          switchedProvider: failoverAction.provider,
-        }
+        // Clear the "switch to <provider>" message — it's a harness command, not for the agent.
+        // The session already has the user's original question from the failed turn.
+        // Fall through to normal pipeline processing so the agent retries automatically
+        // on the new provider.
+        input.messages = []
+        input.switchedProvider = failoverAction.provider
       }
-      // Switch failed — fall through to normal processing with old provider
+      // Switch failed OR succeeded — either way, fall through to normal processing.
     }
   }
 
@@ -558,5 +560,6 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
     sessionPath: session.sessionPath,
     messages: sessionMessages,
     drainedPending: pending,
+    ...(input.switchedProvider ? { switchedProvider: input.switchedProvider } : {}),
   }
 }

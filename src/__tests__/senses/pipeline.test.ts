@@ -1438,7 +1438,8 @@ describe("handleInboundTurn", () => {
       expect(failoverState.pending).not.toBeNull()
     })
 
-    it("handles failover reply to switch provider", async () => {
+    it("handles failover reply to switch provider and auto-retries on new provider", async () => {
+      const mockRunAgent = vi.fn().mockResolvedValue({ usage: usageData, outcome: "complete" })
       const failoverState = {
         pending: {
           errorSummary: "openai-codex hit its usage limit",
@@ -1453,6 +1454,7 @@ describe("handleInboundTurn", () => {
       const input = makeInput({
         failoverState,
         messages: [{ role: "user", content: "switch to anthropic" }],
+        runAgent: mockRunAgent,
       })
 
       const result = await handleInboundTurn(input)
@@ -1460,6 +1462,13 @@ describe("handleInboundTurn", () => {
       expect(result.switchedProvider).toBe("anthropic")
       expect(mockWriteAgentProviderSelection).toHaveBeenCalledWith("slugger", "anthropic")
       expect(failoverState.pending).toBeNull()
+      // The pipeline should have auto-retried: runAgent was called on the new provider
+      expect(mockRunAgent).toHaveBeenCalledTimes(1)
+      // "switch to anthropic" should NOT be in the messages passed to runAgent
+      const passedMessages = mockRunAgent.mock.calls[0][0]
+      expect(passedMessages.every((m: any) => m.content !== "switch to anthropic")).toBe(true)
+      // Turn completed successfully on the new provider
+      expect(result.turnOutcome).toBe("complete")
     })
 
     it("dismisses failover on unrelated reply and processes normally", async () => {

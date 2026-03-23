@@ -642,7 +642,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
       callbacks.onError(capturedTerminalError, "terminal")
     }
     if (result.switchedProvider) {
-      stream.emit(`switched to ${result.switchedProvider}. your conversation is intact — go ahead whenever you're ready.`)
+      stream.emit(`switched to ${result.switchedProvider}.`)
     }
     /* v8 ignore stop */
 

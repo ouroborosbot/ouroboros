@@ -938,7 +938,7 @@ export async function main(agentName?: string, options?: { pasteDebounceMs?: num
           process.stderr.write(`\x1b[31m${formatError(capturedTerminalError)}\x1b[0m\n`)
         }
         if (result.switchedProvider) {
-          process.stdout.write(`\x1b[32mswitched to ${result.switchedProvider}. your conversation is intact — go ahead whenever you're ready.\x1b[0m\n`)
+          process.stdout.write(`\x1b[32mswitched to ${result.switchedProvider}.\x1b[0m\n`)
         }
         /* v8 ignore stop */
 
