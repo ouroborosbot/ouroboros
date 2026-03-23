@@ -1,3 +1,5 @@
+import type Anthropic from "@anthropic-ai/sdk"
+import OpenAI from "openai"
 import type { ProviderErrorClassification, ProviderRuntime } from "./core"
 import type { AgentProvider } from "./identity"
 import type {
@@ -27,6 +29,28 @@ type ProviderConfig =
   | OpenAICodexProviderConfig
 
 const PING_TIMEOUT_MS = 10_000
+
+/**
+ * Strip raw JSON API response bodies from error messages.
+ * SDK errors often include the full response body: "400 {"type":"error","error":...}".
+ * Extract just the HTTP status prefix or a short summary.
+ */
+export function sanitizeErrorMessage(message: string): string {
+  // Match "NNN {json...}" pattern — keep the status code, drop the JSON
+  const match = message.match(/^(\d{3})\s*\{/)
+  if (match) {
+    // Try to extract the inner message from the JSON
+    try {
+      const json = JSON.parse(message.slice(match[1].length).trim())
+      const inner = json?.error?.message
+      if (typeof inner === "string" && inner && inner !== "Error") {
+        return `${match[1]} ${inner}`
+      }
+    } catch { /* not valid JSON, fall through */ }
+    return `HTTP ${match[1]}`
+  }
+  return message
+}
 
 function hasEmptyCredentials(provider: AgentProvider, config: ProviderConfig): boolean {
   switch (provider) {
@@ -68,18 +92,6 @@ function createRuntimeForPing(provider: AgentProvider, config: ProviderConfig): 
   }
 }
 
-/* v8 ignore start -- no-op stubs: never invoked, ping only needs streamTurn to not throw @preserve */
-const noop = () => {}
-/* v8 ignore stop */
-const noopCallbacks = {
-  onModelStart: noop,
-  onModelStreamStart: noop,
-  onTextChunk: noop,
-  onReasoningChunk: noop,
-  onToolStart: noop,
-  onToolEnd: noop,
-  onError: noop,
-}
 
 export async function pingProvider(
   provider: AgentProvider,
@@ -107,12 +119,25 @@ export async function pingProvider(
     /* v8 ignore next -- timeout callback: only fires after 10s, tests resolve faster @preserve */
     const timeout = setTimeout(() => controller.abort(), PING_TIMEOUT_MS)
     try {
-      await runtime.streamTurn({
-        messages: [{ role: "user", content: "ping" }],
-        activeTools: [],
-        callbacks: noopCallbacks,
-        signal: controller.signal,
-      })
+      // Minimal API call — no thinking, no reasoning, no tools.
+      if (provider === "anthropic") {
+        // Use haiku for the ping — setup tokens may not have access to newer
+        // models, but if haiku works, the credentials are valid.
+        // Override the beta header to exclude thinking (which requires a
+        // thinking param in the request body).
+        const client = runtime.client as Anthropic
+        await client.messages.create(
+          { model: "claude-haiku-4-5-20251001", max_tokens: 1, messages: [{ role: "user", content: "ping" }] },
+          { signal: controller.signal, headers: { "anthropic-beta": "claude-code-20250219,oauth-2025-04-20" } },
+        )
+      } else {
+        // OpenAI-compatible providers (azure, codex, minimax, github-copilot)
+        const client = runtime.client as OpenAI
+        await client.chat.completions.create(
+          { model: runtime.model, max_tokens: 1, messages: [{ role: "user", content: "ping" }] },
+          { signal: controller.signal },
+        )
+      }
       return { ok: true }
     } finally {
       clearTimeout(timeout)
@@ -132,7 +157,7 @@ export async function pingProvider(
       message: `provider ping failed: ${provider}`,
       meta: { provider, classification, error: err.message },
     })
-    return { ok: false, classification, message: err.message }
+    return { ok: false, classification, message: sanitizeErrorMessage(err.message) }
   }
 }
 

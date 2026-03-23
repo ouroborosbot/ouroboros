@@ -4,15 +4,21 @@ vi.mock("../../nerves/runtime", () => ({
   emitNervesEvent: vi.fn(),
 }))
 
-const mockStreamTurn = vi.fn()
+const mockAnthropicCreate = vi.fn()
+const mockOpenAICreate = vi.fn()
 const mockClassifyError = vi.fn()
 
-// Mock all provider factories to return a controllable runtime
+
+// Anthropic client mock: client.messages.create(...)
+const anthropicClient = { messages: { create: (...args: any[]) => mockAnthropicCreate(...args) } }
+// OpenAI-compatible client mock: client.chat.completions.create(...)
+const openaiClient = { chat: { completions: { create: (...args: any[]) => mockOpenAICreate(...args) } } }
+
 vi.mock("../../heart/providers/anthropic", () => ({
   createAnthropicProviderRuntime: vi.fn(() => ({
     id: "anthropic",
     model: "claude-opus-4-6",
-    streamTurn: mockStreamTurn,
+    client: anthropicClient,
     classifyError: mockClassifyError,
   })),
   classifyAnthropicError: vi.fn(() => "unknown"),
@@ -22,7 +28,7 @@ vi.mock("../../heart/providers/azure", () => ({
   createAzureProviderRuntime: vi.fn(() => ({
     id: "azure",
     model: "gpt-4o-mini",
-    streamTurn: mockStreamTurn,
+    client: openaiClient,
     classifyError: mockClassifyError,
   })),
   classifyAzureError: vi.fn(() => "unknown"),
@@ -32,7 +38,7 @@ vi.mock("../../heart/providers/minimax", () => ({
   createMinimaxProviderRuntime: vi.fn(() => ({
     id: "minimax",
     model: "minimax-text-01",
-    streamTurn: mockStreamTurn,
+    client: openaiClient,
     classifyError: mockClassifyError,
   })),
   classifyMinimaxError: vi.fn(() => "unknown"),
@@ -42,7 +48,7 @@ vi.mock("../../heart/providers/openai-codex", () => ({
   createOpenAICodexProviderRuntime: vi.fn(() => ({
     id: "openai-codex",
     model: "gpt-5.4",
-    streamTurn: mockStreamTurn,
+    client: openaiClient,
     classifyError: mockClassifyError,
   })),
   classifyOpenAICodexError: vi.fn(() => "unknown"),
@@ -52,40 +58,79 @@ vi.mock("../../heart/providers/github-copilot", () => ({
   createGithubCopilotProviderRuntime: vi.fn(() => ({
     id: "github-copilot",
     model: "gpt-5.4",
-    streamTurn: mockStreamTurn,
+    client: openaiClient,
     classifyError: mockClassifyError,
   })),
   classifyGithubCopilotError: vi.fn(() => "unknown"),
 }))
 
-import { pingProvider, type PingResult } from "../../heart/provider-ping"
+import { pingProvider, sanitizeErrorMessage, type PingResult } from "../../heart/provider-ping"
 import type { ProviderErrorClassification } from "../../heart/core"
+
+describe("sanitizeErrorMessage", () => {
+  it("strips raw JSON from Anthropic SDK errors", () => {
+    const raw = '400 {"type":"error","error":{"type":"invalid_request_error","message":"thinking.adaptive.effort: Extra inputs are not permitted"},"request_id":"req_123"}'
+    expect(sanitizeErrorMessage(raw)).toBe("400 thinking.adaptive.effort: Extra inputs are not permitted")
+  })
+
+  it("extracts inner message from JSON error body", () => {
+    const raw = '401 {"type":"error","error":{"type":"authentication_error","message":"OAuth authentication is currently not supported."}}'
+    expect(sanitizeErrorMessage(raw)).toBe("401 OAuth authentication is currently not supported.")
+  })
+
+  it("falls back to HTTP status when inner message is generic 'Error'", () => {
+    const raw = '400 {"type":"error","error":{"type":"invalid_request_error","message":"Error"}}'
+    expect(sanitizeErrorMessage(raw)).toBe("HTTP 400")
+  })
+
+  it("falls back to HTTP status when JSON is malformed", () => {
+    expect(sanitizeErrorMessage("400 {not valid json")).toBe("HTTP 400")
+  })
+
+  it("passes through clean error messages unchanged", () => {
+    expect(sanitizeErrorMessage("401 Provided authentication token is expired.")).toBe("401 Provided authentication token is expired.")
+  })
+
+  it("passes through simple messages unchanged", () => {
+    expect(sanitizeErrorMessage("network error")).toBe("network error")
+  })
+})
 
 describe("pingProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it("returns ok: true when streamTurn succeeds for anthropic", async () => {
-    mockStreamTurn.mockResolvedValue({ content: "hi", outputItems: [] })
+  it("returns ok: true when ping succeeds for anthropic", async () => {
+    mockAnthropicCreate.mockResolvedValue({ content: [{ text: "hi" }] })
     const result = await pingProvider("anthropic", {
       model: "claude-opus-4-6",
       setupToken: "sk-ant-oat01-valid-token-that-is-long-enough-to-pass-format-check-1234567890abcdef",
     })
     expect(result.ok).toBe(true)
+    // Should call messages.create with minimal params (no thinking)
+    // Ping uses haiku regardless of configured model (cheapest, widest token access)
+    expect(mockAnthropicCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "claude-haiku-4-5-20251001", max_tokens: 1 }),
+      expect.anything(),
+    )
   })
 
-  it("returns ok: true when streamTurn succeeds for openai-codex", async () => {
-    mockStreamTurn.mockResolvedValue({ content: "hi", outputItems: [] })
+  it("returns ok: true when ping succeeds for openai-codex", async () => {
+    mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: "hi" } }] })
     const result = await pingProvider("openai-codex", {
       model: "gpt-5.4",
       oauthAccessToken: "valid-token",
     })
     expect(result.ok).toBe(true)
+    expect(mockOpenAICreate).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "gpt-5.4", max_tokens: 1 }),
+      expect.anything(),
+    )
   })
 
-  it("returns ok: true when streamTurn succeeds for azure", async () => {
-    mockStreamTurn.mockResolvedValue({ content: "hi", outputItems: [] })
+  it("returns ok: true when ping succeeds for azure", async () => {
+    mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: "hi" } }] })
     const result = await pingProvider("azure", {
       modelName: "gpt-4o-mini",
       apiKey: "valid-key",
@@ -96,11 +141,21 @@ describe("pingProvider", () => {
     expect(result.ok).toBe(true)
   })
 
-  it("returns ok: true when streamTurn succeeds for minimax", async () => {
-    mockStreamTurn.mockResolvedValue({ content: "hi", outputItems: [] })
+  it("returns ok: true when ping succeeds for minimax", async () => {
+    mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: "hi" } }] })
     const result = await pingProvider("minimax", {
       model: "minimax-text-01",
       apiKey: "valid-key",
+    })
+    expect(result.ok).toBe(true)
+  })
+
+  it("returns ok: true when ping succeeds for github-copilot", async () => {
+    mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: "hi" } }] })
+    const result = await pingProvider("github-copilot", {
+      model: "gpt-5.4",
+      githubToken: "ghp_test123",
+      baseUrl: "https://api.copilot.example.com",
     })
     expect(result.ok).toBe(true)
   })
@@ -164,19 +219,9 @@ describe("pingProvider", () => {
     }
   })
 
-  it("returns ok: true when streamTurn succeeds for github-copilot", async () => {
-    mockStreamTurn.mockResolvedValue({ content: "hi", outputItems: [] })
-    const result = await pingProvider("github-copilot", {
-      model: "gpt-5.4",
-      githubToken: "ghp_test123",
-      baseUrl: "https://api.copilot.example.com",
-    })
-    expect(result.ok).toBe(true)
-  })
-
-  it("classifies error from streamTurn failure", async () => {
+  it("classifies error from API call failure", async () => {
     const err = Object.assign(new Error("auth failed"), { status: 401 })
-    mockStreamTurn.mockRejectedValue(err)
+    mockAnthropicCreate.mockRejectedValue(err)
     mockClassifyError.mockReturnValue("auth-failure" as ProviderErrorClassification)
 
     const result = await pingProvider("anthropic", {
@@ -190,9 +235,9 @@ describe("pingProvider", () => {
     }
   })
 
-  it("classifies usage-limit error from streamTurn", async () => {
+  it("classifies usage-limit error", async () => {
     const err = Object.assign(new Error("exceeded your usage limit"), { status: 429 })
-    mockStreamTurn.mockRejectedValue(err)
+    mockOpenAICreate.mockRejectedValue(err)
     mockClassifyError.mockReturnValue("usage-limit" as ProviderErrorClassification)
 
     const result = await pingProvider("openai-codex", {
@@ -205,8 +250,8 @@ describe("pingProvider", () => {
     }
   })
 
-  it("returns network-error on timeout", async () => {
-    mockStreamTurn.mockImplementation(() => new Promise((_, reject) => {
+  it("classifies network error on timeout", async () => {
+    mockAnthropicCreate.mockImplementation(() => new Promise((_, reject) => {
       setTimeout(() => reject(new Error("aborted")), 100)
     }))
     mockClassifyError.mockReturnValue("network-error" as ProviderErrorClassification)
@@ -222,7 +267,7 @@ describe("pingProvider", () => {
   })
 
   it("falls back to unknown when classifyError throws", async () => {
-    mockStreamTurn.mockRejectedValue(new Error("weird error"))
+    mockAnthropicCreate.mockRejectedValue(new Error("weird error"))
     mockClassifyError.mockImplementation(() => { throw new Error("classify itself broke") })
 
     const result = await pingProvider("anthropic", {

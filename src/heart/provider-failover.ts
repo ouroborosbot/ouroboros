@@ -17,6 +17,15 @@ export type FailoverAction =
   | { action: "switch"; provider: AgentProvider }
   | { action: "dismiss" }
 
+const FAILING_PROVIDER_LABELS: Record<ProviderErrorClassification, string> = {
+  "auth-failure": "its credentials need to be refreshed",
+  "usage-limit": "has also hit its usage limit",
+  "rate-limit": "is also being rate limited",
+  "server-error": "is also experiencing an outage",
+  "network-error": "could not be reached",
+  "unknown": "could not be reached",
+}
+
 const CLASSIFICATION_LABELS: Record<ProviderErrorClassification, string> = {
   "auth-failure": "authentication failed",
   "usage-limit": "hit its usage limit",
@@ -27,7 +36,7 @@ const CLASSIFICATION_LABELS: Record<ProviderErrorClassification, string> = {
 }
 
 export function buildFailoverContext(
-  errorMessage: string,
+  _errorMessage: string,
   classification: ProviderErrorClassification,
   currentProvider: AgentProvider,
   currentModel: string,
@@ -37,20 +46,21 @@ export function buildFailoverContext(
 ): FailoverContext {
   const label = CLASSIFICATION_LABELS[classification]
   const providerWithModel = currentModel ? `${currentProvider} (${currentModel})` : currentProvider
-  const errorSummary = errorMessage
-    ? `${providerWithModel} ${label} (${errorMessage})`
-    : `${providerWithModel} ${label}`
+  const errorSummary = `${providerWithModel} ${label}`
 
   const workingProviders: AgentProvider[] = []
   const unconfiguredProviders: AgentProvider[] = []
+  const failingProviders: { provider: AgentProvider; classification: ProviderErrorClassification }[] = []
 
   for (const [provider, result] of Object.entries(inventory) as [AgentProvider, PingResult][]) {
     if (result.ok) {
       workingProviders.push(provider)
     } else if (result.classification === "auth-failure" && result.message === "no credentials configured") {
       unconfiguredProviders.push(provider)
+    } else {
+      // Configured but ping failed (expired token, provider also down, etc.)
+      failingProviders.push({ provider, classification: result.classification })
     }
-    // Providers that are configured but failing (e.g., also rate-limited) are omitted from both lists
   }
 
   const lines: string[] = [`${errorSummary}.`]
@@ -65,11 +75,19 @@ export function buildFailoverContext(
     lines.push(`reply ${switchOptions} to continue.`)
   }
 
+  if (failingProviders.length > 0) {
+    for (const { provider, classification } of failingProviders) {
+      /* v8 ignore next -- defensive: all classifications have labels @preserve */
+      const detail = FAILING_PROVIDER_LABELS[classification] ?? "could not be reached"
+      lines.push(`${provider} is configured but ${detail}. run \`ouro auth --agent ${agentName} --provider ${provider}\` to refresh.`)
+    }
+  }
+
   if (unconfiguredProviders.length > 0) {
     lines.push(`to set up ${unconfiguredProviders.join(", ")}, run \`ouro auth --agent ${agentName}\` in terminal.`)
   }
 
-  if (workingProviders.length === 0 && unconfiguredProviders.length === 0) {
+  if (workingProviders.length === 0 && unconfiguredProviders.length === 0 && failingProviders.length === 0) {
     lines.push(`no other providers are available. run \`ouro auth --agent ${agentName}\` in terminal to configure one.`)
   }
 
@@ -97,7 +115,7 @@ export function handleFailoverReply(
 ): FailoverAction {
   const lower = reply.toLowerCase().trim()
   for (const provider of context.workingProviders) {
-    if (lower === `switch to ${provider}` || lower === provider) {
+    if (lower.includes(`switch to ${provider}`) || lower === provider) {
       return { action: "switch", provider }
     }
   }
