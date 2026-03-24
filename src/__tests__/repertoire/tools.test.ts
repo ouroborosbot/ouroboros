@@ -727,6 +727,11 @@ describe("summarizeArgs", () => {
     // A completely hypothetical tool name that doesn't exist in any definition
     expect(summarizeArgs("totally_unknown_tool_xyz", { a: "1", b: "2" })).toBe("a=1 b=2")
   })
+
+  it("falls back to showing all args for registered tools without summaryKeys", () => {
+    // query_active_work is in allDefinitions but has no summaryKeys
+    expect(summarizeArgs("query_active_work", { status: "all" })).toBe("status=all")
+  })
 })
 
 describe("ToolDefinition type and registry", () => {
