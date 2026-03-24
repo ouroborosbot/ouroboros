@@ -1451,10 +1451,10 @@ export const baseToolDefinitions: ToolDefinition[] = [
 
 export const tools: OpenAI.ChatCompletionFunctionTool[] = baseToolDefinitions.map((d) => d.tool);
 
-export const goInwardTool: OpenAI.ChatCompletionFunctionTool = {
+export const descendTool: OpenAI.ChatCompletionFunctionTool = {
   type: "function",
   function: {
-    name: "go_inward",
+    name: "descend",
     description: "i need to think about this privately. this takes the current thread inward -- i'll sit with it, work through it, or carry it to where it needs to go. must be the only tool call in the turn.",
     parameters: {
       type: "object",

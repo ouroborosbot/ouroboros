@@ -8,7 +8,7 @@ import {
   getOpenAICodexConfig,
 } from "./config";
 import { loadAgentConfig } from "./identity";
-import { execTool, summarizeArgs, settleTool, observeTool, goInwardTool, getToolsForChannel, isConfirmationRequired } from "../repertoire/tools";
+import { execTool, summarizeArgs, settleTool, observeTool, descendTool, getToolsForChannel, isConfirmationRequired } from "../repertoire/tools";
 import type { ToolContext } from "../repertoire/tools";
 import { getChannelCapabilities } from "../mind/friends/channel";
 import { surfaceToolDef } from "../senses/surface-tool";
@@ -266,14 +266,14 @@ export type RunAgentOutcome =
   | "aborted"
   | "errored"
   | "observed"
-  | "go_inward";
+  | "descended";
 
 // Sole-call tools must be the only tool call in a turn. When they appear
 // alongside other tools, the sole-call tool is rejected with this message.
 const SOLE_CALL_REJECTION: Record<string, string> = {
   settle: "rejected: settle must be the only tool call. finish your work first, then call settle alone.",
   observe: "rejected: observe must be the only tool call. call observe alone when you want to stay silent.",
-  go_inward: "rejected: go_inward must be the only tool call. finish your other work first, then call go_inward alone.",
+  descend: "rejected: descend must be the only tool call. finish your other work first, then call descend alone.",
 };
 
 const DELEGATION_REASON_PROSE_HANDOFF: Record<DelegationReason, string> = {
@@ -285,7 +285,7 @@ const DELEGATION_REASON_PROSE_HANDOFF: Record<DelegationReason, string> = {
   unresolved_obligation: "there's an unresolved commitment from an earlier conversation",
 };
 
-function buildGoInwardHandoffPacket(params: {
+function buildDescendHandoffPacket(params: {
   topic: string
   mode: "reflect" | "plan" | "relay"
   delegationDecision?: DelegationDecision
@@ -363,7 +363,7 @@ export function getSettleRetryError(
   sawSteeringFollowUp: boolean,
   _delegationDecision?: DelegationDecision,
   sawSendMessageSelf?: boolean,
-  sawGoInward?: boolean,
+  sawDescend?: boolean,
   _sawQuerySession?: boolean,
   currentObligation?: string | null,
   innerJob?: InnerJob,
@@ -374,8 +374,8 @@ export function getSettleRetryError(
   // rejection loops where the agent couldn't respond to the user at all.
   // The agent is free to follow or ignore the delegation hint.
   // 2. Pending obligation not addressed
-  if (innerJob?.obligationStatus === "pending" && !sawSendMessageSelf && !sawGoInward) {
-    return "you're still holding something from an earlier conversation -- someone is waiting for your answer. finish the thought first, or go_inward to keep working on it privately.";
+  if (innerJob?.obligationStatus === "pending" && !sawSendMessageSelf && !sawDescend) {
+    return "you're still holding something from an earlier conversation -- someone is waiting for your answer. finish the thought first, or descend to keep working on it privately.";
   }
   // 3. mustResolveBeforeHandoff + missing intent
   if (mustResolveBeforeHandoff && !intent) {
@@ -630,7 +630,7 @@ export async function runAgent(
   let mustResolveBeforeHandoffActive = options?.mustResolveBeforeHandoff === true;
   let currentReasoningEffort = "medium";
   let sawSendMessageSelf = false;
-  let sawGoInward = false;
+  let sawDescend = false;
   let sawQuerySession = false;
   let sawBridgeManage = false;
   let sawExternalStateQuery = false;
@@ -662,11 +662,11 @@ export async function runAgent(
 
   while (!done) {
     // Channel-based tool filtering:
-    // - Inner dialog: exclude go_inward (already inward), send_message (delivery via surface), observe (no one to observe)
+    // - Inner dialog: exclude descend (already inward), send_message (delivery via surface), observe (no one to observe)
     // - 1:1 sessions: exclude observe (can't ignore someone talking directly to you)
     // - Group chats: observe available
     //
-    // go_inward, settle, surface, and observe are always assembled based on channel context.
+    // descend, settle, surface, and observe are always assembled based on channel context.
     // toolChoiceRequired only controls whether tool_choice: "required" is set in the API call.
     const isInnerDialog = channel === "inner";
     const filteredBaseTools = isInnerDialog
@@ -674,7 +674,7 @@ export async function runAgent(
       : baseTools;
     const activeTools = [
       ...filteredBaseTools,
-      ...(!isInnerDialog ? [goInwardTool] : []),
+      ...(!isInnerDialog ? [descendTool] : []),
       ...(isInnerDialog ? [surfaceToolDef] : []),
       ...(currentContext?.isGroupChat && !isInnerDialog ? [observeTool] : []),
       settleTool,
@@ -794,7 +794,7 @@ export async function runAgent(
             sawSteeringFollowUp,
             options?.delegationDecision,
             sawSendMessageSelf,
-            sawGoInward,
+            sawDescend,
             sawQuerySession,
             options?.currentObligation ?? null,
             options?.activeWorkFrame?.inner?.job,
@@ -872,9 +872,9 @@ export async function runAgent(
           continue;
         }
 
-        // Check for go_inward sole call: intercept before tool execution
-        const isSoleGoInward = result.toolCalls.length === 1 && result.toolCalls[0].name === "go_inward";
-        if (isSoleGoInward) {
+        // Check for descend sole call: intercept before tool execution
+        const isSoleDescend = result.toolCalls.length === 1 && result.toolCalls[0].name === "descend";
+        if (isSoleDescend) {
           let parsedArgs: { topic?: string; answer?: string; mode?: string } = {};
           try {
             parsedArgs = JSON.parse(result.toolCalls[0].arguments);
@@ -894,7 +894,7 @@ export async function runAgent(
           }
 
           // Build handoff packet and enqueue
-          const handoffContent = buildGoInwardHandoffPacket({
+          const handoffContent = buildDescendHandoffPacket({
             topic,
             mode,
             delegationDecision: options?.delegationDecision,
@@ -934,12 +934,12 @@ export async function runAgent(
                 content: topic,
               })
             } catch {
-              /* v8 ignore next -- defensive: obligation store write failure should not break go_inward @preserve */
+              /* v8 ignore next -- defensive: obligation store write failure should not break descend @preserve */
             }
           }
           try { await requestInnerWake(getAgentName()); } catch { /* daemon may not be running */ }
 
-          sawGoInward = true;
+          sawDescend = true;
           messages.push(msg);
           const ack = "(going inward)";
           messages.push({ role: "tool", tool_call_id: result.toolCalls[0].id, content: ack });
@@ -947,12 +947,12 @@ export async function runAgent(
 
           emitNervesEvent({
             component: "engine",
-            event: "engine.go_inward",
+            event: "engine.descended",
             message: "taking thread inward",
             meta: { mode, hasAnswer: answer !== undefined, contentSnippet: topic.slice(0, 80) },
           });
 
-          outcome = "go_inward";
+          outcome = "descended";
           done = true;
           continue;
         }
@@ -1100,7 +1100,7 @@ export async function runAgent(
     trace_id: traceId,
     component: "engine",
     message: "runAgent turn completed",
-    meta: { done, sawGoInward, sawQuerySession, sawBridgeManage },
+    meta: { done, sawDescend, sawQuerySession, sawBridgeManage },
   });
   return {
     usage: lastUsage,

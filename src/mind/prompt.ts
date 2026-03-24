@@ -602,7 +602,7 @@ i should orient around that live lane first, then decide what still needs to com
     return `## where my attention is
 i have unfinished work that needs attention before i move on.
 
-i can take it inward with go_inward to think privately, or address it directly here.`
+i can take it inward with descend to think privately, or address it directly here.`
   }
 
   if (cog === "shared-work") {
