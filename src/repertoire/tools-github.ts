@@ -44,8 +44,3 @@ export const githubToolDefinitions: ToolDefinition[] = [
     summaryKeys: ["title"],
   },
 ]
-
-export function summarizeGithubArgs(name: string, args: Record<string, string>): string | undefined {
-  if (name === "file_ouroboros_bug") return args.title || ""
-  return undefined
-}
