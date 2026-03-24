@@ -162,6 +162,7 @@ const surfaceToolDefinition: ToolDefinition = {
       },
     })
   },
+  summaryKeys: ["content", "delegationId"],
 }
 /* v8 ignore stop */
 

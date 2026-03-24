@@ -33,6 +33,7 @@ export const teamsToolDefinitions: ToolDefinition[] = [
       return graphRequest(ctx.graphToken, "GET", args.path);
     },
     integration: "graph",
+    summaryKeys: ["path"],
   },
   {
     tool: {
@@ -62,6 +63,7 @@ export const teamsToolDefinitions: ToolDefinition[] = [
     },
     integration: "graph",
     confirmationRequired: true,
+    summaryKeys: ["method", "path"],
   },
   // -- Generic ADO tools --
   {
@@ -91,6 +93,7 @@ export const teamsToolDefinitions: ToolDefinition[] = [
       return adoRequest(ctx.adoToken, method, args.organization, args.path, args.body, args.host);
     },
     integration: "ado",
+    summaryKeys: ["method", "organization", "path"],
   },
   {
     tool: {
@@ -122,6 +125,7 @@ export const teamsToolDefinitions: ToolDefinition[] = [
     },
     integration: "ado",
     confirmationRequired: true,
+    summaryKeys: ["method", "organization", "path"],
   },
   // -- Convenience aliases (backward compat) --
   {
@@ -140,6 +144,7 @@ export const teamsToolDefinitions: ToolDefinition[] = [
       return getProfile(ctx.graphToken);
     },
     integration: "graph",
+    summaryKeys: [],
   },
   {
     tool: {
@@ -181,6 +186,7 @@ export const teamsToolDefinitions: ToolDefinition[] = [
       return queryWorkItems(ctx.adoToken, org, query);
     },
     integration: "ado",
+    summaryKeys: ["organization", "query"],
   },
   // -- Proactive messaging --
   {
@@ -231,6 +237,7 @@ export const teamsToolDefinitions: ToolDefinition[] = [
     },
     /* v8 ignore stop */
     confirmationRequired: true,
+    summaryKeys: ["user_name", "user_id"],
   },
   // -- Documentation tools --
   {
@@ -252,6 +259,7 @@ export const teamsToolDefinitions: ToolDefinition[] = [
       return searchEndpoints(graphEndpoints as EndpointEntry[], args.query || "");
     },
     integration: "graph",
+    summaryKeys: ["query"],
   },
   {
     tool: {
@@ -272,6 +280,7 @@ export const teamsToolDefinitions: ToolDefinition[] = [
       return searchEndpoints(adoEndpoints as EndpointEntry[], args.query || "");
     },
     integration: "ado",
+    summaryKeys: ["query"],
   },
 ];
 

@@ -41,6 +41,7 @@ export const githubToolDefinitions: ToolDefinition[] = [
     },
     integration: "github",
     confirmationRequired: true,
+    summaryKeys: ["title"],
   },
 ]
 

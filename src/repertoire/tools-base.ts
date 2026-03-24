@@ -90,6 +90,7 @@ export interface ToolDefinition {
   integration?: Integration;
   confirmationRequired?: boolean;
   requiredCapability?: import("../heart/core").ProviderCapability;
+  summaryKeys?: string[];
 }
 
 // Tracks which file paths have been read via read_file in this session.
@@ -420,6 +421,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       const end = limit !== undefined ? start + limit : lines.length
       return lines.slice(start, end).join("\n")
     },
+    summaryKeys: ["path"],
   },
   {
     tool: {
@@ -440,6 +442,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       fs.writeFileSync(resolvedPath, a.content, "utf-8")
       return "ok"
     },
+    summaryKeys: ["path"],
   },
   {
     tool: {
@@ -504,6 +507,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
 
       return buildContextDiff(lines, changeStartLine, changeEndLine)
     },
+    summaryKeys: ["path"],
   },
   {
     tool: {
@@ -526,6 +530,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       const matches = fg.globSync(a.pattern, { cwd, dot: true })
       return matches.sort().join("\n")
     },
+    summaryKeys: ["pattern", "cwd"],
   },
   {
     tool: {
@@ -638,6 +643,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       }
       return allResults.join("\n")
     },
+    summaryKeys: ["pattern", "path", "include"],
   },
   {
     tool: {
@@ -683,6 +689,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
         ...(prepared.cwd ? { cwd: prepared.cwd } : {}),
       })
     },
+    summaryKeys: ["command"],
   },
   {
     tool: {
@@ -715,6 +722,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
         return `error: ${e}`;
       }
     },
+    summaryKeys: ["name"],
   },
   {
     tool: {
@@ -749,6 +757,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
         return `error: ${e}`;
       }
     },
+    summaryKeys: ["prompt"],
   },
   {
     tool: {
@@ -788,6 +797,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
         return `error: ${e}`;
       }
     },
+    summaryKeys: ["query"],
   },
   {
     tool: {
@@ -816,6 +826,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
         return `error: ${e instanceof Error ? e.message : String(e)}`;
       }
     },
+    summaryKeys: ["query"],
   },
   {
     tool: {
@@ -844,6 +855,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       });
       return `saved memory fact (added=${result.added}, skipped=${result.skipped})`;
     },
+    summaryKeys: ["text", "about"],
   },
   {
     tool: {
@@ -870,6 +882,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       if (!friend) return `friend not found: ${friendId}`;
       return JSON.stringify(friend, null, 2);
     },
+    summaryKeys: ["friendId"],
   },
   {
     tool: {
@@ -954,6 +967,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
         return `error saving note: ${err instanceof Error ? err.message : String(err)}`;
       }
     },
+    summaryKeys: ["type", "key", "content"],
   },
   // -- cross-session awareness --
   {
@@ -1067,6 +1081,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
 
       return `unknown bridge action: ${action}`
     },
+    summaryKeys: ["action", "bridgeId", "objective", "friendId", "channel", "key"],
   },
   {
     tool: {
@@ -1445,6 +1460,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       return `reasoning effort set to "${level}".`;
     },
     requiredCapability: "reasoning-effort" as const,
+    summaryKeys: ["level"],
   },
   ...codingToolDefinitions,
 ];
