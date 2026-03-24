@@ -998,3 +998,65 @@ describe("repairSessionMessages", () => {
     expect((repaired[2] as any).content).toBe("\n\n")
   })
 })
+
+describe("migrateToolNames", () => {
+  it("rewrites old tool names in assistant tool_calls", async () => {
+    const { migrateToolNames } = await import("../../mind/context")
+    const messages: any[] = [
+      { role: "system", content: "you are helpful" },
+      { role: "user", content: "hello" },
+      {
+        role: "assistant",
+        tool_calls: [{ id: "tc1", type: "function", function: { name: "final_answer", arguments: '{"answer":"hi"}' } }],
+      },
+      { role: "tool", tool_call_id: "tc1", content: "(delivered)" },
+      {
+        role: "assistant",
+        tool_calls: [{ id: "tc2", type: "function", function: { name: "go_inward", arguments: '{"topic":"think"}' } }],
+      },
+      { role: "tool", tool_call_id: "tc2", content: "(going inward)" },
+      {
+        role: "assistant",
+        tool_calls: [{ id: "tc3", type: "function", function: { name: "no_response", arguments: '{}' } }],
+      },
+      { role: "tool", tool_call_id: "tc3", content: "(observing)" },
+    ]
+    const migrated = migrateToolNames(messages)
+    expect((migrated[2] as any).tool_calls[0].function.name).toBe("settle")
+    expect((migrated[4] as any).tool_calls[0].function.name).toBe("descend")
+    expect((migrated[6] as any).tool_calls[0].function.name).toBe("observe")
+  })
+
+  it("leaves current tool names unchanged", async () => {
+    const { migrateToolNames } = await import("../../mind/context")
+    const messages: any[] = [
+      {
+        role: "assistant",
+        tool_calls: [{ id: "tc1", type: "function", function: { name: "settle", arguments: '{"answer":"hi"}' } }],
+      },
+      { role: "tool", tool_call_id: "tc1", content: "(delivered)" },
+    ]
+    const migrated = migrateToolNames(messages)
+    expect((migrated[0] as any).tool_calls[0].function.name).toBe("settle")
+  })
+
+  it("returns messages unchanged when no renames needed", async () => {
+    const { migrateToolNames } = await import("../../mind/context")
+    const messages: any[] = [
+      { role: "user", content: "hello" },
+      { role: "assistant", content: "hi" },
+    ]
+    const migrated = migrateToolNames(messages)
+    expect(migrated).toEqual(messages)
+  })
+
+  it("handles messages with no tool_calls", async () => {
+    const { migrateToolNames } = await import("../../mind/context")
+    const messages: any[] = [
+      { role: "assistant", content: "just text" },
+      { role: "assistant", tool_calls: [] },
+    ]
+    const migrated = migrateToolNames(messages)
+    expect(migrated).toEqual(messages)
+  })
+})
