@@ -712,6 +712,21 @@ describe("summarizeArgs", () => {
     })
     expect(result).toBe("key=value")
   })
+
+  it("returns empty string for tools with summaryKeys: [] (graph_profile)", () => {
+    expect(summarizeArgs("graph_profile", {})).toBe("")
+    expect(summarizeArgs("graph_profile", { foo: "bar" })).toBe("")
+  })
+
+  it("uses summaryKeys from tool definition rather than switch branch", () => {
+    // file_ouroboros_bug has summaryKeys: ["title"] -- should return key=value format
+    expect(summarizeArgs("file_ouroboros_bug", { title: "Fix the login bug" })).toBe("title=Fix the login bug")
+  })
+
+  it("falls back to showing all args for tools not in any definition registry", () => {
+    // A completely hypothetical tool name that doesn't exist in any definition
+    expect(summarizeArgs("totally_unknown_tool_xyz", { a: "1", b: "2" })).toBe("a=1 b=2")
+  })
 })
 
 describe("ToolDefinition type and registry", () => {
@@ -2699,10 +2714,10 @@ describe("github tool registration", () => {
     expect(isConfirmationRequired("file_ouroboros_bug")).toBe(true)
   })
 
-  it("summarizeArgs returns title for file_ouroboros_bug", async () => {
+  it("summarizeArgs returns title key=value for file_ouroboros_bug", async () => {
     vi.resetModules()
     const { summarizeArgs } = await import("../../repertoire/tools")
-    expect(summarizeArgs("file_ouroboros_bug", { title: "Fix bug" })).toBe("Fix bug")
+    expect(summarizeArgs("file_ouroboros_bug", { title: "Fix bug" })).toBe("title=Fix bug")
   })
 
   it("summarizeArgs returns empty string for file_ouroboros_bug with no title", async () => {
