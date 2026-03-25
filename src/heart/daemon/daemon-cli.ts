@@ -2199,15 +2199,16 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     let repoCwd: string
     if (command.repoPath) {
       repoCwd = path.resolve(command.repoPath)
+    /* v8 ignore start -- clone branch: resolveClonePath requires real git/npm, tested manually @preserve */
     } else if (command.clone) {
       try {
         repoCwd = resolveClonePath(command, checkExists, deps)
       } catch (err) {
-        /* v8 ignore next -- defensive: resolveClonePath error message @preserve */
         const message = err instanceof Error ? err.message : String(err)
         deps.writeStdout(message)
         return message
       }
+    /* v8 ignore stop */
     } else {
       repoCwd = deps.getRepoCwd ? deps.getRepoCwd() : getRepoRoot()
     }
