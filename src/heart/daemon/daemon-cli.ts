@@ -89,6 +89,7 @@ export type OuroCliCommand =
   | { kind: "hatch.start"; agentName?: string; humanName?: string; provider?: AgentProvider; credentials?: HatchCredentialsInput; migrationPath?: string }
   | { kind: "rollback"; version?: string }
   | { kind: "versions" }
+  | { kind: "daemon.dev" }
   | { kind: "attention.list"; agent?: string }
   | { kind: "attention.show"; id: string; agent?: string }
   | { kind: "attention.history"; agent?: string }
@@ -388,6 +389,7 @@ function usage(): string {
   return [
     "Usage:",
     "  ouro [up]",
+    "  ouro dev",
     "  ouro stop|down|status|logs|hatch",
     "  ouro -v|--version",
     "  ouro config model --agent <name> <model-name>",
@@ -1042,6 +1044,7 @@ export function parseOuroCommand(args: string[]): OuroCliCommand {
   }
 
   if (head === "up") return { kind: "daemon.up" }
+  if (head === "dev") return { kind: "daemon.dev" }
   if (head === "rollback") return { kind: "rollback", ...(second ? { version: second } : {}) }
   if (head === "versions") return { kind: "versions" }
   if (head === "stop" || head === "down") return { kind: "daemon.stop" }
@@ -1585,7 +1588,7 @@ type ConfigModelsCliCommand = Extract<OuroCliCommand, { kind: "config.models" }>
 type RollbackCliCommand = Extract<OuroCliCommand, { kind: "rollback" }>
 type VersionsCliCommand = Extract<OuroCliCommand, { kind: "versions" }>
 type AttentionCliCommand = Extract<OuroCliCommand, { kind: "attention.list" } | { kind: "attention.show" } | { kind: "attention.history" }>
-function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "hatch.start" } | AuthCliCommand | AuthVerifyCliCommand | AuthSwitchCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand | ConfigModelCliCommand | ConfigModelsCliCommand | RollbackCliCommand | VersionsCliCommand | AttentionCliCommand>): DaemonCommand {
+function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "daemon.dev" } | { kind: "hatch.start" } | AuthCliCommand | AuthVerifyCliCommand | AuthSwitchCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand | ConfigModelCliCommand | ConfigModelsCliCommand | RollbackCliCommand | VersionsCliCommand | AttentionCliCommand>): DaemonCommand {
   return command
 }
 
@@ -2110,6 +2113,12 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     const daemonResult = await ensureDaemonRunning(deps)
     deps.writeStdout(daemonResult.message)
     return daemonResult.message
+  }
+
+  if (command.kind === "daemon.dev") {
+    const message = "ouro dev: not yet implemented"
+    deps.writeStdout(message)
+    return message
   }
 
   // ── rollback command (local, no daemon socket needed for symlinks) ──

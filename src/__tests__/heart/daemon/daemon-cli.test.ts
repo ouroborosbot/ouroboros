@@ -582,6 +582,10 @@ describe("ouro CLI parsing", () => {
     ).toThrow("Unknown provider")
     expect(() => parseOuroCommand(["mystery"])).toThrow("Unknown command")
   })
+
+  it("parses dev command", () => {
+    expect(parseOuroCommand(["dev"])).toEqual({ kind: "daemon.dev" })
+  })
 })
 
 describe("ouro CLI execution", () => {
