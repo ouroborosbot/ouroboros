@@ -2215,9 +2215,9 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     const repoCwd = resolveDevRepoCwd(command, checkExists, deps)
 
     const entryPath = path.join(repoCwd, "dist", "heart", "daemon", "daemon-entry.js")
-    if (!checkExists(entryPath)) {
+    if (!checkExists(entryPath) || !checkExists(path.join(repoCwd, ".git"))) {
       const lines = [
-        "no built harness repo found at " + repoCwd,
+        "no harness repo found at " + repoCwd,
         "",
         "options:",
         "  ouro dev --repo-path /path/to/ouroboros   use an existing checkout",

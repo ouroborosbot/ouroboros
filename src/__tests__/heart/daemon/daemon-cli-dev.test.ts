@@ -54,7 +54,7 @@ describe("ouro dev command handler", () => {
 
     const result = await runOuroCli(["dev"], deps)
 
-    expect(result).toContain("no built harness repo found")
+    expect(result).toContain("no harness repo found")
     expect(result).toContain("--repo-path")
     expect(result).toContain("--clone")
     expect(deps.startDaemonProcess).not.toHaveBeenCalled()
@@ -100,9 +100,26 @@ describe("ouro dev command handler", () => {
     expect(ensureCurrentVersionInstalled).not.toHaveBeenCalled()
   })
 
+  it("rejects when cwd has dist/ but no .git (installed package, not a repo)", async () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => {
+        if (p.includes(".git")) return false
+        if (p.includes("dist")) return true
+        return false
+      }),
+      getRepoCwd: vi.fn(() => "/installed/npm/package"),
+    })
+
+    const result = await runOuroCli(["dev"], deps)
+
+    expect(result).toContain("no harness repo found")
+    expect(result).toContain("--repo-path")
+    expect(deps.startDaemonProcess).not.toHaveBeenCalled()
+  })
+
   it("uses --repo-path when provided", async () => {
     const deps = makeDeps({
-      existsSync: vi.fn((p: string) => p.includes("/custom/repo/dist")),
+      existsSync: vi.fn((p: string) => p.includes("/custom/repo")),
       ensureDaemonBootPersistence: vi.fn(),
     })
 
