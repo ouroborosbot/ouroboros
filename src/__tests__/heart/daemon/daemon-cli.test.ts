@@ -584,7 +584,7 @@ describe("ouro CLI parsing", () => {
   })
 
   it("parses dev command", () => {
-    expect(parseOuroCommand(["dev"])).toEqual({ kind: "daemon.dev" })
+    expect(parseOuroCommand(["dev"])).toEqual({ kind: "daemon.dev", repoPath: undefined, clone: false, clonePath: undefined })
   })
 })
 
