@@ -912,6 +912,23 @@ export async function runAgent(
           const pendingDir = getInnerDialogPendingDir(getAgentName());
           const currentSession = (options?.toolContext as ToolContext | undefined)?.currentSession;
           const isInnerChannel = currentSession?.friendId === "self" && currentSession?.channel === "inner";
+          // Create obligation FIRST so we can attach its ID to the pending message
+          let createdObligationId: string | undefined;
+          if (currentSession && !isInnerChannel) {
+            try {
+              const obligation = createObligation(getAgentRoot(), {
+                origin: {
+                  friendId: currentSession.friendId,
+                  channel: currentSession.channel,
+                  key: currentSession.key,
+                },
+                content: topic,
+              })
+              createdObligationId = obligation.id;
+            } catch {
+              /* v8 ignore next -- defensive: obligation store write failure should not break descend @preserve */
+            }
+          }
           const envelope: PendingMessage = {
             from: getAgentName(),
             friendId: "self",
@@ -927,23 +944,10 @@ export async function runAgent(
                 key: currentSession.key,
               },
               obligationStatus: "pending" as const,
+              ...(createdObligationId ? { obligationId: createdObligationId } : {}),
             } : {}),
           };
           queuePendingMessage(pendingDir, envelope);
-          if (currentSession && !isInnerChannel) {
-            try {
-              createObligation(getAgentRoot(), {
-                origin: {
-                  friendId: currentSession.friendId,
-                  channel: currentSession.channel,
-                  key: currentSession.key,
-                },
-                content: topic,
-              })
-            } catch {
-              /* v8 ignore next -- defensive: obligation store write failure should not break descend @preserve */
-            }
-          }
           try { await requestInnerWake(getAgentName()); } catch { /* daemon may not be running */ }
 
           callbacks.onToolEnd("descend", summarizeArgs("descend", parsedArgs as Record<string, string>), true);
