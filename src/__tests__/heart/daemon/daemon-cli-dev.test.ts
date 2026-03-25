@@ -97,3 +97,48 @@ describe("ouro dev command handler", () => {
     expect(ensureCurrentVersionInstalled).not.toHaveBeenCalled()
   })
 })
+
+describe("ouro up from dev context", () => {
+  it("delegates to installed binary when running from dev mode", async () => {
+    const execInstalledBinary = vi.fn(() => { throw new Error("exec replaced process") }) as unknown as (binaryPath: string, args: string[]) => never
+    const deps = makeDeps({
+      detectMode: vi.fn(() => "dev" as const),
+      getInstalledBinaryPath: vi.fn(() => "/Users/me/.ouro-cli/bin/ouro"),
+      execInstalledBinary,
+    })
+
+    await expect(runOuroCli(["up"], deps)).rejects.toThrow("exec replaced process")
+
+    expect(execInstalledBinary).toHaveBeenCalledWith(
+      "/Users/me/.ouro-cli/bin/ouro",
+      ["up"],
+    )
+    // Should NOT start daemon directly
+    expect(deps.startDaemonProcess).not.toHaveBeenCalled()
+  })
+
+  it("prints error when no installed binary exists in dev mode", async () => {
+    const deps = makeDeps({
+      detectMode: vi.fn(() => "dev" as const),
+      getInstalledBinaryPath: vi.fn(() => null),
+    })
+
+    const result = await runOuroCli(["up"], deps)
+
+    expect(result).toContain("no installed version found")
+    expect(result).toContain("npx @ouro.bot/cli@alpha")
+    expect(deps.startDaemonProcess).not.toHaveBeenCalled()
+  })
+
+  it("proceeds normally when running from production mode", async () => {
+    const deps = makeDeps({
+      detectMode: vi.fn(() => "production" as const),
+      ensureDaemonBootPersistence: vi.fn(),
+    })
+
+    const result = await runOuroCli(["up"], deps)
+
+    expect(result).toContain("daemon started")
+    expect(deps.startDaemonProcess).toHaveBeenCalled()
+  })
+})

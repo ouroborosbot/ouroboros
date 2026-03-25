@@ -130,6 +130,9 @@ export interface OuroCliDeps {
   listCliVersions?: () => string[]
   existsSync?: (p: string) => boolean
   getRepoCwd?: () => string
+  detectMode?: () => "dev" | "production"
+  getInstalledBinaryPath?: () => string | null
+  execInstalledBinary?: (binaryPath: string, args: string[]) => never
 }
 
 export interface SessionEntry {
@@ -2015,6 +2018,23 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   })
 
   if (command.kind === "daemon.up") {
+    // ── dev mode delegation: ouro up from a dev repo delegates to installed binary ──
+    const runtimeMode = deps.detectMode ? deps.detectMode() : detectRuntimeMode(getRepoRoot())
+    if (runtimeMode === "dev") {
+      const installedBinary = deps.getInstalledBinaryPath ? deps.getInstalledBinaryPath() : null
+      if (installedBinary) {
+        deps.writeStdout("delegating to installed ouro...")
+        if (deps.execInstalledBinary) {
+          deps.execInstalledBinary(installedBinary, args)
+        }
+        /* v8 ignore next 2 -- unreachable after exec replaces process @preserve */
+        return ""
+      }
+      const message = "no installed version found. run: npx @ouro.bot/cli@alpha"
+      deps.writeStdout(message)
+      return message
+    }
+
     const linkedVersionBeforeUp = deps.getCurrentCliVersion?.() ?? null
 
     // ── versioned CLI update check ──
