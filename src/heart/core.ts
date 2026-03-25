@@ -944,6 +944,7 @@ export async function runAgent(
                 key: currentSession.key,
               },
               obligationStatus: "pending" as const,
+              /* v8 ignore next -- defensive: createdObligationId is undefined only when obligation store write fails @preserve */
               ...(createdObligationId ? { obligationId: createdObligationId } : {}),
             } : {}),
           };
