@@ -36,6 +36,7 @@ emitNervesEvent({
   meta: { socketPath, entryPath, mode },
 })
 
+/* v8 ignore next -- dev-mode indicator: false branch (production) tested in daemon-boot-updates.test.ts @preserve */
 if (mode === "dev") {
   const repoRoot = getRepoRoot()
   emitNervesEvent({
