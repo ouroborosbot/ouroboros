@@ -7,6 +7,7 @@ vi.mock("fs", () => ({
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
   unlinkSync: vi.fn(),
+  existsSync: vi.fn(),
 }))
 
 // Mock config for postTurn tests
@@ -996,6 +997,48 @@ describe("repairSessionMessages", () => {
     expect(repaired).toHaveLength(3)
     // Both non-string contents should fall back to ""
     expect((repaired[2] as any).content).toBe("\n\n")
+  })
+})
+
+describe("appendSyntheticAssistantMessage", () => {
+  it("appends an assistant message to an existing session file", async () => {
+    vi.mocked(fs.readFileSync).mockReset()
+    vi.mocked(fs.writeFileSync).mockReset()
+    const { appendSyntheticAssistantMessage } = await import("../../mind/context")
+    const sessionData = JSON.stringify({
+      version: 1,
+      messages: [
+        { role: "system", content: "test" },
+        { role: "user", content: "hello" },
+      ],
+    })
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readFileSync).mockReturnValue(sessionData)
+    const result = appendSyntheticAssistantMessage("/mock/session.json", "[surfaced from inner dialog] my reflection")
+    expect(result).toBe(true)
+    const written = JSON.parse(vi.mocked(fs.writeFileSync).mock.calls[0][1] as string)
+    expect(written.messages).toHaveLength(3)
+    expect(written.messages[2]).toEqual({ role: "assistant", content: "[surfaced from inner dialog] my reflection" })
+  })
+
+  it("returns false for non-existent file", async () => {
+    const { appendSyntheticAssistantMessage } = await import("../../mind/context")
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    expect(appendSyntheticAssistantMessage("/mock/missing.json", "test")).toBe(false)
+  })
+
+  it("returns false for invalid session version", async () => {
+    const { appendSyntheticAssistantMessage } = await import("../../mind/context")
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ version: 2, messages: [] }))
+    expect(appendSyntheticAssistantMessage("/mock/bad.json", "test")).toBe(false)
+  })
+
+  it("returns false for unparseable JSON", async () => {
+    const { appendSyntheticAssistantMessage } = await import("../../mind/context")
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error("bad json") })
+    expect(appendSyntheticAssistantMessage("/mock/bad.json", "test")).toBe(false)
   })
 })
 
