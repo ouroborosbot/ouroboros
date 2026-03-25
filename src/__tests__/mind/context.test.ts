@@ -1059,4 +1059,16 @@ describe("migrateToolNames", () => {
     const migrated = migrateToolNames(messages)
     expect(migrated).toEqual(messages)
   })
+
+  it("skips non-function tool calls (e.g. custom type)", async () => {
+    const { migrateToolNames } = await import("../../mind/context")
+    const messages: any[] = [
+      {
+        role: "assistant",
+        tool_calls: [{ id: "tc1", type: "custom", custom: { name: "final_answer" } }],
+      },
+    ]
+    const migrated = migrateToolNames(messages)
+    expect((migrated[0] as any).tool_calls[0].type).toBe("custom")
+  })
 })
