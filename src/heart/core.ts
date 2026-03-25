@@ -762,9 +762,12 @@ export async function runAgent(
       } else {
         // Check for settle sole call: intercept before tool execution
         if (isSoleSettle) {
+          const settleArgs = (() => { try { return JSON.parse(result.toolCalls[0].arguments) } catch { return {} } })();
+          callbacks.onToolStart("settle", settleArgs);
           // Inner dialog attention queue gate: reject settle if items remain
           const attentionQueue = (augmentedToolContext ?? options?.toolContext)?.delegatedOrigins;
           if (isInnerDialog && attentionQueue && attentionQueue.length > 0) {
+            callbacks.onToolEnd("settle", summarizeArgs("settle", settleArgs), false);
             callbacks.onClearText?.();
             messages.push(msg);
             const gateMessage = "you're holding thoughts someone is waiting for — surface them before you settle.";
@@ -779,6 +782,7 @@ export async function runAgent(
 
           // Inner dialog settle: no CompletionMetadata, "(settled)" ack
           if (isInnerDialog) {
+            callbacks.onToolEnd("settle", summarizeArgs("settle", settleArgs), true);
             messages.push(msg);
             const settled = "(settled)";
             messages.push({ role: "tool", tool_call_id: result.toolCalls[0].id, content: settled });
@@ -808,6 +812,7 @@ export async function runAgent(
             && (!mustResolveBeforeHandoffActive || validDirectReply || validTerminalIntent);
 
           if (validClosure) {
+            callbacks.onToolEnd("settle", summarizeArgs("settle", settleArgs), true);
             completion = {
               answer: deliveredAnswer,
               intent: validDirectReply ? "direct_reply" : intent === "blocked" ? "blocked" : "complete",
@@ -839,6 +844,7 @@ export async function runAgent(
             // Answer is undefined -- the model's settle was incomplete or
             // malformed. Clear any partial streamed text or noise, then push the
             // assistant msg + error tool result and let the model try again.
+            callbacks.onToolEnd("settle", summarizeArgs("settle", settleArgs), false);
             callbacks.onClearText?.();
             messages.push(msg);
             const toolRetryMessage = retryError
@@ -852,17 +858,17 @@ export async function runAgent(
         // Check for observe sole call: intercept before tool execution
         const isSoleObserve = result.toolCalls.length === 1 && result.toolCalls[0].name === "observe";
         if (isSoleObserve) {
+          const observeArgs = (() => { try { return JSON.parse(result.toolCalls[0].arguments) } catch { return {} } })();
           let reason: string | undefined;
-          try {
-            const parsed = JSON.parse(result.toolCalls[0].arguments);
-            if (typeof parsed?.reason === "string") reason = parsed.reason;
-          } catch { /* ignore */ }
+          if (typeof observeArgs?.reason === "string") reason = observeArgs.reason;
+          callbacks.onToolStart("observe", observeArgs);
           emitNervesEvent({
             component: "engine",
             event: "engine.observe",
             message: "agent declined to respond in group chat",
             meta: { ...(reason ? { reason } : {}) },
           });
+          callbacks.onToolEnd("observe", summarizeArgs("observe", observeArgs), true);
           messages.push(msg);
           const silenced = "(silenced)";
           messages.push({ role: "tool", tool_call_id: result.toolCalls[0].id, content: silenced });
@@ -879,6 +885,7 @@ export async function runAgent(
           try {
             parsedArgs = JSON.parse(result.toolCalls[0].arguments);
           } catch { /* ignore */ }
+          callbacks.onToolStart("descend", parsedArgs as Record<string, string>);
           /* v8 ignore next -- defensive: topic always string from model @preserve */
           const topic = typeof parsedArgs.topic === "string" ? parsedArgs.topic : "";
           const answer = typeof parsedArgs.answer === "string" ? parsedArgs.answer : undefined;
@@ -939,6 +946,7 @@ export async function runAgent(
           }
           try { await requestInnerWake(getAgentName()); } catch { /* daemon may not be running */ }
 
+          callbacks.onToolEnd("descend", summarizeArgs("descend", parsedArgs as Record<string, string>), true);
           sawDescend = true;
           messages.push(msg);
           const ack = "(going inward)";
