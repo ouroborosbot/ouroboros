@@ -36,6 +36,16 @@ emitNervesEvent({
   meta: { socketPath, entryPath, mode },
 })
 
+if (mode === "dev") {
+  const repoRoot = getRepoRoot()
+  emitNervesEvent({
+    component: "daemon",
+    event: "daemon.dev_mode_indicator",
+    message: `[dev] running from ${repoRoot}`,
+    meta: { repoRoot },
+  })
+}
+
 const managedAgents = listEnabledBundleAgents()
 
 const processManager = new DaemonProcessManager({
