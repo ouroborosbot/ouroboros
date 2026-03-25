@@ -43,18 +43,6 @@ vi.mock("../../repertoire/skills", () => ({
   loadSkill: vi.fn(),
 }))
 
-vi.mock("../../heart/safe-workspace", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../heart/safe-workspace")>()
-  const nodePath = await import("path")
-  return {
-    ...actual,
-    resolveSafeRepoPath: vi.fn((options: { requestedPath: string }) => ({
-      selection: null,
-      resolvedPath: nodePath.resolve("/mock/repo", options.requestedPath),
-    })),
-  }
-})
-
 vi.mock("../../heart/identity", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../heart/identity")>()
   return {

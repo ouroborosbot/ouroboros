@@ -9,7 +9,7 @@ import type { Integration, ResolvedContext, FriendRecord } from "../mind/friends
 import type { FriendStore } from "../mind/friends/store";
 import { emitNervesEvent } from "../nerves/runtime";
 import { getAgentRoot, getAgentName } from "../heart/identity";
-import { ensureSafeRepoWorkspace, resolveSafeRepoPath, resolveSafeShellExecution } from "../heart/safe-workspace";
+import { getRepoRoot } from "../heart/identity";
 import { requestInnerWake } from "../heart/daemon/socket-client";
 import {
   deriveInnerDialogStatus,
@@ -110,7 +110,10 @@ function buildContextDiff(lines: string[], changeStart: number, changeEnd: numbe
 }
 
 function resolveLocalToolPath(targetPath: string): string {
-  return resolveSafeRepoPath({ requestedPath: targetPath }).resolvedPath
+  if (!path.isAbsolute(targetPath)) {
+    return path.resolve(getRepoRoot(), targetPath)
+  }
+  return targetPath
 }
 
 const NO_SESSION_FOUND_MESSAGE = "no session found for that friend/channel/key combination."
@@ -649,29 +652,6 @@ export const baseToolDefinitions: ToolDefinition[] = [
     tool: {
       type: "function",
       function: {
-        name: "safe_workspace",
-        description: "acquire or inspect the safe harness repo workspace for local edits. returns the real workspace path, branch, and why it was chosen.",
-        parameters: {
-          type: "object",
-          properties: {},
-        },
-      },
-    },
-    handler: () => {
-      const selection = ensureSafeRepoWorkspace()
-      return [
-        `workspace: ${selection.workspaceRoot}`,
-        `branch: ${selection.workspaceBranch}`,
-        `runtime: ${selection.runtimeKind}`,
-        `cleanup_after_merge: ${selection.cleanupAfterMerge ? "yes" : "no"}`,
-        `note: ${selection.note}`,
-      ].join("\n")
-    },
-  },
-  {
-    tool: {
-      type: "function",
-      function: {
         name: "shell",
         description: "run shell command",
         parameters: {
@@ -682,11 +662,9 @@ export const baseToolDefinitions: ToolDefinition[] = [
       },
     },
     handler: (a) => {
-      const prepared = resolveSafeShellExecution(a.command)
-      return execSync(prepared.command, {
+      return execSync(a.command, {
         encoding: "utf-8",
         timeout: 30000,
-        ...(prepared.cwd ? { cwd: prepared.cwd } : {}),
       })
     },
     summaryKeys: ["command"],

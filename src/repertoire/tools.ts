@@ -10,7 +10,6 @@ import { emitNervesEvent } from "../nerves/runtime";
 import type { ProviderCapability } from "../heart/core";
 import { guardInvocation } from "./guardrails";
 import { getAgentRoot, getAgentName } from "../heart/identity";
-import { resolveSafeRepoPath } from "../heart/safe-workspace";
 import { surfaceToolDef, handleSurface, type SurfaceRouteResult } from "../senses/surface-tool";
 import { advanceObligation as advanceInnerObligation } from "../mind/obligations";
 import { findFreshestFriendSession, listSessionActivity } from "../heart/session-activity";
@@ -257,13 +256,7 @@ export function isConfirmationRequired(toolName: string): boolean {
   return def?.confirmationRequired === true;
 }
 
-function normalizeGuardArgs(name: string, args: Record<string, string>): Record<string, string> {
-  if ((name === "read_file" || name === "write_file" || name === "edit_file") && args.path) {
-    return {
-      ...args,
-      path: resolveSafeRepoPath({ requestedPath: args.path }).resolvedPath,
-    }
-  }
+function normalizeGuardArgs(_name: string, args: Record<string, string>): Record<string, string> {
   return args
 }
 
