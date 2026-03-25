@@ -762,6 +762,7 @@ export async function runAgent(
       } else {
         // Check for settle sole call: intercept before tool execution
         if (isSoleSettle) {
+          /* v8 ignore next -- defensive: JSON.parse catch for malformed settle args @preserve */
           const settleArgs = (() => { try { return JSON.parse(result.toolCalls[0].arguments) } catch { return {} } })();
           callbacks.onToolStart("settle", settleArgs);
           // Inner dialog attention queue gate: reject settle if items remain
@@ -858,6 +859,7 @@ export async function runAgent(
         // Check for observe sole call: intercept before tool execution
         const isSoleObserve = result.toolCalls.length === 1 && result.toolCalls[0].name === "observe";
         if (isSoleObserve) {
+          /* v8 ignore next -- defensive: JSON.parse catch for malformed observe args @preserve */
           const observeArgs = (() => { try { return JSON.parse(result.toolCalls[0].arguments) } catch { return {} } })();
           let reason: string | undefined;
           if (typeof observeArgs?.reason === "string") reason = observeArgs.reason;
