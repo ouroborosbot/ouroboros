@@ -66,6 +66,10 @@ const surfaceToolDefinition: ToolDefinition = {
                   text: content,
                 })
                 if (proactiveResult.delivered) {
+                  // Also queue as inner thought so the target session knows what was surfaced
+                  const { queuePendingMessage: queueEcho, getPendingDir: getEchoDir } = await import("../mind/pending")
+                  const echoDir = getEchoDir(agentName, bridgeTarget.friendId, bridgeTarget.channel, bridgeTarget.key)
+                  queueEcho(echoDir, { from: agentName, friendId: bridgeTarget.friendId, channel: bridgeTarget.channel, key: bridgeTarget.key, content: `[surfaced] ${content}`, timestamp: Date.now() })
                   return { status: "delivered", detail: "via iMessage" }
                 }
               }
@@ -103,6 +107,10 @@ const surfaceToolDefinition: ToolDefinition = {
               text: content,
             })
             if (proactiveResult.delivered) {
+              // Also queue as inner thought so the target session knows what was surfaced
+              const { queuePendingMessage: queueEcho, getPendingDir: getEchoDir } = await import("../mind/pending")
+              const echoDir = getEchoDir(agentName, freshest.friendId, freshest.channel, freshest.key)
+              queueEcho(echoDir, { from: agentName, friendId: freshest.friendId, channel: freshest.channel, key: freshest.key, content: `[surfaced] ${content}`, timestamp: Date.now() })
               return { status: "delivered", detail: "via iMessage" }
             }
           }
