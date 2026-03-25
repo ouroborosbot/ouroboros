@@ -128,6 +128,8 @@ export interface OuroCliDeps {
   reExecFromNewVersion?: (args: string[]) => never
   getPreviousCliVersion?: () => string | null
   listCliVersions?: () => string[]
+  existsSync?: (p: string) => boolean
+  getRepoCwd?: () => string
 }
 
 export interface SessionEntry {
@@ -2116,7 +2118,32 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   }
 
   if (command.kind === "daemon.dev") {
-    const message = "ouro dev: not yet implemented"
+    const repoCwd = deps.getRepoCwd ? deps.getRepoCwd() : getRepoRoot()
+    const checkExists = deps.existsSync ?? fs.existsSync
+    const entryPath = path.join(repoCwd, "dist", "heart", "daemon", "daemon-entry.js")
+    if (!checkExists(entryPath)) {
+      const message = "not a valid ouro harness repo (missing dist/). run npm run build first."
+      deps.writeStdout(message)
+      return message
+    }
+
+    if (deps.ensureDaemonBootPersistence) {
+      try {
+        await Promise.resolve(deps.ensureDaemonBootPersistence(deps.socketPath))
+      } catch (error) {
+        emitNervesEvent({
+          level: "warn",
+          component: "daemon",
+          event: "daemon.dev_boot_persistence_error",
+          message: "failed to persist daemon boot startup in dev mode",
+          meta: { error: error instanceof Error ? error.message : String(error), socketPath: deps.socketPath },
+        })
+      }
+    }
+
+    const daemonResult = await ensureDaemonRunning(deps)
+    const message = `daemon running in dev mode from ${repoCwd}`
+    deps.writeStdout(daemonResult.message)
     deps.writeStdout(message)
     return message
   }
