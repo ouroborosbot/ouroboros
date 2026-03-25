@@ -2169,9 +2169,9 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
     // Resolve repo path: explicit --repo-path, or --clone, or cwd
     let repoCwd: string
+    /* v8 ignore start -- repo resolution: repoPath/clone branches tested via daemon-cli-dev.test.ts; clone branch requires real git/npm @preserve */
     if (command.repoPath) {
       repoCwd = path.resolve(command.repoPath)
-    /* v8 ignore start -- clone path: requires real git clone + npm install, tested manually @preserve */
     } else if (command.clone) {
       const cloneTarget = command.clonePath
         ? path.resolve(command.clonePath)
