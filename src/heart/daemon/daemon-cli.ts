@@ -2248,9 +2248,14 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       /* v8 ignore stop */
     }
 
-    const daemonResult = await ensureDaemonRunning(deps)
-    const message = `daemon running in dev mode from ${repoCwd}`
-    deps.writeStdout(daemonResult.message)
+    // Always force-restart in dev mode — you rebuilt, you want this code running
+    const alive = await deps.checkSocketAlive(deps.socketPath)
+    if (alive) {
+      try { await deps.sendCommand(deps.socketPath, { kind: "daemon.stop" }) } catch { /* already stopping */ }
+    }
+    deps.cleanupStaleSocket(deps.socketPath)
+    const started = await deps.startDaemonProcess(deps.socketPath)
+    const message = `daemon running in dev mode from ${repoCwd} (pid ${started.pid ?? "unknown"})`
     deps.writeStdout(message)
     return message
   }
