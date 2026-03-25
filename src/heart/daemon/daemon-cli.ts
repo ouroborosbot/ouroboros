@@ -4,7 +4,7 @@ import * as fs from "fs"
 import * as os from "os"
 import * as path from "path"
 import * as semver from "semver"
-import { getAgentBundlesRoot, getAgentDaemonLogsDir, getAgentName, getAgentRoot, getRepoRoot, type AgentProvider } from "../identity"
+import { getAgentBundlesRoot, getAgentDaemonLogsDir, getAgentName, getAgentRoot, getRepoRoot, HARNESS_CANONICAL_REPO_URL, type AgentProvider } from "../identity"
 import { emitNervesEvent } from "../../nerves/runtime"
 import { FileFriendStore } from "../../mind/friends/store-file"
 import type { FriendStore } from "../../mind/friends/store"
@@ -89,7 +89,7 @@ export type OuroCliCommand =
   | { kind: "hatch.start"; agentName?: string; humanName?: string; provider?: AgentProvider; credentials?: HatchCredentialsInput; migrationPath?: string }
   | { kind: "rollback"; version?: string }
   | { kind: "versions" }
-  | { kind: "daemon.dev" }
+  | { kind: "daemon.dev"; repoPath?: string; clone?: boolean; clonePath?: string }
   | { kind: "attention.list"; agent?: string }
   | { kind: "attention.show"; id: string; agent?: string }
   | { kind: "attention.history"; agent?: string }
@@ -394,7 +394,7 @@ function usage(): string {
   return [
     "Usage:",
     "  ouro [up]",
-    "  ouro dev",
+    "  ouro dev [--repo-path <path>] [--clone [--clone-path <path>]]",
     "  ouro stop|down|status|logs|hatch",
     "  ouro -v|--version",
     "  ouro config model --agent <name> <model-name>",
@@ -1049,7 +1049,18 @@ export function parseOuroCommand(args: string[]): OuroCliCommand {
   }
 
   if (head === "up") return { kind: "daemon.up" }
-  if (head === "dev") return { kind: "daemon.dev" }
+  if (head === "dev") {
+    const devArgs = args.slice(1)
+    let repoPath: string | undefined
+    let clone = false
+    let clonePath: string | undefined
+    for (let i = 0; i < devArgs.length; i++) {
+      if (devArgs[i] === "--repo-path" && devArgs[i + 1]) { repoPath = devArgs[++i]; continue }
+      if (devArgs[i] === "--clone") { clone = true; continue }
+      if (devArgs[i] === "--clone-path" && devArgs[i + 1]) { clonePath = devArgs[++i]; continue }
+    }
+    return { kind: "daemon.dev", repoPath, clone, clonePath }
+  }
   if (head === "rollback") return { kind: "rollback", ...(second ? { version: second } : {}) }
   if (head === "versions") return { kind: "versions" }
   if (head === "stop" || head === "down") return { kind: "daemon.stop" }
@@ -2154,11 +2165,56 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   }
 
   if (command.kind === "daemon.dev") {
-    const repoCwd = deps.getRepoCwd ? deps.getRepoCwd() : getRepoRoot()
     const checkExists = deps.existsSync ?? fs.existsSync
+
+    // Resolve repo path: explicit --repo-path, or --clone, or cwd
+    let repoCwd: string
+    if (command.repoPath) {
+      repoCwd = path.resolve(command.repoPath)
+    } else if (command.clone) {
+      const cloneTarget = command.clonePath
+        ? path.resolve(command.clonePath)
+        : path.join(os.homedir(), "Projects", "ouroboros")
+      if (checkExists(path.join(cloneTarget, ".git"))) {
+        deps.writeStdout(`repo already exists at ${cloneTarget}`)
+        repoCwd = cloneTarget
+      } else {
+        deps.writeStdout(`cloning ouroboros to ${cloneTarget}...`)
+        try {
+          execSync(`git clone ${HARNESS_CANONICAL_REPO_URL} "${cloneTarget}"`, { stdio: "inherit" })
+        } catch {
+          const message = `clone failed. check your network and try again, or clone manually and use --repo-path.`
+          deps.writeStdout(message)
+          return message
+        }
+        repoCwd = cloneTarget
+      }
+      // Build after clone
+      deps.writeStdout("building...")
+      try {
+        execSync("npm install && npm run build", { cwd: repoCwd, stdio: "inherit" })
+      } catch {
+        const message = `build failed in ${repoCwd}. check the output above.`
+        deps.writeStdout(message)
+        return message
+      }
+    } else {
+      repoCwd = deps.getRepoCwd ? deps.getRepoCwd() : getRepoRoot()
+    }
+
     const entryPath = path.join(repoCwd, "dist", "heart", "daemon", "daemon-entry.js")
     if (!checkExists(entryPath)) {
-      const message = "not a valid ouro harness repo (missing dist/). run npm run build first."
+      const lines = [
+        "no built harness repo found at " + repoCwd,
+        "",
+        "options:",
+        "  ouro dev --repo-path /path/to/ouroboros   use an existing checkout",
+        "  ouro dev --clone                          fresh clone to ~/Projects/ouroboros",
+        "  ouro dev --clone --clone-path /somewhere   fresh clone to a custom path",
+        "",
+        "if you have the repo, cd into it and run: npm run build && ouro dev",
+      ]
+      const message = lines.join("\n")
       deps.writeStdout(message)
       return message
     }

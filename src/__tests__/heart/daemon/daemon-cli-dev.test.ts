@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest"
 
 import {
   runOuroCli,
+  parseOuroCommand,
   type OuroCliDeps,
 } from "../../../heart/daemon/daemon-cli"
 
@@ -11,6 +12,7 @@ vi.mock("../../../heart/identity", () => ({
   getAgentName: () => "test",
   getAgentRoot: () => "/mock/AgentBundles/test.ouro",
   getAgentDaemonLogsDir: () => "/mock/logs",
+  HARNESS_CANONICAL_REPO_URL: "https://github.com/ouroborosbot/ouroboros.git",
 }))
 
 function makeDeps(overrides: Partial<OuroCliDeps> = {}): OuroCliDeps {
@@ -52,8 +54,9 @@ describe("ouro dev command handler", () => {
 
     const result = await runOuroCli(["dev"], deps)
 
-    expect(result).toContain("not a valid ouro harness repo")
-    expect(result).toContain("npm run build")
+    expect(result).toContain("no built harness repo found")
+    expect(result).toContain("--repo-path")
+    expect(result).toContain("--clone")
     expect(deps.startDaemonProcess).not.toHaveBeenCalled()
   })
 
@@ -95,6 +98,40 @@ describe("ouro dev command handler", () => {
     expect(syncGlobalOuroBotWrapper).not.toHaveBeenCalled()
     expect(ensureSkillManagement).not.toHaveBeenCalled()
     expect(ensureCurrentVersionInstalled).not.toHaveBeenCalled()
+  })
+
+  it("uses --repo-path when provided", async () => {
+    const deps = makeDeps({
+      existsSync: vi.fn((p: string) => p.includes("/custom/repo/dist")),
+      ensureDaemonBootPersistence: vi.fn(),
+    })
+
+    const result = await runOuroCli(["dev", "--repo-path", "/custom/repo"], deps)
+
+    expect(result).toContain("dev mode")
+    expect(result).toContain("/custom/repo")
+  })
+})
+
+describe("parseOuroCommand dev flags", () => {
+  it("parses --repo-path", () => {
+    const cmd = parseOuroCommand(["dev", "--repo-path", "/my/repo"])
+    expect(cmd).toEqual({ kind: "daemon.dev", repoPath: "/my/repo", clone: false, clonePath: undefined })
+  })
+
+  it("parses --clone", () => {
+    const cmd = parseOuroCommand(["dev", "--clone"])
+    expect(cmd).toEqual({ kind: "daemon.dev", repoPath: undefined, clone: true, clonePath: undefined })
+  })
+
+  it("parses --clone --clone-path", () => {
+    const cmd = parseOuroCommand(["dev", "--clone", "--clone-path", "/tmp/ouro"])
+    expect(cmd).toEqual({ kind: "daemon.dev", repoPath: undefined, clone: true, clonePath: "/tmp/ouro" })
+  })
+
+  it("parses bare dev", () => {
+    const cmd = parseOuroCommand(["dev"])
+    expect(cmd).toEqual({ kind: "daemon.dev", repoPath: undefined, clone: false, clonePath: undefined })
   })
 })
 
