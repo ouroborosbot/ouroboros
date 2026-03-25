@@ -1535,6 +1535,19 @@ export function createDefaultOuroCliDeps(socketPath = DEFAULT_DAEMON_SOCKET_PATH
     syncGlobalOuroBotWrapper: defaultSyncGlobalOuroBotWrapper,
     ensureSkillManagement: defaultEnsureSkillManagement,
     ensureDaemonBootPersistence: defaultEnsureDaemonBootPersistence,
+    detectMode: () => detectRuntimeMode(getRepoRoot()),
+    /* v8 ignore start -- dev-mode delegation: requires installed binary on disk @preserve */
+    getInstalledBinaryPath: () => {
+      const cliHome = getOuroCliHome()
+      const binaryPath = path.join(cliHome, "bin", "ouro")
+      return fs.existsSync(binaryPath) ? binaryPath : null
+    },
+    execInstalledBinary: (binaryPath: string, binArgs: string[]) => {
+      const { execFileSync } = require("child_process") as typeof import("child_process")
+      execFileSync(binaryPath, binArgs, { stdio: "inherit" })
+      process.exit(0)
+    },
+    /* v8 ignore stop */
     /* v8 ignore next 3 -- integration: launches interactive CLI session @preserve */
     startChat: async (agentName: string) => {
       const { main } = await import("../../senses/cli")
@@ -2019,20 +2032,23 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
   if (command.kind === "daemon.up") {
     // ── dev mode delegation: ouro up from a dev repo delegates to installed binary ──
-    const runtimeMode = deps.detectMode ? deps.detectMode() : detectRuntimeMode(getRepoRoot())
-    if (runtimeMode === "dev") {
-      const installedBinary = deps.getInstalledBinaryPath ? deps.getInstalledBinaryPath() : null
-      if (installedBinary) {
-        deps.writeStdout("delegating to installed ouro...")
-        if (deps.execInstalledBinary) {
-          deps.execInstalledBinary(installedBinary, args)
+    // Only runs when detectMode is explicitly injected (via createDefaultOuroCliDeps or tests)
+    if (deps.detectMode) {
+      const runtimeMode = deps.detectMode()
+      if (runtimeMode === "dev") {
+        const installedBinary = deps.getInstalledBinaryPath ? deps.getInstalledBinaryPath() : null
+        if (installedBinary) {
+          deps.writeStdout("delegating to installed ouro...")
+          if (deps.execInstalledBinary) {
+            deps.execInstalledBinary(installedBinary, args)
+          }
+          /* v8 ignore next 2 -- unreachable after exec replaces process @preserve */
+          return ""
         }
-        /* v8 ignore next 2 -- unreachable after exec replaces process @preserve */
-        return ""
+        const message = "no installed version found. run: npx @ouro.bot/cli@alpha"
+        deps.writeStdout(message)
+        return message
       }
-      const message = "no installed version found. run: npx @ouro.bot/cli@alpha"
-      deps.writeStdout(message)
-      return message
     }
 
     const linkedVersionBeforeUp = deps.getCurrentCliVersion?.() ?? null
