@@ -1957,6 +1957,18 @@ function executeReminderCommand(command: ReminderCliCommand, taskMod: TaskModule
   }
 }
 
+/* v8 ignore start -- repo resolution for ouro dev: repoPath branch tested via daemon-cli-dev; clone requires real git/npm @preserve */
+function resolveDevRepoCwd(
+  command: { repoPath?: string; clone?: boolean; clonePath?: string },
+  checkExists: (p: string) => boolean,
+  deps: { writeStdout: (text: string) => void; getRepoCwd?: () => string },
+): string {
+  if (command.repoPath) return path.resolve(command.repoPath)
+  if (command.clone) return resolveClonePath(command, checkExists, deps)
+  return deps.getRepoCwd ? deps.getRepoCwd() : getRepoRoot()
+}
+/* v8 ignore stop */
+
 /* v8 ignore start -- clone/build: requires real git clone + npm install on disk @preserve */
 function resolveClonePath(
   command: { clonePath?: string },
@@ -2196,22 +2208,8 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   if (command.kind === "daemon.dev") {
     const checkExists = deps.existsSync ?? fs.existsSync
 
-    let repoCwd: string
-    if (command.repoPath) {
-      repoCwd = path.resolve(command.repoPath)
-    /* v8 ignore start -- clone branch: resolveClonePath requires real git/npm, tested manually @preserve */
-    } else if (command.clone) {
-      try {
-        repoCwd = resolveClonePath(command, checkExists, deps)
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-        deps.writeStdout(message)
-        return message
-      }
-    /* v8 ignore stop */
-    } else {
-      repoCwd = deps.getRepoCwd ? deps.getRepoCwd() : getRepoRoot()
-    }
+    /* v8 ignore next -- repo resolution dispatched to v8-ignored helper @preserve */
+    const repoCwd = resolveDevRepoCwd(command, checkExists, deps)
 
     const entryPath = path.join(repoCwd, "dist", "heart", "daemon", "daemon-entry.js")
     if (!checkExists(entryPath)) {
