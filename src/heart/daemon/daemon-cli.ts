@@ -1957,6 +1957,35 @@ function executeReminderCommand(command: ReminderCliCommand, taskMod: TaskModule
   }
 }
 
+/* v8 ignore start -- clone/build: requires real git clone + npm install on disk @preserve */
+function resolveClonePath(
+  command: { clonePath?: string },
+  checkExists: (p: string) => boolean,
+  deps: { writeStdout: (text: string) => void },
+): string {
+  const cloneTarget = command.clonePath
+    ? path.resolve(command.clonePath)
+    : path.join(os.homedir(), "Projects", "ouroboros")
+  if (!checkExists(path.join(cloneTarget, ".git"))) {
+    deps.writeStdout(`cloning ouroboros to ${cloneTarget}...`)
+    try {
+      execSync(`git clone ${HARNESS_CANONICAL_REPO_URL} "${cloneTarget}"`, { stdio: "inherit" })
+    } catch {
+      throw new Error(`clone failed. check your network and try again, or clone manually and use --repo-path.`)
+    }
+  } else {
+    deps.writeStdout(`repo already exists at ${cloneTarget}`)
+  }
+  deps.writeStdout("building...")
+  try {
+    execSync("npm install && npm run build", { cwd: cloneTarget, stdio: "inherit" })
+  } catch {
+    throw new Error(`build failed in ${cloneTarget}. check the output above.`)
+  }
+  return cloneTarget
+}
+/* v8 ignore stop */
+
 export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefaultOuroCliDeps()): Promise<string> {
   if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) {
     const text = usage()
@@ -2167,38 +2196,18 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   if (command.kind === "daemon.dev") {
     const checkExists = deps.existsSync ?? fs.existsSync
 
-    // Resolve repo path: explicit --repo-path, or --clone, or cwd
     let repoCwd: string
-    /* v8 ignore start -- repo resolution: repoPath/clone branches tested via daemon-cli-dev.test.ts; clone branch requires real git/npm @preserve */
     if (command.repoPath) {
       repoCwd = path.resolve(command.repoPath)
     } else if (command.clone) {
-      const cloneTarget = command.clonePath
-        ? path.resolve(command.clonePath)
-        : path.join(os.homedir(), "Projects", "ouroboros")
-      if (checkExists(path.join(cloneTarget, ".git"))) {
-        deps.writeStdout(`repo already exists at ${cloneTarget}`)
-        repoCwd = cloneTarget
-      } else {
-        deps.writeStdout(`cloning ouroboros to ${cloneTarget}...`)
-        try {
-          execSync(`git clone ${HARNESS_CANONICAL_REPO_URL} "${cloneTarget}"`, { stdio: "inherit" })
-        } catch {
-          const message = `clone failed. check your network and try again, or clone manually and use --repo-path.`
-          deps.writeStdout(message)
-          return message
-        }
-        repoCwd = cloneTarget
-      }
-      deps.writeStdout("building...")
       try {
-        execSync("npm install && npm run build", { cwd: repoCwd, stdio: "inherit" })
-      } catch {
-        const message = `build failed in ${repoCwd}. check the output above.`
+        repoCwd = resolveClonePath(command, checkExists, deps)
+      } catch (err) {
+        /* v8 ignore next -- defensive: resolveClonePath error message @preserve */
+        const message = err instanceof Error ? err.message : String(err)
         deps.writeStdout(message)
         return message
       }
-    /* v8 ignore stop */
     } else {
       repoCwd = deps.getRepoCwd ? deps.getRepoCwd() : getRepoRoot()
     }
