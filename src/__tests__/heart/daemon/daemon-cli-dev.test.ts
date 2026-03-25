@@ -129,6 +129,11 @@ describe("parseOuroCommand dev flags", () => {
     expect(cmd).toEqual({ kind: "daemon.dev", repoPath: undefined, clone: true, clonePath: "/tmp/ouro" })
   })
 
+  it("ignores --clone-path without a value", () => {
+    const cmd = parseOuroCommand(["dev", "--clone", "--clone-path"])
+    expect(cmd).toEqual({ kind: "daemon.dev", repoPath: undefined, clone: true, clonePath: undefined })
+  })
+
   it("parses bare dev", () => {
     const cmd = parseOuroCommand(["dev"])
     expect(cmd).toEqual({ kind: "daemon.dev", repoPath: undefined, clone: false, clonePath: undefined })

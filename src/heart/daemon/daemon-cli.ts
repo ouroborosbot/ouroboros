@@ -2088,6 +2088,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     if (deps.detectMode) {
       const runtimeMode = deps.detectMode()
       if (runtimeMode === "dev") {
+        /* v8 ignore next -- defensive: getInstalledBinaryPath always injected in tests @preserve */
         const installedBinary = deps.getInstalledBinaryPath ? deps.getInstalledBinaryPath() : null
         if (installedBinary) {
           deps.writeStdout("delegating to installed ouro...")
