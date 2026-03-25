@@ -1546,8 +1546,8 @@ export function createDefaultOuroCliDeps(socketPath = DEFAULT_DAEMON_SOCKET_PATH
     syncGlobalOuroBotWrapper: defaultSyncGlobalOuroBotWrapper,
     ensureSkillManagement: defaultEnsureSkillManagement,
     ensureDaemonBootPersistence: defaultEnsureDaemonBootPersistence,
+    /* v8 ignore start -- dev-mode defaults: tests inject mocks for mode detection and binary resolution @preserve */
     detectMode: () => detectRuntimeMode(getRepoRoot()),
-    /* v8 ignore start -- dev-mode delegation: requires installed binary on disk @preserve */
     getInstalledBinaryPath: () => {
       const cliHome = getOuroCliHome()
       const binaryPath = path.join(cliHome, "bin", "ouro")
