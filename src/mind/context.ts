@@ -349,6 +349,26 @@ export function saveSession(
   fs.writeFileSync(filePath, JSON.stringify(envelope, null, 2))
 }
 
+export function appendSyntheticAssistantMessage(filePath: string, content: string): boolean {
+  try {
+    if (!fs.existsSync(filePath)) return false
+    const raw = fs.readFileSync(filePath, "utf-8")
+    const data = JSON.parse(raw)
+    if (data.version !== 1 || !Array.isArray(data.messages)) return false
+    data.messages.push({ role: "assistant", content })
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2))
+    emitNervesEvent({
+      component: "mind",
+      event: "mind.session_synthetic_message_appended",
+      message: "appended synthetic assistant message to session",
+      meta: { path: filePath, contentLength: content.length },
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function loadSession(filePath: string): SessionData | null {
   try {
     const raw = fs.readFileSync(filePath, "utf-8")

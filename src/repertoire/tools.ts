@@ -66,10 +66,10 @@ const surfaceToolDefinition: ToolDefinition = {
                   text: content,
                 })
                 if (proactiveResult.delivered) {
-                  // Also queue as inner thought so the target session knows what was surfaced
-                  const { queuePendingMessage: queueEcho, getPendingDir: getEchoDir } = await import("../mind/pending")
-                  const echoDir = getEchoDir(agentName, bridgeTarget.friendId, bridgeTarget.channel, bridgeTarget.key)
-                  queueEcho(echoDir, { from: agentName, friendId: bridgeTarget.friendId, channel: bridgeTarget.channel, key: bridgeTarget.key, content: `[surfaced] ${content}`, timestamp: Date.now() })
+                  // Inject surfaced content into the target session so it knows what was delivered
+                  const { appendSyntheticAssistantMessage } = await import("../mind/context")
+                  const sessionFilePath = path.join(sessionsDir, bridgeTarget.friendId, bridgeTarget.channel, `${bridgeTarget.key}.json`)
+                  appendSyntheticAssistantMessage(sessionFilePath, `[surfaced from inner dialog] ${content}`)
                   return { status: "delivered", detail: "via iMessage" }
                 }
               }
@@ -107,10 +107,10 @@ const surfaceToolDefinition: ToolDefinition = {
               text: content,
             })
             if (proactiveResult.delivered) {
-              // Also queue as inner thought so the target session knows what was surfaced
-              const { queuePendingMessage: queueEcho, getPendingDir: getEchoDir } = await import("../mind/pending")
-              const echoDir = getEchoDir(agentName, freshest.friendId, freshest.channel, freshest.key)
-              queueEcho(echoDir, { from: agentName, friendId: freshest.friendId, channel: freshest.channel, key: freshest.key, content: `[surfaced] ${content}`, timestamp: Date.now() })
+              // Inject surfaced content into the target session so it knows what was delivered
+              const { appendSyntheticAssistantMessage } = await import("../mind/context")
+              const sessionFilePath = path.join(sessionsDir, freshest.friendId, freshest.channel, `${freshest.key}.json`)
+              appendSyntheticAssistantMessage(sessionFilePath, `[surfaced from inner dialog] ${content}`)
               return { status: "delivered", detail: "via iMessage" }
             }
           }
