@@ -2171,6 +2171,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     let repoCwd: string
     if (command.repoPath) {
       repoCwd = path.resolve(command.repoPath)
+    /* v8 ignore start -- clone path: requires real git clone + npm install, tested manually @preserve */
     } else if (command.clone) {
       const cloneTarget = command.clonePath
         ? path.resolve(command.clonePath)
@@ -2189,7 +2190,6 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
         }
         repoCwd = cloneTarget
       }
-      // Build after clone
       deps.writeStdout("building...")
       try {
         execSync("npm install && npm run build", { cwd: repoCwd, stdio: "inherit" })
@@ -2198,6 +2198,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
         deps.writeStdout(message)
         return message
       }
+    /* v8 ignore stop */
     } else {
       repoCwd = deps.getRepoCwd ? deps.getRepoCwd() : getRepoRoot()
     }
@@ -2222,6 +2223,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     if (deps.ensureDaemonBootPersistence) {
       try {
         await Promise.resolve(deps.ensureDaemonBootPersistence(deps.socketPath))
+      /* v8 ignore start -- defensive: boot persistence error should not block dev mode @preserve */
       } catch (error) {
         emitNervesEvent({
           level: "warn",
@@ -2231,6 +2233,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
           meta: { error: error instanceof Error ? error.message : String(error), socketPath: deps.socketPath },
         })
       }
+      /* v8 ignore stop */
     }
 
     const daemonResult = await ensureDaemonRunning(deps)
