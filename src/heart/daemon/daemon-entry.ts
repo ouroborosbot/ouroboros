@@ -79,6 +79,7 @@ const daemon = new OuroDaemon({
   scheduler,
   healthMonitor,
   router,
+  mode,
 })
 
 void daemon.start().catch(async () => {
