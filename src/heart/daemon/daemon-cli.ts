@@ -1986,7 +1986,12 @@ function resolveClonePath(
       throw new Error(`clone failed. check your network and try again, or clone manually and use --repo-path.`)
     }
   } else {
-    deps.writeStdout(`repo already exists at ${cloneTarget}`)
+    deps.writeStdout(`repo already exists at ${cloneTarget}, pulling latest...`)
+    try {
+      execSync("git pull --ff-only", { cwd: cloneTarget, stdio: "inherit" })
+    } catch {
+      deps.writeStdout("pull failed (may have local changes). continuing with existing code.")
+    }
   }
   deps.writeStdout("building...")
   try {
@@ -2254,7 +2259,16 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       try { await deps.sendCommand(deps.socketPath, { kind: "daemon.stop" }) } catch { /* already stopping */ }
     }
     deps.cleanupStaleSocket(deps.socketPath)
-    const started = await deps.startDaemonProcess(deps.socketPath)
+    // Start daemon from repoCwd, not getRepoRoot() — --repo-path may differ from cwd
+    const devEntry = path.join(repoCwd, "dist", "heart", "daemon", "daemon-entry.js")
+    const startDevDaemon = deps.startDaemonProcess === defaultStartDaemonProcess
+      ? async (sp: string) => {
+          const child = spawn("node", [devEntry, "--socket", sp], { detached: true, stdio: "ignore" })
+          child.unref()
+          return { pid: child.pid ?? null }
+        }
+      : deps.startDaemonProcess
+    const started = await startDevDaemon(deps.socketPath)
     const message = `daemon running in dev mode from ${repoCwd} (pid ${started.pid ?? "unknown"})`
     deps.writeStdout(message)
     return message
