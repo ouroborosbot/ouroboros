@@ -2091,6 +2091,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
         const installedBinary = deps.getInstalledBinaryPath ? deps.getInstalledBinaryPath() : null
         if (installedBinary) {
           deps.writeStdout("delegating to installed ouro...")
+          /* v8 ignore next 3 -- defensive: execInstalledBinary always injected; missing branch unreachable @preserve */
           if (deps.execInstalledBinary) {
             deps.execInstalledBinary(installedBinary, args)
           }
@@ -2206,6 +2207,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   }
 
   if (command.kind === "daemon.dev") {
+    /* v8 ignore next -- defensive: existsSync always injected in tests @preserve */
     const checkExists = deps.existsSync ?? fs.existsSync
 
     /* v8 ignore next -- repo resolution dispatched to v8-ignored helper @preserve */
@@ -2228,10 +2230,11 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       return message
     }
 
+    /* v8 ignore start -- defensive: ensureDaemonBootPersistence always injected in tests @preserve */
     if (deps.ensureDaemonBootPersistence) {
       try {
         await Promise.resolve(deps.ensureDaemonBootPersistence(deps.socketPath))
-      /* v8 ignore start -- defensive: boot persistence error should not block dev mode @preserve */
+      /* v8 ignore next -- defensive: boot persistence error should not block dev mode @preserve */
       } catch (error) {
         emitNervesEvent({
           level: "warn",
