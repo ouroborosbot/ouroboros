@@ -432,7 +432,9 @@ function usage(): string {
 }
 
 function formatVersionOutput(): string {
-  return getRuntimeMetadata().version
+  const version = getRuntimeMetadata().version
+  const mode = detectRuntimeMode(getRepoRoot())
+  return mode === "dev" ? `${version} (dev)` : version
 }
 
 function buildStoppedStatusPayload(socketPath: string): StatusPayload {
