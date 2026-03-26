@@ -2282,6 +2282,19 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       /* v8 ignore stop */
     }
 
+    // Auto-build: always rebuild in dev mode so dist/ matches source
+    /* v8 ignore start -- dev auto-build: execSync in repo cwd, tested manually @preserve */
+    deps.writeStdout(`building from ${repoCwd}...`)
+    try {
+      execSync("npm run build", { cwd: repoCwd, stdio: "inherit" })
+      entryPath = path.join(repoCwd, "dist", "heart", "daemon", "daemon-entry.js")
+    } catch {
+      const message = `build failed in ${repoCwd}. fix compilation errors and retry.`
+      deps.writeStdout(message)
+      return message
+    }
+    /* v8 ignore stop */
+
     /* v8 ignore start -- defensive: ensureDaemonBootPersistence always injected in tests @preserve */
     if (deps.ensureDaemonBootPersistence) {
       try {
