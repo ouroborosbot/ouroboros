@@ -1041,15 +1041,17 @@ function parseMcpCommand(args: string[]): OuroCliCommand {
   throw new Error(`Usage\n${usage()}`)
 }
 
-function parseMcpServeCommand(args: string[]): OuroCliCommand {
+function parseMcpServeCommand(args: string[]): OuroCliCommand & { socketOverride?: string } {
   let agent: string | undefined
   let friendId: string | undefined
+  let socketOverride: string | undefined
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--agent" && args[i + 1]) { agent = args[++i]; continue }
     if (args[i] === "--friend" && args[i + 1]) { friendId = args[++i]; continue }
+    if (args[i] === "--socket" && args[i + 1]) { socketOverride = args[++i]; continue }
   }
   if (!agent) throw new Error("mcp-serve requires --agent <name>")
-  return { kind: "mcp-serve", agent, ...(friendId ? { friendId } : {}) }
+  return { kind: "mcp-serve", agent, ...(friendId ? { friendId } : {}), ...(socketOverride ? { socketOverride } : {}) }
 }
 
 export function parseOuroCommand(args: string[]): OuroCliCommand {
@@ -2376,10 +2378,11 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   if (command.kind === "mcp-serve") {
     const { createMcpServer } = await import("./mcp-server")
     const friendId = command.friendId ?? `local-${os.userInfo().username}`
+    const mcpSocketPath = (command as { socketOverride?: string }).socketOverride ?? deps.socketPath
     const server = createMcpServer({
       agent: command.agent,
       friendId,
-      socketPath: deps.socketPath,
+      socketPath: mcpSocketPath,
       stdin: process.stdin,
       stdout: process.stdout,
     })
