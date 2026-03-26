@@ -781,9 +781,9 @@ export const baseToolDefinitions: ToolDefinition[] = [
     tool: {
       type: "function",
       function: {
-        name: "memory_search",
+        name: "recall",
         description:
-          "search remembered facts stored in psyche memory and return relevant matches for a query",
+          "recall what i know — search my diary and journal for facts, thoughts, and working notes that match a query",
         parameters: {
           type: "object",
           properties: { query: { type: "string" } },
@@ -795,10 +795,9 @@ export const baseToolDefinitions: ToolDefinition[] = [
       try {
         const query = (a.query || "").trim();
         if (!query) return "query is required";
-        const memoryRoot = path.join(getAgentRoot(), "psyche", "memory");
-        const hits = await searchMemoryFacts(query, readMemoryFacts(memoryRoot));
+        const hits = await searchMemoryFacts(query, readMemoryFacts());
         return hits
-          .map((fact) => `- ${fact.text} (source=${fact.source}, createdAt=${fact.createdAt})`)
+          .map((fact) => `[diary] ${fact.text} (source=${fact.source}, createdAt=${fact.createdAt})`)
           .join("\n");
       } catch (e) {
         return `error: ${e instanceof Error ? e.message : String(e)}`;
@@ -810,30 +809,30 @@ export const baseToolDefinitions: ToolDefinition[] = [
     tool: {
       type: "function",
       function: {
-        name: "memory_save",
+        name: "diary_write",
         description:
-          "save a general memory fact i want to recall later. optional 'about' can tag the fact to a person/topic/context",
+          "write an entry in my diary — something i learned, noticed, or concluded that i want to recall later. optional 'about' tags the entry to a person, topic, or context.",
         parameters: {
           type: "object",
           properties: {
-            text: { type: "string" },
+            entry: { type: "string" },
             about: { type: "string" },
           },
-          required: ["text"],
+          required: ["entry"],
         },
       },
     },
     handler: async (a) => {
-      const text = (a.text || "").trim();
-      if (!text) return "text is required";
+      const entry = (a.entry || "").trim();
+      if (!entry) return "entry is required";
       const result = await saveMemoryFact({
-        text,
-        source: "tool:memory_save",
+        text: entry,
+        source: "tool:diary_write",
         about: typeof a.about === "string" ? a.about : undefined,
       });
-      return `saved memory fact (added=${result.added}, skipped=${result.skipped})`;
+      return `saved diary entry (added=${result.added}, skipped=${result.skipped})`;
     },
-    summaryKeys: ["text", "about"],
+    summaryKeys: ["entry", "about"],
   },
   {
     tool: {

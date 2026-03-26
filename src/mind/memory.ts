@@ -266,13 +266,23 @@ async function buildEmbedding(text: string, embeddingProvider?: MemoryEmbeddingP
   }
 }
 
-export function readMemoryFacts(memoryRoot = path.join(getAgentRoot(), "psyche", "memory")): MemoryFact[] {
-  return readExistingFacts(path.join(memoryRoot, "facts.jsonl"));
+export function resolveDiaryRoot(explicitRoot?: string): string {
+  if (explicitRoot) return explicitRoot;
+  const agentRoot = getAgentRoot();
+  const diaryPath = path.join(agentRoot, "diary");
+  if (fs.existsSync(diaryPath)) return diaryPath;
+  const legacyPath = path.join(agentRoot, "psyche", "memory");
+  if (fs.existsSync(legacyPath)) return legacyPath;
+  return diaryPath; // default to new path (will be created on first write)
+}
+
+export function readMemoryFacts(memoryRoot?: string): MemoryFact[] {
+  return readExistingFacts(path.join(resolveDiaryRoot(memoryRoot), "facts.jsonl"));
 }
 
 export async function saveMemoryFact(options: SaveMemoryFactOptions): Promise<MemoryWriteResult> {
   const text = options.text.trim();
-  const memoryRoot = options.memoryRoot ?? path.join(getAgentRoot(), "psyche", "memory");
+  const memoryRoot = resolveDiaryRoot(options.memoryRoot);
   const stores = ensureMemoryStorePaths(memoryRoot);
   const embedding = await buildEmbedding(text, options.embeddingProvider);
 
@@ -299,7 +309,7 @@ export async function backfillEmbeddings(options?: {
   embeddingProvider?: MemoryEmbeddingProvider;
   batchSize?: number;
 }): Promise<BackfillEmbeddingsResult> {
-  const memoryRoot = options?.memoryRoot ?? path.join(getAgentRoot(), "psyche", "memory");
+  const memoryRoot = resolveDiaryRoot(options?.memoryRoot);
   const factsPath = path.join(memoryRoot, "facts.jsonl");
   if (!fs.existsSync(factsPath)) return { total: 0, backfilled: 0, failed: 0 };
 

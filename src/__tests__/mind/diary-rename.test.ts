@@ -44,12 +44,13 @@ describe("diary tool definitions", () => {
 // ── Diary path tests ────────────────────────────────────────────
 
 const mockGetAgentRoot = vi.fn()
+const mockGetOpenAIEmbeddingsApiKey = vi.fn().mockReturnValue("")
 vi.mock("../../heart/identity", () => ({
   getAgentName: () => "test-agent",
   getAgentRoot: () => mockGetAgentRoot(),
 }))
 vi.mock("../../heart/config", () => ({
-  getOpenAIEmbeddingsApiKey: () => null,
+  getOpenAIEmbeddingsApiKey: () => mockGetOpenAIEmbeddingsApiKey(),
 }))
 vi.mock("../../nerves/runtime", () => ({
   emitNervesEvent: vi.fn(),
@@ -58,6 +59,7 @@ vi.mock("../../nerves/runtime", () => ({
 describe("diary default path", () => {
   beforeEach(() => {
     mockGetAgentRoot.mockReset()
+    mockGetOpenAIEmbeddingsApiKey.mockReset().mockReturnValue("")
   })
 
   it("readMemoryFacts defaults to diary/ (not psyche/memory/)", async () => {

@@ -4,6 +4,7 @@ import * as path from "path"
 import { getOpenAIEmbeddingsApiKey } from "../heart/config"
 import { getAgentRoot } from "../heart/identity"
 import { emitNervesEvent } from "../nerves/runtime"
+import { resolveDiaryRoot } from "./memory"
 
 export interface EmbeddingProvider {
   embed(texts: string[]): Promise<number[][]>
@@ -149,7 +150,7 @@ export async function injectAssociativeRecall(
     const query = getLatestUserText(messages)
     if (!query) return
 
-    const memoryRoot = options?.memoryRoot ?? path.join(getAgentRoot(), "psyche", "memory")
+    const memoryRoot = options?.memoryRoot ?? resolveDiaryRoot()
     const facts = readFacts(memoryRoot)
     if (facts.length === 0) return
 
