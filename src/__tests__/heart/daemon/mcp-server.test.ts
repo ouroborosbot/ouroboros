@@ -37,6 +37,7 @@ vi.mock("fs", () => ({
 
 import * as fs from "fs"
 import { sendDaemonCommand } from "../../../heart/daemon/socket-client"
+import { handleAgentStatus } from "../../../heart/daemon/agent-service"
 
 describe("MCP server protocol layer", () => {
   let stdin: PassThrough
@@ -398,6 +399,267 @@ describe("MCP server protocol layer", () => {
       component: "daemon",
       event: "daemon.mcp_server_test_end",
       message: "daemon not running initialize test complete",
+      meta: {},
+    })
+  })
+
+  it("skips invalid Content-Length headers gracefully", async () => {
+    const { createMcpServer } = await import("../../../heart/daemon/mcp-server")
+    const localStdin = new PassThrough()
+    const localStdout = new PassThrough()
+    const server = createMcpServer({
+      agent: "test-agent",
+      friendId: "test-friend",
+      socketPath: "/tmp/test.sock",
+      stdin: localStdin,
+      stdout: localStdout,
+    })
+
+    const outputPromise = collectOutput(localStdout)
+    server.start()
+
+    // Send a header with "Content-Length:" present but no valid digits after it.
+    // This triggers the invalid-header branch in tryParseContentLength (lines 97-98).
+    // Then follow with a valid Content-Length message.
+    localStdin.write("Content-Length: abc\r\n\r\n")
+    const body = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 99,
+      method: "initialize",
+      params: {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: { name: "test-client", version: "1.0" },
+      },
+    })
+    const header = `Content-Length: ${Buffer.byteLength(body)}\r\n\r\n`
+    localStdin.write(header + body)
+
+    await new Promise((r) => setTimeout(r, 100))
+    server.stop()
+    localStdin.end()
+
+    const output = await outputPromise
+    // The response uses Content-Length framing; extract JSON after the last header
+    const lastHeaderEnd = output.lastIndexOf("\r\n\r\n")
+    expect(lastHeaderEnd).not.toBe(-1)
+    const jsonPart = output.slice(lastHeaderEnd + 4)
+    const response = JSON.parse(jsonPart)
+    expect(response.id).toBe(99)
+    expect(response.result.protocolVersion).toBe("2024-11-05")
+
+    localStdin.destroy()
+    localStdout.destroy()
+
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.mcp_server_test_end",
+      message: "invalid header skip test complete",
+      meta: {},
+    })
+  })
+
+  it("returns JSON-RPC parse error for malformed JSON body", async () => {
+    const { createMcpServer } = await import("../../../heart/daemon/mcp-server")
+    const server = createMcpServer({
+      agent: "test-agent",
+      friendId: "test-friend",
+      socketPath: "/tmp/test.sock",
+      stdin,
+      stdout,
+    })
+
+    const outputPromise = collectOutput(stdout)
+    server.start()
+
+    // Send a Content-Length message with invalid JSON body
+    const badBody = "not valid json{{"
+    const header = `Content-Length: ${Buffer.byteLength(badBody)}\r\n\r\n`
+    stdin.write(header + badBody)
+
+    await new Promise((r) => setTimeout(r, 100))
+    server.stop()
+    stdin.end()
+
+    const output = await outputPromise
+    const match = output.match(/\{.*\}/s)
+    expect(match).not.toBeNull()
+    const response = JSON.parse(match![0])
+    expect(response.error).toBeDefined()
+    expect(response.error.code).toBe(-32700)
+    expect(response.error.message).toBe("Parse error")
+
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.mcp_server_test_end",
+      message: "parse error test complete",
+      meta: {},
+    })
+  })
+
+  it("returns service error when agent-service handler throws", async () => {
+    // Make handleAgentStatus throw for the next call
+    vi.mocked(handleAgentStatus).mockRejectedValueOnce(new Error("disk read failed"))
+
+    const { createMcpServer } = await import("../../../heart/daemon/mcp-server")
+    const localStdin = new PassThrough()
+    const localStdout = new PassThrough()
+    const server = createMcpServer({
+      agent: "test-agent",
+      friendId: "test-friend",
+      socketPath: "/tmp/test.sock",
+      stdin: localStdin,
+      stdout: localStdout,
+    })
+
+    const outputPromise = collectOutput(localStdout)
+    server.start()
+
+    writeJsonRpc(localStdin, {
+      jsonrpc: "2.0",
+      id: 10,
+      method: "tools/call",
+      params: {
+        name: "status",
+        arguments: {},
+      },
+    })
+
+    await new Promise((r) => setTimeout(r, 100))
+    server.stop()
+    localStdin.end()
+
+    const output = await outputPromise
+    const match = output.match(/\{.*\}/s)
+    expect(match).not.toBeNull()
+    const response = JSON.parse(match![0])
+    expect(response.id).toBe(10)
+    // The catch block sets response = { ok: false, error: "Service error: ..." }
+    // text is built from response.message ?? response.summary ?? JSON.stringify(response.data ?? { ok: response.ok })
+    // Since .message and .summary are undefined, text = JSON.stringify({ ok: false })
+    expect(response.result.isError).toBe(true)
+
+    localStdin.destroy()
+    localStdout.destroy()
+
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.mcp_server_test_end",
+      message: "service error test complete",
+      meta: {},
+    })
+  })
+
+  it("ignores duplicate start() calls", async () => {
+    const { createMcpServer } = await import("../../../heart/daemon/mcp-server")
+    const server = createMcpServer({
+      agent: "test-agent",
+      friendId: "test-friend",
+      socketPath: "/tmp/test.sock",
+      stdin,
+      stdout,
+    })
+
+    server.start()
+    server.start() // second call should be a no-op
+    server.stop()
+
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.mcp_server_test_end",
+      message: "duplicate start test complete",
+      meta: {},
+    })
+  })
+
+  it("ignores duplicate stop() calls", async () => {
+    const { createMcpServer } = await import("../../../heart/daemon/mcp-server")
+    const server = createMcpServer({
+      agent: "test-agent",
+      friendId: "test-friend",
+      socketPath: "/tmp/test.sock",
+      stdin,
+      stdout,
+    })
+
+    server.start()
+    server.stop()
+    server.stop() // second call should be a no-op
+
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.mcp_server_test_end",
+      message: "duplicate stop test complete",
+      meta: {},
+    })
+  })
+
+  it("ignores stop() when never started", async () => {
+    const { createMcpServer } = await import("../../../heart/daemon/mcp-server")
+    const server = createMcpServer({
+      agent: "test-agent",
+      friendId: "test-friend",
+      socketPath: "/tmp/test.sock",
+      stdin,
+      stdout,
+    })
+
+    server.stop() // never started, should be a no-op
+
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.mcp_server_test_end",
+      message: "stop without start test complete",
+      meta: {},
+    })
+  })
+
+  it("skips blank lines in newline-delimited mode", async () => {
+    const { createMcpServer } = await import("../../../heart/daemon/mcp-server")
+    const localStdin = new PassThrough()
+    const localStdout = new PassThrough()
+    const server = createMcpServer({
+      agent: "test-agent",
+      friendId: "test-friend",
+      socketPath: "/tmp/test.sock",
+      stdin: localStdin,
+      stdout: localStdout,
+    })
+
+    const outputPromise = collectOutput(localStdout)
+    server.start()
+
+    // Send blank lines followed by a valid newline-delimited JSON message
+    const body = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 55,
+      method: "initialize",
+      params: {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: { name: "codex", version: "1.0" },
+      },
+    })
+    localStdin.write("\n\n" + body + "\n")
+
+    await new Promise((r) => setTimeout(r, 100))
+    server.stop()
+    localStdin.end()
+
+    const output = await outputPromise
+    const match = output.match(/\{.*\}/s)
+    expect(match).not.toBeNull()
+    const response = JSON.parse(match![0])
+    expect(response.id).toBe(55)
+    expect(response.result.protocolVersion).toBe("2024-11-05")
+
+    localStdin.destroy()
+    localStdout.destroy()
+
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.mcp_server_test_end",
+      message: "blank line skip test complete",
       meta: {},
     })
   })

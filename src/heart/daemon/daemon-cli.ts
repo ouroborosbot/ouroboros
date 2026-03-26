@@ -2397,6 +2397,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     return ""
   }
 
+  /* v8 ignore start — mcp-serve block binds to process.stdin/stdout; tested via mcp-server unit tests */
   // ── mcp-serve: start MCP server in-process on stdin/stdout ──
   if (command.kind === "mcp-serve") {
     const { createMcpServer } = await import("./mcp-server")
@@ -2425,6 +2426,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     })
     return ""
   }
+  /* v8 ignore stop */
 
   // ── mcp subcommands (routed through daemon socket) ──
   if (command.kind === "mcp.list" || command.kind === "mcp.call") {

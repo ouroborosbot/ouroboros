@@ -92,6 +92,48 @@ describe("ouro mcp-serve CLI command", () => {
     })
   })
 
+  it("parses mcp-serve with --socket override", () => {
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.cli_mcp_serve_test_start",
+      message: "testing mcp-serve socket override",
+      meta: {},
+    })
+
+    const command = parseOuroCommand(["mcp-serve", "--agent", "slugger", "--socket", "/tmp/custom.sock"])
+    expect(command.kind).toBe("mcp-serve")
+    expect((command as any).agent).toBe("slugger")
+    expect((command as any).socketOverride).toBe("/tmp/custom.sock")
+
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.cli_mcp_serve_test_end",
+      message: "mcp-serve socket override test complete",
+      meta: {},
+    })
+  })
+
+  it("ignores --socket when no value follows", () => {
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.cli_mcp_serve_test_start",
+      message: "testing mcp-serve socket without value",
+      meta: {},
+    })
+
+    const command = parseOuroCommand(["mcp-serve", "--agent", "slugger", "--socket"])
+    expect(command.kind).toBe("mcp-serve")
+    expect((command as any).agent).toBe("slugger")
+    expect((command as any).socketOverride).toBeUndefined()
+
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.cli_mcp_serve_test_end",
+      message: "mcp-serve socket without value test complete",
+      meta: {},
+    })
+  })
+
   it("emits mcp_serve_started when runOuroCli handles mcp-serve", async () => {
     // Emit the event directly to satisfy the nerves source coverage audit.
     // The full integration test for runOuroCli mcp-serve requires stdio mocking

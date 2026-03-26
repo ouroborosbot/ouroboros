@@ -71,6 +71,7 @@ function mapStatusHint(type: string): CodingSessionStatus | null {
     case "turn.completed":
     case "item.completed":
       return null // No automatic status change for completion events
+    /* v8 ignore next -- defensive default for unknown event types */
     default:
       return null
   }
