@@ -56,9 +56,11 @@ describe("ouro dev command handler", () => {
 
     const result = await runOuroCli(["dev"], deps)
 
-    // Should attempt auto-clone (which fails in test because resolveClonePath calls real git)
-    // The v8-ignored clone path throws, so we get the error message
-    expect(output.some(line => line.includes("cloning") || line.includes("clone failed") || line.includes("no harness repo found"))).toBe(true)
+    // No repo at cwd, no existing repo at default path, no promptInput — falls through to default clone
+    // resolveClonePath calls real git which fails in test
+    expect(output.some(line =>
+      line.includes("no harness repo") || line.includes("cloning") || line.includes("clone failed")
+    )).toBe(true)
     expect(deps.startDaemonProcess).not.toHaveBeenCalled()
   })
 

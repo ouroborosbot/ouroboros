@@ -2221,24 +2221,35 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
     let entryPath = path.join(repoCwd, "dist", "heart", "daemon", "daemon-entry.js")
     if (!checkExists(entryPath) || !checkExists(path.join(repoCwd, ".git"))) {
-      // No repo at cwd and no --repo-path — auto-clone
-      if (!command.repoPath) {
-        deps.writeStdout(`no harness repo found at ${repoCwd} — cloning...`)
-        try {
-          /* v8 ignore next -- auto-clone: requires real git/npm @preserve */
-          repoCwd = resolveClonePath(command, checkExists, deps)
-          entryPath = path.join(repoCwd, "dist", "heart", "daemon", "daemon-entry.js")
-        } catch (err) {
-          /* v8 ignore next -- defensive: clone error message @preserve */
-          const message = err instanceof Error ? err.message : String(err)
-          deps.writeStdout(message)
-          return message
-        }
-      } else {
-        const message = `no harness repo found at ${repoCwd}. run npm run build first, or omit --repo-path to auto-clone.`
+      if (command.repoPath) {
+        // Explicit --repo-path didn't have a valid repo — error
+        const message = `no harness repo found at ${repoCwd}. run npm run build first.`
         deps.writeStdout(message)
         return message
       }
+      // No repo at cwd — check default location, then ask user
+      /* v8 ignore start -- auto-clone: interactive prompt + real git/npm @preserve */
+      const defaultClonePath = path.join(os.homedir(), "Projects", "ouroboros")
+      let cloneTarget: string
+      if (checkExists(path.join(defaultClonePath, ".git"))) {
+        deps.writeStdout(`found existing repo at ${defaultClonePath}`)
+        cloneTarget = defaultClonePath
+      } else if (deps.promptInput) {
+        deps.writeStdout("no harness repo found. let's get you set up.")
+        const answer = await deps.promptInput(`clone to (${defaultClonePath}): `)
+        cloneTarget = answer.trim() || defaultClonePath
+      } else {
+        cloneTarget = defaultClonePath
+      }
+      try {
+        repoCwd = resolveClonePath({ clonePath: cloneTarget }, checkExists, deps)
+        entryPath = path.join(repoCwd, "dist", "heart", "daemon", "daemon-entry.js")
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        deps.writeStdout(message)
+        return message
+      }
+      /* v8 ignore stop */
     }
 
     /* v8 ignore start -- defensive: ensureDaemonBootPersistence always injected in tests @preserve */
