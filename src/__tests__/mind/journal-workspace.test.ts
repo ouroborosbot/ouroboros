@@ -161,6 +161,86 @@ describe("journalSection", () => {
     expect(result).toMatch(/2 hours? ago/)
   })
 
+  it("shows 'just now' for very recent files", async () => {
+    const { journalSection } = await import("../../mind/prompt")
+    const agentRoot = path.join(tmpDir, "just-now-agent")
+    const journalDir = path.join(agentRoot, "journal")
+    fs.mkdirSync(journalDir, { recursive: true })
+
+    const now = new Date("2026-03-26T12:00:00Z")
+    const file = path.join(journalDir, "fresh.md")
+    fs.writeFileSync(file, "# Fresh", "utf8")
+    const mtime = new Date(now.getTime() - 10 * 1000) // 10 seconds ago
+    fs.utimesSync(file, mtime, mtime)
+
+    const result = journalSection(agentRoot, now)
+    expect(result).toContain("just now")
+  })
+
+  it("shows '1 minute ago' for singular minute", async () => {
+    const { journalSection } = await import("../../mind/prompt")
+    const agentRoot = path.join(tmpDir, "one-min-agent")
+    const journalDir = path.join(agentRoot, "journal")
+    fs.mkdirSync(journalDir, { recursive: true })
+
+    const now = new Date("2026-03-26T12:00:00Z")
+    const file = path.join(journalDir, "recent.md")
+    fs.writeFileSync(file, "# Recent", "utf8")
+    const mtime = new Date(now.getTime() - 1 * 60 * 1000) // 1 minute ago
+    fs.utimesSync(file, mtime, mtime)
+
+    const result = journalSection(agentRoot, now)
+    expect(result).toContain("1 minute ago")
+  })
+
+  it("shows '1 hour ago' for singular hour", async () => {
+    const { journalSection } = await import("../../mind/prompt")
+    const agentRoot = path.join(tmpDir, "one-hour-agent")
+    const journalDir = path.join(agentRoot, "journal")
+    fs.mkdirSync(journalDir, { recursive: true })
+
+    const now = new Date("2026-03-26T12:00:00Z")
+    const file = path.join(journalDir, "hourold.md")
+    fs.writeFileSync(file, "# Hour old", "utf8")
+    const mtime = new Date(now.getTime() - 1 * 60 * 60 * 1000)
+    fs.utimesSync(file, mtime, mtime)
+
+    const result = journalSection(agentRoot, now)
+    expect(result).toContain("1 hour ago")
+  })
+
+  it("shows 'days ago' for files older than 24 hours", async () => {
+    const { journalSection } = await import("../../mind/prompt")
+    const agentRoot = path.join(tmpDir, "days-ago-agent")
+    const journalDir = path.join(agentRoot, "journal")
+    fs.mkdirSync(journalDir, { recursive: true })
+
+    const now = new Date("2026-03-26T12:00:00Z")
+    const file = path.join(journalDir, "old.md")
+    fs.writeFileSync(file, "# Old thoughts", "utf8")
+    const mtime = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000) // 3 days ago
+    fs.utimesSync(file, mtime, mtime)
+
+    const result = journalSection(agentRoot, now)
+    expect(result).toContain("3 days ago")
+  })
+
+  it("shows '1 day ago' for singular day", async () => {
+    const { journalSection } = await import("../../mind/prompt")
+    const agentRoot = path.join(tmpDir, "one-day-agent")
+    const journalDir = path.join(agentRoot, "journal")
+    fs.mkdirSync(journalDir, { recursive: true })
+
+    const now = new Date("2026-03-26T12:00:00Z")
+    const file = path.join(journalDir, "yesterday.md")
+    fs.writeFileSync(file, "# Yesterday", "utf8")
+    const mtime = new Date(now.getTime() - 25 * 60 * 60 * 1000) // 25 hours = 1 day
+    fs.utimesSync(file, mtime, mtime)
+
+    const result = journalSection(agentRoot, now)
+    expect(result).toContain("1 day ago")
+  })
+
   it("limits output to 10 most recently modified files", async () => {
     const { journalSection } = await import("../../mind/prompt")
     const agentRoot = path.join(tmpDir, "many-files-agent")
@@ -200,6 +280,39 @@ describe("journalSection", () => {
     const result = journalSection(agentRoot, now)
     // Should still list the file even if content is empty
     expect(result).toContain("blank.md")
+  })
+
+  it("skips subdirectories in journal/", async () => {
+    const { journalSection } = await import("../../mind/prompt")
+    const agentRoot = path.join(tmpDir, "subdir-agent")
+    const journalDir = path.join(agentRoot, "journal")
+    fs.mkdirSync(journalDir, { recursive: true })
+
+    // Create a subdirectory
+    fs.mkdirSync(path.join(journalDir, "subdir"))
+    // Create a regular file
+    fs.writeFileSync(path.join(journalDir, "notes.md"), "# Notes", "utf8")
+
+    const now = new Date("2026-03-26T12:00:00Z")
+    const result = journalSection(agentRoot, now)
+    expect(result).toContain("notes.md")
+    expect(result).not.toContain("subdir")
+  })
+
+  it("uses current time when now is not provided", async () => {
+    const { journalSection } = await import("../../mind/prompt")
+    const agentRoot = path.join(tmpDir, "default-now-agent")
+    const journalDir = path.join(agentRoot, "journal")
+    fs.mkdirSync(journalDir, { recursive: true })
+
+    const file = path.join(journalDir, "recent.md")
+    fs.writeFileSync(file, "# Recent work", "utf8")
+
+    // Call without a `now` parameter — should use Date.now() internally
+    const result = journalSection(agentRoot)
+    expect(result).toContain("recent.md")
+    // Since we just wrote the file, it should show "just now" or a very small time
+    expect(result).toMatch(/just now|1 minute/)
   })
 
   it("skips hidden files like .index.json", async () => {
