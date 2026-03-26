@@ -5,7 +5,25 @@ import { emitNervesEvent } from "../../../nerves/runtime"
 // Mock the socket client
 vi.mock("../../../heart/daemon/socket-client", () => ({
   sendDaemonCommand: vi.fn(),
+  checkDaemonSocketAlive: vi.fn(),
   DEFAULT_DAEMON_SOCKET_PATH: "/tmp/ouroboros-daemon.sock",
+}))
+
+// Mock agent-service
+vi.mock("../../../heart/daemon/agent-service", () => ({
+  handleAgentStatus: vi.fn(async () => ({ ok: true, message: "Agent test-agent status", data: { agent: "test-agent", status: "active" } })),
+  handleAgentAsk: vi.fn(async () => ({ ok: true, message: "Test response" })),
+  handleAgentCatchup: vi.fn(async () => ({ ok: true, message: "Catchup" })),
+  handleAgentDelegate: vi.fn(async () => ({ ok: true, message: "Delegated" })),
+  handleAgentGetContext: vi.fn(async () => ({ ok: true, message: "Context" })),
+  handleAgentSearchMemory: vi.fn(async () => ({ ok: true, message: "Memory" })),
+  handleAgentGetTask: vi.fn(async () => ({ ok: true, message: "Tasks" })),
+  handleAgentCheckScope: vi.fn(async () => ({ ok: true, message: "In scope" })),
+  handleAgentRequestDecision: vi.fn(async () => ({ ok: true, message: "Decision" })),
+  handleAgentCheckGuidance: vi.fn(async () => ({ ok: true, message: "Guidance" })),
+  handleAgentReportProgress: vi.fn(async () => ({ ok: true, message: "Recorded" })),
+  handleAgentReportBlocker: vi.fn(async () => ({ ok: true, message: "Recorded" })),
+  handleAgentReportComplete: vi.fn(async () => ({ ok: true, message: "Recorded" })),
 }))
 
 // Mock fs
@@ -223,10 +241,9 @@ describe("MCP server protocol layer", () => {
     expect(Array.isArray(response.result.content)).toBe(true)
     expect(response.result.content[0].type).toBe("text")
 
-    expect(sendDaemonCommand).toHaveBeenCalledWith(
-      "/tmp/test.sock",
-      expect.objectContaining({ kind: "agent.status" }),
-    )
+    // Tool calls go through agent-service directly, not daemon socket
+    const { handleAgentStatus } = await import("../../../heart/daemon/agent-service")
+    expect(handleAgentStatus).toHaveBeenCalled()
 
     emitNervesEvent({
       component: "daemon",
@@ -236,9 +253,7 @@ describe("MCP server protocol layer", () => {
     })
   })
 
-  it("returns error when daemon is not running during tools/call", async () => {
-    vi.mocked(sendDaemonCommand).mockRejectedValue(new Error("ENOENT: socket not found"))
-
+  it("returns error for unknown tool name during tools/call", async () => {
     const { createMcpServer } = await import("../../../heart/daemon/mcp-server")
     const server = createMcpServer({
       agent: "test-agent",
@@ -256,7 +271,7 @@ describe("MCP server protocol layer", () => {
       id: 4,
       method: "tools/call",
       params: {
-        name: "status",
+        name: "nonexistent_tool",
         arguments: {},
       },
     })
@@ -271,12 +286,12 @@ describe("MCP server protocol layer", () => {
     const response = JSON.parse(match![0])
     expect(response.id).toBe(4)
     expect(response.result.isError).toBe(true)
-    expect(response.result.content[0].text).toContain("ENOENT")
+    expect(response.result.content[0].text).toContain("Unknown tool")
 
     emitNervesEvent({
       component: "daemon",
       event: "daemon.mcp_server_test_end",
-      message: "daemon not running error test complete",
+      message: "unknown tool error test complete",
       meta: {},
     })
   })
@@ -341,7 +356,7 @@ describe("MCP server protocol layer", () => {
     })
   })
 
-  it("returns error when socket does not exist for initialize", async () => {
+  it("initializes successfully even without daemon socket (standalone mode)", async () => {
     vi.mocked(fs.existsSync).mockReturnValue(false)
 
     const { createMcpServer } = await import("../../../heart/daemon/mcp-server")
@@ -376,8 +391,8 @@ describe("MCP server protocol layer", () => {
     expect(match).not.toBeNull()
     const response = JSON.parse(match![0])
     expect(response.id).toBe(1)
-    expect(response.error).toBeDefined()
-    expect(response.error.message).toContain("daemon")
+    expect(response.result).toBeDefined()
+    expect(response.result.protocolVersion).toBe("2024-11-05")
 
     emitNervesEvent({
       component: "daemon",

@@ -1,7 +1,7 @@
-import * as fs from "fs"
 import type { Readable, Writable } from "stream"
 import { sendDaemonCommand } from "./socket-client"
 import type { DaemonCommand, DaemonResponse } from "./daemon"
+import * as agentService from "./agent-service"
 import { emitNervesEvent } from "../../nerves/runtime"
 
 /**
@@ -201,19 +201,8 @@ export function createMcpServer(options: McpServerOptions): McpServer {
   }
 
   async function handleInitialize(request: JsonRpcRequest): Promise<void> {
-    // Check daemon is running by verifying socket exists
-    if (!fs.existsSync(socketPath)) {
-      writeResponse({
-        jsonrpc: "2.0",
-        id: request.id!,
-        error: {
-          code: -32002,
-          message: `Agent daemon is not running. Start it with: ouro daemon --agent ${agent}`,
-        },
-      })
-      return
-    }
-
+    // MCP server works standalone (agent-service reads filesystem directly)
+    // Daemon is optional — only needed for commands without a direct service handler
     writeResponse({
       jsonrpc: "2.0",
       id: request.id!,
@@ -239,6 +228,23 @@ export function createMcpServer(options: McpServerOptions): McpServer {
     })
   }
 
+  /** Map tool name → agent-service handler function name */
+  const TOOL_TO_SERVICE: Record<string, keyof typeof agentService> = {
+    ask: "handleAgentAsk",
+    status: "handleAgentStatus",
+    catchup: "handleAgentCatchup",
+    delegate: "handleAgentDelegate",
+    get_context: "handleAgentGetContext",
+    search_memory: "handleAgentSearchMemory",
+    get_task: "handleAgentGetTask",
+    check_scope: "handleAgentCheckScope",
+    request_decision: "handleAgentRequestDecision",
+    check_guidance: "handleAgentCheckGuidance",
+    report_progress: "handleAgentReportProgress",
+    report_blocker: "handleAgentReportBlocker",
+    report_complete: "handleAgentReportComplete",
+  }
+
   async function handleToolsCall(request: JsonRpcRequest): Promise<void> {
     const params = request.params ?? {}
     const toolName = params.name as string
@@ -257,39 +263,40 @@ export function createMcpServer(options: McpServerOptions): McpServer {
       return
     }
 
-    const command: DaemonCommand = {
-      kind: commandKind,
-      agent,
-      friendId,
-      ...toolArgs,
-    } as DaemonCommand
+    // Call agent-service directly (no daemon roundtrip needed for read-only ops)
+    const serviceHandler = TOOL_TO_SERVICE[toolName]
+    let response: DaemonResponse
 
-    let daemonResponse: DaemonResponse
-    try {
-      daemonResponse = await sendDaemonCommand(socketPath, command)
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      writeResponse({
-        jsonrpc: "2.0",
-        id: request.id!,
-        result: {
-          content: [{ type: "text", text: `Daemon error: ${errorMessage}` }],
-          isError: true,
-        },
-      })
-      return
+    if (serviceHandler && typeof agentService[serviceHandler] === "function") {
+      const handlerFn = agentService[serviceHandler] as (p: agentService.AgentServiceParams) => Promise<DaemonResponse>
+      try {
+        response = await handlerFn({ agent, friendId, ...toolArgs })
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        response = { ok: false, error: `Service error: ${errorMessage}` }
+      }
+    } else {
+      // Fallback: route through daemon socket
+      try {
+        response = await sendDaemonCommand(socketPath, {
+          kind: commandKind, agent, friendId, ...toolArgs,
+        } as DaemonCommand)
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        response = { ok: false, error: `Daemon error: ${errorMessage}` }
+      }
     }
 
-    const text = daemonResponse.message
-      ?? daemonResponse.summary
-      ?? JSON.stringify(daemonResponse.data ?? { ok: daemonResponse.ok })
+    const text = response.message
+      ?? response.summary
+      ?? JSON.stringify(response.data ?? { ok: response.ok })
 
     writeResponse({
       jsonrpc: "2.0",
       id: request.id!,
       result: {
         content: [{ type: "text", text }],
-        isError: !daemonResponse.ok,
+        isError: !response.ok,
       },
     })
   }
