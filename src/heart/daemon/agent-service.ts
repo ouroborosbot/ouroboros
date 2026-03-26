@@ -23,6 +23,13 @@ function readAgentFile(agent: string, ...segments: string[]): string | null {
   return fs.readFileSync(filePath, "utf-8")
 }
 
+/** Read agent memory from multiple possible locations. */
+function readAgentMemory(agent: string): string | null {
+  // Try memory/MEMORY.md first, then psyche/memory/facts.jsonl
+  return readAgentFile(agent, "memory", "MEMORY.md")
+    ?? readAgentFile(agent, "psyche", "memory", "facts.jsonl")
+}
+
 function listStateFiles(agent: string, ...segments: string[]): string[] {
   const dirPath = path.join(getAgentStateRoot(agent), ...segments)
   if (!fs.existsSync(dirPath)) return []
@@ -38,7 +45,7 @@ export async function handleAgentStatus(params: AgentServiceParams): Promise<Dae
   })
 
   const sessionFiles = listStateFiles(params.agent, "sessions")
-  const memoryContent = readAgentFile(params.agent, "memory", "MEMORY.md")
+  const memoryContent = readAgentMemory(params.agent)
 
   emitNervesEvent({
     component: "daemon",
@@ -80,7 +87,7 @@ export async function handleAgentAsk(params: AgentServiceParams): Promise<Daemon
   }
 
   // MVP: return memory + recent session context without running inference
-  const memoryContent = readAgentFile(params.agent, "memory", "MEMORY.md")
+  const memoryContent = readAgentMemory(params.agent)
   const context = memoryContent
     ? `Based on agent memory:\n${memoryContent.slice(0, 2000)}`
     : `Agent ${params.agent} has no memory file. Question was: ${question}`
@@ -164,7 +171,7 @@ export async function handleAgentGetContext(params: AgentServiceParams): Promise
     meta: { agent: params.agent, friendId: params.friendId },
   })
 
-  const memoryContent = readAgentFile(params.agent, "memory", "MEMORY.md")
+  const memoryContent = readAgentMemory(params.agent)
   const taskFiles = listStateFiles(params.agent, "tasks")
 
   emitNervesEvent({
@@ -206,7 +213,7 @@ export async function handleAgentSearchMemory(params: AgentServiceParams): Promi
   }
 
   // MVP: simple substring search in memory file
-  const memoryContent = readAgentFile(params.agent, "memory", "MEMORY.md")
+  const memoryContent = readAgentMemory(params.agent)
   const matches: string[] = []
   if (memoryContent) {
     const lines = memoryContent.split("\n")
@@ -352,7 +359,7 @@ export async function handleAgentCheckGuidance(params: AgentServiceParams): Prom
   }
 
   // MVP: check memory for relevant guidance
-  const memoryContent = readAgentFile(params.agent, "memory", "MEMORY.md")
+  const memoryContent = readAgentMemory(params.agent)
   let guidance = `No specific guidance found for: ${topic}`
   if (memoryContent) {
     const lines = memoryContent.split("\n")
