@@ -2760,8 +2760,8 @@ describe("buildSystem with context", () => {
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("inner")
-    expect(result).toContain("thoughts worth sharing can go outward")
-    expect(result).toContain("think. share. think some more.")
+    expect(result).toContain("when a thought is ready to share, i surface it outward")
+    expect(result).toContain("think. journal. share. rest.")
   })
 
   it("buildSystem('cli') does NOT include metacognitive framing", async () => {
@@ -3025,7 +3025,7 @@ describe("loopOrientationSection", () => {
     resetPsycheCache()
     const result = await buildSystem("inner")
     // Inner dialog has metacognitive framing with its own loop text
-    expect(result).toContain("think. share. think some more.")
+    expect(result).toContain("think. journal. share. rest.")
     // But not the external channel version
     expect(result).not.toContain("sometimes a thought of mine surfaces")
   })
