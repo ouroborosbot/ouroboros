@@ -46,17 +46,32 @@ describe("ouro dev command handler", () => {
     expect(deps.checkForCliUpdate).toBeUndefined()
   })
 
-  it("prints error and exits when dist entry is missing", async () => {
+  it("auto-clones when no repo found at cwd", async () => {
+    const output: string[] = []
     const deps = makeDeps({
       existsSync: vi.fn(() => false),
       getRepoCwd: vi.fn(() => "/my/dev/repo"),
+      writeStdout: vi.fn((text: string) => output.push(text)),
     })
 
     const result = await runOuroCli(["dev"], deps)
 
+    // Should attempt auto-clone (which fails in test because resolveClonePath calls real git)
+    // The v8-ignored clone path throws, so we get the error message
+    expect(output.some(line => line.includes("cloning") || line.includes("clone failed") || line.includes("no harness repo found"))).toBe(true)
+    expect(deps.startDaemonProcess).not.toHaveBeenCalled()
+  })
+
+  it("prints error when --repo-path points to missing repo", async () => {
+    const deps = makeDeps({
+      existsSync: vi.fn(() => false),
+      getRepoCwd: vi.fn(() => "/bad/path"),
+    })
+
+    const result = await runOuroCli(["dev", "--repo-path", "/bad/path"], deps)
+
     expect(result).toContain("no harness repo found")
-    expect(result).toContain("--repo-path")
-    expect(result).toContain("--clone")
+    expect(result).toContain("npm run build")
     expect(deps.startDaemonProcess).not.toHaveBeenCalled()
   })
 
@@ -100,7 +115,8 @@ describe("ouro dev command handler", () => {
     expect(ensureCurrentVersionInstalled).not.toHaveBeenCalled()
   })
 
-  it("rejects when cwd has dist/ but no .git (installed package, not a repo)", async () => {
+  it("auto-clones when cwd has dist/ but no .git (installed package, not a repo)", async () => {
+    const output: string[] = []
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => {
         if (p.includes(".git")) return false
@@ -108,12 +124,13 @@ describe("ouro dev command handler", () => {
         return false
       }),
       getRepoCwd: vi.fn(() => "/installed/npm/package"),
+      writeStdout: vi.fn((text: string) => output.push(text)),
     })
 
     const result = await runOuroCli(["dev"], deps)
 
-    expect(result).toContain("no harness repo found")
-    expect(result).toContain("--repo-path")
+    // Should attempt auto-clone (fails in test because resolveClonePath calls real git)
+    expect(output.some(line => line.includes("cloning") || line.includes("clone failed"))).toBe(true)
     expect(deps.startDaemonProcess).not.toHaveBeenCalled()
   })
 

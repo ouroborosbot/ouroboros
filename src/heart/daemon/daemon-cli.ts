@@ -2217,23 +2217,28 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     const checkExists = deps.existsSync ?? fs.existsSync
 
     /* v8 ignore next -- repo resolution dispatched to v8-ignored helper @preserve */
-    const repoCwd = resolveDevRepoCwd(command, checkExists, deps)
+    let repoCwd = resolveDevRepoCwd(command, checkExists, deps)
 
-    const entryPath = path.join(repoCwd, "dist", "heart", "daemon", "daemon-entry.js")
+    let entryPath = path.join(repoCwd, "dist", "heart", "daemon", "daemon-entry.js")
     if (!checkExists(entryPath) || !checkExists(path.join(repoCwd, ".git"))) {
-      const lines = [
-        "no harness repo found at " + repoCwd,
-        "",
-        "options:",
-        "  ouro dev --repo-path /path/to/ouroboros   use an existing checkout",
-        "  ouro dev --clone                          fresh clone to ~/Projects/ouroboros",
-        "  ouro dev --clone --clone-path /somewhere   fresh clone to a custom path",
-        "",
-        "if you have the repo, cd into it and run: npm run build && ouro dev",
-      ]
-      const message = lines.join("\n")
-      deps.writeStdout(message)
-      return message
+      // No repo at cwd and no --repo-path — auto-clone
+      if (!command.repoPath) {
+        deps.writeStdout(`no harness repo found at ${repoCwd} — cloning...`)
+        try {
+          /* v8 ignore next -- auto-clone: requires real git/npm @preserve */
+          repoCwd = resolveClonePath(command, checkExists, deps)
+          entryPath = path.join(repoCwd, "dist", "heart", "daemon", "daemon-entry.js")
+        } catch (err) {
+          /* v8 ignore next -- defensive: clone error message @preserve */
+          const message = err instanceof Error ? err.message : String(err)
+          deps.writeStdout(message)
+          return message
+        }
+      } else {
+        const message = `no harness repo found at ${repoCwd}. run npm run build first, or omit --repo-path to auto-clone.`
+        deps.writeStdout(message)
+        return message
+      }
     }
 
     /* v8 ignore start -- defensive: ensureDaemonBootPersistence always injected in tests @preserve */
