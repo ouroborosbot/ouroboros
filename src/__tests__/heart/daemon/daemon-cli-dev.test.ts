@@ -46,21 +46,17 @@ describe("ouro dev command handler", () => {
     expect(deps.checkForCliUpdate).toBeUndefined()
   })
 
-  it("auto-clones when no repo found at cwd", async () => {
-    const output: string[] = []
+  it("errors with guidance when no repo found and no interactive prompt available", async () => {
     const deps = makeDeps({
       existsSync: vi.fn(() => false),
       getRepoCwd: vi.fn(() => "/my/dev/repo"),
-      writeStdout: vi.fn((text: string) => output.push(text)),
     })
+    // promptInput is undefined by default in makeDeps
 
     const result = await runOuroCli(["dev"], deps)
 
-    // No repo at cwd, no existing repo at default path, no promptInput — falls through to default clone
-    // resolveClonePath calls real git which fails in test
-    expect(output.some(line =>
-      line.includes("no harness repo") || line.includes("cloning") || line.includes("clone failed")
-    )).toBe(true)
+    expect(result).toContain("no harness repo found")
+    expect(result).toContain("--repo-path")
     expect(deps.startDaemonProcess).not.toHaveBeenCalled()
   })
 
@@ -117,8 +113,7 @@ describe("ouro dev command handler", () => {
     expect(ensureCurrentVersionInstalled).not.toHaveBeenCalled()
   })
 
-  it("auto-clones when cwd has dist/ but no .git (installed package, not a repo)", async () => {
-    const output: string[] = []
+  it("errors when cwd has dist/ but no .git (installed package, not a repo)", async () => {
     const deps = makeDeps({
       existsSync: vi.fn((p: string) => {
         if (p.includes(".git")) return false
@@ -126,13 +121,11 @@ describe("ouro dev command handler", () => {
         return false
       }),
       getRepoCwd: vi.fn(() => "/installed/npm/package"),
-      writeStdout: vi.fn((text: string) => output.push(text)),
     })
 
     const result = await runOuroCli(["dev"], deps)
 
-    // Should attempt auto-clone (fails in test because resolveClonePath calls real git)
-    expect(output.some(line => line.includes("cloning") || line.includes("clone failed"))).toBe(true)
+    expect(result).toContain("no harness repo found")
     expect(deps.startDaemonProcess).not.toHaveBeenCalled()
   })
 
