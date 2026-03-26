@@ -5,8 +5,8 @@
       "version": "0.1.0-alpha.137",
       "changes": [
         "ouro dev auto-discovers existing repo at ~/Projects/ouroboros or prompts for clone path.",
-        "ouro dev --repo-path errors clearly when path has no repo.",
-        "ouro dev never clones without user consent — prompts first in interactive mode, errors in non-interactive."
+        "ouro dev never clones without user consent — prompts in interactive mode, errors in non-interactive.",
+        "ouro dev --repo-path errors clearly when the specified path has no repo."
       ]
     },
     {
