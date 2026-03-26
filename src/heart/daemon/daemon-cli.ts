@@ -2270,6 +2270,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       : deps.startDaemonProcess
     /* v8 ignore stop */
     const started = await startDevDaemon(deps.socketPath)
+    /* v8 ignore next -- defensive: pid is null only when spawn fails silently @preserve */
     const message = `daemon running in dev mode from ${repoCwd} (pid ${started.pid ?? "unknown"})`
     deps.writeStdout(message)
     return message
