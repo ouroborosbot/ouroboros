@@ -29,6 +29,8 @@ export interface BlueBubblesClient {
   markChatRead(chat: BlueBubblesChatRef): Promise<void>
   checkHealth(): Promise<void>
   repairEvent(event: BlueBubblesNormalizedEvent): Promise<BlueBubblesNormalizedEvent>
+  /** Fetch the text content of a message by its GUID. Returns null if not found or on error. */
+  getMessageText(messageGuid: string): Promise<string | null>
 }
 
 type ClientConfig = ReturnType<typeof getBlueBubblesConfig>
@@ -579,6 +581,29 @@ export function createBlueBubblesClient(
         return applyRepairNotice(event, `BlueBubbles repair failed: ${reason}`)
       }
 
+    },
+
+    async getMessageText(messageGuid: string): Promise<string | null> {
+      const url = buildRepairUrl(config.serverUrl, messageGuid, config.password)
+      try {
+        const response = await fetch(url, {
+          method: "GET",
+          signal: AbortSignal.timeout(channelConfig.requestTimeoutMs),
+        })
+        if (!response.ok) return null
+        const payload = await parseJsonBody(response)
+        const data = extractRepairData(payload)
+        if (!data || typeof data.text !== "string") return null
+        emitNervesEvent({
+          component: "senses",
+          event: "senses.bluebubbles_get_message_text",
+          message: "fetched message text by guid",
+          meta: { messageGuid },
+        })
+        return data.text.trim() || null
+      } catch {
+        return null
+      }
     },
   }
 }
