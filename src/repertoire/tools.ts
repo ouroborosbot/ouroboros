@@ -12,6 +12,7 @@ import { guardInvocation } from "./guardrails";
 import { getAgentRoot, getAgentName } from "../heart/identity";
 import { surfaceToolDef, handleSurface, type SurfaceRouteResult } from "../senses/surface-tool";
 import { advanceObligation as advanceInnerObligation } from "../mind/obligations";
+import { findPendingObligationForOrigin, fulfillObligation } from "../heart/obligations";
 import { findFreshestFriendSession, listSessionActivity } from "../heart/session-activity";
 import * as path from "path";
 import type { AttentionItem } from "../senses/attention-queue";
@@ -25,7 +26,7 @@ function safeGetAgentRoot(): string | undefined {
 }
 
 // Re-export types and constants used by the rest of the codebase
-export { tools, settleTool, observeTool, descendTool } from "./tools-base";
+export { tools, settleTool, observeTool, ponderTool, restTool } from "./tools-base";
 export type { ToolContext, ToolHandler, ToolDefinition } from "./tools-base";
 
 // Surface tool handler: routes content to friend's freshest session
@@ -164,6 +165,19 @@ const surfaceToolDefinition: ToolDefinition = {
           })
         } catch {
           // swallowed — obligation advance must never break surface delivery
+        }
+        /* v8 ignore stop */
+      },
+      fulfillHeartObligation: (origin) => {
+        /* v8 ignore start -- heart obligation fulfillment: tested via surface-tool.test.ts @preserve */
+        try {
+          const agentRoot = getAgentRoot()
+          const heartObligation = findPendingObligationForOrigin(agentRoot, origin)
+          if (heartObligation) {
+            fulfillObligation(agentRoot, heartObligation.id)
+          }
+        } catch {
+          // swallowed — heart obligation fulfillment must never break surface delivery
         }
         /* v8 ignore stop */
       },
