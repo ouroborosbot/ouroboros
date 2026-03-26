@@ -135,13 +135,27 @@ describe("agent-service", () => {
       })
 
       expect(result.ok).toBe(true)
-      expect(result.message).toContain("Based on agent memory")
       expect(result.message).toContain("deployment automation")
+    })
+
+    it("returns a no-match message when no relevant memory is found", async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true)
+      vi.mocked(fs.readFileSync).mockReturnValue("# Memory\nI work on deployment automation.\n")
+
+      const { handleAgentAsk } = await import("../../../heart/daemon/agent-service")
+      const result = await handleAgentAsk({
+        agent: "test-agent",
+        friendId: "friend-1",
+        question: "What is your favorite color?",
+      })
+
+      expect(result.ok).toBe(true)
+      expect(result.message).toBe("No relevant memory found for: What is your favorite color?")
 
       emitNervesEvent({
         component: "daemon",
         event: "daemon.agent_service_test_end",
-        message: "handleAgentAsk with memory test complete",
+        message: "handleAgentAsk with no match test complete",
         meta: {},
       })
     })
@@ -257,24 +271,51 @@ describe("agent-service", () => {
       })
     })
 
-    it("includes memory summary when memory file exists", async () => {
+    it("includes relevant memory summary when a query-like param is provided", async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true)
-      vi.mocked(fs.readFileSync).mockReturnValue("# Memory\nAgent context details here\n")
+      vi.mocked(fs.readFileSync).mockReturnValue("# Memory\nAgent context details here\nDeployment automation owner\n")
       vi.mocked(fs.readdirSync).mockReturnValue(["task-1.json"] as unknown as ReturnType<typeof fs.readdirSync>)
 
       const { handleAgentGetContext } = await import("../../../heart/daemon/agent-service")
-      const result = await handleAgentGetContext({ agent: "test-agent", friendId: "friend-1" })
+      const result = await handleAgentGetContext({
+        agent: "test-agent",
+        friendId: "friend-1",
+        query: "deployment",
+      })
 
       expect(result.ok).toBe(true)
       const data = result.data as Record<string, unknown>
       expect(data.hasMemory).toBe(true)
-      expect(data.memorySummary).toContain("Agent context details")
+      expect(data.memorySummary).toContain("Deployment automation owner")
       expect(data.taskCount).toBe(1)
 
       emitNervesEvent({
         component: "daemon",
         event: "daemon.agent_service_test_end",
         message: "handleAgentGetContext with memory test complete",
+        meta: {},
+      })
+    })
+
+    it("returns a no-match memory summary when query-like params do not match", async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true)
+      vi.mocked(fs.readFileSync).mockReturnValue("# Memory\nAgent context details here\n")
+
+      const { handleAgentGetContext } = await import("../../../heart/daemon/agent-service")
+      const result = await handleAgentGetContext({
+        agent: "test-agent",
+        friendId: "friend-1",
+        question: "favorite color",
+      })
+
+      expect(result.ok).toBe(true)
+      const data = result.data as Record<string, unknown>
+      expect(data.memorySummary).toBe("No relevant memory found for: favorite color")
+
+      emitNervesEvent({
+        component: "daemon",
+        event: "daemon.agent_service_test_end",
+        message: "handleAgentGetContext with no match test complete",
         meta: {},
       })
     })

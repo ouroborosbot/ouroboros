@@ -30,6 +30,28 @@ function readAgentMemory(agent: string): string | null {
     ?? readAgentFile(agent, "psyche", "memory", "facts.jsonl")
 }
 
+function findRelevantMemoryLines(agent: string, query: string): string[] {
+  const memoryContent = readAgentMemory(agent)
+  if (!memoryContent) return []
+
+  const keywords = query
+    .toLowerCase()
+    .split(/\W+/)
+    .map((keyword) => keyword.trim())
+    .filter((keyword) => keyword.length > 2)
+
+  if (keywords.length === 0) return []
+
+  return memoryContent
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => {
+      const lineLower = line.toLowerCase()
+      return keywords.some((keyword) => lineLower.includes(keyword))
+    })
+}
+
 function listStateFiles(agent: string, ...segments: string[]): string[] {
   const dirPath = path.join(getAgentStateRoot(agent), ...segments)
   if (!fs.existsSync(dirPath)) return []
@@ -86,11 +108,10 @@ export async function handleAgentAsk(params: AgentServiceParams): Promise<Daemon
     return { ok: false, error: "Missing required parameter: question" }
   }
 
-  // MVP: return memory + recent session context without running inference
-  const memoryContent = readAgentMemory(params.agent)
-  const context = memoryContent
-    ? `Based on agent memory:\n${memoryContent.slice(0, 2000)}`
-    : `Agent ${params.agent} has no memory file. Question was: ${question}`
+  const matches = findRelevantMemoryLines(params.agent, question)
+  const context = matches.length > 0
+    ? matches.join("\n")
+    : `No relevant memory found for: ${question}`
 
   emitNervesEvent({
     component: "daemon",
@@ -171,8 +192,16 @@ export async function handleAgentGetContext(params: AgentServiceParams): Promise
     meta: { agent: params.agent, friendId: params.friendId },
   })
 
-  const memoryContent = readAgentMemory(params.agent)
+  const query = (params.question as string | undefined)
+    ?? (params.query as string | undefined)
+    ?? (params.topic as string | undefined)
   const taskFiles = listStateFiles(params.agent, "tasks")
+  const memorySummary = query
+    ? (() => {
+        const matches = findRelevantMemoryLines(params.agent, query)
+        return matches.length > 0 ? matches.join("\n").slice(0, 500) : `No relevant memory found for: ${query}`
+      })()
+    : null
 
   emitNervesEvent({
     component: "daemon",
@@ -185,8 +214,8 @@ export async function handleAgentGetContext(params: AgentServiceParams): Promise
     ok: true,
     data: {
       agent: params.agent,
-      hasMemory: memoryContent !== null,
-      memorySummary: memoryContent ? memoryContent.slice(0, 500) : null,
+      hasMemory: readAgentMemory(params.agent) !== null,
+      memorySummary,
       taskCount: taskFiles.length,
     },
   }
@@ -212,18 +241,7 @@ export async function handleAgentSearchMemory(params: AgentServiceParams): Promi
     return { ok: false, error: "Missing required parameter: query" }
   }
 
-  // MVP: simple substring search in memory file
-  const memoryContent = readAgentMemory(params.agent)
-  const matches: string[] = []
-  if (memoryContent) {
-    const lines = memoryContent.split("\n")
-    const queryLower = query.toLowerCase()
-    for (const line of lines) {
-      if (line.toLowerCase().includes(queryLower)) {
-        matches.push(line.trim())
-      }
-    }
-  }
+  const matches = findRelevantMemoryLines(params.agent, query)
 
   emitNervesEvent({
     component: "daemon",
