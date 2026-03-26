@@ -287,7 +287,7 @@ const DELEGATION_REASON_PROSE_HANDOFF: Record<DelegationReason, string> = {
   unresolved_obligation: "there's an unresolved commitment from an earlier conversation",
 };
 
-function buildDescendHandoffPacket(params: {
+function buildPonderHandoffPacket(params: {
   topic: string
   mode: "reflect" | "plan" | "relay"
   delegationDecision?: DelegationDecision
@@ -914,7 +914,7 @@ export async function runAgent(
             callbacks.onTextChunk(say);
 
             // Build handoff packet and enqueue
-            const handoffContent = buildDescendHandoffPacket({
+            const handoffContent = buildPonderHandoffPacket({
               topic: thought,
               mode: "reflect",
               delegationDecision: options?.delegationDecision,
