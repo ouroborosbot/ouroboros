@@ -2825,8 +2825,8 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   /* v8 ignore stop */
 
   // ── inner dialog status (local, no daemon socket needed) ──
+  /* v8 ignore start -- inner status handler: requires real agent state on disk @preserve */
   if (command.kind === "inner.status") {
-    /* v8 ignore start -- inner status handler: requires real agent state on disk @preserve */
     try {
       const agentName = command.agent ?? getAgentName()
       const agentRoot = getAgentRoot(agentName)
@@ -2904,8 +2904,8 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       deps.writeStdout(message)
       return message
     }
-    /* v8 ignore stop */
   }
+  /* v8 ignore stop */
 
   // ── session list (local, no daemon socket needed) ──
   if (command.kind === "session.list") {
