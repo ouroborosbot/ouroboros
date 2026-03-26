@@ -579,4 +579,152 @@ describe("ponder tool in runAgent", () => {
     // If ponder were filtered out, it wouldn't be intercepted
     expect(result.outcome).toBe("pondered")
   })
+
+  // ── Handoff packet coverage ──────────────────────────────────
+
+  it("handoff packet includes delegation decision reasons as prose", async () => {
+    mockCreate.mockReturnValueOnce(makeStream(
+      ponderToolCallChunks({ thought: "naming conventions", say: "let me think" }),
+    ))
+
+    const callbacks = makeCallbacks()
+    await runAgent(
+      [{ role: "user", content: "hi" }],
+      callbacks,
+      "cli",
+      undefined,
+      {
+        delegationDecision: {
+          target: "delegate-inward",
+          reasons: ["explicit_reflection", "cross_session"],
+          outwardClosureRequired: false,
+        },
+        toolContext: {
+          currentSession: { friendId: "alex", channel: "teams", key: "session1" },
+        },
+      },
+    )
+
+    const enqueued = mockQueuePendingMessage.mock.calls[0][1]
+    expect(enqueued.content).toContain("something in the conversation called for reflection")
+    expect(enqueued.content).toContain("this touches other conversations")
+  })
+
+  it("handoff packet with outwardClosureRequired includes obligation text", async () => {
+    mockCreate.mockReturnValueOnce(makeStream(
+      ponderToolCallChunks({ thought: "naming", say: "pondering that" }),
+    ))
+
+    const callbacks = makeCallbacks()
+    await runAgent(
+      [{ role: "user", content: "hi" }],
+      callbacks,
+      "cli",
+      undefined,
+      {
+        delegationDecision: {
+          target: "delegate-inward",
+          reasons: [],
+          outwardClosureRequired: true,
+        },
+        toolContext: {
+          currentSession: { friendId: "alex", channel: "teams", key: "session1" },
+        },
+      },
+    )
+
+    const enqueued = mockQueuePendingMessage.mock.calls[0][1]
+    expect(enqueued.content).toContain("i'm holding something for alex")
+  })
+
+  it("handoff packet without currentSession says 'no one -- just thinking'", async () => {
+    mockCreate.mockReturnValueOnce(makeStream(
+      ponderToolCallChunks({ thought: "just pondering", say: "hmm" }),
+    ))
+
+    const callbacks = makeCallbacks()
+    await runAgent(
+      [{ role: "user", content: "hi" }],
+      callbacks,
+      "cli",
+    )
+
+    const enqueued = mockQueuePendingMessage.mock.calls[0][1]
+    expect(enqueued.content).toContain("no one -- just thinking")
+  })
+
+  it("handoff packet without outwardClosureRequired says 'nothing -- just thinking'", async () => {
+    mockCreate.mockReturnValueOnce(makeStream(
+      ponderToolCallChunks({ thought: "just thinking", say: "one sec" }),
+    ))
+
+    const callbacks = makeCallbacks()
+    await runAgent(
+      [{ role: "user", content: "hi" }],
+      callbacks,
+      "cli",
+    )
+
+    const enqueued = mockQueuePendingMessage.mock.calls[0][1]
+    expect(enqueued.content).toContain("nothing -- just thinking")
+  })
+
+  it("handoff packet without delegation decision uses default reason", async () => {
+    mockCreate.mockReturnValueOnce(makeStream(
+      ponderToolCallChunks({ thought: "just thinking", say: "one sec" }),
+    ))
+
+    const callbacks = makeCallbacks()
+    await runAgent(
+      [{ role: "user", content: "hi" }],
+      callbacks,
+      "cli",
+    )
+
+    const enqueued = mockQueuePendingMessage.mock.calls[0][1]
+    expect(enqueued.content).toContain("this felt like it needed more thought")
+  })
+
+  it("enqueues pending with obligationId when obligation creation succeeds", async () => {
+    mockCreateObligation.mockReturnValue({ id: "obl-xyz-789" })
+    mockCreate.mockReturnValueOnce(makeStream(
+      ponderToolCallChunks({ thought: "naming", say: "thinking..." }),
+    ))
+
+    const callbacks = makeCallbacks()
+    await runAgent(
+      [{ role: "user", content: "hi" }],
+      callbacks,
+      "cli",
+      undefined,
+      {
+        toolContext: {
+          currentSession: { friendId: "alex", channel: "teams", key: "s1" },
+        },
+      },
+    )
+
+    const enqueued = mockQueuePendingMessage.mock.calls[0][1]
+    expect(enqueued.obligationId).toBe("obl-xyz-789")
+  })
+
+  // ── Ponder from outer without currentSession ──────────────────
+
+  it("ponder from outer without currentSession does not create obligation", async () => {
+    mockCreate.mockReturnValueOnce(makeStream(
+      ponderToolCallChunks({ thought: "musing", say: "let me think" }),
+    ))
+
+    const callbacks = makeCallbacks()
+    await runAgent(
+      [{ role: "user", content: "hi" }],
+      callbacks,
+      "cli",
+    )
+
+    expect(mockCreateObligation).not.toHaveBeenCalled()
+    // Still enqueues pending but without delegatedFrom
+    const enqueued = mockQueuePendingMessage.mock.calls[0][1]
+    expect(enqueued.delegatedFrom).toBeUndefined()
+  })
 })
