@@ -468,4 +468,166 @@ describe("HeartbeatTimer", () => {
 
     timer.stop()
   })
+
+  it("uses default cadence when heartbeat file found but readFileSync throws", () => {
+    const BASE_TIME = 1000000
+    let currentTime = BASE_TIME
+
+    const sendToAgent = vi.fn()
+    // readdirSync returns a heartbeat file, but readFileSync throws when reading it
+    const readdirSync = vi.fn(() => ["2026-01-01-0000-heartbeat.md"])
+    const readFileSync = vi.fn((filePath: string) => {
+      if (filePath.includes("heartbeat.md")) {
+        throw new Error("EACCES") // file found but unreadable
+      }
+      return JSON.stringify({ lastCompletedAt: new Date(BASE_TIME).toISOString() })
+    })
+
+    const { timer } = createTimer({
+      sendToAgent,
+      readFileSync,
+      readdirSync,
+      now: () => currentTime,
+    })
+    timer.start()
+
+    // Default 30m cadence, just completed
+    vi.advanceTimersByTime(0)
+    expect(sendToAgent).not.toHaveBeenCalled()
+
+    currentTime += 30 * 60 * 1000
+    vi.advanceTimersByTime(30 * 60 * 1000)
+    expect(sendToAgent).toHaveBeenCalledTimes(1)
+
+    timer.stop()
+  })
+
+  it("uses default cadence when task file content has no frontmatter", () => {
+    const BASE_TIME = 1000000
+    let currentTime = BASE_TIME
+
+    const sendToAgent = vi.fn()
+    const readdirSync = vi.fn(() => ["2026-01-01-0000-heartbeat.md"])
+    const readFileSync = vi.fn((filePath: string) => {
+      if (filePath.includes("heartbeat.md")) {
+        return "no frontmatter here, just plain text"
+      }
+      return JSON.stringify({ lastCompletedAt: new Date(BASE_TIME).toISOString() })
+    })
+
+    const { timer } = createTimer({
+      sendToAgent,
+      readFileSync,
+      readdirSync,
+      now: () => currentTime,
+    })
+    timer.start()
+
+    // Default 30m
+    currentTime += 30 * 60 * 1000
+    vi.advanceTimersByTime(30 * 60 * 1000)
+    expect(sendToAgent).toHaveBeenCalledTimes(1)
+
+    timer.stop()
+  })
+
+  it("uses default cadence when task file has unterminated frontmatter", () => {
+    const BASE_TIME = 1000000
+    let currentTime = BASE_TIME
+
+    const sendToAgent = vi.fn()
+    const readdirSync = vi.fn(() => ["2026-01-01-0000-heartbeat.md"])
+    const readFileSync = vi.fn((filePath: string) => {
+      if (filePath.includes("heartbeat.md")) {
+        return "---\ncadence: \"30m\"\nno closing delimiter"
+      }
+      return JSON.stringify({ lastCompletedAt: new Date(BASE_TIME).toISOString() })
+    })
+
+    const { timer } = createTimer({
+      sendToAgent,
+      readFileSync,
+      readdirSync,
+      now: () => currentTime,
+    })
+    timer.start()
+
+    // Default 30m
+    currentTime += 30 * 60 * 1000
+    vi.advanceTimersByTime(30 * 60 * 1000)
+    expect(sendToAgent).toHaveBeenCalledTimes(1)
+
+    timer.stop()
+  })
+
+  it("fires immediately when lastCompletedAt is not a string", () => {
+    const sendToAgent = vi.fn()
+    const readdirSync = vi.fn(() => [])
+    const readFileSync = vi.fn((filePath: string) => {
+      if (filePath.includes("runtime.json")) {
+        return JSON.stringify({ lastCompletedAt: 12345 }) // number, not string
+      }
+      throw new Error("ENOENT")
+    })
+
+    const { timer } = createTimer({ sendToAgent, readFileSync, readdirSync })
+    timer.start()
+
+    // No valid lastCompletedAt -> fire immediately
+    vi.advanceTimersByTime(0)
+    expect(sendToAgent).toHaveBeenCalledTimes(1)
+
+    timer.stop()
+  })
+
+  it("fires immediately when lastCompletedAt is an invalid date", () => {
+    const sendToAgent = vi.fn()
+    const readdirSync = vi.fn(() => [])
+    const readFileSync = vi.fn((filePath: string) => {
+      if (filePath.includes("runtime.json")) {
+        return JSON.stringify({ lastCompletedAt: "not-a-date" })
+      }
+      throw new Error("ENOENT")
+    })
+
+    const { timer } = createTimer({ sendToAgent, readFileSync, readdirSync })
+    timer.start()
+
+    // Invalid date -> null -> fire immediately
+    vi.advanceTimersByTime(0)
+    expect(sendToAgent).toHaveBeenCalledTimes(1)
+
+    timer.stop()
+  })
+
+  it("stop() is safe to call when no timer is pending", () => {
+    const { timer } = createTimer()
+    // stop() without start() should not throw
+    expect(() => timer.stop()).not.toThrow()
+  })
+
+  it("uses Date.now() when deps.now is not provided", () => {
+    const sendToAgent = vi.fn()
+    const readFileSync = vi.fn(() => { throw new Error("ENOENT") })
+    const readdirSync = vi.fn(() => [])
+
+    const timer = new HeartbeatTimer({
+      agent: "slugger",
+      sendToAgent,
+      deps: {
+        readFileSync,
+        readdirSync,
+        heartbeatTaskDir: "/bundles/tasks/habits",
+        runtimeStatePath: "/bundles/state/sessions/self/inner/runtime.json",
+        // no 'now' — uses Date.now() default
+      },
+    })
+    timer.start()
+
+    // Should fire immediately (no runtime state)
+    vi.advanceTimersByTime(0)
+    expect(sendToAgent).toHaveBeenCalledTimes(1)
+
+    timer.stop()
+  })
 })

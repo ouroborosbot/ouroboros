@@ -96,6 +96,7 @@ const daemon = new OuroDaemon({
 
 const heartbeatTimers: HeartbeatTimer[] = []
 
+/* v8 ignore start -- heartbeat wiring: lambdas delegate to processManager/fs; tested via HeartbeatTimer unit tests @preserve */
 void daemon.start().then(() => {
   const bundlesRoot = getAgentBundlesRoot()
   for (const agent of managedAgents) {
@@ -114,6 +115,7 @@ void daemon.start().then(() => {
     heartbeatTimers.push(timer)
   }
 }).catch(async () => {
+/* v8 ignore stop */
   emitNervesEvent({
     level: "error",
     component: "daemon",
