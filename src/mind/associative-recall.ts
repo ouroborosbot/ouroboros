@@ -211,6 +211,7 @@ export async function injectAssociativeRecall(
 
     // Build combined result lines tagged by source
     const resultLines: Array<{ text: string; score: number }> = []
+    let queryEmbedding: number[] | undefined
 
     // Search diary entries
     if (facts.length > 0) {
@@ -219,16 +220,10 @@ export async function injectAssociativeRecall(
         const provider = options?.provider ?? createDefaultProvider()
         recalled = await recallFactsForQuery(query, facts, provider, options)
 
-        // Also search journal if we have a provider and query embedding
+        // Compute query embedding for journal search while provider is available
         if (journalEntries.length > 0) {
-          const [queryEmbedding] = await provider.embed([query.trim()])
-          const journalResults = searchJournalIndex(queryEmbedding, journalEntries, options)
-          for (const entry of journalResults) {
-            resultLines.push({
-              text: `[journal] ${entry.filename}: ${entry.preview} [score=${entry.score.toFixed(3)}]`,
-              score: entry.score,
-            })
-          }
+          const [qe] = await provider.embed([query.trim()])
+          queryEmbedding = qe
         }
       } catch {
         // Embeddings unavailable — fall back to substring matching
@@ -255,17 +250,24 @@ export async function injectAssociativeRecall(
           score: fact.score,
         })
       }
-    } else if (journalEntries.length > 0) {
-      // No diary entries, but have journal entries — search journal only
+    }
+
+    // Search journal entries (works whether diary had results or not)
+    if (journalEntries.length > 0) {
       try {
-        const provider = options?.provider ?? createDefaultProvider()
-        const [queryEmbedding] = await provider.embed([query.trim()])
-        const journalResults = searchJournalIndex(queryEmbedding, journalEntries, options)
-        for (const entry of journalResults) {
-          resultLines.push({
-            text: `[journal] ${entry.filename}: ${entry.preview} [score=${entry.score.toFixed(3)}]`,
-            score: entry.score,
-          })
+        if (!queryEmbedding) {
+          const provider = options?.provider ?? createDefaultProvider()
+          const [qe] = await provider.embed([query.trim()])
+          queryEmbedding = qe
+        }
+        if (queryEmbedding) {
+          const journalResults = searchJournalIndex(queryEmbedding, journalEntries, options)
+          for (const entry of journalResults) {
+            resultLines.push({
+              text: `[journal] ${entry.filename}: ${entry.preview} [score=${entry.score.toFixed(3)}]`,
+              score: entry.score,
+            })
+          }
         }
       } catch {
         // Embeddings unavailable — no journal fallback
