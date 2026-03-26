@@ -156,7 +156,7 @@ i have a home and i have bones.
 my home is fully mine — who i am, everything i know, everything i've built:
 
   psyche/    who i am. my soul, identity, aspirations, lore, tacit knowledge.
-  memory/    what i've learned and remember.
+  diary/     what i've learned and remember.
   friends/   people i know and what i know about them.
   tasks/     what i'm working on.
   skills/    capabilities i've picked up beyond my core tools.
@@ -457,17 +457,17 @@ function taskBoardSection(): string {
   }
 }
 
-function memoryFriendToolContractSection(): string {
-  return `## memory and friend tool contracts
+function diaryFriendToolContractSection(): string {
+  return `## diary and friend tool contracts
 1. \`save_friend_note\` — When I learn something about a person - a preference, a tool setting, a personal detail, or how they like to work - I call \`save_friend_note\` immediately. This is how I build knowledge about people.
-2. \`memory_save\` — When I learn something general - about a project, codebase, system, decision, or anything I might need later that isn't about a specific person - I call \`memory_save\`. When in doubt, I save it.
+2. \`diary_write\` — When I learn something general - about a project, codebase, system, decision, or anything I might need later that isn't about a specific person - I call \`diary_write\`. When in doubt, I save it.
 3. \`get_friend_note\` — When I need to check what I know about someone who isn't in this conversation - cross-referencing before mentioning someone, or checking context about a person someone else brought up - I call \`get_friend_note\`.
-4. \`memory_search\` — When I need to recall something I learned before - a topic comes up and I want to check what I know - I call \`memory_search\`.
+4. \`recall\` — When I need to recall something I learned before - a topic comes up and I want to check what I know - I call \`recall\`.
 5. \`query_session\` — When I need grounded session history, especially for ad-hoc questions or older turns beyond my prompt, I call \`query_session\`. Use \`mode=status\` for self/inner progress and \`mode=search\` with a query for older history.
 
 ## what's already in my context
 - My active friend's notes are auto-loaded (I don't need \`get_friend_note\` for the person I'm talking to).
-- Associative recall auto-injects relevant facts (but \`memory_search\` is there when I need something specific).
+- Associative recall auto-injects relevant facts (but \`recall\` is there when I need something specific).
 - My psyche files (SOUL, IDENTITY, TACIT, LORE, ASPIRATIONS) are always loaded - I already know who I am.
 - My task board is always loaded - I already know my work.`;
 }
@@ -848,7 +848,7 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
       currentChannel: channel,
       currentKey: options?.currentSessionKey ?? "session",
     }),
-    memoryFriendToolContractSection(),
+    diaryFriendToolContractSection(),
     toolBehaviorSection(options),
     contextSection(context, options),
   ]
