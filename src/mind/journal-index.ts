@@ -78,6 +78,7 @@ export async function indexJournalFiles(
     try {
       stat = fs.statSync(filePath)
     } catch {
+      /* v8 ignore next -- filesystem race: file deleted between readdir and stat @preserve */
       continue
     }
 
@@ -92,6 +93,7 @@ export async function indexJournalFiles(
     try {
       content = fs.readFileSync(filePath, "utf8")
     } catch {
+      /* v8 ignore next -- filesystem race: file deleted between stat and read @preserve */
       continue
     }
 

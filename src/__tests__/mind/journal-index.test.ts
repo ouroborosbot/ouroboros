@@ -274,6 +274,104 @@ describe("indexJournalFiles", () => {
     expect(index).toHaveLength(3)
   })
 
+  it("handles malformed existing index gracefully", async () => {
+    const journalDir = path.join(tmpDir, "journal")
+    fs.mkdirSync(journalDir, { recursive: true })
+    fs.writeFileSync(path.join(journalDir, "notes.md"), "# Notes", "utf8")
+
+    // Write malformed index
+    const indexPath = path.join(journalDir, ".index.json")
+    fs.writeFileSync(indexPath, "not-valid-json!!!", "utf8")
+
+    const mockProvider = {
+      embed: vi.fn().mockResolvedValue([[0.1, 0.2]]),
+    }
+
+    const { indexJournalFiles } = await import("../../mind/journal-index")
+    const count = await indexJournalFiles(journalDir, indexPath, mockProvider)
+
+    // Should start fresh and index the file
+    expect(count).toBe(1)
+  })
+
+  it("handles non-array existing index", async () => {
+    const journalDir = path.join(tmpDir, "journal")
+    fs.mkdirSync(journalDir, { recursive: true })
+    fs.writeFileSync(path.join(journalDir, "notes.md"), "# Notes", "utf8")
+
+    // Write non-array JSON
+    const indexPath = path.join(journalDir, ".index.json")
+    fs.writeFileSync(indexPath, '{"not":"array"}', "utf8")
+
+    const mockProvider = {
+      embed: vi.fn().mockResolvedValue([[0.1, 0.2]]),
+    }
+
+    const { indexJournalFiles } = await import("../../mind/journal-index")
+    const count = await indexJournalFiles(journalDir, indexPath, mockProvider)
+
+    expect(count).toBe(1)
+  })
+
+  it("skips subdirectories in journal dir", async () => {
+    const journalDir = path.join(tmpDir, "journal")
+    fs.mkdirSync(journalDir, { recursive: true })
+    fs.mkdirSync(path.join(journalDir, "subdir"))
+    fs.writeFileSync(path.join(journalDir, "notes.md"), "# Notes", "utf8")
+
+    const indexPath = path.join(journalDir, ".index.json")
+    const mockProvider = {
+      embed: vi.fn().mockResolvedValue([[0.1, 0.2]]),
+    }
+
+    const { indexJournalFiles } = await import("../../mind/journal-index")
+    const count = await indexJournalFiles(journalDir, indexPath, mockProvider)
+
+    // Should only index files, not directories
+    expect(count).toBe(1)
+    const index = JSON.parse(fs.readFileSync(indexPath, "utf8"))
+    expect(index).toHaveLength(1)
+    expect(index[0].filename).toBe("notes.md")
+  })
+
+  it("handles embed returning empty first vector", async () => {
+    const journalDir = path.join(tmpDir, "journal")
+    fs.mkdirSync(journalDir, { recursive: true })
+    fs.writeFileSync(path.join(journalDir, "notes.md"), "# Notes", "utf8")
+
+    const indexPath = path.join(journalDir, ".index.json")
+    const mockProvider = {
+      // Returns an array where the first element is undefined
+      embed: vi.fn().mockResolvedValue([undefined]),
+    }
+
+    const { indexJournalFiles } = await import("../../mind/journal-index")
+    const count = await indexJournalFiles(journalDir, indexPath, mockProvider)
+
+    expect(count).toBe(1)
+    const index = JSON.parse(fs.readFileSync(indexPath, "utf8"))
+    // Should fall back to empty embedding via ?? []
+    expect(index[0].embedding).toEqual([])
+  })
+
+  it("handles file with empty content", async () => {
+    const journalDir = path.join(tmpDir, "journal")
+    fs.mkdirSync(journalDir, { recursive: true })
+    fs.writeFileSync(path.join(journalDir, "empty.md"), "", "utf8")
+
+    const indexPath = path.join(journalDir, ".index.json")
+    const mockProvider = {
+      embed: vi.fn().mockResolvedValue([[0.1, 0.2]]),
+    }
+
+    const { indexJournalFiles } = await import("../../mind/journal-index")
+    const count = await indexJournalFiles(journalDir, indexPath, mockProvider)
+
+    expect(count).toBe(1)
+    const index = JSON.parse(fs.readFileSync(indexPath, "utf8"))
+    expect(index[0].preview).toBe("")
+  })
+
   it("skips hidden files like .index.json", async () => {
     const journalDir = path.join(tmpDir, "journal")
     fs.mkdirSync(journalDir, { recursive: true })
