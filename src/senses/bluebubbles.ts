@@ -239,7 +239,6 @@ function buildConversationScopePrefix(
   event: BlueBubblesNormalizedEvent,
   existingMessages: OpenAI.ChatCompletionMessageParam[],
   repliedToText?: string | null,
-  threadGuid?: string,
 ): string {
   if (event.kind !== "message") {
     return ""
@@ -253,10 +252,8 @@ function buildConversationScopePrefix(
     )
     if (repliedToText) {
       lines.push(`[replying to: "${repliedToText}"]`)
-      lines.push(`[if you need more context about what was being discussed, use query_session to search your session history, or memory_search to check your memory.]`)
-    } else if (threadGuid) {
-      lines.push(`[this is a reply to an earlier message (guid: ${threadGuid}) but its text could not be fetched. use query_session to search your session history for context.]`)
     }
+    lines.push(`[if you need more context about what was being discussed, use query_session to search your session history, or memory_search to check your memory.]`)
   } else {
     lines.push(
       "[conversation scope: existing chat trunk | current inbound lane: top_level | default outbound target for this turn: top_level]",
@@ -280,9 +277,8 @@ function buildInboundText(
   event: BlueBubblesNormalizedEvent,
   existingMessages: OpenAI.ChatCompletionMessageParam[],
   repliedToText?: string | null,
-  threadGuid?: string,
 ): string {
-  const metadataPrefix = buildConversationScopePrefix(event, existingMessages, repliedToText, threadGuid)
+  const metadataPrefix = buildConversationScopePrefix(event, existingMessages, repliedToText)
   const baseText = event.repairNotice?.trim()
     ? `${event.textForAgent}\n[${event.repairNotice.trim()}]`
     : event.textForAgent
@@ -300,9 +296,8 @@ function buildInboundContent(
   event: BlueBubblesNormalizedEvent,
   existingMessages: OpenAI.ChatCompletionMessageParam[],
   repliedToText?: string | null,
-  threadGuid?: string,
 ): OpenAI.ChatCompletionUserMessageParam["content"] {
-  const text = buildInboundText(event, existingMessages, repliedToText, threadGuid)
+  const text = buildInboundText(event, existingMessages, repliedToText)
   if (event.kind !== "message" || !event.inputPartsForAgent || event.inputPartsForAgent.length === 0) {
     return text
   }
@@ -724,7 +719,7 @@ async function handleBlueBubblesNormalizedEvent(
     // Build inbound user message (adapter concern: BB-specific content formatting)
     const userMessage: OpenAI.ChatCompletionMessageParam = {
       role: "user",
-      content: buildInboundContent(event, existing?.messages ?? sessionMessages, repliedToText, threadGuid),
+      content: buildInboundContent(event, existing?.messages ?? sessionMessages, repliedToText),
     }
 
     const callbacks = createBlueBubblesCallbacks(
