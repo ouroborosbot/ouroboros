@@ -282,4 +282,182 @@ describe("buildContextualHeartbeat", () => {
     // Checkpoint
     expect(result).toContain("was reviewing task priorities")
   })
+
+  it("shows days in journal file recency", () => {
+    const nowDate = new Date("2026-03-26T12:00:00Z")
+    const files = [
+      { name: "old-entry.md", mtime: nowDate.getTime() - 3 * 24 * 3600000, preview: "Old thoughts" },
+    ]
+
+    const result = buildContextualHeartbeat(makeOptions({
+      lastCompletedAt: new Date("2026-03-26T11:30:00Z").toISOString(),
+      now: () => nowDate,
+      readJournalDir: () => files,
+    }))
+
+    expect(result).toContain("3 days ago")
+  })
+
+  it("shows singular day in journal file recency", () => {
+    const nowDate = new Date("2026-03-26T12:00:00Z")
+    const files = [
+      { name: "yesterday.md", mtime: nowDate.getTime() - 25 * 3600000, preview: "Yesterday" },
+    ]
+
+    const result = buildContextualHeartbeat(makeOptions({
+      lastCompletedAt: new Date("2026-03-26T11:30:00Z").toISOString(),
+      now: () => nowDate,
+      readJournalDir: () => files,
+    }))
+
+    expect(result).toContain("1 day ago")
+    expect(result).not.toContain("1 days ago")
+  })
+
+  it("shows just now for very recent journal files", () => {
+    const nowDate = new Date("2026-03-26T12:00:00Z")
+    const files = [
+      { name: "just-now.md", mtime: nowDate.getTime() - 30000, preview: "Just wrote this" },
+    ]
+
+    const result = buildContextualHeartbeat(makeOptions({
+      lastCompletedAt: new Date("2026-03-26T11:30:00Z").toISOString(),
+      now: () => nowDate,
+      readJournalDir: () => files,
+    }))
+
+    expect(result).toContain("just now")
+  })
+
+  it("shows singular hour elapsed", () => {
+    const nowDate = new Date("2026-03-26T13:00:00Z")
+    const result = buildContextualHeartbeat(makeOptions({
+      lastCompletedAt: new Date("2026-03-26T12:00:00Z").toISOString(),
+      now: () => nowDate,
+      readJournalDir: () => [],
+    }))
+
+    expect(result).toContain("1 hour")
+    expect(result).not.toContain("1 hours")
+  })
+
+  it("shows singular journal entry since surface", () => {
+    const nowDate = new Date("2026-03-26T12:00:00Z")
+    const lastSurface = new Date("2026-03-26T10:00:00Z")
+    const files = [
+      { name: "entry.md", mtime: nowDate.getTime() - 1 * 3600000, preview: "Single entry" },
+    ]
+
+    const result = buildContextualHeartbeat(makeOptions({
+      lastCompletedAt: new Date("2026-03-26T11:30:00Z").toISOString(),
+      lastSurfaceAt: lastSurface.toISOString(),
+      now: () => nowDate,
+      readJournalDir: () => files,
+    }))
+
+    expect(result).toContain("1 journal entry since you last surfaced")
+    expect(result).not.toContain("1 journal entries")
+  })
+
+  it("does not show surface gap when no entries since surface", () => {
+    const nowDate = new Date("2026-03-26T12:00:00Z")
+    const lastSurface = new Date("2026-03-26T11:00:00Z")
+    const files = [
+      // This file is from before the surface
+      { name: "old.md", mtime: nowDate.getTime() - 3 * 3600000, preview: "Old entry" },
+    ]
+
+    const result = buildContextualHeartbeat(makeOptions({
+      lastCompletedAt: new Date("2026-03-26T11:30:00Z").toISOString(),
+      lastSurfaceAt: lastSurface.toISOString(),
+      now: () => nowDate,
+      readJournalDir: () => files,
+    }))
+
+    expect(result).not.toContain("since you last surfaced")
+  })
+
+  it("handles journal files without preview", () => {
+    const nowDate = new Date("2026-03-26T12:00:00Z")
+    const files = [
+      { name: "empty.md", mtime: nowDate.getTime() - 1 * 3600000, preview: "" },
+    ]
+
+    const result = buildContextualHeartbeat(makeOptions({
+      lastCompletedAt: new Date("2026-03-26T11:30:00Z").toISOString(),
+      now: () => nowDate,
+      readJournalDir: () => files,
+    }))
+
+    expect(result).toContain("empty.md")
+    // Should not have " — " since no preview
+    expect(result).not.toContain("empty.md (1 hour ago) —")
+  })
+
+  it("shows singular hour in journal recency", () => {
+    const nowDate = new Date("2026-03-26T13:00:00Z")
+    const files = [
+      { name: "entry.md", mtime: nowDate.getTime() - 1 * 3600000, preview: "One hour old" },
+    ]
+
+    const result = buildContextualHeartbeat(makeOptions({
+      lastCompletedAt: new Date("2026-03-26T12:30:00Z").toISOString(),
+      now: () => nowDate,
+      readJournalDir: () => files,
+    }))
+
+    expect(result).toContain("1 hour ago")
+    expect(result).not.toContain("1 hours ago")
+  })
+
+  it("shows singular minute in journal recency", () => {
+    const nowDate = new Date("2026-03-26T12:01:00Z")
+    const files = [
+      { name: "entry.md", mtime: nowDate.getTime() - 60000, preview: "One minute old" },
+    ]
+
+    const result = buildContextualHeartbeat(makeOptions({
+      lastCompletedAt: new Date("2026-03-26T12:00:00Z").toISOString(),
+      now: () => nowDate,
+      readJournalDir: () => files,
+    }))
+
+    expect(result).toContain("1 minute ago")
+    expect(result).not.toContain("1 minutes ago")
+  })
+
+  it("skips elapsed time when journal exists but no lastCompletedAt", () => {
+    const nowDate = new Date("2026-03-26T12:00:00Z")
+    const files = [
+      { name: "entry.md", mtime: nowDate.getTime() - 2 * 3600000, preview: "Something" },
+    ]
+
+    const result = buildContextualHeartbeat(makeOptions({
+      lastCompletedAt: undefined,
+      now: () => nowDate,
+      readJournalDir: () => files,
+    }))
+
+    // Should NOT contain "since your last turn" because no lastCompletedAt
+    expect(result).not.toContain("since your last turn")
+    // But should contain journal index
+    expect(result).toContain("entry.md")
+    // Should not be cold-start (we have journal)
+    expect(result).not.toContain("anything stirring?")
+  })
+
+  it("shows multiple minutes in journal recency for 5 minutes ago", () => {
+    const nowDate = new Date("2026-03-26T12:05:00Z")
+    const files = [
+      { name: "entry.md", mtime: nowDate.getTime() - 5 * 60000, preview: "Five minutes" },
+    ]
+
+    const result = buildContextualHeartbeat(makeOptions({
+      lastCompletedAt: new Date("2026-03-26T12:00:00Z").toISOString(),
+      now: () => nowDate,
+      readJournalDir: () => files,
+    }))
+
+    expect(result).toContain("5 minutes ago")
+  })
 })
