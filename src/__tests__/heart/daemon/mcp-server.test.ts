@@ -386,4 +386,50 @@ describe("MCP server protocol layer", () => {
       meta: {},
     })
   })
+
+  it("handles newline-delimited JSON (Codex compatibility)", async () => {
+    const { createMcpServer } = await import("../../../heart/daemon/mcp-server")
+    const server = createMcpServer({
+      agent: "test-agent",
+      friendId: "test-friend",
+      socketPath: "/tmp/test.sock",
+      stdin,
+      stdout,
+    })
+
+    const outputPromise = collectOutput(stdout)
+    server.start()
+
+    // Send newline-delimited (no Content-Length header)
+    const body = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 42,
+      method: "initialize",
+      params: {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: { name: "codex", version: "1.0" },
+      },
+    })
+    stdin.write(body + "\n")
+
+    await new Promise((r) => setTimeout(r, 100))
+    server.stop()
+    stdin.end()
+
+    const output = await outputPromise
+    const match = output.match(/\{.*\}/s)
+    expect(match).not.toBeNull()
+    const response = JSON.parse(match![0])
+    expect(response.jsonrpc).toBe("2.0")
+    expect(response.id).toBe(42)
+    expect(response.result.protocolVersion).toBe("2024-11-05")
+
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.mcp_server_test_end",
+      message: "newline-delimited test complete",
+      meta: {},
+    })
+  })
 })

@@ -82,41 +82,60 @@ export function createMcpServer(options: McpServerOptions): McpServer {
     stdout.write(header + body)
   }
 
+  function tryParseContentLength(): boolean {
+    const headerEnd = buffer.indexOf("\r\n\r\n")
+    if (headerEnd === -1) return false
+
+    const headerSection = buffer.slice(0, headerEnd)
+    const contentLengthMatch = headerSection.match(/Content-Length:\s*(\d+)/i)
+    if (!contentLengthMatch) {
+      buffer = buffer.slice(headerEnd + 4)
+      return true // consumed invalid header, try again
+    }
+
+    const contentLength = parseInt(contentLengthMatch[1], 10)
+    const bodyStart = headerEnd + 4
+    if (buffer.length < bodyStart + contentLength) return false
+
+    const body = buffer.slice(bodyStart, bodyStart + contentLength)
+    buffer = buffer.slice(bodyStart + contentLength)
+    parseAndDispatch(body)
+    return true
+  }
+
+  function tryParseNewlineDelimited(): boolean {
+    const newlineIdx = buffer.indexOf("\n")
+    if (newlineIdx === -1) return false
+
+    const line = buffer.slice(0, newlineIdx).trim()
+    buffer = buffer.slice(newlineIdx + 1)
+    if (line.length === 0) return true // skip blank lines
+    parseAndDispatch(line)
+    return true
+  }
+
+  function parseAndDispatch(body: string): void {
+    let request: JsonRpcRequest
+    try {
+      request = JSON.parse(body) as JsonRpcRequest
+    } catch {
+      writeResponse({
+        jsonrpc: "2.0",
+        id: null,
+        error: { code: -32700, message: "Parse error" },
+      })
+      return
+    }
+    void handleRequest(request)
+  }
+
   function handleData(chunk: Buffer): void {
     buffer += chunk.toString("utf-8")
-    // Try to parse JSON-RPC messages from the buffer using Content-Length framing
+    // Support both Content-Length framing (Claude Code) and newline-delimited JSON (Codex)
     while (buffer.length > 0) {
-      const headerEnd = buffer.indexOf("\r\n\r\n")
-      if (headerEnd === -1) break
-
-      const headerSection = buffer.slice(0, headerEnd)
-      const contentLengthMatch = headerSection.match(/Content-Length:\s*(\d+)/i)
-      if (!contentLengthMatch) {
-        // Invalid framing, skip
-        buffer = buffer.slice(headerEnd + 4)
-        continue
-      }
-
-      const contentLength = parseInt(contentLengthMatch[1], 10)
-      const bodyStart = headerEnd + 4
-      if (buffer.length < bodyStart + contentLength) break // Not enough data yet
-
-      const body = buffer.slice(bodyStart, bodyStart + contentLength)
-      buffer = buffer.slice(bodyStart + contentLength)
-
-      let request: JsonRpcRequest
-      try {
-        request = JSON.parse(body) as JsonRpcRequest
-      } catch {
-        writeResponse({
-          jsonrpc: "2.0",
-          id: null,
-          error: { code: -32700, message: "Parse error" },
-        })
-        continue
-      }
-
-      void handleRequest(request)
+      const hasContentLength = buffer.startsWith("Content-Length:")
+      const parsed = hasContentLength ? tryParseContentLength() : tryParseNewlineDelimited()
+      if (!parsed) break
     }
   }
 
