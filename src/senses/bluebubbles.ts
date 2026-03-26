@@ -253,7 +253,7 @@ function buildConversationScopePrefix(
     if (repliedToText) {
       lines.push(`[replying to: "${repliedToText}"]`)
     }
-    lines.push(`[if you need more context about what was being discussed, use query_session to search your session history, or memory_search to check your memory.]`)
+    lines.push(`[if you need more context about what was being discussed, use query_session to search your session history, or recall to check your memory.]`)
   } else {
     lines.push(
       "[conversation scope: existing chat trunk | current inbound lane: top_level | default outbound target for this turn: top_level]",
