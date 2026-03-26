@@ -38,7 +38,7 @@ import { getTaskModule } from "../../repertoire/tasks"
 import { parseInnerDialogSession, formatThoughtTurns, getInnerDialogSessionPath, followThoughts } from "./thoughts"
 import type { TaskModule } from "../../repertoire/tasks/types"
 import { syncGlobalOuroBotWrapper as defaultSyncGlobalOuroBotWrapper } from "./ouro-bot-global-installer"
-import { installLaunchAgent, type LaunchdDeps } from "./launchd"
+import { installLaunchAgent, isDaemonInstalled, DAEMON_PLIST_LABEL, type LaunchdDeps } from "./launchd"
 import { DEFAULT_DAEMON_SOCKET_PATH, sendDaemonCommand, checkDaemonSocketAlive } from "./socket-client"
 import type { CheckForUpdateResult } from "./update-checker"
 import { listSessionActivity } from "../session-activity"
@@ -2314,6 +2314,23 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       /* v8 ignore stop */
     }
 
+    // Disable launchd KeepAlive before killing — prevents the installed daemon from respawning
+    /* v8 ignore start -- dev launchd disable: requires real launchctl + plist on disk @preserve */
+    const launchdDevDeps: Pick<LaunchdDeps, "exec" | "existsFile" | "removeFile" | "homeDir" | "userUid"> = {
+      exec: (cmd: string) => { execSync(cmd) },
+      existsFile: (p: string) => fs.existsSync(p),
+      removeFile: (p: string) => { try { fs.unlinkSync(p) } catch { /* best effort */ } },
+      homeDir: os.homedir(),
+      userUid: process.getuid?.() ?? 0,
+    }
+    if (isDaemonInstalled(launchdDevDeps)) {
+      const plistPath = path.join(os.homedir(), "Library", "LaunchAgents", `${DAEMON_PLIST_LABEL}.plist`)
+      const domain = `gui/${launchdDevDeps.userUid}`
+      try { execSync(`launchctl bootout ${domain} "${plistPath}"`) } catch { /* already unloaded */ }
+      deps.writeStdout("disabled launchd auto-restart for dev mode")
+    }
+    /* v8 ignore stop */
+
     // Always force-restart in dev mode — you rebuilt, you want this code running
     /* v8 ignore start -- dev force-restart: socket alive/stop/spawn tested via integration; tests inject mocks @preserve */
     const alive = await deps.checkSocketAlive(deps.socketPath)
@@ -2332,7 +2349,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     /* v8 ignore stop */
     const started = await startDevDaemon(deps.socketPath)
     /* v8 ignore next -- defensive: pid is null only when spawn fails silently @preserve */
-    const message = `daemon running in dev mode from ${repoCwd} (pid ${started.pid ?? "unknown"})`
+    const message = `daemon running in dev mode from ${repoCwd} (pid ${started.pid ?? "unknown"})\nrun 'ouro up' to return to production mode`
     deps.writeStdout(message)
     return message
   }

@@ -144,6 +144,16 @@ export class DaemonProcessManager {
       meta: { agent, pid: child.pid ?? null, cwd: runCwd },
     })
 
+    child.on("error", (err) => {
+      emitNervesEvent({
+        level: "warn",
+        component: "daemon",
+        event: "daemon.agent_process_error",
+        message: "managed agent process emitted error",
+        meta: { agent, error: err.message },
+      })
+    })
+
     child.once("exit", (code, signal) => {
       this.onExit(state, code, signal)
     })
