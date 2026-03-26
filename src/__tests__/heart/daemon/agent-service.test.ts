@@ -6,6 +6,7 @@ vi.mock("fs", () => ({
   existsSync: vi.fn(() => false),
   readFileSync: vi.fn(() => ""),
   readdirSync: vi.fn(() => []),
+  statSync: vi.fn(() => ({ isDirectory: () => false })),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
 }))
@@ -20,11 +21,28 @@ vi.mock("../../../heart/identity", () => ({
 
 import * as fs from "fs"
 
+// Helper: build a JSONL facts file from an array of partial fact objects
+function buildFactsJsonl(facts: Array<{ text: string; source?: string; id?: string; createdAt?: string; embedding?: number[] }>): string {
+  return facts.map((f) => JSON.stringify({
+    id: f.id ?? "fact-1",
+    text: f.text,
+    source: f.source ?? "test",
+    createdAt: f.createdAt ?? "2026-03-26T00:00:00Z",
+    embedding: f.embedding ?? [0.1, 0.2, 0.3],
+    about: "test-agent",
+  })).join("\n") + "\n"
+}
+
 describe("agent-service", () => {
   beforeEach(() => {
     vi.mocked(fs.existsSync).mockReset()
     vi.mocked(fs.readFileSync).mockReset()
     vi.mocked(fs.readdirSync).mockReset()
+    vi.mocked(fs.statSync).mockReset()
+
+    // Default: nothing exists
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => false } as ReturnType<typeof fs.statSync>)
 
     emitNervesEvent({
       component: "daemon",
@@ -35,7 +53,7 @@ describe("agent-service", () => {
   })
 
   describe("handleAgentStatus", () => {
-    it("returns status with agent name", async () => {
+    it("returns status with agent name and zero counts when no state exists", async () => {
       const { handleAgentStatus } = await import("../../../heart/daemon/agent-service")
       const result = await handleAgentStatus({ agent: "test-agent", friendId: "friend-1" })
 
@@ -43,7 +61,10 @@ describe("agent-service", () => {
       expect(result.data).toBeDefined()
       const data = result.data as Record<string, unknown>
       expect(data.agent).toBe("test-agent")
-      expect(data.status).toBeDefined()
+      expect(data.innerStatus).toBe("unknown")
+      expect(data.sessionCount).toBe(0)
+      expect(data.hasMemory).toBe(false)
+      expect(data.factCount).toBe(0)
 
       emitNervesEvent({
         component: "daemon",
@@ -53,10 +74,18 @@ describe("agent-service", () => {
       })
     })
 
-    it("reads memory and session files when they exist on disk", async () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true)
-      vi.mocked(fs.readFileSync).mockReturnValue("# Agent Memory\nSome content here\n")
-      vi.mocked(fs.readdirSync).mockReturnValue(["session-1.json", "session-2.json", "notes.txt"] as unknown as ReturnType<typeof fs.readdirSync>)
+    it("reads facts.jsonl and reports factCount and hasMemory", async () => {
+      const factsContent = buildFactsJsonl([
+        { text: "I like deployment automation", id: "f1" },
+        { text: "My owner is Ari", id: "f2" },
+      ])
+
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes("facts.jsonl")) return true
+        return false
+      })
+      vi.mocked(fs.readFileSync).mockReturnValue(factsContent)
 
       const { handleAgentStatus } = await import("../../../heart/daemon/agent-service")
       const result = await handleAgentStatus({ agent: "test-agent", friendId: "friend-1" })
@@ -64,83 +93,122 @@ describe("agent-service", () => {
       expect(result.ok).toBe(true)
       const data = result.data as Record<string, unknown>
       expect(data.hasMemory).toBe(true)
-      // readdirSync filters to .json/.jsonl/.md — "notes.txt" is excluded
+      expect(data.factCount).toBe(2)
+
+      emitNervesEvent({
+        component: "daemon",
+        event: "daemon.agent_service_test_end",
+        message: "handleAgentStatus with facts test complete",
+        meta: {},
+      })
+    })
+
+    it("counts sessions by enumerating state/sessions/ directories", async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.endsWith("state/sessions")) return true
+        if (s.endsWith("session.json")) return true
+        return false
+      })
+      vi.mocked(fs.readdirSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.endsWith("state/sessions")) return ["alice", "bob"] as unknown as ReturnType<typeof fs.readdirSync>
+        if (s.endsWith("alice")) return ["cli"] as unknown as ReturnType<typeof fs.readdirSync>
+        if (s.endsWith("bob")) return ["teams"] as unknown as ReturnType<typeof fs.readdirSync>
+        if (s.endsWith("cli") || s.endsWith("teams")) return ["default"] as unknown as ReturnType<typeof fs.readdirSync>
+        return [] as unknown as ReturnType<typeof fs.readdirSync>
+      })
+      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as ReturnType<typeof fs.statSync>)
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ lastUsage: "2026-03-26T10:00:00Z", messages: [] }))
+
+      const { handleAgentStatus } = await import("../../../heart/daemon/agent-service")
+      const result = await handleAgentStatus({ agent: "test-agent", friendId: "friend-1" })
+
+      expect(result.ok).toBe(true)
+      const data = result.data as Record<string, unknown>
       expect(data.sessionCount).toBe(2)
 
       emitNervesEvent({
         component: "daemon",
         event: "daemon.agent_service_test_end",
-        message: "handleAgentStatus with files test complete",
+        message: "handleAgentStatus sessions test complete",
         meta: {},
       })
     })
 
-    it("falls back to psyche/memory/facts.jsonl when MEMORY.md does not exist", async () => {
-      // First call (MEMORY.md) -> not found, second call (facts.jsonl) -> found
+    it("reads inner dialog runtime status", async () => {
       vi.mocked(fs.existsSync).mockImplementation((p) => {
-        const pathStr = String(p)
-        if (pathStr.includes("MEMORY.md")) return false
-        if (pathStr.includes("facts.jsonl")) return true
-        // sessions dir exists
-        return true
+        const s = String(p)
+        if (s.includes("runtime.json")) return true
+        return false
       })
-      vi.mocked(fs.readFileSync).mockReturnValue("psyche memory facts content\n")
-      vi.mocked(fs.readdirSync).mockReturnValue([] as unknown as ReturnType<typeof fs.readdirSync>)
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ status: "thinking", lastCompletedAt: "2026-03-26T09:00:00Z" }))
 
       const { handleAgentStatus } = await import("../../../heart/daemon/agent-service")
       const result = await handleAgentStatus({ agent: "test-agent", friendId: "friend-1" })
 
       expect(result.ok).toBe(true)
       const data = result.data as Record<string, unknown>
-      expect(data.hasMemory).toBe(true)
+      expect(data.innerStatus).toBe("thinking")
+      expect(data.lastThoughtAt).toBe("2026-03-26T09:00:00Z")
 
       emitNervesEvent({
         component: "daemon",
         event: "daemon.agent_service_test_end",
-        message: "handleAgentStatus fallback memory test complete",
+        message: "handleAgentStatus inner dialog test complete",
         meta: {},
       })
     })
   })
 
   describe("handleAgentAsk", () => {
-    it("returns a response for a question", async () => {
-      const { handleAgentAsk } = await import("../../../heart/daemon/agent-service")
-      const result = await handleAgentAsk({
-        agent: "test-agent",
-        friendId: "friend-1",
-        question: "What are you working on?",
+    it("returns matching fact text when facts exist", async () => {
+      const factsContent = buildFactsJsonl([
+        { text: "I work on deployment automation", id: "f1" },
+        { text: "My favorite color is blue", id: "f2" },
+        { text: "Deployment schedule is weekly", id: "f3" },
+      ])
+
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes("facts.jsonl")) return true
+        return false
       })
-
-      expect(result.ok).toBe(true)
-      expect(result.message).toBeDefined()
-
-      emitNervesEvent({
-        component: "daemon",
-        event: "daemon.agent_service_test_end",
-        message: "handleAgentAsk test complete",
-        meta: {},
-      })
-    })
-
-    it("returns memory-based answer when memory file exists", async () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true)
-      vi.mocked(fs.readFileSync).mockReturnValue("# Memory\nI work on deployment automation.\n")
+      vi.mocked(fs.readFileSync).mockReturnValue(factsContent)
 
       const { handleAgentAsk } = await import("../../../heart/daemon/agent-service")
       const result = await handleAgentAsk({
         agent: "test-agent",
         friendId: "friend-1",
-        question: "What do you work on?",
+        question: "What do you work on with deployment?",
       })
 
       expect(result.ok).toBe(true)
       expect(result.message).toContain("deployment automation")
+      expect(result.message).toContain("Deployment schedule")
+      // Must NOT contain embedding data
+      expect(result.message).not.toContain("0.1")
+      expect(result.message).not.toContain("embedding")
+
+      emitNervesEvent({
+        component: "daemon",
+        event: "daemon.agent_service_test_end",
+        message: "handleAgentAsk with matches test complete",
+        meta: {},
+      })
     })
 
-    it("returns a no-match message when no relevant memory is found", async () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true)
-      vi.mocked(fs.readFileSync).mockReturnValue("# Memory\nI work on deployment automation.\n")
+    it("returns no-match message when no facts match the question", async () => {
+      const factsContent = buildFactsJsonl([
+        { text: "I work on deployment automation", id: "f1" },
+      ])
+
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes("facts.jsonl")) return true
+        return false
+      })
+      vi.mocked(fs.readFileSync).mockReturnValue(factsContent)
 
       const { handleAgentAsk } = await import("../../../heart/daemon/agent-service")
       const result = await handleAgentAsk({
@@ -150,12 +218,31 @@ describe("agent-service", () => {
       })
 
       expect(result.ok).toBe(true)
-      expect(result.message).toBe("No relevant memory found for: What is your favorite color?")
+      expect(result.message).toBe("No relevant memories found for: What is your favorite color?")
 
       emitNervesEvent({
         component: "daemon",
         event: "daemon.agent_service_test_end",
-        message: "handleAgentAsk with no match test complete",
+        message: "handleAgentAsk no match test complete",
+        meta: {},
+      })
+    })
+
+    it("returns no-match message when no memory files exist", async () => {
+      const { handleAgentAsk } = await import("../../../heart/daemon/agent-service")
+      const result = await handleAgentAsk({
+        agent: "test-agent",
+        friendId: "friend-1",
+        question: "What are you working on?",
+      })
+
+      expect(result.ok).toBe(true)
+      expect(result.message).toContain("No relevant memories found for:")
+
+      emitNervesEvent({
+        component: "daemon",
+        event: "daemon.agent_service_test_end",
+        message: "handleAgentAsk no memory test complete",
         meta: {},
       })
     })
@@ -180,7 +267,7 @@ describe("agent-service", () => {
   })
 
   describe("handleAgentCatchup", () => {
-    it("returns catchup summary", async () => {
+    it("returns no-activity message when no state exists", async () => {
       const { handleAgentCatchup } = await import("../../../heart/daemon/agent-service")
       const result = await handleAgentCatchup({ agent: "test-agent", friendId: "friend-1" })
 
@@ -190,26 +277,67 @@ describe("agent-service", () => {
       emitNervesEvent({
         component: "daemon",
         event: "daemon.agent_service_test_end",
-        message: "handleAgentCatchup test complete",
+        message: "handleAgentCatchup empty test complete",
         meta: {},
       })
     })
 
-    it("reports recent sessions when session files exist", async () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true)
-      vi.mocked(fs.readdirSync).mockReturnValue(["session-a.json", "session-b.json"] as unknown as ReturnType<typeof fs.readdirSync>)
+    it("includes recent sessions sorted by lastUsage", async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.endsWith("state/sessions")) return true
+        if (s.endsWith("session.json")) return true
+        return false
+      })
+      vi.mocked(fs.readdirSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.endsWith("state/sessions")) return ["alice"] as unknown as ReturnType<typeof fs.readdirSync>
+        if (s.endsWith("alice")) return ["cli"] as unknown as ReturnType<typeof fs.readdirSync>
+        if (s.endsWith("cli")) return ["default"] as unknown as ReturnType<typeof fs.readdirSync>
+        return [] as unknown as ReturnType<typeof fs.readdirSync>
+      })
+      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as ReturnType<typeof fs.statSync>)
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ lastUsage: "2026-03-26T10:00:00Z", messages: [] }))
 
       const { handleAgentCatchup } = await import("../../../heart/daemon/agent-service")
       const result = await handleAgentCatchup({ agent: "test-agent", friendId: "friend-1" })
 
       expect(result.ok).toBe(true)
-      expect(result.message).toContain("Recent activity")
-      expect(result.message).toContain("2 recent sessions")
+      expect(result.message).toContain("alice/cli/default")
+      const data = result.data as Record<string, unknown>
+      const recentSessions = data.recentSessions as Array<Record<string, string>>
+      expect(recentSessions).toHaveLength(1)
+      expect(recentSessions[0].friendId).toBe("alice")
 
       emitNervesEvent({
         component: "daemon",
         event: "daemon.agent_service_test_end",
         message: "handleAgentCatchup with sessions test complete",
+        meta: {},
+      })
+    })
+
+    it("includes inner dialog status when present", async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes("runtime.json")) return true
+        return false
+      })
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ status: "idle", lastCompletedAt: "2026-03-26T08:00:00Z" }))
+
+      const { handleAgentCatchup } = await import("../../../heart/daemon/agent-service")
+      const result = await handleAgentCatchup({ agent: "test-agent", friendId: "friend-1" })
+
+      expect(result.ok).toBe(true)
+      expect(result.message).toContain("Inner dialog: idle")
+      const data = result.data as Record<string, unknown>
+      const innerStatus = data.innerStatus as Record<string, string>
+      expect(innerStatus.status).toBe("idle")
+
+      emitNervesEvent({
+        component: "daemon",
+        event: "daemon.agent_service_test_end",
+        message: "handleAgentCatchup inner dialog test complete",
         meta: {},
       })
     })
@@ -256,12 +384,17 @@ describe("agent-service", () => {
   })
 
   describe("handleAgentGetContext", () => {
-    it("returns current context", async () => {
+    it("returns context with zero counts when no state exists", async () => {
       const { handleAgentGetContext } = await import("../../../heart/daemon/agent-service")
       const result = await handleAgentGetContext({ agent: "test-agent", friendId: "friend-1" })
 
       expect(result.ok).toBe(true)
       expect(result.data).toBeDefined()
+      const data = result.data as Record<string, unknown>
+      expect(data.hasMemory).toBe(false)
+      expect(data.factCount).toBe(0)
+      expect(data.taskCount).toBe(0)
+      expect(data.sessionCount).toBe(0)
 
       emitNervesEvent({
         component: "daemon",
@@ -271,10 +404,19 @@ describe("agent-service", () => {
       })
     })
 
-    it("includes relevant memory summary when a query-like param is provided", async () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true)
-      vi.mocked(fs.readFileSync).mockReturnValue("# Memory\nAgent context details here\nDeployment automation owner\n")
-      vi.mocked(fs.readdirSync).mockReturnValue(["task-1.json"] as unknown as ReturnType<typeof fs.readdirSync>)
+    it("filters facts by query keyword when a query param is provided", async () => {
+      const factsContent = buildFactsJsonl([
+        { text: "Deployment automation is my specialty", id: "f1" },
+        { text: "Testing requires node 20", id: "f2" },
+        { text: "Deployment schedule is weekly", id: "f3" },
+      ])
+
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes("facts.jsonl")) return true
+        return false
+      })
+      vi.mocked(fs.readFileSync).mockReturnValue(factsContent)
 
       const { handleAgentGetContext } = await import("../../../heart/daemon/agent-service")
       const result = await handleAgentGetContext({
@@ -286,20 +428,31 @@ describe("agent-service", () => {
       expect(result.ok).toBe(true)
       const data = result.data as Record<string, unknown>
       expect(data.hasMemory).toBe(true)
-      expect(data.memorySummary).toContain("Deployment automation owner")
-      expect(data.taskCount).toBe(1)
+      expect(data.factCount).toBe(3)
+      const summary = data.memorySummary as string
+      expect(summary).toContain("Deployment automation")
+      expect(summary).toContain("Deployment schedule")
+      expect(summary).not.toContain("node 20")
 
       emitNervesEvent({
         component: "daemon",
         event: "daemon.agent_service_test_end",
-        message: "handleAgentGetContext with memory test complete",
+        message: "handleAgentGetContext with query test complete",
         meta: {},
       })
     })
 
-    it("returns a no-match memory summary when query-like params do not match", async () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true)
-      vi.mocked(fs.readFileSync).mockReturnValue("# Memory\nAgent context details here\n")
+    it("returns no-match memory summary when query does not match any facts", async () => {
+      const factsContent = buildFactsJsonl([
+        { text: "Agent context details here", id: "f1" },
+      ])
+
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes("facts.jsonl")) return true
+        return false
+      })
+      vi.mocked(fs.readFileSync).mockReturnValue(factsContent)
 
       const { handleAgentGetContext } = await import("../../../heart/daemon/agent-service")
       const result = await handleAgentGetContext({
@@ -310,42 +463,61 @@ describe("agent-service", () => {
 
       expect(result.ok).toBe(true)
       const data = result.data as Record<string, unknown>
-      expect(data.memorySummary).toBe("No relevant memory found for: favorite color")
+      expect(data.memorySummary).toBe("No relevant memories found for: favorite color")
 
       emitNervesEvent({
         component: "daemon",
         event: "daemon.agent_service_test_end",
-        message: "handleAgentGetContext with no match test complete",
+        message: "handleAgentGetContext no match test complete",
+        meta: {},
+      })
+    })
+
+    it("returns last 10 facts as summary when no query is provided", async () => {
+      const factsContent = buildFactsJsonl([
+        { text: "Fact one about something", id: "f1" },
+        { text: "Fact two about another", id: "f2" },
+      ])
+
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes("facts.jsonl")) return true
+        return false
+      })
+      vi.mocked(fs.readFileSync).mockReturnValue(factsContent)
+
+      const { handleAgentGetContext } = await import("../../../heart/daemon/agent-service")
+      const result = await handleAgentGetContext({ agent: "test-agent", friendId: "friend-1" })
+
+      expect(result.ok).toBe(true)
+      const data = result.data as Record<string, unknown>
+      const summary = data.memorySummary as string
+      expect(summary).toContain("Fact one")
+      expect(summary).toContain("Fact two")
+
+      emitNervesEvent({
+        component: "daemon",
+        event: "daemon.agent_service_test_end",
+        message: "handleAgentGetContext summary test complete",
         meta: {},
       })
     })
   })
 
   describe("handleAgentSearchMemory", () => {
-    it("searches memory with a query", async () => {
-      const { handleAgentSearchMemory } = await import("../../../heart/daemon/agent-service")
-      const result = await handleAgentSearchMemory({
-        agent: "test-agent",
-        friendId: "friend-1",
-        query: "deployment process",
+    it("returns formatted matches from facts.jsonl", async () => {
+      const factsContent = buildFactsJsonl([
+        { text: "Deployment process uses Docker", id: "f1", source: "conversation", createdAt: "2026-03-25T10:00:00Z" },
+        { text: "Testing requires node 20", id: "f2", source: "inner-dialog", createdAt: "2026-03-25T11:00:00Z" },
+        { text: "Deployment schedule is weekly", id: "f3", source: "conversation", createdAt: "2026-03-25T12:00:00Z" },
+      ])
+
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes("facts.jsonl")) return true
+        return false
       })
-
-      expect(result.ok).toBe(true)
-      expect(result.data).toBeDefined()
-
-      emitNervesEvent({
-        component: "daemon",
-        event: "daemon.agent_service_test_end",
-        message: "handleAgentSearchMemory test complete",
-        meta: {},
-      })
-    })
-
-    it("returns matching lines when memory file exists", async () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true)
-      vi.mocked(fs.readFileSync).mockReturnValue(
-        "# Memory\nDeployment process uses Docker\nTesting requires node 20\nDeployment schedule is weekly\n",
-      )
+      vi.mocked(fs.readFileSync).mockReturnValue(factsContent)
 
       const { handleAgentSearchMemory } = await import("../../../heart/daemon/agent-service")
       const result = await handleAgentSearchMemory({
@@ -357,13 +529,50 @@ describe("agent-service", () => {
       expect(result.ok).toBe(true)
       const data = result.data as { matches: string[] }
       expect(data.matches.length).toBe(2)
-      expect(data.matches[0]).toContain("Deployment process")
-      expect(data.matches[1]).toContain("Deployment schedule")
+      // Verify [fact] format with source and createdAt
+      expect(data.matches[0]).toContain("[fact]")
+      expect(data.matches[0]).toContain("Deployment process uses Docker")
+      expect(data.matches[0]).toContain("source=conversation")
+      expect(data.matches[1]).toContain("Deployment schedule is weekly")
+      // Must not contain embedding data
+      expect(data.matches[0]).not.toContain("0.1")
 
       emitNervesEvent({
         component: "daemon",
         event: "daemon.agent_service_test_end",
         message: "handleAgentSearchMemory with matches test complete",
+        meta: {},
+      })
+    })
+
+    it("returns empty matches when no facts match query", async () => {
+      const factsContent = buildFactsJsonl([
+        { text: "Testing requires node 20", id: "f1" },
+      ])
+
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes("facts.jsonl")) return true
+        return false
+      })
+      vi.mocked(fs.readFileSync).mockReturnValue(factsContent)
+
+      const { handleAgentSearchMemory } = await import("../../../heart/daemon/agent-service")
+      const result = await handleAgentSearchMemory({
+        agent: "test-agent",
+        friendId: "friend-1",
+        query: "deployment",
+      })
+
+      expect(result.ok).toBe(true)
+      expect(result.message).toBe("No matches found")
+      const data = result.data as { matches: string[] }
+      expect(data.matches).toHaveLength(0)
+
+      emitNervesEvent({
+        component: "daemon",
+        event: "daemon.agent_service_test_end",
+        message: "handleAgentSearchMemory no match test complete",
         meta: {},
       })
     })
@@ -388,36 +597,77 @@ describe("agent-service", () => {
   })
 
   describe("handleAgentGetTask", () => {
-    it("returns current task info", async () => {
+    it("returns no-tasks message when tasks dir does not exist", async () => {
       const { handleAgentGetTask } = await import("../../../heart/daemon/agent-service")
       const result = await handleAgentGetTask({ agent: "test-agent", friendId: "friend-1" })
 
       expect(result.ok).toBe(true)
+      expect(result.message).toContain("No active tasks")
 
       emitNervesEvent({
         component: "daemon",
         event: "daemon.agent_service_test_end",
-        message: "handleAgentGetTask test complete",
+        message: "handleAgentGetTask empty test complete",
         meta: {},
       })
     })
 
-    it("lists task files when they exist on disk", async () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true)
-      vi.mocked(fs.readdirSync).mockReturnValue(["fix-build.json", "deploy.md", "notes.txt"] as unknown as ReturnType<typeof fs.readdirSync>)
+    it("lists task markdown files with status lines", async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.endsWith("tasks")) return true
+        if (s.includes("facts.jsonl")) return false
+        return true
+      })
+      vi.mocked(fs.readdirSync).mockReturnValue(["2026-03-doing-fix-build.md", "2026-02-done-deploy.md", "planning.md"] as unknown as ReturnType<typeof fs.readdirSync>)
+      vi.mocked(fs.readFileSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes("doing-fix-build")) return "# Fix Build\nStatus: in progress\n"
+        return "# Other Task\nStatus: unknown\n"
+      })
 
       const { handleAgentGetTask } = await import("../../../heart/daemon/agent-service")
       const result = await handleAgentGetTask({ agent: "test-agent", friendId: "friend-1" })
 
       expect(result.ok).toBe(true)
-      expect(result.message).toContain("Current tasks")
-      expect(result.message).toContain("fix-build.json")
-      expect(result.message).toContain("deploy.md")
+      const data = result.data as { tasks: Array<{ name: string; statusLine: string }>; activeCount: number; totalCount: number }
+      // Should find the "doing" file (not done)
+      expect(data.activeCount).toBe(1)
+      expect(data.totalCount).toBe(3)
+      // Active tasks shown when available
+      expect(data.tasks).toHaveLength(1)
+      expect(data.tasks[0].name).toBe("2026-03-doing-fix-build.md")
+      expect(data.tasks[0].statusLine).toBe("# Fix Build")
 
       emitNervesEvent({
         component: "daemon",
         event: "daemon.agent_service_test_end",
         message: "handleAgentGetTask with files test complete",
+        meta: {},
+      })
+    })
+
+    it("falls back to all task files when no 'doing' files exist", async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.endsWith("tasks")) return true
+        return true
+      })
+      vi.mocked(fs.readdirSync).mockReturnValue(["planning.md", "notes.md"] as unknown as ReturnType<typeof fs.readdirSync>)
+      vi.mocked(fs.readFileSync).mockReturnValue("# Planning\nSome content\n")
+
+      const { handleAgentGetTask } = await import("../../../heart/daemon/agent-service")
+      const result = await handleAgentGetTask({ agent: "test-agent", friendId: "friend-1" })
+
+      expect(result.ok).toBe(true)
+      const data = result.data as { tasks: Array<{ name: string }>; activeCount: number; totalCount: number }
+      expect(data.activeCount).toBe(0)
+      expect(data.tasks).toHaveLength(2)
+
+      emitNervesEvent({
+        component: "daemon",
+        event: "daemon.agent_service_test_end",
+        message: "handleAgentGetTask fallback test complete",
         meta: {},
       })
     })
@@ -502,7 +752,7 @@ describe("agent-service", () => {
   })
 
   describe("handleAgentCheckGuidance", () => {
-    it("returns guidance for a topic", async () => {
+    it("returns no guidance when no memory exists", async () => {
       const { handleAgentCheckGuidance } = await import("../../../heart/daemon/agent-service")
       const result = await handleAgentCheckGuidance({
         agent: "test-agent",
@@ -511,6 +761,7 @@ describe("agent-service", () => {
       })
 
       expect(result.ok).toBe(true)
+      expect(result.message).toContain("No specific guidance found for: error handling patterns")
 
       emitNervesEvent({
         component: "daemon",
@@ -520,11 +771,19 @@ describe("agent-service", () => {
       })
     })
 
-    it("returns relevant guidance when memory contains matching lines", async () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true)
-      vi.mocked(fs.readFileSync).mockReturnValue(
-        "# Guidance\nError handling: always use try-catch\nLogging: use structured logs\nError handling: wrap async calls\n",
-      )
+    it("returns relevant facts as guidance when they match the topic", async () => {
+      const factsContent = buildFactsJsonl([
+        { text: "Error handling: always use try-catch", id: "f1" },
+        { text: "Logging: use structured logs", id: "f2" },
+        { text: "Error handling: wrap async calls", id: "f3" },
+      ])
+
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes("facts.jsonl")) return true
+        return false
+      })
+      vi.mocked(fs.readFileSync).mockReturnValue(factsContent)
 
       const { handleAgentCheckGuidance } = await import("../../../heart/daemon/agent-service")
       const result = await handleAgentCheckGuidance({
@@ -536,20 +795,29 @@ describe("agent-service", () => {
       expect(result.ok).toBe(true)
       expect(result.message).toContain("Relevant guidance:")
       expect(result.message).toContain("always use try-catch")
+      expect(result.message).toContain("wrap async calls")
+      // Should not include unrelated fact
+      expect(result.message).not.toContain("structured logs")
 
       emitNervesEvent({
         component: "daemon",
         event: "daemon.agent_service_test_end",
-        message: "handleAgentCheckGuidance with memory test complete",
+        message: "handleAgentCheckGuidance with matches test complete",
         meta: {},
       })
     })
 
-    it("returns no guidance when memory exists but has no matching lines", async () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true)
-      vi.mocked(fs.readFileSync).mockReturnValue(
-        "# Memory\nDeployment process uses Docker\nTesting requires node 20\n",
-      )
+    it("returns no guidance when facts exist but do not match topic", async () => {
+      const factsContent = buildFactsJsonl([
+        { text: "Deployment process uses Docker", id: "f1" },
+      ])
+
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes("facts.jsonl")) return true
+        return false
+      })
+      vi.mocked(fs.readFileSync).mockReturnValue(factsContent)
 
       const { handleAgentCheckGuidance } = await import("../../../heart/daemon/agent-service")
       const result = await handleAgentCheckGuidance({

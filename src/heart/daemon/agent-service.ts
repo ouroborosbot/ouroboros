@@ -1,14 +1,13 @@
 /**
  * Agent service layer — handles MCP-facing daemon commands.
  * Each handler receives { agent, friendId, ...params } and returns DaemonResponse.
- * For MVP, these read from agent state on the filesystem.
- * Full inference support can come later.
+ * Reads agent state from the filesystem: facts.jsonl, sessions, inner dialog, tasks.
  */
 
 import * as fs from "fs"
 import * as path from "path"
 import type { DaemonResponse } from "./daemon"
-import { getAgentRoot, getAgentStateRoot } from "../identity"
+import { getAgentRoot } from "../identity"
 import { emitNervesEvent } from "../../nerves/runtime"
 
 export interface AgentServiceParams {
@@ -17,46 +16,168 @@ export interface AgentServiceParams {
   [key: string]: unknown
 }
 
+/** A parsed fact from facts.jsonl, with embedding stripped. */
+interface Fact {
+  id: string
+  text: string
+  source: string
+  createdAt: string
+  about?: string
+}
+
+/** Read a file from the agent root, returning null if it doesn't exist. */
 function readAgentFile(agent: string, ...segments: string[]): string | null {
   const filePath = path.join(getAgentRoot(agent), ...segments)
   if (!fs.existsSync(filePath)) return null
   return fs.readFileSync(filePath, "utf-8")
 }
 
-/** Read agent memory from multiple possible locations. */
-function readAgentMemory(agent: string): string | null {
-  // Try memory/MEMORY.md first, then psyche/memory/facts.jsonl
-  return readAgentFile(agent, "memory", "MEMORY.md")
-    ?? readAgentFile(agent, "psyche", "memory", "facts.jsonl")
+/** Parse a JSONL file into an array of Fact objects, stripping embeddings. */
+function parseFactsJsonl(content: string): Fact[] {
+  const facts: Fact[] = []
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim()
+    if (trimmed.length === 0) continue
+    try {
+      const parsed = JSON.parse(trimmed)
+      facts.push({
+        id: parsed.id ?? "",
+        text: parsed.text ?? "",
+        source: parsed.source ?? "",
+        createdAt: parsed.createdAt ?? "",
+        about: parsed.about,
+      })
+    } catch {
+      // Skip malformed lines
+    }
+  }
+  return facts
 }
 
-function findRelevantMemoryLines(agent: string, query: string): string[] {
-  const memoryContent = readAgentMemory(agent)
-  if (!memoryContent) return []
+/** Read agent facts from psyche/memory/facts.jsonl plus today's daily journal. */
+function readAgentMemory(agent: string): Fact[] {
+  const facts: Fact[] = []
 
-  const keywords = query
+  // Main facts file
+  const factsContent = readAgentFile(agent, "psyche", "memory", "facts.jsonl")
+  if (factsContent) {
+    facts.push(...parseFactsJsonl(factsContent))
+  }
+
+  // Today's daily journal
+  const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+  const dailyContent = readAgentFile(agent, "psyche", "memory", "daily", `${today}.jsonl`)
+  if (dailyContent) {
+    facts.push(...parseFactsJsonl(dailyContent))
+  }
+
+  return facts
+}
+
+/** Extract keywords from a query string (lowercase, >2 chars). */
+function extractKeywords(query: string): string[] {
+  return query
     .toLowerCase()
     .split(/\W+/)
-    .map((keyword) => keyword.trim())
-    .filter((keyword) => keyword.length > 2)
+    .map((w) => w.trim())
+    .filter((w) => w.length > 2)
+}
 
+/** Search facts by keyword matching against the text field. */
+function searchFacts(facts: Fact[], query: string): Fact[] {
+  const keywords = extractKeywords(query)
   if (keywords.length === 0) return []
-
-  return memoryContent
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .filter((line) => {
-      const lineLower = line.toLowerCase()
-      return keywords.some((keyword) => lineLower.includes(keyword))
-    })
+  return facts.filter((fact) => {
+    const textLower = fact.text.toLowerCase()
+    return keywords.some((kw) => textLower.includes(kw))
+  })
 }
 
-function listStateFiles(agent: string, ...segments: string[]): string[] {
-  const dirPath = path.join(getAgentStateRoot(agent), ...segments)
-  if (!fs.existsSync(dirPath)) return []
-  return fs.readdirSync(dirPath).filter((f) => f.endsWith(".json") || f.endsWith(".jsonl") || f.endsWith(".md"))
+/** Session info extracted from the filesystem. */
+interface SessionInfo {
+  friendId: string
+  channel: string
+  key: string
+  lastUsage: string
 }
+
+/** Enumerate sessions from state/sessions/, reading session.json files. */
+function enumerateSessions(agent: string): SessionInfo[] {
+  const sessionsDir = path.join(getAgentRoot(agent), "state", "sessions")
+  if (!fs.existsSync(sessionsDir)) return []
+
+  const sessions: SessionInfo[] = []
+  const friendDirs = safeReaddir(sessionsDir)
+
+  for (const friendId of friendDirs) {
+    const friendPath = path.join(sessionsDir, friendId)
+    if (!safeIsDir(friendPath)) continue
+    const channels = safeReaddir(friendPath)
+    for (const channel of channels) {
+      const channelPath = path.join(friendPath, channel)
+      if (!safeIsDir(channelPath)) continue
+      const keys = safeReaddir(channelPath)
+      for (const key of keys) {
+        const sessionFile = path.join(channelPath, key, "session.json")
+        if (!fs.existsSync(sessionFile)) continue
+        try {
+          const data = JSON.parse(fs.readFileSync(sessionFile, "utf-8"))
+          sessions.push({
+            friendId,
+            channel,
+            key,
+            lastUsage: data.lastUsage ?? "",
+          })
+        } catch {
+          // Skip malformed session files
+        }
+      }
+    }
+  }
+
+  return sessions
+}
+
+function safeReaddir(dirPath: string): string[] {
+  try {
+    return fs.readdirSync(dirPath).map(String)
+  } catch {
+    return []
+  }
+}
+
+function safeIsDir(dirPath: string): boolean {
+  try {
+    return fs.statSync(dirPath).isDirectory()
+  } catch {
+    return false
+  }
+}
+
+/** Read inner dialog runtime status. */
+function readInnerDialogStatus(agent: string): { status: string; lastCompletedAt: string } | null {
+  const content = readAgentFile(agent, "state", "sessions", "self", "inner", "runtime.json")
+  if (!content) return null
+  try {
+    const data = JSON.parse(content)
+    return { status: data.status ?? "unknown", lastCompletedAt: data.lastCompletedAt ?? "" }
+  } catch {
+    return null
+  }
+}
+
+/** List markdown files in {agentRoot}/tasks/. */
+function listTaskFiles(agent: string): string[] {
+  const tasksDir = path.join(getAgentRoot(agent), "tasks")
+  if (!fs.existsSync(tasksDir)) return []
+  try {
+    return fs.readdirSync(tasksDir).map(String).filter((f) => f.endsWith(".md"))
+  } catch {
+    return []
+  }
+}
+
+// ─── Handlers ────────────────────────────────────────────────────────────────
 
 export async function handleAgentStatus(params: AgentServiceParams): Promise<DaemonResponse> {
   emitNervesEvent({
@@ -66,8 +187,9 @@ export async function handleAgentStatus(params: AgentServiceParams): Promise<Dae
     meta: { agent: params.agent, friendId: params.friendId },
   })
 
-  const sessionFiles = listStateFiles(params.agent, "sessions")
-  const memoryContent = readAgentMemory(params.agent)
+  const facts = readAgentMemory(params.agent)
+  const innerStatus = readInnerDialogStatus(params.agent)
+  const sessions = enumerateSessions(params.agent)
 
   emitNervesEvent({
     component: "daemon",
@@ -81,9 +203,11 @@ export async function handleAgentStatus(params: AgentServiceParams): Promise<Dae
     message: `Agent ${params.agent} status`,
     data: {
       agent: params.agent,
-      status: "active",
-      sessionCount: sessionFiles.length,
-      hasMemory: memoryContent !== null,
+      innerStatus: innerStatus?.status ?? "unknown",
+      lastThoughtAt: innerStatus?.lastCompletedAt ?? null,
+      sessionCount: sessions.length,
+      hasMemory: facts.length > 0,
+      factCount: facts.length,
     },
   }
 }
@@ -108,10 +232,11 @@ export async function handleAgentAsk(params: AgentServiceParams): Promise<Daemon
     return { ok: false, error: "Missing required parameter: question" }
   }
 
-  const matches = findRelevantMemoryLines(params.agent, question)
+  const facts = readAgentMemory(params.agent)
+  const matches = searchFacts(facts, question).slice(0, 10)
   const context = matches.length > 0
-    ? matches.join("\n")
-    : `No relevant memory found for: ${question}`
+    ? matches.map((f) => f.text).join("\n")
+    : `No relevant memories found for: ${question}`
 
   emitNervesEvent({
     component: "daemon",
@@ -131,8 +256,43 @@ export async function handleAgentCatchup(params: AgentServiceParams): Promise<Da
     meta: { agent: params.agent, friendId: params.friendId },
   })
 
-  const sessionFiles = listStateFiles(params.agent, "sessions")
-  const recentSessions = sessionFiles.slice(-5)
+  // Recent sessions sorted by lastUsage, take 5 most recent
+  const sessions = enumerateSessions(params.agent)
+  const sorted = sessions.sort((a, b) => (b.lastUsage || "").localeCompare(a.lastUsage || ""))
+  const recentSessions = sorted.slice(0, 5).map((s) => ({
+    friendId: s.friendId,
+    channel: s.channel,
+    key: s.key,
+    lastUsage: s.lastUsage,
+  }))
+
+  // Inner dialog status
+  const innerStatus = readInnerDialogStatus(params.agent)
+
+  // Today's journal entries
+  const today = new Date().toISOString().slice(0, 10)
+  const dailyContent = readAgentFile(params.agent, "psyche", "memory", "daily", `${today}.jsonl`)
+  const todayEntries = dailyContent ? parseFactsJsonl(dailyContent) : []
+
+  // Build summary
+  const parts: string[] = []
+  if (innerStatus) {
+    parts.push(`Inner dialog: ${innerStatus.status} (last completed: ${innerStatus.lastCompletedAt || "never"})`)
+  }
+  if (recentSessions.length > 0) {
+    parts.push(`Recent sessions (${recentSessions.length}):`)
+    for (const s of recentSessions) {
+      parts.push(`  - ${s.friendId}/${s.channel}/${s.key} (${s.lastUsage || "unknown"})`)
+    }
+  } else {
+    parts.push("No recent sessions")
+  }
+  if (todayEntries.length > 0) {
+    parts.push(`Today's journal (${todayEntries.length} entries):`)
+    for (const entry of todayEntries.slice(0, 5)) {
+      parts.push(`  - ${entry.text}`)
+    }
+  }
 
   emitNervesEvent({
     component: "daemon",
@@ -143,10 +303,10 @@ export async function handleAgentCatchup(params: AgentServiceParams): Promise<Da
 
   return {
     ok: true,
-    message: recentSessions.length > 0
-      ? `Recent activity: ${recentSessions.length} recent sessions found`
+    message: parts.length > 0
+      ? parts.join("\n")
       : `No recent activity for ${params.agent}`,
-    data: { recentSessions },
+    data: { recentSessions, innerStatus, todayEntryCount: todayEntries.length },
   }
 }
 
@@ -195,13 +355,25 @@ export async function handleAgentGetContext(params: AgentServiceParams): Promise
   const query = (params.question as string | undefined)
     ?? (params.query as string | undefined)
     ?? (params.topic as string | undefined)
-  const taskFiles = listStateFiles(params.agent, "tasks")
-  const memorySummary = query
-    ? (() => {
-        const matches = findRelevantMemoryLines(params.agent, query)
-        return matches.length > 0 ? matches.join("\n").slice(0, 500) : `No relevant memory found for: ${query}`
-      })()
-    : null
+
+  const facts = readAgentMemory(params.agent)
+  const innerStatus = readInnerDialogStatus(params.agent)
+  const sessions = enumerateSessions(params.agent)
+  const taskFiles = listTaskFiles(params.agent)
+
+  let memorySummary: string | null = null
+  if (query) {
+    const matches = searchFacts(facts, query)
+    memorySummary = matches.length > 0
+      ? matches.slice(0, 10).map((f) => f.text).join("\n")
+      : `No relevant memories found for: ${query}`
+  } else {
+    // Return last 10 facts as summary
+    const recent = facts.slice(-10)
+    if (recent.length > 0) {
+      memorySummary = recent.map((f) => f.text).join("\n")
+    }
+  }
 
   emitNervesEvent({
     component: "daemon",
@@ -214,9 +386,12 @@ export async function handleAgentGetContext(params: AgentServiceParams): Promise
     ok: true,
     data: {
       agent: params.agent,
-      hasMemory: readAgentMemory(params.agent) !== null,
+      hasMemory: facts.length > 0,
+      factCount: facts.length,
       memorySummary,
       taskCount: taskFiles.length,
+      sessionCount: sessions.length,
+      innerStatus: innerStatus?.status ?? null,
     },
   }
 }
@@ -241,7 +416,11 @@ export async function handleAgentSearchMemory(params: AgentServiceParams): Promi
     return { ok: false, error: "Missing required parameter: query" }
   }
 
-  const matches = findRelevantMemoryLines(params.agent, query)
+  const facts = readAgentMemory(params.agent)
+  const matches = searchFacts(facts, query).slice(0, 20)
+  const formatted = matches.map(
+    (f) => `[fact] ${f.text} (source=${f.source}, ${f.createdAt})`,
+  )
 
   emitNervesEvent({
     component: "daemon",
@@ -253,7 +432,7 @@ export async function handleAgentSearchMemory(params: AgentServiceParams): Promi
   return {
     ok: true,
     message: matches.length > 0 ? `Found ${matches.length} matches` : "No matches found",
-    data: { query, matches: matches.slice(0, 20) },
+    data: { query, matches: formatted },
   }
 }
 
@@ -265,7 +444,24 @@ export async function handleAgentGetTask(params: AgentServiceParams): Promise<Da
     meta: { agent: params.agent, friendId: params.friendId },
   })
 
-  const taskFiles = listStateFiles(params.agent, "tasks")
+  const taskFiles = listTaskFiles(params.agent)
+  // Look for active tasks: files with "doing" in the name that don't have "done"
+  const activeTasks = taskFiles.filter((f) => {
+    const lower = f.toLowerCase()
+    return lower.includes("doing") && !lower.includes("done")
+  })
+  const taskNames = activeTasks.length > 0 ? activeTasks : taskFiles
+
+  // Read first status line from each task file
+  const tasks = taskNames.map((name) => {
+    const content = readAgentFile(params.agent, "tasks", name)
+    let statusLine = ""
+    if (content) {
+      const firstLine = content.split("\n").find((l) => l.trim().length > 0)
+      statusLine = firstLine?.trim() ?? ""
+    }
+    return { name, statusLine }
+  })
 
   emitNervesEvent({
     component: "daemon",
@@ -276,10 +472,10 @@ export async function handleAgentGetTask(params: AgentServiceParams): Promise<Da
 
   return {
     ok: true,
-    message: taskFiles.length > 0
-      ? `Current tasks: ${taskFiles.join(", ")}`
+    message: tasks.length > 0
+      ? `Tasks (${tasks.length}): ${tasks.map((t) => t.name).join(", ")}`
       : `No active tasks for ${params.agent}`,
-    data: { tasks: taskFiles },
+    data: { tasks, activeCount: activeTasks.length, totalCount: taskFiles.length },
   }
 }
 
@@ -376,16 +572,29 @@ export async function handleAgentCheckGuidance(params: AgentServiceParams): Prom
     return { ok: false, error: "Missing required parameter: topic" }
   }
 
-  // MVP: check memory for relevant guidance
-  const memoryContent = readAgentMemory(params.agent)
-  let guidance = `No specific guidance found for: ${topic}`
-  if (memoryContent) {
-    const lines = memoryContent.split("\n")
-    const topicLower = topic.toLowerCase()
-    const relevant = lines.filter((line) => line.toLowerCase().includes(topicLower))
-    if (relevant.length > 0) {
-      guidance = `Relevant guidance:\n${relevant.slice(0, 10).join("\n")}`
-    }
+  // Search facts for guidance
+  const facts = readAgentMemory(params.agent)
+  const matches = searchFacts(facts, topic)
+
+  // Also search today's journal
+  const today = new Date().toISOString().slice(0, 10)
+  const dailyContent = readAgentFile(params.agent, "psyche", "memory", "daily", `${today}.jsonl`)
+  const journalMatches = dailyContent ? searchFacts(parseFactsJsonl(dailyContent), topic) : []
+
+  const allMatches = [...matches, ...journalMatches]
+  // Deduplicate by id
+  const seen = new Set<string>()
+  const unique = allMatches.filter((f) => {
+    if (seen.has(f.id)) return false
+    seen.add(f.id)
+    return true
+  })
+
+  let guidance: string
+  if (unique.length > 0) {
+    guidance = `Relevant guidance:\n${unique.slice(0, 10).map((f) => f.text).join("\n")}`
+  } else {
+    guidance = `No specific guidance found for: ${topic}`
   }
 
   emitNervesEvent({
