@@ -218,7 +218,7 @@ export function recordToolOutcome(
 // ponder = continue thinking (inner dialog) or hand off to inner dialog (outer).
 // rest = end inner dialog turn (added in Unit 8b).
 // Blocking these traps the agent: it can think all it wants but can never speak or stop.
-const CIRCUIT_BREAKER_EXEMPT = new Set(["settle", "surface", "ponder"])
+const CIRCUIT_BREAKER_EXEMPT = new Set(["settle", "surface", "ponder", "rest"])
 
 export function detectToolLoop(
   state: ToolLoopState,

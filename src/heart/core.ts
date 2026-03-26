@@ -8,7 +8,7 @@ import {
   getOpenAICodexConfig,
 } from "./config";
 import { loadAgentConfig } from "./identity";
-import { execTool, summarizeArgs, settleTool, observeTool, ponderTool, getToolsForChannel, isConfirmationRequired } from "../repertoire/tools";
+import { execTool, summarizeArgs, settleTool, observeTool, ponderTool, restTool, getToolsForChannel, isConfirmationRequired } from "../repertoire/tools";
 import type { ToolContext } from "../repertoire/tools";
 import { getChannelCapabilities } from "../mind/friends/channel";
 import { surfaceToolDef } from "../senses/surface-tool";
@@ -266,7 +266,8 @@ export type RunAgentOutcome =
   | "aborted"
   | "errored"
   | "observed"
-  | "pondered";
+  | "pondered"
+  | "rested";
 
 // Sole-call tools must be the only tool call in a turn. When they appear
 // alongside other tools, the sole-call tool is rejected with this message.
@@ -274,6 +275,7 @@ const SOLE_CALL_REJECTION: Record<string, string> = {
   settle: "rejected: settle must be the only tool call. finish your work first, then call settle alone.",
   observe: "rejected: observe must be the only tool call. call observe alone when you want to stay silent.",
   ponder: "rejected: ponder must be the only tool call. finish your other work first, then call ponder alone.",
+  rest: "rejected: rest must be the only tool call. finish your work first, then call rest alone.",
 };
 
 const DELEGATION_REASON_PROSE_HANDOFF: Record<DelegationReason, string> = {
@@ -666,8 +668,9 @@ export async function runAgent(
     // - 1:1 sessions: exclude observe (can't ignore someone talking directly to you)
     // - Group chats: observe available
     //
-    // ponder, settle, surface, and observe are always assembled based on channel context.
+    // ponder, settle/rest, surface, and observe are always assembled based on channel context.
     // ponder is available in ALL channels (outer: think privately, inner: keep turning).
+    // Inner dialog gets restTool instead of settleTool (rest = end turn, gated by attention queue).
     // toolChoiceRequired only controls whether tool_choice: "required" is set in the API call.
     const isInnerDialog = channel === "inner";
     const filteredBaseTools = isInnerDialog
@@ -676,9 +679,9 @@ export async function runAgent(
     const activeTools = [
       ...filteredBaseTools,
       ponderTool,
-      ...(isInnerDialog ? [surfaceToolDef] : []),
+      ...(isInnerDialog ? [surfaceToolDef, restTool] : []),
       ...(currentContext?.isGroupChat && !isInnerDialog ? [observeTool] : []),
-      settleTool,
+      ...(!isInnerDialog ? [settleTool] : []),
     ];
     const steeringFollowUps = options?.drainSteeringFollowUps?.() ?? [];
     if (steeringFollowUps.length > 0) {
@@ -1000,6 +1003,41 @@ export async function runAgent(
           }
 
           outcome = "pondered";
+          done = true;
+          continue;
+        }
+
+        // Check for rest sole call: intercept before tool execution
+        const isSoleRest = result.toolCalls.length === 1 && result.toolCalls[0].name === "rest";
+        if (isSoleRest) {
+          const restArgs = (() => { try { return JSON.parse(result.toolCalls[0].arguments) } catch { return {} } })();
+          callbacks.onToolStart("rest", restArgs);
+
+          // Attention queue gate: reject rest if items remain
+          const attentionQueue = (augmentedToolContext ?? options?.toolContext)?.delegatedOrigins;
+          if (attentionQueue && attentionQueue.length > 0) {
+            callbacks.onToolEnd("rest", summarizeArgs("rest", restArgs), false);
+            messages.push(msg);
+            const gateMessage = "you're holding thoughts someone is waiting for — surface them before you rest.";
+            messages.push({ role: "tool", tool_call_id: result.toolCalls[0].id, content: gateMessage });
+            providerRuntime.appendToolOutput(result.toolCalls[0].id, gateMessage);
+            continue;
+          }
+
+          callbacks.onToolEnd("rest", summarizeArgs("rest", restArgs), true);
+          messages.push(msg);
+          const ack = "(resting)";
+          messages.push({ role: "tool", tool_call_id: result.toolCalls[0].id, content: ack });
+          providerRuntime.appendToolOutput(result.toolCalls[0].id, ack);
+
+          emitNervesEvent({
+            component: "engine",
+            event: "engine.rested",
+            message: "resting until next heartbeat",
+            meta: {},
+          });
+
+          outcome = "rested";
           done = true;
           continue;
         }

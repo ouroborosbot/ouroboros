@@ -1525,3 +1525,15 @@ export const settleTool: OpenAI.ChatCompletionFunctionTool = {
     },
   },
 };
+
+export const restTool: OpenAI.ChatCompletionFunctionTool = {
+  type: "function",
+  function: {
+    name: "rest",
+    description: "put this down for now — the wheel stops until the next heartbeat. must be the only tool call in the turn.",
+    parameters: {
+      type: "object",
+      properties: {},
+    },
+  },
+};
