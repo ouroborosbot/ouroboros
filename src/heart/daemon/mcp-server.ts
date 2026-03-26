@@ -75,11 +75,16 @@ export function createMcpServer(options: McpServerOptions): McpServer {
   const { agent, friendId, socketPath, stdin, stdout } = options
   let buffer = ""
   let running = false
+  let useContentLengthFraming = true // default to Content-Length, auto-detect from first message
 
   function writeResponse(response: JsonRpcResponse): void {
     const body = JSON.stringify(response)
-    const header = `Content-Length: ${Buffer.byteLength(body)}\r\n\r\n`
-    stdout.write(header + body)
+    if (useContentLengthFraming) {
+      const header = `Content-Length: ${Buffer.byteLength(body)}\r\n\r\n`
+      stdout.write(header + body)
+    } else {
+      stdout.write(body + "\n")
+    }
   }
 
   function tryParseContentLength(): boolean {
@@ -129,8 +134,15 @@ export function createMcpServer(options: McpServerOptions): McpServer {
     void handleRequest(request)
   }
 
+  let framingDetected = false
+
   function handleData(chunk: Buffer): void {
     buffer += chunk.toString("utf-8")
+    // Auto-detect framing from first message and mirror it in responses
+    if (!framingDetected && buffer.length > 0) {
+      useContentLengthFraming = buffer.startsWith("Content-Length:")
+      framingDetected = true
+    }
     // Support both Content-Length framing (Claude Code) and newline-delimited JSON (Codex)
     while (buffer.length > 0) {
       const hasContentLength = buffer.startsWith("Content-Length:")
