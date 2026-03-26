@@ -173,13 +173,20 @@ describe("HeartbeatTimer", () => {
   it("reschedules after each fire", () => {
     const BASE_TIME = 1000000
     let currentTime = BASE_TIME
+    let fireCount = 0
 
     const sendToAgent = vi.fn()
+    // Runtime state: completed 25 minutes ago (5 min remain of 30m cadence)
+    const completedAt = new Date(BASE_TIME - 25 * 60 * 1000).toISOString()
     const readFileSync = vi.fn((filePath: string) => {
       if (filePath.includes("heartbeat.md")) {
         return "---\ncadence: \"30m\"\n---\n"
       }
-      throw new Error("ENOENT") // no runtime state
+      // After first fire, update lastCompletedAt to "just now"
+      if (fireCount > 0) {
+        return JSON.stringify({ lastCompletedAt: new Date(currentTime).toISOString() })
+      }
+      return JSON.stringify({ lastCompletedAt: completedAt })
     })
     const readdirSync = vi.fn(() => ["2026-01-01-0000-heartbeat.md"])
 
@@ -191,43 +198,49 @@ describe("HeartbeatTimer", () => {
     })
     timer.start()
 
-    // First fire (immediate -- no runtime state)
+    // Not yet fired (5 min remain)
     vi.advanceTimersByTime(0)
+    expect(sendToAgent).not.toHaveBeenCalled()
+
+    // Advance 5 minutes -> first fire
+    currentTime += 5 * 60 * 1000
+    sendToAgent.mockImplementation(() => { fireCount++ })
+    vi.advanceTimersByTime(5 * 60 * 1000)
     expect(sendToAgent).toHaveBeenCalledTimes(1)
 
-    // After first fire, reschedules. Since no runtime state, fires again immediately
-    // But on reschedule it re-reads the files. Let's make runtime state appear after first fire.
-    readFileSync.mockImplementation((filePath: string) => {
-      if (filePath.includes("heartbeat.md")) {
-        return "---\ncadence: \"30m\"\n---\n"
-      }
-      return JSON.stringify({ lastCompletedAt: new Date(currentTime).toISOString() })
-    })
-
-    // Advance to trigger reschedule
-    vi.advanceTimersByTime(1)
-    // Should not have fired again yet (30 min cadence, just completed)
+    // After fire, reschedules with updated lastCompletedAt = now
+    // Full 30m cadence remains. Advance 29 min -> still no fire
+    currentTime += 29 * 60 * 1000
+    vi.advanceTimersByTime(29 * 60 * 1000)
     expect(sendToAgent).toHaveBeenCalledTimes(1)
 
-    // Advance 30 minutes
-    currentTime += 30 * 60 * 1000
-    vi.advanceTimersByTime(30 * 60 * 1000)
+    // Advance 1 more minute -> second fire
+    currentTime += 1 * 60 * 1000
+    vi.advanceTimersByTime(1 * 60 * 1000)
     expect(sendToAgent).toHaveBeenCalledTimes(2)
 
     timer.stop()
   })
 
   it("picks up cadence changes on each reschedule cycle", () => {
+    // Cadence changes are picked up because scheduleNext() re-reads the task file each cycle.
+    // Cycle 1: cadence=10m, completed 8m ago, fires in 2m
+    // Cycle 2: cadence=10m (scheduleNext reads at fire time), fires in 10m
+    // Cycle 3: cadence=5m (changed between fires), fires in 5m
     const BASE_TIME = 1000000
     let currentTime = BASE_TIME
     let cadence = "10m"
+    let fireCount = 0
 
-    const sendToAgent = vi.fn()
+    const sendToAgent = vi.fn(() => { fireCount++ })
     const readFileSync = vi.fn((filePath: string) => {
       if (filePath.includes("heartbeat.md")) {
         return `---\ncadence: "${cadence}"\n---\n`
       }
-      throw new Error("ENOENT")
+      if (fireCount > 0) {
+        return JSON.stringify({ lastCompletedAt: new Date(currentTime).toISOString() })
+      }
+      return JSON.stringify({ lastCompletedAt: new Date(BASE_TIME - 8 * 60 * 1000).toISOString() })
     })
     const readdirSync = vi.fn(() => ["2026-01-01-0000-heartbeat.md"])
 
@@ -239,25 +252,30 @@ describe("HeartbeatTimer", () => {
     })
     timer.start()
 
-    // First fire (immediate)
-    vi.advanceTimersByTime(0)
+    // First fire at 2 min (8 min elapsed of 10m cadence)
+    currentTime += 2 * 60 * 1000
+    vi.advanceTimersByTime(2 * 60 * 1000)
     expect(sendToAgent).toHaveBeenCalledTimes(1)
 
-    // After first fire, change cadence to 5m and simulate "just completed"
+    // Reschedule read cadence=10m at fire time. Second fire in 10m.
+    // Change cadence to 5m now — will be picked up on NEXT reschedule (after second fire).
     cadence = "5m"
-    readFileSync.mockImplementation((filePath: string) => {
-      if (filePath.includes("heartbeat.md")) {
-        return `---\ncadence: "${cadence}"\n---\n`
-      }
-      return JSON.stringify({ lastCompletedAt: new Date(currentTime).toISOString() })
-    })
 
-    vi.advanceTimersByTime(1)
-
-    // Advance 5 minutes (new cadence)
-    currentTime += 5 * 60 * 1000
-    vi.advanceTimersByTime(5 * 60 * 1000)
+    // Second fire at +10m (cadence=10m was read during first fire's reschedule)
+    currentTime += 10 * 60 * 1000
+    vi.advanceTimersByTime(10 * 60 * 1000)
     expect(sendToAgent).toHaveBeenCalledTimes(2)
+
+    // Now the third cycle should use cadence=5m (read during second fire's reschedule)
+    // Advance 4m — not yet
+    currentTime += 4 * 60 * 1000
+    vi.advanceTimersByTime(4 * 60 * 1000)
+    expect(sendToAgent).toHaveBeenCalledTimes(2)
+
+    // Advance 1 more min — 5m total since second fire
+    currentTime += 1 * 60 * 1000
+    vi.advanceTimersByTime(1 * 60 * 1000)
+    expect(sendToAgent).toHaveBeenCalledTimes(3)
 
     timer.stop()
   })
@@ -384,21 +402,26 @@ describe("HeartbeatTimer", () => {
   })
 
   it("scans habits directory for heartbeat task file matching *-heartbeat.md", () => {
+    const BASE_TIME = 1000000
+    let currentTime = BASE_TIME
+    let fireCount = 0
+
+    const sendToAgent = vi.fn(() => { fireCount++ })
+    // Start with runtime state: completed 10 min ago (5 min remain of 15m cadence)
     const readFileSync = vi.fn((filePath: string) => {
       if (filePath.includes("2026-03-08-1200-heartbeat.md")) {
         return "---\ncadence: \"15m\"\n---\n"
       }
-      throw new Error("ENOENT")
+      if (fireCount > 0) {
+        return JSON.stringify({ lastCompletedAt: new Date(currentTime).toISOString() })
+      }
+      return JSON.stringify({ lastCompletedAt: new Date(BASE_TIME - 10 * 60 * 1000).toISOString() })
     })
     const readdirSync = vi.fn(() => [
       "2026-03-08-0900-daily-review.md",
       "2026-03-08-1200-heartbeat.md",
       "2026-03-08-1500-weekly-report.md",
     ])
-
-    const BASE_TIME = 1000000
-    let currentTime = BASE_TIME
-    const sendToAgent = vi.fn()
 
     const { timer } = createTimer({
       sendToAgent,
@@ -408,26 +431,24 @@ describe("HeartbeatTimer", () => {
     })
     timer.start()
 
-    // First fire immediate (no runtime state)
+    // 5 min remain, not yet
     vi.advanceTimersByTime(0)
+    expect(sendToAgent).not.toHaveBeenCalled()
+
+    // Advance 5 min -> first fire
+    currentTime += 5 * 60 * 1000
+    vi.advanceTimersByTime(5 * 60 * 1000)
     expect(sendToAgent).toHaveBeenCalledTimes(1)
 
-    // After fire, provide runtime state
-    readFileSync.mockImplementation((filePath: string) => {
-      if (filePath.includes("2026-03-08-1200-heartbeat.md")) {
-        return "---\ncadence: \"15m\"\n---\n"
-      }
-      if (filePath.includes("runtime.json")) {
-        return JSON.stringify({ lastCompletedAt: new Date(currentTime).toISOString() })
-      }
-      throw new Error("ENOENT")
-    })
+    // After fire, reschedules. 15 min cadence, just completed.
+    // Advance 14 min -> not yet
+    currentTime += 14 * 60 * 1000
+    vi.advanceTimersByTime(14 * 60 * 1000)
+    expect(sendToAgent).toHaveBeenCalledTimes(1)
 
-    vi.advanceTimersByTime(1)
-
-    // Advance 15 minutes (the cadence from the found file)
-    currentTime += 15 * 60 * 1000
-    vi.advanceTimersByTime(15 * 60 * 1000)
+    // Advance 1 more min -> second fire
+    currentTime += 1 * 60 * 1000
+    vi.advanceTimersByTime(1 * 60 * 1000)
     expect(sendToAgent).toHaveBeenCalledTimes(2)
 
     timer.stop()
