@@ -356,6 +356,30 @@ describe("skills - harness-level fallback in listSkills", () => {
   })
 })
 
+describe("skills - configure-dev-tools harness skill", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.mocked(fs.existsSync).mockReset()
+    vi.mocked(fs.readdirSync).mockReset()
+    vi.mocked(fs.readFileSync).mockReset()
+  })
+
+  it("loads configure-dev-tools from harness skills dir as fallback", async () => {
+    const harnessSkillPath = "/mock/harness/skills/configure-dev-tools.md"
+    vi.mocked(fs.existsSync).mockImplementation((p) =>
+      p === harnessSkillPath,
+    )
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      if (p === harnessSkillPath) return "# Configure Dev Tools\nSetup content" as any
+      return "" as any
+    })
+
+    const { loadSkill } = await import("../../repertoire/skills")
+    const content = loadSkill("configure-dev-tools")
+    expect(content).toContain("Configure Dev Tools")
+  })
+})
+
 describe("skills observability contract", () => {
   it("emits repertoire.load_start when loading a skill", async () => {
     vi.resetModules()
