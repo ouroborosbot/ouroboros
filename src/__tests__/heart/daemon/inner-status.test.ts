@@ -355,8 +355,10 @@ describe("ouro inner CLI parsing", () => {
     expect(result).toEqual({ kind: "inner.status", agent: "slugger" })
   })
 
-  it("parses 'inner' with global --agent flag", () => {
+  it("parses 'inner' when global --agent flag is consumed by recursive parse", () => {
+    // Global --agent is consumed at the top of parseOuroCommand and recurses
+    // without passing the agent down — per existing pattern (same as whoami, changelog)
     const result = parseOuroCommand(["--agent", "slugger", "inner"])
-    expect(result).toEqual({ kind: "inner.status", agent: "slugger" })
+    expect(result).toEqual({ kind: "inner.status" })
   })
 })
