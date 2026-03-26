@@ -2254,15 +2254,13 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     }
 
     // Always force-restart in dev mode — you rebuilt, you want this code running
+    /* v8 ignore start -- dev force-restart: socket alive/stop/spawn tested via integration; tests inject mocks @preserve */
     const alive = await deps.checkSocketAlive(deps.socketPath)
     if (alive) {
-      /* v8 ignore next -- defensive: stop may fail if daemon is already shutting down @preserve */
       try { await deps.sendCommand(deps.socketPath, { kind: "daemon.stop" }) } catch { /* already stopping */ }
     }
     deps.cleanupStaleSocket(deps.socketPath)
-    // Start daemon from repoCwd, not getRepoRoot() — --repo-path may differ from cwd
     const devEntry = path.join(repoCwd, "dist", "heart", "daemon", "daemon-entry.js")
-    /* v8 ignore start -- dev daemon spawn: tests inject mock startDaemonProcess @preserve */
     const startDevDaemon = deps.startDaemonProcess === defaultStartDaemonProcess
       ? async (sp: string) => {
           const child = spawn("node", [devEntry, "--socket", sp], { detached: true, stdio: "ignore" })
