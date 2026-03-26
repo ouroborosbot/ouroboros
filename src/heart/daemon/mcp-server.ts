@@ -296,16 +296,143 @@ export function createMcpServer(options: McpServerOptions): McpServer {
 }
 
 /**
- * Returns the list of MCP tool schemas.
- * Defined here as a stub -- full schemas will be added in Unit 5.
+ * Returns the list of MCP tool schemas for all 13 agent tools.
+ * Each schema follows JSON Schema for inputSchema as required by MCP.
  */
 export function getToolSchemas(): McpToolSchema[] {
-  return Object.keys(TOOL_TO_COMMAND).map((name) => ({
-    name,
-    description: `${name.replace(/_/g, " ")} -- agent tool`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {},
+  return [
+    {
+      name: "ask",
+      description: "Ask the agent a question. The agent uses its memory and recent session context to provide a useful answer.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          question: { type: "string", description: "The question to ask the agent" },
+        },
+        required: ["question"],
+      },
     },
-  }))
+    {
+      name: "status",
+      description: "Get the agent's current status including active sessions, memory state, and activity level.",
+      inputSchema: {
+        type: "object",
+        properties: {},
+      },
+    },
+    {
+      name: "catchup",
+      description: "Get a summary of the agent's recent activity including recent sessions and what it has been working on.",
+      inputSchema: {
+        type: "object",
+        properties: {},
+      },
+    },
+    {
+      name: "delegate",
+      description: "Request the agent to handle a task. The agent queues the task and will work on it when available.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          task: { type: "string", description: "Description of the task to delegate" },
+          context: { type: "string", description: "Additional context about the task" },
+        },
+        required: ["task"],
+      },
+    },
+    {
+      name: "get_context",
+      description: "Get the agent's current working context including memory summary, active tasks, and relevant state.",
+      inputSchema: {
+        type: "object",
+        properties: {},
+      },
+    },
+    {
+      name: "search_memory",
+      description: "Search the agent's memory for information about a specific topic. Returns matching lines from the agent's memory file.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search term to look for in agent memory" },
+        },
+        required: ["query"],
+      },
+    },
+    {
+      name: "get_task",
+      description: "Get details about the agent's current task or list of active tasks.",
+      inputSchema: {
+        type: "object",
+        properties: {},
+      },
+    },
+    {
+      name: "check_scope",
+      description: "Check whether a proposed item or change is in scope for the agent's current work.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          item: { type: "string", description: "The item or change to check scope for" },
+        },
+        required: ["item"],
+      },
+    },
+    {
+      name: "request_decision",
+      description: "Ask the agent to make a decision about a topic. Optionally provide a list of options to choose from.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          topic: { type: "string", description: "The topic requiring a decision" },
+          options: { type: "string", description: "Comma-separated list of options to consider" },
+        },
+        required: ["topic"],
+      },
+    },
+    {
+      name: "check_guidance",
+      description: "Get guidance from the agent on how to approach a topic. The agent searches its memory for relevant guidance.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          topic: { type: "string", description: "The topic to get guidance on" },
+        },
+        required: ["topic"],
+      },
+    },
+    {
+      name: "report_progress",
+      description: "Report progress on delegated work back to the agent. The agent records the update.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          summary: { type: "string", description: "Summary of progress made" },
+        },
+        required: ["summary"],
+      },
+    },
+    {
+      name: "report_blocker",
+      description: "Report a blocker on delegated work to the agent. The agent records the blocker for review.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          blocker: { type: "string", description: "Description of the blocker" },
+        },
+        required: ["blocker"],
+      },
+    },
+    {
+      name: "report_complete",
+      description: "Report completion of delegated work to the agent. The agent records the completion.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          summary: { type: "string", description: "Summary of what was completed" },
+        },
+        required: ["summary"],
+      },
+    },
+  ]
 }
