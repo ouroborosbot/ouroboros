@@ -401,4 +401,43 @@ describe("rest tool in runAgent", () => {
     expect(toolNames).toContain("settle")
     expect(toolNames).not.toContain("rest")
   })
+
+  // ── Edge cases ──────────────────────────────────
+
+  it("rest handles malformed JSON arguments gracefully", async () => {
+    // Stream a rest call with invalid JSON arguments
+    mockCreate.mockReturnValueOnce(makeStream([
+      makeChunk(undefined, [{ index: 0, id: "call_rest", function: { name: "rest", arguments: "" } }]),
+      makeChunk(undefined, [{ index: 0, function: { arguments: "not json" } }]),
+    ]))
+
+    const callbacks = makeCallbacks()
+    const result = await runAgent(
+      [{ role: "user", content: "heartbeat" }],
+      callbacks,
+      "inner",
+      undefined,
+      {
+        toolContext: {
+          currentSession: { friendId: "self", channel: "inner", key: "dialog" },
+        },
+      },
+    )
+
+    // Should still succeed (args parse falls back to {})
+    expect(result.outcome).toBe("rested")
+  })
+
+  it("rest from inner dialog with no toolContext succeeds (no attention queue)", async () => {
+    mockCreate.mockReturnValueOnce(makeStream(restToolCallChunks()))
+
+    const callbacks = makeCallbacks()
+    const result = await runAgent(
+      [{ role: "user", content: "heartbeat" }],
+      callbacks,
+      "inner",
+    )
+
+    expect(result.outcome).toBe("rested")
+  })
 })
