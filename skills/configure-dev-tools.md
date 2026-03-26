@@ -2,14 +2,25 @@
 
 Set up your development tools (Claude Code, Codex) to communicate with Ouroboros agents via MCP (Model Context Protocol). This enables bidirectional structured communication between dev tools and running agents.
 
+## Detecting dev mode vs installed mode
+
+Before configuring, determine which mode the harness is running in:
+
+- **Installed mode** (`ouro` is on PATH via npm): Use `ouro` as the MCP server command.
+- **Dev mode** (`ouro dev --repo-path <path>`): The installed `ouro` binary may not have the latest MCP features. Use `node <repo>/dist/heart/daemon/ouro-entry.js` as the command instead.
+
+To detect: check `ouro -v`. If the version includes your latest changes, use `ouro`. If not, use the `node` + absolute path approach.
+
 ## Claude Code Setup
 
-Add an MCP server entry to your Claude Code settings at `~/.claude/settings.json`:
+### Installed mode
+
+Add an MCP server entry to `~/.claude/settings.json`:
 
 ```json
 {
   "mcpServers": {
-    "ouro": {
+    "<agent-name>": {
       "command": "ouro",
       "args": ["mcp-serve", "--agent", "<agent-name>"]
     }
@@ -17,26 +28,47 @@ Add an MCP server entry to your Claude Code settings at `~/.claude/settings.json
 }
 ```
 
-Replace `<agent-name>` with the name of the agent you want to connect to (e.g., `slugger`).
+### Dev mode
+
+Use the absolute path to the dev build's entry point:
+
+```json
+{
+  "mcpServers": {
+    "<agent-name>": {
+      "command": "node",
+      "args": ["<repo-path>/dist/heart/daemon/ouro-entry.js", "mcp-serve", "--agent", "<agent-name>"]
+    }
+  }
+}
+```
+
+Replace `<agent-name>` with the agent name (e.g., `slugger`) and `<repo-path>` with the harness repo root.
 
 ### Per-project configuration
 
-You can also add the MCP entry to a project-level `.claude/settings.json` to scope it to a specific workspace.
+You can also add the MCP entry to a project-level `.claude/settings.json` or `.claude/settings.local.json` to scope it to a specific workspace.
 
 ## Codex Setup
 
-Add the MCP server using the Codex CLI:
+### Installed mode
 
 ```bash
-codex mcp add ouro -- ouro mcp-serve --agent <agent-name>
+codex mcp add <agent-name> -- ouro mcp-serve --agent <agent-name>
+```
+
+### Dev mode
+
+```bash
+codex mcp add <agent-name> -- node <repo-path>/dist/heart/daemon/ouro-entry.js mcp-serve --agent <agent-name>
 ```
 
 ### Spawned session injection
 
-When the agent spawns Codex for coding tasks, MCP configuration is injected automatically via the `-c` flag:
+When the agent spawns Codex for coding tasks, MCP is injected automatically via `-c` flags:
 
 ```bash
-codex -c '{"mcp_servers":{"ouro":{"command":"ouro","args":["mcp-serve","--agent","<agent-name>"]}}}' ...
+codex exec -c 'mcp_servers.ouro.command=node' -c 'mcp_servers.ouro.args=["<entry-path>","mcp-serve","--agent","<agent-name>"]' ...
 ```
 
 You do not need to configure this manually -- the harness handles it.
@@ -45,9 +77,9 @@ You do not need to configure this manually -- the harness handles it.
 
 After configuration, verify the connection:
 
-1. **Check daemon is running**: The agent daemon must be active. Start it with `ouro daemon --agent <agent-name>` if needed.
-2. **Test from Claude Code**: Ask Claude Code to use the `status` tool to check the agent's state.
-3. **Test from Codex**: Run `codex exec "Use the ouro status tool to check the agent"`.
+1. **Check daemon is running**: The agent daemon must be active. Start it with `ouro up` (installed) or `ouro dev --repo-path <path>` (dev mode).
+2. **Test from Claude Code**: Start a new session and ask Claude to use the `status` tool.
+3. **Test from Codex**: Run `codex exec "Use the <agent-name> status tool to check the agent"`.
 
 ## Available MCP Tools
 
@@ -80,27 +112,24 @@ This means the dev tool can ask the agent for guidance mid-task, and the agent c
 ## Troubleshooting
 
 ### "Daemon not running" error
-The agent daemon must be active before the MCP server can forward requests. Start it with:
-```bash
-ouro daemon --agent <agent-name>
-```
+The MCP server works in standalone mode for most tools (reads agent state directly from the filesystem). If you see daemon errors for write operations, start the daemon with `ouro up` or `ouro dev`.
 
 ### MCP server not appearing in tool list
-- Verify the `ouro` command is available in your PATH (install via `npm install -g @ouro.bot/cli`)
+- Verify the command works by running it directly: `ouro mcp-serve --agent <name>` (or the `node` equivalent)
 - Check that the settings file is valid JSON
-- Restart your dev tool after changing MCP configuration
+- Restart your dev tool after changing MCP configuration (MCP loads at session start only)
 
 ### Connection timeouts
-The MCP server connects to the daemon via Unix socket. If the socket file is stale:
-1. Stop the daemon: `ouro daemon stop --agent <agent-name>`
-2. Restart: `ouro daemon --agent <agent-name>`
+- Claude Code uses Content-Length framing; Codex uses newline-delimited JSON. The server auto-detects and mirrors the client's framing.
+- If timeouts persist, check that the entry point path is correct and the `dist/` directory is built.
 
 ### Friend identity
-By default, the MCP server identifies as the local user. To use a specific friend identity:
+By default, the MCP server identifies the caller as the local OS user. To use a specific friend identity:
+
 ```json
 {
   "mcpServers": {
-    "ouro": {
+    "<agent-name>": {
       "command": "ouro",
       "args": ["mcp-serve", "--agent", "<agent-name>", "--friend", "<friend-id>"]
     }
