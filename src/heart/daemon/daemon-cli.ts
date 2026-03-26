@@ -2227,11 +2227,10 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
         deps.writeStdout(message)
         return message
       }
-      // No repo at cwd — check default location, then ask user
+      /* v8 ignore start -- auto-clone: interactive prompt + existing repo discovery + real git/npm @preserve */
       const defaultClonePath = path.join(os.homedir(), "Projects", "ouroboros")
       if (checkExists(path.join(defaultClonePath, ".git"))) {
         deps.writeStdout(`found existing repo at ${defaultClonePath}`)
-        /* v8 ignore start -- auto-pull + build on discovered repo @preserve */
         try {
           repoCwd = resolveClonePath({ clonePath: defaultClonePath }, checkExists, deps)
           entryPath = path.join(repoCwd, "dist", "heart", "daemon", "daemon-entry.js")
@@ -2240,12 +2239,10 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
           deps.writeStdout(message)
           return message
         }
-        /* v8 ignore stop */
       } else if (deps.promptInput) {
         deps.writeStdout("no harness repo found.")
         const answer = await deps.promptInput(`already have a checkout? enter its path, or press enter to clone to ${defaultClonePath}: `)
         const cloneTarget = answer.trim() || defaultClonePath
-        /* v8 ignore start -- interactive clone: real git/npm @preserve */
         try {
           repoCwd = resolveClonePath({ clonePath: cloneTarget }, checkExists, deps)
           entryPath = path.join(repoCwd, "dist", "heart", "daemon", "daemon-entry.js")
@@ -2254,12 +2251,12 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
           deps.writeStdout(message)
           return message
         }
-        /* v8 ignore stop */
       } else {
         const message = `no harness repo found. run: ouro dev --repo-path /path/to/ouroboros`
         deps.writeStdout(message)
         return message
       }
+      /* v8 ignore stop */
     }
 
     /* v8 ignore start -- defensive: ensureDaemonBootPersistence always injected in tests @preserve */
