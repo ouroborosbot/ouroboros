@@ -343,5 +343,32 @@ describe("surface tool", () => {
 
       expect(callOrder).toEqual(["advance-inner", "fulfill-heart"])
     })
+
+    it("calls fulfillHeartObligation even when queue item has no obligationId", async () => {
+      const queue: AttentionItem[] = [
+        { id: "abc123", friendId: "ari", friendName: "Ari", channel: "bb", key: "c1", delegatedContent: "think", source: "drained", timestamp: 1000 },
+        // Note: no obligationId on this queue item
+      ]
+
+      const advanceObligation = vi.fn()
+      const fulfillHeartObligation = vi.fn()
+      await handleSurface({
+        content: "here's the answer",
+        delegationId: "abc123",
+        queue,
+        routeToFriend: async () => ({ status: "delivered" }),
+        advanceObligation,
+        fulfillHeartObligation,
+      })
+
+      // advanceObligation should NOT be called (no obligationId)
+      expect(advanceObligation).not.toHaveBeenCalled()
+      // fulfillHeartObligation SHOULD still be called (origin-based lookup)
+      expect(fulfillHeartObligation).toHaveBeenCalledWith({
+        friendId: "ari",
+        channel: "bb",
+        key: "c1",
+      })
+    })
   })
 })
