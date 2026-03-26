@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => ({
   markChatRead: vi.fn().mockResolvedValue(undefined),
   checkHealth: vi.fn().mockResolvedValue(undefined),
   repairEvent: vi.fn(async (event: unknown) => event),
+  getMessageText: vi.fn(async () => null),
   recordMutation: vi.fn(),
   createServer: vi.fn(),
   listen: vi.fn((_: number, cb?: () => void) => cb?.()),
@@ -178,6 +179,7 @@ vi.mock("../../senses/bluebubbles-client", () => ({
     markChatRead: (...args: any[]) => mocks.markChatRead(...args),
     checkHealth: (...args: any[]) => mocks.checkHealth(...args),
     repairEvent: (...args: any[]) => mocks.repairEvent(...args),
+    getMessageText: (...args: any[]) => mocks.getMessageText(...args),
   })),
 }))
 
@@ -681,7 +683,7 @@ describe("BlueBubbles sense runtime", () => {
         expect.objectContaining({
           role: "user",
           content:
-            "[conversation scope: existing chat trunk | current inbound lane: thread | current thread id: 54D4109C-7170-41A1-8161-F6F8C863CC0D | default outbound target for this turn: current_lane]\n[routing control: use bluebubbles_set_reply_target with target=top_level to widen back out, or target=thread plus a listed thread id to route into a specific active thread]\nthreaded reply",
+            "[conversation scope: existing chat trunk | current inbound lane: thread | current thread id: 54D4109C-7170-41A1-8161-F6F8C863CC0D | default outbound target for this turn: current_lane]\n[this is a reply to an earlier message (guid: 54D4109C-7170-41A1-8161-F6F8C863CC0D) but its text could not be fetched. use query_session to search your session history for context.]\n[routing control: use bluebubbles_set_reply_target with target=top_level to widen back out, or target=thread plus a listed thread id to route into a specific active thread]\nthreaded reply",
         }),
       ]),
       expect.any(Object),
@@ -771,7 +773,7 @@ describe("BlueBubbles sense runtime", () => {
         expect.objectContaining({
           role: "user",
           content:
-            "[conversation scope: existing chat trunk | current inbound lane: thread | current thread id: 54D4109C-7170-41A1-8161-F6F8C863CC0D | default outbound target for this turn: current_lane]\n[routing control: use bluebubbles_set_reply_target with target=top_level to widen back out, or target=thread plus a listed thread id to route into a specific active thread]\nthreaded reply",
+            "[conversation scope: existing chat trunk | current inbound lane: thread | current thread id: 54D4109C-7170-41A1-8161-F6F8C863CC0D | default outbound target for this turn: current_lane]\n[this is a reply to an earlier message (guid: 54D4109C-7170-41A1-8161-F6F8C863CC0D) but its text could not be fetched. use query_session to search your session history for context.]\n[routing control: use bluebubbles_set_reply_target with target=top_level to widen back out, or target=thread plus a listed thread id to route into a specific active thread]\nthreaded reply",
         }),
       ]),
       expect.any(Object),
@@ -891,7 +893,7 @@ describe("BlueBubbles sense runtime", () => {
         expect.objectContaining({
           role: "user",
           content:
-            "[conversation scope: existing chat trunk | current inbound lane: thread | current thread id: 54D4109C-7170-41A1-8161-F6F8C863CC0D | default outbound target for this turn: current_lane]\n[recent active lanes]\n- top_level: recent top-level topic\n- thread:THREAD-OLD: old thread topic\n[routing control: use bluebubbles_set_reply_target with target=top_level to widen back out, or target=thread plus a listed thread id to route into a specific active thread]\nthreaded reply",
+            "[conversation scope: existing chat trunk | current inbound lane: thread | current thread id: 54D4109C-7170-41A1-8161-F6F8C863CC0D | default outbound target for this turn: current_lane]\n[this is a reply to an earlier message (guid: 54D4109C-7170-41A1-8161-F6F8C863CC0D) but its text could not be fetched. use query_session to search your session history for context.]\n[recent active lanes]\n- top_level: recent top-level topic\n- thread:THREAD-OLD: old thread topic\n[routing control: use bluebubbles_set_reply_target with target=top_level to widen back out, or target=thread plus a listed thread id to route into a specific active thread]\nthreaded reply",
         }),
       ]),
       expect.any(Object),
@@ -960,7 +962,7 @@ describe("BlueBubbles sense runtime", () => {
         expect.objectContaining({
           role: "user",
           content:
-            "[conversation scope: existing chat trunk | current inbound lane: thread | current thread id: 54D4109C-7170-41A1-8161-F6F8C863CC0D | default outbound target for this turn: current_lane]\n[recent active lanes]\n- top_level: actual top-level body\n[routing control: use bluebubbles_set_reply_target with target=top_level to widen back out, or target=thread plus a listed thread id to route into a specific active thread]\nthreaded reply",
+            "[conversation scope: existing chat trunk | current inbound lane: thread | current thread id: 54D4109C-7170-41A1-8161-F6F8C863CC0D | default outbound target for this turn: current_lane]\n[this is a reply to an earlier message (guid: 54D4109C-7170-41A1-8161-F6F8C863CC0D) but its text could not be fetched. use query_session to search your session history for context.]\n[recent active lanes]\n- top_level: actual top-level body\n[routing control: use bluebubbles_set_reply_target with target=top_level to widen back out, or target=thread plus a listed thread id to route into a specific active thread]\nthreaded reply",
         }),
       ]),
       expect.any(Object),
@@ -1030,7 +1032,7 @@ describe("BlueBubbles sense runtime", () => {
         expect.objectContaining({
           role: "user",
           content:
-            "[conversation scope: existing chat trunk | current inbound lane: thread | current thread id: 54D4109C-7170-41A1-8161-F6F8C863CC0D | default outbound target for this turn: current_lane]\n[recent active lanes]\n- top_level: (no recent text)\n[routing control: use bluebubbles_set_reply_target with target=top_level to widen back out, or target=thread plus a listed thread id to route into a specific active thread]\nthreaded reply",
+            "[conversation scope: existing chat trunk | current inbound lane: thread | current thread id: 54D4109C-7170-41A1-8161-F6F8C863CC0D | default outbound target for this turn: current_lane]\n[this is a reply to an earlier message (guid: 54D4109C-7170-41A1-8161-F6F8C863CC0D) but its text could not be fetched. use query_session to search your session history for context.]\n[recent active lanes]\n- top_level: (no recent text)\n[routing control: use bluebubbles_set_reply_target with target=top_level to widen back out, or target=thread plus a listed thread id to route into a specific active thread]\nthreaded reply",
         }),
       ]),
       expect.any(Object),
@@ -1062,7 +1064,7 @@ describe("BlueBubbles sense runtime", () => {
         expect.objectContaining({
           role: "user",
           content:
-            "[conversation scope: existing chat trunk | current inbound lane: thread | current thread id: 54D4109C-7170-41A1-8161-F6F8C863CC0D | default outbound target for this turn: current_lane]\n[routing control: use bluebubbles_set_reply_target with target=top_level to widen back out, or target=thread plus a listed thread id to route into a specific active thread]\nthreaded reply",
+            "[conversation scope: existing chat trunk | current inbound lane: thread | current thread id: 54D4109C-7170-41A1-8161-F6F8C863CC0D | default outbound target for this turn: current_lane]\n[this is a reply to an earlier message (guid: 54D4109C-7170-41A1-8161-F6F8C863CC0D) but its text could not be fetched. use query_session to search your session history for context.]\n[routing control: use bluebubbles_set_reply_target with target=top_level to widen back out, or target=thread plus a listed thread id to route into a specific active thread]\nthreaded reply",
         }),
       ]),
       expect.any(Object),
@@ -1167,7 +1169,7 @@ describe("BlueBubbles sense runtime", () => {
         expect.objectContaining({
           role: "user",
           content:
-            "[conversation scope: existing chat trunk | current inbound lane: thread | current thread id: 54D4109C-7170-41A1-8161-F6F8C863CC0D | default outbound target for this turn: current_lane]\n[recent active lanes]\n- thread:THREAD-OLD-5: duplicate fifth thread\n- thread:THREAD-OLD-4: fourth thread\n- thread:THREAD-OLD-3: third thread\n- thread:THREAD-OLD-2: second thread\n- top_level: newest top-level\n[routing control: use bluebubbles_set_reply_target with target=top_level to widen back out, or target=thread plus a listed thread id to route into a specific active thread]\nthreaded reply",
+            "[conversation scope: existing chat trunk | current inbound lane: thread | current thread id: 54D4109C-7170-41A1-8161-F6F8C863CC0D | default outbound target for this turn: current_lane]\n[this is a reply to an earlier message (guid: 54D4109C-7170-41A1-8161-F6F8C863CC0D) but its text could not be fetched. use query_session to search your session history for context.]\n[recent active lanes]\n- thread:THREAD-OLD-5: duplicate fifth thread\n- thread:THREAD-OLD-4: fourth thread\n- thread:THREAD-OLD-3: third thread\n- thread:THREAD-OLD-2: second thread\n- top_level: newest top-level\n[routing control: use bluebubbles_set_reply_target with target=top_level to widen back out, or target=thread plus a listed thread id to route into a specific active thread]\nthreaded reply",
         }),
       ]),
       expect.any(Object),
@@ -1605,7 +1607,7 @@ describe("BlueBubbles sense runtime", () => {
         expect.objectContaining({
           role: "user",
           content:
-            "ari@mendelow.me: [conversation scope: existing chat trunk | current inbound lane: thread | current thread id: 3E02B90F-D374-4381-BDD2-3572D3EB1195 | default outbound target for this turn: current_lane]\n[routing control: use bluebubbles_set_reply_target with target=top_level to widen back out, or target=thread plus a listed thread id to route into a specific active thread]\nyay!",
+            "ari@mendelow.me: [conversation scope: existing chat trunk | current inbound lane: thread | current thread id: 3E02B90F-D374-4381-BDD2-3572D3EB1195 | default outbound target for this turn: current_lane]\n[this is a reply to an earlier message (guid: 3E02B90F-D374-4381-BDD2-3572D3EB1195) but its text could not be fetched. use query_session to search your session history for context.]\n[routing control: use bluebubbles_set_reply_target with target=top_level to widen back out, or target=thread plus a listed thread id to route into a specific active thread]\nyay!",
         }),
       ]),
     )
@@ -4068,6 +4070,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4108,6 +4111,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4142,6 +4146,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4180,6 +4185,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4215,6 +4221,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4254,6 +4261,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4293,6 +4301,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4333,6 +4342,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4370,6 +4380,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4399,6 +4410,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, emptyRoot)
@@ -4454,6 +4466,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4480,6 +4493,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, "/nonexistent/pending/root")
@@ -4515,6 +4529,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4543,6 +4558,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
@@ -4575,6 +4591,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4607,6 +4624,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4642,6 +4660,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4679,6 +4698,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4716,6 +4736,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4758,6 +4779,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4793,6 +4815,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4834,6 +4857,7 @@ describe("drainAndSendPendingBlueBubbles", () => {
         setTyping: mocks.setTyping,
         markChatRead: mocks.markChatRead,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     }, pendingRoot)
@@ -4899,6 +4923,7 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         markChatRead: mocks.markChatRead,
         checkHealth: mocks.checkHealth,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
@@ -4937,6 +4962,7 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         markChatRead: mocks.markChatRead,
         checkHealth: mocks.checkHealth,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
@@ -4974,6 +5000,7 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         markChatRead: mocks.markChatRead,
         checkHealth: mocks.checkHealth,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
@@ -5009,6 +5036,7 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         markChatRead: mocks.markChatRead,
         checkHealth: mocks.checkHealth,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
@@ -5045,6 +5073,7 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         markChatRead: mocks.markChatRead,
         checkHealth: mocks.checkHealth,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
@@ -5081,6 +5110,7 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         markChatRead: mocks.markChatRead,
         checkHealth: mocks.checkHealth,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
@@ -5112,6 +5142,7 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         markChatRead: mocks.markChatRead,
         checkHealth: mocks.checkHealth,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
@@ -5143,6 +5174,7 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         markChatRead: mocks.markChatRead,
         checkHealth: mocks.checkHealth,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
@@ -5174,6 +5206,7 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         markChatRead: mocks.markChatRead,
         checkHealth: mocks.checkHealth,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
@@ -5205,6 +5238,7 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         markChatRead: mocks.markChatRead,
         checkHealth: mocks.checkHealth,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
@@ -5250,6 +5284,7 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         markChatRead: mocks.markChatRead,
         checkHealth: mocks.checkHealth,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
@@ -5302,6 +5337,7 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         markChatRead: mocks.markChatRead,
         checkHealth: mocks.checkHealth,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
@@ -5355,6 +5391,7 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         markChatRead: mocks.markChatRead,
         checkHealth: mocks.checkHealth,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
@@ -5393,6 +5430,7 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         markChatRead: mocks.markChatRead,
         checkHealth: mocks.checkHealth,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
@@ -5438,6 +5476,7 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         markChatRead: mocks.markChatRead,
         checkHealth: mocks.checkHealth,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
@@ -5471,6 +5510,7 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         markChatRead: mocks.markChatRead,
         checkHealth: mocks.checkHealth,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
@@ -5503,6 +5543,7 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         markChatRead: mocks.markChatRead,
         checkHealth: mocks.checkHealth,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
@@ -5534,6 +5575,7 @@ describe("sendProactiveBlueBubblesMessageToSession", () => {
         markChatRead: mocks.markChatRead,
         checkHealth: mocks.checkHealth,
         repairEvent: mocks.repairEvent,
+        getMessageText: mocks.getMessageText,
       }),
       createFriendStore: () => friendStore as any,
     })
