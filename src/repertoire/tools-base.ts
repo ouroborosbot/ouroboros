@@ -34,6 +34,7 @@ import { buildActiveWorkFrame, formatActiveWorkFrame, type ActiveWorkFrame } fro
 import { codingToolDefinitions } from "./coding/tools";
 import { getCodingSessionManager, type CodingSessionStatus } from "./coding";
 import { readDiaryEntries, saveDiaryEntry, searchDiaryEntries } from "../mind/diary";
+import { type JournalIndexEntry } from "../mind/associative-recall";
 import { getTaskModule } from "./tasks";
 import { getPendingDir, getInnerDialogPendingDir } from "../mind/pending";
 import type { PendingMessage } from "../mind/pending";
@@ -795,10 +796,38 @@ export const baseToolDefinitions: ToolDefinition[] = [
       try {
         const query = (a.query || "").trim();
         if (!query) return "query is required";
+
+        const resultLines: string[] = [];
+
+        // Search diary entries
         const hits = await searchDiaryEntries(query, readDiaryEntries());
-        return hits
-          .map((fact) => `[diary] ${fact.text} (source=${fact.source}, createdAt=${fact.createdAt})`)
-          .join("\n");
+        for (const fact of hits) {
+          resultLines.push(`[diary] ${fact.text} (source=${fact.source}, createdAt=${fact.createdAt})`);
+        }
+
+        // Search journal index
+        const agentRoot = getAgentRoot();
+        const journalIndexPath = path.join(agentRoot, "journal", ".index.json");
+        try {
+          const raw = fs.readFileSync(journalIndexPath, "utf8");
+          const journalEntries = JSON.parse(raw) as JournalIndexEntry[];
+          if (Array.isArray(journalEntries) && journalEntries.length > 0) {
+            // Substring match on preview and filename
+            const lowerQuery = query.toLowerCase();
+            for (const entry of journalEntries) {
+              if (
+                entry.preview.toLowerCase().includes(lowerQuery) ||
+                entry.filename.toLowerCase().includes(lowerQuery)
+              ) {
+                resultLines.push(`[journal] ${entry.filename}: ${entry.preview}`);
+              }
+            }
+          }
+        } catch {
+          // No journal index or malformed — skip journal search
+        }
+
+        return resultLines.join("\n");
       } catch (e) {
         return `error: ${e instanceof Error ? e.message : String(e)}`;
       }
