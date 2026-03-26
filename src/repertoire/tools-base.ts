@@ -33,7 +33,7 @@ import { listSessionActivity } from "../heart/session-activity";
 import { buildActiveWorkFrame, formatActiveWorkFrame, type ActiveWorkFrame } from "../heart/active-work";
 import { codingToolDefinitions } from "./coding/tools";
 import { getCodingSessionManager, type CodingSessionStatus } from "./coding";
-import { readMemoryFacts, saveMemoryFact, searchMemoryFacts } from "../mind/memory";
+import { readDiaryEntries, saveDiaryEntry, searchDiaryEntries } from "../mind/diary";
 import { getTaskModule } from "./tasks";
 import { getPendingDir, getInnerDialogPendingDir } from "../mind/pending";
 import type { PendingMessage } from "../mind/pending";
@@ -795,7 +795,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       try {
         const query = (a.query || "").trim();
         if (!query) return "query is required";
-        const hits = await searchMemoryFacts(query, readMemoryFacts());
+        const hits = await searchDiaryEntries(query, readDiaryEntries());
         return hits
           .map((fact) => `[diary] ${fact.text} (source=${fact.source}, createdAt=${fact.createdAt})`)
           .join("\n");
@@ -825,7 +825,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
     handler: async (a) => {
       const entry = (a.entry || "").trim();
       if (!entry) return "entry is required";
-      const result = await saveMemoryFact({
+      const result = await saveDiaryEntry({
         text: entry,
         source: "tool:diary_write",
         about: typeof a.about === "string" ? a.about : undefined,

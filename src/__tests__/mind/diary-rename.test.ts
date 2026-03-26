@@ -62,7 +62,7 @@ describe("diary default path", () => {
     mockGetOpenAIEmbeddingsApiKey.mockReset().mockReturnValue("")
   })
 
-  it("readMemoryFacts defaults to diary/ (not psyche/memory/)", async () => {
+  it("readDiaryEntries defaults to diary/ (not psyche/memory/)", async () => {
     const agentRoot = fs.mkdtempSync(path.join(os.tmpdir(), "diary-path-"))
     mockGetAgentRoot.mockReturnValue(agentRoot)
 
@@ -72,13 +72,13 @@ describe("diary default path", () => {
     const fact = { id: "f1", text: "test fact", source: "test", createdAt: "2026-03-25T00:00:00Z", embedding: [] }
     fs.writeFileSync(path.join(diaryDir, "facts.jsonl"), JSON.stringify(fact) + "\n", "utf8")
 
-    const { readMemoryFacts } = await import("../../mind/memory")
-    const facts = readMemoryFacts()
+    const { readDiaryEntries } = await import("../../mind/diary")
+    const facts = readDiaryEntries()
     expect(facts).toHaveLength(1)
     expect(facts[0].text).toBe("test fact")
   })
 
-  it("readMemoryFacts falls back to psyche/memory/ when diary/ does not exist", async () => {
+  it("readDiaryEntries falls back to psyche/memory/ when diary/ does not exist", async () => {
     const agentRoot = fs.mkdtempSync(path.join(os.tmpdir(), "diary-fallback-"))
     mockGetAgentRoot.mockReturnValue(agentRoot)
 
@@ -88,18 +88,18 @@ describe("diary default path", () => {
     const fact = { id: "f1", text: "legacy fact", source: "test", createdAt: "2026-03-25T00:00:00Z", embedding: [] }
     fs.writeFileSync(path.join(legacyDir, "facts.jsonl"), JSON.stringify(fact) + "\n", "utf8")
 
-    const { readMemoryFacts } = await import("../../mind/memory")
-    const facts = readMemoryFacts()
+    const { readDiaryEntries } = await import("../../mind/diary")
+    const facts = readDiaryEntries()
     expect(facts).toHaveLength(1)
     expect(facts[0].text).toBe("legacy fact")
   })
 
-  it("saveMemoryFact writes to diary/ by default", async () => {
+  it("saveDiaryEntry writes to diary/ by default", async () => {
     const agentRoot = fs.mkdtempSync(path.join(os.tmpdir(), "diary-write-"))
     mockGetAgentRoot.mockReturnValue(agentRoot)
 
-    const { saveMemoryFact } = await import("../../mind/memory")
-    await saveMemoryFact({
+    const { saveDiaryEntry } = await import("../../mind/diary")
+    await saveDiaryEntry({
       text: "new diary entry",
       source: "tool:diary_write",
       idFactory: () => "test-id",
@@ -151,6 +151,7 @@ vi.stubGlobal("fetch", mockFetch)
 describe("injectAssociativeRecall diary path", () => {
   beforeEach(() => {
     mockGetAgentRoot.mockReset()
+    mockGetOpenAIEmbeddingsApiKey.mockReset().mockReturnValue("test-key")
     mockFetch.mockReset()
   })
 

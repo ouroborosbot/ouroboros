@@ -2,15 +2,14 @@ import type OpenAI from "openai"
 import * as fs from "fs"
 import * as path from "path"
 import { getOpenAIEmbeddingsApiKey } from "../heart/config"
-import { getAgentRoot } from "../heart/identity"
 import { emitNervesEvent } from "../nerves/runtime"
-import { resolveDiaryRoot } from "./memory"
+import { resolveDiaryRoot } from "./diary"
 
 export interface EmbeddingProvider {
   embed(texts: string[]): Promise<number[][]>
 }
 
-export interface MemoryFactRecord {
+export interface DiaryEntryRecord {
   id: string
   text: string
   source: string
@@ -18,7 +17,7 @@ export interface MemoryFactRecord {
   embedding: number[]
 }
 
-export interface RecalledFact extends MemoryFactRecord {
+export interface RecalledFact extends DiaryEntryRecord {
   score: number
 }
 
@@ -29,7 +28,7 @@ export interface RecallQueryOptions {
 
 export interface InjectAssociativeRecallOptions extends RecallQueryOptions {
   provider?: EmbeddingProvider
-  memoryRoot?: string
+  diaryRoot?: string
 }
 
 const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
@@ -76,17 +75,17 @@ function createDefaultProvider(): EmbeddingProvider {
   return new OpenAIEmbeddingProvider(apiKey)
 }
 
-function readFacts(memoryRoot: string): MemoryFactRecord[] {
-  const factsPath = path.join(memoryRoot, "facts.jsonl")
+function readFacts(diaryRoot: string): DiaryEntryRecord[] {
+  const factsPath = path.join(diaryRoot, "facts.jsonl")
   if (!fs.existsSync(factsPath)) return []
   const raw = fs.readFileSync(factsPath, "utf8").trim()
   if (!raw) return []
-  const facts: MemoryFactRecord[] = []
+  const facts: DiaryEntryRecord[] = []
   for (const line of raw.split("\n")) {
     const trimmed = line.trim()
     if (!trimmed) continue
     try {
-      facts.push(JSON.parse(trimmed) as MemoryFactRecord)
+      facts.push(JSON.parse(trimmed) as DiaryEntryRecord)
     } catch {
       // Skip corrupt lines (e.g. partial write from a crash).
     }
@@ -121,7 +120,7 @@ export function cosineSimilarity(left: number[], right: number[]): number {
 
 export async function recallFactsForQuery(
   query: string,
-  facts: MemoryFactRecord[],
+  facts: DiaryEntryRecord[],
   provider: EmbeddingProvider,
   options?: RecallQueryOptions,
 ): Promise<RecalledFact[]> {
@@ -150,8 +149,8 @@ export async function injectAssociativeRecall(
     const query = getLatestUserText(messages)
     if (!query) return
 
-    const memoryRoot = options?.memoryRoot ?? resolveDiaryRoot()
-    const facts = readFacts(memoryRoot)
+    const diaryRoot = options?.diaryRoot ?? resolveDiaryRoot()
+    const facts = readFacts(diaryRoot)
     if (facts.length === 0) return
 
     let recalled: RecalledFact[]
