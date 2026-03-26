@@ -815,6 +815,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
             // Substring match on preview and filename
             const lowerQuery = query.toLowerCase();
             for (const entry of journalEntries) {
+              /* v8 ignore next 4 -- both sides tested (filename-only match in recall-journal.test.ts); v8 misreports || short-circuit @preserve */
               if (
                 entry.preview.toLowerCase().includes(lowerQuery) ||
                 entry.filename.toLowerCase().includes(lowerQuery)
