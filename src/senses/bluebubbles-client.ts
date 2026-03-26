@@ -590,10 +590,28 @@ export function createBlueBubblesClient(
           method: "GET",
           signal: AbortSignal.timeout(channelConfig.requestTimeoutMs),
         })
-        if (!response.ok) return null
+        if (!response.ok) {
+          emitNervesEvent({
+            level: "warn",
+            component: "senses",
+            event: "senses.bluebubbles_get_message_text_error",
+            message: "failed to fetch message text",
+            meta: { messageGuid, status: response.status },
+          })
+          return null
+        }
         const payload = await parseJsonBody(response)
         const data = extractRepairData(payload)
-        if (!data || typeof data.text !== "string") return null
+        if (!data || typeof data.text !== "string") {
+          emitNervesEvent({
+            level: "warn",
+            component: "senses",
+            event: "senses.bluebubbles_get_message_text_error",
+            message: "message payload missing text field",
+            meta: { messageGuid, hasData: !!data, textType: data ? typeof data.text : "n/a" },
+          })
+          return null
+        }
         emitNervesEvent({
           component: "senses",
           event: "senses.bluebubbles_get_message_text",
@@ -601,7 +619,14 @@ export function createBlueBubblesClient(
           meta: { messageGuid },
         })
         return data.text.trim() || null
-      } catch {
+      } catch (error) {
+        emitNervesEvent({
+          level: "warn",
+          component: "senses",
+          event: "senses.bluebubbles_get_message_text_error",
+          message: "exception fetching message text",
+          meta: { messageGuid, reason: error instanceof Error ? error.message : String(error) },
+        })
         return null
       }
     },

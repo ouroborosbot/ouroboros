@@ -712,9 +712,16 @@ async function handleBlueBubblesNormalizedEvent(
 
     // Fetch the text of the message being replied to (if this is a threaded reply)
     const threadGuid = event.kind === "message" ? event.threadOriginatorGuid?.trim() : undefined
-    const repliedToText = threadGuid
-      ? await client.getMessageText(threadGuid).catch(() => null)
-      : null
+    let repliedToText: string | null = null
+    if (threadGuid) {
+      repliedToText = await client.getMessageText(threadGuid).catch(() => null)
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.bluebubbles_reply_context",
+        message: repliedToText ? "fetched replied-to message text" : "could not fetch replied-to message text",
+        meta: { threadGuid, hasText: !!repliedToText },
+      })
+    }
 
     // Build inbound user message (adapter concern: BB-specific content formatting)
     const userMessage: OpenAI.ChatCompletionMessageParam = {
