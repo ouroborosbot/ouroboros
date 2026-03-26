@@ -52,7 +52,7 @@ describe("coding spawner defaults", () => {
         "--ephemeral",
         "--json",
         "-c",
-        "mcp_servers.ouro.command=ouro",
+        "mcp_servers.ouro.command=node",
         "-c",
         expect.stringContaining("mcp_servers.ouro.args="),
       ],
