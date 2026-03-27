@@ -48,8 +48,9 @@ export interface InnerDialogState {
 }
 
 export interface RunInnerDialogTurnOptions {
-  reason?: "boot" | "heartbeat" | "instinct"
+  reason?: "boot" | "heartbeat" | "habit" | "instinct"
   taskId?: string
+  habitName?: string
   instincts?: InnerDialogInstinct[]
   now?: () => Date
   signal?: AbortSignal
@@ -64,7 +65,7 @@ export interface InnerDialogTurnResult {
 
 interface InnerDialogRuntimeState {
   status: "idle" | "running"
-  reason?: "boot" | "heartbeat" | "instinct"
+  reason?: "boot" | "heartbeat" | "habit" | "instinct"
   startedAt?: string
   lastCompletedAt?: string
 }
@@ -124,7 +125,7 @@ function displayCheckpoint(checkpoint?: string): string | undefined {
 
 export function buildInstinctUserMessage(
   instincts: InnerDialogInstinct[],
-  _reason: "boot" | "heartbeat" | "instinct",
+  _reason: "boot" | "heartbeat" | "habit" | "instinct",
   state: InnerDialogState,
 ): string {
   const active = instincts.find((instinct) => instinct.enabled !== false) ?? DEFAULT_INNER_DIALOG_INSTINCTS[0]
