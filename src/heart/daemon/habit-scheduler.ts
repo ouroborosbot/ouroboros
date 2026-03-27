@@ -5,6 +5,10 @@ import { parseCadenceToCron, parseCadenceToMs } from "./cadence"
 import type { OsCronManager } from "./os-cron"
 import type { ScheduledTaskJob } from "./task-scheduler"
 
+export interface FsWatcher {
+  close: () => void
+}
+
 export interface HabitSchedulerDeps {
   readdir: (dir: string) => string[]
   readFile: (filePath: string, encoding: string) => string
@@ -12,6 +16,7 @@ export interface HabitSchedulerDeps {
   existsSync: (target: string) => boolean
   now: () => number
   ouroPath: string
+  watch?: (dir: string, callback: (event: string, filename: string | null) => void) => FsWatcher
 }
 
 export interface HabitSchedulerOptions {
@@ -27,12 +32,16 @@ export interface OverdueHabit {
   elapsedMs: number
 }
 
+const WATCH_DEBOUNCE_MS = 200
+
 export class HabitScheduler {
   private readonly agent: string
   private readonly habitsDir: string
   private readonly osCronManager: OsCronManager
   private readonly onHabitFire: (habitName: string) => void
   private readonly deps: HabitSchedulerDeps
+  private watcher: FsWatcher | null = null
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(options: HabitSchedulerOptions) {
     this.agent = options.agent
@@ -147,6 +156,32 @@ export class HabitScheduler {
       return parseHabitFile(content, filePath)
     } catch {
       return null
+    }
+  }
+
+  watchForChanges(): void {
+    const watchFn = this.deps.watch
+    if (!watchFn) return
+
+    this.watcher = watchFn(this.habitsDir, (_event: string, _filename: string | null) => {
+      if (this.debounceTimer !== null) {
+        clearTimeout(this.debounceTimer)
+      }
+      this.debounceTimer = setTimeout(() => {
+        this.debounceTimer = null
+        this.reconcile()
+      }, WATCH_DEBOUNCE_MS)
+    })
+  }
+
+  stopWatching(): void {
+    if (this.debounceTimer !== null) {
+      clearTimeout(this.debounceTimer)
+      this.debounceTimer = null
+    }
+    if (this.watcher !== null) {
+      this.watcher.close()
+      this.watcher = null
     }
   }
 
