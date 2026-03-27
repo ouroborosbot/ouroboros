@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { OsCronManager } from "../../../heart/daemon/os-cron"
 import type { ScheduledTaskJob } from "../../../heart/daemon/task-scheduler"
 
@@ -885,6 +885,146 @@ describe("HabitScheduler", () => {
           }),
         }),
       )
+    })
+  })
+
+  describe("watchForChanges()", () => {
+    let mockWatcher: { callback: ((event: string, filename: string | null) => void) | null; close: ReturnType<typeof vi.fn> }
+
+    beforeEach(() => {
+      vi.useFakeTimers()
+      mockWatcher = { callback: null, close: vi.fn() }
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    function makeWatchableDeps(overrides: Partial<HabitSchedulerDeps> = {}): HabitSchedulerDeps & { watch: ReturnType<typeof vi.fn> } {
+      const watch = vi.fn((_dir: string, cb: (event: string, filename: string | null) => void) => {
+        mockWatcher.callback = cb
+        return { close: mockWatcher.close }
+      })
+      return {
+        ...makeDeps(overrides),
+        watch,
+      }
+    }
+
+    it("reconcile called when file is created (debounced ~200ms)", () => {
+      const readdir = vi.fn(() => [])
+      const watchDeps = makeWatchableDeps({ readdir })
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps: watchDeps,
+      })
+
+      scheduler.watchForChanges()
+
+      expect(watchDeps.watch).toHaveBeenCalledWith("/bundles/slugger.ouro/habits", expect.any(Function))
+
+      // Trigger file creation event
+      mockWatcher.callback!("rename", "new-habit.md")
+
+      // Before debounce: no reconcile
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled()
+
+      // After debounce
+      vi.advanceTimersByTime(250)
+
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1)
+    })
+
+    it("reconcile called when file is modified", () => {
+      const readdir = vi.fn(() => [])
+      const watchDeps = makeWatchableDeps({ readdir })
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps: watchDeps,
+      })
+
+      scheduler.watchForChanges()
+      mockWatcher.callback!("change", "heartbeat.md")
+
+      vi.advanceTimersByTime(250)
+
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1)
+    })
+
+    it("multiple rapid events result in only one reconcile (debounce)", () => {
+      const readdir = vi.fn(() => [])
+      const watchDeps = makeWatchableDeps({ readdir })
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps: watchDeps,
+      })
+
+      scheduler.watchForChanges()
+
+      // Rapid events within debounce window
+      mockWatcher.callback!("change", "heartbeat.md")
+      vi.advanceTimersByTime(50)
+      mockWatcher.callback!("rename", "new-habit.md")
+      vi.advanceTimersByTime(50)
+      mockWatcher.callback!("change", "daily-reflection.md")
+
+      // Debounce not yet elapsed from last event
+      vi.advanceTimersByTime(100)
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled()
+
+      // Now debounce elapses
+      vi.advanceTimersByTime(150)
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1)
+    })
+
+    it("handles null filename via full rescan (no crash)", () => {
+      const readdir = vi.fn(() => [])
+      const watchDeps = makeWatchableDeps({ readdir })
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps: watchDeps,
+      })
+
+      scheduler.watchForChanges()
+      mockWatcher.callback!("rename", null)
+
+      vi.advanceTimersByTime(250)
+
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1)
+    })
+
+    it("stopWatching closes the watcher", () => {
+      const readdir = vi.fn(() => [])
+      const watchDeps = makeWatchableDeps({ readdir })
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps: watchDeps,
+      })
+
+      scheduler.watchForChanges()
+      scheduler.stopWatching()
+
+      expect(mockWatcher.close).toHaveBeenCalledTimes(1)
     })
   })
 })
