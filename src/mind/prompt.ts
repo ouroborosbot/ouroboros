@@ -229,6 +229,7 @@ const PROCESS_TYPE_LABELS: Record<Channel, string> = {
   inner: "inner dialog",
   teams: "teams handler",
   bluebubbles: "bluebubbles handler",
+  mcp: "mcp bridge",
 }
 
 function processTypeLabel(channel: Channel): string {
