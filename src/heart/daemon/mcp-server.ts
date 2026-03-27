@@ -3,6 +3,9 @@ import { sendDaemonCommand } from "./socket-client"
 import type { DaemonCommand, DaemonResponse } from "./daemon"
 import * as agentService from "./agent-service"
 import { emitNervesEvent } from "../../nerves/runtime"
+import { runSenseTurn } from "../../senses/shared-turn"
+import { resolveSessionId } from "./session-id-resolver"
+import { drainPending, getPendingDir } from "../../mind/pending"
 
 /**
  * MCP tool schema definition.
@@ -76,6 +79,9 @@ export function createMcpServer(options: McpServerOptions): McpServer {
   let buffer = ""
   let running = false
   let useContentLengthFraming = true // default to Content-Length, auto-detect from first message
+
+  // Resolve session ID once per MCP server instance for conversation continuity
+  const sessionId = resolveSessionId()
 
   function writeResponse(response: JsonRpcResponse): void {
     const body = JSON.stringify(response)
@@ -260,6 +266,66 @@ export function createMcpServer(options: McpServerOptions): McpServer {
     const toolArgs = (params.arguments ?? {}) as Record<string, unknown>
     /* v8 ignore stop */
 
+    // ── Conversation tools: send_message, check_response ──
+    if (toolName === "send_message") {
+      const message = toolArgs.message as string ?? ""
+      try {
+        const result = await runSenseTurn({
+          agentName: agent,
+          channel: "mcp",
+          sessionKey: sessionId,
+          friendId,
+          userMessage: message,
+        })
+        writeResponse({
+          jsonrpc: "2.0",
+          id: request.id!,
+          result: {
+            content: [{ type: "text", text: result.response }],
+            isError: false,
+          },
+        })
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        writeResponse({
+          jsonrpc: "2.0",
+          id: request.id!,
+          result: {
+            content: [{ type: "text", text: `Error: ${errorMessage}` }],
+            isError: true,
+          },
+        })
+      }
+      return
+    }
+
+    if (toolName === "check_response") {
+      const pendingDir = getPendingDir(agent, friendId, "mcp", sessionId)
+      const pending = drainPending(pendingDir)
+      if (pending.length === 0) {
+        writeResponse({
+          jsonrpc: "2.0",
+          id: request.id!,
+          result: {
+            content: [{ type: "text", text: "no pending messages" }],
+            isError: false,
+          },
+        })
+      } else {
+        const text = pending.map((m) => m.content).join("\n\n---\n\n")
+        writeResponse({
+          jsonrpc: "2.0",
+          id: request.id!,
+          result: {
+            content: [{ type: "text", text }],
+            isError: false,
+          },
+        })
+      }
+      return
+    }
+
+    // ── Legacy daemon/service tools ──
     const commandKind = TOOL_TO_COMMAND[toolName]
     if (!commandKind) {
       writeResponse({
@@ -481,6 +547,25 @@ export function getToolSchemas(): McpToolSchema[] {
           summary: { type: "string", description: "Summary of what was completed" },
         },
         required: ["summary"],
+      },
+    },
+    {
+      name: "send_message",
+      description: "Send a message to the agent and get a synchronous response. This runs a full agent turn — the agent can use tools, think, and respond. For multi-turn conversations, call repeatedly — the agent remembers prior messages in this session.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          message: { type: "string", description: "The message to send to the agent" },
+        },
+        required: ["message"],
+      },
+    },
+    {
+      name: "check_response",
+      description: "Check for pending messages from the agent. Use this after send_message returns a ponder deferral, or to pick up proactive messages the agent has surfaced to you.",
+      inputSchema: {
+        type: "object",
+        properties: {},
       },
     },
   ]
