@@ -2516,12 +2516,9 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
         } catch { /* start fresh */ }
       }
 
-      const hookScriptPath = runtimeMode === "dev"
-        ? path.join(sourceRoot, "scripts", "claude-code-hook.js")
-        : path.join(sourceRoot, "dist", "scripts", "claude-code-hook.js")
-      const stopHookScriptPath = runtimeMode === "dev"
-        ? path.join(sourceRoot, "scripts", "claude-code-stop-hook.js")
-        : path.join(sourceRoot, "dist", "scripts", "claude-code-stop-hook.js")
+      // Always use dist/ — hook scripts are TypeScript source that compiles to dist/scripts/
+      const hookScriptPath = path.join(sourceRoot, "dist", "scripts", "claude-code-hook.js")
+      const stopHookScriptPath = path.join(sourceRoot, "dist", "scripts", "claude-code-stop-hook.js")
 
       settings.hooks = {
         ...(settings.hooks as Record<string, unknown> ?? {}),
