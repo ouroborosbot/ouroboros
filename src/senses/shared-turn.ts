@@ -5,6 +5,7 @@
 // Does NOT refactor CLI — CLI is stable with 2280+ tests. This is a new
 // code path for new senses that follows the same pipeline pattern.
 
+import * as os from "os"
 import * as path from "path"
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions"
 import type { ChannelCallbacks } from "../heart/core"
@@ -16,6 +17,7 @@ import { buildSystem } from "../mind/prompt"
 import { getChannelCapabilities } from "../mind/friends/channel"
 import { FriendResolver } from "../mind/friends/resolver"
 import { FileFriendStore } from "../mind/friends/store-file"
+import type { IdentityProvider } from "../mind/friends/types"
 import { getPendingDir, drainPending } from "../mind/pending"
 import { postTurn } from "../mind/context"
 import { accumulateFriendTokens } from "../mind/friends/tokens"
@@ -67,12 +69,31 @@ export async function runSenseTurn(options: RunSenseTurnOptions): Promise<RunSen
   const friendStore = new FileFriendStore(friendsPath)
   const capabilities = getChannelCapabilities(channel)
 
-  const resolver = new FriendResolver(friendStore, {
-    provider: "local" as const,
-    externalId: friendId,
-    displayName: friendId,
-    channel,
-  })
+  // If friendId looks like a UUID, look up the friend record directly and use its identity.
+  // Otherwise, resolve as a local user (same pattern as CLI sense).
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-/.test(friendId)
+  let resolverParams: { provider: IdentityProvider; externalId: string; displayName: string; channel: string }
+  if (isUuid) {
+    const existingFriend = await friendStore.get(friendId)
+    if (existingFriend) {
+      // Use the friend's first external ID for resolver context
+      const ext = existingFriend.externalIds?.[0]
+      resolverParams = {
+        provider: (ext?.provider ?? "local") as IdentityProvider,
+        externalId: ext?.externalId ?? friendId,
+        displayName: existingFriend.name ?? friendId,
+        channel,
+      }
+    } else {
+      resolverParams = { provider: "local", externalId: friendId, displayName: friendId, channel }
+    }
+  } else {
+    // Treat as local user identity (username@hostname pattern)
+    const username = os.userInfo().username
+    const hostname = os.hostname()
+    resolverParams = { provider: "local", externalId: `${username}@${hostname}`, displayName: username, channel }
+  }
+  const resolver = new FriendResolver(friendStore, resolverParams)
 
   // Session path and loading
   const sessPath = sessionPath(friendId, channel, sessionKey)
