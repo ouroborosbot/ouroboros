@@ -446,7 +446,7 @@ export function createMcpServer(options: McpServerOptions): McpServer {
 }
 
 /**
- * Returns the list of MCP tool schemas for all 13 agent tools.
+ * Returns the list of MCP tool schemas for all 15 agent tools.
  * Each schema follows JSON Schema for inputSchema as required by MCP.
  */
 export function getToolSchemas(): McpToolSchema[] {
