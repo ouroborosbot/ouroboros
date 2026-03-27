@@ -38,7 +38,7 @@ import { getTaskModule } from "../../repertoire/tasks"
 import { parseInnerDialogSession, formatThoughtTurns, getInnerDialogSessionPath, followThoughts } from "./thoughts"
 import type { TaskModule } from "../../repertoire/tasks/types"
 import { syncGlobalOuroBotWrapper as defaultSyncGlobalOuroBotWrapper } from "./ouro-bot-global-installer"
-import { installLaunchAgent, isDaemonInstalled, DAEMON_PLIST_LABEL, type LaunchdDeps } from "./launchd"
+import { installLaunchAgent, uninstallLaunchAgent, isDaemonInstalled, type LaunchdDeps } from "./launchd"
 import { DEFAULT_DAEMON_SOCKET_PATH, sendDaemonCommand, checkDaemonSocketAlive } from "./socket-client"
 import type { CheckForUpdateResult } from "./update-checker"
 import { listSessionActivity } from "../session-activity"
@@ -2340,9 +2340,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       userUid: process.getuid?.() ?? 0,
     }
     if (isDaemonInstalled(launchdDevDeps)) {
-      const plistPath = path.join(os.homedir(), "Library", "LaunchAgents", `${DAEMON_PLIST_LABEL}.plist`)
-      const domain = `gui/${launchdDevDeps.userUid}`
-      try { execSync(`launchctl bootout ${domain} "${plistPath}"`) } catch { /* already unloaded */ }
+      uninstallLaunchAgent(launchdDevDeps as LaunchdDeps)
       deps.writeStdout("disabled launchd auto-restart for dev mode")
     }
     /* v8 ignore stop */
@@ -2499,7 +2497,18 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
         meta: { tool, agent: setupAgent, runtimeMode },
       })
 
-      const message = `setup complete: claude-code + ${setupAgent}\n  MCP server registered\n  hooks configured`
+      // 3. Write conversation formatting instructions to ~/.claude/CLAUDE.md
+      const claudeMdPath = path.join(os.homedir(), ".claude", "CLAUDE.md")
+      const agentInstructions = `\n## Agent conversations (ouro)\nWhen using MCP \`send_message\` to talk to an ouro agent, format the exchange clearly:\n- Before the tool call, briefly say what you're asking/telling the agent\n- After the response, quote the agent's reply in a blockquote, then add your reaction\n- Example: **Me → Agent:** "question" / > **Agent:** "response" / Your synthesis here\n`
+      let existingClaudeMd = ""
+      if (fs.existsSync(claudeMdPath)) {
+        existingClaudeMd = fs.readFileSync(claudeMdPath, "utf-8")
+      }
+      if (!existingClaudeMd.includes("Agent conversations (ouro)")) {
+        fs.writeFileSync(claudeMdPath, existingClaudeMd + agentInstructions)
+      }
+
+      const message = `setup complete: claude-code + ${setupAgent}\n  MCP server registered\n  hooks configured\n  conversation formatting instructions added`
       deps.writeStdout(message)
       return message
     }
