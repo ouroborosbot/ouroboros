@@ -3,8 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const mockRunInnerDialogTurn = vi.fn()
 const mockEmitNervesEvent = vi.fn()
 const mockGetAgentName = vi.fn(() => "slugger")
+const mockGetAgentRoot = vi.fn(() => "/bundles/slugger.ouro")
 const mockGetInnerDialogPendingDir = vi.fn(() => "/mock/pending/self/inner/dialog")
 const mockHasPendingMessages = vi.fn(() => false)
+const mockParseHabitFile = vi.fn()
+const mockRenderHabitFile = vi.fn()
+const mockReadFileSync = vi.fn()
+const mockWriteFileSync = vi.fn()
 
 vi.mock("../../senses/inner-dialog", () => ({
   runInnerDialogTurn: (...args: any[]) => mockRunInnerDialogTurn(...args),
@@ -16,6 +21,7 @@ vi.mock("../../nerves/runtime", () => ({
 
 vi.mock("../../heart/identity", () => ({
   getAgentName: (...args: any[]) => mockGetAgentName(...args),
+  getAgentRoot: (...args: any[]) => mockGetAgentRoot(...args),
 }))
 
 vi.mock("../../mind/pending", () => ({
@@ -23,13 +29,33 @@ vi.mock("../../mind/pending", () => ({
   hasPendingMessages: (...args: any[]) => mockHasPendingMessages(...args),
 }))
 
+vi.mock("../../heart/daemon/habit-parser", () => ({
+  parseHabitFile: (...args: any[]) => mockParseHabitFile(...args),
+  renderHabitFile: (...args: any[]) => mockRenderHabitFile(...args),
+}))
+
+vi.mock("fs", async () => {
+  const actual = await vi.importActual("fs")
+  return {
+    ...actual,
+    readFileSync: (...args: any[]) => mockReadFileSync(...args),
+    writeFileSync: (...args: any[]) => mockWriteFileSync(...args),
+  }
+})
+
 import { createInnerDialogWorker, startInnerDialogWorker } from "../../senses/inner-dialog-worker"
 
 describe("inner-dialog-worker", () => {
   beforeEach(() => {
     mockHasPendingMessages.mockReset().mockReturnValue(false)
     mockGetAgentName.mockReset().mockReturnValue("slugger")
+    mockGetAgentRoot.mockReset().mockReturnValue("/bundles/slugger.ouro")
     mockGetInnerDialogPendingDir.mockReset().mockReturnValue("/mock/pending/self/inner/dialog")
+    mockParseHabitFile.mockReset()
+    mockRenderHabitFile.mockReset()
+    mockReadFileSync.mockReset()
+    mockWriteFileSync.mockReset()
+    mockEmitNervesEvent.mockReset()
   })
 
   it("runs boot/habit/instinct cycles and ignores unknown messages", async () => {
@@ -312,5 +338,127 @@ describe("inner-dialog-worker", () => {
       onSpy.mockRestore()
       mockExit.mockRestore()
     }
+  })
+
+  // ── lastRun update tests ──────────────────────────────────────────
+
+  describe("lastRun update after habit turn", () => {
+    it("reads habit file, updates lastRun, and writes back after a habit turn", async () => {
+      const habitContent = "---\ntitle: Heartbeat\ncadence: 30m\nstatus: active\nlastRun: 2026-03-27T10:00:00.000Z\ncreated: 2026-03-01\n---\n\nCheck in."
+      mockReadFileSync.mockReturnValueOnce(habitContent)
+      mockParseHabitFile.mockReturnValueOnce({
+        name: "heartbeat",
+        title: "Heartbeat",
+        cadence: "30m",
+        status: "active",
+        lastRun: "2026-03-27T10:00:00.000Z",
+        created: "2026-03-01",
+        body: "Check in.",
+      })
+      mockRenderHabitFile.mockReturnValueOnce("---\ntitle: Heartbeat\ncadence: 30m\nstatus: active\nlastRun: 2026-03-27T12:00:00.000Z\ncreated: 2026-03-01\n---\n\nCheck in.\n")
+
+      const runTurn = vi.fn().mockResolvedValue(undefined)
+      const worker = createInnerDialogWorker(runTurn)
+
+      await worker.run("habit", undefined, "heartbeat")
+
+      expect(mockReadFileSync).toHaveBeenCalledWith("/bundles/slugger.ouro/habits/heartbeat.md", "utf-8")
+      expect(mockParseHabitFile).toHaveBeenCalled()
+      expect(mockRenderHabitFile).toHaveBeenCalledWith(
+        expect.objectContaining({ lastRun: expect.any(String) }),
+        "Check in.",
+      )
+      expect(mockWriteFileSync).toHaveBeenCalledWith(
+        "/bundles/slugger.ouro/habits/heartbeat.md",
+        expect.any(String),
+        "utf-8",
+      )
+
+      // Verify lastRun is an ISO timestamp
+      const renderCall = mockRenderHabitFile.mock.calls[0]
+      const updatedFrontmatter = renderCall[0] as Record<string, unknown>
+      const lastRun = updatedFrontmatter.lastRun as string
+      expect(new Date(lastRun).toISOString()).toBe(lastRun)
+    })
+
+    it("updates lastRun AFTER the turn completes (not before)", async () => {
+      const callOrder: string[] = []
+
+      const runTurn = vi.fn().mockImplementation(async () => {
+        callOrder.push("runTurn")
+      })
+      mockReadFileSync.mockImplementation(() => {
+        callOrder.push("readFile")
+        return "---\ntitle: Test\ncadence: 30m\nstatus: active\nlastRun: null\ncreated: 2026-03-01\n---\n\nBody."
+      })
+      mockParseHabitFile.mockReturnValue({
+        name: "heartbeat",
+        title: "Test",
+        cadence: "30m",
+        status: "active",
+        lastRun: null,
+        created: "2026-03-01",
+        body: "Body.",
+      })
+      mockRenderHabitFile.mockReturnValue("rendered")
+      mockWriteFileSync.mockImplementation(() => {
+        callOrder.push("writeFile")
+      })
+
+      const worker = createInnerDialogWorker(runTurn)
+      await worker.run("habit", undefined, "heartbeat")
+
+      expect(callOrder).toEqual(["runTurn", "readFile", "writeFile"])
+    })
+
+    it("skips lastRun update gracefully if habit file was deleted during turn", async () => {
+      mockReadFileSync.mockImplementation(() => {
+        throw new Error("ENOENT: no such file or directory")
+      })
+
+      const runTurn = vi.fn().mockResolvedValue(undefined)
+      const worker = createInnerDialogWorker(runTurn)
+
+      // Should not throw
+      await worker.run("habit", undefined, "heartbeat")
+
+      expect(mockWriteFileSync).not.toHaveBeenCalled()
+    })
+
+    it("does not update lastRun for non-habit turns", async () => {
+      const runTurn = vi.fn().mockResolvedValue(undefined)
+      const worker = createInnerDialogWorker(runTurn)
+
+      await worker.run("instinct")
+      await worker.run("boot")
+
+      expect(mockReadFileSync).not.toHaveBeenCalled()
+      expect(mockWriteFileSync).not.toHaveBeenCalled()
+    })
+
+    it("updates lastRun with ISO timestamp from current time", async () => {
+      mockReadFileSync.mockReturnValueOnce("content")
+      mockParseHabitFile.mockReturnValueOnce({
+        name: "daily-reflection",
+        title: "Daily Reflection",
+        cadence: "1d",
+        status: "active",
+        lastRun: null,
+        created: "2026-03-01",
+        body: "Reflect.",
+      })
+      mockRenderHabitFile.mockReturnValueOnce("rendered")
+
+      const runTurn = vi.fn().mockResolvedValue(undefined)
+      const worker = createInnerDialogWorker(runTurn)
+
+      await worker.run("habit", undefined, "daily-reflection")
+
+      const renderCall = mockRenderHabitFile.mock.calls[0]
+      const updatedFrontmatter = renderCall[0] as Record<string, unknown>
+      const lastRun = updatedFrontmatter.lastRun as string
+      // Should be a valid ISO date string
+      expect(lastRun).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
+    })
   })
 })
