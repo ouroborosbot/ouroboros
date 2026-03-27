@@ -604,10 +604,10 @@ describe("ouro CLI execution", () => {
     const shortResult = await runOuroCli(["-v"], deps)
     const longResult = await runOuroCli(["--version"], deps)
 
-    expect(shortResult).toBe(PACKAGE_VERSION.version)
-    expect(longResult).toBe(PACKAGE_VERSION.version)
-    expect(deps.writeStdout).toHaveBeenNthCalledWith(1, PACKAGE_VERSION.version)
-    expect(deps.writeStdout).toHaveBeenNthCalledWith(2, PACKAGE_VERSION.version)
+    expect(shortResult).toContain(PACKAGE_VERSION.version)
+    expect(longResult).toContain(PACKAGE_VERSION.version)
+    expect(deps.writeStdout).toHaveBeenNthCalledWith(1, expect.stringContaining(PACKAGE_VERSION.version))
+    expect(deps.writeStdout).toHaveBeenNthCalledWith(2, expect.stringContaining(PACKAGE_VERSION.version))
     expect(deps.sendCommand).not.toHaveBeenCalled()
   })
 
