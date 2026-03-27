@@ -162,6 +162,14 @@ describe("task module", () => {
     expect(first.boardStatus("not-a-status")).toEqual([])
   })
 
+  it("ensureTaskLayout does not create tasks/habits/", async () => {
+    const scanner = await import("../../../repertoire/tasks/scanner")
+    scanner.ensureTaskLayout()
+
+    const habitsDir = path.join(agentRoot, "tasks", "habits")
+    expect(fs.existsSync(habitsDir)).toBe(false)
+  })
+
   it("reuses scanner cache when filesystem fingerprint is unchanged", async () => {
     const scanner = await import("../../../repertoire/tasks/scanner")
     scanner.ensureTaskLayout()
@@ -693,6 +701,45 @@ describe("task module", () => {
     expect(habitFromCollection.updated).toBe("")
   })
 
+  it("parser collection inference does not return habits for paths containing habits", async () => {
+    const parser = await import("../../../repertoire/tasks/parser")
+    // A task file in a path containing "habits" should NOT get collection "habits"
+    // since "habits" is no longer a canonical collection.
+    // With "habit" removed as a type, the parser should reject this entirely.
+    expect(() =>
+      parser.parseTaskFile(
+        parser.renderTaskFile(
+          {
+            type: "ongoing",
+            category: "ops",
+            title: "Not a habit",
+            status: "drafting",
+            created: "2026-03-02",
+            updated: "2026-03-02",
+          },
+          "body",
+        ),
+        path.join(agentRoot, "tasks", "habits", "2026-03-02-1105-not-a-habit.md"),
+      ),
+    ).not.toThrow()
+
+    const parsed = parser.parseTaskFile(
+      parser.renderTaskFile(
+        {
+          type: "ongoing",
+          category: "ops",
+          title: "Not a habit",
+          status: "drafting",
+          created: "2026-03-02",
+          updated: "2026-03-02",
+        },
+        "body",
+      ),
+      path.join(agentRoot, "tasks", "habits", "2026-03-02-1105-not-a-habit.md"),
+    )
+    expect(parsed.collection).not.toBe("habits")
+  })
+
   it("parses frontmatter with quotes, blank lines, and non-key lines", async () => {
     const parser = await import("../../../repertoire/tasks/parser")
     const frontmatter = parser.parseFrontmatter(
@@ -978,6 +1025,15 @@ describe("task transition helpers", () => {
     expect(transitions.isCanonicalTaskFilename("2026-03-01-1015-good-name.md")).toBe(true)
     expect(transitions.isCanonicalTaskFilename("bad.md")).toBe(false)
     expect(transitions.renderTaskTransitionLines().length).toBeGreaterThan(0)
+  })
+
+  it("does not include habit or habits in canonical task types and collections", async () => {
+    const transitions = await import("../../../repertoire/tasks/transitions")
+    expect(transitions.TASK_CANONICAL_COLLECTIONS).not.toContain("habits")
+    expect(transitions.TASK_CANONICAL_TYPES).not.toContain("habit")
+    expect(transitions.normalizeTaskType("habit")).toBeNull()
+    expect(transitions.TASK_TYPE_TO_COLLECTION).not.toHaveProperty("habit")
+    expect(transitions.TASK_REQUIRED_TEMPLATE_FIELDS).not.toHaveProperty("habit")
   })
 
   it("falls back to an empty board status list for missing status keys", async () => {

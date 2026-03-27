@@ -392,4 +392,46 @@ describe("task-driven scheduler", () => {
     await expect(scheduler.reconcile()).resolves.toBeUndefined()
     expect(() => scheduler.stop()).not.toThrow()
   })
+
+  it("does not scan tasks/habits/ collection", async () => {
+    bundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "task-scheduler-"))
+
+    // Put a task file in tasks/habits/ — it should NOT be found
+    makeTaskFile(bundlesRoot, "slugger", "habits", "2026-03-07-0800-heartbeat", {
+      type: "ongoing",
+      category: "operations",
+      title: "Heartbeat",
+      status: "processing",
+      cadence: "30m",
+      scheduledAt: null,
+      lastRun: null,
+      created: "2026-03-07",
+      updated: "2026-03-07",
+    })
+
+    // Put a real task in one-shots — it SHOULD be found
+    makeTaskFile(bundlesRoot, "slugger", "one-shots", "2026-03-07-0815-real-task", {
+      type: "one-shot",
+      category: "ops",
+      title: "Real task",
+      status: "processing",
+      cadence: "1h",
+      scheduledAt: null,
+      lastRun: null,
+      created: "2026-03-07",
+      updated: "2026-03-07",
+    })
+
+    const scheduler = new TaskDrivenScheduler({
+      bundlesRoot,
+      agents: ["slugger"],
+    })
+
+    scheduler.start()
+
+    const jobs = scheduler.listJobs()
+    // Should only find the one-shots task, not the habits one
+    expect(jobs.every((job) => !job.id.includes("heartbeat"))).toBe(true)
+    expect(jobs.some((job) => job.id.includes("real-task"))).toBe(true)
+  })
 })
