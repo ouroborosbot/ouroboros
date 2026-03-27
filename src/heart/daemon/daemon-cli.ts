@@ -96,6 +96,7 @@ export type OuroCliCommand =
   | { kind: "inner.status"; agent?: string }
   | { kind: "mcp-serve"; agent: string; friendId?: string }
   | { kind: "setup"; tool: "claude-code" | "codex"; agent: string }
+  | { kind: "hook"; event: string }
 
 export interface OuroCliDeps {
   socketPath: string
@@ -1080,6 +1081,11 @@ export function parseOuroCommand(args: string[]): OuroCliCommand {
     return parseOuroCommand(args.slice(2))
   }
 
+  if (head === "hook") {
+    const event = second
+    if (!event) throw new Error("hook requires an event name (session-start, stop, post-tool-use)")
+    return { kind: "hook", event }
+  }
   if (head === "up") return { kind: "daemon.up" }
   if (head === "dev") {
     const devArgs = args.slice(1)
@@ -1658,7 +1664,8 @@ type AttentionCliCommand = Extract<OuroCliCommand, { kind: "attention.list" } | 
 type InnerStatusCliCommand = Extract<OuroCliCommand, { kind: "inner.status" }>
 type McpServeCliCommand = Extract<OuroCliCommand, { kind: "mcp-serve" }>
 type SetupCliCommand = Extract<OuroCliCommand, { kind: "setup" }>
-function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "daemon.dev" } | { kind: "hatch.start" } | AuthCliCommand | AuthVerifyCliCommand | AuthSwitchCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand | ConfigModelCliCommand | ConfigModelsCliCommand | RollbackCliCommand | VersionsCliCommand | AttentionCliCommand | InnerStatusCliCommand | McpServeCliCommand | SetupCliCommand>): DaemonCommand {
+type HookCliCommand = Extract<OuroCliCommand, { kind: "hook" }>
+function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "daemon.dev" } | { kind: "hatch.start" } | AuthCliCommand | AuthVerifyCliCommand | AuthSwitchCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand | ConfigModelCliCommand | ConfigModelsCliCommand | RollbackCliCommand | VersionsCliCommand | AttentionCliCommand | InnerStatusCliCommand | McpServeCliCommand | SetupCliCommand | HookCliCommand>): DaemonCommand {
   return command
 }
 
@@ -2493,6 +2500,54 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     return ""
   }
 
+  // ── hook: handle Claude Code lifecycle hooks ──
+  /* v8 ignore start -- hook handler: reads real stdin, sends to real daemon @preserve */
+  if (command.kind === "hook") {
+    let stdinData = ""
+    try {
+      stdinData = require("fs").readFileSync(0, "utf-8")
+    } catch { /* no stdin */ }
+
+    let event: Record<string, unknown> = {}
+    try { event = JSON.parse(stdinData) } catch { /* malformed */ }
+
+    const eventType = command.event
+    const sessionId = (event.session_id as string) ?? "unknown"
+    const cwd = (event.cwd as string) ?? ""
+
+    // Build notification content based on event type
+    let content: string
+    if (eventType === "session-start") {
+      const model = (event.model as string) ?? ""
+      const source = (event.source as string) ?? ""
+      content = `[Claude Code session started: ${sessionId}, cwd: ${cwd}${model ? `, model: ${model}` : ""}${source ? `, source: ${source}` : ""}]`
+    } else if (eventType === "stop") {
+      const lastMsg = (event.last_assistant_message as string) ?? ""
+      content = `[Claude Code session ended: ${sessionId}${lastMsg ? `, last: ${lastMsg.slice(0, 200)}` : ""}]`
+    } else if (eventType === "post-tool-use") {
+      const toolName = (event.tool_name as string) ?? ""
+      content = `[Claude Code used ${toolName} in session ${sessionId}]`
+    } else {
+      content = `[Claude Code hook: ${eventType} in session ${sessionId}]`
+    }
+
+    // Send to daemon (best effort — daemon may not be running)
+    try {
+      const agents = require("fs").readdirSync(path.join(os.homedir(), "AgentBundles"))
+        .filter((f: string) => f.endsWith(".ouro"))
+        .map((f: string) => f.replace(".ouro", ""))
+      for (const agent of agents) {
+        await deps.sendCommand(deps.socketPath, { kind: "message.send", from: `claude-code:${sessionId}`, to: agent, content } as DaemonCommand)
+      }
+      await deps.sendCommand(deps.socketPath, { kind: "inner.wake", agent: agents[0] } as DaemonCommand).catch(() => {})
+    } catch { /* daemon not running — silent */ }
+
+    // Output for Claude Code hook system
+    deps.writeStdout(JSON.stringify({ continue: true }))
+    return JSON.stringify({ continue: true })
+  }
+  /* v8 ignore stop */
+
   // ── setup: configure dev tool integration ──
   if (command.kind === "setup") {
     const { tool, agent: setupAgent } = command
@@ -2516,15 +2571,13 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
         } catch { /* start fresh */ }
       }
 
-      // Always use dist/ — hook scripts are TypeScript source that compiles to dist/scripts/
-      const hookScriptPath = path.join(sourceRoot, "dist", "scripts", "claude-code-hook.js")
-      const stopHookScriptPath = path.join(sourceRoot, "dist", "scripts", "claude-code-stop-hook.js")
-
+      // Use `ouro hook <event>` — resolves the right code based on dev vs installed mode.
+      // Bare `ouro` works because ouro is on PATH via ~/.ouro-cli/bin/.
       settings.hooks = {
         ...(settings.hooks as Record<string, unknown> ?? {}),
-        SessionStart: [{ hooks: [{ type: "command", command: `node ${hookScriptPath}`, timeout: 5 }] }],
-        Stop: [{ hooks: [{ type: "command", command: `node ${stopHookScriptPath}`, timeout: 5 }] }],
-        PostToolUse: [{ matcher: "Bash|Edit|Write", hooks: [{ type: "command", command: `node ${hookScriptPath}`, timeout: 5 }] }],
+        SessionStart: [{ hooks: [{ type: "command", command: "ouro hook session-start", timeout: 5 }] }],
+        Stop: [{ hooks: [{ type: "command", command: "ouro hook stop", timeout: 5 }] }],
+        PostToolUse: [{ matcher: "Bash|Edit|Write", hooks: [{ type: "command", command: "ouro hook post-tool-use", timeout: 5 }] }],
       }
 
       fs.mkdirSync(path.dirname(settingsPath), { recursive: true })
