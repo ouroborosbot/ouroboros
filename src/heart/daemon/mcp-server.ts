@@ -325,6 +325,41 @@ export function createMcpServer(options: McpServerOptions): McpServer {
       return
     }
 
+    // ── delegate: full conversation turn via runSenseTurn ──
+    if (toolName === "delegate") {
+      const task = toolArgs.task as string ?? ""
+      const context = toolArgs.context as string | undefined
+      const delegateMessage = context ? `[delegate] ${task}\n\ncontext: ${context}` : `[delegate] ${task}`
+      try {
+        const result = await runSenseTurn({
+          agentName: agent,
+          channel: "mcp",
+          sessionKey: sessionId,
+          friendId,
+          userMessage: delegateMessage,
+        })
+        writeResponse({
+          jsonrpc: "2.0",
+          id: request.id!,
+          result: {
+            content: [{ type: "text", text: result.response }],
+            isError: false,
+          },
+        })
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        writeResponse({
+          jsonrpc: "2.0",
+          id: request.id!,
+          result: {
+            content: [{ type: "text", text: `Error: ${errorMessage}` }],
+            isError: true,
+          },
+        })
+      }
+      return
+    }
+
     // ── Legacy daemon/service tools ──
     const commandKind = TOOL_TO_COMMAND[toolName]
     if (!commandKind) {
