@@ -1,7 +1,10 @@
+import * as fs from "fs"
+import * as path from "path"
 import { runInnerDialogTurn } from "./inner-dialog"
 import { emitNervesEvent } from "../nerves/runtime"
-import { getAgentName } from "../heart/identity"
+import { getAgentName, getAgentRoot } from "../heart/identity"
 import { getInnerDialogPendingDir, hasPendingMessages } from "../mind/pending"
+import { parseHabitFile, renderHabitFile } from "../heart/daemon/habit-parser"
 
 export type InnerDialogWorkerReason = "boot" | "habit" | "instinct"
 
@@ -61,6 +64,27 @@ export function createInnerDialogWorker(
               error: error instanceof Error ? error.message : String(error),
             },
           })
+        }
+
+        // Update lastRun in habit frontmatter after a habit turn
+        if (nextReason === "habit" && nextHabitName) {
+          try {
+            const agentRoot = getAgentRoot()
+            const habitFilePath = path.join(agentRoot, "habits", `${nextHabitName}.md`)
+            const content = fs.readFileSync(habitFilePath, "utf-8")
+            const parsed = parseHabitFile(content, habitFilePath)
+            const frontmatter: Record<string, unknown> = {
+              title: parsed.title,
+              cadence: parsed.cadence,
+              status: parsed.status,
+              lastRun: new Date().toISOString(),
+              created: parsed.created,
+            }
+            const rendered = renderHabitFile(frontmatter, parsed.body)
+            fs.writeFileSync(habitFilePath, rendered, "utf-8")
+          } catch {
+            // Habit file may have been deleted during the turn — skip gracefully
+          }
         }
 
         // Drain queue first
