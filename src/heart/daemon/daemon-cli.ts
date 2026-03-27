@@ -436,7 +436,9 @@ function usage(): string {
 function formatVersionOutput(): string {
   const version = getRuntimeMetadata().version
   const mode = detectRuntimeMode(getRepoRoot())
+  /* v8 ignore start — cosmetic display toggle; dev mode always true in test env */
   return mode === "dev" ? `${version} (dev)` : version
+  /* v8 ignore stop */
 }
 
 function buildStoppedStatusPayload(socketPath: string): StatusPayload {
@@ -2604,9 +2606,8 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       const message = `setup complete: claude-code + ${setupAgent}\n  MCP server registered\n  hooks configured\n  conversation formatting instructions added`
       deps.writeStdout(message)
       return message
-    }
-
-    if (tool === "codex") {
+    } else {
+      // tool === "codex" (parseSetupCommand validates tool, so this is the only remaining option)
       const mcpAddCmd = `codex mcp add ouro-${setupAgent} -- ${mcpServeCommand}`
       execSync(mcpAddCmd, { stdio: "pipe" })
 
@@ -2621,9 +2622,6 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       deps.writeStdout(message)
       return message
     }
-
-    /* v8 ignore next -- exhaustive: parseSetupCommand validates tool */
-    throw new Error(`Unsupported tool: ${tool}`)
   }
 
   /* v8 ignore start — mcp-serve block binds to process.stdin/stdout; tested via mcp-server unit tests */

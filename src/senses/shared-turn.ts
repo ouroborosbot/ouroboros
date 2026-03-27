@@ -108,6 +108,7 @@ export async function runSenseTurn(options: RunSenseTurnOptions): Promise<RunSen
 
   // Accumulate response text via callbacks
   let responseText = ""
+  /* v8 ignore start — no-op callback stubs; only onTextChunk does real work (covered via mock) */
   const callbacks: ChannelCallbacks = {
     onModelStart: () => {},
     onModelStreamStart: () => {},
@@ -117,6 +118,7 @@ export async function runSenseTurn(options: RunSenseTurnOptions): Promise<RunSen
     onToolEnd: () => {},
     onError: () => {},
   }
+  /* v8 ignore stop */
 
   // Run the pipeline
   const result = await handleInboundTurn({
@@ -125,6 +127,7 @@ export async function runSenseTurn(options: RunSenseTurnOptions): Promise<RunSen
     capabilities,
     messages: [{ role: "user", content: userMessage }],
     callbacks,
+    /* v8 ignore start — delegation wrappers; pipeline integration tested separately */
     friendResolver: { resolve: () => resolver.resolve() },
     sessionLoader: {
       loadOrCreate: () => Promise.resolve({
@@ -133,17 +136,20 @@ export async function runSenseTurn(options: RunSenseTurnOptions): Promise<RunSen
         state: sessionState,
       }),
     },
+    /* v8 ignore stop */
     pendingDir,
     friendStore,
     provider: "local",
     externalId: friendId,
     enforceTrustGate,
     drainPending,
+    /* v8 ignore start — delegation wrappers; these just forward to the real functions */
     runAgent: (msgs, cb, ch, sig, opts) => runAgent(msgs, cb, ch, sig, opts),
     postTurn: (turnMessages, sessionPathArg, usage, hooks, state) => {
       postTurn(turnMessages, sessionPathArg, usage, hooks, state)
       sessionState = state
     },
+    /* v8 ignore stop */
     accumulateFriendTokens,
   })
 

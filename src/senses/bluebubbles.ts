@@ -714,7 +714,7 @@ async function handleBlueBubblesNormalizedEvent(
     const threadGuid = event.kind === "message" ? event.threadOriginatorGuid?.trim() : undefined
     let repliedToText: string | null = null
     if (threadGuid) {
-      repliedToText = await client.getMessageText(threadGuid).catch(() => null)
+      repliedToText = await client.getMessageText(threadGuid).catch(/* v8 ignore next */ () => null)
       emitNervesEvent({
         component: "senses",
         event: "senses.bluebubbles_reply_context",

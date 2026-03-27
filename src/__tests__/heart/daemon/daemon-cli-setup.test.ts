@@ -93,6 +93,11 @@ describe("ouro setup command", () => {
       expect(() => parseOuroCommand(["setup", "--tool", "claude-code"])).toThrow()
     })
 
+    it("throws when --agent is provided without a value", async () => {
+      const { parseOuroCommand } = await import("../../../heart/daemon/daemon-cli")
+      expect(() => parseOuroCommand(["setup", "--tool", "claude-code", "--agent"])).toThrow()
+    })
+
     it("throws for unknown tool", async () => {
       const { parseOuroCommand } = await import("../../../heart/daemon/daemon-cli")
       expect(() => parseOuroCommand(["setup", "--tool", "vscode", "--agent", "slugger"])).toThrow()
@@ -149,6 +154,78 @@ describe("ouro setup command", () => {
       expect(mockExecSync).toHaveBeenCalled()
       const calls = mockExecSync.mock.calls.map((c: any[]) => c[0])
       expect(calls.some((c: string) => c.includes("codex") && c.includes("mcp") && c.includes("add"))).toBe(true)
+    })
+
+    it("claude-code setup reads existing CLAUDE.md and skips write when instructions present", async () => {
+      const { runOuroCli, createDefaultOuroCliDeps } = await import("../../../heart/daemon/daemon-cli")
+      const deps = createDefaultOuroCliDeps()
+      deps.writeStdout = vi.fn()
+
+      // Mock CLAUDE.md already exists with the agent instructions
+      mockExistsSync.mockImplementation((p: any) => {
+        const s = String(p)
+        return s.includes("CLAUDE.md") || s.includes("settings.json")
+      })
+      mockReadFileSync.mockImplementation((p: any) => {
+        const s = String(p)
+        if (s.includes("CLAUDE.md")) return "# My Claude\n## Agent conversations (ouro)\nExisting instructions\n"
+        if (s.includes("settings.json")) return JSON.stringify({})
+        return ""
+      })
+
+      await runOuroCli(["setup", "--tool", "claude-code", "--agent", "test-agent"], deps)
+
+      // CLAUDE.md should NOT be written since instructions are already present
+      const claudeWrites = mockWriteFileSync.mock.calls.filter((c: any[]) =>
+        String(c[0]).includes("CLAUDE.md"),
+      )
+      expect(claudeWrites).toHaveLength(0)
+    })
+
+    it("claude-code setup appends instructions to existing CLAUDE.md without agent section", async () => {
+      const { runOuroCli, createDefaultOuroCliDeps } = await import("../../../heart/daemon/daemon-cli")
+      const deps = createDefaultOuroCliDeps()
+      deps.writeStdout = vi.fn()
+
+      // Mock CLAUDE.md exists but without agent instructions
+      mockExistsSync.mockImplementation((p: any) => {
+        const s = String(p)
+        return s.includes("CLAUDE.md") || s.includes("settings.json")
+      })
+      mockReadFileSync.mockImplementation((p: any) => {
+        const s = String(p)
+        if (s.includes("CLAUDE.md")) return "# My Claude\nSome existing content\n"
+        if (s.includes("settings.json")) return JSON.stringify({})
+        return ""
+      })
+
+      await runOuroCli(["setup", "--tool", "claude-code", "--agent", "test-agent"], deps)
+
+      // CLAUDE.md SHOULD be written with appended instructions
+      const claudeWrites = mockWriteFileSync.mock.calls.filter((c: any[]) =>
+        String(c[0]).includes("CLAUDE.md"),
+      )
+      expect(claudeWrites).toHaveLength(1)
+      expect(claudeWrites[0][1]).toContain("Agent conversations (ouro)")
+      expect(claudeWrites[0][1]).toContain("Some existing content")
+    })
+
+    it("uses bare ouro command in installed mode", async () => {
+      const { detectRuntimeMode } = await import("../../../heart/daemon/runtime-mode")
+      vi.mocked(detectRuntimeMode).mockReturnValue("installed")
+
+      const { runOuroCli, createDefaultOuroCliDeps } = await import("../../../heart/daemon/daemon-cli")
+      const deps = createDefaultOuroCliDeps()
+      deps.writeStdout = vi.fn()
+
+      await runOuroCli(["setup", "--tool", "claude-code", "--agent", "test-agent"], deps)
+
+      // In installed mode, should use bare `ouro` command
+      const calls = mockExecSync.mock.calls.map((c: any[]) => c[0])
+      const mcpAddCall = calls.find((c: string) => c.includes("mcp") && c.includes("add"))
+      expect(mcpAddCall).toBeDefined()
+      expect(mcpAddCall).toContain("ouro mcp-serve")
+      expect(mcpAddCall).not.toContain("node")
     })
 
     it("detects dev mode and uses node + absolute path", async () => {

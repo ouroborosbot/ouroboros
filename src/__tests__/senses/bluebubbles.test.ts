@@ -712,6 +712,19 @@ describe("BlueBubbles sense runtime", () => {
     )
   })
 
+  it("includes replied-to text in inbound content when getMessageText returns text", async () => {
+    mocks.getMessageText.mockResolvedValueOnce("This is the original message being replied to")
+
+    const bluebubbles = await import("../../senses/bluebubbles")
+    await bluebubbles.handleBlueBubblesEvent(dmThreadPayload)
+
+    // The inbound message should contain the replied-to text
+    const turnInput = mocks.handleInboundTurn.mock.calls[0][0]
+    const userMsg = turnInput.messages[0]
+    const userContent = typeof userMsg.content === "string" ? userMsg.content : userMsg.content.find((p: any) => p.type === "text")?.text ?? ""
+    expect(userContent).toContain('replying to: "This is the original message being replied to"')
+  })
+
   it("keeps group observe turns model-visible while leaving typing off", async () => {
     mocks.runAgent.mockImplementationOnce(async (_messages: any, callbacks: any) => {
       callbacks.onModelStart()

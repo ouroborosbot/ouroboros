@@ -61,6 +61,18 @@ describe("agent-service handlers", () => {
       const r = await handleAgentStatus({ agent: "test", friendId: "f1" })
       expect(r.data).toMatchObject({ innerStatus: "thinking" })
     })
+
+    it("handles malformed runtime.json gracefully (JSON parse error)", async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p) => String(p).includes("runtime.json"))
+      vi.mocked(fs.readFileSync).mockImplementation((p) => {
+        if (String(p).includes("runtime.json")) return "not valid json{{"
+        return ""
+      })
+      const { handleAgentStatus } = await import("../../../heart/daemon/agent-service")
+      const r = await handleAgentStatus({ agent: "test", friendId: "f1" })
+      // Falls back to unknown when JSON parse fails
+      expect(r.data).toMatchObject({ innerStatus: "unknown" })
+    })
   })
 
   describe("handleAgentAsk", () => {
@@ -117,6 +129,112 @@ describe("agent-service handlers", () => {
       expect(r.message).toContain("No recent sessions")
     })
 
+    it("enumerates sessions from filesystem and sorts by lastUsage", async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true)
+      vi.mocked(fs.statSync).mockImplementation((p) => {
+        const s = String(p)
+        // Make files (not directories) at certain paths
+        if (s.endsWith("not-a-dir")) return { isDirectory: () => false } as any
+        if (s.endsWith("not-a-channel")) return { isDirectory: () => false } as any
+        return { isDirectory: () => true } as any
+      })
+      vi.mocked(fs.readdirSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.endsWith("sessions")) return ["friend-1", "not-a-dir"] as any
+        if (s.endsWith("friend-1")) return ["mcp", "not-a-channel"] as any
+        if (s.endsWith("mcp")) return ["session-1", "session-missing"] as any
+        return []
+      })
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes("sessions") && !s.includes("session.json")) return true
+        // session.json exists for session-1 but not session-missing
+        if (s.includes("session-1") && s.endsWith("session.json")) return true
+        if (s.includes("session-missing") && s.endsWith("session.json")) return false
+        return false
+      })
+      vi.mocked(fs.readFileSync).mockImplementation((p) => {
+        if (String(p).includes("session-1") && String(p).includes("session.json")) return JSON.stringify({ lastUsage: "2026-03-26T10:00:00Z" })
+        return ""
+      })
+      const { handleAgentCatchup } = await import("../../../heart/daemon/agent-service")
+      const r = await handleAgentCatchup({ agent: "test", friendId: "f1" })
+      expect(r.ok).toBe(true)
+      const data = r.data as { recentSessions: any[] }
+      expect(data.recentSessions.length).toBe(1)
+      expect(data.recentSessions[0].friendId).toBe("friend-1")
+      expect(data.recentSessions[0].channel).toBe("mcp")
+    })
+
+    it("skips malformed session.json files gracefully", async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true)
+      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any)
+      vi.mocked(fs.readdirSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.endsWith("sessions")) return ["friend-1"] as any
+        if (s.endsWith("friend-1")) return ["cli"] as any
+        if (s.endsWith("cli")) return ["sess-bad"] as any
+        return []
+      })
+      vi.mocked(fs.readFileSync).mockImplementation(() => "not valid json{{")
+      const { handleAgentCatchup } = await import("../../../heart/daemon/agent-service")
+      const r = await handleAgentCatchup({ agent: "test", friendId: "f1" })
+      expect(r.ok).toBe(true)
+      expect(r.message).toContain("No recent sessions")
+    })
+
+    it("sorts sessions by lastUsage, handling missing values", async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true)
+      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any)
+      vi.mocked(fs.readdirSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.endsWith("sessions")) return ["f1", "f2", "f3"] as any
+        if (s.endsWith("f1")) return ["mcp"] as any
+        if (s.endsWith("f2")) return ["cli"] as any
+        if (s.endsWith("f3")) return ["teams"] as any
+        if (s.endsWith("mcp")) return ["s1"] as any
+        if (s.endsWith("cli")) return ["s2"] as any
+        if (s.endsWith("teams")) return ["s3"] as any
+        return []
+      })
+      vi.mocked(fs.readFileSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes("f1") && s.includes("session.json")) return JSON.stringify({})
+        if (s.includes("f2") && s.includes("session.json")) return JSON.stringify({ lastUsage: "2026-03-26T10:00:00Z" })
+        if (s.includes("f3") && s.includes("session.json")) return JSON.stringify({})
+        return ""
+      })
+      const { handleAgentCatchup } = await import("../../../heart/daemon/agent-service")
+      const r = await handleAgentCatchup({ agent: "test", friendId: "f1" })
+      const data = r.data as { recentSessions: any[] }
+      expect(data.recentSessions.length).toBe(3)
+      // f2 has lastUsage, so it should sort first
+      expect(data.recentSessions[0].friendId).toBe("f2")
+    })
+
+    it("handles session without lastUsage property", async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true)
+      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any)
+      vi.mocked(fs.readdirSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.endsWith("sessions")) return ["friend-1"] as any
+        if (s.endsWith("friend-1")) return ["mcp"] as any
+        if (s.endsWith("mcp")) return ["sess-1"] as any
+        return []
+      })
+      vi.mocked(fs.readFileSync).mockImplementation((p) => {
+        if (String(p).includes("session.json")) return JSON.stringify({ version: 1 })
+        return ""
+      })
+      const { handleAgentCatchup } = await import("../../../heart/daemon/agent-service")
+      const r = await handleAgentCatchup({ agent: "test", friendId: "f1" })
+      expect(r.ok).toBe(true)
+      const data = r.data as { recentSessions: any[] }
+      expect(data.recentSessions.length).toBe(1)
+      // lastUsage defaults to "" when not present
+      expect(data.recentSessions[0].lastUsage).toBe("")
+    })
+
     it("includes inner dialog status", async () => {
       vi.mocked(fs.existsSync).mockImplementation((p) => String(p).includes("runtime.json"))
       vi.mocked(fs.readFileSync).mockImplementation((p) => {
@@ -130,6 +248,24 @@ describe("agent-service handlers", () => {
   })
 
   describe("handleAgentGetContext", () => {
+    it("returns recent facts when no query is provided", async () => {
+      vi.mocked(readDiaryEntries).mockReturnValue([
+        { id: "1", text: "fact one", source: "test", createdAt: "2026-01-01", embedding: [] },
+        { id: "2", text: "fact two", source: "test", createdAt: "2026-01-02", embedding: [] },
+      ])
+      const { handleAgentGetContext } = await import("../../../heart/daemon/agent-service")
+      const r = await handleAgentGetContext({ agent: "test", friendId: "f1" })
+      expect((r.data as Record<string, unknown>).memorySummary).toContain("fact one")
+      expect((r.data as Record<string, unknown>).memorySummary).toContain("fact two")
+    })
+
+    it("returns no-match message when query finds nothing", async () => {
+      vi.mocked(searchDiaryEntries).mockResolvedValue([])
+      const { handleAgentGetContext } = await import("../../../heart/daemon/agent-service")
+      const r = await handleAgentGetContext({ agent: "test", friendId: "f1", question: "nonexistent" })
+      expect((r.data as Record<string, unknown>).memorySummary).toContain("No relevant memories")
+    })
+
     it("uses searchDiaryEntries when query is provided", async () => {
       vi.mocked(searchDiaryEntries).mockResolvedValue([
         { id: "1", text: "relevant", source: "test", createdAt: "2026-01-01", embedding: [] },
@@ -177,6 +313,65 @@ describe("agent-service handlers", () => {
     it("returns no tasks when empty", async () => {
       const { handleAgentGetTask } = await import("../../../heart/daemon/agent-service")
       const r = await handleAgentGetTask({ agent: "test", friendId: "f1" })
+      expect(r.message).toContain("No active tasks")
+    })
+
+    it("handles missing task file content gracefully", async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p)
+        return s.includes("tasks") && !s.endsWith(".md")
+      })
+      vi.mocked(fs.readdirSync).mockImplementation((p) => {
+        if (String(p).includes("tasks")) return ["plan.md"] as any
+        return []
+      })
+      vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error("ENOENT") })
+      const { handleAgentGetTask } = await import("../../../heart/daemon/agent-service")
+      const r = await handleAgentGetTask({ agent: "test", friendId: "f1" })
+      expect(r.ok).toBe(true)
+      // Task shows up but with empty statusLine since file doesn't exist
+      const data = r.data as { tasks: { name: string; statusLine: string }[] }
+      expect(data.tasks[0].name).toBe("plan.md")
+      expect(data.tasks[0].statusLine).toBe("")
+    })
+
+    it("returns task files with first-line summary", async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p)
+        return s.includes("tasks")
+      })
+      vi.mocked(fs.readdirSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes("tasks")) return ["doing-feature.md", "plan.md"] as any
+        return []
+      })
+      vi.mocked(fs.readFileSync).mockImplementation((p) => {
+        const s = String(p)
+        if (s.includes("doing-feature.md")) return "# Feature doing doc\nSome details"
+        if (s.includes("plan.md")) return "# Plan\nPlanning details"
+        return ""
+      })
+      const { handleAgentGetTask } = await import("../../../heart/daemon/agent-service")
+      const r = await handleAgentGetTask({ agent: "test", friendId: "f1" })
+      expect(r.ok).toBe(true)
+      const data = r.data as { tasks: { name: string; statusLine: string }[]; activeCount: number; totalCount: number }
+      // "doing" file should be prioritized
+      expect(data.activeCount).toBe(1)
+      expect(data.totalCount).toBe(2)
+      expect(data.tasks[0].name).toBe("doing-feature.md")
+      expect(data.tasks[0].statusLine).toBe("# Feature doing doc")
+    })
+  })
+
+  describe("handleAgentGetTask — edge cases", () => {
+    it("returns empty when tasks dir exists but readdirSync throws", async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        return String(p).includes("tasks")
+      })
+      vi.mocked(fs.readdirSync).mockImplementation(() => { throw new Error("EACCES") })
+      const { handleAgentGetTask } = await import("../../../heart/daemon/agent-service")
+      const r = await handleAgentGetTask({ agent: "test", friendId: "f1" })
+      expect(r.ok).toBe(true)
       expect(r.message).toContain("No active tasks")
     })
   })

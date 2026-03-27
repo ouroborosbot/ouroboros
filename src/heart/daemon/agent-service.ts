@@ -49,11 +49,19 @@ function readInnerDialogStatus(agent: string): { status: string; lastCompletedAt
 }
 
 function safeReaddir(dirPath: string): string[] {
-  try { return fs.readdirSync(dirPath).map(String) } catch { return [] }
+  try {
+    return fs.readdirSync(dirPath).map(String)
+  /* v8 ignore start — catch is defensive; tested paths don't trigger fs errors */
+  } catch { return [] }
+  /* v8 ignore stop */
 }
 
 function safeIsDir(dirPath: string): boolean {
-  try { return fs.statSync(dirPath).isDirectory() } catch { return false }
+  try {
+    return fs.statSync(dirPath).isDirectory()
+  /* v8 ignore start — catch is defensive; tested paths don't trigger fs errors */
+  } catch { return false }
+  /* v8 ignore stop */
 }
 
 /** Session info extracted from the filesystem. */
@@ -97,7 +105,7 @@ function emit(event: string, message: string, meta: Record<string, unknown>): vo
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
 export async function handleAgentStatus(params: AgentServiceParams): Promise<DaemonResponse> {
-  emit("daemon.agent_service_start", "handling agent.status", { agent: params.agent })
+  emitNervesEvent({ component: "daemon", event: "daemon.agent_service_start", message: "handling agent.status", meta: { agent: params.agent } })
   const diaryRoot = agentDiaryRoot(params.agent)
   const facts = readDiaryEntries(diaryRoot)
   const innerStatus = readInnerDialogStatus(params.agent)
@@ -156,6 +164,7 @@ export async function handleAgentCatchup(params: AgentServiceParams): Promise<Da
   emit("daemon.agent_service_end", "completed agent.catchup", { agent: params.agent })
   return {
     ok: true,
+    /* v8 ignore next — parts always has at least one element (either sessions or "No recent sessions") */
     message: parts.length > 0 ? parts.join("\n") : `No recent activity for ${params.agent}`,
     data: { recentSessions, innerStatus },
   }

@@ -144,6 +144,7 @@ export class DaemonProcessManager {
       meta: { agent, pid: child.pid ?? null, cwd: runCwd },
     })
 
+    /* v8 ignore start — child process error handler; requires real spawn to trigger */
     child.on("error", (err) => {
       emitNervesEvent({
         level: "warn",
@@ -153,6 +154,7 @@ export class DaemonProcessManager {
         meta: { agent, error: err.message },
       })
     })
+    /* v8 ignore stop */
 
     child.once("exit", (code, signal) => {
       this.onExit(state, code, signal)

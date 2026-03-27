@@ -361,6 +361,116 @@ describe("runSenseTurn", () => {
     expect(result.response).toBe("hello world")
   })
 
+  it("resolves UUID friendId with existing friend record", async () => {
+    mockStoreInstance.get.mockResolvedValue({
+      id: "a1b2c3d4-e5f6-7890-abcd-ef0123456789",
+      name: "Jordan",
+      externalIds: [{ provider: "imessage-handle", externalId: "jordan@example.com" }],
+    })
+    const { runSenseTurn } = await import("../../senses/shared-turn")
+    const result = await runSenseTurn({
+      agentName: "test-agent",
+      channel: "mcp",
+      sessionKey: "session-123",
+      friendId: "a1b2c3d4-e5f6-7890-abcd-ef0123456789",
+      userMessage: "hello",
+    })
+    expect(result.response).toBe("hello from the agent")
+    expect(mockStoreInstance.get).toHaveBeenCalledWith("a1b2c3d4-e5f6-7890-abcd-ef0123456789")
+  })
+
+  it("resolves UUID friendId with existing friend but no external IDs (fallback defaults)", async () => {
+    mockStoreInstance.get.mockResolvedValue({
+      id: "a1b2c3d4-e5f6-7890-abcd-ef0123456789",
+      name: null,
+      externalIds: [],
+    })
+    const { runSenseTurn } = await import("../../senses/shared-turn")
+    const result = await runSenseTurn({
+      agentName: "test-agent",
+      channel: "mcp",
+      sessionKey: "session-123",
+      friendId: "a1b2c3d4-e5f6-7890-abcd-ef0123456789",
+      userMessage: "hello",
+    })
+    expect(result.response).toBe("hello from the agent")
+  })
+
+  it("resolves UUID friendId with no existing friend record (fallback to local)", async () => {
+    mockStoreInstance.get.mockResolvedValue(null)
+    const { runSenseTurn } = await import("../../senses/shared-turn")
+    const result = await runSenseTurn({
+      agentName: "test-agent",
+      channel: "mcp",
+      sessionKey: "session-123",
+      friendId: "a1b2c3d4-e5f6-7890-abcd-ef0123456789",
+      userMessage: "hello",
+    })
+    expect(result.response).toBe("hello from the agent")
+    expect(mockStoreInstance.get).toHaveBeenCalledWith("a1b2c3d4-e5f6-7890-abcd-ef0123456789")
+  })
+
+  it("falls back to session transcript when no text from callbacks but session has assistant message", async () => {
+    mockHandleInboundTurn.mockImplementation(async () => {
+      return {
+        resolvedContext: makeResolvedContext(),
+        gateResult: { allowed: true },
+        turnOutcome: "settled",
+        sessionPath: "/tmp/session.json",
+        messages: [],
+      }
+    })
+    // When no text comes from callbacks, runSenseTurn re-loads the session
+    mockLoadSession.mockReturnValue({
+      messages: [
+        { role: "system", content: "system" },
+        { role: "user", content: "hi" },
+        { role: "assistant", content: "recovered answer from session" },
+      ],
+      state: {},
+    })
+    const { runSenseTurn } = await import("../../senses/shared-turn")
+    const result = await runSenseTurn({
+      agentName: "test-agent",
+      channel: "mcp",
+      sessionKey: "session-123",
+      friendId: "friend-1",
+      userMessage: "hello",
+    })
+    expect(result.response).toBe("recovered answer from session")
+    expect(result.ponderDeferred).toBe(false)
+  })
+
+  it("returns empty message when session has messages but no assistant content", async () => {
+    mockHandleInboundTurn.mockImplementation(async () => {
+      return {
+        resolvedContext: makeResolvedContext(),
+        gateResult: { allowed: true },
+        turnOutcome: "settled",
+        sessionPath: "/tmp/session.json",
+        messages: [],
+      }
+    })
+    // Session exists but assistant message is empty
+    mockLoadSession.mockReturnValue({
+      messages: [
+        { role: "system", content: "system" },
+        { role: "user", content: "hi" },
+        { role: "assistant", content: "   " },
+      ],
+      state: {},
+    })
+    const { runSenseTurn } = await import("../../senses/shared-turn")
+    const result = await runSenseTurn({
+      agentName: "test-agent",
+      channel: "mcp",
+      sessionKey: "session-123",
+      friendId: "friend-1",
+      userMessage: "hello",
+    })
+    expect(result.response).toContain("agent responded but response was empty")
+  })
+
   it("propagates errors from handleInboundTurn", async () => {
     mockHandleInboundTurn.mockRejectedValue(new Error("pipeline explosion"))
     const { runSenseTurn } = await import("../../senses/shared-turn")
