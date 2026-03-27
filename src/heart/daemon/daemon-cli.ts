@@ -2525,9 +2525,9 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
       settings.hooks = {
         ...(settings.hooks as Record<string, unknown> ?? {}),
-        SessionStart: [`node ${hookScriptPath}`],
-        Stop: [`node ${stopHookScriptPath}`],
-        PostToolUse: [`node ${hookScriptPath}`],
+        SessionStart: [{ hooks: [{ type: "command", command: `node ${hookScriptPath}`, timeout: 5 }] }],
+        Stop: [{ hooks: [{ type: "command", command: `node ${stopHookScriptPath}`, timeout: 5 }] }],
+        PostToolUse: [{ matcher: "Bash|Edit|Write", hooks: [{ type: "command", command: `node ${hookScriptPath}`, timeout: 5 }] }],
       }
 
       fs.mkdirSync(path.dirname(settingsPath), { recursive: true })
