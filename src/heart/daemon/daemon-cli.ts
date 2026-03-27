@@ -1999,13 +1999,50 @@ function executeReminderCommand(command: ReminderCliCommand, taskMod: TaskModule
 }
 
 /* v8 ignore start -- repo resolution for ouro dev: repoPath branch tested via daemon-cli-dev; clone requires real git/npm @preserve */
+const DEV_CONFIG_PATH = path.join(getOuroCliHome(), "dev-config.json")
+
+function readPersistedDevPath(): string | null {
+  try {
+    const data = JSON.parse(fs.readFileSync(DEV_CONFIG_PATH, "utf-8"))
+    return typeof data.repoPath === "string" ? data.repoPath : null
+  } catch {
+    return null
+  }
+}
+
+function persistDevPath(repoPath: string): void {
+  try {
+    fs.mkdirSync(path.dirname(DEV_CONFIG_PATH), { recursive: true })
+    fs.writeFileSync(DEV_CONFIG_PATH, JSON.stringify({ repoPath }, null, 2))
+  } catch { /* best effort */ }
+}
+
 function resolveDevRepoCwd(
   command: { repoPath?: string; clone?: boolean; clonePath?: string },
   checkExists: (p: string) => boolean,
   deps: { writeStdout: (text: string) => void; getRepoCwd?: () => string },
 ): string {
-  if (command.repoPath) return path.resolve(command.repoPath)
+  // 1. Explicit --repo-path: use it and persist for next time
+  if (command.repoPath) {
+    const resolved = path.resolve(command.repoPath)
+    persistDevPath(resolved)
+    return resolved
+  }
+  // 2. Clone request
   if (command.clone) return resolveClonePath(command, checkExists, deps)
+  // 3. Check CWD — if we're inside a harness repo, use it
+  const cwd = process.cwd()
+  if (checkExists(path.join(cwd, ".git")) && checkExists(path.join(cwd, "src", "heart", "daemon"))) {
+    persistDevPath(cwd)
+    return cwd
+  }
+  // 4. Read persisted path from last --repo-path
+  const persisted = readPersistedDevPath()
+  if (persisted && checkExists(path.join(persisted, ".git"))) {
+    deps.writeStdout(`using remembered dev path: ${persisted}`)
+    return persisted
+  }
+  // 5. Fall back to getRepoRoot (works when running from installed binary → resolves to npm package)
   return deps.getRepoCwd ? deps.getRepoCwd() : getRepoRoot()
 }
 /* v8 ignore stop */
