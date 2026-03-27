@@ -1999,11 +1999,13 @@ function executeReminderCommand(command: ReminderCliCommand, taskMod: TaskModule
 }
 
 /* v8 ignore start -- repo resolution for ouro dev: repoPath branch tested via daemon-cli-dev; clone requires real git/npm @preserve */
-const DEV_CONFIG_PATH = path.join(getOuroCliHome(), "dev-config.json")
+function getDevConfigPath(): string {
+  return path.join(getOuroCliHome(), "dev-config.json")
+}
 
 function readPersistedDevPath(): string | null {
   try {
-    const data = JSON.parse(fs.readFileSync(DEV_CONFIG_PATH, "utf-8"))
+    const data = JSON.parse(fs.readFileSync(getDevConfigPath(), "utf-8"))
     return typeof data.repoPath === "string" ? data.repoPath : null
   } catch {
     return null
@@ -2012,8 +2014,8 @@ function readPersistedDevPath(): string | null {
 
 function persistDevPath(repoPath: string): void {
   try {
-    fs.mkdirSync(path.dirname(DEV_CONFIG_PATH), { recursive: true })
-    fs.writeFileSync(DEV_CONFIG_PATH, JSON.stringify({ repoPath }, null, 2))
+    fs.mkdirSync(path.dirname(getDevConfigPath()), { recursive: true })
+    fs.writeFileSync(getDevConfigPath(), JSON.stringify({ repoPath }, null, 2))
   } catch { /* best effort */ }
 }
 
@@ -2030,20 +2032,24 @@ function resolveDevRepoCwd(
   }
   // 2. Clone request
   if (command.clone) return resolveClonePath(command, checkExists, deps)
-  // 3. Check CWD — if we're inside a harness repo, use it
+  // 3. If test/internal deps provide getRepoCwd, use it directly
+  if (deps.getRepoCwd) {
+    return deps.getRepoCwd()
+  }
+  // 4. Check CWD — if we're inside a harness repo, use it
   const cwd = process.cwd()
   if (checkExists(path.join(cwd, ".git")) && checkExists(path.join(cwd, "src", "heart", "daemon"))) {
     persistDevPath(cwd)
     return cwd
   }
-  // 4. Read persisted path from last --repo-path
+  // 5. Read persisted path from last --repo-path
   const persisted = readPersistedDevPath()
   if (persisted && checkExists(path.join(persisted, ".git"))) {
     deps.writeStdout(`using remembered dev path: ${persisted}`)
     return persisted
   }
-  // 5. Fall back to getRepoRoot (works when running from installed binary → resolves to npm package)
-  return deps.getRepoCwd ? deps.getRepoCwd() : getRepoRoot()
+  // 6. Fall back to getRepoRoot (works when running from installed binary → resolves to npm package)
+  return getRepoRoot()
 }
 /* v8 ignore stop */
 

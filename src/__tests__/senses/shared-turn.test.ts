@@ -315,7 +315,7 @@ describe("runSenseTurn", () => {
       friendId: "friend-1",
       userMessage: "hello",
     })
-    expect(result.response).toBe("")
+    expect(result.response).toContain("agent responded but response was empty")
     expect(result.ponderDeferred).toBe(false)
   })
 
