@@ -95,6 +95,7 @@ export type OuroCliCommand =
   | { kind: "attention.history"; agent?: string }
   | { kind: "inner.status"; agent?: string }
   | { kind: "mcp-serve"; agent: string; friendId?: string }
+  | { kind: "setup"; tool: "claude-code" | "codex"; agent: string }
 
 export interface OuroCliDeps {
   socketPath: string
@@ -1058,6 +1059,19 @@ function parseMcpServeCommand(args: string[]): OuroCliCommand & { socketOverride
   return { kind: "mcp-serve", agent, ...(friendId ? { friendId } : {}), ...(socketOverride ? { socketOverride } : {}) }
 }
 
+function parseSetupCommand(args: string[]): OuroCliCommand {
+  let tool: string | undefined
+  let agent: string | undefined
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--tool" && args[i + 1]) { tool = args[++i]; continue }
+    if (args[i] === "--agent" && args[i + 1]) { agent = args[++i]; continue }
+  }
+  if (!tool) throw new Error("setup requires --tool (claude-code | codex)")
+  if (tool !== "claude-code" && tool !== "codex") throw new Error(`Unknown tool: ${tool}. Supported: claude-code, codex`)
+  if (!agent) throw new Error("setup requires --agent <name>")
+  return { kind: "setup", tool, agent }
+}
+
 export function parseOuroCommand(args: string[]): OuroCliCommand {
   const [head, second] = args
   if (!head) return { kind: "daemon.up" }
@@ -1120,6 +1134,7 @@ export function parseOuroCommand(args: string[]): OuroCliCommand {
   if (head === "poke") return parsePokeCommand(args.slice(1))
   if (head === "link") return parseLinkCommand(args.slice(1))
   if (head === "mcp-serve") return parseMcpServeCommand(args.slice(1))
+  if (head === "setup") return parseSetupCommand(args.slice(1))
 
   throw new Error(`Unknown command '${args.join(" ")}'.\n${usage()}`)
 }
@@ -1642,7 +1657,8 @@ type VersionsCliCommand = Extract<OuroCliCommand, { kind: "versions" }>
 type AttentionCliCommand = Extract<OuroCliCommand, { kind: "attention.list" } | { kind: "attention.show" } | { kind: "attention.history" }>
 type InnerStatusCliCommand = Extract<OuroCliCommand, { kind: "inner.status" }>
 type McpServeCliCommand = Extract<OuroCliCommand, { kind: "mcp-serve" }>
-function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "daemon.dev" } | { kind: "hatch.start" } | AuthCliCommand | AuthVerifyCliCommand | AuthSwitchCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand | ConfigModelCliCommand | ConfigModelsCliCommand | RollbackCliCommand | VersionsCliCommand | AttentionCliCommand | InnerStatusCliCommand | McpServeCliCommand>): DaemonCommand {
+type SetupCliCommand = Extract<OuroCliCommand, { kind: "setup" }>
+function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "daemon.dev" } | { kind: "hatch.start" } | AuthCliCommand | AuthVerifyCliCommand | AuthSwitchCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand | ConfigModelCliCommand | ConfigModelsCliCommand | RollbackCliCommand | VersionsCliCommand | AttentionCliCommand | InnerStatusCliCommand | McpServeCliCommand | SetupCliCommand>): DaemonCommand {
   return command
 }
 
@@ -2434,6 +2450,78 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   if (command.kind === "daemon.logs" && deps.tailLogs) {
     deps.tailLogs()
     return ""
+  }
+
+  // ── setup: configure dev tool integration ──
+  if (command.kind === "setup") {
+    const { tool, agent: setupAgent } = command
+    const sourceRoot = getRepoRoot()
+    const runtimeMode = detectRuntimeMode(sourceRoot)
+    const mcpServeCommand = runtimeMode === "dev"
+      ? `node ${path.join(sourceRoot, "dist", "heart", "daemon", "ouro-bot-entry.js")} mcp-serve --agent ${setupAgent}`
+      : `ouro mcp-serve --agent ${setupAgent}`
+
+    if (tool === "claude-code") {
+      // 1. Register MCP server with Claude Code
+      const mcpAddCmd = `claude mcp add ouro-${setupAgent} -s user -- ${mcpServeCommand}`
+      execSync(mcpAddCmd, { stdio: "pipe" })
+
+      // 2. Write hooks config to ~/.claude/settings.json
+      const settingsPath = path.join(os.homedir(), ".claude", "settings.json")
+      let settings: Record<string, unknown> = {}
+      if (fs.existsSync(settingsPath)) {
+        try {
+          settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"))
+        } catch { /* start fresh */ }
+      }
+
+      const hookScriptPath = runtimeMode === "dev"
+        ? path.join(sourceRoot, "scripts", "claude-code-hook.js")
+        : path.join(sourceRoot, "dist", "scripts", "claude-code-hook.js")
+      const stopHookScriptPath = runtimeMode === "dev"
+        ? path.join(sourceRoot, "scripts", "claude-code-stop-hook.js")
+        : path.join(sourceRoot, "dist", "scripts", "claude-code-stop-hook.js")
+
+      settings.hooks = {
+        ...(settings.hooks as Record<string, unknown> ?? {}),
+        SessionStart: [`node ${hookScriptPath}`],
+        Stop: [`node ${stopHookScriptPath}`],
+        PostToolUse: [`node ${hookScriptPath}`],
+      }
+
+      fs.mkdirSync(path.dirname(settingsPath), { recursive: true })
+      fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
+
+      emitNervesEvent({
+        component: "daemon",
+        event: "daemon.setup_complete",
+        message: "dev tool setup complete",
+        meta: { tool, agent: setupAgent, runtimeMode },
+      })
+
+      const message = `setup complete: claude-code + ${setupAgent}\n  MCP server registered\n  hooks configured`
+      deps.writeStdout(message)
+      return message
+    }
+
+    if (tool === "codex") {
+      const mcpAddCmd = `codex mcp add ouro-${setupAgent} -- ${mcpServeCommand}`
+      execSync(mcpAddCmd, { stdio: "pipe" })
+
+      emitNervesEvent({
+        component: "daemon",
+        event: "daemon.setup_complete",
+        message: "dev tool setup complete",
+        meta: { tool, agent: setupAgent, runtimeMode },
+      })
+
+      const message = `setup complete: codex + ${setupAgent}\n  MCP server registered`
+      deps.writeStdout(message)
+      return message
+    }
+
+    /* v8 ignore next -- exhaustive: parseSetupCommand validates tool */
+    throw new Error(`Unsupported tool: ${tool}`)
   }
 
   /* v8 ignore start — mcp-serve block binds to process.stdin/stdout; tested via mcp-server unit tests */
