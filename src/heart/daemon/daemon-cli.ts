@@ -2533,15 +2533,22 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       content = `[Claude Code hook: ${eventType} in session ${sessionId}]`
     }
 
-    // Send to daemon (best effort — daemon may not be running)
+    // Send to enabled agents only (best effort — daemon may not be running)
     try {
-      const agents = require("fs").readdirSync(path.join(os.homedir(), "AgentBundles"))
+      const bundlesDir = path.join(os.homedir(), "AgentBundles")
+      const agents = require("fs").readdirSync(bundlesDir)
         .filter((f: string) => f.endsWith(".ouro"))
         .map((f: string) => f.replace(".ouro", ""))
+        .filter((agent: string) => {
+          try {
+            const config = JSON.parse(require("fs").readFileSync(path.join(bundlesDir, `${agent}.ouro`, "agent.json"), "utf-8"))
+            return config.enabled !== false
+          } catch { return false }
+        })
       for (const agent of agents) {
-        await deps.sendCommand(deps.socketPath, { kind: "message.send", from: `claude-code:${sessionId}`, to: agent, content } as DaemonCommand)
+        await deps.sendCommand(deps.socketPath, { kind: "message.send", from: `claude-code:${sessionId}`, to: agent, content } as DaemonCommand).catch(() => {})
+        await deps.sendCommand(deps.socketPath, { kind: "inner.wake", agent } as DaemonCommand).catch(() => {})
       }
-      await deps.sendCommand(deps.socketPath, { kind: "inner.wake", agent: agents[0] } as DaemonCommand).catch(() => {})
     } catch { /* daemon not running — silent */ }
 
     // Output for Claude Code hook system
