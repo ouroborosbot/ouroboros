@@ -1,10 +1,7 @@
-import * as fs from "fs"
-import * as path from "path"
 import type { Readable, Writable } from "stream"
 import { sendDaemonCommand } from "./socket-client"
 import type { DaemonCommand, DaemonResponse } from "./daemon"
 import * as agentService from "./agent-service"
-import { getAgentRoot } from "../identity"
 import { emitNervesEvent } from "../../nerves/runtime"
 import { runSenseTurn } from "../../senses/shared-turn"
 import { resolveSessionId } from "./session-id-resolver"
@@ -303,22 +300,8 @@ export function createMcpServer(options: McpServerOptions): McpServer {
     }
 
     if (toolName === "check_response") {
-      // Check this session's pending queue first, then all other mcp sessions for this friend
-      // (ponder responses may route to a different mcp session via surface tool)
       const pendingDir = getPendingDir(agent, friendId, "mcp", sessionId)
-      let pending = drainPending(pendingDir)
-      if (pending.length === 0) {
-        // Check other mcp sessions for this friend
-        const mcpDir = path.join(getAgentRoot(agent), "state", "pending", friendId, "mcp")
-        try {
-          const otherKeys = fs.readdirSync(mcpDir).filter((k: string) => k !== sessionId)
-          for (const key of otherKeys) {
-            const otherDir = path.join(mcpDir, key)
-            const otherPending = drainPending(otherDir)
-            pending.push(...otherPending)
-          }
-        } catch { /* no other sessions */ }
-      }
+      const pending = drainPending(pendingDir)
       if (pending.length === 0) {
         writeResponse({
           jsonrpc: "2.0",
