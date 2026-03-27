@@ -134,8 +134,18 @@ export async function runSenseTurn(options: RunSenseTurnOptions): Promise<RunSen
   if (ponderDeferred) {
     finalResponse = "the agent is pondering this — check back shortly via check_response."
   } else if (responseText.length === 0) {
-    // Gate rejection or empty response
-    finalResponse = ""
+    // Agent settled but no text came through callbacks — check session transcript for the settle answer
+    const postTurnSession = loadSession(sessPath)
+    if (postTurnSession?.messages) {
+      const lastAssistant = [...postTurnSession.messages].reverse().find(m => m.role === "assistant")
+      if (lastAssistant && typeof lastAssistant.content === "string" && lastAssistant.content.trim()) {
+        finalResponse = lastAssistant.content
+      } else {
+        finalResponse = "(agent responded but response was empty)"
+      }
+    } else {
+      finalResponse = "(agent responded but response was empty)"
+    }
   } else {
     finalResponse = responseText
   }

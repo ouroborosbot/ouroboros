@@ -1117,7 +1117,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
           type: "object",
           properties: {
             friendId: { type: "string", description: "the friend UUID (or 'self')" },
-            channel: { type: "string", description: "the channel: cli, teams, or inner" },
+            channel: { type: "string", description: "the channel: cli, teams, bluebubbles, inner, or mcp" },
             key: { type: "string", description: "session key (defaults to 'session')" },
             messageCount: { type: "string", description: "how many recent messages to return (default 20)" },
             mode: {
@@ -1210,7 +1210,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
           type: "object",
           properties: {
             friendId: { type: "string", description: "the friend UUID (or 'self')" },
-            channel: { type: "string", description: "the channel: cli, teams, or inner" },
+            channel: { type: "string", description: "the channel: cli, teams, bluebubbles, inner, or mcp" },
             key: { type: "string", description: "session key (defaults to 'session')" },
             content: { type: "string", description: "the message content to send" },
           },
