@@ -17,9 +17,9 @@ describe("mcp channel capabilities", () => {
     expect(caps.availableIntegrations).toEqual([])
   })
 
-  it("does not support markdown", () => {
+  it("supports markdown (dev tools render markdown)", () => {
     const caps = getChannelCapabilities("mcp")
-    expect(caps.supportsMarkdown).toBe(false)
+    expect(caps.supportsMarkdown).toBe(true)
   })
 
   it("does not support streaming", () => {

@@ -45,7 +45,7 @@ const CHANNEL_CAPABILITIES: Record<string, ChannelCapabilities> = {
     channel: "mcp",
     senseType: "local",
     availableIntegrations: [],
-    supportsMarkdown: false,
+    supportsMarkdown: true,
     supportsStreaming: false,
     supportsRichCards: false,
     maxMessageLength: Infinity,
