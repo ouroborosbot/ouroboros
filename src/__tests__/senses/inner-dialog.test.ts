@@ -1144,7 +1144,16 @@ describe("inner dialog runtime", () => {
     expect(content).toContain("Unit 2b editing src/repertoire/tools.ts")
   })
 
-  it("uses contextual heartbeat builder on resumed session with reason heartbeat", async () => {
+  it("uses contextual heartbeat builder on resumed session with reason habit + heartbeat", async () => {
+    // Create heartbeat habit file
+    const habitsDir = path.join(agentRoot, "habits")
+    fs.mkdirSync(habitsDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(habitsDir, "heartbeat.md"),
+      "---\ntitle: Heartbeat\ncadence: 30m\nstatus: active\nlastRun: 2026-03-06T11:30:00.000Z\ncreated: 2026-03-01\n---\n\nCheck in on responsibilities.",
+      "utf8",
+    )
+
     mockLoadSession.mockReturnValue({
       messages: [
         { role: "system", content: "system prompt" },
@@ -1154,7 +1163,8 @@ describe("inner dialog runtime", () => {
     mockBuildContextualHeartbeat.mockReturnValueOnce("contextual heartbeat with journal context")
 
     await runInnerDialogTurn({
-      reason: "heartbeat",
+      reason: "habit",
+      habitName: "heartbeat",
       now: () => new Date("2026-03-06T12:05:00.000Z"),
     })
 
@@ -1467,15 +1477,13 @@ describe("inner dialog runtime", () => {
         { role: "assistant", content: "ready for next cycle" },
       ],
     })
-    mockBuildContextualHeartbeat.mockReturnValueOnce("contextual heartbeat default")
 
     await runInnerDialogTurn()
 
-    // Default reason is "heartbeat", so on resumed session uses contextual heartbeat
-    expect(mockBuildContextualHeartbeat).toHaveBeenCalledTimes(1)
+    // Default reason is now "instinct", so on resumed session uses instinct message
     const input = mockHandleInboundTurn.mock.calls[0][0]
     const content = String(input.messages[0].content)
-    expect(content).toBe("contextual heartbeat default")
+    expect(content).toContain("stirring")
   })
 
   // ── Return value propagation ──────────────────────────────────────
