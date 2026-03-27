@@ -1,23 +1,15 @@
 import { emitNervesEvent } from "../../nerves/runtime"
 import { parseFrontmatter } from "../../repertoire/tasks/parser"
+import {
+  parseCadenceToMs as _parseCadenceToMs,
+  DEFAULT_CADENCE_MS as _DEFAULT_CADENCE_MS,
+} from "./cadence"
 
-export const DEFAULT_CADENCE_MS = 30 * 60 * 1000 // 30 minutes
+// Re-export for backward compatibility
+export const DEFAULT_CADENCE_MS = _DEFAULT_CADENCE_MS
 
 export function parseCadenceMs(raw: unknown): number | null {
-  if (typeof raw !== "string") return null
-  const value = raw.trim()
-  if (!value) return null
-
-  const match = /^(\d+)(m|h|d)$/.exec(value)
-  if (!match) return null
-
-  const interval = Number.parseInt(match[1], 10)
-  if (!Number.isFinite(interval) || interval <= 0) return null
-
-  const unit = match[2]
-  if (unit === "m") return interval * 60 * 1000
-  if (unit === "h") return interval * 60 * 60 * 1000
-  return interval * 24 * 60 * 60 * 1000
+  return _parseCadenceToMs(raw)
 }
 
 type ReadFileSync = (filePath: string, encoding: string) => string
