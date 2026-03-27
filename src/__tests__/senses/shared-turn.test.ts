@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions"
 import type { ChannelCallbacks } from "../../heart/core"
-import type { FriendRecord, ResolvedContext, ChannelCapabilities, Channel } from "../../mind/friends/types"
-import type { FriendStore } from "../../mind/friends/store"
-import type { UsageData } from "../../mind/context"
-import type { PendingMessage } from "../../mind/pending"
+import type { FriendRecord, ResolvedContext, ChannelCapabilities } from "../../mind/friends/types"
 import type { InboundTurnResult } from "../../senses/pipeline"
 
 // ── Mocks ──────────────────────────────────────────────────────
@@ -41,13 +38,21 @@ vi.mock("../../mind/prompt", async () => {
 })
 
 const mockSessionPath = vi.fn().mockReturnValue("/tmp/session.json")
-const mockLoadSession = vi.fn().mockReturnValue(null)
 
 vi.mock("../../heart/config", async () => {
   const actual = await vi.importActual<typeof import("../../heart/config")>("../../heart/config")
   return {
     ...actual,
     sessionPath: (...args: any[]) => mockSessionPath(...args),
+  }
+})
+
+const mockLoadSession = vi.fn().mockReturnValue(null)
+
+vi.mock("../../mind/context", async () => {
+  const actual = await vi.importActual<typeof import("../../mind/context")>("../../mind/context")
+  return {
+    ...actual,
     loadSession: (...args: any[]) => mockLoadSession(...args),
   }
 })
@@ -97,23 +102,29 @@ vi.mock("../../mind/friends/channel", async () => {
 })
 
 const mockFriendResolve = vi.fn()
-const mockFileFriendStore = vi.fn()
 
 vi.mock("../../mind/friends/resolver", async () => {
   const actual = await vi.importActual<typeof import("../../mind/friends/resolver")>("../../mind/friends/resolver")
   return {
     ...actual,
-    FriendResolver: vi.fn().mockImplementation(() => ({
-      resolve: (...args: any[]) => mockFriendResolve(...args),
-    })),
+    FriendResolver: vi.fn().mockImplementation(function () { return { resolve: (...args: any[]) => mockFriendResolve(...args) } }),
   }
 })
+
+const mockStoreInstance = {
+  get: vi.fn().mockResolvedValue(null),
+  put: vi.fn().mockResolvedValue(undefined),
+  delete: vi.fn().mockResolvedValue(undefined),
+  findByExternalId: vi.fn().mockResolvedValue(null),
+  hasAnyFriends: vi.fn().mockResolvedValue(true),
+  listAll: vi.fn().mockResolvedValue([]),
+}
 
 vi.mock("../../mind/friends/store-file", async () => {
   const actual = await vi.importActual<typeof import("../../mind/friends/store-file")>("../../mind/friends/store-file")
   return {
     ...actual,
-    FileFriendStore: vi.fn().mockImplementation(() => mockFileFriendStore()),
+    FileFriendStore: vi.fn().mockImplementation(function () { return mockStoreInstance }),
   }
 })
 
@@ -154,17 +165,6 @@ function makeResolvedContext(): ResolvedContext {
   return { friend: makeFriend(), channel: makeMcpCapabilities() }
 }
 
-function makeStore(friend?: FriendRecord): FriendStore {
-  const f = friend ?? makeFriend()
-  return {
-    get: vi.fn().mockResolvedValue(f),
-    put: vi.fn().mockResolvedValue(undefined),
-    delete: vi.fn().mockResolvedValue(undefined),
-    findByExternalId: vi.fn().mockResolvedValue(f),
-    hasAnyFriends: vi.fn().mockResolvedValue(true),
-    listAll: vi.fn().mockResolvedValue([f]),
-  }
-}
 
 // Set up default handleInboundTurn mock that simulates a settle with text response
 function setupSettledTurn(text: string = "hello from the agent") {
@@ -213,7 +213,6 @@ describe("runSenseTurn", () => {
     vi.clearAllMocks()
     setupSettledTurn()
     mockFriendResolve.mockResolvedValue(makeResolvedContext())
-    mockFileFriendStore.mockReturnValue(makeStore())
   })
 
   it("returns response text from a settled turn", async () => {
