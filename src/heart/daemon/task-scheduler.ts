@@ -126,7 +126,7 @@ export class TaskDrivenScheduler {
 
     for (const agent of this.agents) {
       const taskRoot = path.join(this.bundlesRoot, `${agent}.ouro`, "tasks")
-      const collections = ["one-shots", "ongoing", "habits"]
+      const collections = ["one-shots", "ongoing"]
       const files: string[] = []
       for (const collection of collections) {
         walkMarkdownFiles(path.join(taskRoot, collection), this.readdirSync, this.existsSync, files)

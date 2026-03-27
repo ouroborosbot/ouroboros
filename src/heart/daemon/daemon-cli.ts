@@ -2003,7 +2003,7 @@ function executeReminderCommand(command: ReminderCliCommand, taskMod: TaskModule
   try {
     const created = taskMod.createTask({
       title: command.title,
-      type: command.cadence ? "habit" : "one-shot",
+      type: command.cadence ? "ongoing" : "one-shot",
       category: command.category ?? "reminder",
       body: command.body,
       scheduledAt: command.scheduledAt,

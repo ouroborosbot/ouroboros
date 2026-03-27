@@ -4204,7 +4204,7 @@ describe("ouro reminder CLI execution", () => {
     expect(mockTaskModule.createTask).toHaveBeenCalledWith(
       expect.objectContaining({
         title: "Heartbeat",
-        type: "habit",
+        type: "ongoing",
         category: "reminder",
         body: "Run heartbeat",
         cadence: "30m",
