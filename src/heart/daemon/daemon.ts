@@ -651,6 +651,25 @@ export class OuroDaemon {
       meta: { kind: command.kind },
     })
 
+    try {
+      return await this.handleCommandInner(command)
+    } catch (error) {
+      emitNervesEvent({
+        level: "error",
+        component: "daemon",
+        event: "daemon.command_error",
+        message: "unexpected error handling daemon command",
+        meta: {
+          kind: command.kind,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack ?? null : null,
+        },
+      })
+      throw error
+    }
+  }
+
+  private async handleCommandInner(command: DaemonCommand): Promise<DaemonResponse> {
     switch (command.kind) {
       case "daemon.start":
         await this.start()
