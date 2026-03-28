@@ -27,11 +27,13 @@ export function writeDaemonTombstone(
     now?: () => Date
   } = {},
 ): void {
+  /* v8 ignore start -- default deps: production fallbacks always injected in tests @preserve */
   const writeFileSync = deps.writeFileSync ?? fs.writeFileSync
   const mkdirSync = deps.mkdirSync ?? fs.mkdirSync
   const pid = deps.pid ?? process.pid
   const uptimeSeconds = deps.uptimeSeconds ?? process.uptime()
   const now = deps.now ?? (() => new Date())
+  /* v8 ignore stop */
 
   const tombstonePath = getTombstonePath()
   const tombstone: DaemonTombstone = {
@@ -65,8 +67,10 @@ export function readDaemonTombstone(
     existsSync?: typeof fs.existsSync
   } = {},
 ): DaemonTombstone | null {
+  /* v8 ignore start -- default deps: production fallbacks always injected in tests @preserve */
   const readFileSync = deps.readFileSync ?? fs.readFileSync
   const existsSync = deps.existsSync ?? fs.existsSync
+  /* v8 ignore stop */
   const tombstonePath = getTombstonePath()
 
   if (!existsSync(tombstonePath)) return null

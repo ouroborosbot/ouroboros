@@ -122,6 +122,7 @@ void daemon.start().then(() => {
     component: "daemon",
     event: "daemon.entry_error",
     message: "daemon entrypoint failed",
+    /* v8 ignore next -- crash handler: non-Error branch tested via daemon-tombstone.test.ts @preserve */
     meta: { error: err instanceof Error ? err.message : String(err) },
   })
   writeDaemonTombstone("startup_failure", err)

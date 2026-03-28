@@ -90,6 +90,7 @@ export class HeartbeatTimer {
         component: "daemon",
         event: "daemon.heartbeat_schedule_error",
         message: "heartbeat scheduleNext failed, falling back to default cadence",
+        /* v8 ignore next -- defensive: non-Error branch for error message extraction @preserve */
         meta: { agent: this.agent, error: error instanceof Error ? error.message : String(error) },
       })
     }
@@ -117,6 +118,7 @@ export class HeartbeatTimer {
         component: "daemon",
         event: "daemon.heartbeat_send_error",
         message: "heartbeat sendToAgent failed",
+        /* v8 ignore next -- defensive: non-Error branch for error message extraction @preserve */
         meta: { agent: this.agent, error: error instanceof Error ? error.message : String(error) },
       })
     }

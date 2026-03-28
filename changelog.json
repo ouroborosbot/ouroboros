@@ -2,6 +2,18 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.147",
+      "changes": [
+        "Daemon resilience overhaul: uncaughtException handler writes tombstone to ~/.ouro-cli/daemon-death.json with graceful 5s shutdown deadline.",
+        "Log rotation: ndjson file sinks rotate at 50MB with .1/.2 scheme, throttled size checks every ~1MB.",
+        "HeartbeatTimer error isolation: sendToAgent and scheduleNext failures caught and logged, timer continues.",
+        "Socket error handling: connection.on('error') prevents EPIPE crashes, persistent server error handler after listen.",
+        "Crash context in status: lastExitCode/lastSignal in worker table, tombstone shown when daemon stopped.",
+        "Cooldown recovery: after restart exhaustion, retry after 5 minutes (up to 3 times) with reset crash history.",
+        "Defensive handleCommand wrapping: errors logged with command context before re-throw."
+      ]
+    },
+    {
       "version": "0.1.0-alpha.146",
       "changes": [
         "fix(hook): target specific agent only, ouro up breaks dev dispatch loop"

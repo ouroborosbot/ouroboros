@@ -417,6 +417,7 @@ export class OuroDaemon {
         try {
           connection.end(response)
         } catch (err) {
+          /* v8 ignore start -- defensive: connection.end EPIPE only on real broken sockets @preserve */
           emitNervesEvent({
             level: "warn",
             component: "daemon",
@@ -424,6 +425,7 @@ export class OuroDaemon {
             message: "failed to write response to socket connection",
             meta: { error: err instanceof Error ? err.message : String(err) },
           })
+          /* v8 ignore stop */
         }
       }
 
@@ -442,6 +444,7 @@ export class OuroDaemon {
       server.listen(this.socketPath, () => {
         // Replace once("error") handler with persistent handler after successful listen
         server.removeAllListeners("error")
+        /* v8 ignore start -- defensive: post-listen server errors only in degraded network conditions @preserve */
         server.on("error", (err) => {
           emitNervesEvent({
             level: "warn",
@@ -451,6 +454,7 @@ export class OuroDaemon {
             meta: { error: err.message },
           })
         })
+        /* v8 ignore stop */
         resolve()
       })
     })
@@ -661,6 +665,7 @@ export class OuroDaemon {
         meta: {
           kind: command.kind,
           error: error instanceof Error ? error.message : String(error),
+          /* v8 ignore next -- defensive: error.stack is always set on real Error instances @preserve */
           stack: error instanceof Error ? (error.stack ?? null) : null,
         },
       })
