@@ -13,6 +13,7 @@ import { listEnabledBundleAgents } from "./agent-discovery"
 import { getRepoRoot, getAgentBundlesRoot } from "../identity"
 import { detectRuntimeMode } from "./runtime-mode"
 import { HeartbeatTimer } from "./heartbeat-timer"
+import { writeDaemonTombstone } from "./daemon-tombstone"
 
 function parseSocketPath(argv: string[]): string {
   const socketIndex = argv.indexOf("--socket")
@@ -114,15 +115,16 @@ void daemon.start().then(() => {
     timer.start()
     heartbeatTimers.push(timer)
   }
-}).catch(async () => {
+}).catch(async (err: unknown) => {
 /* v8 ignore stop */
   emitNervesEvent({
     level: "error",
     component: "daemon",
     event: "daemon.entry_error",
     message: "daemon entrypoint failed",
-    meta: {},
+    meta: { error: err instanceof Error ? err.message : String(err) },
   })
+  writeDaemonTombstone("startup_failure", err)
   await daemon.stop()
   process.exit(1)
 })
@@ -135,4 +137,34 @@ process.on("SIGINT", () => {
 process.on("SIGTERM", () => {
   for (const timer of heartbeatTimers) timer.stop()
   void daemon.stop().then(() => process.exit(0))
+})
+
+/* v8 ignore start -- crash handler: only fires on uncaught exceptions in production @preserve */
+process.on("uncaughtException", (error) => {
+  emitNervesEvent({
+    level: "error",
+    component: "daemon",
+    event: "daemon.uncaught_exception",
+    message: "uncaught exception in daemon process",
+    meta: { error: error.message, stack: error.stack ?? null },
+  })
+  writeDaemonTombstone("uncaughtException", error)
+  for (const timer of heartbeatTimers) timer.stop()
+  const deadline = setTimeout(() => process.exit(1), 5000)
+  if (typeof deadline.unref === "function") deadline.unref()
+  void daemon.stop().then(
+    () => process.exit(1),
+    () => process.exit(1),
+  )
+})
+/* v8 ignore stop */
+
+process.on("unhandledRejection", (reason) => {
+  emitNervesEvent({
+    level: "error",
+    component: "daemon",
+    event: "daemon.unhandled_rejection",
+    message: "unhandled promise rejection in daemon process",
+    meta: { reason: reason instanceof Error ? reason.message : String(reason) },
+  })
 })

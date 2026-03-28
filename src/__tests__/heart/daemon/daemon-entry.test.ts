@@ -18,10 +18,19 @@ vi.mock("../../../heart/daemon/heartbeat-timer", () => ({
   },
 }))
 
+const { writeDaemonTombstoneMock } = vi.hoisted(() => ({
+  writeDaemonTombstoneMock: vi.fn(),
+}))
+
+vi.mock("../../../heart/daemon/daemon-tombstone", () => ({
+  writeDaemonTombstone: writeDaemonTombstoneMock,
+}))
+
 describe("daemon entrypoint", () => {
   afterEach(() => {
     listEnabledBundleAgentsMock.mockReset()
     listEnabledBundleAgentsMock.mockReturnValue([])
+    writeDaemonTombstoneMock.mockReset()
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })
@@ -148,6 +157,8 @@ describe("daemon entrypoint", () => {
     )
     expect(onSpy).toHaveBeenCalledWith("SIGINT", expect.any(Function))
     expect(onSpy).toHaveBeenCalledWith("SIGTERM", expect.any(Function))
+    expect(onSpy).toHaveBeenCalledWith("uncaughtException", expect.any(Function))
+    expect(onSpy).toHaveBeenCalledWith("unhandledRejection", expect.any(Function))
 
     onHandlers.SIGINT?.()
     await Promise.resolve()
@@ -390,6 +401,149 @@ describe("daemon entrypoint", () => {
       }),
     )
     expect(configureDaemonRuntimeLogger).toHaveBeenCalledWith("daemon")
+
+    argvSpy.mockRestore()
+  })
+
+  it("emits nerves event on unhandledRejection without exiting", async () => {
+    vi.resetModules()
+
+    const start = vi.fn(async () => undefined)
+    const stop = vi.fn(async () => undefined)
+    const emitNervesEvent = vi.fn()
+    const configureDaemonRuntimeLogger = vi.fn()
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => code as never) as any)
+    const onHandlers: Record<string, (...args: unknown[]) => void> = {}
+    vi.spyOn(process, "on").mockImplementation(((event: string, cb: (...args: unknown[]) => void) => {
+      onHandlers[event] = cb
+      return process
+    }) as any)
+
+    class MockOuroDaemon {
+      start = start
+      stop = stop
+    }
+
+    class MockProcessManager {
+      listAgentSnapshots = vi.fn(() => [])
+    }
+
+    vi.doMock("../../../heart/daemon/daemon", () => ({
+      OuroDaemon: MockOuroDaemon,
+    }))
+    vi.doMock("../../../heart/daemon/process-manager", () => ({
+      DaemonProcessManager: MockProcessManager,
+    }))
+    vi.doMock("../../../nerves/runtime", () => ({ emitNervesEvent }))
+    vi.doMock("../../../heart/daemon/runtime-logging", () => ({ configureDaemonRuntimeLogger }))
+
+    const argvSpy = vi.spyOn(process, "argv", "get").mockReturnValue(["node", "daemon-entry.js"])
+
+    await import("../../../heart/daemon/daemon-entry")
+    await Promise.resolve()
+
+    // Trigger unhandledRejection
+    onHandlers.unhandledRejection?.(new Error("rejected promise"))
+
+    expect(emitNervesEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: "error",
+        event: "daemon.unhandled_rejection",
+        meta: expect.objectContaining({ reason: "rejected promise" }),
+      }),
+    )
+    // Should NOT exit
+    expect(exitSpy).not.toHaveBeenCalledWith(1)
+
+    argvSpy.mockRestore()
+  })
+
+  it("emits nerves event on unhandledRejection with non-Error reason", async () => {
+    vi.resetModules()
+
+    const start = vi.fn(async () => undefined)
+    const stop = vi.fn(async () => undefined)
+    const emitNervesEvent = vi.fn()
+    const configureDaemonRuntimeLogger = vi.fn()
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => code as never) as any)
+    const onHandlers: Record<string, (...args: unknown[]) => void> = {}
+    vi.spyOn(process, "on").mockImplementation(((event: string, cb: (...args: unknown[]) => void) => {
+      onHandlers[event] = cb
+      return process
+    }) as any)
+
+    class MockOuroDaemon {
+      start = start
+      stop = stop
+    }
+
+    class MockProcessManager {
+      listAgentSnapshots = vi.fn(() => [])
+    }
+
+    vi.doMock("../../../heart/daemon/daemon", () => ({
+      OuroDaemon: MockOuroDaemon,
+    }))
+    vi.doMock("../../../heart/daemon/process-manager", () => ({
+      DaemonProcessManager: MockProcessManager,
+    }))
+    vi.doMock("../../../nerves/runtime", () => ({ emitNervesEvent }))
+    vi.doMock("../../../heart/daemon/runtime-logging", () => ({ configureDaemonRuntimeLogger }))
+
+    const argvSpy = vi.spyOn(process, "argv", "get").mockReturnValue(["node", "daemon-entry.js"])
+
+    await import("../../../heart/daemon/daemon-entry")
+    await Promise.resolve()
+
+    // Trigger with string reason
+    onHandlers.unhandledRejection?.("string rejection reason")
+
+    expect(emitNervesEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "daemon.unhandled_rejection",
+        meta: expect.objectContaining({ reason: "string rejection reason" }),
+      }),
+    )
+
+    argvSpy.mockRestore()
+  })
+
+  it("writes tombstone when daemon start fails", async () => {
+    vi.resetModules()
+
+    const startError = new Error("startup boom")
+    const start = vi.fn(async () => { throw startError })
+    const stop = vi.fn(async () => undefined)
+    const emitNervesEvent = vi.fn()
+    const configureDaemonRuntimeLogger = vi.fn()
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => code as never) as any)
+    vi.spyOn(process, "on").mockImplementation(((_event: string, _cb: () => void) => process) as any)
+
+    class MockOuroDaemon {
+      start = start
+      stop = stop
+    }
+
+    class MockProcessManager {
+      listAgentSnapshots = vi.fn(() => [])
+    }
+
+    vi.doMock("../../../heart/daemon/daemon", () => ({
+      OuroDaemon: MockOuroDaemon,
+    }))
+    vi.doMock("../../../heart/daemon/process-manager", () => ({
+      DaemonProcessManager: MockProcessManager,
+    }))
+    vi.doMock("../../../nerves/runtime", () => ({ emitNervesEvent }))
+    vi.doMock("../../../heart/daemon/runtime-logging", () => ({ configureDaemonRuntimeLogger }))
+
+    const argvSpy = vi.spyOn(process, "argv", "get").mockReturnValue(["node", "daemon-entry.js"])
+
+    await import("../../../heart/daemon/daemon-entry")
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(writeDaemonTombstoneMock).toHaveBeenCalledWith("startup_failure", startError)
 
     argvSpy.mockRestore()
   })
