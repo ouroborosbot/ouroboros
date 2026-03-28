@@ -41,6 +41,7 @@ import { syncGlobalOuroBotWrapper as defaultSyncGlobalOuroBotWrapper } from "./o
 import { installLaunchAgent, uninstallLaunchAgent, isDaemonInstalled, type LaunchdDeps } from "./launchd"
 import { DEFAULT_DAEMON_SOCKET_PATH, sendDaemonCommand, checkDaemonSocketAlive } from "./socket-client"
 import type { CheckForUpdateResult } from "./update-checker"
+import { readDaemonTombstone } from "./daemon-tombstone"
 import { listSessionActivity } from "../session-activity"
 import {
   loadAgentSecrets,
@@ -180,6 +181,8 @@ interface StatusWorkerRow {
   status: string
   pid: number | null
   restartCount: number
+  lastExitCode: number | null
+  lastSignal: string | null
 }
 
 interface StatusPayload {
@@ -259,6 +262,8 @@ function parseStatusPayload(data: unknown): StatusPayload | null {
       status,
       pid,
       restartCount,
+      lastExitCode: row.lastExitCode === null || row.lastExitCode === undefined ? null : numberField(row.lastExitCode),
+      lastSignal: row.lastSignal === null || row.lastSignal === undefined ? null : stringField(row.lastSignal),
     } satisfies StatusWorkerRow
   })
 
@@ -314,13 +319,23 @@ function formatDaemonStatusOutput(response: DaemonResponse, fallback: string): s
     row.status,
     row.detail,
   ])
-  const workerRows = payload.workers.map((row) => [
-    row.agent,
-    row.worker,
-    row.status,
-    row.pid === null ? "n/a" : String(row.pid),
-    String(row.restartCount),
-  ])
+  const workerRows = payload.workers.map((row) => {
+    let exitInfo = "n/a"
+    if (row.lastExitCode !== null || row.lastSignal !== null) {
+      const parts: string[] = []
+      if (row.lastExitCode !== null) parts.push(`code=${row.lastExitCode}`)
+      if (row.lastSignal !== null) parts.push(`signal=${row.lastSignal}`)
+      exitInfo = parts.join(" ")
+    }
+    return [
+      row.agent,
+      row.worker,
+      row.status,
+      row.pid === null ? "n/a" : String(row.pid),
+      String(row.restartCount),
+      exitInfo,
+    ]
+  })
 
   return [
     "Overview",
@@ -330,7 +345,7 @@ function formatDaemonStatusOutput(response: DaemonResponse, fallback: string): s
     formatTable(["Agent", "Sense", "Enabled", "State", "Detail"], senseRows),
     "",
     "Workers",
-    formatTable(["Agent", "Worker", "State", "PID", "Restarts"], workerRows),
+    formatTable(["Agent", "Worker", "State", "PID", "Restarts", "Last Exit"], workerRows),
   ].join("\n")
 }
 
@@ -464,15 +479,24 @@ function buildStoppedStatusPayload(socketPath: string): StatusPayload {
 }
 
 function daemonUnavailableStatusOutput(socketPath: string): string {
-  return [
+  const tombstone = readDaemonTombstone()
+  const tombstoneLine = tombstone
+    ? `Last death: ${tombstone.timestamp} -- ${tombstone.reason}: ${tombstone.message}`
+    : null
+  const lines = [
     formatDaemonStatusOutput({
       ok: true,
       summary: "daemon not running",
       data: buildStoppedStatusPayload(socketPath),
     }, "daemon not running"),
     "",
-    "daemon not running; run `ouro up`",
-  ].join("\n")
+  ]
+  if (tombstoneLine) {
+    lines.push(tombstoneLine)
+    lines.push("")
+  }
+  lines.push("daemon not running; run `ouro up`")
+  return lines.join("\n")
 }
 
 function isDaemonUnavailableError(error: unknown): boolean {
