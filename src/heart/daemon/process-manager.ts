@@ -22,6 +22,8 @@ export interface DaemonAgentSnapshot {
   startedAt: string | null
   lastCrashAt: string | null
   backoffMs: number
+  lastExitCode: number | null
+  lastSignal: string | null
 }
 
 export interface DaemonProcessManagerOptions {
@@ -89,6 +91,8 @@ export class DaemonProcessManager {
           startedAt: null,
           lastCrashAt: null,
           backoffMs: this.initialBackoffMs,
+          lastExitCode: null,
+          lastSignal: null,
         },
       })
     }
@@ -229,6 +233,8 @@ export class DaemonProcessManager {
     if (!state.process) return
     state.process = null
     state.snapshot.pid = null
+    state.snapshot.lastExitCode = code
+    state.snapshot.lastSignal = signal
 
     const crashed = !state.stopRequested && code !== 0
     const now = this.now()

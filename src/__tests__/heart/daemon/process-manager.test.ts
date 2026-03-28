@@ -550,4 +550,61 @@ describe("daemon process manager", () => {
     expect(spawn).toHaveBeenCalledTimes(1)
     expect(manager.getAgentSnapshot("slugger")?.status).toBe("running")
   })
+
+  it("stores lastExitCode and lastSignal on crash", async () => {
+    const child = new MockChild()
+    spawn.mockReturnValue(child)
+    now.mockReturnValue(1_000)
+
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+    })
+
+    await manager.startAgent("slugger")
+    child.emit("exit", 137, "SIGKILL")
+
+    const snapshot = manager.getAgentSnapshot("slugger")
+    expect(snapshot?.lastExitCode).toBe(137)
+    expect(snapshot?.lastSignal).toBe("SIGKILL")
+  })
+
+  it("stores lastExitCode as null on graceful exit with null code", async () => {
+    const child = new MockChild()
+    spawn.mockReturnValue(child)
+    now.mockReturnValue(1_000)
+
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+    })
+
+    await manager.startAgent("slugger")
+    // Simulate a graceful stop (stopRequested flag via stopAgent)
+    await manager.stopAgent("slugger")
+
+    const snapshot = manager.getAgentSnapshot("slugger")
+    expect(snapshot?.lastExitCode).toBeNull()
+    expect(snapshot?.lastSignal).toBeNull()
+  })
+
+  it("initializes lastExitCode and lastSignal as null", () => {
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+    })
+
+    const snapshot = manager.getAgentSnapshot("slugger")
+    expect(snapshot?.lastExitCode).toBeNull()
+    expect(snapshot?.lastSignal).toBeNull()
+  })
 })
