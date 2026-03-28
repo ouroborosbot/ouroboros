@@ -2,9 +2,9 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
-      "version": "0.1.0-alpha.152",
+      "version": "0.1.0-alpha.151",
       "changes": [
-        "fix(nerves): catch EPIPE on terminal sink for detached daemon"
+        "docs: comprehensive update for MCP bridge, daemon resilience, dev mode, hooks"
       ]
     },
     {
