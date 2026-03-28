@@ -49,10 +49,16 @@ export interface InnerDialogState {
   checkpoint?: string
 }
 
+export interface HabitParseErrorInfo {
+  file: string
+  error: string
+}
+
 export interface RunInnerDialogTurnOptions {
   reason?: "boot" | "heartbeat" | "habit" | "instinct"
   taskId?: string
   habitName?: string
+  parseErrors?: HabitParseErrorInfo[]
   instincts?: InnerDialogInstinct[]
   now?: () => Date
   signal?: AbortSignal
@@ -508,6 +514,14 @@ function createNoOpFriendStore(): FriendStore {
   }
 }
 
+export function buildParseErrorNudge(parseErrors: HabitParseErrorInfo[]): string {
+  if (parseErrors.length === 0) return ""
+  const lines = parseErrors.map(
+    (e) => `I noticed my habit file \`${e.file}\` has invalid frontmatter — I should fix it. (${e.error})`,
+  )
+  return lines.join("\n")
+}
+
 function buildAlsoDueLine(agentRoot: string, currentHabitName: string, now: () => Date): string {
   const habitsDir = path.join(agentRoot, "habits")
   let files: string[]
@@ -649,6 +663,10 @@ export async function runInnerDialogTurn(options?: RunInnerDialogTurnOptions): P
         const alsoDue = buildAlsoDueLine(agentRoot, habitName, now)
         userContent = alsoDue ? `${heartbeatContent}\n\n${alsoDue}` : heartbeatContent
 
+        // Parse error nudge
+        const parseErrorNudge = buildParseErrorNudge(options?.parseErrors ?? [])
+        if (parseErrorNudge) userContent = `${userContent}\n\n${parseErrorNudge}`
+
         // Piggyback journal embedding indexing (best-effort, fire-and-forget)
         /* v8 ignore start -- journal indexing piggyback: embedding provider may not be available; tested via journal-index unit tests @preserve */
         void indexJournalFiles(journalDir, path.join(journalDir, ".index.json"), {
@@ -679,6 +697,10 @@ export async function runInnerDialogTurn(options?: RunInnerDialogTurnOptions): P
         // Also due line
         const alsoDue = buildAlsoDueLine(agentRoot, habitName, now)
         if (alsoDue) sections.push(alsoDue)
+
+        // Parse error nudge
+        const parseErrorNudge = buildParseErrorNudge(options?.parseErrors ?? [])
+        if (parseErrorNudge) sections.push(parseErrorNudge)
 
         userContent = sections.join("\n\n")
       } else {

@@ -32,6 +32,11 @@ export interface OverdueHabit {
   elapsedMs: number
 }
 
+export interface HabitParseError {
+  file: string
+  error: string
+}
+
 const WATCH_DEBOUNCE_MS = 200
 
 export class HabitScheduler {
@@ -42,6 +47,7 @@ export class HabitScheduler {
   private readonly deps: HabitSchedulerDeps
   private watcher: FsWatcher | null = null
   private debounceTimer: ReturnType<typeof setTimeout> | null = null
+  private parseErrors: HabitParseError[] = []
 
   constructor(options: HabitSchedulerOptions) {
     this.agent = options.agent
@@ -149,6 +155,10 @@ export class HabitScheduler {
     return overdue
   }
 
+  getParseErrors(): HabitParseError[] {
+    return [...this.parseErrors]
+  }
+
   getHabitFile(name: string): HabitFile | null {
     const filePath = path.join(this.habitsDir, `${name}.md`)
     try {
@@ -190,10 +200,12 @@ export class HabitScheduler {
     try {
       files = this.deps.readdir(this.habitsDir)
     } catch {
+      this.parseErrors = []
       return []
     }
 
     const habits: HabitFile[] = []
+    const errors: HabitParseError[] = []
     for (const file of files) {
       if (!file.endsWith(".md")) continue
 
@@ -203,6 +215,8 @@ export class HabitScheduler {
         const habit = parseHabitFile(content, filePath)
         habits.push(habit)
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        errors.push({ file, error: errorMessage })
         emitNervesEvent({
           level: "error",
           component: "daemon",
@@ -210,12 +224,13 @@ export class HabitScheduler {
           message: "failed to parse habit file",
           meta: {
             file,
-            error: error instanceof Error ? error.message : String(error),
+            error: errorMessage,
             agent: this.agent,
           },
         })
       }
     }
+    this.parseErrors = errors
 
     return habits
   }
