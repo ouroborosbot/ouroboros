@@ -394,11 +394,31 @@ export class OuroDaemon {
       let raw = ""
       let responded = false
 
+      connection.on("error", (err) => {
+        emitNervesEvent({
+          level: "warn",
+          component: "daemon",
+          event: "daemon.connection_error",
+          message: "socket connection error",
+          meta: { error: err.message },
+        })
+      })
+
       const flushResponse = async () => {
         if (responded) return
         responded = true
         const response = await this.handleRawPayload(raw)
-        connection.end(response)
+        try {
+          connection.end(response)
+        } catch (err) {
+          emitNervesEvent({
+            level: "warn",
+            component: "daemon",
+            event: "daemon.connection_write_error",
+            message: "failed to write response to socket connection",
+            meta: { error: err instanceof Error ? err.message : String(err) },
+          })
+        }
       }
 
       connection.on("data", (chunk) => {
@@ -413,7 +433,20 @@ export class OuroDaemon {
     const server = this.server
     await new Promise<void>((resolve, reject) => {
       server.once("error", reject)
-      server.listen(this.socketPath, () => resolve())
+      server.listen(this.socketPath, () => {
+        // Replace once("error") handler with persistent handler after successful listen
+        server.removeAllListeners("error")
+        server.on("error", (err) => {
+          emitNervesEvent({
+            level: "warn",
+            component: "daemon",
+            event: "daemon.server_error",
+            message: "daemon server error after listen",
+            meta: { error: err.message },
+          })
+        })
+        resolve()
+      })
     })
   }
 
