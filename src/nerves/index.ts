@@ -1,4 +1,4 @@
-import { appendFile, mkdirSync } from "fs"
+import { appendFile, existsSync, mkdirSync, renameSync, statSync, unlinkSync } from "fs"
 import { dirname } from "path"
 import { randomUUID } from "crypto"
 
@@ -134,16 +134,52 @@ export function createStderrSink(write: (chunk: string) => unknown = (chunk) => 
   return createTerminalSink(write)
 }
 
-export function createNdjsonFileSink(filePath: string): LogSink {
+const DEFAULT_MAX_SIZE_BYTES = 50 * 1024 * 1024 // 50 MB
+const DEFAULT_CHECK_INTERVAL_BYTES = 1 * 1024 * 1024 // 1 MB
+
+export function rotateIfNeeded(filePath: string, maxSize: number): void {
+  try {
+    const stats = statSync(filePath)
+    if (stats.size <= maxSize) return
+  } catch {
+    return // File doesn't exist or can't be stat'd
+  }
+
+  const base = filePath.replace(/\.ndjson$/, "")
+  const rotated2 = `${base}.2.ndjson`
+  const rotated1 = `${base}.1.ndjson`
+
+  // Delete .2 if it exists
+  try { unlinkSync(rotated2) } catch { /* may not exist */ }
+
+  // Rename .1 -> .2 if it exists
+  try { if (existsSync(rotated1)) renameSync(rotated1, rotated2) } catch { /* best effort */ }
+
+  // Rename current -> .1
+  try { renameSync(filePath, rotated1) } catch { /* best effort */ }
+}
+
+export function createNdjsonFileSink(
+  filePath: string,
+  options?: { maxSizeBytes?: number; checkIntervalBytes?: number },
+): LogSink {
   mkdirSync(dirname(filePath), { recursive: true })
   const queue: string[] = []
   let flushing = false
+  let bytesSinceCheck = 0
+  const maxSize = options?.maxSizeBytes ?? DEFAULT_MAX_SIZE_BYTES
+  const checkInterval = options?.checkIntervalBytes ?? DEFAULT_CHECK_INTERVAL_BYTES
 
   function flush(): void {
     if (flushing || queue.length === 0) return
     flushing = true
     const line = queue.shift() as string
     appendFile(filePath, line, "utf8", () => {
+      bytesSinceCheck += Buffer.byteLength(line, "utf8")
+      if (bytesSinceCheck >= checkInterval) {
+        bytesSinceCheck = 0
+        rotateIfNeeded(filePath, maxSize)
+      }
       flushing = false
       flush()
     })
