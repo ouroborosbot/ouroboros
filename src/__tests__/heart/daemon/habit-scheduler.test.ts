@@ -1027,4 +1027,90 @@ describe("HabitScheduler", () => {
       expect(mockWatcher.close).toHaveBeenCalledTimes(1)
     })
   })
+
+  describe("getParseErrors()", () => {
+    it("returns parse errors from latest reconcile", () => {
+      const readdir = vi.fn(() => ["good.md", "broken.md"])
+      const readFile = vi.fn(() => "content")
+      deps = makeDeps({ readdir, readFile })
+
+      mockParseHabitFile
+        .mockReturnValueOnce(makeHeartbeatHabit())
+        .mockImplementationOnce(() => { throw new Error("invalid frontmatter in broken.md") })
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps,
+      })
+
+      scheduler.start()
+
+      const errors = scheduler.getParseErrors()
+      expect(errors).toHaveLength(1)
+      expect(errors[0].file).toBe("broken.md")
+      expect(errors[0].error).toContain("invalid frontmatter")
+    })
+
+    it("returns empty array when no parse errors", () => {
+      const readdir = vi.fn(() => ["heartbeat.md"])
+      const readFile = vi.fn(() => "content")
+      deps = makeDeps({ readdir, readFile })
+
+      mockParseHabitFile.mockReturnValueOnce(makeHeartbeatHabit())
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps,
+      })
+
+      scheduler.start()
+
+      const errors = scheduler.getParseErrors()
+      expect(errors).toHaveLength(0)
+    })
+
+    it("clears previous parse errors on reconcile", () => {
+      const readdir = vi.fn()
+        .mockReturnValueOnce(["broken.md"])
+        .mockReturnValueOnce(["heartbeat.md"])
+      const readFile = vi.fn(() => "content")
+      deps = makeDeps({ readdir, readFile })
+
+      mockParseHabitFile
+        .mockImplementationOnce(() => { throw new Error("bad") })
+        .mockReturnValueOnce(makeHeartbeatHabit())
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps,
+      })
+
+      scheduler.start()
+      expect(scheduler.getParseErrors()).toHaveLength(1)
+
+      scheduler.reconcile()
+      expect(scheduler.getParseErrors()).toHaveLength(0)
+    })
+
+    it("returns empty array before start() is called", () => {
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps,
+      })
+
+      expect(scheduler.getParseErrors()).toHaveLength(0)
+    })
+  })
 })

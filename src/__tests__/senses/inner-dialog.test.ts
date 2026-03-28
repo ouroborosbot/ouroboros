@@ -1315,6 +1315,94 @@ describe("inner dialog runtime", () => {
     expect(content).toBeDefined()
   })
 
+  // ── Parse error nudge tests ──────────────────────────────────────
+
+  it("includes parse error nudge in habit turn when parseErrors provided", async () => {
+    const habitsDir = path.join(agentRoot, "habits")
+    fs.mkdirSync(habitsDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(habitsDir, "daily-reflection.md"),
+      "---\ntitle: Daily Reflection\ncadence: 1d\nstatus: active\nlastRun: 2026-03-05T22:00:00.000Z\ncreated: 2026-03-01\n---\n\nReflect on the day.",
+      "utf8",
+    )
+
+    mockLoadSession.mockReturnValue({
+      messages: [
+        { role: "system", content: "system prompt" },
+        { role: "assistant", content: "checkpoint: reviewed" },
+      ],
+    })
+
+    await runInnerDialogTurn({
+      reason: "habit",
+      habitName: "daily-reflection",
+      now: () => new Date("2026-03-06T22:00:00.000Z"),
+      parseErrors: [{ file: "broken-habit.md", error: "invalid frontmatter" }],
+    })
+
+    const input = mockHandleInboundTurn.mock.calls[0][0]
+    const content = String(input.messages[0].content)
+    expect(content).toContain("broken-habit.md")
+    expect(content).toContain("invalid frontmatter")
+  })
+
+  it("does not include parse error nudge when parseErrors is empty", async () => {
+    const habitsDir = path.join(agentRoot, "habits")
+    fs.mkdirSync(habitsDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(habitsDir, "daily-reflection.md"),
+      "---\ntitle: Daily Reflection\ncadence: 1d\nstatus: active\nlastRun: 2026-03-05T22:00:00.000Z\ncreated: 2026-03-01\n---\n\nReflect on the day.",
+      "utf8",
+    )
+
+    mockLoadSession.mockReturnValue({
+      messages: [
+        { role: "system", content: "system prompt" },
+        { role: "assistant", content: "checkpoint: reviewed" },
+      ],
+    })
+
+    await runInnerDialogTurn({
+      reason: "habit",
+      habitName: "daily-reflection",
+      now: () => new Date("2026-03-06T22:00:00.000Z"),
+      parseErrors: [],
+    })
+
+    const input = mockHandleInboundTurn.mock.calls[0][0]
+    const content = String(input.messages[0].content)
+    expect(content).not.toContain("invalid frontmatter")
+    expect(content).not.toContain("noticed my habit file")
+  })
+
+  it("does not include parse error nudge when parseErrors not provided", async () => {
+    const habitsDir = path.join(agentRoot, "habits")
+    fs.mkdirSync(habitsDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(habitsDir, "heartbeat.md"),
+      "---\ntitle: Heartbeat\ncadence: 30m\nstatus: active\nlastRun: 2026-03-06T11:30:00.000Z\ncreated: 2026-03-01\n---\n\nCheck in.",
+      "utf8",
+    )
+
+    mockLoadSession.mockReturnValue({
+      messages: [
+        { role: "system", content: "system prompt" },
+        { role: "assistant", content: "checkpoint: reviewed" },
+      ],
+    })
+    mockBuildContextualHeartbeat.mockReturnValueOnce("heartbeat content")
+
+    await runInnerDialogTurn({
+      reason: "habit",
+      habitName: "heartbeat",
+      now: () => new Date("2026-03-06T12:05:00.000Z"),
+    })
+
+    const input = mockHandleInboundTurn.mock.calls[0][0]
+    const content = String(input.messages[0].content)
+    expect(content).not.toContain("noticed my habit file")
+  })
+
   // ── TaskId passthrough tests ──────────────────────────────────────
 
   it("builds task-triggered user message when taskId is provided on resumed session", async () => {
