@@ -90,7 +90,7 @@ describe("daemon process manager", () => {
     expect(spawn).toHaveBeenCalledTimes(2)
   })
 
-  it("stops restarting after max restarts per hour", async () => {
+  it("stops restarting after max restarts per hour (cooldown recovery scheduled)", async () => {
     const first = new MockChild()
     spawn.mockReturnValue(first)
     now.mockReturnValue(1_000)
@@ -108,7 +108,8 @@ describe("daemon process manager", () => {
     first.emit("exit", 1, null)
 
     expect(manager.getAgentSnapshot("slugger")?.status).toBe("crashed")
-    expect(timers).toHaveLength(0)
+    // No immediate restart timer, but cooldown recovery is scheduled (default 5min)
+    expect(timers.every((t) => t.delay >= 5 * 60 * 1_000)).toBe(true)
   })
 
   it("supports explicit stop and restart", async () => {
