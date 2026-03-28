@@ -466,6 +466,244 @@ describe("migrateHabitsFromTaskSystem", () => {
     expect(habitFiles).not.toContain("README.md")
   })
 
+  it("maps unknown task status to active", async () => {
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.migration_test_start",
+      message: "testing unknown status mapping",
+      meta: {},
+    })
+
+    const bundleRoot = makeTempDir("migrate-unknown-status")
+    cleanup.push(bundleRoot)
+
+    const oldHabitsDir = path.join(bundleRoot, "tasks", "habits")
+    fs.mkdirSync(oldHabitsDir, { recursive: true })
+
+    fs.writeFileSync(path.join(oldHabitsDir, "weird-status.md"), [
+      "---",
+      "title: Weird Status",
+      "status: in_review",
+      "cadence: \"1h\"",
+      "lastRun: null",
+      "---",
+      "",
+      "Unknown status body.",
+    ].join("\n"), "utf-8")
+
+    const { migrateHabitsFromTaskSystem } = await import("../../../heart/daemon/habit-migration")
+    migrateHabitsFromTaskSystem(bundleRoot)
+
+    const content = fs.readFileSync(path.join(bundleRoot, "habits", "weird-status.md"), "utf-8")
+    expect(content).toContain("status: active")
+  })
+
+  it("handles unreadable individual file gracefully", async () => {
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.migration_test_start",
+      message: "testing unreadable file",
+      meta: {},
+    })
+
+    const bundleRoot = makeTempDir("migrate-unreadable")
+    cleanup.push(bundleRoot)
+
+    const oldHabitsDir = path.join(bundleRoot, "tasks", "habits")
+    fs.mkdirSync(oldHabitsDir, { recursive: true })
+
+    // Create a file then make it unreadable (symlink to nowhere)
+    const brokenLink = path.join(oldHabitsDir, "broken.md")
+    fs.symlinkSync("/nonexistent/path/to/nowhere", brokenLink)
+
+    // Also create a valid file to ensure migration continues
+    fs.writeFileSync(path.join(oldHabitsDir, "valid.md"), [
+      "---",
+      "title: Valid Habit",
+      "status: processing",
+      "cadence: \"1h\"",
+      "lastRun: null",
+      "---",
+      "",
+      "Valid body.",
+    ].join("\n"), "utf-8")
+
+    const { migrateHabitsFromTaskSystem } = await import("../../../heart/daemon/habit-migration")
+    migrateHabitsFromTaskSystem(bundleRoot)
+
+    // Valid file should still be migrated
+    expect(fs.existsSync(path.join(bundleRoot, "habits", "valid.md"))).toBe(true)
+  })
+
+  it("preserves extra non-task frontmatter fields", async () => {
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.migration_test_start",
+      message: "testing extra field preservation",
+      meta: {},
+    })
+
+    const bundleRoot = makeTempDir("migrate-extra-fields")
+    cleanup.push(bundleRoot)
+
+    const oldHabitsDir = path.join(bundleRoot, "tasks", "habits")
+    fs.mkdirSync(oldHabitsDir, { recursive: true })
+
+    fs.writeFileSync(path.join(oldHabitsDir, "custom.md"), [
+      "---",
+      "title: Custom Habit",
+      "status: processing",
+      "cadence: \"1h\"",
+      "lastRun: null",
+      "custom_field: hello",
+      "priority: high",
+      "---",
+      "",
+      "Custom body.",
+    ].join("\n"), "utf-8")
+
+    const { migrateHabitsFromTaskSystem } = await import("../../../heart/daemon/habit-migration")
+    migrateHabitsFromTaskSystem(bundleRoot)
+
+    const content = fs.readFileSync(path.join(bundleRoot, "habits", "custom.md"), "utf-8")
+    expect(content).toContain("custom_field: hello")
+    expect(content).toContain("priority: high")
+  })
+
+  it("is no-op when tasks/habits/ has only non-md files", async () => {
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.migration_test_start",
+      message: "testing empty md files",
+      meta: {},
+    })
+
+    const bundleRoot = makeTempDir("migrate-no-md")
+    cleanup.push(bundleRoot)
+
+    const oldHabitsDir = path.join(bundleRoot, "tasks", "habits")
+    fs.mkdirSync(oldHabitsDir, { recursive: true })
+    fs.writeFileSync(path.join(oldHabitsDir, "README.md"), "# Habits", "utf-8")
+    fs.writeFileSync(path.join(oldHabitsDir, ".gitkeep"), "", "utf-8")
+
+    const { migrateHabitsFromTaskSystem } = await import("../../../heart/daemon/habit-migration")
+    migrateHabitsFromTaskSystem(bundleRoot)
+
+    expect(fs.existsSync(path.join(bundleRoot, "habits"))).toBe(false)
+  })
+
+  it("skips files without frontmatter marker", async () => {
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.migration_test_start",
+      message: "testing missing frontmatter",
+      meta: {},
+    })
+
+    const bundleRoot = makeTempDir("migrate-no-frontmatter")
+    cleanup.push(bundleRoot)
+
+    const oldHabitsDir = path.join(bundleRoot, "tasks", "habits")
+    fs.mkdirSync(oldHabitsDir, { recursive: true })
+    fs.writeFileSync(path.join(oldHabitsDir, "no-front.md"), "Just plain text, no frontmatter.", "utf-8")
+    fs.writeFileSync(path.join(oldHabitsDir, "valid.md"), [
+      "---",
+      "title: Valid",
+      "status: processing",
+      "cadence: \"1h\"",
+      "lastRun: null",
+      "---",
+      "",
+      "Body.",
+    ].join("\n"), "utf-8")
+
+    const { migrateHabitsFromTaskSystem } = await import("../../../heart/daemon/habit-migration")
+    migrateHabitsFromTaskSystem(bundleRoot)
+
+    expect(fs.existsSync(path.join(bundleRoot, "habits", "valid.md"))).toBe(true)
+    expect(fs.existsSync(path.join(bundleRoot, "habits", "no-front.md"))).toBe(false)
+  })
+
+  it("skips files with unterminated frontmatter", async () => {
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.migration_test_start",
+      message: "testing unterminated frontmatter",
+      meta: {},
+    })
+
+    const bundleRoot = makeTempDir("migrate-unterminated")
+    cleanup.push(bundleRoot)
+
+    const oldHabitsDir = path.join(bundleRoot, "tasks", "habits")
+    fs.mkdirSync(oldHabitsDir, { recursive: true })
+    fs.writeFileSync(path.join(oldHabitsDir, "broken.md"), "---\ntitle: Broken\nstatus: processing\n", "utf-8")
+
+    const { migrateHabitsFromTaskSystem } = await import("../../../heart/daemon/habit-migration")
+    migrateHabitsFromTaskSystem(bundleRoot)
+
+    expect(fs.existsSync(path.join(bundleRoot, "habits", "broken.md"))).toBe(false)
+  })
+
+  it("handles habit file without status field (defaults to active)", async () => {
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.migration_test_start",
+      message: "testing missing status field",
+      meta: {},
+    })
+
+    const bundleRoot = makeTempDir("migrate-no-status")
+    cleanup.push(bundleRoot)
+
+    const oldHabitsDir = path.join(bundleRoot, "tasks", "habits")
+    fs.mkdirSync(oldHabitsDir, { recursive: true })
+    fs.writeFileSync(path.join(oldHabitsDir, "no-status.md"), [
+      "---",
+      "title: No Status",
+      "cadence: \"1h\"",
+      "lastRun: null",
+      "---",
+      "",
+      "Body.",
+    ].join("\n"), "utf-8")
+
+    const { migrateHabitsFromTaskSystem } = await import("../../../heart/daemon/habit-migration")
+    migrateHabitsFromTaskSystem(bundleRoot)
+
+    const content = fs.readFileSync(path.join(bundleRoot, "habits", "no-status.md"), "utf-8")
+    expect(content).toContain("status: active")
+  })
+
+  it("handles habit file without title or cadence fields", async () => {
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.migration_test_start",
+      message: "testing missing title/cadence",
+      meta: {},
+    })
+
+    const bundleRoot = makeTempDir("migrate-no-title-cadence")
+    cleanup.push(bundleRoot)
+
+    const oldHabitsDir = path.join(bundleRoot, "tasks", "habits")
+    fs.mkdirSync(oldHabitsDir, { recursive: true })
+    fs.writeFileSync(path.join(oldHabitsDir, "minimal.md"), [
+      "---",
+      "status: processing",
+      "lastRun: null",
+      "---",
+      "",
+      "Minimal body.",
+    ].join("\n"), "utf-8")
+
+    const { migrateHabitsFromTaskSystem } = await import("../../../heart/daemon/habit-migration")
+    migrateHabitsFromTaskSystem(bundleRoot)
+
+    // Should still migrate, just without title/cadence in frontmatter
+    expect(fs.existsSync(path.join(bundleRoot, "habits", "minimal.md"))).toBe(true)
+  })
+
   it("handles files without timestamp prefix in name gracefully", async () => {
     emitNervesEvent({
       component: "daemon",

@@ -568,10 +568,12 @@ function parseHabitCommand(args: string[]): OuroCliCommand {
         cadence = nameArgs[++i]
         continue
       }
+      /* v8 ignore start -- defensive: --agent already extracted by extractAgentFlag; guard prevents regression if parsing flow changes @preserve */
       if (nameArgs[i] === "--agent" && nameArgs[i + 1]) {
         i++ // skip --agent value (already extracted)
         continue
       }
+      /* v8 ignore stop */
       positional.push(nameArgs[i])
     }
     name = positional[0]

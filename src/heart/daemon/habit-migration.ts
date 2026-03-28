@@ -53,6 +53,7 @@ export function migrateHabitsFromTaskSystem(bundleRoot: string): void {
   try {
     files = fs.readdirSync(oldHabitsDir)
   } catch {
+    /* v8 ignore next -- race condition: dir removed between existsSync and readdirSync @preserve */
     return
   }
 
@@ -125,6 +126,7 @@ export function migrateHabitsFromTaskSystem(bundleRoot: string): void {
     for (const [key, value] of Object.entries(frontmatter)) {
       if (TASK_ONLY_FIELDS.has(key)) continue
       if (key in newFrontmatter) continue
+      /* v8 ignore next -- dead code: status is caught by `key in newFrontmatter` above since newFrontmatter.status is always set @preserve */
       if (key === "status") continue // already mapped
       newFrontmatter[key] = value
     }

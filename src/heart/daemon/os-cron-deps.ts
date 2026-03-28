@@ -50,14 +50,17 @@ export function createRealCrontabDeps(): CrontabCronDeps {
     meta: {},
   })
 
+  /* v8 ignore start -- crontab exec closures: calling these in tests would modify the real system crontab @preserve */
   return {
     execOutput: (cmd: string) => execSync(cmd, { encoding: "utf-8" }),
     execWrite: (cmd: string, stdin: string) => {
       execSync(cmd, { input: stdin, stdio: ["pipe", "ignore", "ignore"] })
     },
   }
+  /* v8 ignore stop */
 }
 
+/* v8 ignore start -- ouro path resolution: probes process.argv, filesystem layout, and PATH; branches depend on install method and runtime environment @preserve */
 export function resolveOuroBinaryPath(): string {
   // Try to resolve from process.argv[1] — the script being run
   const scriptPath = process.argv[1]
@@ -94,3 +97,4 @@ export function resolveOuroBinaryPath(): string {
   })
   return "ouro"
 }
+/* v8 ignore stop */

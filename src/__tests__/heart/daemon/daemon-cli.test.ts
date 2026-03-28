@@ -5632,6 +5632,14 @@ describe("ouro habit CLI parsing", () => {
     })
   })
 
+  it("parses ouro habit create without --agent", () => {
+    expect(parseOuroCommand(["habit", "create", "morning-check", "--cadence", "1h"])).toEqual({
+      kind: "habit.create",
+      name: "morning-check",
+      cadence: "1h",
+    })
+  })
+
   it("throws on ouro habit create without name", () => {
     expect(() => parseOuroCommand(["habit", "create", "--agent", "slugger"])).toThrow("Usage")
   })
@@ -5728,6 +5736,54 @@ describe("ouro habit CLI execution", () => {
   it("ouro habit list returns message when no habits exist", async () => {
     const tempBundle = fs.mkdtempSync(path.join(os.tmpdir(), "habit-list-empty-"))
     cleanup.push(tempBundle)
+
+    const deps = makeDeps({ agentBundleRoot: tempBundle })
+    const result = await runOuroCli(["habit", "list", "--agent", "test"], deps)
+    expect(result).toContain("no habits")
+  })
+
+  it("ouro habit list shows 'none' for habits without cadence and 'never' for null lastRun", async () => {
+    const tempBundle = fs.mkdtempSync(path.join(os.tmpdir(), "habit-list-nocadence-"))
+    cleanup.push(tempBundle)
+    const habitsDir = path.join(tempBundle, "habits")
+    fs.mkdirSync(habitsDir, { recursive: true })
+
+    fs.writeFileSync(path.join(habitsDir, "manual.md"), [
+      "---",
+      "title: Manual Check",
+      "status: active",
+      "lastRun: null",
+      "created: 2026-03-01T00:00:00.000Z",
+      "---",
+      "",
+      "Manual only.",
+    ].join("\n"), "utf-8")
+
+    const deps = makeDeps({ agentBundleRoot: tempBundle })
+    const result = await runOuroCli(["habit", "list", "--agent", "test"], deps)
+    expect(result).toContain("none")
+    expect(result).toContain("never")
+  })
+
+  it("ouro habit create without --cadence uses null cadence", async () => {
+    const tempBundle = fs.mkdtempSync(path.join(os.tmpdir(), "habit-create-nocadence-"))
+    cleanup.push(tempBundle)
+
+    const deps = makeDeps({ agentBundleRoot: tempBundle })
+    const result = await runOuroCli(["habit", "create", "--agent", "test", "meditation"], deps)
+    expect(result).toContain("meditation")
+
+    // Verify file was created with null cadence
+    const content = fs.readFileSync(path.join(tempBundle, "habits", "meditation.md"), "utf-8")
+    expect(content).toContain("cadence: null")
+  })
+
+  it("ouro habit list returns message when habits dir exists but has no .md files", async () => {
+    const tempBundle = fs.mkdtempSync(path.join(os.tmpdir(), "habit-list-emptydir-"))
+    cleanup.push(tempBundle)
+    fs.mkdirSync(path.join(tempBundle, "habits"), { recursive: true })
+    // Only a README, no .md habit files
+    fs.writeFileSync(path.join(tempBundle, "habits", "README.md"), "# Habits", "utf8")
 
     const deps = makeDeps({ agentBundleRoot: tempBundle })
     const result = await runOuroCli(["habit", "list", "--agent", "test"], deps)

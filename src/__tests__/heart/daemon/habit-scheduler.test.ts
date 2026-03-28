@@ -1026,6 +1026,97 @@ describe("HabitScheduler", () => {
 
       expect(mockWatcher.close).toHaveBeenCalledTimes(1)
     })
+
+    it("stopWatching cancels pending debounce timer", () => {
+      const readdir = vi.fn(() => [])
+      const watchDeps = makeWatchableDeps({ readdir })
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps: watchDeps,
+      })
+
+      scheduler.watchForChanges()
+
+      // Trigger an event but DON'T advance timers (debounce is pending)
+      mockWatcher.callback!("change", "heartbeat.md")
+
+      // Stop watching while debounce is pending
+      scheduler.stopWatching()
+
+      // Advance timers — reconcile should NOT fire (timer was cancelled)
+      vi.advanceTimersByTime(500)
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled()
+    })
+
+    it("watchForChanges is no-op when watch dep is not provided", () => {
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps: makeDeps(), // no watch function
+      })
+
+      // Should not throw
+      scheduler.watchForChanges()
+
+      // stopWatching should also be safe
+      scheduler.stopWatching()
+    })
+  })
+
+  describe("edge cases", () => {
+    it("listOverdueHabits skips habits with unparseable cadence", () => {
+      const nowMs = new Date("2026-03-27T12:00:00.000Z").getTime()
+      const readdir = vi.fn(() => ["weird.md"])
+      const readFile = vi.fn(() => "content")
+      const nowFn = vi.fn(() => nowMs)
+      deps = makeDeps({ readdir, readFile, now: nowFn })
+
+      mockParseHabitFile.mockReturnValueOnce({
+        ...makeHeartbeatHabit(),
+        name: "weird",
+        cadence: "invalid",
+      })
+      mockParseCadenceToMs.mockReturnValueOnce(null)
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps,
+      })
+
+      const overdue = scheduler.listOverdueHabits()
+      expect(overdue).toHaveLength(0)
+    })
+
+    it("tracks parse errors for non-Error thrown values", () => {
+      const readdir = vi.fn(() => ["broken.md"])
+      const readFile = vi.fn(() => "content")
+      deps = makeDeps({ readdir, readFile })
+
+      mockParseHabitFile.mockImplementationOnce(() => { throw "string error" })
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps,
+      })
+
+      scheduler.start()
+
+      const errors = scheduler.getParseErrors()
+      expect(errors).toHaveLength(1)
+      expect(errors[0].error).toBe("string error")
+    })
   })
 
   describe("getParseErrors()", () => {
