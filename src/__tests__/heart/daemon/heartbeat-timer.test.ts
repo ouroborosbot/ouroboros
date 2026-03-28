@@ -620,6 +620,80 @@ describe("HeartbeatTimer", () => {
     expect(() => timer.stop()).not.toThrow()
   })
 
+  it("catches and logs sendToAgent errors in fire() without crashing", () => {
+    const sendToAgent = vi.fn(() => { throw new Error("IPC channel closed") })
+    const readFileSync = vi.fn(() => { throw new Error("ENOENT") })
+    const readdirSync = vi.fn(() => [])
+
+    const { timer } = createTimer({ sendToAgent, readFileSync, readdirSync })
+    timer.start()
+
+    // Should not throw when sendToAgent fails
+    vi.advanceTimersByTime(30 * 60 * 1000)
+    expect(sendToAgent).toHaveBeenCalledTimes(1)
+
+    // Should have emitted error nerves event
+    expect(emitNervesEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: "warn",
+        component: "daemon",
+        event: "daemon.heartbeat_send_error",
+        meta: expect.objectContaining({
+          agent: "slugger",
+          error: "IPC channel closed",
+        }),
+      }),
+    )
+
+    // Should still reschedule after error
+    vi.advanceTimersByTime(30 * 60 * 1000)
+    expect(sendToAgent).toHaveBeenCalledTimes(2)
+
+    timer.stop()
+  })
+
+  it("falls back to DEFAULT_CADENCE_MS when scheduleNext throws", () => {
+    let nowCallCount = 0
+    const sendToAgent = vi.fn()
+    const readFileSync = vi.fn(() => { throw new Error("ENOENT") })
+    const readdirSync = vi.fn(() => [])
+
+    // now() works for the first scheduleNext, but throws on the second (after fire)
+    const now = vi.fn(() => {
+      nowCallCount++
+      if (nowCallCount > 1) throw new Error("clock failure")
+      return Date.now()
+    })
+
+    const { timer } = createTimer({ sendToAgent, readFileSync, readdirSync, now })
+    timer.start()
+
+    // First schedule uses default 30m cadence
+    vi.advanceTimersByTime(30 * 60 * 1000)
+    expect(sendToAgent).toHaveBeenCalledTimes(1)
+
+    // After fire, scheduleNext calls now() which throws — should catch
+    // and fall back to DEFAULT_CADENCE_MS
+    expect(emitNervesEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: "warn",
+        component: "daemon",
+        event: "daemon.heartbeat_schedule_error",
+        meta: expect.objectContaining({
+          agent: "slugger",
+          error: "clock failure",
+        }),
+      }),
+    )
+
+    // Should still reschedule with default cadence
+    nowCallCount = 0 // reset so next fire's scheduleNext works
+    vi.advanceTimersByTime(30 * 60 * 1000)
+    expect(sendToAgent).toHaveBeenCalledTimes(2)
+
+    timer.stop()
+  })
+
   it("uses Date.now() when deps.now is not provided", () => {
     const sendToAgent = vi.fn()
     const readFileSync = vi.fn(() => { throw new Error("ENOENT") })

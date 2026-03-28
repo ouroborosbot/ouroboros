@@ -69,18 +69,29 @@ export class HeartbeatTimer {
   }
 
   private scheduleNext(): void {
-    const cadenceMs = this.readCadence()
-    const lastCompletedAt = this.readLastCompletedAt()
-    const nowMs = this.now()
-
     let delay: number
-    if (lastCompletedAt === null) {
-      // Never run before — fire once after a full cadence (not immediately, to avoid spin loop
-      // when the agent has no inner dialog state to write lastCompletedAt)
-      delay = cadenceMs
-    } else {
-      const elapsed = nowMs - lastCompletedAt
-      delay = Math.max(0, cadenceMs - elapsed)
+    try {
+      const cadenceMs = this.readCadence()
+      const lastCompletedAt = this.readLastCompletedAt()
+      const nowMs = this.now()
+
+      if (lastCompletedAt === null) {
+        // Never run before — fire once after a full cadence (not immediately, to avoid spin loop
+        // when the agent has no inner dialog state to write lastCompletedAt)
+        delay = cadenceMs
+      } else {
+        const elapsed = nowMs - lastCompletedAt
+        delay = Math.max(0, cadenceMs - elapsed)
+      }
+    } catch (error) {
+      delay = DEFAULT_CADENCE_MS
+      emitNervesEvent({
+        level: "warn",
+        component: "daemon",
+        event: "daemon.heartbeat_schedule_error",
+        message: "heartbeat scheduleNext failed, falling back to default cadence",
+        meta: { agent: this.agent, error: error instanceof Error ? error.message : String(error) },
+      })
     }
 
     this.pendingTimer = setTimeout(() => {
@@ -98,7 +109,18 @@ export class HeartbeatTimer {
       meta: { agent: this.agent },
     })
 
-    this.sendToAgent(this.agent, { type: "heartbeat" })
+    try {
+      this.sendToAgent(this.agent, { type: "heartbeat" })
+    } catch (error) {
+      emitNervesEvent({
+        level: "warn",
+        component: "daemon",
+        event: "daemon.heartbeat_send_error",
+        message: "heartbeat sendToAgent failed",
+        meta: { agent: this.agent, error: error instanceof Error ? error.message : String(error) },
+      })
+    }
+
     this.scheduleNext()
   }
 
