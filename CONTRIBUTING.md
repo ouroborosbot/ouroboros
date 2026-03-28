@@ -86,6 +86,27 @@ PR-based merge policy, conflict resolution, and retry rules live in:
 
 The implemented workflow helpers have moved to [ouroboros-skills](https://github.com/ouroborosbot/ouroboros-skills). Install via the skill-management skill.
 
+## Dev Mode
+
+When working on the harness, use `ouro dev` instead of `ouro up`:
+
+```bash
+ouro dev                         # auto-detects repo from CWD, builds, starts daemon
+ouro dev --repo-path /path       # explicit repo path (persisted for next time)
+```
+
+This rebuilds from source, disables the production daemon's launchd auto-restart, and force-starts a fresh daemon from your local build. The repo path is saved to `~/.ouro-cli/dev-config.json` so you don't need to specify it again.
+
+To return to production mode: `ouro up` (cleans up dev-config, re-enables launchd).
+
+If you're also working with the MCP bridge, register your dev tool after starting the dev daemon:
+
+```bash
+ouro setup --tool claude-code --agent <name>
+```
+
+This points the MCP server at your local build so your agent uses your dev code, not the installed version.
+
 ## Code Expectations
 
 - `src/` is shared harness code. Changes here affect every agent.
