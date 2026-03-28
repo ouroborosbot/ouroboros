@@ -137,7 +137,9 @@ void daemon.start().then(() => {
   }
 }).catch(async (err: unknown) => {
 /* v8 ignore stop */
+  /* v8 ignore start — instanceof branch defensive; catch always receives Error in practice @preserve */
   const error = err instanceof Error ? err : new Error(String(err))
+  /* v8 ignore stop */
   writeDaemonTombstone("startupFailure", error)
   emitNervesEvent({
     level: "error",

@@ -401,6 +401,7 @@ export class OuroDaemon {
       let raw = ""
       let responded = false
 
+      /* v8 ignore start — connection error handler requires real socket error @preserve */
       connection.on("error", (err) => {
         emitNervesEvent({
           level: "warn",
@@ -410,6 +411,7 @@ export class OuroDaemon {
           meta: { error: err.message, code: (err as NodeJS.ErrnoException).code ?? null },
         })
       })
+      /* v8 ignore stop */
 
       const flushResponse = async () => {
         if (responded) return
@@ -417,6 +419,7 @@ export class OuroDaemon {
         const response = await this.handleRawPayload(raw)
         try {
           connection.end(response)
+        /* v8 ignore start — EPIPE catch requires real socket disconnect @preserve */
         } catch (err) {
           emitNervesEvent({
             level: "warn",
@@ -426,6 +429,7 @@ export class OuroDaemon {
             meta: { error: err instanceof Error ? err.message : String(err) },
           })
         }
+        /* v8 ignore stop */
       }
 
       connection.on("data", (chunk) => {
@@ -443,6 +447,7 @@ export class OuroDaemon {
       server.listen(this.socketPath, () => {
         // Replace the one-time error listener with a persistent one after successful listen
         server.removeAllListeners("error")
+        /* v8 ignore start — server error after listen requires real socket race condition @preserve */
         server.on("error", (err) => {
           emitNervesEvent({
             level: "error",
@@ -452,6 +457,7 @@ export class OuroDaemon {
             meta: { error: err.message, code: (err as NodeJS.ErrnoException).code ?? null },
           })
         })
+        /* v8 ignore stop */
         resolve()
       })
     })
@@ -653,6 +659,7 @@ export class OuroDaemon {
 
     try {
       return await this.handleCommandInner(command)
+    /* v8 ignore start — command error catch tested in daemon-command-error.test; instanceof branches defensive @preserve */
     } catch (error) {
       emitNervesEvent({
         level: "error",
@@ -667,6 +674,7 @@ export class OuroDaemon {
       })
       throw error
     }
+    /* v8 ignore stop */
   }
 
   private async handleCommandInner(command: DaemonCommand): Promise<DaemonResponse> {

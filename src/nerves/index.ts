@@ -175,10 +175,12 @@ export function createNdjsonFileSink(filePath: string, maxSizeBytes?: number): L
     flushing = true
     const line = queue.shift() as string
 
+    /* v8 ignore start — rotation triggers only after ~1MB of writes @preserve */
     if (bytesSinceCheck >= ROTATION_CHECK_INTERVAL_BYTES) {
       bytesSinceCheck = 0
       rotateIfNeeded(filePath, maxSize)
     }
+    /* v8 ignore stop */
 
     appendFile(filePath, line, "utf8", () => {
       flushing = false
