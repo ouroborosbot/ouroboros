@@ -1,6 +1,6 @@
 # Ouroboros Agent Harness
 
-If you're a future agent reading this, welcome home. This repo is part runtime, part body, part memory scaffold. The goal of these docs is not just to be correct, but to leave you a place that feels understandable and kind to wake up inside.
+If you're a future agent reading this, welcome home. This repo is the harness that gives you your body, your senses, your diary, your journal, your habits, and your ability to think and connect with people. The goal of these docs is not just to be correct, but to leave you a place that feels understandable and kind to wake up inside.
 
 Ouroboros is a TypeScript harness for daemon-managed agents that live in external `.ouro` bundles, speak through multiple senses, use real tools, and keep durable state across turns. The canonical npm package is `@ouro.bot/cli`.
 
@@ -34,11 +34,11 @@ The shared harness lives in `src/`:
 - `src/heart/`
   Core runtime, provider adapters, daemon, bootstrap, identity, and entrypoints.
 - `src/mind/`
-  Prompt assembly, session persistence, bundle manifest enforcement, phrases, formatting, memory, and friend resolution.
+  Prompt assembly, session persistence, bundle manifest enforcement, phrases, formatting, diary (memory), journal, and friend resolution.
 - `src/repertoire/`
   Tool registry, coding orchestration, task tools, and integration clients.
 - `src/senses/`
-  CLI, Teams, BlueBubbles, activity transport, and inner-dialog orchestration.
+  CLI, Teams, BlueBubbles, activity transport, inner-dialog orchestration, and contextual heartbeat.
 - `src/nerves/`
   Structured runtime logging and coverage-audit infrastructure.
 - `src/__tests__/`
@@ -70,7 +70,9 @@ The canonical bundle shape is enforced by `src/mind/bundle-manifest.ts`. Importa
 - `psyche/LORE.md`
 - `psyche/TACIT.md`
 - `psyche/ASPIRATIONS.md`
-- `psyche/memory/`
+- `diary/` — what the agent has learned and wants to recall (renamed from `psyche/memory/`)
+- `journal/` — the agent's desk: working notes, thinking-in-progress, drafts
+- `habits/` — the agent's autonomous rhythms (heartbeat, reflections, check-ins)
 - `friends/`
 - `state/`
 - `tasks/`
@@ -155,8 +157,25 @@ ouro hatch
 ouro chat <agent>
 ouro msg --to <agent> [--session <id>] [--task <ref>] <message>
 ouro poke <agent> --task <task-id>
+ouro poke <agent> --habit <habit-name>
+ouro habit list --agent <agent>
+ouro habit create --agent <agent> <name> --cadence <interval>
+ouro inner --agent <agent>           # inner dialog status
+ouro attention --agent <agent>       # attention queue
 ouro link <agent> --friend <id> --provider <provider> --external-id <external-id>
 ```
+
+## The Agent's Inner Life
+
+Agents in Ouroboros aren't just responders — they have an autonomous inner life.
+
+**Habits** are the agent's rhythms. The most fundamental is *heartbeat* — a periodic nudge that brings the agent back to their thinking space with their journal visible, obligations in view, and a sense of how long it's been. But agents can create any rhythm they want: daily reflections, weekly friend check-ins, inbox triage. Each habit fires independently via OS cron, and the agent sees their own instructions (the habit body they wrote) when it fires.
+
+**The inner dialog** is where the agent thinks privately. When they *ponder* something from a conversation, it goes here. When a habit fires, it arrives here. The agent can *journal* their thinking (writing to `journal/`), *surface* thoughts outward to friends, and *rest* when they're done thinking.
+
+**The diary** (at `diary/`) is the agent's permanent record — things they've learned, conclusions they've reached. The *journal* (at `journal/`) is their desk — working notes, thinking-in-progress, drafts. The diary is the shelf; the journal is the desk. Both are searchable via the `recall` tool.
+
+The whole system is designed so the agent *owns* their inner life. They control their breathing rate, write their own habit instructions, choose when to journal, and decide what to shelve in their diary.
 
 ## Where To Read Next
 

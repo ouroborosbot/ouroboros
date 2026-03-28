@@ -55,10 +55,12 @@ Canonical paths:
 - `psyche/LORE.md`
 - `psyche/TACIT.md`
 - `psyche/ASPIRATIONS.md`
-- `psyche/memory/`
+- `diary/` — durable facts, conclusions, things worth recalling (renamed from `psyche/memory/`; legacy path still works as fallback)
+- `journal/` — thinking-in-progress, working notes, drafts (the agent's desk)
+- `habits/` — autonomous rhythms: heartbeat, reflections, check-ins (extracted from `tasks/habits/`)
 - `friends/`
 - `state/`
-- `tasks/`
+- `tasks/` — one-shots and ongoing work (habits no longer live here)
 - `skills/`
 - `senses/`
 - `senses/teams/`
@@ -122,11 +124,11 @@ Threads are treated as routing/context metadata, not as separate long-lived memo
 - `src/heart/`
   Core engine, provider runtimes, identity/config loading, daemon, bootstrap, and entrypoints.
 - `src/mind/`
-  Prompt assembly, sessions, bundle manifest, memory, phrases, formatting, and friend identity.
+  Prompt assembly, sessions, bundle manifest, diary (memory), journal indexing, phrases, formatting, and friend identity.
 - `src/repertoire/`
   Tool registry, coding orchestration, task tooling, and integration clients.
 - `src/senses/`
-  CLI, Teams, BlueBubbles, activity transport, trust gating, and inner-dialog worker logic.
+  CLI, Teams, BlueBubbles, activity transport, trust gating, inner-dialog worker logic, and contextual heartbeat.
 - `src/nerves/`
   Structured runtime events and deterministic audit coverage.
 
@@ -138,16 +140,57 @@ Tool access is channel-aware and trust-aware.
 - Trusted one-to-one remote contexts can use the feasible local tool surface.
 - Shared or untrusted remote contexts stay more constrained.
 
-Important recent additions include:
+The metacognitive tool vocabulary:
 
-- `schedule_reminder`
-- coding session tooling with inspectable output tails
-- BlueBubbles reply-target selection as explicit tool state
+- **settle** — deliver a response to a friend (outer sessions)
+- **ponder** — "I need to think about this" (takes thought inward, or continues thinking)
+- **rest** — "I'm putting this down" (inner dialog only, ends the turn)
+- **surface** — share a thought outward from inner dialog
+- **observe** — stay quiet in group chats
+- **diary_write** — record something to the diary for later recall
+- **recall** — search both diary and journal for relevant facts and notes
+
+Other important tools include coding session orchestration, bridge management, and BlueBubbles reply-target selection.
+
+## Habits And Rhythms
+
+Habits are the agent's autonomous rhythms — recurring patterns that fire independently.
+
+- Habits live at `~/AgentBundles/<agent>.ouro/habits/` as simple markdown files.
+- Each habit has: title, cadence (e.g., `"30m"`, `"1d"`), status (`active`/`paused`), lastRun, created, and a body (the agent's instructions to themselves).
+- The `HabitScheduler` registers each active habit as an OS cron entry (launchd on macOS, crontab on Linux).
+- When a cron fires, it pokes the daemon, which routes it to the agent's inner dialog.
+- The agent sees their own habit body as the prompt, plus an "also due" line showing other overdue habits.
+- `lastRun` is updated in the habit's frontmatter after each turn.
+- `fs.watch` + CLI notifications provide event-driven discovery (no polling).
+- On daemon startup, the scheduler auto-migrates any old `tasks/habits/` files and fires overdue habits.
+
+The heartbeat is just one habit among many — the agent's breathing. But agents can create any rhythm they want.
+
+## Inner Dialog
+
+The inner dialog is the agent's private thinking space.
+
+- **ponder**: From any conversation, the agent can *ponder* something — it goes to inner dialog with the thought as context. From inner dialog, *ponder* triggers another turn (the wheel keeps turning).
+- **rest**: When thinking is done, the agent *rests*. The wheel stops until the next habit fires.
+- **surface**: From inner dialog, the agent can *surface* thoughts outward to friends.
+- **settle**: In outer conversations, the agent *settles* on a response (not available in inner dialog).
+- **observe**: In group chats, the agent can choose to stay quiet.
+
+The inner dialog session is continuous — different habits and delegations are different prompts into the same stream of thought.
+
+## Diary And Journal
+
+- **Diary** (`diary/`): The agent's permanent record. `diary_write` saves entries with embeddings for associative recall. `recall` searches both diary and journal.
+- **Journal** (`journal/`): The agent's desk. Freeform files the agent writes with `write_file`. The heartbeat shows a journal index (recent files, previews) so the agent sees where they left off.
+
+Both are searchable. The diary is the shelf; the journal is the desk.
 
 ## Scheduling And Messaging
 
-- Task markdown supports `scheduledAt` and `cadence`.
-- The daemon scheduler reconciles those tasks into OS jobs that call `ouro poke`.
+- Task markdown supports `scheduledAt` and `cadence` for one-shot timed events.
+- The daemon task scheduler reconciles those into OS jobs that call `ouro poke`.
+- Habits have their own scheduler (see above) — they don't go through the task system.
 - `ouro msg` routes messages through the daemon and falls back to pending delivery when needed.
 
 ## Version And Update Model
