@@ -22,13 +22,6 @@ const { migrateHabitsFromTaskSystemMock } = vi.hoisted(() => ({
   migrateHabitsFromTaskSystemMock: vi.fn(),
 }))
 
-vi.mock("../../../heart/daemon/heartbeat-timer", () => ({
-  HeartbeatTimer: class MockHeartbeatTimer {
-    start = vi.fn()
-    stop = vi.fn()
-  },
-}))
-
 vi.mock("../../../heart/daemon/habit-scheduler", () => ({
   HabitScheduler: class MockHabitScheduler {
     constructor(public options: unknown) {}

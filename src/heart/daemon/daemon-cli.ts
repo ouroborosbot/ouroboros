@@ -3174,7 +3174,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       const agentRoot = getAgentRoot(agentName)
       const { buildInnerStatusOutput } = await import("./inner-status")
       const { sessionPath: getSessionPath } = await import("../config")
-      const { parseCadenceMs, DEFAULT_CADENCE_MS } = await import("./heartbeat-timer")
+      const { parseCadenceToMs: parseCadenceMs, DEFAULT_CADENCE_MS } = await import("./cadence")
       const { parseFrontmatter } = await import("../../repertoire/tasks/parser")
       const { listActiveObligations } = await import("../../mind/obligations")
 
