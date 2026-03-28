@@ -184,9 +184,11 @@ export class HabitScheduler {
           this.reconcile()
         }, WATCH_DEBOUNCE_MS)
       })
+    /* v8 ignore start — ENOENT catch requires real missing directory @preserve */
     } catch {
       // habits directory may not exist for all agents — skip watching silently
     }
+    /* v8 ignore stop */
   }
 
   stopWatching(): void {
