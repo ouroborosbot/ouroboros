@@ -108,7 +108,10 @@ describe("daemon process manager", () => {
     first.emit("exit", 1, null)
 
     expect(manager.getAgentSnapshot("slugger")?.status).toBe("crashed")
-    expect(timers).toHaveLength(0)
+    // Cooldown recovery timer is scheduled (no restart timer, but a cooldown timer)
+    // The old expectation of 0 timers no longer holds because cooldown recovery was added.
+    // With default maxCooldownRetries=3, one cooldown timer is scheduled.
+    expect(timers.length).toBeGreaterThanOrEqual(1)
   })
 
   it("supports explicit stop and restart", async () => {
@@ -566,6 +569,140 @@ describe("daemon process manager", () => {
     const snapshot = manager.getAgentSnapshot("slugger")
     expect(snapshot?.lastExitCode).toBeNull()
     expect(snapshot?.lastSignal).toBeNull()
+  })
+
+  it("schedules cooldown recovery after restart exhaustion", async () => {
+    const first = new MockChild()
+    const second = new MockChild()
+    spawn.mockReturnValueOnce(first).mockReturnValueOnce(second)
+    now.mockReturnValue(1_000)
+
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+      maxRestartsPerHour: 0,
+      cooldownRecoveryMs: 10_000,
+      maxCooldownRetries: 2,
+    })
+
+    await manager.startAgent("slugger")
+    first.emit("exit", 1, null)
+
+    expect(manager.getAgentSnapshot("slugger")?.status).toBe("crashed")
+    // Should schedule a cooldown recovery timer
+    expect(timers).toHaveLength(1)
+    expect(timers[0]?.delay).toBe(10_000)
+  })
+
+  it("resets crash history and restarts on cooldown recovery", async () => {
+    const first = new MockChild()
+    const second = new MockChild()
+    spawn.mockReturnValueOnce(first).mockReturnValueOnce(second)
+    now.mockReturnValue(1_000)
+
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+      maxRestartsPerHour: 0,
+      cooldownRecoveryMs: 10_000,
+      maxCooldownRetries: 3,
+      initialBackoffMs: 100,
+    })
+
+    await manager.startAgent("slugger")
+    first.emit("exit", 1, null)
+
+    expect(manager.getAgentSnapshot("slugger")?.status).toBe("crashed")
+
+    // Fire the cooldown recovery timer
+    timers[0]?.cb()
+    await Promise.resolve()
+
+    // Should have reset and spawned again
+    expect(spawn).toHaveBeenCalledTimes(2)
+  })
+
+  it("gives up permanently after maxCooldownRetries", async () => {
+    now.mockReturnValue(1_000)
+    timers.length = 0
+
+    const child1 = new MockChild()
+    const child2 = new MockChild()
+    spawn.mockReturnValueOnce(child1).mockReturnValueOnce(child2)
+
+    const manager = new DaemonProcessManager({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+      maxRestartsPerHour: 0,
+      cooldownRecoveryMs: 5_000,
+      maxCooldownRetries: 1,
+    })
+
+    // First crash cycle
+    await manager.startAgent("slugger")
+    child1.emit("exit", 1, null)
+    expect(manager.getAgentSnapshot("slugger")?.status).toBe("crashed")
+
+    // One cooldown timer should be scheduled (retry 1 of 1)
+    const timerCountAfterFirstExhaustion = timers.length
+    expect(timerCountAfterFirstExhaustion).toBe(1)
+
+    // Fire the cooldown recovery — resets crash history, starts agent again
+    timers[timerCountAfterFirstExhaustion - 1]?.cb()
+    await Promise.resolve()
+
+    // child2 is now spawned and running, crash it
+    child2.emit("exit", 1, null)
+    expect(manager.getAgentSnapshot("slugger")?.status).toBe("crashed")
+
+    // maxCooldownRetries=1 is exhausted, no new timer should be scheduled
+    // Only the already-fired timers should exist
+    expect(timers.length).toBe(timerCountAfterFirstExhaustion)
+  })
+
+  it("logs cooldown recovery attempts via nerves event", async () => {
+    vi.resetModules()
+
+    const emitNervesEventMock = vi.fn()
+    vi.doMock("../../../nerves/runtime", () => ({
+      emitNervesEvent: emitNervesEventMock,
+    }))
+
+    const { DaemonProcessManager: PM } = await import("../../../heart/daemon/process-manager")
+
+    const child = new MockChild()
+    spawn.mockReturnValue(child)
+    now.mockReturnValue(1_000)
+
+    const manager = new PM({
+      agents,
+      spawn,
+      now,
+      setTimeoutFn,
+      clearTimeoutFn,
+      maxRestartsPerHour: 0,
+      cooldownRecoveryMs: 5_000,
+      maxCooldownRetries: 2,
+    })
+
+    await manager.startAgent("slugger")
+    child.emit("exit", 1, null)
+
+    expect(emitNervesEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "daemon.agent_cooldown_scheduled",
+        meta: expect.objectContaining({ agent: "slugger" }),
+      }),
+    )
   })
 
   it("sets status to crashed and does not spawn when entry script path does not exist", async () => {

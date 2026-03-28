@@ -32,6 +32,8 @@ export interface DaemonProcessManagerOptions {
   stabilityThresholdMs?: number
   initialBackoffMs?: number
   maxBackoffMs?: number
+  cooldownRecoveryMs?: number
+  maxCooldownRetries?: number
   spawn?: (command: string, args: string[], options: Record<string, unknown>) => ChildProcess
   now?: () => number
   setTimeoutFn?: (cb: () => void, delay: number) => unknown
@@ -44,7 +46,9 @@ interface AgentRuntimeState {
   snapshot: DaemonAgentSnapshot
   process: ChildProcess | null
   restartTimer: unknown | null
+  cooldownTimer: unknown | null
   crashTimestamps: number[]
+  cooldownRetryCount: number
   stopRequested: boolean
 }
 
@@ -58,6 +62,8 @@ export class DaemonProcessManager {
   private readonly stabilityThresholdMs: number
   private readonly initialBackoffMs: number
   private readonly maxBackoffMs: number
+  private readonly cooldownRecoveryMs: number
+  private readonly maxCooldownRetries: number
   private readonly spawnFn: (command: string, args: string[], options: Record<string, unknown>) => ChildProcess
   private readonly now: () => number
   private readonly setTimeoutFn: (cb: () => void, delay: number) => unknown
@@ -69,6 +75,8 @@ export class DaemonProcessManager {
     this.stabilityThresholdMs = options.stabilityThresholdMs ?? 60_000
     this.initialBackoffMs = options.initialBackoffMs ?? 1_000
     this.maxBackoffMs = options.maxBackoffMs ?? 60_000
+    this.cooldownRecoveryMs = options.cooldownRecoveryMs ?? 5 * 60 * 1000
+    this.maxCooldownRetries = options.maxCooldownRetries ?? 3
     this.spawnFn = options.spawn ?? ((command, args, spawnOptions) => nodeSpawn(command, args, spawnOptions))
     this.now = options.now ?? (() => Date.now())
     this.setTimeoutFn = options.setTimeoutFn ?? ((cb, delay) => setTimeout(cb, delay))
@@ -80,7 +88,9 @@ export class DaemonProcessManager {
         config: agent,
         process: null,
         restartTimer: null,
+        cooldownTimer: null,
         crashTimestamps: [],
+        cooldownRetryCount: 0,
         stopRequested: false,
         snapshot: {
           name: agent.name,
@@ -111,6 +121,7 @@ export class DaemonProcessManager {
     if (state.process) return
 
     this.clearRestartTimer(state)
+    this.clearCooldownTimer(state)
     state.stopRequested = false
     state.snapshot.status = "starting"
 
@@ -168,6 +179,7 @@ export class DaemonProcessManager {
   async stopAgent(agent: string): Promise<void> {
     const state = this.requireAgent(agent)
     this.clearRestartTimer(state)
+    this.clearCooldownTimer(state)
     state.stopRequested = true
 
     if (!state.process) {
@@ -270,6 +282,7 @@ export class DaemonProcessManager {
         message: "managed agent exceeded restart limit and is marked crashed",
         meta: { agent: state.config.name, maxRestartsPerHour: this.maxRestartsPerHour },
       })
+      this.scheduleCooldownRecovery(state)
       return
     }
 
@@ -284,10 +297,52 @@ export class DaemonProcessManager {
     }, waitMs)
   }
 
+  private scheduleCooldownRecovery(state: AgentRuntimeState): void {
+    if (state.cooldownRetryCount >= this.maxCooldownRetries) {
+      emitNervesEvent({
+        level: "error",
+        component: "daemon",
+        event: "daemon.agent_cooldown_exhausted",
+        message: "managed agent exhausted all cooldown recovery retries — giving up permanently",
+        meta: { agent: state.config.name, cooldownRetryCount: state.cooldownRetryCount, maxCooldownRetries: this.maxCooldownRetries },
+      })
+      return
+    }
+
+    state.cooldownRetryCount += 1
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.agent_cooldown_scheduled",
+      message: "scheduling cooldown recovery for crashed agent",
+      meta: { agent: state.config.name, cooldownRecoveryMs: this.cooldownRecoveryMs, attempt: state.cooldownRetryCount },
+    })
+
+    this.clearCooldownTimer(state)
+    state.cooldownTimer = this.setTimeoutFn(() => {
+      emitNervesEvent({
+        component: "daemon",
+        event: "daemon.agent_cooldown_recovery",
+        message: "attempting cooldown recovery for crashed agent",
+        meta: { agent: state.config.name, attempt: state.cooldownRetryCount },
+      })
+      // Reset crash history and backoff for fresh start
+      state.crashTimestamps = []
+      state.snapshot.backoffMs = this.initialBackoffMs
+      state.snapshot.status = "stopped"
+      void this.startAgent(state.config.name)
+    }, this.cooldownRecoveryMs)
+  }
+
   private clearRestartTimer(state: AgentRuntimeState): void {
     if (state.restartTimer === null) return
     this.clearTimeoutFn(state.restartTimer)
     state.restartTimer = null
+  }
+
+  private clearCooldownTimer(state: AgentRuntimeState): void {
+    if (state.cooldownTimer === null) return
+    this.clearTimeoutFn(state.cooldownTimer)
+    state.cooldownTimer = null
   }
 
   private requireAgent(agent: string): AgentRuntimeState {
