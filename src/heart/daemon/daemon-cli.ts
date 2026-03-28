@@ -479,7 +479,12 @@ function buildStoppedStatusPayload(socketPath: string): StatusPayload {
 }
 
 function daemonUnavailableStatusOutput(socketPath: string): string {
-  const tombstone = readDaemonTombstone()
+  let tombstone: ReturnType<typeof readDaemonTombstone> = null
+  try {
+    tombstone = readDaemonTombstone()
+  } catch {
+    // Best effort — tombstone read failure should never break status output.
+  }
   const tombstoneLine = tombstone
     ? `Last death: ${tombstone.timestamp} -- ${tombstone.reason}: ${tombstone.message}`
     : null

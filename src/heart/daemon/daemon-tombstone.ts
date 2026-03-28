@@ -12,7 +12,9 @@ export interface DaemonTombstone {
   uptimeSeconds: number
 }
 
-export const TOMBSTONE_PATH = path.join(os.homedir(), ".ouro-cli", "daemon-death.json")
+export function getTombstonePath(): string {
+  return path.join(os.homedir(), ".ouro-cli", "daemon-death.json")
+}
 
 export function writeDaemonTombstone(
   reason: string,
@@ -31,6 +33,7 @@ export function writeDaemonTombstone(
   const uptimeSeconds = deps.uptimeSeconds ?? process.uptime()
   const now = deps.now ?? (() => new Date())
 
+  const tombstonePath = getTombstonePath()
   const tombstone: DaemonTombstone = {
     reason,
     message: error instanceof Error ? error.message : String(error ?? reason),
@@ -41,8 +44,8 @@ export function writeDaemonTombstone(
   }
 
   try {
-    mkdirSync(path.dirname(TOMBSTONE_PATH), { recursive: true })
-    writeFileSync(TOMBSTONE_PATH, JSON.stringify(tombstone, null, 2) + "\n", "utf-8")
+    mkdirSync(path.dirname(tombstonePath), { recursive: true })
+    writeFileSync(tombstonePath, JSON.stringify(tombstone, null, 2) + "\n", "utf-8")
   } catch {
     // Synchronous write failed — nothing more we can do during a crash.
   }
@@ -52,7 +55,7 @@ export function writeDaemonTombstone(
     component: "daemon",
     event: "daemon.tombstone_written",
     message: "wrote daemon death tombstone",
-    meta: { reason, tombstonePath: TOMBSTONE_PATH },
+    meta: { reason, tombstonePath },
   })
 }
 
@@ -64,11 +67,12 @@ export function readDaemonTombstone(
 ): DaemonTombstone | null {
   const readFileSync = deps.readFileSync ?? fs.readFileSync
   const existsSync = deps.existsSync ?? fs.existsSync
+  const tombstonePath = getTombstonePath()
 
-  if (!existsSync(TOMBSTONE_PATH)) return null
+  if (!existsSync(tombstonePath)) return null
 
   try {
-    const raw = readFileSync(TOMBSTONE_PATH, "utf-8")
+    const raw = readFileSync(tombstonePath, "utf-8")
     const parsed = JSON.parse(raw) as DaemonTombstone
     if (typeof parsed.reason !== "string" || typeof parsed.timestamp !== "string") return null
     return parsed

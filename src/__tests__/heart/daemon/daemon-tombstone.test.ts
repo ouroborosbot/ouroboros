@@ -8,14 +8,14 @@ vi.mock("../../../nerves/runtime", () => ({
 import {
   writeDaemonTombstone,
   readDaemonTombstone,
-  TOMBSTONE_PATH,
+  getTombstonePath,
   type DaemonTombstone,
 } from "../../../heart/daemon/daemon-tombstone"
 
 describe("daemon tombstone", () => {
-  describe("TOMBSTONE_PATH", () => {
+  describe("getTombstonePath", () => {
     it("points to ~/.ouro-cli/daemon-death.json", () => {
-      expect(TOMBSTONE_PATH).toMatch(/\.ouro-cli\/daemon-death\.json$/)
+      expect(getTombstonePath()).toMatch(/\.ouro-cli\/daemon-death\.json$/)
     })
   })
 
