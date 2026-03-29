@@ -704,14 +704,12 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   // --- Tool/status callbacks ---
 
-  it("onToolStart sends informative status", async () => {
+  it("onToolStart sends human-readable description", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     callbacks.onToolStart("read_file", { path: "package.json" })
-    expect(mockStream.update).toHaveBeenCalledWith(
-      "shared work: processing\nrunning read_file (path=package.json)...",
-    )
+    expect(mockStream.update).toHaveBeenCalledWith("reading package.json...")
   })
 
   it("onToolStart always flushes accumulated textBuffer before showing tool status", async () => {
@@ -727,30 +725,31 @@ describe("Teams adapter - createTeamsCallbacks (SDK-delegated streaming)", () =>
 
   // --- Unified onToolEnd: always via stream.update (transient status) ---
 
-  it("onToolEnd success shows formatted result via stream.update (not emit)", async () => {
+  it("onToolEnd success is silent in default mode (no stream.update)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     callbacks.onToolEnd("read_file", "package.json", true)
-    expect(mockStream.update).toHaveBeenCalledWith("shared work: processing\n\u2713 read_file (package.json)")
+    // Default mode: successful tool END does not send a status update
+    expect(mockStream.update).not.toHaveBeenCalled()
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
-  it("onToolEnd with empty summary shows formatted result via stream.update", async () => {
+  it("onToolEnd with empty summary is silent in default mode", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     callbacks.onToolEnd("get_current_time", "", true)
-    expect(mockStream.update).toHaveBeenCalledWith("shared work: processing\n\u2713 get_current_time")
+    expect(mockStream.update).not.toHaveBeenCalled()
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
-  it("onToolEnd failure shows formatted error via stream.update (not emit)", async () => {
+  it("onToolEnd failure shows error via stream.update (not emit)", async () => {
     vi.resetModules()
     const teams = await import("../../senses/teams")
     const callbacks = teams.createTeamsCallbacks(mockStream as any, controller)
     callbacks.onToolEnd("read_file", "missing.txt", false)
-    expect(mockStream.update).toHaveBeenCalledWith("shared work: processing\n\u2717 read_file: missing.txt")
+    expect(mockStream.update).toHaveBeenCalledWith("\u2717 read_file failed: missing.txt")
     expect(mockStream.emit).not.toHaveBeenCalled()
   })
 
@@ -5544,9 +5543,9 @@ describe("Teams adapter - handleTeamsMessage with sendMessage", () => {
 
     await teams.handleTeamsMessage("show file", mockStream as any, "conv-send-1", undefined, true, sendMessage)
 
-    // onToolEnd now uses safeUpdate (stream.update) not safeSend in buffered mode
-    expect(mockStream.update).toHaveBeenCalledWith("shared work: processing\n\u2713 read_file (package.json)")
-    expect(sendMessage).not.toHaveBeenCalledWith("shared work: processing\n\u2713 read_file (package.json)")
+    // Default mode: successful onToolEnd is silent — no update sent
+    expect(mockStream.update).not.toHaveBeenCalled()
+    expect(sendMessage).not.toHaveBeenCalled()
   })
 
   it("handleTeamsMessage awaits flush() (which is now async)", async () => {
