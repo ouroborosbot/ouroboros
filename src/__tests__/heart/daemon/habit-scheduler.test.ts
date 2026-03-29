@@ -1204,4 +1204,290 @@ describe("HabitScheduler", () => {
       expect(scheduler.getParseErrors()).toHaveLength(0)
     })
   })
+
+  describe("cron verification and timer fallback", () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    function makeSchedulerWithVerify(options: {
+      habits?: ReturnType<typeof makeHeartbeatHabit>[]
+      execForVerify?: ReturnType<typeof vi.fn>
+      platform?: string
+    } = {}) {
+      const habits = options.habits ?? [makeHeartbeatHabit()]
+      const readdir = vi.fn(() => habits.map((h) => `${h.name}.md`))
+      const readFile = vi.fn(() => "content")
+      deps = makeDeps({ readdir, readFile })
+
+      for (const h of habits) {
+        mockParseHabitFile.mockReturnValueOnce(h)
+      }
+
+      const execForVerify = options.execForVerify ?? vi.fn(() => "")
+      const platform = options.platform ?? "darwin"
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps,
+        execForVerify,
+        platform,
+      })
+
+      return { scheduler, execForVerify, readdir }
+    }
+
+    it("calls execForVerify after osCronManager.sync() to verify cron entries", () => {
+      const execForVerify = vi.fn(() => "bot.ouro.slugger.heartbeat\n")
+
+      const { scheduler } = makeSchedulerWithVerify({ execForVerify })
+
+      scheduler.start()
+
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1)
+      expect(execForVerify).toHaveBeenCalled()
+    })
+
+    it("on macOS, checks launchctl list output for specific habit labels", () => {
+      const execForVerify = vi.fn(() => "78\t0\tbot.ouro.slugger.heartbeat\n")
+
+      const { scheduler } = makeSchedulerWithVerify({ execForVerify, platform: "darwin" })
+
+      scheduler.start()
+
+      expect(execForVerify).toHaveBeenCalledWith(expect.stringContaining("launchctl"))
+    })
+
+    it("on Linux, checks crontab -l output for specific habit command lines", () => {
+      const execForVerify = vi.fn(() => "*/30 * * * * /usr/local/bin/ouro poke slugger --habit heartbeat\n")
+
+      const { scheduler } = makeSchedulerWithVerify({ execForVerify, platform: "linux" })
+
+      scheduler.start()
+
+      expect(execForVerify).toHaveBeenCalledWith(expect.stringContaining("crontab"))
+    })
+
+    it("creates timer fallback when cron verification fails for a habit", () => {
+      // execForVerify returns empty — no matching labels found
+      const execForVerify = vi.fn(() => "")
+
+      const { scheduler } = makeSchedulerWithVerify({ execForVerify })
+
+      scheduler.start()
+
+      const degraded = scheduler.getDegradedHabits()
+      expect(degraded).toHaveLength(1)
+      expect(degraded[0].name).toBe("heartbeat")
+      expect(degraded[0].reason).toContain("cron")
+    })
+
+    it("does not create timer fallback when cron verification succeeds", () => {
+      const execForVerify = vi.fn(() => "bot.ouro.slugger.heartbeat\n")
+
+      const { scheduler } = makeSchedulerWithVerify({ execForVerify })
+
+      scheduler.start()
+
+      const degraded = scheduler.getDegradedHabits()
+      expect(degraded).toHaveLength(0)
+    })
+
+    it("timer fallback fires onHabitFire at cadence interval", () => {
+      const execForVerify = vi.fn(() => "")
+
+      const { scheduler } = makeSchedulerWithVerify({ execForVerify })
+
+      scheduler.start()
+      // Clear the initial overdue fire calls
+      onHabitFire.mockClear()
+
+      // Advance by cadence (30m = 1800000ms)
+      vi.advanceTimersByTime(30 * 60 * 1000)
+
+      expect(onHabitFire).toHaveBeenCalledWith("heartbeat")
+    })
+
+    it("timer fires repeatedly at cadence interval", () => {
+      const execForVerify = vi.fn(() => "")
+
+      const { scheduler } = makeSchedulerWithVerify({ execForVerify })
+
+      scheduler.start()
+      onHabitFire.mockClear()
+
+      // Advance by 2 cadence intervals
+      vi.advanceTimersByTime(30 * 60 * 1000)
+      expect(onHabitFire).toHaveBeenCalledTimes(1)
+
+      vi.advanceTimersByTime(30 * 60 * 1000)
+      expect(onHabitFire).toHaveBeenCalledTimes(2)
+    })
+
+    it("getDegradedHabits returns habits on timer fallback", () => {
+      const execForVerify = vi.fn(() => "")
+
+      const { scheduler } = makeSchedulerWithVerify({
+        execForVerify,
+        habits: [makeHeartbeatHabit(), makeDailyReflection()],
+      })
+
+      scheduler.start()
+
+      const degraded = scheduler.getDegradedHabits()
+      expect(degraded).toHaveLength(2)
+      expect(degraded.map((d) => d.name)).toContain("heartbeat")
+      expect(degraded.map((d) => d.name)).toContain("daily-reflection")
+    })
+
+    it("getDegradedHabits returns empty when no timer fallbacks", () => {
+      const execForVerify = vi.fn(() => "bot.ouro.slugger.heartbeat\n")
+
+      const { scheduler } = makeSchedulerWithVerify({ execForVerify })
+
+      scheduler.start()
+
+      expect(scheduler.getDegradedHabits()).toHaveLength(0)
+    })
+
+    it("emits daemon.habit_cron_verification_failed for unverified habits", () => {
+      const execForVerify = vi.fn(() => "")
+
+      const { scheduler } = makeSchedulerWithVerify({ execForVerify })
+
+      scheduler.start()
+
+      expect(mockEmitNervesEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: "daemon.habit_cron_verification_failed",
+          component: "daemon",
+          meta: expect.objectContaining({ habitName: "heartbeat" }),
+        }),
+      )
+    })
+
+    it("on reconciliation: clears all timers FIRST, then re-syncs and re-verifies", () => {
+      const execForVerify = vi.fn(() => "")
+
+      const { scheduler, readdir } = makeSchedulerWithVerify({ execForVerify })
+
+      scheduler.start()
+      onHabitFire.mockClear()
+
+      // Now simulate reconciliation where cron is now verified
+      mockParseHabitFile.mockReturnValueOnce(makeHeartbeatHabit())
+      readdir.mockReturnValueOnce(["heartbeat.md"])
+      execForVerify.mockReturnValueOnce("bot.ouro.slugger.heartbeat\n")
+
+      scheduler.reconcile()
+
+      // Timer should be cleared — advancing time should NOT fire
+      vi.advanceTimersByTime(30 * 60 * 1000)
+      expect(onHabitFire).not.toHaveBeenCalled()
+
+      // Degraded list should be empty now
+      expect(scheduler.getDegradedHabits()).toHaveLength(0)
+    })
+
+    it("when verification succeeds on later reconciliation: removes timer, cron takes over", () => {
+      const execForVerify = vi.fn()
+        .mockReturnValueOnce("") // first: verification fails
+        .mockReturnValueOnce("bot.ouro.slugger.heartbeat\n") // second: verification succeeds
+
+      const { scheduler, readdir } = makeSchedulerWithVerify({ execForVerify })
+
+      scheduler.start()
+      expect(scheduler.getDegradedHabits()).toHaveLength(1)
+
+      // Reconcile — cron now verified
+      mockParseHabitFile.mockReturnValueOnce(makeHeartbeatHabit())
+      readdir.mockReturnValueOnce(["heartbeat.md"])
+
+      scheduler.reconcile()
+
+      expect(scheduler.getDegradedHabits()).toHaveLength(0)
+    })
+
+    it("stop() clears all timer fallbacks", () => {
+      const execForVerify = vi.fn(() => "")
+
+      const { scheduler } = makeSchedulerWithVerify({ execForVerify })
+
+      scheduler.start()
+      onHabitFire.mockClear()
+
+      scheduler.stop()
+
+      // Timers should be cleared
+      vi.advanceTimersByTime(30 * 60 * 1000)
+      expect(onHabitFire).not.toHaveBeenCalled()
+    })
+
+    it("skips verification if execForVerify is not provided", () => {
+      const readdir = vi.fn(() => ["heartbeat.md"])
+      const readFile = vi.fn(() => "content")
+      deps = makeDeps({ readdir, readFile })
+
+      mockParseHabitFile.mockReturnValueOnce(makeHeartbeatHabit())
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps,
+      })
+
+      scheduler.start()
+
+      // Should not crash, and no degraded habits (verification skipped)
+      expect(scheduler.getDegradedHabits()).toHaveLength(0)
+    })
+
+    it("handles execForVerify throwing an error gracefully", () => {
+      const execForVerify = vi.fn(() => { throw new Error("launchctl not found") })
+
+      const { scheduler } = makeSchedulerWithVerify({ execForVerify })
+
+      scheduler.start()
+
+      // All habits should fall back to timer
+      const degraded = scheduler.getDegradedHabits()
+      expect(degraded).toHaveLength(1)
+      expect(degraded[0].name).toBe("heartbeat")
+    })
+
+    it("only verifies active habits with cadence (not paused/no-cadence)", () => {
+      const execForVerify = vi.fn(() => "bot.ouro.slugger.heartbeat\n")
+
+      const { scheduler } = makeSchedulerWithVerify({
+        execForVerify,
+        habits: [makeHeartbeatHabit(), makePausedHabit(), makeNoCadenceHabit()],
+      })
+
+      scheduler.start()
+
+      // Only heartbeat is active with cadence and was verified
+      expect(scheduler.getDegradedHabits()).toHaveLength(0)
+    })
+
+    it("on macOS, only matches specific habit labels not the daemon plist", () => {
+      // launchctl list returns daemon plist AND habit plist
+      const execForVerify = vi.fn(() => "bot.ouro.daemon\nbot.ouro.slugger.heartbeat\n")
+
+      const { scheduler } = makeSchedulerWithVerify({ execForVerify, platform: "darwin" })
+
+      scheduler.start()
+
+      // heartbeat should be verified (exact label match)
+      expect(scheduler.getDegradedHabits()).toHaveLength(0)
+    })
+  })
 })
