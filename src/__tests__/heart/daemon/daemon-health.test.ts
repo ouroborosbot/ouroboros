@@ -11,6 +11,7 @@ vi.mock("../../../nerves/runtime", () => ({
 import {
   DaemonHealthWriter,
   readHealth,
+  getDefaultHealthPath,
   type DaemonHealthState,
   type DegradedComponent,
   type AgentHealth,
@@ -46,6 +47,11 @@ describe("daemon-health", () => {
       ...overrides,
     }
   }
+
+  it("getDefaultHealthPath returns path under ~/.ouro-cli", () => {
+    const result = getDefaultHealthPath()
+    expect(result).toBe(path.join(os.homedir(), ".ouro-cli", "daemon-health.json"))
+  })
 
   describe("DaemonHealthWriter", () => {
     it("writes daemon-health.json to the configured path", () => {
