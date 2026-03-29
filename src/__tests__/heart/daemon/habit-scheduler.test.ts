@@ -1478,6 +1478,76 @@ describe("HabitScheduler", () => {
       expect(scheduler.getDegradedHabits()).toHaveLength(0)
     })
 
+    it("marks habit as degraded even if cadence cannot be parsed for timer", () => {
+      const execForVerify = vi.fn(() => "")
+      const readdir = vi.fn(() => ["heartbeat.md"])
+      const readFile = vi.fn(() => "content")
+      deps = makeDeps({ readdir, readFile })
+
+      // Return a habit with cadence that parseCadenceToMs returns null for
+      mockParseHabitFile.mockReturnValueOnce({
+        ...makeHeartbeatHabit(),
+        cadence: "*/30 * * * *", // raw cron string: parseCadenceToCron works but parseCadenceToMs returns null
+      })
+      // parseCadenceToCron will be called by buildJobs
+      mockParseCadenceToCron.mockReturnValueOnce("*/30 * * * *")
+      // parseCadenceToMs will be called by verifyCronAndCreateFallbacks via getHabitFile
+      // The second call to parseHabitFile (from getHabitFile) needs to return the same habit
+      mockParseHabitFile.mockReturnValueOnce({
+        ...makeHeartbeatHabit(),
+        cadence: "*/30 * * * *",
+      })
+      mockParseCadenceToMs.mockReturnValueOnce(null) // for start() overdue check
+      mockParseCadenceToMs.mockReturnValueOnce(null) // for verifyCronAndCreateFallbacks
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps,
+        execForVerify,
+        platform: "darwin",
+      })
+
+      scheduler.start()
+
+      // Still marked degraded even without timer fallback
+      const degraded = scheduler.getDegradedHabits()
+      expect(degraded).toHaveLength(1)
+      expect(degraded[0].name).toBe("heartbeat")
+    })
+
+    it("handles habit with null cadence from getHabitFile during verification", () => {
+      const execForVerify = vi.fn(() => "")
+      const readdir = vi.fn(() => ["heartbeat.md"])
+      const readFile = vi.fn(() => "content")
+      deps = makeDeps({ readdir, readFile })
+
+      mockParseHabitFile.mockReturnValueOnce(makeHeartbeatHabit())
+      // getHabitFile call returns habit with null cadence
+      mockParseHabitFile.mockReturnValueOnce({
+        ...makeHeartbeatHabit(),
+        cadence: null,
+      })
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps,
+        execForVerify,
+        platform: "darwin",
+      })
+
+      scheduler.start()
+
+      // Marked degraded but no timer fallback (null cadence)
+      const degraded = scheduler.getDegradedHabits()
+      expect(degraded).toHaveLength(1)
+    })
+
     it("on macOS, only matches specific habit labels not the daemon plist", () => {
       // launchctl list returns daemon plist AND habit plist
       const execForVerify = vi.fn(() => "bot.ouro.daemon\nbot.ouro.slugger.heartbeat\n")
