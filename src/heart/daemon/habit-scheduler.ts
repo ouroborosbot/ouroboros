@@ -59,6 +59,7 @@ export class HabitScheduler {
   private parseErrors: HabitParseError[] = []
   private timerFallbacks: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private degradedHabitNames: Map<string, string> = new Map()
+  private periodicTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(options: HabitSchedulerOptions) {
     this.agent = options.agent
@@ -143,6 +144,7 @@ export class HabitScheduler {
       meta: { agent: this.agent },
     })
 
+    this.stopPeriodicReconciliation()
     this.clearAllTimerFallbacks()
     this.osCronManager.removeAll()
   }
@@ -227,6 +229,33 @@ export class HabitScheduler {
       result.push({ name, reason })
     }
     return result
+  }
+
+  private static readonly DEFAULT_PERIODIC_INTERVAL_MS = 300_000 // 5 minutes
+  private static readonly INITIAL_RECONCILIATION_DELAY_MS = 30_000 // 30 seconds
+
+  startPeriodicReconciliation(intervalMs?: number): void {
+    const interval = intervalMs ?? HabitScheduler.DEFAULT_PERIODIC_INTERVAL_MS
+
+    // First reconciliation after a short delay (30s)
+    this.periodicTimer = setTimeout(() => {
+      this.reconcile()
+      this.scheduleNextReconciliation(interval)
+    }, HabitScheduler.INITIAL_RECONCILIATION_DELAY_MS)
+  }
+
+  stopPeriodicReconciliation(): void {
+    if (this.periodicTimer !== null) {
+      clearTimeout(this.periodicTimer)
+      this.periodicTimer = null
+    }
+  }
+
+  private scheduleNextReconciliation(intervalMs: number): void {
+    this.periodicTimer = setTimeout(() => {
+      this.reconcile()
+      this.scheduleNextReconciliation(intervalMs)
+    }, intervalMs)
   }
 
   private verifyCronAndCreateFallbacks(jobs: ScheduledTaskJob[]): void {
