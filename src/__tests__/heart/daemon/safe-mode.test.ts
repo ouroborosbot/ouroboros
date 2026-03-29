@@ -243,6 +243,54 @@ describe("safe-mode", () => {
       expect(result.active).toBe(false)
     })
 
+    it("filters out invalid date strings from recentCrashes", () => {
+      const dir = makeTmpDir()
+      const now = Date.now()
+      writeTombstone(dir, {
+        reason: "uncaughtException",
+        message: "boom",
+        stack: null,
+        timestamp: new Date(now).toISOString(),
+        pid: 1234,
+        uptimeSeconds: 2,
+        recentCrashes: [
+          "not-a-valid-date",
+          "also-invalid",
+          new Date(now - 60_000).toISOString(),
+        ],
+      })
+      const tombstonePath = path.join(dir, "daemon-death.json")
+
+      // Only 1 valid entry within window — not enough for safe mode
+      const result = detectSafeMode(tombstonePath, { now: () => now })
+
+      expect(result.active).toBe(false)
+    })
+
+    it("uses Date.now() as default when no now option provided", () => {
+      const dir = makeTmpDir()
+      const now = Date.now()
+      writeTombstone(dir, {
+        reason: "uncaughtException",
+        message: "boom",
+        stack: null,
+        timestamp: new Date(now).toISOString(),
+        pid: 1234,
+        uptimeSeconds: 2,
+        recentCrashes: [
+          new Date(now - 60_000).toISOString(),
+          new Date(now - 30_000).toISOString(),
+          new Date(now - 10_000).toISOString(),
+        ],
+      })
+      const tombstonePath = path.join(dir, "daemon-death.json")
+
+      // No options at all — should use Date.now() internally
+      const result = detectSafeMode(tombstonePath)
+
+      expect(result.active).toBe(true)
+    })
+
     it("handles recentCrashes that is not an array gracefully", () => {
       const dir = makeTmpDir()
       writeTombstone(dir, {
@@ -411,6 +459,52 @@ describe("safe-mode", () => {
       const tombstonePath = path.join(dir, "daemon-death.json")
 
       expect(() => pruneOldCrashes(tombstonePath)).not.toThrow()
+    })
+
+    it("filters out non-string entries in recentCrashes during prune", () => {
+      const dir = makeTmpDir()
+      const now = Date.now()
+      const recentCrash = new Date(now - 60_000).toISOString()
+      writeTombstone(dir, {
+        reason: "uncaughtException",
+        message: "boom",
+        stack: null,
+        timestamp: new Date(now).toISOString(),
+        pid: 1234,
+        uptimeSeconds: 120,
+        recentCrashes: [42, null, recentCrash, "not-a-valid-date"],
+      })
+      const tombstonePath = path.join(dir, "daemon-death.json")
+
+      pruneOldCrashes(tombstonePath, { now: () => now })
+
+      const raw = fs.readFileSync(tombstonePath, "utf-8")
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      const crashes = parsed.recentCrashes as string[]
+      // Only the valid recent ISO timestamp survives; invalid date string is filtered by isNaN
+      expect(crashes).toEqual([recentCrash])
+    })
+
+    it("uses Date.now() as default when no now option provided for prune", () => {
+      const dir = makeTmpDir()
+      writeTombstone(dir, {
+        reason: "uncaughtException",
+        message: "boom",
+        stack: null,
+        timestamp: new Date().toISOString(),
+        pid: 1234,
+        uptimeSeconds: 120,
+        recentCrashes: [new Date(Date.now() - 1000).toISOString()],
+      })
+      const tombstonePath = path.join(dir, "daemon-death.json")
+
+      // No options — should use Date.now() internally
+      pruneOldCrashes(tombstonePath)
+
+      const raw = fs.readFileSync(tombstonePath, "utf-8")
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      // Recent crash (1s ago) should still be within the 5-minute window
+      expect((parsed.recentCrashes as string[]).length).toBe(1)
     })
 
     it("preserves other tombstone fields when pruning", () => {
