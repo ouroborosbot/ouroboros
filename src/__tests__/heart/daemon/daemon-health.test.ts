@@ -312,4 +312,136 @@ describe("daemon-health", () => {
       expect(result!.status).toBe("running")
     })
   })
+
+  describe("createHealthNervesSink", () => {
+    it("returns a LogSink that triggers debounced health writes on relevant events", async () => {
+      const dir = makeTmpDir()
+      const healthPath = path.join(dir, "daemon-health.json")
+      const { createHealthNervesSink } = await import("../../../heart/daemon/daemon-health")
+
+      const writer = new DaemonHealthWriter(healthPath)
+      const getState = vi.fn<() => DaemonHealthState>(() => makeHealthState())
+      const sink = createHealthNervesSink(writer, getState)
+
+      // Emit a relevant event
+      sink({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "daemon.agent_started",
+        trace_id: "test-1",
+        component: "daemon",
+        message: "agent started",
+        meta: {},
+      })
+
+      // Debounce: should not have written immediately
+      expect(fs.existsSync(healthPath)).toBe(false)
+
+      // Wait for debounce (1 second)
+      await new Promise((resolve) => setTimeout(resolve, 1100))
+
+      expect(fs.existsSync(healthPath)).toBe(true)
+      expect(getState).toHaveBeenCalled()
+    })
+
+    it("ignores events that are not in the tracked set", async () => {
+      const dir = makeTmpDir()
+      const healthPath = path.join(dir, "daemon-health.json")
+      const { createHealthNervesSink } = await import("../../../heart/daemon/daemon-health")
+
+      const writer = new DaemonHealthWriter(healthPath)
+      const getState = vi.fn<() => DaemonHealthState>(() => makeHealthState())
+      const sink = createHealthNervesSink(writer, getState)
+
+      // Emit an irrelevant event
+      sink({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "some.other.event",
+        trace_id: "test-2",
+        component: "foo",
+        message: "unrelated",
+        meta: {},
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 1100))
+
+      // Should NOT have written health file for irrelevant event
+      expect(getState).not.toHaveBeenCalled()
+    })
+
+    it("debounces multiple events into a single write", async () => {
+      const dir = makeTmpDir()
+      const healthPath = path.join(dir, "daemon-health.json")
+      const { createHealthNervesSink } = await import("../../../heart/daemon/daemon-health")
+
+      const writer = new DaemonHealthWriter(healthPath)
+      const writeHealthSpy = vi.spyOn(writer, "writeHealth")
+      const getState = vi.fn<() => DaemonHealthState>(() => makeHealthState())
+      const sink = createHealthNervesSink(writer, getState)
+
+      const makeEvent = (name: string) => ({
+        ts: new Date().toISOString(),
+        level: "info" as const,
+        event: name,
+        trace_id: "test-3",
+        component: "daemon",
+        message: "event",
+        meta: {},
+      })
+
+      // Rapid-fire multiple events
+      sink(makeEvent("daemon.agent_started"))
+      sink(makeEvent("daemon.agent_exit"))
+      sink(makeEvent("daemon.habit_fire"))
+
+      await new Promise((resolve) => setTimeout(resolve, 1100))
+
+      // Should have written only once (debounced)
+      expect(writeHealthSpy).toHaveBeenCalledTimes(1)
+      expect(getState).toHaveBeenCalledTimes(1)
+    })
+
+    it("tracks all specified event names", async () => {
+      const dir = makeTmpDir()
+      const healthPath = path.join(dir, "daemon-health.json")
+      const { createHealthNervesSink, HEALTH_TRACKED_EVENTS } = await import("../../../heart/daemon/daemon-health")
+
+      expect(HEALTH_TRACKED_EVENTS).toContain("daemon.habit_cron_verification_failed")
+      expect(HEALTH_TRACKED_EVENTS).toContain("daemon.habit_fire")
+      expect(HEALTH_TRACKED_EVENTS).toContain("daemon.agent_exit")
+      expect(HEALTH_TRACKED_EVENTS).toContain("daemon.agent_started")
+      expect(HEALTH_TRACKED_EVENTS).toContain("daemon.agent_restart_exhausted")
+      expect(HEALTH_TRACKED_EVENTS).toContain("daemon.agent_permanent_failure")
+      expect(HEALTH_TRACKED_EVENTS).toContain("daemon.agent_cooldown_recovery")
+      expect(HEALTH_TRACKED_EVENTS).toContain("daemon.safe_mode_entered")
+      expect(HEALTH_TRACKED_EVENTS).toContain("daemon.habit_scheduler_start")
+    })
+
+    it("calls writeHealth with the state returned by getState", async () => {
+      const dir = makeTmpDir()
+      const healthPath = path.join(dir, "daemon-health.json")
+      const { createHealthNervesSink } = await import("../../../heart/daemon/daemon-health")
+
+      const writer = new DaemonHealthWriter(healthPath)
+      const writeHealthSpy = vi.spyOn(writer, "writeHealth")
+      const customState = makeHealthState({ status: "degraded", pid: 99999 })
+      const getState = vi.fn<() => DaemonHealthState>(() => customState)
+      const sink = createHealthNervesSink(writer, getState)
+
+      sink({
+        ts: new Date().toISOString(),
+        level: "error",
+        event: "daemon.safe_mode_entered",
+        trace_id: "test-5",
+        component: "daemon",
+        message: "safe mode",
+        meta: {},
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 1100))
+
+      expect(writeHealthSpy).toHaveBeenCalledWith(customState)
+    })
+  })
 })
