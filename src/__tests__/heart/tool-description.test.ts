@@ -13,7 +13,12 @@ describe("humanReadableToolDescription", () => {
       const result = humanReadableToolDescription("shell", { command: longCmd })
       expect(result!.length).toBeLessThan(70)
       expect(result).toContain("running ")
-      expect(result).toEndWith("...")
+      expect(result).toMatch(/\.\.\.$/)
+    })
+
+    it("handles multiline commands by keeping first line", () => {
+      expect(humanReadableToolDescription("shell", { command: "npm test" }))
+        .toBe("running npm test...")
     })
 
     it("falls back to generic when no command arg", () => {
@@ -26,6 +31,11 @@ describe("humanReadableToolDescription", () => {
     it("extracts filename from args.file_path", () => {
       expect(humanReadableToolDescription("read_file", { file_path: "/foo/bar/mcp-server.ts" }))
         .toBe("reading mcp-server.ts...")
+    })
+
+    it("handles bare filename (no path separators)", () => {
+      expect(humanReadableToolDescription("read_file", { file_path: "package.json" }))
+        .toBe("reading package.json...")
     })
 
     it("falls back to generic when no file_path arg", () => {
