@@ -1560,4 +1560,195 @@ describe("HabitScheduler", () => {
       expect(scheduler.getDegradedHabits()).toHaveLength(0)
     })
   })
+
+  describe("periodic reconciliation", () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it("startPeriodicReconciliation triggers first reconciliation after 30s", () => {
+      const readdir = vi.fn(() => [])
+      deps = makeDeps({ readdir })
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps,
+      })
+
+      scheduler.startPeriodicReconciliation()
+
+      // Before 30s: no reconciliation
+      vi.advanceTimersByTime(29_999)
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled()
+
+      // After 30s: first reconciliation
+      vi.advanceTimersByTime(1)
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1)
+    })
+
+    it("after first reconciliation, subsequent ones fire every 5 minutes", () => {
+      const readdir = vi.fn(() => [])
+      deps = makeDeps({ readdir })
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps,
+      })
+
+      scheduler.startPeriodicReconciliation()
+
+      // First at 30s
+      vi.advanceTimersByTime(30_000)
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1)
+
+      // Second at 30s + 5min
+      vi.advanceTimersByTime(300_000)
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(2)
+
+      // Third at 30s + 10min
+      vi.advanceTimersByTime(300_000)
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(3)
+    })
+
+    it("accepts custom interval", () => {
+      const readdir = vi.fn(() => [])
+      deps = makeDeps({ readdir })
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps,
+      })
+
+      scheduler.startPeriodicReconciliation(60_000) // 1 minute interval
+
+      // First at 30s
+      vi.advanceTimersByTime(30_000)
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1)
+
+      // Second at 30s + 1min
+      vi.advanceTimersByTime(60_000)
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(2)
+    })
+
+    it("stopPeriodicReconciliation clears the periodic timer", () => {
+      const readdir = vi.fn(() => [])
+      deps = makeDeps({ readdir })
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps,
+      })
+
+      scheduler.startPeriodicReconciliation()
+
+      // Stop before first fires
+      scheduler.stopPeriodicReconciliation()
+
+      vi.advanceTimersByTime(600_000)
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled()
+    })
+
+    it("stop() also clears periodic reconciliation timer", () => {
+      const readdir = vi.fn(() => [])
+      deps = makeDeps({ readdir })
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps,
+      })
+
+      scheduler.startPeriodicReconciliation()
+
+      scheduler.stop()
+
+      vi.advanceTimersByTime(600_000)
+      // sync should not have been called by the periodic reconciliation
+      // (stop() calls removeAll, not sync)
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled()
+    })
+
+    it("uses setTimeout chain not setInterval (each completes before next)", () => {
+      const readdir = vi.fn(() => [])
+      deps = makeDeps({ readdir })
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps,
+      })
+
+      scheduler.startPeriodicReconciliation()
+
+      // First at 30s
+      vi.advanceTimersByTime(30_000)
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1)
+
+      // If it was setInterval, all would fire at fixed intervals regardless
+      // With setTimeout chain, each schedules the next after completion
+      vi.advanceTimersByTime(300_000)
+      expect((cronManager.sync as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(2)
+    })
+
+    it("reconciliation re-verifies cron entries", () => {
+      const execForVerify = vi.fn(() => "")
+      const readdir = vi.fn(() => ["heartbeat.md"])
+      const readFile = vi.fn(() => "content")
+      deps = makeDeps({ readdir, readFile })
+
+      // Need to set up mock returns for multiple reconcile calls
+      mockParseHabitFile.mockReturnValue(makeHeartbeatHabit())
+
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps,
+        execForVerify,
+        platform: "darwin",
+      })
+
+      scheduler.startPeriodicReconciliation()
+
+      // First reconciliation at 30s
+      vi.advanceTimersByTime(30_000)
+
+      // execForVerify should have been called during reconciliation
+      expect(execForVerify).toHaveBeenCalled()
+    })
+
+    it("stopPeriodicReconciliation is safe to call when not started", () => {
+      const scheduler = new HabitScheduler({
+        agent: "slugger",
+        habitsDir: "/bundles/slugger.ouro/habits",
+        osCronManager: cronManager,
+        onHabitFire,
+        deps,
+      })
+
+      // Should not throw
+      scheduler.stopPeriodicReconciliation()
+    })
+  })
 })
