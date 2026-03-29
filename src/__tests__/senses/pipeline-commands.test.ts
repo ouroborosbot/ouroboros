@@ -7,6 +7,7 @@ import type { TrustGateResult } from "../../senses/trust-gate"
 import type { UsageData } from "../../mind/context"
 import type { PendingMessage } from "../../mind/pending"
 import type { InboundTurnInput } from "../../senses/pipeline"
+import { resetSharedCommandRegistry, resetDebugMode } from "../../senses/commands"
 
 const mockFindBridgesForSession = vi.fn()
 const mockListTargetSessionCandidates = vi.fn()
@@ -57,6 +58,20 @@ vi.mock("../../heart/daemon/auth-flow", async () => ({
     secretsPath: "/mock/secrets.json",
     secrets: { providers: {} },
   }),
+}))
+
+vi.mock("../../heart/identity", () => ({
+  getAgentName: vi.fn(() => "testagent"),
+  getAgentRoot: vi.fn(() => "/tmp/AgentBundles/testagent.ouro"),
+  getAgentBundlesRoot: vi.fn(() => "/tmp/AgentBundles"),
+  getAgentSecretsPath: vi.fn(() => "/tmp/.agentsecrets/testagent/secrets.json"),
+  loadAgentConfig: vi.fn(() => ({
+    version: 1,
+    enabled: true,
+    provider: "anthropic",
+    phrases: { thinking: [], tool: [], followup: [] },
+  })),
+  setAgentName: vi.fn(),
 }))
 
 // ── Test helpers ──────────────────────────────────────────────────
@@ -151,6 +166,8 @@ describe("pipeline slash command interception", () => {
     mockFindBridgesForSession.mockReset().mockReturnValue([])
     mockListTargetSessionCandidates.mockReset().mockResolvedValue([])
     mockListCodingSessions.mockReset().mockReturnValue([])
+    resetSharedCommandRegistry()
+    resetDebugMode()
   })
 
   it("/debug command is intercepted and returns 'command' turnOutcome", async () => {
@@ -246,6 +263,38 @@ describe("pipeline slash command interception", () => {
     expect(callbacks.onClearText).toHaveBeenCalled()
   })
 
+  it("command with no message still returns 'command' turnOutcome", async () => {
+    const { handleInboundTurn } = await import("../../senses/pipeline")
+    const callbacks = makeCallbacks()
+    const input = makeInput({
+      messages: [{ role: "user", content: "/exit" }],
+      callbacks,
+      channel: "cli",
+    })
+
+    const result = await handleInboundTurn(input)
+
+    expect(result.turnOutcome).toBe("command")
+    // onTextChunk should NOT be called since /exit has no message
+    expect(callbacks.onTextChunk).not.toHaveBeenCalled()
+    expect(input.runAgent).not.toHaveBeenCalled()
+  })
+
+  it("multipart content with no text part passes through to agent", async () => {
+    const { handleInboundTurn } = await import("../../senses/pipeline")
+    const input = makeInput({
+      messages: [{
+        role: "user",
+        content: [{ type: "image_url", image_url: { url: "data:image/png;base64,..." } }] as any,
+      }],
+    })
+
+    const result = await handleInboundTurn(input)
+
+    // No text to parse as command, so passes through to agent
+    expect(input.runAgent).toHaveBeenCalled()
+  })
+
   it("multipart content messages are checked for slash commands", async () => {
     const { handleInboundTurn } = await import("../../senses/pipeline")
     const callbacks = makeCallbacks()
@@ -261,6 +310,19 @@ describe("pipeline slash command interception", () => {
 
     expect(result.turnOutcome).toBe("command")
     expect(input.runAgent).not.toHaveBeenCalled()
+  })
+})
+
+describe("getSharedCommandRegistry caching", () => {
+  beforeEach(() => {
+    resetSharedCommandRegistry()
+  })
+
+  it("returns the same registry on subsequent calls", async () => {
+    const { getSharedCommandRegistry } = await import("../../senses/commands")
+    const reg1 = getSharedCommandRegistry()
+    const reg2 = getSharedCommandRegistry()
+    expect(reg1).toBe(reg2)
   })
 })
 
