@@ -4,11 +4,14 @@
     {
       "version": "0.1.0-alpha.153",
       "changes": [
-        "feat(heart): humanReadableToolDescription — one-line descriptions for tool activity (reading file.ts, running npm test, etc.)",
-        "feat(heart): createToolActivityCallbacks — shared tool activity callbacks with debug mode toggle",
-        "feat(senses): slash command interception in pipeline — /debug toggle for verbose tool output, centralized command dispatch",
-        "refactor(senses): BB and Teams callbacks use clean human-readable descriptions instead of 'shared work: processing'",
-        "cleanup: removed debug-activity.ts (replaced by tool-activity-callbacks)"
+        "Daemon health file: DaemonHealthWriter writes atomic daemon-health.json on every state change. readHealth() standalone reader for CLI and agent processes.",
+        "Nerves event buffer: createBufferedSink wraps sinks with bounded ring buffer (1000 events), auto-flushes on recovery, TTL discards after 5 min of unhealthy sink.",
+        "Cron verification + timer fallback: after cron sync, verifyCronEntries checks launchctl/crontab for registered habits. Unverified habits get in-process setTimeout fallback. getDegradedHabits() for health reporting.",
+        "Periodic reconciliation: 30s initial delay then 5-minute setTimeout chain re-scans habits and re-verifies cron entries.",
+        "Safe mode: detectSafeMode reads crash history (recentCrashes in tombstone). 3+ crashes in 5 minutes triggers safe mode - daemon stays alive, socket works, agents/habits paused. ouro up --force writes override file.",
+        "Health nerves sink: createHealthNervesSink registers as global sink, listens for daemon events (agent_started, agent_exit, habit_fire, safe_mode_entered, etc.), triggers debounced health writes.",
+        "ouro status health fallback: when daemon socket is unreachable, reads health file to show last-known status, safe mode, and degraded components.",
+        "Degraded state in agent dialog: habit turns read daemon-health.json and append scheduling degradation nudge when components are degraded."
       ]
     },
     {
