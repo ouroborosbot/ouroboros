@@ -628,13 +628,6 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
   const resolvedContext = await resolver.resolve()
   const friendId = resolvedContext.friend.id
 
-  const registry = createTeamsCommandRegistry()
-
-  // Check for slash commands (before pipeline -- these are transport-level concerns)
-  if (handleTeamsSlashCommand(text, registry, friendId, conversationId, stream)) {
-    return
-  }
-
   // ── Teams adapter concerns: controller, callbacks, session path ──────────
   const controller = new AbortController()
   const channelConfig = getTeamsChannelConfig()
@@ -747,6 +740,17 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
       failoverState: teamsFailoverState,
     })
 
+    // ── Handle pipeline-intercepted commands ────────────────────────
+    if (result.turnOutcome === "command") {
+      if (result.commandAction === "new") {
+        deleteSession(sessPath)
+        stream.emit("session cleared")
+      }
+      // For "response" commands: pipeline already emitted the response via onTextChunk
+      await callbacks.flush()
+      return
+    }
+
     /* v8 ignore start -- failover display: tested via pipeline integration tests @preserve */
     if (result.failoverMessage) {
       stream.emit(result.failoverMessage)
@@ -797,7 +801,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
       continue
     }
 
-    if (handleTeamsSlashCommand(supersedingFollowUp.text, registry, friendId, conversationId, stream, false)) {
+    if (handleTeamsSlashCommand(supersedingFollowUp.text, createTeamsCommandRegistry(), friendId, conversationId, stream, false)) {
       return
     }
 

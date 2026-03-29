@@ -132,6 +132,8 @@ export interface InboundTurnResult {
   failoverMessage?: string
   /** If set, a provider switch was executed via failover reply. */
   switchedProvider?: string
+  /** If turnOutcome is "command", the action from the dispatched command (exit, new, response). */
+  commandAction?: "exit" | "new" | "response"
 }
 
 function emptyTaskBoard(): BoardResult {
@@ -308,13 +310,13 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
         if (dispatchResult.result.message) {
           input.callbacks.onTextChunk(dispatchResult.result.message)
         }
-        input.callbacks.onClearText?.()
         // Return a minimal result — no agent turn, no session write
         const resolvedContext = await input.friendResolver.resolve()
         return {
           resolvedContext,
           gateResult: { allowed: true },
           turnOutcome: "command",
+          commandAction: dispatchResult.result.action,
         }
       }
     }

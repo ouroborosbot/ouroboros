@@ -250,7 +250,7 @@ describe("pipeline slash command interception", () => {
     expect(input.runAgent).not.toHaveBeenCalled()
   })
 
-  it("onClearText is called after command response", async () => {
+  it("onClearText is NOT called for command responses (text should be flushed, not cleared)", async () => {
     const { handleInboundTurn } = await import("../../senses/pipeline")
     const callbacks = makeCallbacks()
     const input = makeInput({
@@ -260,7 +260,7 @@ describe("pipeline slash command interception", () => {
 
     await handleInboundTurn(input)
 
-    expect(callbacks.onClearText).toHaveBeenCalled()
+    expect(callbacks.onClearText).not.toHaveBeenCalled()
   })
 
   it("command with no message still returns 'command' turnOutcome", async () => {
