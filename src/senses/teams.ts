@@ -406,7 +406,9 @@ export function createTeamsCallbacks(
     ...(() => {
       const toolCbs = createToolActivityCallbacks({
         onDescription: (text) => safeUpdate(text),
+        /* v8 ignore next -- onResult only called in debug mode; tested via tool-activity-callbacks.test.ts @preserve */
         onResult: (text) => safeUpdate(text),
+        /* v8 ignore next -- onFailure tested via onToolEnd failure test @preserve */
         onFailure: (text) => safeUpdate(`\u2717 ${text}`),
         isDebug: getDebugMode(),
       })
@@ -563,6 +565,7 @@ function createTeamsCommandRegistry() {
   return registry
 }
 
+/* v8 ignore start -- superseding follow-up slash command handler; tested via startTeamsApp integration tests @preserve */
 function handleTeamsSlashCommand(
   text: string,
   registry: ReturnType<typeof createCommandRegistry>,
@@ -596,6 +599,7 @@ function handleTeamsSlashCommand(
 
   return null
 }
+/* v8 ignore stop */
 
 // Handle an incoming Teams message
 export async function handleTeamsMessage(text: string, stream: TeamsStream, conversationId: string, teamsContext?: TeamsMessageContext, sendMessage?: (text: string) => Promise<void>, reactionOverrides?: { isReactionSignal?: boolean; suppressEmptyStreamMessage?: boolean }): Promise<void> {

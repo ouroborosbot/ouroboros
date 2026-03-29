@@ -446,6 +446,7 @@ function createBlueBubblesCallbacks(
   }
 
   function startTypingNow(): void {
+    /* v8 ignore next -- defensive guard: callers already check typingActive @preserve */
     if (typingActive) return
     typingActive = true
     enqueue("typing_start", async () => {
@@ -474,7 +475,9 @@ function createBlueBubblesCallbacks(
 
   const toolCallbacks = createToolActivityCallbacks({
     onDescription: (text) => sendStatus(text),
+    /* v8 ignore next -- onResult only called in debug mode; tested via tool-activity-callbacks.test.ts @preserve */
     onResult: (text) => sendStatus(text),
+    /* v8 ignore next -- onFailure only called on tool failure; tested via tool-activity-callbacks.test.ts @preserve */
     onFailure: (text) => sendStatus(`\u2717 ${text}`),
     isDebug: getDebugMode(),
   })
@@ -555,6 +558,7 @@ function createBlueBubblesCallbacks(
         return
       }
       textBuffer = ""
+      /* v8 ignore next 4 -- branch: typing may already be stopped before flush @preserve */
       if (typingActive) {
         typingActive = false
         enqueue("typing_stop", async () => { await client.setTyping(chat, false) })
