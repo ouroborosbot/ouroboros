@@ -304,6 +304,41 @@ describe("event-buffer", () => {
         )
       })
 
+      it("handles TTL expiry when buffer was already flushed externally", () => {
+        const clock = { now: Date.now() }
+        let broken = true
+        innerSink.mockImplementation(() => {
+          if (broken) throw new Error("broken")
+        })
+
+        const buffered = createBufferedSink(innerSink, {
+          nowMs: () => clock.now,
+        })
+
+        // Buffer an event
+        buffered.sink(makeLogEvent({ message: "event 1" }))
+        expect(buffered.state().buffered).toBe(1)
+
+        // Manually flush (sink recovers briefly)
+        broken = false
+        buffered.flush()
+        expect(buffered.state().buffered).toBe(0)
+
+        // Break again and advance past TTL from original unhealthy time
+        broken = true
+        // We need to get unhealthy again first
+        buffered.sink(makeLogEvent({ message: "event 2" }))
+        expect(buffered.state().buffered).toBe(1)
+
+        // Advance past TTL
+        clock.now += 300_001
+
+        // Trigger TTL check — discards the single event
+        buffered.sink(makeLogEvent({ message: "event 3" }))
+        // event 2 dropped, event 3 buffered
+        expect(buffered.state().dropped).toBe(1)
+      })
+
       it("uses custom ttlMs option", () => {
         const clock = { now: Date.now() }
         innerSink.mockImplementation(() => { throw new Error("broken") })
@@ -321,6 +356,76 @@ describe("event-buffer", () => {
         expect(buffered.state().buffered).toBe(1)
         expect(buffered.state().dropped).toBe(1)
       })
+    })
+
+    it("flush() is a no-op when buffer is empty", () => {
+      const buffered = createBufferedSink(innerSink)
+
+      // No events buffered
+      buffered.flush()
+
+      expect(buffered.state().buffered).toBe(0)
+      expect(innerSink).not.toHaveBeenCalled()
+    })
+
+    it("TTL discard with empty buffer does not emit nerves event", () => {
+      const clock = { now: Date.now() }
+      let broken = true
+      innerSink.mockImplementation(() => {
+        if (broken) throw new Error("broken")
+      })
+
+      const buffered = createBufferedSink(innerSink, {
+        nowMs: () => clock.now,
+      })
+
+      // Make sink unhealthy with one event, then flush it manually
+      buffered.sink(makeLogEvent())
+      expect(buffered.state().buffered).toBe(1)
+
+      // Recover and flush
+      broken = false
+      buffered.flush()
+      expect(buffered.state().buffered).toBe(0)
+
+      // Now break again and advance past TTL
+      broken = true
+      buffered.sink(makeLogEvent())
+      expect(buffered.state().buffered).toBe(1)
+
+      // Advance past TTL
+      clock.now += 300_001
+
+      // The single buffered event should be discarded
+      buffered.sink(makeLogEvent())
+      expect(buffered.state().buffered).toBe(1) // only the new one
+    })
+
+    it("markUnhealthy does not reset unhealthySince when already unhealthy", () => {
+      const clock = { now: Date.now() }
+      innerSink.mockImplementation(() => { throw new Error("broken") })
+
+      const buffered = createBufferedSink(innerSink, {
+        nowMs: () => clock.now,
+        ttlMs: 100_000,
+      })
+
+      // First failure: marks unhealthy at clock.now
+      buffered.sink(makeLogEvent())
+      expect(buffered.state().sinkHealthy).toBe(false)
+
+      // Advance time partway
+      clock.now += 50_000
+
+      // Second failure: should NOT reset unhealthySince
+      buffered.sink(makeLogEvent())
+
+      // Advance to original unhealthySince + ttl
+      clock.now += 50_001
+
+      // TTL should trigger based on original failure time, not second failure
+      buffered.sink(makeLogEvent())
+      expect(buffered.state().dropped).toBeGreaterThan(0)
     })
 
     describe("flush behavior during auto-flush failure", () => {
