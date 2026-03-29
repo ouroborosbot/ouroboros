@@ -24,17 +24,17 @@ const TOOL_DESCRIPTIONS: Record<string, DescriptionBuilder> = {
     return `running ${truncate(cmd, 50)}...`
   },
   read_file: (args) => {
-    const fp = args.file_path
+    const fp = args.path || args.file_path
     if (!fp) return "reading a file..."
     return `reading ${basename(fp)}...`
   },
   write_file: (args) => {
-    const fp = args.file_path
+    const fp = args.path || args.file_path
     if (!fp) return "writing a file..."
     return `writing ${basename(fp)}...`
   },
   edit_file: (args) => {
-    const fp = args.file_path
+    const fp = args.path || args.file_path
     if (!fp) return "editing a file..."
     return `editing ${basename(fp)}...`
   },

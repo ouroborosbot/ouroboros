@@ -28,17 +28,22 @@ describe("humanReadableToolDescription", () => {
   })
 
   describe("read_file", () => {
-    it("extracts filename from args.file_path", () => {
+    it("extracts filename from args.path (primary)", () => {
+      expect(humanReadableToolDescription("read_file", { path: "/foo/bar/mcp-server.ts" }))
+        .toBe("reading mcp-server.ts...")
+    })
+
+    it("extracts filename from args.file_path (fallback)", () => {
       expect(humanReadableToolDescription("read_file", { file_path: "/foo/bar/mcp-server.ts" }))
         .toBe("reading mcp-server.ts...")
     })
 
     it("handles bare filename (no path separators)", () => {
-      expect(humanReadableToolDescription("read_file", { file_path: "package.json" }))
+      expect(humanReadableToolDescription("read_file", { path: "package.json" }))
         .toBe("reading package.json...")
     })
 
-    it("falls back to generic when no file_path arg", () => {
+    it("falls back to generic when no path arg", () => {
       expect(humanReadableToolDescription("read_file", {}))
         .toBe("reading a file...")
     })
