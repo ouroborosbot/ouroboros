@@ -1457,7 +1457,11 @@ describe("HabitScheduler", () => {
       onHabitFire.mockClear()
 
       // Now simulate reconciliation where cron is now verified
-      mockParseHabitFile.mockReturnValueOnce(makeHeartbeatHabit())
+      // Use a recent lastRun so the habit is NOT overdue during reconcile
+      mockParseHabitFile.mockReturnValueOnce({
+        ...makeHeartbeatHabit(),
+        lastRun: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // 5 min ago, cadence 30m
+      })
       readdir.mockReturnValueOnce(["heartbeat.md"])
       execForVerify.mockReturnValueOnce("bot.ouro.slugger.heartbeat\n")
 
