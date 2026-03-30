@@ -100,10 +100,10 @@ function readTaskSummary(agentRoot: string): { summary: OutlookTaskSummary; issu
   const byStatus = emptyByStatus()
 
   for (const status of Object.keys(byStatus) as TaskStatus[]) {
-    byStatus[status] = board.byStatus[status]?.length ?? 0
+    byStatus[status] = board.byStatus[status].length
   }
 
-  const liveTaskNames = LIVE_TASK_STATUSES.flatMap((status) => board.byStatus[status] ?? [])
+  const liveTaskNames = LIVE_TASK_STATUSES.flatMap((status) => board.byStatus[status])
   const issues: OutlookIssue[] = [
     ...index.parseErrors.map((detail) => issue("task-parse-error", detail)),
     ...index.invalidFilenames.map((detail) => issue("task-invalid-filename", detail)),
@@ -157,53 +157,35 @@ function readSessionSummary(agentName: string, agentRoot: string): { items: Outl
   return { items }
 }
 
-function readInnerSummary(agentName: string, agentRoot: string): {
+function readInnerSummary(agentRoot: string): {
   summary: OutlookAgentState["inner"]
   issues: OutlookIssue[]
   latestActivityAt: string | null
 } {
   const sessionPath = getInnerDialogSessionPath(agentRoot)
   const pendingDir = path.join(agentRoot, "state", "pending", "self", "inner", "dialog")
-  const issues: OutlookIssue[] = []
+  const { pendingMessages, turns, runtimeState } = readInnerDialogRawData(sessionPath, pendingDir)
+  const job = deriveInnerJob(pendingMessages, turns, runtimeState)
+  const surfacedSummary = job.surfacedResult ? formatSurfacedValue(job.surfacedResult) : null
+  const latestPendingTimestamp = pendingMessages.length > 0
+    ? new Date(Math.max(...pendingMessages.map((message) => message.timestamp))).toISOString()
+    : null
+  const latestActivityAt = latestPendingTimestamp
+    ?? runtimeState?.startedAt
+    ?? runtimeState?.lastCompletedAt
+    ?? null
 
-  try {
-    const { pendingMessages, turns, runtimeState } = readInnerDialogRawData(sessionPath, pendingDir)
-    const job = deriveInnerJob(pendingMessages, turns, runtimeState)
-    const surfacedSummary = job.surfacedResult ? formatSurfacedValue(job.surfacedResult) : null
-    const latestPendingTimestamp = pendingMessages.length > 0
-      ? new Date(Math.max(...pendingMessages.map((message) => message.timestamp))).toISOString()
-      : null
-    const latestActivityAt = latestPendingTimestamp
-      ?? runtimeState?.startedAt
-      ?? runtimeState?.lastCompletedAt
-      ?? null
-
-    return {
-      summary: {
-        visibility: OUTLOOK_DEFAULT_INNER_VISIBILITY,
-        status: job.status,
-        hasPending: pendingMessages.length > 0,
-        surfacedSummary,
-        origin: job.origin,
-        obligationStatus: job.obligationStatus,
-      },
-      issues,
-      latestActivityAt,
-    }
-  } catch (error) {
-    issues.push(issue("inner-read-failed", `${agentName}: ${error instanceof Error ? error.message : String(error)}`))
-    return {
-      summary: {
-        visibility: OUTLOOK_DEFAULT_INNER_VISIBILITY,
-        status: "idle",
-        hasPending: false,
-        surfacedSummary: null,
-        origin: null,
-        obligationStatus: null,
-      },
-      issues,
-      latestActivityAt: null,
-    }
+  return {
+    summary: {
+      visibility: OUTLOOK_DEFAULT_INNER_VISIBILITY,
+      status: job.status,
+      hasPending: pendingMessages.length > 0,
+      surfacedSummary,
+      origin: job.origin,
+      obligationStatus: job.obligationStatus,
+    },
+    issues: [],
+    latestActivityAt,
   }
 }
 
@@ -344,7 +326,7 @@ export function readOutlookAgentState(agentName: string, options: OutlookReadOpt
 
   const obligations = readObligationSummary(agentRoot)
   const sessions = readSessionSummary(agentName, agentRoot)
-  const inner = readInnerSummary(agentName, agentRoot)
+  const inner = readInnerSummary(agentRoot)
   issues.push(...inner.issues)
 
   const coding = readCodingSummary(agentRoot)

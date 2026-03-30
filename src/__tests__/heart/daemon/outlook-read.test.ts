@@ -120,7 +120,13 @@ describe("outlook direct reads", () => {
     const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
     const betaRoot = path.join(bundlesRoot, "beta.ouro")
 
-    writeAgentConfig(alphaRoot)
+    writeAgentConfig(alphaRoot, {
+      senses: {
+        cli: { enabled: true },
+        teams: { enabled: true },
+        bluebubbles: { enabled: false },
+      },
+    })
     writeAgentConfig(betaRoot)
 
     writeTask(path.join(alphaRoot, "tasks"), "one-shots", "2026-03-29-1100-agent-dashboard", {
@@ -148,6 +154,13 @@ describe("outlook direct reads", () => {
       createdAt: "2026-03-29T11:10:00.000Z",
       updatedAt: "2026-03-29T11:56:00.000Z",
       nextAction: "finish the read layer and move to daemon hosting",
+    })
+    writeJson(path.join(alphaRoot, "state", "obligations", "ob-0.json"), {
+      id: "ob-0",
+      origin: { friendId: "friend-2", channel: "teams", key: "thread" },
+      content: "Older open thread.",
+      status: "pending",
+      createdAt: "2026-03-29T09:10:00.000Z",
     })
     writeJson(path.join(alphaRoot, "state", "sessions", "friend-1", "cli", "session.json"), {
       version: 1,
@@ -189,6 +202,7 @@ describe("outlook direct reads", () => {
     })
     fs.mkdirSync(path.join(betaRoot, "tasks", "one-shots"), { recursive: true })
     fs.writeFileSync(path.join(betaRoot, "tasks", "one-shots", "2026-03-21-0901-bad-task.md"), "---\ntype: one-shot\nstatus: nope\n---\n", "utf-8")
+    fs.writeFileSync(path.join(betaRoot, "tasks", "one-shots", "badname.md"), "---\ntype: one-shot\ncategory: infrastructure\ntitle: Bad filename\nstatus: paused\ncreated: 2026-03-21\nupdated: 2026-03-21\n---\n", "utf-8")
     writeJson(path.join(betaRoot, "state", "sessions", "friend-2", "cli", "session.json"), {
       version: 1,
       messages: [],
@@ -227,7 +241,7 @@ describe("outlook direct reads", () => {
       agentName: "alpha",
       freshness: { status: "fresh" },
       tasks: { liveCount: 2, blockedCount: 1 },
-      obligations: { openCount: 1 },
+      obligations: { openCount: 2 },
       coding: { activeCount: 1, blockedCount: 1 },
     })
     expect(machine.agents[1]).toMatchObject({
@@ -242,10 +256,12 @@ describe("outlook direct reads", () => {
     })
 
     expect(alpha.agentName).toBe("alpha")
+    expect(alpha.senses).toEqual(["cli", "teams"])
     expect(alpha.tasks.liveTaskNames).toEqual([
       "agent-dashboard",
       "cross-session-followup",
     ])
+    expect(alpha.obligations.items.map((item) => item.id)).toEqual(["ob-1", "ob-0"])
     expect(alpha.sessions.liveCount).toBe(1)
     expect(alpha.sessions.items[0]).toMatchObject({
       friendId: "friend-1",
@@ -308,5 +324,323 @@ describe("outlook direct reads", () => {
     })
     expect(second.tasks.liveCount).toBe(0)
     expect(second.tasks.byStatus.done).toBe(1)
+  })
+
+  it("handles sparse or malformed direct-read inputs without inventing state", async () => {
+    const bundlesRoot = makeBundleRoot()
+    const gammaRoot = path.join(bundlesRoot, "gamma.ouro")
+    const deltaRoot = path.join(bundlesRoot, "delta.ouro")
+    const epsilonRoot = path.join(bundlesRoot, "epsilon.ouro")
+    const zetaRoot = path.join(bundlesRoot, "zeta.ouro")
+    const thetaRoot = path.join(bundlesRoot, "theta.ouro")
+
+    fs.mkdirSync(gammaRoot, { recursive: true })
+    fs.writeFileSync(path.join(gammaRoot, "agent.json"), "{not-json", "utf-8")
+    writeJson(path.join(gammaRoot, "state", "sessions", "self", "inner", "dialog.json"), {
+      version: 1,
+      messages: [
+        { role: "system", content: "system prompt" },
+        { role: "user", content: "waking up.\n\nwhat needs my attention?" },
+        { role: "assistant", content: "Nothing is on fire, but there is no fresh outer activity." },
+      ],
+    })
+    writeJson(path.join(gammaRoot, "state", "sessions", "self", "inner", "runtime.json"), {
+      status: "idle",
+    })
+    writeCodingState(gammaRoot, [
+      { session: { runner: "codex" } },
+      buildCodingRecord({
+        id: "coding-002",
+        checkpoint: null,
+        originSession: { friendId: 42 },
+        taskRef: null,
+        stdoutTail: "stdout fallback checkpoint",
+        stderrTail: "",
+        lastActivityAt: "2026-03-29T09:00:00.000Z",
+      }),
+      buildCodingRecord({
+        id: "coding-003",
+        checkpoint: null,
+        originSession: { friendId: 42 },
+        taskRef: null,
+        stdoutTail: "",
+        stderrTail: "stderr fallback checkpoint",
+        lastActivityAt: "2026-03-29T09:05:00.000Z",
+      }),
+      buildCodingRecord({
+        id: "coding-004",
+        checkpoint: null,
+        originSession: { friendId: 42 },
+        taskRef: null,
+        stdoutTail: "",
+        stderrTail: "",
+        lastActivityAt: "2026-03-29T09:10:00.000Z",
+      }),
+    ])
+    writeAgentConfig(deltaRoot)
+    writeJson(path.join(deltaRoot, "state", "sessions", "self", "inner", "dialog.json"), {
+      version: 1,
+      messages: [],
+    })
+    writeJson(path.join(deltaRoot, "state", "sessions", "self", "inner", "runtime.json"), {
+      status: "idle",
+    })
+    writeAgentConfig(epsilonRoot)
+    writeJson(path.join(epsilonRoot, "state", "sessions", "self", "inner", "dialog.json"), {
+      version: 1,
+      messages: [],
+    })
+    writeJson(path.join(epsilonRoot, "state", "sessions", "self", "inner", "runtime.json"), {
+      status: "idle",
+    })
+    writeJson(path.join(epsilonRoot, "state", "coding", "sessions.json"), {
+      sequence: 1,
+      records: { bad: true },
+    })
+    writeAgentConfig(zetaRoot)
+    writeJson(path.join(zetaRoot, "state", "sessions", "self", "inner", "dialog.json"), {
+      version: 1,
+      messages: [
+        { role: "system", content: "system prompt" },
+        { role: "user", content: "[pending from friend-7/cli/session]: Please think about the daemon seam." },
+        { role: "assistant", content: "The daemon seam should stay loopback-only." },
+      ],
+    })
+    writeJson(path.join(zetaRoot, "state", "sessions", "self", "inner", "runtime.json"), {
+      status: "idle",
+    })
+    writeJson(path.join(thetaRoot, "agent.json"), {
+      version: 1,
+      provider: 42,
+      phrases: {
+        thinking: ["working"],
+        tool: ["running tool"],
+        followup: ["processing"],
+      },
+    })
+    writeJson(path.join(thetaRoot, "state", "sessions", "self", "inner", "dialog.json"), {
+      version: 1,
+      messages: [],
+    })
+    writeJson(path.join(thetaRoot, "state", "sessions", "self", "inner", "runtime.json"), {
+      status: "idle",
+    })
+
+    const { readOutlookAgentState, readOutlookMachineState } = await import("../../../heart/daemon/outlook-read")
+
+    const gamma = readOutlookAgentState("gamma", {
+      bundlesRoot,
+      now: () => new Date("2026-03-29T12:00:00.000Z"),
+    })
+
+    expect(gamma.enabled).toBe(false)
+    expect(gamma.degraded.status).toBe("degraded")
+    expect(gamma.degraded.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "agent-config-unreadable" }),
+      ]),
+    )
+    expect(gamma.freshness.status).toBe("fresh")
+    expect(gamma.inner).toMatchObject({
+      status: "idle",
+      hasPending: false,
+      surfacedSummary: null,
+    })
+    expect(gamma.coding.items).toHaveLength(3)
+    expect(gamma.coding.items[0]).toMatchObject({
+      id: "coding-002",
+      checkpoint: "stdout fallback checkpoint",
+      originSession: null,
+      taskRef: null,
+    })
+    expect(gamma.coding.items[1]).toMatchObject({
+      id: "coding-003",
+      checkpoint: "stderr fallback checkpoint",
+      originSession: null,
+    })
+    expect(gamma.coding.items[2]).toMatchObject({
+      id: "coding-004",
+      checkpoint: null,
+      originSession: null,
+    })
+
+    const delta = readOutlookAgentState("delta", {
+      bundlesRoot,
+      now: () => new Date("2026-03-29T12:00:00.000Z"),
+    })
+
+    expect(delta.freshness.status).toBe("unknown")
+    expect(delta.degraded.status).toBe("ok")
+
+    const machine = readOutlookMachineState({
+      bundlesRoot,
+      agentNames: ["delta"],
+      now: () => new Date("2026-03-29T12:00:00.000Z"),
+      runtimeMetadata: {
+        version: "0.1.0-test",
+        lastUpdated: "2026-03-29T11:30:00.000Z",
+        repoRoot: "/tmp/repo",
+        configFingerprint: "cfg-test",
+      },
+    })
+
+    expect(machine.agentCount).toBe(1)
+    expect(machine.freshness.status).toBe("unknown")
+    expect(machine.degraded.status).toBe("ok")
+
+    const epsilon = readOutlookAgentState("epsilon", {
+      bundlesRoot,
+      now: () => new Date("2026-03-29T12:00:00.000Z"),
+    })
+    expect(epsilon.coding.items).toEqual([])
+
+    const zeta = readOutlookAgentState("zeta", {
+      bundlesRoot,
+      now: () => new Date("2026-03-29T12:00:00.000Z"),
+    })
+    expect(zeta.inner).toMatchObject({
+      status: "surfaced",
+      surfacedSummary: "\"The daemon seam should stay loopback-only.\"",
+    })
+
+    const theta = readOutlookAgentState("theta", {
+      bundlesRoot,
+      now: () => new Date("2026-03-29T12:00:00.000Z"),
+    })
+    expect(theta.enabled).toBe(true)
+    expect(theta.provider).toBeNull()
+    expect(theta.senses).toEqual([])
+  })
+
+  it("records non-Error coding read failures truthfully", async () => {
+    const bundlesRoot = makeBundleRoot()
+    const etaRoot = path.join(bundlesRoot, "eta.ouro")
+    const iotaRoot = path.join(bundlesRoot, "iota.ouro")
+    writeAgentConfig(etaRoot)
+    writeJson(path.join(etaRoot, "state", "sessions", "self", "inner", "dialog.json"), {
+      version: 1,
+      messages: [],
+    })
+    writeJson(path.join(etaRoot, "state", "sessions", "self", "inner", "runtime.json"), {
+      status: "idle",
+    })
+    writeJson(path.join(etaRoot, "state", "coding", "sessions.json"), {
+      sequence: 1,
+      records: [],
+    })
+    writeAgentConfig(iotaRoot)
+    writeJson(path.join(iotaRoot, "state", "sessions", "self", "inner", "dialog.json"), {
+      version: 1,
+      messages: [],
+    })
+    writeJson(path.join(iotaRoot, "state", "sessions", "self", "inner", "runtime.json"), {
+      status: "idle",
+    })
+
+    vi.resetModules()
+    vi.doMock("fs", async () => {
+      const actual = await vi.importActual<typeof import("fs")>("fs")
+      return {
+        ...actual,
+        readFileSync: ((filePath: fs.PathOrFileDescriptor, encoding?: unknown) => {
+          if (typeof filePath === "string" && filePath.endsWith(path.join("eta.ouro", "state", "coding", "sessions.json"))) {
+            throw "boom-string"
+          }
+          if (typeof filePath === "string" && filePath.endsWith(path.join("iota.ouro", "agent.json"))) {
+            throw "config-string"
+          }
+          return actual.readFileSync(filePath, encoding as BufferEncoding)
+        }) as typeof fs.readFileSync,
+      }
+    })
+    const { readOutlookAgentState } = await import("../../../heart/daemon/outlook-read")
+    const eta = readOutlookAgentState("eta", {
+      bundlesRoot,
+      now: () => new Date("2026-03-29T12:00:00.000Z"),
+    })
+
+    expect(eta.degraded.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "coding-state-unreadable",
+          detail: expect.stringContaining("boom-string"),
+        }),
+      ]),
+    )
+
+    const iota = readOutlookAgentState("iota", {
+      bundlesRoot,
+      now: () => new Date("2026-03-29T12:00:00.000Z"),
+    })
+    expect(iota.degraded.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "agent-config-unreadable",
+          detail: expect.stringContaining("config-string"),
+        }),
+      ]),
+    )
+    vi.doUnmock("fs")
+  })
+
+  it("uses default discovery and runtime dependencies when options are omitted", async () => {
+    const bundlesRoot = makeBundleRoot()
+    const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+    writeAgentConfig(alphaRoot)
+    writeJson(path.join(alphaRoot, "state", "sessions", "self", "inner", "dialog.json"), {
+      version: 1,
+      messages: [],
+    })
+    writeJson(path.join(alphaRoot, "state", "sessions", "self", "inner", "runtime.json"), {
+      status: "idle",
+    })
+
+    vi.resetModules()
+
+    const getAgentBundlesRootMock = vi.fn(() => bundlesRoot)
+    const getRuntimeMetadataMock = vi.fn(() => ({
+      version: "0.1.0-test",
+      lastUpdated: "2026-03-29T11:30:00.000Z",
+      repoRoot: "/tmp/repo",
+      configFingerprint: "cfg-test",
+    }))
+    const listEnabledBundleAgentsMock = vi.fn(() => ["alpha"])
+
+    vi.doMock("../../../heart/identity", async () => {
+      const actual = await vi.importActual<typeof import("../../../heart/identity")>("../../../heart/identity")
+      return {
+        ...actual,
+        getAgentBundlesRoot: getAgentBundlesRootMock,
+      }
+    })
+    vi.doMock("../../../heart/daemon/runtime-metadata", async () => {
+      const actual = await vi.importActual<typeof import("../../../heart/daemon/runtime-metadata")>("../../../heart/daemon/runtime-metadata")
+      return {
+        ...actual,
+        getRuntimeMetadata: getRuntimeMetadataMock,
+      }
+    })
+    vi.doMock("../../../heart/daemon/agent-discovery", async () => {
+      const actual = await vi.importActual<typeof import("../../../heart/daemon/agent-discovery")>("../../../heart/daemon/agent-discovery")
+      return {
+        ...actual,
+        listEnabledBundleAgents: listEnabledBundleAgentsMock,
+      }
+    })
+
+    const { readOutlookAgentState, readOutlookMachineState } = await import("../../../heart/daemon/outlook-read")
+
+    const agent = readOutlookAgentState("alpha")
+    const machine = readOutlookMachineState()
+
+    expect(agent.agentRoot).toBe(path.join(bundlesRoot, "alpha.ouro"))
+    expect(machine.runtime.version).toBe("0.1.0-test")
+    expect(getAgentBundlesRootMock).toHaveBeenCalled()
+    expect(getRuntimeMetadataMock).toHaveBeenCalledWith({ bundlesRoot })
+    expect(listEnabledBundleAgentsMock).toHaveBeenCalledWith({ bundlesRoot })
+
+    vi.doUnmock("../../../heart/identity")
+    vi.doUnmock("../../../heart/daemon/runtime-metadata")
+    vi.doUnmock("../../../heart/daemon/agent-discovery")
   })
 })
