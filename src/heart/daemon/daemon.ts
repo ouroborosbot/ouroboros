@@ -15,6 +15,8 @@ import { execSync, spawnSync } from "child_process"
 import { drainPending } from "../../mind/pending"
 import { getAlwaysOnSenseNames } from "../../mind/friends/channel"
 import { getSharedMcpManager, shutdownSharedMcpManager } from "../../repertoire/mcp-manager"
+import { startOutlookHttpServer, type OutlookHttpServerHandle } from "./outlook-http"
+import { readOutlookAgentState, readOutlookMachineState } from "./outlook-read"
 
 export interface DaemonCronJobSummary {
   id: string
@@ -128,6 +130,7 @@ interface DaemonStatusOverview {
   daemon: "running" | "stopped"
   health: "ok" | "warn"
   socketPath: string
+  outlookUrl: string
   version: string
   lastUpdated: string
   repoRoot: string
@@ -200,6 +203,7 @@ export class OuroDaemon {
   private readonly senseManager: DaemonSenseManagerLike | null
   private readonly bundlesRoot: string
   private server: net.Server | null = null
+  private outlookServer: OutlookHttpServerHandle | null = null
 
   constructor(options: OuroDaemonOptions) {
     this.socketPath = options.socketPath
@@ -269,6 +273,13 @@ export class OuroDaemon {
     await this.scheduler.reconcile?.()
     await this.drainPendingBundleMessages()
     await this.drainPendingSenseMessages()
+    if (!this.outlookServer) {
+      this.outlookServer = await startOutlookHttpServer({
+        host: "127.0.0.1",
+        readMachineState: () => readOutlookMachineState({ bundlesRoot: this.bundlesRoot }),
+        readAgentState: (agentName) => readOutlookAgentState(agentName, { bundlesRoot: this.bundlesRoot }),
+      })
+    }
 
     if (fs.existsSync(this.socketPath)) {
       fs.unlinkSync(this.socketPath)
@@ -468,6 +479,10 @@ export class OuroDaemon {
       })
       this.server = null
     }
+    if (this.outlookServer) {
+      await this.outlookServer.stop()
+      this.outlookServer = null
+    }
 
     if (fs.existsSync(this.socketPath)) {
       fs.unlinkSync(this.socketPath)
@@ -512,6 +527,7 @@ export class OuroDaemon {
             daemon: "running",
             health: workers.every((worker) => worker.status === "running") ? "ok" : "warn",
             socketPath: this.socketPath,
+            outlookUrl: `${this.outlookServer?.origin ?? "http://127.0.0.1:0"}/outlook`,
             ...getRuntimeMetadata(),
             workerCount: workers.length,
             senseCount: senses.length,

@@ -57,6 +57,7 @@ export type OuroCliCommand =
   | { kind: "daemon.stop" }
   | { kind: "daemon.status" }
   | { kind: "daemon.logs" }
+  | { kind: "outlook"; json?: boolean }
   | { kind: "auth.run"; agent: string; provider?: AgentProvider }
   | { kind: "auth.verify"; agent: string; provider?: AgentProvider }
   | { kind: "auth.switch"; agent: string; provider: AgentProvider }
@@ -141,6 +142,7 @@ interface StatusOverviewRow {
   daemon: string
   health: string
   socketPath: string
+  outlookUrl: string
   version: string
   lastUpdated: string
   repoRoot: string
@@ -199,6 +201,7 @@ function parseStatusPayload(data: unknown): StatusPayload | null {
     daemon: stringField((overview as Record<string, unknown>).daemon) ?? "unknown",
     health: stringField((overview as Record<string, unknown>).health) ?? "unknown",
     socketPath: stringField((overview as Record<string, unknown>).socketPath) ?? "unknown",
+    outlookUrl: stringField((overview as Record<string, unknown>).outlookUrl) ?? "unavailable",
     version: stringField((overview as Record<string, unknown>).version) ?? "unknown",
     lastUpdated: stringField((overview as Record<string, unknown>).lastUpdated) ?? "unknown",
     repoRoot: stringField((overview as Record<string, unknown>).repoRoot) ?? "unknown",
@@ -269,7 +272,11 @@ function formatTable(headers: string[], rows: string[][]): string {
   const widths = headers.map((header, index) =>
     Math.max(header.length, ...rows.map((row) => row[index]!.length)),
   )
-  const renderRow = (row: string[]) => `| ${row.map((cell, index) => cell.padEnd(widths[index])).join(" | ")} |`
+  const renderRow = (row: string[]) => `| ${row.map((cell, index) => (
+    index === row.length - 1
+      ? cell
+      : cell.padEnd(widths[index])
+  )).join(" | ")} |`
   const divider = `|-${widths.map((width) => "-".repeat(width)).join("-|-")}-|`
   return [
     renderRow(headers),
@@ -287,6 +294,7 @@ function formatDaemonStatusOutput(response: DaemonResponse, fallback: string): s
     ["Socket", payload.overview.socketPath],
     ["Version", payload.overview.version],
     ["Last Updated", payload.overview.lastUpdated],
+    ["Outlook", payload.overview.outlookUrl],
     ["Entry Path", payload.overview.entryPath],
     ["Mode", payload.overview.mode],
     ["Workers", String(payload.overview.workerCount)],
@@ -385,6 +393,7 @@ function usage(): string {
     "Usage:",
     "  ouro [up]",
     "  ouro stop|down|status|logs|hatch",
+    "  ouro outlook [--json]",
     "  ouro -v|--version",
     "  ouro config model --agent <name> <model-name>",
     "  ouro config models --agent <name>",
@@ -429,6 +438,7 @@ function buildStoppedStatusPayload(socketPath: string): StatusPayload {
       daemon: "stopped",
       health: "warn",
       socketPath,
+      outlookUrl: "unavailable",
       version: metadata.version,
       lastUpdated: metadata.lastUpdated,
       repoRoot: metadata.repoRoot,
@@ -1050,6 +1060,7 @@ export function parseOuroCommand(args: string[]): OuroCliCommand {
   if (head === "stop" || head === "down") return { kind: "daemon.stop" }
   if (head === "status") return { kind: "daemon.status" }
   if (head === "logs") return { kind: "daemon.logs" }
+  if (head === "outlook") return { kind: "outlook", ...(args.includes("--json") ? { json: true } : {}) }
   if (head === "hatch") return parseHatchCommand(args.slice(1))
   if (head === "auth") return parseAuthCommand(args.slice(1))
   if (head === "task") return parseTaskCommand(args.slice(1))
@@ -1586,7 +1597,7 @@ type ConfigModelCliCommand = Extract<OuroCliCommand, { kind: "config.model" }>
 type ConfigModelsCliCommand = Extract<OuroCliCommand, { kind: "config.models" }>
 type RollbackCliCommand = Extract<OuroCliCommand, { kind: "rollback" }>
 type VersionsCliCommand = Extract<OuroCliCommand, { kind: "versions" }>
-function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "hatch.start" } | AuthCliCommand | AuthVerifyCliCommand | AuthSwitchCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand | ConfigModelCliCommand | ConfigModelsCliCommand | RollbackCliCommand | VersionsCliCommand>): DaemonCommand {
+function toDaemonCommand(command: Exclude<OuroCliCommand, { kind: "daemon.up" } | { kind: "outlook" } | { kind: "hatch.start" } | AuthCliCommand | AuthVerifyCliCommand | AuthSwitchCliCommand | TaskCliCommand | ReminderCliCommand | FriendCliCommand | WhoamiCliCommand | SessionCliCommand | ThoughtsCliCommand | ChangelogCliCommand | ConfigModelCliCommand | ConfigModelsCliCommand | RollbackCliCommand | VersionsCliCommand>): DaemonCommand {
   return command
 }
 
@@ -2190,6 +2201,36 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   if (command.kind === "daemon.logs" && deps.tailLogs) {
     deps.tailLogs()
     return ""
+  }
+
+  if (command.kind === "outlook") {
+    let status: DaemonResponse
+    try {
+      status = await deps.sendCommand(deps.socketPath, { kind: "daemon.status" })
+    } catch {
+      const message = "daemon unavailable — start with `ouro up` first"
+      deps.writeStdout(message)
+      return message
+    }
+
+    const payload = parseStatusPayload(status.data)
+    const outlookUrl = payload?.overview.outlookUrl ?? "unavailable"
+    if (!command.json) {
+      deps.writeStdout(outlookUrl)
+      return outlookUrl
+    }
+
+    if (outlookUrl === "unavailable") {
+      deps.writeStdout(outlookUrl)
+      return outlookUrl
+    }
+
+    const fetchImpl = deps.fetchImpl ?? fetch
+    const response = await fetchImpl(`${outlookUrl}/api/machine`)
+    const data = await response.json() as unknown
+    const text = JSON.stringify(data, null, 2)
+    deps.writeStdout(text)
+    return text
   }
 
   // ── mcp subcommands (routed through daemon socket) ──
