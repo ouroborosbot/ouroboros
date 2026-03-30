@@ -126,3 +126,62 @@ export interface OutlookMachineState {
   degraded: OutlookDegradedState
   agents: OutlookAgentSummary[]
 }
+
+export interface OutlookMachineDaemonSummary {
+  status: "running" | "stopped"
+  health: "ok" | "warn"
+  mode: "dev" | "production"
+  socketPath: string
+  outlookUrl: string
+  entryPath: string
+  workerCount: number
+  senseCount: number
+}
+
+export interface OutlookMachineTotals {
+  agents: number
+  enabledAgents: number
+  degradedAgents: number
+  staleAgents: number
+  liveTasks: number
+  blockedTasks: number
+  openObligations: number
+  activeCodingAgents: number
+  blockedCodingAgents: number
+}
+
+export interface OutlookEntryPoint {
+  kind: "web" | "cli"
+  label: string
+  target: string
+}
+
+export type OutlookAttentionLevel = "degraded" | "stale" | "blocked" | "active" | "idle"
+export type OutlookMachineMood = "calm" | "watchful" | "strained"
+
+export interface OutlookAttentionSummary {
+  level: OutlookAttentionLevel
+  label: string
+}
+
+export interface OutlookMachineAgentView extends OutlookAgentSummary {
+  attention: OutlookAttentionSummary
+}
+
+export interface OutlookMachineOverview {
+  productName: typeof OUTLOOK_PRODUCT_NAME
+  observedAt: string
+  primaryEntryPoint: string
+  daemon: OutlookMachineDaemonSummary
+  runtime: RuntimeMetadata
+  freshness: OutlookFreshness
+  degraded: OutlookDegradedState
+  totals: OutlookMachineTotals
+  mood: OutlookMachineMood
+  entrypoints: OutlookEntryPoint[]
+}
+
+export interface OutlookMachineView {
+  overview: OutlookMachineOverview
+  agents: OutlookMachineAgentView[]
+}

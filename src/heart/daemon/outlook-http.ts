@@ -2,12 +2,13 @@ import * as http from "http"
 import type { AddressInfo } from "net"
 import { emitNervesEvent } from "../../nerves/runtime"
 import { readOutlookAgentState, readOutlookMachineState } from "./outlook-read"
-import type { OutlookAgentState, OutlookMachineState } from "./outlook-types"
+import type { OutlookAgentState, OutlookMachineState, OutlookMachineView } from "./outlook-types"
 
 export interface StartOutlookHttpServerOptions {
   host?: string
   port?: number
   readMachineState?: () => OutlookMachineState
+  readMachineView?: (input: { origin: string; machine: OutlookMachineState }) => OutlookMachineView
   readAgentState?: (agentName: string) => OutlookAgentState | null
   renderApp?: (input: { origin: string; machine: OutlookMachineState }) => string
 }
@@ -63,6 +64,7 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
   const host = options.host ?? "127.0.0.1"
   const port = options.port ?? 0
   const readMachineState = options.readMachineState ?? (() => readOutlookMachineState())
+  const readMachineView = options.readMachineView
   const readAgentState = options.readAgentState ?? ((agentName: string) => readOutlookAgentState(agentName))
   const renderApp = options.renderApp ?? defaultRenderApp
 
@@ -70,6 +72,7 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
     const pathname = normalizePath(request.url)
     const machine = readMachineState()
     const origin = `http://${host}:${(server.address() as AddressInfo).port}`
+    const machineView = readMachineView?.({ origin, machine })
 
     if (pathname === "/outlook") {
       writeHtml(response, renderApp({ origin, machine }))
@@ -77,7 +80,7 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
     }
 
     if (pathname === "/outlook/api/machine") {
-      writeJson(response, 200, machine)
+      writeJson(response, 200, machineView ?? machine)
       return
     }
 

@@ -17,6 +17,7 @@ import { getAlwaysOnSenseNames } from "../../mind/friends/channel"
 import { getSharedMcpManager, shutdownSharedMcpManager } from "../../repertoire/mcp-manager"
 import { startOutlookHttpServer, type OutlookHttpServerHandle } from "./outlook-http"
 import { readOutlookAgentState, readOutlookMachineState } from "./outlook-read"
+import { buildOutlookMachineView } from "./outlook-view"
 
 export interface DaemonCronJobSummary {
   id: string
@@ -215,6 +216,29 @@ export class OuroDaemon {
     this.bundlesRoot = options.bundlesRoot ?? getAgentBundlesRoot()
   }
 
+  private buildStatusPayload(): DaemonStatusPayload {
+    const snapshots = this.processManager.listAgentSnapshots()
+    const workers = buildWorkerRows(snapshots)
+    const senses = this.senseManager?.listSenseRows() ?? []
+    const repoRoot = getRepoRoot()
+
+    return {
+      overview: {
+        daemon: "running",
+        health: workers.every((worker) => worker.status === "running") ? "ok" : "warn",
+        socketPath: this.socketPath,
+        outlookUrl: `${this.outlookServer?.origin ?? "http://127.0.0.1:0"}/outlook`,
+        ...getRuntimeMetadata(),
+        workerCount: workers.length,
+        senseCount: senses.length,
+        entryPath: path.join(repoRoot, "dist", "heart", "daemon", "daemon-entry.js"),
+        mode: detectRuntimeMode(repoRoot),
+      },
+      workers,
+      senses,
+    }
+  }
+
   async start(): Promise<void> {
     if (this.server) return
 
@@ -277,6 +301,22 @@ export class OuroDaemon {
       this.outlookServer = await startOutlookHttpServer({
         host: "127.0.0.1",
         readMachineState: () => readOutlookMachineState({ bundlesRoot: this.bundlesRoot }),
+        readMachineView: ({ machine }) => {
+          const overview = this.buildStatusPayload().overview
+          return buildOutlookMachineView({
+            machine,
+            daemon: {
+              status: overview.daemon,
+              health: overview.health,
+              mode: overview.mode,
+              socketPath: overview.socketPath,
+              outlookUrl: overview.outlookUrl,
+              entryPath: overview.entryPath,
+              workerCount: overview.workerCount,
+              senseCount: overview.senseCount,
+            },
+          })
+        },
         readAgentState: (agentName) => readOutlookAgentState(agentName, { bundlesRoot: this.bundlesRoot }),
       })
     }
@@ -518,25 +558,7 @@ export class OuroDaemon {
         await this.stop()
         return { ok: true, message: "daemon stopped" }
       case "daemon.status": {
-        const snapshots = this.processManager.listAgentSnapshots()
-        const workers = buildWorkerRows(snapshots)
-        const senses = this.senseManager?.listSenseRows() ?? []
-        const repoRoot = getRepoRoot()
-        const data: DaemonStatusPayload = {
-          overview: {
-            daemon: "running",
-            health: workers.every((worker) => worker.status === "running") ? "ok" : "warn",
-            socketPath: this.socketPath,
-            outlookUrl: `${this.outlookServer?.origin ?? "http://127.0.0.1:0"}/outlook`,
-            ...getRuntimeMetadata(),
-            workerCount: workers.length,
-            senseCount: senses.length,
-            entryPath: path.join(repoRoot, "dist", "heart", "daemon", "daemon-entry.js"),
-            mode: detectRuntimeMode(repoRoot),
-          },
-          workers,
-          senses,
-        }
+        const data = this.buildStatusPayload()
         return {
           ok: true,
           summary: formatStatusSummary(data),
