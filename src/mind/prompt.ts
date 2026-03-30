@@ -970,9 +970,11 @@ export function rhythmStatusSection(): string {
       : "healthy."
 
     return `my rhythms: ${parts.join(". ")}. ${degradedNote}`
+  /* v8 ignore start -- defensive: readHealth handles its own errors; this catch is a safety net for truly unexpected failures @preserve */
   } catch {
     return ""
   }
+  /* v8 ignore stop */
 }
 
 export async function buildSystem(channel: Channel = "cli", options?: BuildSystemOptions, context?: ResolvedContext): Promise<string> {

@@ -3714,6 +3714,32 @@ describe("rhythmStatusSection", () => {
     expect(result).toBe("")
   })
 
+  it("shows 'never' for habits that have not fired yet", async () => {
+    vi.mocked(fs.readFileSync).mockImplementation((filePath: any) => {
+      const p = String(filePath)
+      if (p.endsWith("daemon-health.json")) {
+        return JSON.stringify({
+          status: "running",
+          mode: "prod",
+          pid: 1234,
+          startedAt: new Date().toISOString(),
+          uptimeSeconds: 100,
+          safeMode: null,
+          degraded: [],
+          agents: {},
+          habits: {
+            "daily-reflection": { cronStatus: "verified", lastFired: null, fallback: false },
+          },
+        })
+      }
+      return ""
+    })
+
+    const { rhythmStatusSection } = await import("../../mind/prompt")
+    const result = rhythmStatusSection()
+    expect(result).toContain("daily-reflection last fired never")
+  })
+
   it("returns empty string when no habits in health file", async () => {
     vi.mocked(fs.readFileSync).mockImplementation((filePath: any) => {
       const p = String(filePath)

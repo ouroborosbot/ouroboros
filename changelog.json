@@ -2,6 +2,7 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+<<<<<<< HEAD
       "version": "0.1.0-alpha.156",
       "changes": [
         "polish: observe tool now hidden (like settle/rest/descend)",
@@ -15,6 +16,15 @@
       "version": "0.1.0-alpha.155",
       "changes": [
         "polish(debug): dynamic toggle, richer descriptions, human-readable results"
+=======
+      "version": "0.1.0-alpha.155",
+      "changes": [
+        "feat: habit turns as awareness \u2014 continuity-first unified format for all habits",
+        "buildHabitTurnMessage replaces buildContextualHeartbeat: checkpoint leads, then elapsed, then body, no special-casing by habit name",
+        "First-beat framing: 'your [Title] is alive. this is its first breath.' with habit body",
+        "fix: reconcile() now fires overdue/new habits immediately (was only start())",
+        "rhythmStatusSection in system prompt for all channels \u2014 reads daemon-health.json, shows habit firing recency and degraded state"
+>>>>>>> 1b237998 (feat: Unit 5 — version bump 0.1.0-alpha.155, changelog, coverage fix, final integration)
       ]
     },
     {
