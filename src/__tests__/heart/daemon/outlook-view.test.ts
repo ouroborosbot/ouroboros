@@ -459,4 +459,228 @@ describe("outlook agent view", () => {
       obligationStatus: "pending",
     })
   })
+
+  it("defaults to a human summary viewer and filters recent activity down to valid truth-bearing items", async () => {
+    const { buildOutlookAgentView } = await import("../../../heart/daemon/outlook-view")
+
+    const view = buildOutlookAgentView({
+      agent: {
+        productName: "Ouro Outlook",
+        agentName: "slugger",
+        agentRoot: "/mock/slugger.ouro",
+        enabled: true,
+        provider: null,
+        senses: [],
+        freshness: {
+          status: "unknown",
+          latestActivityAt: null,
+          ageMs: null,
+        },
+        degraded: {
+          status: "ok",
+          issues: [],
+        },
+        tasks: {
+          totalCount: 0,
+          liveCount: 0,
+          blockedCount: 0,
+          byStatus: {
+            drafting: 0,
+            processing: 0,
+            validating: 0,
+            collaborating: 0,
+            paused: 0,
+            blocked: 0,
+            done: 0,
+          },
+          liveTaskNames: [],
+          actionRequired: [],
+          activeBridges: [],
+        },
+        obligations: {
+          openCount: 1,
+          items: [
+            {
+              id: "ob-1",
+              status: "pending",
+              content: "Follow up with daemon health",
+              updatedAt: "2026-03-30T07:36:00.000Z",
+              nextAction: null,
+            },
+          ],
+        },
+        sessions: {
+          liveCount: 1,
+          items: [
+            {
+              friendId: "ari",
+              friendName: "Ari",
+              channel: "cli",
+              key: "cli:ari",
+              sessionPath: "/mock/sessions/ari.json",
+              lastActivityAt: "2026-03-30T07:37:00.000Z",
+              activitySource: "friend-facing",
+            },
+          ],
+        },
+        inner: {
+          visibility: "summary",
+          status: "working",
+          hasPending: false,
+          surfacedSummary: null,
+          origin: null,
+          obligationStatus: null,
+          latestActivityAt: "2026-03-30T07:35:00.000Z",
+        },
+        coding: {
+          totalCount: 2,
+          activeCount: 1,
+          blockedCount: 1,
+          items: [
+            {
+              id: "code-1",
+              runner: "codex",
+              status: "stalled",
+              checkpoint: null,
+              taskRef: null,
+              workdir: "/mock/repo",
+              originSession: null,
+              lastActivityAt: "2026-03-30T07:38:00.000Z",
+            },
+            {
+              id: "code-2",
+              runner: "claude-code",
+              status: "running",
+              checkpoint: "Bad timestamp should vanish",
+              taskRef: null,
+              workdir: "/mock/repo",
+              originSession: null,
+              lastActivityAt: "not-a-date",
+            },
+          ],
+        },
+      },
+    })
+
+    expect(view.viewer).toEqual({
+      kind: "human",
+      agentName: undefined,
+      innerDetail: "summary",
+    })
+    expect(view.inner).toEqual({
+      mode: "summary",
+      status: "working",
+      summary: null,
+      hasPending: false,
+    })
+    expect(view.activity.recent).toEqual([
+      {
+        kind: "coding",
+        at: "2026-03-30T07:38:00.000Z",
+        label: "codex stalled",
+        detail: "/mock/repo",
+      },
+      {
+        kind: "session",
+        at: "2026-03-30T07:37:00.000Z",
+        label: "Ari via cli",
+        detail: "cli:ari",
+      },
+      {
+        kind: "obligation",
+        at: "2026-03-30T07:36:00.000Z",
+        label: "Follow up with daemon health",
+        detail: "pending",
+      },
+      {
+        kind: "inner",
+        at: "2026-03-30T07:35:00.000Z",
+        label: "working",
+        detail: "no linked obligation",
+      },
+    ])
+  })
+
+  it("omits inner activity when no latest inner timestamp exists", async () => {
+    const { buildOutlookAgentView } = await import("../../../heart/daemon/outlook-view")
+
+    const view = buildOutlookAgentView({
+      agent: {
+        productName: "Ouro Outlook",
+        agentName: "slugger",
+        agentRoot: "/mock/slugger.ouro",
+        enabled: true,
+        provider: null,
+        senses: [],
+        freshness: {
+          status: "unknown",
+          latestActivityAt: null,
+          ageMs: null,
+        },
+        degraded: {
+          status: "ok",
+          issues: [],
+        },
+        tasks: {
+          totalCount: 0,
+          liveCount: 0,
+          blockedCount: 0,
+          byStatus: {
+            drafting: 0,
+            processing: 0,
+            validating: 0,
+            collaborating: 0,
+            paused: 0,
+            blocked: 0,
+            done: 0,
+          },
+          liveTaskNames: [],
+          actionRequired: [],
+          activeBridges: [],
+        },
+        obligations: {
+          openCount: 0,
+          items: [],
+        },
+        sessions: {
+          liveCount: 1,
+          items: [
+            {
+              friendId: "ari",
+              friendName: "Ari",
+              channel: "cli",
+              key: "cli:ari",
+              sessionPath: "/mock/sessions/ari.json",
+              lastActivityAt: "2026-03-30T07:37:00.000Z",
+              activitySource: "friend-facing",
+            },
+          ],
+        },
+        inner: {
+          visibility: "summary",
+          status: "idle",
+          hasPending: false,
+          surfacedSummary: null,
+          origin: null,
+          obligationStatus: null,
+          latestActivityAt: null,
+        },
+        coding: {
+          totalCount: 0,
+          activeCount: 0,
+          blockedCount: 0,
+          items: [],
+        },
+      },
+    })
+
+    expect(view.activity.recent).toEqual([
+      {
+        kind: "session",
+        at: "2026-03-30T07:37:00.000Z",
+        label: "Ari via cli",
+        detail: "cli:ari",
+      },
+    ])
+  })
 })
