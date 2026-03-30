@@ -137,11 +137,12 @@ function readObligationSummary(agentRoot: string): { items: OutlookObligationIte
   return { items }
 }
 
-function readSessionSummary(agentName: string, agentRoot: string): { items: OutlookSessionItem[] } {
+function readSessionSummary(agentName: string, agentRoot: string, now: Date): { items: OutlookSessionItem[] } {
   const items = listSessionActivity({
     sessionsDir: path.join(agentRoot, "state", "sessions"),
     friendsDir: path.join(agentRoot, "friends"),
     agentName,
+    nowMs: now.getTime(),
   })
     .filter((session) => !(session.friendId === "self" && session.channel === "inner"))
     .map((session) => ({
@@ -326,7 +327,7 @@ export function readOutlookAgentState(agentName: string, options: OutlookReadOpt
   issues.push(...tasks.issues)
 
   const obligations = readObligationSummary(agentRoot)
-  const sessions = readSessionSummary(agentName, agentRoot)
+  const sessions = readSessionSummary(agentName, agentRoot, now)
   const inner = readInnerSummary(agentRoot)
   issues.push(...inner.issues)
 

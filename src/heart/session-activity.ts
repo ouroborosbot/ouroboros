@@ -1,6 +1,7 @@
 import * as fs from "fs"
 import * as path from "path"
 import { emitNervesEvent } from "../nerves/runtime"
+import { sanitizeKey } from "./config"
 
 export interface SessionActivityRecord {
   friendId: string
@@ -18,6 +19,7 @@ export interface SessionActivityQuery {
   friendsDir: string
   agentName: string
   activeThresholdMs?: number
+  nowMs?: number
   currentSession?: { friendId: string; channel: string; key: string } | null
 }
 
@@ -77,6 +79,7 @@ export function listSessionActivity(query: SessionActivityQuery): SessionActivit
     friendsDir,
     agentName,
     activeThresholdMs = DEFAULT_ACTIVE_THRESHOLD_MS,
+    nowMs = Date.now(),
     currentSession = null,
   } = query
 
@@ -92,7 +95,6 @@ export function listSessionActivity(query: SessionActivityQuery): SessionActivit
 
   if (!fs.existsSync(sessionsDir)) return []
 
-  const now = Date.now()
   const results: SessionActivityRecord[] = []
 
   let friendDirs: string[]
@@ -124,14 +126,17 @@ export function listSessionActivity(query: SessionActivityQuery): SessionActivit
         if (!keyFile.endsWith(".json")) continue
         const key = keyFile.replace(/\.json$/, "")
 
-        if (currentSession && friendId === currentSession.friendId && channel === currentSession.channel && key === currentSession.key) {
+        // Compare with sanitizeKey on both sides — session keys from the filesystem
+        // are already sanitized (colons → underscores), but the canonical key from
+        // the pipeline may still have colons (e.g. "chat:any" vs "chat_any").
+        if (currentSession && friendId === currentSession.friendId && channel === currentSession.channel && sanitizeKey(key) === sanitizeKey(currentSession.key)) {
           continue
         }
 
         const sessionPath = path.join(channelPath, keyFile)
         const activity = parseFriendActivity(sessionPath)
         if (!activity) continue
-        if (now - activity.lastActivityMs > activeThresholdMs) continue
+        if (nowMs - activity.lastActivityMs > activeThresholdMs) continue
 
         results.push({
           friendId,
@@ -160,13 +165,14 @@ export function findFreshestFriendSession(
   const {
     activeOnly = false,
     activeThresholdMs = DEFAULT_ACTIVE_THRESHOLD_MS,
+    nowMs,
     ...rest
   } = query
 
   const currentSession = rest.currentSession ?? null
   const all = activeOnly
-    ? listSessionActivity({ ...rest, activeThresholdMs, currentSession })
-    : listSessionActivity({ ...rest, activeThresholdMs: Number.MAX_SAFE_INTEGER, currentSession })
+    ? listSessionActivity({ ...rest, activeThresholdMs, nowMs, currentSession })
+    : listSessionActivity({ ...rest, activeThresholdMs: Number.MAX_SAFE_INTEGER, nowMs, currentSession })
 
   return all.find((entry) => entry.friendId === query.friendId) ?? null
 }
