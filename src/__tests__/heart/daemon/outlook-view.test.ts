@@ -167,4 +167,63 @@ describe("outlook machine view", () => {
     expect(view.agents.map((agent) => agent.agentName)).toEqual(["alpha", "beta"])
     expect(view.agents.every((agent) => agent.attention.level === "idle")).toBe(true)
   })
+
+  it("marks stale but non-degraded machines as watchful and blocked agents as blocked", async () => {
+    const { buildOutlookMachineView } = await import("../../../heart/daemon/outlook-view")
+
+    const view = buildOutlookMachineView({
+      machine: {
+        productName: "Ouro Outlook",
+        observedAt: "2026-03-30T07:35:00.000Z",
+        runtime: {
+          version: "0.1.0-alpha.109",
+          lastUpdated: "2026-03-30T00:30:24.000Z",
+          repoRoot: "/mock/repo",
+          configFingerprint: "cfg-123",
+        },
+        agentCount: 1,
+        freshness: {
+          status: "stale",
+          latestActivityAt: "2026-03-28T07:35:00.000Z",
+          ageMs: 172_800_000,
+        },
+        degraded: {
+          status: "ok",
+          issues: [],
+        },
+        agents: [
+          {
+            agentName: "alpha",
+            enabled: true,
+            freshness: { status: "fresh", latestActivityAt: "2026-03-30T07:35:00.000Z", ageMs: 0 },
+            degraded: { status: "ok", issues: [] },
+            tasks: { liveCount: 1, blockedCount: 1 },
+            obligations: { openCount: 0 },
+            coding: { activeCount: 0, blockedCount: 0 },
+          },
+        ],
+      },
+      daemon: {
+        status: "running",
+        health: "ok",
+        mode: "production",
+        socketPath: "/tmp/ouro.sock",
+        outlookUrl: "http://127.0.0.1:4310/outlook",
+        entryPath: "/mock/repo/dist/heart/daemon/daemon-entry.js",
+        workerCount: 1,
+        senseCount: 1,
+      },
+    })
+
+    expect(view.overview.mood).toBe("watchful")
+    expect(view.agents).toEqual([
+      expect.objectContaining({
+        agentName: "alpha",
+        attention: {
+          level: "blocked",
+          label: "Blocked",
+        },
+      }),
+    ])
+  })
 })
