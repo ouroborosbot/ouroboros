@@ -54,6 +54,51 @@ export function enrichReactionText(baseText: string, originalText: string | null
   return `${baseText} to: "${truncated}"`
 }
 
+export interface StatusBatcher {
+  add(text: string): void
+  flush(): void
+}
+
+/**
+ * Accumulates status descriptions and debounces them.
+ * If multiple descriptions arrive within `delayMs`, they are joined with ` · `
+ * and sent as a single message. Flush sends immediately and clears the timer.
+ */
+export function createStatusBatcher(send: (text: string) => void, delayMs: number): StatusBatcher {
+  emitNervesEvent({
+    component: "senses",
+    event: "senses.bluebubbles_status_batcher_created",
+    message: "status batcher initialized",
+    meta: { delayMs },
+  })
+
+  let pending: string[] = []
+  let timer: ReturnType<typeof setTimeout> | null = null
+
+  function fire(): void {
+    if (pending.length === 0) return
+    const combined = pending.join(" \u00b7 ")
+    pending = []
+    timer = null
+    send(combined)
+  }
+
+  return {
+    add(text: string): void {
+      pending.push(text)
+      if (timer !== null) clearTimeout(timer)
+      timer = setTimeout(fire, delayMs)
+    },
+    flush(): void {
+      if (timer !== null) {
+        clearTimeout(timer)
+        timer = null
+      }
+      fire()
+    },
+  }
+}
+
 export interface BlueBubblesHandleResult {
   handled: boolean
   notifiedAgent: boolean
@@ -473,12 +518,14 @@ function createBlueBubblesCallbacks(
     })
   }
 
+  const statusBatcher = createStatusBatcher((text) => sendStatus(text), 500)
+
   const toolCallbacks = createToolActivityCallbacks({
-    onDescription: (text) => sendStatus(text),
+    onDescription: (text) => statusBatcher.add(text),
     /* v8 ignore next -- onResult only called in debug mode; tested via tool-activity-callbacks.test.ts @preserve */
-    onResult: (text) => sendStatus(text),
+    onResult: (text) => { statusBatcher.flush(); sendStatus(text) },
     /* v8 ignore next -- onFailure only called on tool failure; tested via tool-activity-callbacks.test.ts @preserve */
-    onFailure: (text) => sendStatus(text),
+    onFailure: (text) => { statusBatcher.flush(); sendStatus(text) },
     isDebug: getDebugMode,
   })
 
@@ -547,6 +594,7 @@ function createBlueBubblesCallbacks(
     },
 
     async flush(): Promise<void> {
+      statusBatcher.flush()
       await queue
       const trimmed = textBuffer.trim()
       if (!trimmed) {
@@ -572,6 +620,7 @@ function createBlueBubblesCallbacks(
     },
 
     async finish(): Promise<void> {
+      statusBatcher.flush()
       if (!typingActive) {
         await queue
         return

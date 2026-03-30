@@ -1524,12 +1524,15 @@ describe("BlueBubbles sense runtime", () => {
   })
 
   it("treats group chat tool progress as reply commitment before final text", async () => {
+    vi.useFakeTimers()
     mocks.runAgent.mockImplementationOnce(async (_messages: any, callbacks: any) => {
       callbacks.onModelStart()
       expect(mocks.markChatRead).not.toHaveBeenCalled()
       expect(mocks.setTyping).not.toHaveBeenCalled()
 
       callbacks.onToolStart("query_session", {})
+      // Advance past status batcher debounce window (500ms)
+      vi.advanceTimersByTime(500)
       await flushAsyncWork()
       await flushAsyncWork()
 
@@ -1566,6 +1569,7 @@ describe("BlueBubbles sense runtime", () => {
     expect(finalReplyCall).toBeTruthy()
     expect(mocks.markChatRead.mock.invocationCallOrder[0]).toBeLessThan(finalReplyCall[0].chat ? mocks.sendText.mock.invocationCallOrder[mocks.sendText.mock.calls.indexOf(finalReplyCall)] : Number.MAX_SAFE_INTEGER)
     expect(mocks.setTyping.mock.invocationCallOrder[0]).toBeLessThan(finalReplyCall[0].chat ? mocks.sendText.mock.invocationCallOrder[mocks.sendText.mock.calls.indexOf(finalReplyCall)] : Number.MAX_SAFE_INTEGER)
+    vi.useRealTimers()
   })
 
   it("uses group chat identity rather than sender handle instability for group sessions", async () => {
