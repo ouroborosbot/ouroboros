@@ -515,6 +515,8 @@ function createBlueBubblesCallbacks(
         text,
         replyToMessageGuid: replyTarget.getReplyToMessageGuid(),
       })
+      // Re-enable typing indicator — sending a message clears the typing bubble
+      await client.setTyping(chat, true)
     })
   }
 
