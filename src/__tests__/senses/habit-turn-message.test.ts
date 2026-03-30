@@ -12,12 +12,12 @@ import {
 
 function makeOptions(overrides: Partial<HabitTurnMessageOptions> = {}): HabitTurnMessageOptions {
   return {
-    habitName: overrides.habitName ?? "heartbeat",
-    habitTitle: overrides.habitTitle ?? "Heartbeat",
-    habitBody: overrides.habitBody ?? "Check in on responsibilities.",
-    lastRun: overrides.lastRun ?? "2026-03-26T11:30:00.000Z",
-    checkpoint: overrides.checkpoint ?? undefined,
-    alsoDue: overrides.alsoDue ?? undefined,
+    habitName: "habitName" in overrides ? overrides.habitName! : "heartbeat",
+    habitTitle: "habitTitle" in overrides ? overrides.habitTitle! : "Heartbeat",
+    habitBody: "habitBody" in overrides ? overrides.habitBody : "Check in on responsibilities.",
+    lastRun: "lastRun" in overrides ? overrides.lastRun! : "2026-03-26T11:30:00.000Z",
+    checkpoint: "checkpoint" in overrides ? overrides.checkpoint : undefined,
+    alsoDue: "alsoDue" in overrides ? overrides.alsoDue : undefined,
     staleObligations: overrides.staleObligations ?? [],
     parseErrors: overrides.parseErrors ?? [],
     degradedComponents: overrides.degradedComponents ?? [],
@@ -347,18 +347,18 @@ describe("buildHabitTurnMessage", () => {
     expect(result).not.toContain("1 hours")
   })
 
-  // ── No habitBody on first beat ─────────────────────────────────────
+  // ── First beat with checkpoint but no body ──────────────────────────
 
-  it("first beat with no body: nudge to add body", () => {
+  it("first beat with checkpoint but no body: nudge to add body", () => {
     const result = buildHabitTurnMessage(makeOptions({
       habitName: "daily-reflection",
       habitTitle: "Daily Reflection",
       habitBody: undefined,
       lastRun: null,
+      checkpoint: "something from earlier",
     }))
 
-    // Should get the no-body nudge, not cold-start
-    // because title is present (we know the habit exists)
+    // Has checkpoint so NOT cold start -- should get nudge
     expect(result).toContain("your Daily Reflection fired but has no instructions")
   })
 
