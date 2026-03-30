@@ -2,6 +2,7 @@ import * as http from "http"
 import type { AddressInfo } from "net"
 import { emitNervesEvent } from "../../nerves/runtime"
 import { readOutlookAgentState, readOutlookMachineState } from "./outlook-read"
+import { renderOutlookApp } from "./outlook-render"
 import type { OutlookAgentState, OutlookAgentView, OutlookMachineState, OutlookMachineView } from "./outlook-types"
 
 export interface StartOutlookHttpServerOptions {
@@ -11,37 +12,12 @@ export interface StartOutlookHttpServerOptions {
   readMachineView?: (input: { origin: string; machine: OutlookMachineState }) => OutlookMachineView
   readAgentState?: (agentName: string) => OutlookAgentState | null
   readAgentView?: (agentName: string) => OutlookAgentView | null
-  renderApp?: (input: { origin: string; machine: OutlookMachineState }) => string
+  renderApp?: (input: { origin: string; machine: OutlookMachineState; machineView?: OutlookMachineView }) => string
 }
 
 export interface OutlookHttpServerHandle {
   origin: string
   stop(): Promise<void>
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll("\"", "&quot;")
-}
-
-function defaultRenderApp(input: { origin: string; machine: OutlookMachineState }): string {
-  const productName = escapeHtml(input.machine.productName)
-  return [
-    "<!doctype html>",
-    "<html lang=\"en\">",
-    "<head>",
-    "  <meta charset=\"utf-8\" />",
-    "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />",
-    `  <title>${productName}</title>`,
-    "</head>",
-    "<body>",
-    `  <main><h1>${productName}</h1><p>${input.origin}/outlook/api/machine</p><pre>${escapeHtml(JSON.stringify(input.machine, null, 2))}</pre></main>`,
-    "</body>",
-    "</html>",
-  ].join("\n")
 }
 
 function writeJson(response: http.ServerResponse, statusCode: number, payload: unknown): void {
@@ -68,7 +44,7 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
   const readMachineView = options.readMachineView
   const readAgentState = options.readAgentState ?? ((agentName: string) => readOutlookAgentState(agentName))
   const readAgentView = options.readAgentView
-  const renderApp = options.renderApp ?? defaultRenderApp
+  const renderApp = options.renderApp ?? renderOutlookApp
 
   const server = http.createServer((request, response) => {
     const pathname = normalizePath(request.url)
@@ -77,7 +53,7 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
     const machineView = readMachineView?.({ origin, machine })
 
     if (pathname === "/outlook") {
-      writeHtml(response, renderApp({ origin, machine }))
+      writeHtml(response, renderApp({ origin, machine, machineView }))
       return
     }
 
