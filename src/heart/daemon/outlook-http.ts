@@ -2,7 +2,7 @@ import * as http from "http"
 import type { AddressInfo } from "net"
 import { emitNervesEvent } from "../../nerves/runtime"
 import { readOutlookAgentState, readOutlookMachineState } from "./outlook-read"
-import type { OutlookAgentState, OutlookMachineState, OutlookMachineView } from "./outlook-types"
+import type { OutlookAgentState, OutlookAgentView, OutlookMachineState, OutlookMachineView } from "./outlook-types"
 
 export interface StartOutlookHttpServerOptions {
   host?: string
@@ -10,6 +10,7 @@ export interface StartOutlookHttpServerOptions {
   readMachineState?: () => OutlookMachineState
   readMachineView?: (input: { origin: string; machine: OutlookMachineState }) => OutlookMachineView
   readAgentState?: (agentName: string) => OutlookAgentState | null
+  readAgentView?: (agentName: string) => OutlookAgentView | null
   renderApp?: (input: { origin: string; machine: OutlookMachineState }) => string
 }
 
@@ -66,6 +67,7 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
   const readMachineState = options.readMachineState ?? (() => readOutlookMachineState())
   const readMachineView = options.readMachineView
   const readAgentState = options.readAgentState ?? ((agentName: string) => readOutlookAgentState(agentName))
+  const readAgentView = options.readAgentView
   const renderApp = options.renderApp ?? defaultRenderApp
 
   const server = http.createServer((request, response) => {
@@ -87,6 +89,11 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
     const agentMatch = /^\/outlook\/api\/agents\/([^/]+)$/.exec(pathname)
     if (agentMatch) {
       const agent = decodeURIComponent(agentMatch[1]!)
+      const view = readAgentView?.(agent)
+      if (view) {
+        writeJson(response, 200, view)
+        return
+      }
       const state = readAgentState(agent)
       if (!state) {
         writeJson(response, 404, { ok: false, error: `unknown agent: ${agent}` })

@@ -1,13 +1,19 @@
 import {
+  OUTLOOK_RELEASE_INTERACTION_MODEL,
   OUTLOOK_PRODUCT_NAME,
+  type OutlookAgentState,
   type OutlookAgentSummary,
+  type OutlookAgentView,
   type OutlookAttentionLevel,
+  type OutlookInnerSummary,
   type OutlookMachineDaemonSummary,
   type OutlookMachineMood,
   type OutlookMachineView,
   type OutlookMachineAgentView,
+  type OutlookRecentActivityItem,
   type OutlookMachineState,
   type OutlookMachineTotals,
+  type OutlookViewer,
 } from "./outlook-types"
 
 const ATTENTION_RANK: Record<OutlookAttentionLevel, number> = {
@@ -36,6 +42,26 @@ function deriveAttention(agent: OutlookAgentSummary): OutlookMachineAgentView["a
   }
 
   return { level: "idle", label: "Idle" }
+}
+
+function deriveAgentAttention(agent: OutlookAgentState): OutlookMachineAgentView["attention"] {
+  return deriveAttention({
+    agentName: agent.agentName,
+    enabled: agent.enabled,
+    freshness: agent.freshness,
+    degraded: agent.degraded,
+    tasks: {
+      liveCount: agent.tasks.liveCount,
+      blockedCount: agent.tasks.blockedCount,
+    },
+    obligations: {
+      openCount: agent.obligations.openCount,
+    },
+    coding: {
+      activeCount: agent.coding.activeCount,
+      blockedCount: agent.coding.blockedCount,
+    },
+  })
 }
 
 function buildTotals(machine: OutlookMachineState): OutlookMachineTotals {
@@ -108,5 +134,105 @@ export function buildOutlookMachineView(input: {
       ],
     },
     agents,
+  }
+}
+
+function normalizeViewer(viewer: OutlookViewer | undefined): OutlookAgentView["viewer"] {
+  return {
+    kind: viewer?.kind ?? "human",
+    agentName: viewer?.agentName,
+    innerDetail: viewer?.innerDetail ?? "summary",
+  }
+}
+
+function buildInnerView(inner: OutlookInnerSummary, viewer: OutlookAgentView["viewer"]): OutlookAgentView["inner"] {
+  if (viewer.innerDetail === "deep") {
+    return {
+      mode: "deep",
+      status: inner.status,
+      summary: inner.surfacedSummary,
+      hasPending: inner.hasPending,
+      origin: inner.origin,
+      obligationStatus: inner.obligationStatus,
+    }
+  }
+
+  return {
+    mode: "summary",
+    status: inner.status,
+    summary: inner.surfacedSummary,
+    hasPending: inner.hasPending,
+  }
+}
+
+function buildRecentActivity(agent: OutlookAgentState): OutlookRecentActivityItem[] {
+  const items: OutlookRecentActivityItem[] = [
+    ...agent.coding.items.map((item) => ({
+      kind: "coding" as const,
+      at: item.lastActivityAt,
+      label: item.checkpoint ?? `${item.runner} ${item.status}`,
+      detail: item.workdir,
+    })),
+    ...agent.sessions.items.map((item) => ({
+      kind: "session" as const,
+      at: item.lastActivityAt,
+      label: `${item.friendName} via ${item.channel}`,
+      detail: item.key,
+    })),
+    ...agent.obligations.items.map((item) => ({
+      kind: "obligation" as const,
+      at: item.updatedAt,
+      label: item.content,
+      detail: item.nextAction ?? item.status,
+    })),
+  ]
+
+  if (agent.inner.latestActivityAt) {
+    items.push({
+      kind: "inner",
+      at: agent.inner.latestActivityAt,
+      label: agent.inner.surfacedSummary ?? agent.inner.status,
+      detail: agent.inner.hasPending ? "pending inner work" : agent.inner.obligationStatus ?? "no linked obligation",
+    })
+  }
+
+  return items
+    .filter((item) => Number.isFinite(Date.parse(item.at)))
+    .sort((left, right) => right.at.localeCompare(left.at))
+    .slice(0, 4)
+}
+
+export function buildOutlookAgentView(input: {
+  agent: OutlookAgentState
+  viewer?: OutlookViewer
+}): OutlookAgentView {
+  const viewer = normalizeViewer(input.viewer)
+
+  return {
+    productName: OUTLOOK_PRODUCT_NAME,
+    interactionModel: OUTLOOK_RELEASE_INTERACTION_MODEL,
+    viewer,
+    agent: {
+      agentName: input.agent.agentName,
+      agentRoot: input.agent.agentRoot,
+      enabled: input.agent.enabled,
+      provider: input.agent.provider,
+      senses: input.agent.senses,
+      freshness: input.agent.freshness,
+      degraded: input.agent.degraded,
+      attention: deriveAgentAttention(input.agent),
+    },
+    work: {
+      tasks: input.agent.tasks,
+      obligations: input.agent.obligations,
+      sessions: input.agent.sessions,
+      coding: input.agent.coding,
+      bridges: input.agent.tasks.activeBridges,
+    },
+    inner: buildInnerView(input.agent.inner, viewer),
+    activity: {
+      freshness: input.agent.freshness,
+      recent: buildRecentActivity(input.agent),
+    },
   }
 }

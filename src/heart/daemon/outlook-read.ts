@@ -183,6 +183,7 @@ function readInnerSummary(agentRoot: string): {
       surfacedSummary,
       origin: job.origin,
       obligationStatus: job.obligationStatus,
+      latestActivityAt,
     },
     issues: [],
     latestActivityAt,

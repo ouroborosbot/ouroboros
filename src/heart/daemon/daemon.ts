@@ -17,7 +17,7 @@ import { getAlwaysOnSenseNames } from "../../mind/friends/channel"
 import { getSharedMcpManager, shutdownSharedMcpManager } from "../../repertoire/mcp-manager"
 import { startOutlookHttpServer, type OutlookHttpServerHandle } from "./outlook-http"
 import { readOutlookAgentState, readOutlookMachineState } from "./outlook-read"
-import { buildOutlookMachineView } from "./outlook-view"
+import { buildOutlookAgentView, buildOutlookMachineView } from "./outlook-view"
 
 export interface DaemonCronJobSummary {
   id: string
@@ -318,6 +318,13 @@ export class OuroDaemon {
           })
         },
         readAgentState: (agentName) => readOutlookAgentState(agentName, { bundlesRoot: this.bundlesRoot }),
+        readAgentView: (agentName) => {
+          const agent = readOutlookAgentState(agentName, { bundlesRoot: this.bundlesRoot })
+          return buildOutlookAgentView({
+            agent,
+            viewer: { kind: "human" },
+          })
+        },
       })
     }
 

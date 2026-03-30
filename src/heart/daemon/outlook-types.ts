@@ -71,6 +71,7 @@ export interface OutlookInnerSummary {
   surfacedSummary: string | null
   origin: { friendId: string; channel: string; key: string; friendName?: string } | null
   obligationStatus: "pending" | "fulfilled" | null
+  latestActivityAt: string | null
 }
 
 export interface OutlookCodingItem {
@@ -184,4 +185,71 @@ export interface OutlookMachineOverview {
 export interface OutlookMachineView {
   overview: OutlookMachineOverview
   agents: OutlookMachineAgentView[]
+}
+
+export interface OutlookViewer {
+  kind: "human" | "agent-self" | "agent-peer"
+  agentName?: string
+  innerDetail?: "summary" | "deep"
+}
+
+export interface OutlookAgentIdentityView {
+  agentName: string
+  agentRoot: string
+  enabled: boolean
+  provider: string | null
+  senses: string[]
+  freshness: OutlookFreshness
+  degraded: OutlookDegradedState
+  attention: OutlookAttentionSummary
+}
+
+export interface OutlookAgentWorkView {
+  tasks: OutlookTaskSummary
+  obligations: OutlookObligationSummary
+  sessions: OutlookSessionSummary
+  coding: OutlookCodingSummary
+  bridges: string[]
+}
+
+export interface OutlookRecentActivityItem {
+  kind: "coding" | "session" | "obligation" | "inner"
+  at: string
+  label: string
+  detail: string
+}
+
+export interface OutlookAgentActivityView {
+  freshness: OutlookFreshness
+  recent: OutlookRecentActivityItem[]
+}
+
+export type OutlookAgentInnerView =
+  | {
+      mode: "summary"
+      status: InnerJobStatus
+      summary: string | null
+      hasPending: boolean
+    }
+  | {
+      mode: "deep"
+      status: InnerJobStatus
+      summary: string | null
+      hasPending: boolean
+      origin: OutlookInnerSummary["origin"]
+      obligationStatus: OutlookInnerSummary["obligationStatus"]
+    }
+
+export interface OutlookAgentView {
+  productName: typeof OUTLOOK_PRODUCT_NAME
+  interactionModel: typeof OUTLOOK_RELEASE_INTERACTION_MODEL
+  viewer: {
+    kind: OutlookViewer["kind"]
+    agentName?: string
+    innerDetail: "summary" | "deep"
+  }
+  agent: OutlookAgentIdentityView
+  work: OutlookAgentWorkView
+  inner: OutlookAgentInnerView
+  activity: OutlookAgentActivityView
 }
