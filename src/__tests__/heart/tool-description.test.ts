@@ -117,23 +117,35 @@ describe("humanReadableToolDescription", () => {
   })
 
   describe("web_search", () => {
-    it("returns static description", () => {
+    it("returns fallback without query", () => {
       expect(humanReadableToolDescription("web_search", {}))
         .toBe("searching the web...")
+    })
+    it("includes query when provided", () => {
+      expect(humanReadableToolDescription("web_search", { query: "ouroboros agent" }))
+        .toBe("searching the web for 'ouroboros agent'...")
     })
   })
 
   describe("coding_spawn", () => {
-    it("returns static description", () => {
+    it("returns fallback without runner", () => {
       expect(humanReadableToolDescription("coding_spawn", {}))
         .toBe("starting coding session...")
+    })
+    it("includes runner when provided", () => {
+      expect(humanReadableToolDescription("coding_spawn", { runner: "codex" }))
+        .toBe("starting codex coding session...")
     })
   })
 
   describe("ponder", () => {
-    it("returns static description", () => {
+    it("returns fallback without thought", () => {
       expect(humanReadableToolDescription("ponder", {}))
         .toBe("thinking deeper...")
+    })
+    it("includes thought when provided", () => {
+      expect(humanReadableToolDescription("ponder", { thought: "the auth approach" }))
+        .toBe("thinking about the auth approach...")
     })
   })
 
@@ -145,9 +157,13 @@ describe("humanReadableToolDescription", () => {
   })
 
   describe("diary_write", () => {
-    it("returns static description", () => {
+    it("returns fallback without about", () => {
       expect(humanReadableToolDescription("diary_write", {}))
         .toBe("noting something down...")
+    })
+    it("includes about when provided", () => {
+      expect(humanReadableToolDescription("diary_write", { about: "MCP bridge" }))
+        .toBe("noting something about MCP bridge...")
     })
   })
 
@@ -254,6 +270,11 @@ describe("humanReadableToolDescription", () => {
     it("returns search text when mode is search", () => {
       expect(humanReadableToolDescription("query_session", { mode: "search", query: "MCP" }))
         .toBe("searching session for 'MCP'...")
+    })
+
+    it("returns search text with empty query fallback", () => {
+      expect(humanReadableToolDescription("query_session", { mode: "search" }))
+        .toBe("searching session for ''...")
     })
 
     it("returns status text when mode is status", () => {
