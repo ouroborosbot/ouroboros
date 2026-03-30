@@ -150,9 +150,9 @@ describe("humanReadableToolDescription", () => {
   })
 
   describe("observe", () => {
-    it("returns static description", () => {
+    it("returns null (hidden, like settle)", () => {
       expect(humanReadableToolDescription("observe", {}))
-        .toBe("listening...")
+        .toBeNull()
     })
   })
 

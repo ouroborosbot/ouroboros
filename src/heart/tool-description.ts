@@ -99,7 +99,7 @@ const TOOL_DESCRIPTIONS: Record<string, DescriptionBuilder> = {
     const thought = args.thought
     return thought ? `thinking about ${truncate(thought, 40)}...` : "thinking deeper..."
   },
-  observe: () => "listening...",
+  observe: () => null,
   claude: () => "reasoning...",
   set_reasoning_effort: (args) => {
     const level = args.level
