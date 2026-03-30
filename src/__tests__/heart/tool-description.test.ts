@@ -154,7 +154,111 @@ describe("humanReadableToolDescription", () => {
   describe("save_friend_note", () => {
     it("returns static description", () => {
       expect(humanReadableToolDescription("save_friend_note", {}))
-        .toBe("making a note...")
+        .toBe("making a note about you...")
+    })
+  })
+
+  describe("get_friend_note", () => {
+    it("returns static description", () => {
+      expect(humanReadableToolDescription("get_friend_note", {}))
+        .toBe("checking my notes...")
+    })
+  })
+
+  describe("load_skill", () => {
+    it("includes skill name when provided", () => {
+      expect(humanReadableToolDescription("load_skill", { name: "coding" }))
+        .toBe("loading coding skill...")
+    })
+
+    it("falls back to generic when no name arg", () => {
+      expect(humanReadableToolDescription("load_skill", {}))
+        .toBe("loading a skill...")
+    })
+  })
+
+  describe("coding_status", () => {
+    it("returns static description", () => {
+      expect(humanReadableToolDescription("coding_status", {}))
+        .toBe("checking coding sessions...")
+    })
+  })
+
+  describe("coding_tail", () => {
+    it("returns static description", () => {
+      expect(humanReadableToolDescription("coding_tail", {}))
+        .toBe("reading coding output...")
+    })
+  })
+
+  describe("coding_kill", () => {
+    it("returns static description", () => {
+      expect(humanReadableToolDescription("coding_kill", {}))
+        .toBe("stopping coding session...")
+    })
+  })
+
+  describe("bridge_manage", () => {
+    it("returns static description", () => {
+      expect(humanReadableToolDescription("bridge_manage", {}))
+        .toBe("managing conversation bridge...")
+    })
+  })
+
+  describe("send_message", () => {
+    it("includes recipient when provided", () => {
+      expect(humanReadableToolDescription("send_message", { to: "Jordan" }))
+        .toBe("sending a message to Jordan...")
+    })
+
+    it("falls back to generic when no to arg", () => {
+      expect(humanReadableToolDescription("send_message", {}))
+        .toBe("sending a message...")
+    })
+  })
+
+  describe("surface", () => {
+    it("returns static description", () => {
+      expect(humanReadableToolDescription("surface", {}))
+        .toBe("sharing a thought...")
+    })
+  })
+
+  describe("claude", () => {
+    it("returns static description", () => {
+      expect(humanReadableToolDescription("claude", {}))
+        .toBe("reasoning...")
+    })
+  })
+
+  describe("set_reasoning_effort", () => {
+    it("includes level when provided", () => {
+      expect(humanReadableToolDescription("set_reasoning_effort", { level: "high" }))
+        .toBe("setting thinking depth to high...")
+    })
+
+    it("falls back to generic when no level arg", () => {
+      expect(humanReadableToolDescription("set_reasoning_effort", {}))
+        .toBe("adjusting thinking depth...")
+    })
+  })
+
+  describe("descend", () => {
+    it("returns null (hidden)", () => {
+      expect(humanReadableToolDescription("descend", {}))
+        .toBeNull()
+    })
+  })
+
+  describe("query_session modes", () => {
+    it("returns search text when mode is search", () => {
+      expect(humanReadableToolDescription("query_session", { mode: "search", query: "MCP" }))
+        .toBe("searching session for 'MCP'...")
+    })
+
+    it("returns status text when mode is status", () => {
+      expect(humanReadableToolDescription("query_session", { mode: "status" }))
+        .toBe("checking inner dialog status...")
     })
   })
 
