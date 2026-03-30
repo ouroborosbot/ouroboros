@@ -50,14 +50,76 @@ describe("outlook http", () => {
         productName: "Ouro <Outlook> & \"Co\"",
         agentCount: 1,
       }),
+      readMachineView: () => ({
+        overview: {
+          productName: "Ouro <Outlook> & \"Co\"",
+          observedAt: "2026-03-30T07:35:00.000Z",
+          primaryEntryPoint: "http://127.0.0.1:4310/outlook",
+          daemon: {
+            status: "running",
+            health: "ok",
+            mode: "production",
+            socketPath: "/tmp/ouro.sock",
+            outlookUrl: "http://127.0.0.1:4310/outlook",
+            entryPath: "/mock/repo/dist/heart/daemon/daemon-entry.js",
+            workerCount: 1,
+            senseCount: 2,
+          },
+          runtime: {
+            version: "0.1.0-alpha.109",
+            lastUpdated: "2026-03-30T00:30:24.000Z",
+            repoRoot: "/mock/repo",
+            configFingerprint: "cfg-123",
+          },
+          freshness: {
+            status: "fresh",
+            latestActivityAt: "2026-03-30T07:34:00.000Z",
+            ageMs: 60_000,
+          },
+          degraded: {
+            status: "ok",
+            issues: [],
+          },
+          totals: {
+            agents: 1,
+            enabledAgents: 1,
+            degradedAgents: 0,
+            staleAgents: 0,
+            liveTasks: 1,
+            blockedTasks: 0,
+            openObligations: 0,
+            activeCodingAgents: 1,
+            blockedCodingAgents: 0,
+          },
+          mood: "calm",
+          entrypoints: [
+            { kind: "web", label: "Open Outlook", target: "http://127.0.0.1:4310/outlook" },
+            { kind: "cli", label: "CLI JSON", target: "ouro outlook --json" },
+          ],
+        },
+        agents: [
+          {
+            agentName: "slugger",
+            enabled: true,
+            freshness: { status: "fresh", latestActivityAt: "2026-03-30T07:34:00.000Z", ageMs: 60_000 },
+            degraded: { status: "ok", issues: [] },
+            tasks: { liveCount: 1, blockedCount: 0 },
+            obligations: { openCount: 0 },
+            coding: { activeCount: 1, blockedCount: 0 },
+            attention: { level: "active", label: "In motion" },
+          },
+        ],
+      }),
       readAgentState: () => null,
     })
 
     const html = await fetch(`${server.origin}/outlook/`).then((response) => response.text())
 
     expect(html).toContain("&lt;Outlook&gt; &amp; &quot;Co&quot;")
-    expect(html).toContain(`${server.origin}/outlook/api/machine`)
-    expect(html).toContain("&quot;productName&quot;: &quot;Ouro &lt;Outlook&gt; &amp; \\&quot;Co\\&quot;&quot;")
+    expect(html).toContain("Machine Overview")
+    expect(html).toContain("Regain the plot together.")
+    expect(html).toContain("ouro outlook --json")
+    expect(html).toContain('data-agent-name="slugger"')
 
     await server.stop()
   })
