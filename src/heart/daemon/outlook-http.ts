@@ -26,16 +26,17 @@ function escapeHtml(value: string): string {
 }
 
 function defaultRenderApp(input: { origin: string; machine: OutlookMachineState }): string {
+  const productName = escapeHtml(input.machine.productName)
   return [
     "<!doctype html>",
     "<html lang=\"en\">",
     "<head>",
     "  <meta charset=\"utf-8\" />",
     "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />",
-    `  <title>${input.machine.productName}</title>`,
+    `  <title>${productName}</title>`,
     "</head>",
     "<body>",
-    `  <main><h1>${input.machine.productName}</h1><p>${input.origin}/outlook/api/machine</p><pre>${escapeHtml(JSON.stringify(input.machine, null, 2))}</pre></main>`,
+    `  <main><h1>${productName}</h1><p>${input.origin}/outlook/api/machine</p><pre>${escapeHtml(JSON.stringify(input.machine, null, 2))}</pre></main>`,
     "</body>",
     "</html>",
   ].join("\n")
@@ -51,9 +52,11 @@ function writeHtml(response: http.ServerResponse, html: string): void {
   response.end(html)
 }
 
-function normalizePath(urlValue: string | undefined): string {
-  const parsed = new URL(urlValue ?? "/", "http://127.0.0.1")
-  return parsed.pathname.replace(/\/+$/, "") || "/"
+function normalizePath(urlValue = "/"): string {
+  const parsed = new URL(urlValue, "http://127.0.0.1")
+  const normalizedPath = parsed.pathname.replace(/\/+$/, "")
+  if (normalizedPath.length === 0) return "/"
+  return normalizedPath
 }
 
 export async function startOutlookHttpServer(options: StartOutlookHttpServerOptions = {}): Promise<OutlookHttpServerHandle> {
