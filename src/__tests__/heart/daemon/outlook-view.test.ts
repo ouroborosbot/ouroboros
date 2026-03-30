@@ -227,3 +227,236 @@ describe("outlook machine view", () => {
     ])
   })
 })
+
+describe("outlook agent view", () => {
+  it("builds a read-only human-default agent view with summary-only inward work and recent activity", async () => {
+    const { buildOutlookAgentView } = await import("../../../heart/daemon/outlook-view")
+
+    const view = buildOutlookAgentView({
+      agent: {
+        productName: "Ouro Outlook",
+        agentName: "slugger",
+        agentRoot: "/mock/slugger.ouro",
+        enabled: true,
+        provider: "anthropic",
+        senses: ["cli", "bluebubbles"],
+        freshness: {
+          status: "fresh",
+          latestActivityAt: "2026-03-30T07:38:00.000Z",
+          ageMs: 30_000,
+        },
+        degraded: {
+          status: "ok",
+          issues: [],
+        },
+        tasks: {
+          totalCount: 4,
+          liveCount: 2,
+          blockedCount: 1,
+          byStatus: {
+            drafting: 0,
+            processing: 1,
+            validating: 0,
+            collaborating: 0,
+            paused: 0,
+            blocked: 1,
+            done: 2,
+          },
+          liveTaskNames: ["Build Outlook", "Review daemon seam"],
+          actionRequired: ["Resolve failing Teams auth"],
+          activeBridges: ["ouroboros"],
+        },
+        obligations: {
+          openCount: 2,
+          items: [
+            {
+              id: "ob-1",
+              status: "pending",
+              content: "Reply to Ari",
+              updatedAt: "2026-03-30T07:37:00.000Z",
+              nextAction: "send reply",
+            },
+          ],
+        },
+        sessions: {
+          liveCount: 1,
+          items: [
+            {
+              friendId: "ari",
+              friendName: "Ari",
+              channel: "bluebubbles",
+              key: "bb:ari",
+              sessionPath: "/mock/sessions/ari.json",
+              lastActivityAt: "2026-03-30T07:38:00.000Z",
+              activitySource: "friend-facing",
+            },
+          ],
+        },
+        inner: {
+          visibility: "summary",
+          status: "working",
+          hasPending: true,
+          surfacedSummary: "Ship the daemon seam",
+          origin: {
+            friendId: "ari",
+            channel: "bluebubbles",
+            key: "bb:ari",
+            friendName: "Ari",
+          },
+          obligationStatus: "pending",
+          latestActivityAt: "2026-03-30T07:35:00.000Z",
+        },
+        coding: {
+          totalCount: 2,
+          activeCount: 1,
+          blockedCount: 1,
+          items: [
+            {
+              id: "code-1",
+              runner: "claude-code",
+              status: "running",
+              checkpoint: "Implementing view model",
+              taskRef: "task-123",
+              workdir: "/mock/repo",
+              originSession: {
+                friendId: "ari",
+                channel: "bluebubbles",
+                key: "bb:ari",
+              },
+              lastActivityAt: "2026-03-30T07:39:00.000Z",
+            },
+            {
+              id: "code-2",
+              runner: "codex",
+              status: "stalled",
+              checkpoint: "Waiting on daemon contract",
+              taskRef: null,
+              workdir: "/mock/repo",
+              originSession: null,
+              lastActivityAt: "2026-03-30T07:20:00.000Z",
+            },
+          ],
+        },
+      },
+      viewer: { kind: "human" },
+    })
+
+    expect(view).toEqual(expect.objectContaining({
+      interactionModel: "read-only",
+      viewer: {
+        kind: "human",
+        innerDetail: "summary",
+      },
+      agent: expect.objectContaining({
+        agentName: "slugger",
+        provider: "anthropic",
+        senses: ["cli", "bluebubbles"],
+        freshness: expect.objectContaining({ status: "fresh" }),
+      }),
+      work: expect.objectContaining({
+        tasks: expect.objectContaining({ liveCount: 2, blockedCount: 1 }),
+        obligations: expect.objectContaining({ openCount: 2 }),
+        coding: expect.objectContaining({ activeCount: 1, blockedCount: 1 }),
+        bridges: ["ouroboros"],
+      }),
+      inner: {
+        mode: "summary",
+        status: "working",
+        summary: "Ship the daemon seam",
+        hasPending: true,
+      },
+    }))
+
+    expect(view.activity.recent).toEqual([
+      expect.objectContaining({ kind: "coding", at: "2026-03-30T07:39:00.000Z" }),
+      expect.objectContaining({ kind: "session", at: "2026-03-30T07:38:00.000Z" }),
+      expect.objectContaining({ kind: "obligation", at: "2026-03-30T07:37:00.000Z" }),
+      expect.objectContaining({ kind: "inner", at: "2026-03-30T07:35:00.000Z" }),
+    ])
+  })
+
+  it("allows explicit deep inward drill-down for self-inspection without changing read-only behavior", async () => {
+    const { buildOutlookAgentView } = await import("../../../heart/daemon/outlook-view")
+
+    const view = buildOutlookAgentView({
+      agent: {
+        productName: "Ouro Outlook",
+        agentName: "slugger",
+        agentRoot: "/mock/slugger.ouro",
+        enabled: true,
+        provider: "anthropic",
+        senses: ["cli"],
+        freshness: {
+          status: "fresh",
+          latestActivityAt: "2026-03-30T07:38:00.000Z",
+          ageMs: 30_000,
+        },
+        degraded: {
+          status: "ok",
+          issues: [],
+        },
+        tasks: {
+          totalCount: 1,
+          liveCount: 0,
+          blockedCount: 0,
+          byStatus: {
+            drafting: 0,
+            processing: 0,
+            validating: 0,
+            collaborating: 0,
+            paused: 0,
+            blocked: 0,
+            done: 1,
+          },
+          liveTaskNames: [],
+          actionRequired: [],
+          activeBridges: [],
+        },
+        obligations: {
+          openCount: 0,
+          items: [],
+        },
+        sessions: {
+          liveCount: 0,
+          items: [],
+        },
+        inner: {
+          visibility: "summary",
+          status: "working",
+          hasPending: true,
+          surfacedSummary: "Untangle the daemon state",
+          origin: {
+            friendId: "self",
+            channel: "inner",
+            key: "dialog",
+            friendName: "self",
+          },
+          obligationStatus: "pending",
+          latestActivityAt: "2026-03-30T07:35:00.000Z",
+        },
+        coding: {
+          totalCount: 0,
+          activeCount: 0,
+          blockedCount: 0,
+          items: [],
+        },
+      },
+      viewer: { kind: "agent-self", agentName: "slugger", innerDetail: "deep" },
+    })
+
+    expect(view.interactionModel).toBe("read-only")
+    expect(view.inner).toEqual({
+      mode: "deep",
+      status: "working",
+      summary: "Untangle the daemon state",
+      hasPending: true,
+      origin: {
+        friendId: "self",
+        channel: "inner",
+        key: "dialog",
+        friendName: "self",
+      },
+      obligationStatus: "pending",
+    })
+  })
+})
