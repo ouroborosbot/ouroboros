@@ -214,4 +214,58 @@ describe("outlook render", () => {
     expect(html).toContain("When the daemon sees enabled bundles on this machine, they will gather here.")
     expect(html).toContain('data-outlook-agent-panel')
   })
+
+  it("falls back to raw machine truth when no machine view is provided", async () => {
+    const { renderOutlookApp } = await import("../../../heart/daemon/outlook-render")
+
+    const html = renderOutlookApp({
+      origin: "http://127.0.0.1:4310",
+      machine: {
+        observedAt: "2026-03-30T07:35:00.000Z",
+        runtime: {
+          version: "0.1.0-alpha.109",
+          lastUpdated: "2026-03-30T00:30:24.000Z",
+          repoRoot: "/mock/repo",
+          configFingerprint: "cfg-123",
+        },
+        agentCount: 2,
+        freshness: {
+          status: "stale",
+          latestActivityAt: null,
+          ageMs: null,
+        },
+        degraded: {
+          status: "degraded",
+          issues: [{ code: "agent-degraded", detail: "scanner unreadable" }],
+        },
+        agents: [
+          {
+            agentName: "slugger",
+            enabled: true,
+            freshness: { status: "stale", latestActivityAt: null, ageMs: null },
+            degraded: { status: "degraded", issues: [{ code: "agent-degraded", detail: "scanner unreadable" }] },
+            tasks: { liveCount: 3, blockedCount: 2 },
+            obligations: { openCount: 4 },
+            coding: { activeCount: 1, blockedCount: 1 },
+          },
+          {
+            agentName: "ouroboros",
+            enabled: false,
+            freshness: { status: "fresh", latestActivityAt: "2026-03-30T07:34:00.000Z", ageMs: 60_000 },
+            degraded: { status: "ok", issues: [] },
+          },
+        ],
+      } as any,
+    })
+
+    expect(html).toContain("<title>Ouro Outlook</title>")
+    expect(html).toContain("Visible agents")
+    expect(html).toContain(">2<")
+    expect(html).toContain(">3<")
+    expect(html).toContain(">4<")
+    expect(html).toContain(">1<")
+    expect(html).toContain("Freshness</span><strong>stale</strong>")
+    expect(html).toContain("Degraded</span><strong>degraded</strong>")
+    expect(html).toContain("http://127.0.0.1:4310/outlook")
+  })
 })

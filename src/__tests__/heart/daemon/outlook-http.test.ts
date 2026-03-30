@@ -20,6 +20,16 @@ describe("outlook http", () => {
           ? { agentName: "slugger", productName: "Ouro Outlook" }
           : null
       ),
+      readAgentView: (agentName: string) => (
+        agentName === "slugger"
+          ? {
+              productName: "Ouro Outlook",
+              interactionModel: "read-only",
+              viewer: { kind: "human", innerDetail: "summary" },
+              agent: { agentName: "slugger" },
+            } as any
+          : null
+      ),
       renderApp: ({ machine }) => `<!doctype html><title>${machine.productName}</title>`,
     })
 
@@ -32,7 +42,10 @@ describe("outlook http", () => {
     expect(machine).toEqual(expect.objectContaining({ productName: "Ouro Outlook" }))
 
     const agent = await fetch(`${server.origin}/outlook/api/agents/slugger`).then((response) => response.json())
-    expect(agent).toEqual(expect.objectContaining({ agentName: "slugger" }))
+    expect(agent).toEqual(expect.objectContaining({
+      interactionModel: "read-only",
+      agent: expect.objectContaining({ agentName: "slugger" }),
+    }))
 
     const missing = await fetch(`${server.origin}/outlook/api/agents/missing`)
     expect(missing.status).toBe(404)
