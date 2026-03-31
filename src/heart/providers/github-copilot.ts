@@ -35,7 +35,7 @@ function withAuthGuidance(error: unknown): Error {
 }
 /* v8 ignore stop */
 
-export function createGithubCopilotProviderRuntime(): ProviderRuntime {
+export function createGithubCopilotProviderRuntime(model: string): ProviderRuntime {
   emitNervesEvent({
     component: "engine",
     event: "engine.provider_init",
@@ -54,8 +54,8 @@ export function createGithubCopilotProviderRuntime(): ProviderRuntime {
     );
   }
 
-  const isCompletionsModel = config.model.startsWith("claude");
-  const modelCaps = getModelCapabilities(config.model);
+  const isCompletionsModel = model.startsWith("claude");
+  const modelCaps = getModelCapabilities(model);
   const capabilities = new Set<ProviderCapability>();
   /* v8 ignore next -- branch: capability detection tested via unit test @preserve */
   if (modelCaps.reasoningEffort) capabilities.add("reasoning-effort");
@@ -71,7 +71,7 @@ export function createGithubCopilotProviderRuntime(): ProviderRuntime {
     // Chat completions path (Claude models via Copilot)
     return {
       id: "github-copilot",
-      model: config.model,
+      model,
       client,
       capabilities,
       supportedReasoningEfforts: modelCaps.reasoningEffort,
@@ -112,7 +112,7 @@ export function createGithubCopilotProviderRuntime(): ProviderRuntime {
   let nativeInstructions = "";
   return {
     id: "github-copilot",
-    model: config.model,
+    model,
     client,
     capabilities,
     supportedReasoningEfforts: modelCaps.reasoningEffort,

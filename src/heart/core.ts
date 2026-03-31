@@ -75,27 +75,28 @@ let _providerRuntime: { fingerprint: string; runtime: ProviderRuntime } | null =
 function getProviderRuntimeFingerprint(): string {
   const config = loadAgentConfig();
   const provider = config.humanFacing.provider;
+  const model = config.humanFacing.model;
   /* v8 ignore next -- switch: not all provider branches exercised in CI @preserve */
   switch (provider) {
     case "azure": {
-      const { apiKey, endpoint, deployment, modelName, apiVersion, managedIdentityClientId } = getAzureConfig();
-      return JSON.stringify({ provider, apiKey, endpoint, deployment, modelName, apiVersion, managedIdentityClientId });
+      const { apiKey, endpoint, deployment, apiVersion, managedIdentityClientId } = getAzureConfig();
+      return JSON.stringify({ provider, model, apiKey, endpoint, deployment, apiVersion, managedIdentityClientId });
     }
     case "anthropic": {
-      const { model, setupToken } = getAnthropicConfig();
+      const { setupToken } = getAnthropicConfig();
       return JSON.stringify({ provider, model, setupToken });
     }
     case "minimax": {
-      const { apiKey, model } = getMinimaxConfig();
-      return JSON.stringify({ provider, apiKey, model });
+      const { apiKey } = getMinimaxConfig();
+      return JSON.stringify({ provider, model, apiKey });
     }
     case "openai-codex": {
-      const { model, oauthAccessToken } = getOpenAICodexConfig();
+      const { oauthAccessToken } = getOpenAICodexConfig();
       return JSON.stringify({ provider, model, oauthAccessToken });
     }
     /* v8 ignore start -- fingerprint: tested via provider init tests @preserve */
     case "github-copilot": {
-      const { model, githubToken, baseUrl } = getGithubCopilotConfig();
+      const { githubToken, baseUrl } = getGithubCopilotConfig();
       return JSON.stringify({ provider, model, githubToken, baseUrl });
     }
     /* v8 ignore stop */
@@ -103,7 +104,7 @@ function getProviderRuntimeFingerprint(): string {
 }
 
 export function createProviderRegistry(): ProviderRegistry {
-  const factories: Record<ProviderId, () => ProviderRuntime> = {
+  const factories: Record<ProviderId, (model: string) => ProviderRuntime> = {
     azure: createAzureProviderRuntime,
     anthropic: createAnthropicProviderRuntime,
     minimax: createMinimaxProviderRuntime,
@@ -113,8 +114,10 @@ export function createProviderRegistry(): ProviderRegistry {
 
   return {
     resolve(): ProviderRuntime | null {
-      const provider = loadAgentConfig().humanFacing.provider;
-      return factories[provider]();
+      const config = loadAgentConfig();
+      const provider = config.humanFacing.provider;
+      const model = config.humanFacing.model;
+      return factories[provider](model);
     },
   };
 }
@@ -189,17 +192,19 @@ export function createSummarize(): (transcript: string, instruction: string) => 
 }
 
 export function getProviderDisplayLabel(): string {
-  const provider = loadAgentConfig().humanFacing.provider;
+  const config = loadAgentConfig();
+  const provider = config.humanFacing.provider;
+  const model = config.humanFacing.model || "unknown";
   const providerLabelBuilders: Record<ProviderId, () => string> = {
     azure: () => {
-      const config = getAzureConfig();
-      return `azure openai (${config.deployment || "default"}, model: ${config.modelName || "unknown"})`
+      const azureCfg = getAzureConfig();
+      return `azure openai (${azureCfg.deployment || "default"}, model: ${model})`
     },
-    anthropic: () => `anthropic (${getAnthropicConfig().model || "unknown"})`,
-    minimax: () => `minimax (${getMinimaxConfig().model || "unknown"})`,
-    "openai-codex": () => `openai codex (${getOpenAICodexConfig().model || "unknown"})`,
+    anthropic: () => `anthropic (${model})`,
+    minimax: () => `minimax (${model})`,
+    "openai-codex": () => `openai codex (${model})`,
     /* v8 ignore next -- branch: tested via display label unit test @preserve */
-    "github-copilot": () => `github copilot (${getGithubCopilotConfig().model || "unknown"})`,
+    "github-copilot": () => `github copilot (${model})`,
   };
   return providerLabelBuilders[provider]();
 }

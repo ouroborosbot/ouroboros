@@ -89,7 +89,7 @@ function getChatGPTAccountIdFromToken(token: string): string {
   return accountId.trim();
 }
 
-export function createOpenAICodexProviderRuntime(): ProviderRuntime {
+export function createOpenAICodexProviderRuntime(model: string): ProviderRuntime {
   emitNervesEvent({
     component: "engine",
     event: "engine.provider_init",
@@ -97,10 +97,10 @@ export function createOpenAICodexProviderRuntime(): ProviderRuntime {
     meta: { provider: "openai-codex" },
   });
   const codexConfig = getOpenAICodexConfig();
-  if (!(codexConfig.model && codexConfig.oauthAccessToken)) {
+  if (!codexConfig.oauthAccessToken) {
     throw new Error(
       getOpenAICodexReauthGuidance(
-        "provider 'openai-codex' is selected in agent.json but providers.openai-codex.model/oauthAccessToken is incomplete in secrets.json.",
+        "provider 'openai-codex' is selected in agent.json but providers.openai-codex.oauthAccessToken is missing in secrets.json.",
       ),
     );
   }
@@ -120,7 +120,7 @@ export function createOpenAICodexProviderRuntime(): ProviderRuntime {
       ),
     );
   }
-  const modelCaps = getModelCapabilities(codexConfig.model);
+  const modelCaps = getModelCapabilities(model);
   const capabilities = new Set<ProviderCapability>();
   if (modelCaps.reasoningEffort) capabilities.add("reasoning-effort");
   if (modelCaps.phase) capabilities.add("phase-annotation");
@@ -140,7 +140,7 @@ export function createOpenAICodexProviderRuntime(): ProviderRuntime {
   let nativeInstructions = "";
   return {
     id: "openai-codex",
-    model: codexConfig.model,
+    model,
     client,
     capabilities,
     supportedReasoningEfforts: modelCaps.reasoningEffort,

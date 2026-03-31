@@ -403,7 +403,7 @@ async function streamAnthropicMessages(
   };
 }
 
-export function createAnthropicProviderRuntime(): ProviderRuntime {
+export function createAnthropicProviderRuntime(model: string): ProviderRuntime {
   emitNervesEvent({
     component: "engine",
     event: "engine.provider_init",
@@ -411,14 +411,14 @@ export function createAnthropicProviderRuntime(): ProviderRuntime {
     meta: { provider: "anthropic" },
   });
   const anthropicConfig = getAnthropicConfig();
-  if (!(anthropicConfig.model && anthropicConfig.setupToken)) {
+  if (!anthropicConfig.setupToken) {
     throw new Error(
       getAnthropicReauthGuidance(
-        "provider 'anthropic' is selected in agent.json but providers.anthropic.model/setupToken is incomplete in secrets.json.",
+        "provider 'anthropic' is selected in agent.json but providers.anthropic.setupToken is missing in secrets.json.",
       ),
     );
   }
-  const modelCaps = getModelCapabilities(anthropicConfig.model);
+  const modelCaps = getModelCapabilities(model);
   const capabilities = new Set<ProviderCapability>();
   if (modelCaps.reasoningEffort) capabilities.add("reasoning-effort");
 
@@ -433,7 +433,7 @@ export function createAnthropicProviderRuntime(): ProviderRuntime {
   });
   return {
     id: "anthropic",
-    model: anthropicConfig.model,
+    model,
     client,
     capabilities,
     supportedReasoningEfforts: modelCaps.reasoningEffort,
@@ -444,7 +444,7 @@ export function createAnthropicProviderRuntime(): ProviderRuntime {
       // Anthropic uses canonical messages for tool_result tracking.
     },
     streamTurn(request: ProviderTurnRequest): Promise<TurnResult> {
-      return streamAnthropicMessages(client, anthropicConfig.model, request);
+      return streamAnthropicMessages(client, model, request);
     },
   };
 }

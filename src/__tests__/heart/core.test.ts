@@ -596,9 +596,9 @@ describe("runAgent", () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupConfig({
+      humanFacingModel: "gpt-5.4",
       providers: {
         "openai-codex": {
-          model: "gpt-5.4",
           oauthAccessToken: makeOpenAICodexAccessToken(),
         },
       },
@@ -1533,7 +1533,7 @@ describe("runAgent", () => {
   })
 
   it("uses minimax model from config when set", async () => {
-    await setupConfig({ providers: { minimax: { apiKey: "test-key", model: "custom-model" } } })
+    await setupConfig({ humanFacingModel: "custom-model", providers: { minimax: { apiKey: "test-key" } } })
     mockCreate.mockReturnValue(makeStream([makeChunk("hi")]))
 
     const callbacks: ChannelCallbacks = {
@@ -3248,7 +3248,7 @@ describe("getClient", () => {
   it("prefers Azure when all Azure config is set", async () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
-    await setupConfig({ providers: { azure: { apiKey: "azure-test-key", endpoint: "https://test.openai.azure.com", deployment: "test-deployment", modelName: "gpt-4o" }, minimax: { apiKey: "mm-key", model: "MiniMax-M2.5" } } })
+    await setupConfig({ humanFacingModel: "gpt-4o", providers: { azure: { apiKey: "azure-test-key", endpoint: "https://test.openai.azure.com", deployment: "test-deployment" }, minimax: { apiKey: "mm-key" } } })
 
     const core = await import("../../heart/core")
     expect(core.getModel()).toBe("gpt-4o")
@@ -3260,7 +3260,7 @@ describe("getClient", () => {
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     const emitNervesEvent = vi.fn()
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
-    await setupConfig({ providers: { azure: { apiKey: "azure-test-key" }, minimax: { apiKey: "mm-key", model: "MiniMax-M2.5" } } })
+    await setupConfig({ humanFacingModel: "gpt-4o", providers: { azure: { apiKey: "azure-test-key" }, minimax: { apiKey: "mm-key" } } })
     const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called")
     }) as any)
@@ -3650,9 +3650,9 @@ describe("anthropic setup-token provider contract", () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupConfig({
+      humanFacingModel: "claude-opus-4-6",
       providers: {
         anthropic: {
-          model: "claude-opus-4-6",
           setupToken: makeAnthropicSetupToken(),
         },
       },
@@ -3689,7 +3689,6 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-opus-4-6",
           setupToken: "sk-ant-not-setup-token",
         },
       },
@@ -3720,7 +3719,6 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-opus-4-6",
           setupToken: "sk-ant-oat01-short",
         },
       },
@@ -3751,7 +3749,6 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-opus-4-6",
           setupToken: "   ",
         },
       },
@@ -3785,10 +3782,9 @@ describe("anthropic setup-token provider contract", () => {
     const emitNervesEvent = vi.fn()
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
     await setupConfig({
+      humanFacingModel: "claude-opus-4-6",
       providers: {
-        anthropic: {
-          model: "claude-opus-4-6",
-        },
+        anthropic: {},
       },
     })
 
@@ -3803,7 +3799,7 @@ describe("anthropic setup-token provider contract", () => {
       const msg = emitNervesEvent.mock.calls.find(
         (c: any[]) => c[0]?.event === "engine.provider_init_error",
       )?.[0]?.message ?? ""
-      expect(msg).toContain("model/setupToken is incomplete")
+      expect(msg).toContain("setupToken is missing")
       expect(msg).toContain("ouro auth --agent testagent")
       expect(msg).toContain("/tmp/.agentsecrets/testagent/secrets.json")
       expect(msg).toContain("providers.anthropic.setupToken")
@@ -3822,9 +3818,9 @@ describe("anthropic setup-token provider contract", () => {
     }) as any)
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupConfig({
+      humanFacingModel: "claude-opus-4-6",
       providers: {
         anthropic: {
-          model: "claude-opus-4-6",
           setupToken: makeAnthropicSetupToken(),
         },
       },
@@ -3997,7 +3993,6 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-opus-4-6",
           setupToken: makeAnthropicSetupToken(),
         },
       },
@@ -4103,9 +4098,9 @@ describe("anthropic setup-token provider contract", () => {
     }) as any)
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupConfig({
+      humanFacingModel: "claude-unknown-preview",
       providers: {
         anthropic: {
-          model: "claude-unknown-preview",
           setupToken: makeAnthropicSetupToken(),
         },
       },
@@ -4171,7 +4166,6 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-opus-4-6",
           setupToken: makeAnthropicSetupToken(),
         },
       },
@@ -4243,7 +4237,6 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-opus-4-6",
           setupToken: makeAnthropicSetupToken(),
         },
       },
@@ -4294,7 +4287,6 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-opus-4-6",
           setupToken: makeAnthropicSetupToken(),
         },
       },
@@ -4337,7 +4329,6 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-opus-4-6",
           setupToken: makeAnthropicSetupToken(),
         },
       },
@@ -4384,7 +4375,6 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-opus-4-6",
           setupToken: makeAnthropicSetupToken(),
         },
       },
@@ -4419,9 +4409,9 @@ describe("anthropic setup-token provider contract", () => {
     const emitNervesEvent = vi.fn()
     vi.doMock("../../nerves/runtime", () => ({ emitNervesEvent }))
     await setupConfig({
+      humanFacingModel: "claude-opus-4-6",
       providers: {
         anthropic: {
-          model: "claude-opus-4-6",
           setupToken: "\n \t",
         },
       },
@@ -4456,7 +4446,6 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-opus-4-6",
           setupToken: makeAnthropicSetupToken(),
         },
       },
@@ -4532,7 +4521,6 @@ describe("anthropic setup-token provider contract", () => {
     await setupConfig({
       providers: {
         anthropic: {
-          model: "claude-opus-4-6",
           setupToken: makeAnthropicSetupToken(),
         },
       },
@@ -4626,9 +4614,9 @@ describe("openai-codex oauth provider contract", () => {
     vi.resetModules()
     vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
     await setupConfig({
+      humanFacingModel: "gpt-5.4",
       providers: {
         "openai-codex": {
-          model: "gpt-5.4",
           oauthAccessToken: makeOpenAICodexAccessToken(),
         },
       },
@@ -4656,7 +4644,6 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.4",
           oauthAccessToken: "",
         },
       },
@@ -4690,7 +4677,6 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.4",
           oauthAccessToken: makeOpenAICodexAccessToken(),
         },
       },
@@ -4727,7 +4713,6 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.4",
           oauthAccessToken: makeOpenAICodexAccessToken(),
         },
       },
@@ -4764,7 +4749,6 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.4",
           oauthAccessToken: " \n\t ",
         },
       },
@@ -4796,7 +4780,6 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.4",
           oauthAccessToken: tokenWithoutAccountId,
         },
       },
@@ -4829,7 +4812,6 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.4",
           oauthAccessToken: malformedToken,
         },
       },
@@ -4860,7 +4842,6 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.4",
           oauthAccessToken: "not-a-jwt",
         },
       },
@@ -4892,7 +4873,6 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.4",
           oauthAccessToken: arrayPayloadToken,
         },
       },
@@ -4924,7 +4904,6 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.4",
           oauthAccessToken: nonStringAccountIdToken,
         },
       },
@@ -4953,9 +4932,9 @@ describe("openai-codex oauth provider contract", () => {
     const accountId = "chatgpt-account-123"
     const oauthAccessToken = makeOpenAICodexAccessToken(accountId)
     await setupConfig({
+      humanFacingModel: "gpt-5.4",
       providers: {
         "openai-codex": {
-          model: "gpt-5.4",
           oauthAccessToken,
         },
       },
@@ -5053,7 +5032,6 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.4",
           oauthAccessToken: makeOpenAICodexAccessToken(),
         },
       },
@@ -5088,7 +5066,6 @@ describe("openai-codex oauth provider contract", () => {
     await setupConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.4",
           oauthAccessToken: makeOpenAICodexAccessToken(),
         },
       },

@@ -39,7 +39,7 @@ export function createAzureTokenProvider(managedIdentityClientId?: string): () =
   };
 }
 
-export function createAzureProviderRuntime(): ProviderRuntime {
+export function createAzureProviderRuntime(model: string): ProviderRuntime {
   const azureConfig = getAzureConfig();
   const useApiKey = !!azureConfig.apiKey;
   const authMethod = useApiKey ? "key" : "managed-identity";
@@ -51,12 +51,12 @@ export function createAzureProviderRuntime(): ProviderRuntime {
     meta: { provider: "azure", authMethod },
   });
 
-  if (!(azureConfig.endpoint && azureConfig.deployment && azureConfig.modelName)) {
+  if (!(azureConfig.endpoint && azureConfig.deployment)) {
     throw new Error(
       "provider 'azure' is selected in agent.json but providers.azure is incomplete in secrets.json.",
     );
   }
-  const modelCaps = getModelCapabilities(azureConfig.modelName);
+  const modelCaps = getModelCapabilities(model);
   const capabilities = new Set<ProviderCapability>();
   if (modelCaps.reasoningEffort) capabilities.add("reasoning-effort");
 
@@ -80,7 +80,7 @@ export function createAzureProviderRuntime(): ProviderRuntime {
   let nativeInstructions = "";
   return {
     id: "azure",
-    model: azureConfig.modelName,
+    model,
     client,
     capabilities,
     supportedReasoningEfforts: modelCaps.reasoningEffort,
