@@ -100,13 +100,14 @@ The implemented workflow helpers live in:
 
 ## Config Expectations
 
-- `agent.json` is the agent-facing source of truth.
+- `agent.json` is the agent-facing source of truth, with `humanFacing: { provider, model }` and `agentFacing: { provider, model }` for provider+model selection per facing.
 - `configPath` must point to `~/.agentsecrets/<agent>/secrets.json`.
+- `secrets.json` stores credentials only (API keys, tokens, endpoints) — model selection lives in `agent.json`.
 - Secrets do not belong in the repo.
 - Agent-owned state belongs under `~/AgentBundles/<agent>.ouro/state/...`.
 - Machine-scoped temporary/test artifacts belong under `~/.agentstate/...`.
 
-If selected provider config is incomplete, fail fast with explicit guidance. Do not silently fall back to another provider.
+If either facing config is incomplete, fail fast with explicit guidance. Do not silently fall back to another provider or between facings.
 
 ## Docs Expectations
 
