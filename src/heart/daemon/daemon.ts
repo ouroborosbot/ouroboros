@@ -24,6 +24,7 @@ import {
 import { getAlwaysOnSenseNames } from "../../mind/friends/channel"
 import { getSharedMcpManager, shutdownSharedMcpManager } from "../../repertoire/mcp-manager"
 import { startOutlookHttpServer, type OutlookHttpServerHandle } from "./outlook-http"
+import { OUTLOOK_DEFAULT_PORT } from "./outlook-types"
 import { readOutlookAgentState, readOutlookMachineState } from "./outlook-read"
 import { buildOutlookAgentView, buildOutlookMachineView } from "./outlook-view"
 
@@ -424,6 +425,7 @@ export class OuroDaemon {
     if (!this.outlookServer) {
       this.outlookServer = await startOutlookHttpServer({
         host: "127.0.0.1",
+        port: OUTLOOK_DEFAULT_PORT,
         readMachineState: () => readOutlookMachineState({ bundlesRoot: this.bundlesRoot }),
         readMachineView: ({ machine }) => {
           const overview = this.buildStatusPayload().overview
