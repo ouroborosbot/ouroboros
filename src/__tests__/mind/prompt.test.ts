@@ -4419,3 +4419,103 @@ describe("toolContractsSection (Unit 1.5)", () => {
     expect(result).not.toContain("## tool behavior")
   })
 })
+
+describe("workspaceDisciplineSection expanded (Unit 1.6)", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    const DEFAULT_AGENT_CONTEXT = { maxTokens: 80000, contextMargin: 20 }
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
+      context: { ...DEFAULT_AGENT_CONTEXT },
+    })
+    mockGetBoard.mockReset().mockReturnValue({
+      compact: "",
+      full: "",
+      byStatus: {
+        drafting: [], processing: [], validating: [],
+        collaborating: [], paused: [], blocked: [],
+        done: [], cancelled: [],
+      },
+      actionRequired: [],
+      unresolvedDependencies: [],
+      activeSessions: [],
+    })
+  })
+
+  it("contains '## how i work' heading", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+    expect(result).toContain("## how i work")
+  })
+
+  it("contains 'reversibility and blast radius' sub-heading", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+    expect(result).toContain("**reversibility and blast radius**")
+  })
+
+  it("contains 'engineering discipline' sub-heading", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+    expect(result).toContain("**engineering discipline**")
+  })
+
+  it("contains 'git discipline' sub-heading", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+    expect(result).toContain("**git discipline**")
+  })
+
+  it("contains key locked phrases", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+    expect(result).toContain("I work conservatively")
+    expect(result).toContain("I exercise judgment rather than waiting for permission")
+    expect(result).toContain("I do not add features, refactor code, or make improvements beyond what was asked")
+    expect(result).toContain("I create new commits rather than amending")
+  })
+})
