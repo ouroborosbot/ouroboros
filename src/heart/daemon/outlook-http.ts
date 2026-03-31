@@ -85,13 +85,25 @@ function createSseBroadcaster() {
   function broadcast(event: string, data: Record<string, unknown> = {}): void {
     const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
     for (const client of clients) {
-      try { client.response.write(payload) } catch { /* v8 ignore next */ clients.delete(client) }
+      try {
+        client.response.write(payload)
+      /* v8 ignore start */
+      } catch {
+        clients.delete(client)
+      }
+      /* v8 ignore stop */
     }
   }
 
   function disconnectAll(): void {
     for (const client of clients) {
-      try { client.response.end() } catch { /* v8 ignore next -- already closed */ }
+      try {
+        client.response.end()
+      /* v8 ignore start */
+      } catch {
+        /* already closed */
+      }
+      /* v8 ignore stop */
     }
     clients.clear()
   }
