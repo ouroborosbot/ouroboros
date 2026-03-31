@@ -162,8 +162,14 @@ process.on("SIGTERM", () => {
   void daemon.stop().then(() => process.exit(0))
 })
 
+// Suppress EPIPE on stdout/stderr — normal when detached daemon's parent exits
+process.stdout?.on?.("error", () => {})
+process.stderr?.on?.("error", () => {})
+
 /* v8 ignore start -- global exception handlers: genuinely untestable in vitest; exercised by real daemon crashes @preserve */
 process.on("uncaughtException", (error) => {
+  // EPIPE is normal for detached daemon processes — parent closed the pipe
+  if ((error as NodeJS.ErrnoException).code === "EPIPE") return
   writeDaemonTombstone("uncaughtException", error)
   emitNervesEvent({
     level: "error",
