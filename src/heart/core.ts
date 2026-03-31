@@ -8,7 +8,7 @@ import {
   getOpenAICodexConfig,
 } from "./config";
 import { loadAgentConfig } from "./identity";
-import { execTool, summarizeArgs, settleTool, observeTool, ponderTool, restTool, getToolsForChannel, isConfirmationRequired } from "../repertoire/tools";
+import { execTool, summarizeArgs, buildToolResultSummary, settleTool, observeTool, ponderTool, restTool, getToolsForChannel, isConfirmationRequired } from "../repertoire/tools";
 import type { ToolContext } from "../repertoire/tools";
 import { getChannelCapabilities, channelToFacing, type Facing } from "../mind/friends/channel";
 import { surfaceToolDef } from "../senses/surface-tool";
@@ -1123,7 +1123,7 @@ export async function runAgent(
             success = false;
           }
           recordToolOutcome(toolLoopState, tc.name, args, toolResult, success);
-          callbacks.onToolEnd(tc.name, argSummary, success);
+          callbacks.onToolEnd(tc.name, buildToolResultSummary(tc.name, args, toolResult, success), success);
           messages.push({ role: "tool", tool_call_id: tc.id, content: toolResult });
           providerRuntime.appendToolOutput(tc.id, toolResult);
         }
