@@ -70,6 +70,8 @@ async function setAgentProvider(provider: string) {
   vi.mocked(loadAgentConfig).mockReturnValue({
     name: "testagent",
     provider,
+    humanFacing: { provider, model: "" },
+    agentFacing: { provider, model: "" },
   } as any)
 }
 

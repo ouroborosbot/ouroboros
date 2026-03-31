@@ -73,7 +73,8 @@ interface ProviderRegistry {
 let _providerRuntime: { fingerprint: string; runtime: ProviderRuntime } | null = null;
 
 function getProviderRuntimeFingerprint(): string {
-  const provider = loadAgentConfig().provider;
+  const config = loadAgentConfig();
+  const provider = config.humanFacing.provider;
   /* v8 ignore next -- switch: not all provider branches exercised in CI @preserve */
   switch (provider) {
     case "azure": {
@@ -112,7 +113,7 @@ export function createProviderRegistry(): ProviderRegistry {
 
   return {
     resolve(): ProviderRuntime | null {
-      const provider = loadAgentConfig().provider;
+      const provider = loadAgentConfig().humanFacing.provider;
       return factories[provider]();
     },
   };
@@ -188,7 +189,7 @@ export function createSummarize(): (transcript: string, instruction: string) => 
 }
 
 export function getProviderDisplayLabel(): string {
-  const provider = loadAgentConfig().provider;
+  const provider = loadAgentConfig().humanFacing.provider;
   const providerLabelBuilders: Record<ProviderId, () => string> = {
     azure: () => {
       const config = getAzureConfig();

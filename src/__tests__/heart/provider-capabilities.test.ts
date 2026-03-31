@@ -106,6 +106,8 @@ async function setAgentProvider(provider: "azure" | "minimax" | "anthropic" | "o
     name: "testagent",
     configPath: "~/.agentsecrets/testagent/secrets.json",
     provider,
+    humanFacing: { provider, model: "" },
+    agentFacing: { provider, model: "" },
   })
 }
 

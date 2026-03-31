@@ -603,9 +603,11 @@ describe("ouro CLI execution", () => {
     fs.writeFileSync(
       path.join(agentRoot, "agent.json"),
       JSON.stringify({
-        version: 1,
+        version: 2,
         enabled: true,
         provider: "anthropic",
+        humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+        agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
         phrases: {
           thinking: ["working"],
           tool: ["running tool"],
@@ -652,9 +654,11 @@ describe("ouro CLI execution", () => {
     fs.writeFileSync(
       agentConfigPath,
       JSON.stringify({
-        version: 1,
+        version: 2,
         enabled: true,
         provider: "anthropic",
+        humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+        agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
         phrases: {
           thinking: ["working"],
           tool: ["running tool"],
@@ -703,7 +707,11 @@ describe("ouro CLI execution", () => {
       message: "authenticated slugger with minimax",
     }))
     const readAgentConfigForAgent = vi.fn(() => ({
-      config: { provider: "minimax" },
+      config: {
+        provider: "minimax",
+        humanFacing: { provider: "minimax", model: "minimax-text-01" },
+        agentFacing: { provider: "minimax", model: "minimax-text-01" },
+      },
     }))
     const writeAgentProviderSelection = vi.fn()
 
@@ -755,7 +763,9 @@ describe("ouro CLI execution", () => {
     fs.writeFileSync(
       agentConfigPath,
       JSON.stringify({
-        version: 1, enabled: true, provider: "anthropic",
+        version: 2, enabled: true, provider: "anthropic",
+        humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+        agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
         phrases: { thinking: ["working"], tool: ["running tool"], followup: ["processing"] },
       }, null, 2) + "\n",
       "utf-8",
@@ -787,7 +797,9 @@ describe("ouro CLI execution", () => {
     fs.writeFileSync(
       path.join(agentRoot, "agent.json"),
       JSON.stringify({
-        version: 1, enabled: true, provider: "anthropic",
+        version: 2, enabled: true, provider: "anthropic",
+        humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+        agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
         phrases: { thinking: ["working"], tool: ["running tool"], followup: ["processing"] },
       }, null, 2) + "\n",
       "utf-8",
@@ -827,7 +839,9 @@ describe("ouro CLI execution", () => {
     fs.writeFileSync(
       agentConfigPath,
       JSON.stringify({
-        version: 1, enabled: true, provider: "anthropic",
+        version: 2, enabled: true, provider: "anthropic",
+        humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+        agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
         phrases: { thinking: ["working"], tool: ["running tool"], followup: ["processing"] },
       }, null, 2) + "\n",
       "utf-8",
@@ -870,7 +884,9 @@ describe("ouro CLI execution", () => {
     fs.writeFileSync(
       agentConfigPath,
       JSON.stringify({
-        version: 1, enabled: true, provider: "openai-codex",
+        version: 2, enabled: true, provider: "openai-codex",
+        humanFacing: { provider: "openai-codex", model: "gpt-5.4" },
+        agentFacing: { provider: "openai-codex", model: "gpt-5.4" },
         phrases: { thinking: ["working"], tool: ["running tool"], followup: ["processing"] },
       }, null, 2) + "\n",
       "utf-8",
@@ -905,7 +921,9 @@ describe("ouro CLI execution", () => {
     fs.writeFileSync(
       path.join(agentRoot, "agent.json"),
       JSON.stringify({
-        version: 1, enabled: true, provider: "github-copilot",
+        version: 2, enabled: true, provider: "github-copilot",
+        humanFacing: { provider: "github-copilot", model: "claude-sonnet-4.6" },
+        agentFacing: { provider: "github-copilot", model: "claude-sonnet-4.6" },
         phrases: { thinking: ["working"], tool: ["running tool"], followup: ["processing"] },
       }, null, 2) + "\n",
       "utf-8",
@@ -950,7 +968,9 @@ describe("ouro CLI execution", () => {
     fs.writeFileSync(
       path.join(agentRoot, "agent.json"),
       JSON.stringify({
-        version: 1, enabled: true, provider: "github-copilot",
+        version: 2, enabled: true, provider: "github-copilot",
+        humanFacing: { provider: "github-copilot", model: "claude-sonnet-4.6" },
+        agentFacing: { provider: "github-copilot", model: "claude-sonnet-4.6" },
         phrases: { thinking: ["working"], tool: ["running tool"], followup: ["processing"] },
       }, null, 2) + "\n",
       "utf-8",
@@ -991,7 +1011,9 @@ describe("ouro CLI execution", () => {
     fs.writeFileSync(
       path.join(agentRoot, "agent.json"),
       JSON.stringify({
-        version: 1, enabled: true, provider: "anthropic",
+        version: 2, enabled: true, provider: "anthropic",
+        humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+        agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
         phrases: { thinking: ["working"], tool: ["running tool"], followup: ["processing"] },
       }, null, 2) + "\n",
       "utf-8",

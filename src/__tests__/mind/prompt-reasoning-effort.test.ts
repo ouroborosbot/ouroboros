@@ -45,6 +45,8 @@ vi.mock("../../heart/identity", () => ({
     name: "testagent",
     configPath: "~/.agentsecrets/testagent/secrets.json",
     provider: "minimax",
+    humanFacing: { provider: "minimax", model: "minimax-text-01" },
+    agentFacing: { provider: "minimax", model: "minimax-text-01" },
     senses: { cli: { enabled: true }, teams: { enabled: false }, bluebubbles: { enabled: false } },
   })),
   DEFAULT_AGENT_CONTEXT: { maxTokens: 80000, contextMargin: 20 },

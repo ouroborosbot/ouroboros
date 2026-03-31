@@ -39,9 +39,11 @@ beforeEach(() => {
   vi.mocked(fs.mkdirSync).mockReset()
   vi.mocked(fs.writeFileSync).mockReset()
   vi.mocked(identity.loadAgentConfig).mockReturnValue({
-    version: 1,
+    version: 2,
     enabled: true,
     provider: "minimax",
+    humanFacing: { provider: "minimax", model: "minimax-text-01" },
+    agentFacing: { provider: "minimax", model: "minimax-text-01" },
     phrases: {
       thinking: ["working"],
       tool: ["running tool"],
@@ -530,9 +532,11 @@ describe("getContextConfig", () => {
 
   it("returns context config from agent.json", async () => {
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
-      version: 1,
+      version: 2,
       enabled: true,
       provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
       context: {
         maxTokens: 100000,
         contextMargin: 25,
@@ -573,9 +577,11 @@ describe("getContextConfig", () => {
 
   it("falls back per-field defaults when agent.json context has invalid types", async () => {
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
-      version: 1,
+      version: 2,
       enabled: true,
       provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
       context: {
         maxTokens: "bad",
         contextMargin: 12,
@@ -598,9 +604,11 @@ describe("getContextConfig", () => {
 
   it("falls back contextMargin to default when agent.json contextMargin is not numeric", async () => {
     vi.mocked(identity.loadAgentConfig).mockReturnValue({
-      version: 1,
+      version: 2,
       enabled: true,
       provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
       context: {
         maxTokens: 91000,
         contextMargin: "bad",

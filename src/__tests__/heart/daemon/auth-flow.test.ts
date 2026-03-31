@@ -41,9 +41,11 @@ function writeAgentConfig(
   const agentRoot = path.join(bundlesRoot, `${agentName}.ouro`)
   fs.mkdirSync(agentRoot, { recursive: true })
   const config = {
-    version: 1,
+    version: 2,
     enabled: true,
     provider,
+    humanFacing: { provider, model: "" },
+    agentFacing: { provider, model: "" },
     phrases: {
       thinking: ["working"],
       tool: ["running tool"],
@@ -87,7 +89,7 @@ describe("runtime auth flow", () => {
     expect(readAgentConfigForAgent(agentName, bundlesRoot)).toEqual({
       configPath,
       config: expect.objectContaining({
-        provider: "anthropic",
+        humanFacing: { provider: "anthropic", model: "" },
         customField: "keep-me",
       }),
     })
@@ -779,7 +781,7 @@ describe("github-copilot auth flow", () => {
     const bundlesRoot = makeTempDir("auth-flow-ghcopilot-config")
     writeAgentConfig(bundlesRoot, "CopilotConfig", "github-copilot")
     const { config } = readAgentConfigForAgent("CopilotConfig", bundlesRoot)
-    expect(config.provider).toBe("github-copilot")
+    expect(config.humanFacing.provider).toBe("github-copilot")
   })
 })
 
@@ -787,7 +789,6 @@ describe("readAgentConfigForAgent v2 inline migration", () => {
   it("auto-migrates v1 config on disk and returns v2", () => {
     emitTestEvent("readAgentConfigForAgent v1 auto-migration")
     const bundlesRoot = makeTempDir("auth-flow-v1-migration")
-    const secretsRoot = makeTempDir("auth-flow-v1-migration-secrets")
     const agentName = "MigrateBot"
 
     // Write v1 config
@@ -803,20 +804,25 @@ describe("readAgentConfigForAgent v2 inline migration", () => {
       }, null, 2) + "\n",
     )
 
-    // Write secrets with model
-    const secretsDir = path.join(secretsRoot, agentName)
-    fs.mkdirSync(secretsDir, { recursive: true })
+    // Write secrets at default location so migration can find them
+    const defaultSecretsDir = path.join(os.homedir(), ".agentsecrets", agentName)
+    fs.mkdirSync(defaultSecretsDir, { recursive: true })
     fs.writeFileSync(
-      path.join(secretsDir, "secrets.json"),
+      path.join(defaultSecretsDir, "secrets.json"),
       JSON.stringify({
         providers: { anthropic: { model: "claude-opus-4-6", setupToken: "tok" } },
       }, null, 2) + "\n",
     )
 
-    const { config } = readAgentConfigForAgent(agentName, bundlesRoot)
-    expect(config.version).toBe(2)
-    expect(config.humanFacing).toEqual({ provider: "anthropic", model: "claude-opus-4-6" })
-    expect(config.agentFacing).toEqual({ provider: "anthropic", model: "claude-opus-4-6" })
+    try {
+      const { config } = readAgentConfigForAgent(agentName, bundlesRoot)
+      expect(config.version).toBe(2)
+      expect(config.humanFacing).toEqual({ provider: "anthropic", model: "claude-opus-4-6" })
+      expect(config.agentFacing).toEqual({ provider: "anthropic", model: "claude-opus-4-6" })
+    } finally {
+      // Clean up secrets we wrote to default location
+      fs.rmSync(defaultSecretsDir, { recursive: true, force: true })
+    }
   })
 
   it("returns v2 config directly without migration", () => {

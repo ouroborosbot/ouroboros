@@ -4,6 +4,7 @@ import * as os from "os"
 import * as path from "path"
 import { emitNervesEvent } from "../../nerves/runtime"
 import { getAgentBundlesRoot, getAgentSecretsPath, type AgentConfig, type AgentProvider } from "../identity"
+import { migrateAgentConfigV1ToV2 } from "../migrate-config"
 import type { HatchCredentialsInput } from "./hatch-flow"
 
 const ANTHROPIC_SETUP_TOKEN_PREFIX = "sk-ant-oat01-"
@@ -174,9 +175,24 @@ export function readAgentConfigForAgent(
   agentName: string,
   bundlesRoot = getAgentBundlesRoot(),
 ): { configPath: string; config: AgentConfig } {
-  const configPath = path.join(bundlesRoot, `${agentName}.ouro`, "agent.json")
-  const parsed = readJsonRecord(configPath, "agent config")
-  const provider = parsed.provider
+  const agentRoot = path.join(bundlesRoot, `${agentName}.ouro`)
+  const configPath = path.join(agentRoot, "agent.json")
+  let parsed = readJsonRecord(configPath, "agent config")
+
+  // Inline migration: v1 -> v2
+  const version = typeof parsed.version === "number" ? parsed.version : 1
+  if (version < 2) {
+    migrateAgentConfigV1ToV2(agentRoot)
+    parsed = readJsonRecord(configPath, "agent config")
+  }
+
+  // Validate v2 required facing fields
+  const humanFacing = parsed.humanFacing as Record<string, unknown> | undefined
+  const agentFacing = parsed.agentFacing as Record<string, unknown> | undefined
+  if (!humanFacing || typeof humanFacing !== "object") {
+    throw new Error(`agent.json at ${configPath} has unsupported provider '${String(parsed.provider)}'`)
+  }
+  const provider = humanFacing.provider
   if (
     provider !== "azure" &&
     provider !== "anthropic" &&
@@ -186,6 +202,10 @@ export function readAgentConfigForAgent(
   ) {
     throw new Error(`agent.json at ${configPath} has unsupported provider '${String(provider)}'`)
   }
+  if (!agentFacing || typeof agentFacing !== "object") {
+    throw new Error(`agent.json at ${configPath} has unsupported provider '${String(parsed.provider)}'`)
+  }
+
   return {
     configPath,
     config: parsed as unknown as AgentConfig,
@@ -267,7 +287,7 @@ export function writeAgentModel(
   deps: ProviderSecretsDeps & { bundlesRoot?: string } = {},
 ): { secretsPath: string; provider: AgentProvider; previousModel: string } {
   const { config } = readAgentConfigForAgent(agentName, deps.bundlesRoot)
-  const provider = config.provider
+  const provider = config.humanFacing.provider
   const { secretsPath, secrets } = loadAgentSecrets(agentName, deps)
   const providerSecrets = secrets.providers[provider] as Record<string, string>
   /* v8 ignore next -- fallback: all known providers are in MODEL_FIELD @preserve */

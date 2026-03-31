@@ -88,6 +88,8 @@ describe("Anthropic thinking request params", () => {
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
       provider: "anthropic",
+      humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
     })
     const config = await import("../../heart/config")
     config.resetConfigCache()
@@ -122,6 +124,8 @@ describe("Anthropic thinking request params", () => {
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
       provider: "anthropic",
+      humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
     })
     const config = await import("../../heart/config")
     config.resetConfigCache()
@@ -154,6 +158,8 @@ describe("Anthropic thinking request params", () => {
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
       provider: "anthropic",
+      humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
     })
     const config = await import("../../heart/config")
     config.resetConfigCache()
@@ -186,6 +192,8 @@ describe("Anthropic thinking request params", () => {
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
       provider: "anthropic",
+      humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
     })
     const config = await import("../../heart/config")
     config.resetConfigCache()
@@ -218,6 +226,8 @@ describe("Anthropic thinking request params", () => {
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
       provider: "anthropic",
+      humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
     })
     const config = await import("../../heart/config")
     config.resetConfigCache()

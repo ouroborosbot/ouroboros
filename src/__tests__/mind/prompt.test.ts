@@ -38,6 +38,8 @@ vi.mock("../../heart/identity", () => {
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
       provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
       context: { ...DEFAULT_AGENT_CONTEXT },
     })),
     getAgentName: vi.fn(() => "testagent"),
@@ -97,6 +99,8 @@ function setAgentProvider(provider: "azure" | "minimax" | "anthropic" | "openai-
     name: "testagent",
     configPath: "~/.agentsecrets/testagent/secrets.json",
     provider,
+    humanFacing: { provider, model: "" },
+    agentFacing: { provider, model: "" },
     context: { ...DEFAULT_AGENT_CONTEXT },
   })
 }
@@ -623,6 +627,8 @@ describe("buildSystem", () => {
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
       provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
       context: { maxTokens: 80000, contextMargin: 20 },
       senses: {
         cli: { enabled: true },
@@ -675,6 +681,8 @@ describe("buildSystem", () => {
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
       provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
       context: { maxTokens: 80000, contextMargin: 20 },
       senses: {
         cli: { enabled: true },
@@ -719,6 +727,8 @@ describe("buildSystem", () => {
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
       provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
       context: { maxTokens: 80000, contextMargin: 20 },
       senses: {
         cli: { enabled: true },
@@ -759,6 +769,8 @@ describe("buildSystem", () => {
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
       provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
       context: { maxTokens: 80000, contextMargin: 20 },
       senses: {
         cli: { enabled: true },

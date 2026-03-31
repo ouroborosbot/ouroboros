@@ -1396,9 +1396,11 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
     const phrases = loadIdentityPhrases(bundleSourceDir, identity.fileName)
 
     setAgentConfigOverride({
-      version: 1,
+      version: 2,
       enabled: true,
       provider: providerRaw,
+      humanFacing: { provider: providerRaw, model: "" },
+      agentFacing: { provider: providerRaw, model: "" },
       phrases,
     })
     patchRuntimeConfig({
@@ -2256,7 +2258,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
   // ── auth (local, no daemon socket needed) ──
   if (command.kind === "auth.run") {
-    const provider = command.provider ?? readAgentConfigForAgent(command.agent).config.provider
+    const provider = command.provider ?? readAgentConfigForAgent(command.agent).config.humanFacing.provider
     /* v8 ignore next -- tests always inject runAuthFlow; default is for production @preserve */
     const authRunner = deps.runAuthFlow ?? defaultRunRuntimeAuthFlow
     const result = await authRunner({
@@ -2312,7 +2314,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   /* v8 ignore start -- config models: tested via daemon-cli.test.ts @preserve */
   if (command.kind === "config.models") {
     const { config } = readAgentConfigForAgent(command.agent)
-    const provider = config.provider
+    const provider = config.humanFacing.provider
     if (provider !== "github-copilot") {
       const message = `model listing not available for ${provider} — check provider documentation.`
       deps.writeStdout(message)
@@ -2346,7 +2348,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   if (command.kind === "config.model") {
     // Validate model availability for github-copilot before writing
     const { config } = readAgentConfigForAgent(command.agent)
-    if (config.provider === "github-copilot") {
+    if (config.humanFacing.provider === "github-copilot") {
       const { secrets } = loadAgentSecrets(command.agent)
       const ghConfig = secrets.providers["github-copilot"]
       if (ghConfig.githubToken && ghConfig.baseUrl) {
