@@ -8626,3 +8626,221 @@ describe("sawSendMessageSelf turn loop tracking", () => {
     expect(result).toBeDefined()
   })
 })
+
+// ── Unit 5a: Facing-aware provider runtime tests ──────────────────
+
+describe("facing-aware provider runtime", () => {
+  beforeEach(async () => {
+    vi.resetModules()
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+  })
+
+  async function setupDualFacing(opts: {
+    humanProvider: "azure" | "minimax" | "anthropic" | "openai-codex" | "github-copilot"
+    humanModel: string
+    agentProvider: "azure" | "minimax" | "anthropic" | "openai-codex" | "github-copilot"
+    agentModel: string
+    providers: Record<string, unknown>
+  }) {
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      humanFacing: { provider: opts.humanProvider, model: opts.humanModel },
+      agentFacing: { provider: opts.agentProvider, model: opts.agentModel },
+    })
+    const config = await import("../../heart/config")
+    config.resetConfigCache()
+    config.patchRuntimeConfig({ providers: opts.providers })
+  }
+
+  it("getModel(facing) returns correct model per facing", async () => {
+    await setupDualFacing({
+      humanProvider: "minimax",
+      humanModel: "human-model-1",
+      agentProvider: "minimax",
+      agentModel: "agent-model-1",
+      providers: { minimax: { apiKey: "mm-key" } },
+    })
+    const core = await import("../../heart/core")
+    core.resetProviderRuntime()
+
+    expect(core.getModel("human")).toBe("human-model-1")
+    expect(core.getModel("agent")).toBe("agent-model-1")
+  })
+
+  it("getProvider(facing) returns correct provider per facing", async () => {
+    await setupDualFacing({
+      humanProvider: "minimax",
+      humanModel: "mm-model",
+      agentProvider: "anthropic",
+      agentModel: "claude-agent",
+      providers: {
+        minimax: { apiKey: "mm-key" },
+        anthropic: { setupToken: `sk-ant-oat01-${"a".repeat(80)}` },
+      },
+    })
+    const core = await import("../../heart/core")
+    core.resetProviderRuntime()
+
+    expect(core.getProvider("human")).toBe("minimax")
+    expect(core.getProvider("agent")).toBe("anthropic")
+  })
+
+  it("caches two runtimes independently with separate fingerprints", async () => {
+    await setupDualFacing({
+      humanProvider: "minimax",
+      humanModel: "human-mm",
+      agentProvider: "minimax",
+      agentModel: "agent-mm",
+      providers: { minimax: { apiKey: "mm-key" } },
+    })
+    const core = await import("../../heart/core")
+    core.resetProviderRuntime()
+
+    // Access both facings
+    const humanModel1 = core.getModel("human")
+    const agentModel1 = core.getModel("agent")
+
+    expect(humanModel1).toBe("human-mm")
+    expect(agentModel1).toBe("agent-mm")
+
+    // Access again -- should use cached values (no extra OpenAI ctor calls)
+    const callsBefore = mockOpenAICtor.mock.calls.length
+    core.getModel("human")
+    core.getModel("agent")
+    // No new constructor calls -- runtime was cached
+    expect(mockOpenAICtor.mock.calls.length).toBe(callsBefore)
+  })
+
+  it("resetProviderRuntime clears both cached slots", async () => {
+    await setupDualFacing({
+      humanProvider: "minimax",
+      humanModel: "human-mm",
+      agentProvider: "minimax",
+      agentModel: "agent-mm",
+      providers: { minimax: { apiKey: "mm-key" } },
+    })
+    const core = await import("../../heart/core")
+    core.resetProviderRuntime()
+
+    // Warm caches
+    core.getModel("human")
+    core.getModel("agent")
+
+    const callsBefore = mockOpenAICtor.mock.calls.length
+    core.resetProviderRuntime()
+
+    // After reset, accessing should re-create runtimes
+    core.getModel("human")
+    core.getModel("agent")
+    expect(mockOpenAICtor.mock.calls.length).toBeGreaterThan(callsBefore)
+  })
+
+  it("different providers for human vs agent facing each get their own runtime", async () => {
+    await setupDualFacing({
+      humanProvider: "minimax",
+      humanModel: "mm-human",
+      agentProvider: "anthropic",
+      agentModel: "claude-agent",
+      providers: {
+        minimax: { apiKey: "mm-key" },
+        anthropic: { setupToken: `sk-ant-oat01-${"a".repeat(80)}` },
+      },
+    })
+    const core = await import("../../heart/core")
+    core.resetProviderRuntime()
+
+    expect(core.getProvider("human")).toBe("minimax")
+    expect(core.getModel("human")).toBe("mm-human")
+    expect(core.getProvider("agent")).toBe("anthropic")
+    expect(core.getModel("agent")).toBe("claude-agent")
+  })
+
+  it("getProviderDisplayLabel(facing) shows correct provider+model from agent config", async () => {
+    await setupDualFacing({
+      humanProvider: "minimax",
+      humanModel: "mm-display",
+      agentProvider: "anthropic",
+      agentModel: "claude-display",
+      providers: {
+        minimax: { apiKey: "mm-key" },
+        anthropic: { setupToken: `sk-ant-oat01-${"a".repeat(80)}` },
+      },
+    })
+    const core = await import("../../heart/core")
+    core.resetProviderRuntime()
+
+    expect(core.getProviderDisplayLabel("human")).toBe("minimax (mm-display)")
+    expect(core.getProviderDisplayLabel("agent")).toBe("anthropic (claude-display)")
+  })
+
+  it("createSummarize(facing) uses correct provider runtime", async () => {
+    await setupDualFacing({
+      humanProvider: "minimax",
+      humanModel: "mm-summarize",
+      agentProvider: "minimax",
+      agentModel: "agent-summarize",
+      providers: { minimax: { apiKey: "mm-key" } },
+    })
+    const core = await import("../../heart/core")
+    core.resetProviderRuntime()
+
+    mockCreate.mockResolvedValueOnce({
+      choices: [{ message: { content: "human summary" } }],
+    })
+
+    const humanSummarize = core.createSummarize("human")
+    const result = await humanSummarize("transcript", "instruct")
+    expect(result).toBe("human summary")
+
+    // Verify the model used matches human facing
+    const callArgs = mockCreate.mock.calls[mockCreate.mock.calls.length - 1][0]
+    expect(callArgs.model).toBe("mm-summarize")
+  })
+
+  it("createSummarize(agent) uses agent-facing provider runtime", async () => {
+    await setupDualFacing({
+      humanProvider: "minimax",
+      humanModel: "mm-human",
+      agentProvider: "minimax",
+      agentModel: "mm-agent-sum",
+      providers: { minimax: { apiKey: "mm-key" } },
+    })
+    const core = await import("../../heart/core")
+    core.resetProviderRuntime()
+
+    mockCreate.mockResolvedValueOnce({
+      choices: [{ message: { content: "agent summary" } }],
+    })
+
+    const agentSummarize = core.createSummarize("agent")
+    const result = await agentSummarize("transcript", "instruct")
+    expect(result).toBe("agent summary")
+
+    const callArgs = mockCreate.mock.calls[mockCreate.mock.calls.length - 1][0]
+    expect(callArgs.model).toBe("mm-agent-sum")
+  })
+
+  it("fingerprint includes model from agent config + credentials from secrets", async () => {
+    await setupDualFacing({
+      humanProvider: "minimax",
+      humanModel: "mm-fp",
+      agentProvider: "minimax",
+      agentModel: "mm-fp-agent",
+      providers: { minimax: { apiKey: "mm-key-1" } },
+    })
+    const core = await import("../../heart/core")
+    core.resetProviderRuntime()
+
+    // Warm the cache
+    core.getModel("human")
+    const callsBefore = mockOpenAICtor.mock.calls.length
+
+    // Change the secrets key -- fingerprint should change, forcing re-creation
+    const config = await import("../../heart/config")
+    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "mm-key-2" } } })
+
+    core.getModel("human")
+    expect(mockOpenAICtor.mock.calls.length).toBeGreaterThan(callsBefore)
+  })
+})
