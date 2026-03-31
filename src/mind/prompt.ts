@@ -21,6 +21,7 @@ import type { DelegationDecision } from "../heart/delegation";
 import { deriveCommitments, formatCommitments } from "../heart/commitments";
 import { findActivePersistentObligation, findStatusObligation, renderActiveObligationSteering, renderConcreteStatusGuidance, renderLiveThreadStatusShape } from "./obligation-steering";
 import { readHealth, getDefaultHealthPath } from "../heart/daemon/daemon-health";
+import { preImplementationScrutinySection } from "./scrutiny";
 
 // Lazy-loaded psyche text cache
 let _psycheCache: {
@@ -1005,6 +1006,18 @@ export function rhythmStatusSection(): string {
   /* v8 ignore stop */
 }
 
+/**
+ * Returns true if the channel's resolved tool set includes coding tools
+ * (edit_file, write_file, shell). Used to gate scrutiny prompts.
+ */
+function channelHasCodingTools(
+  channel: Channel,
+  providerCapabilities?: ReadonlySet<import("../heart/core").ProviderCapability>,
+): boolean {
+  const tools = getToolsForChannel(getChannelCapabilities(channel), undefined, undefined, providerCapabilities)
+  return tools.some((t) => t.function.name === "edit_file")
+}
+
 export async function buildSystem(channel: Channel = "cli", options?: BuildSystemOptions, context?: ResolvedContext): Promise<string> {
   emitNervesEvent({
     event: "mind.step_start",
@@ -1045,6 +1058,7 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     // Group 4: how i work
     "# how i work",
     workspaceDisciplineSection(),
+    preImplementationScrutinySection(channelHasCodingTools(channel, options?.providerCapabilities)),
     toolRestrictionSection(context),
     loopOrientationSection(channel),
 
