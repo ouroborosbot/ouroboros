@@ -146,6 +146,11 @@ describe("outlook http", () => {
       readAgentState: () => null,
     })
 
+    // /outlook redirects to /
+    const redirectResponse = await fetch(`${server.origin}/outlook`, { redirect: "manual" })
+    expect(redirectResponse.status).toBe(301)
+    expect(redirectResponse.headers.get("location")).toBe("/")
+
     // Unknown API route should still 404
     const apiResponse = await fetch(`${server.origin}/outlook/api/agents/test/nope`)
     expect(apiResponse.status).toBe(404)
