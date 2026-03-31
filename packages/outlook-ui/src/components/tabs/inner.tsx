@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Badge } from "../../catalyst/badge"
 import { fetchJson, relTime, truncate } from "../../api"
 import { classifyToolCall } from "../../tools"
@@ -95,16 +95,19 @@ export function InnerTab({ agentName, view }: { agentName: string; view: Record<
         </div>
       </section>
 
-      {/* Inner dialog transcript */}
+      {/* Inner dialog — always show recent, load more on demand */}
       <section>
-        <button
-          onClick={loadTranscript}
-          className="w-full rounded-lg px-3 py-2.5 text-left font-mono text-xs text-ouro-glow ring-1 ring-ouro-moss/15 hover:ring-ouro-glow/20 transition-colors"
-        >
-          {showTranscript ? "▼ Hide" : "▶ Show"} inner dialog transcript
-          {transcript && <span className="text-ouro-shadow ml-2">({transcript.messages.length} messages)</span>}
-        </button>
-        {showTranscript && transcript && (
+        <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-ouro-glow">
+          Inner dialog {transcript ? `(${transcript.messages.length} total)` : ""}
+        </p>
+        {!transcript ? (
+          <button
+            onClick={loadTranscript}
+            className="mt-2 w-full rounded-lg px-3 py-2.5 text-left font-mono text-xs text-ouro-glow ring-1 ring-ouro-moss/15 hover:ring-ouro-glow/20 transition-colors"
+          >
+            Load inner dialog
+          </button>
+        ) : (
           <InnerTranscriptView messages={transcript.messages} />
         )}
       </section>
@@ -158,10 +161,28 @@ export function InnerTab({ agentName, view }: { agentName: string; view: Record<
 
 function InnerTranscriptView({ messages }: { messages: TranscriptMessage[] }) {
   const conversation = messages.filter((m) => m.role !== "system" && m.role !== "tool")
+  const [showAll, setShowAll] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const RECENT = 30
+  const visible = showAll ? conversation : conversation.slice(-RECENT)
+  const hiddenCount = conversation.length - visible.length
+
+  useEffect(() => {
+    if (containerRef.current) containerRef.current.scrollTop = containerRef.current.scrollHeight
+  }, [visible.length])
 
   return (
-    <div className="mt-2 max-h-[60vh] overflow-y-auto rounded-lg bg-ouro-void/60 p-3 ring-1 ring-ouro-moss/15 space-y-1">
-      {conversation.map((m) => {
+    <div ref={containerRef} className="mt-2 max-h-[60vh] overflow-y-auto rounded-lg bg-ouro-void/60 p-3 ring-1 ring-ouro-moss/15 space-y-1">
+      {hiddenCount > 0 && (
+        <button
+          onClick={() => setShowAll(true)}
+          className="w-full rounded-lg px-3 py-2 text-center font-mono text-xs text-ouro-shadow hover:text-ouro-mist ring-1 ring-ouro-moss/10 hover:ring-ouro-moss/20 transition-colors mb-2"
+        >
+          Load {hiddenCount} earlier messages
+        </button>
+      )}
+      {visible.map((m) => {
         if (m.role === "user") {
           const isDelegated = m.content?.includes("[pending from") || m.content?.includes("[delegated")
           const isWakeUp = m.content?.includes("waking up") || m.content?.includes("world-state checkpoint")
@@ -174,11 +195,14 @@ function InnerTranscriptView({ messages }: { messages: TranscriptMessage[] }) {
                     ? "bg-ouro-moss/20 ring-ouro-moss/15"
                     : "bg-ouro-moss/25 ring-ouro-moss/15"
               }`}>
-                <p className="font-mono text-[9px] uppercase tracking-wider mb-0.5" style={{
-                  color: isDelegated ? "var(--color-ouro-gold)" : "var(--color-ouro-shadow)"
-                }}>
-                  {isDelegated ? "★ delegated thought" : isWakeUp ? "heartbeat" : "prompt"}
-                </p>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <p className="font-mono text-[9px] uppercase tracking-wider" style={{
+                    color: isDelegated ? "var(--color-ouro-gold)" : "var(--color-ouro-shadow)"
+                  }}>
+                    {isDelegated ? "★ delegated" : isWakeUp ? "heartbeat" : "prompt"}
+                  </p>
+                  <span className="font-mono text-[9px] text-ouro-shadow/40">#{m.index}</span>
+                </div>
                 <p className="text-sm leading-relaxed text-ouro-bone whitespace-pre-wrap break-words">
                   {m.content}
                 </p>
@@ -199,9 +223,10 @@ function InnerTranscriptView({ messages }: { messages: TranscriptMessage[] }) {
               {surfaces.map((sc) => (
                 <div key={sc.id} className="flex justify-end py-1">
                   <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-ouro-scale/15 px-3 py-2 ring-1 ring-ouro-scale/20">
-                    <p className="font-mono text-[9px] uppercase tracking-wider text-ouro-glow mb-0.5">
-                      ★ surfaced outward
-                    </p>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="font-mono text-[9px] uppercase tracking-wider text-ouro-glow">★ surfaced outward</p>
+                      <span className="font-mono text-[9px] text-ouro-shadow/40">#{m.index}</span>
+                    </div>
                     <p className="text-sm leading-relaxed text-ouro-bone whitespace-pre-wrap break-words">{sc.deliveredText}</p>
                     {sc.metadata && <p className="mt-1 font-mono text-[9px] text-ouro-shadow">→ {sc.metadata}</p>}
                   </div>
@@ -209,18 +234,21 @@ function InnerTranscriptView({ messages }: { messages: TranscriptMessage[] }) {
               ))}
 
               {ponders.length > 0 && (
-                <div className="py-1 text-center font-mono text-[10px] text-ouro-gold/50">— still thinking —</div>
+                <div className="py-1 text-center font-mono text-[10px] text-ouro-gold/50">— still thinking — #{m.index}</div>
               )}
 
               {rests.length > 0 && (
-                <div className="py-1 text-center font-mono text-[10px] text-ouro-shadow/40">— resting —</div>
+                <div className="py-1 text-center font-mono text-[10px] text-ouro-shadow/40">— resting — #{m.index}</div>
               )}
 
               {/* Regular thinking (no mechanism calls) */}
               {surfaces.length === 0 && rests.length === 0 && ponders.length === 0 && m.content && (
                 <div className="flex justify-end py-1">
                   <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-ouro-glow/6 px-3 py-2 ring-1 ring-ouro-glow/8">
-                    <p className="font-mono text-[9px] uppercase tracking-wider text-ouro-glow/50 mb-0.5">thinking</p>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="font-mono text-[9px] uppercase tracking-wider text-ouro-glow/50">thinking</p>
+                      <span className="font-mono text-[9px] text-ouro-shadow/40">#{m.index}</span>
+                    </div>
                     <p className="text-sm leading-relaxed text-ouro-mist whitespace-pre-wrap break-words">{m.content}</p>
                   </div>
                 </div>

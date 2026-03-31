@@ -119,7 +119,7 @@ export function AgentInspector({ agentName, view, deskPrefs, initialRoute }: Age
         {/* Tab content */}
         <div className="mt-6">
           {activeTab === "overview" && <OverviewTab view={view} deskPrefs={deskPrefs} />}
-          {activeTab === "sessions" && <SessionsTab agentName={agentName} focus={focusTarget} onFocusConsumed={consumeFocus} />}
+          {activeTab === "sessions" && <SessionsTab agentName={agentName} focus={focusTarget} onFocusConsumed={consumeFocus} deskPrefs={deskPrefs} />}
           {activeTab === "work" && <WorkTab agentName={agentName} view={view} focus={focusTarget} onFocusConsumed={consumeFocus} />}
           {activeTab === "connections" && <ConnectionsTab agentName={agentName} focus={focusTarget} onFocusConsumed={consumeFocus} />}
           {activeTab === "inner" && <InnerTab agentName={agentName} view={view} />}

@@ -47,7 +47,7 @@ const REPLY_STATE_BADGE: Record<string, { color: "red" | "yellow" | "lime" | "zi
   "idle": { color: "zinc", label: "idle" },
 }
 
-export function SessionsTab({ agentName, focus, onFocusConsumed }: { agentName: string; focus?: string; onFocusConsumed?: () => void }) {
+export function SessionsTab({ agentName, focus, onFocusConsumed, deskPrefs }: { agentName: string; focus?: string; onFocusConsumed?: () => void; deskPrefs?: Record<string, unknown> | null }) {
   const nav = useNavigate()
   const [inventory, setInventory] = useState<SessionInventory | null>(null)
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
@@ -82,9 +82,18 @@ export function SessionsTab({ agentName, focus, onFocusConsumed }: { agentName: 
       .finally(() => setLoading(false))
   }
 
+  const starredFriends = new Set(((deskPrefs as any)?.starredFriends ?? []) as string[])
+
   if (!inventory) {
     return <Loading label="Loading sessions" />
   }
+
+  // Sort starred friends to top
+  const sortedItems = [...inventory.items].sort((a, b) => {
+    const aStarred = starredFriends.has(a.friendId) ? 0 : 1
+    const bStarred = starredFriends.has(b.friendId) ? 0 : 1
+    return aStarred - bStarred
+  })
 
   return (
     <div className="space-y-3">
@@ -92,9 +101,9 @@ export function SessionsTab({ agentName, focus, onFocusConsumed }: { agentName: 
         {inventory.totalCount} sessions · {inventory.activeCount} active · {inventory.staleCount} stale
       </p>
 
-      {/* Mobile: full-width stack. Desktop: same but with more padding */}
       <div className="space-y-1.5">
-        {inventory.items.map((s) => {
+        {sortedItems.map((s) => {
+          const isStarred = starredFriends.has(s.friendId)
           const key = `${s.friendId}/${s.channel}/${s.key}`
           const isOpen = expandedKey === key
           const badge = REPLY_STATE_BADGE[s.replyState] ?? REPLY_STATE_BADGE.idle
@@ -115,6 +124,7 @@ export function SessionsTab({ agentName, focus, onFocusConsumed }: { agentName: 
                 {/* Row 1: name + reply state + time */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
+                    {isStarred && <span className="text-ouro-gold" title="Starred">★</span>}
                     <span className="truncate font-medium text-ouro-bone">{s.friendName}</span>
                     <span className="shrink-0 text-xs text-ouro-shadow">via {s.channel}</span>
                     <Badge color={badge.color}>{badge.label}</Badge>
@@ -216,7 +226,10 @@ function UserBubble({ msg }: { msg: TranscriptMessage }) {
   return (
     <div className="flex justify-start py-1">
       <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-bl-sm bg-ouro-moss/25 px-3.5 py-2 ring-1 ring-ouro-moss/15">
-        <p className="font-mono text-[9px] uppercase tracking-wider text-ouro-gold/70 mb-0.5">user</p>
+        <div className="flex items-center gap-2 mb-0.5">
+          <p className="font-mono text-[9px] uppercase tracking-wider text-ouro-gold/70">user</p>
+          <span className="font-mono text-[9px] text-ouro-shadow/40">#{msg.index}</span>
+        </div>
         <p className="text-sm leading-relaxed text-ouro-bone whitespace-pre-wrap break-words">{msg.content}</p>
       </div>
     </div>
