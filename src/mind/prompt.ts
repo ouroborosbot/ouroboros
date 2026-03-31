@@ -471,20 +471,28 @@ function taskBoardSection(): string {
   }
 }
 
-function diaryFriendToolContractSection(): string {
-  return `## diary and friend tool contracts
-1. \`save_friend_note\` — When I learn something about a person - a preference, a tool setting, a personal detail, or how they like to work - I call \`save_friend_note\` immediately. This is how I build knowledge about people.
-2. \`diary_write\` — When I learn something general - about a project, codebase, system, decision, or anything I might need later that isn't about a specific person - I call \`diary_write\`. When in doubt, I save it.
-3. \`get_friend_note\` — When I need to check what I know about someone who isn't in this conversation - cross-referencing before mentioning someone, or checking context about a person someone else brought up - I call \`get_friend_note\`.
-4. \`recall\` — When I need to recall something I learned before - a topic comes up and I want to check what I know - I call \`recall\`.
-5. \`query_session\` — When I need grounded session history, especially for ad-hoc questions or older turns beyond my prompt, I call \`query_session\`. Use \`mode=status\` for self/inner progress and \`mode=search\` with a query for older history.
+function toolContractsSection(options?: BuildSystemOptions): string {
+  const lines = [
+    `## tool contracts`,
+    `1. \`save_friend_note\` -- when I learn something about a person, I save it immediately. Saving comes before responding.`,
+    `2. \`diary_write\` -- when I learn something general about a project, system, or decision, I save it. When in doubt, I save.`,
+    `3. \`get_friend_note\` -- when I need context about someone not in this conversation, I check their notes.`,
+    `4. \`recall\` -- when I need to remember something from before, I search my diary and journal.`,
+    `5. \`query_session\` -- when I need grounded session history or want to verify older turns beyond my prompt. Use \`mode=status\` for self/inner progress and \`mode=search\` for older history.`,
+  ]
 
-## what's already in my context
-- My active friend's notes are auto-loaded (I don't need \`get_friend_note\` for the person I'm talking to).
-- Associative recall auto-injects relevant facts (but \`recall\` is there when I need something specific).
-- My psyche files (SOUL, IDENTITY, TACIT, LORE, ASPIRATIONS) are always loaded - I already know who I am.
-- My task board is always loaded - I already know my work.`;
+  if (options?.toolChoiceRequired ?? true) {
+    lines.push(``)
+    lines.push(`## tool behavior`)
+    lines.push(`tool_choice is set to "required" -- I must call a tool on every turn.`)
+    lines.push(`- When I am ready to respond to the user, I call \`settle\`.`)
+    lines.push(`- \`settle\` must be the only tool call in that turn.`)
+    lines.push(`- I do not call no-op tools before \`settle\`.`)
+  }
+
+  return lines.join("\n")
 }
+
 
 export interface BuildSystemOptions {
   toolChoiceRequired?: boolean;
@@ -696,16 +704,6 @@ function reasoningEffortSection(options?: BuildSystemOptions): string {
 i can adjust my own reasoning depth using the set_reasoning_effort tool. i use higher effort for complex analysis and lower effort for simple tasks. available levels: ${levelList}.`;
 }
 
-function toolBehaviorSection(options?: BuildSystemOptions): string {
-  if (!(options?.toolChoiceRequired ?? true)) return "";
-  return `## tool behavior
-tool_choice is set to "required" -- i must call a tool on every turn.
-- need more information? i call a tool.
-- ready to respond to the user? i call \`settle\`.
-\`settle\` is a tool call -- it satisfies the tool_choice requirement.
-\`settle\` must be the ONLY tool call in that turn. do not combine it with other tool calls.
-do NOT call no-op tools just before \`settle\`. if i am done, i call \`settle\` directly.`;
-}
 
 function workspaceDisciplineSection(): string {
   return `## repo workspace discipline
@@ -1028,8 +1026,7 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     mcpToolsSection(options?.mcpManager),
     reasoningEffortSection(options),
     skillsSection(),
-    diaryFriendToolContractSection(),
-    toolBehaviorSection(options),
+    toolContractsSection(options),
 
     // Group 4: how i work
     "# how i work",

@@ -1144,7 +1144,7 @@ describe("buildSystem", () => {
     expect(result).toContain("## tool behavior")
     expect(result).toContain("tool_choice is set to \"required\"")
     expect(result).toContain("settle")
-    expect(result).toContain("ONLY tool call")
+    expect(result).toContain("the only tool call in that turn")
   })
 
   it("does NOT include tool behavior section when toolChoiceRequired is false", async () => {
@@ -1170,7 +1170,7 @@ describe("buildSystem", () => {
     expect(result).toContain("## tool behavior")
   })
 
-  it("tool behavior section contains decision-tree framing", async () => {
+  it("tool behavior section contains settle-for-responding guidance", async () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
@@ -1178,8 +1178,7 @@ describe("buildSystem", () => {
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli", { toolChoiceRequired: true })
-    // Decision tree: mentions calling tools for info and settle for responding
-    expect(result).toMatch(/need.*information.*call a tool/i)
+    // Settle guidance: when ready to respond, call settle
     expect(result).toMatch(/ready to respond.*call.*settle/i)
   })
 
@@ -1195,7 +1194,7 @@ describe("buildSystem", () => {
     expect(result).toMatch(/do not call.*no-op|do NOT call.*no-op/i)
   })
 
-  it("tool behavior section clarifies settle is a tool call", async () => {
+  it("tool behavior section clarifies settle exclusivity", async () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
@@ -1203,8 +1202,8 @@ describe("buildSystem", () => {
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli", { toolChoiceRequired: true })
-    // Clarification: settle IS a tool call satisfying the requirement
-    expect(result).toMatch(/settle.*tool call.*satisfies|settle.*is a tool call/i)
+    // Settle must be the only tool call in the turn
+    expect(result).toContain("`settle` must be the only tool call in that turn")
   })
 
   it("toolsSection includes settle in tool list when options undefined (defaults on)", async () => {
@@ -2721,7 +2720,7 @@ describe("buildSystem with context", () => {
     expect(result).toContain("## my tools")
     expect(result).toContain("## task board")
     expect(result).toContain("## my skills")
-    expect(result).toContain("## diary and friend tool contracts")
+    expect(result).toContain("## tool contracts")
     expect(result).toContain("query_session")
     expect(result).toContain("mode=search")
   })
@@ -3559,8 +3558,8 @@ describe("active-work prompting", () => {
 
     const result = await buildSystem("cli")
 
-    expect(result).toContain("## diary and friend tool contracts")
-    expect(result).toContain("Use `mode=status` for self/inner progress and `mode=search` with a query for older history.")
+    expect(result).toContain("## tool contracts")
+    expect(result).toContain("`mode=status` for self/inner progress and `mode=search` for older history")
   })
 
   it("buildSystem reinforces active-work as the top-level truth for family status questions", async () => {
