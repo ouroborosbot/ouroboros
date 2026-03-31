@@ -656,7 +656,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       type: "function",
       function: {
         name: "shell",
-        description: "run shell command",
+        description: "Run a shell command and return stdout/stderr. Working directory persists between calls. Use dedicated tools instead of shell when available: read_file instead of cat, edit_file instead of sed, glob instead of find, grep instead of grep/rg. Reserve shell for operations that genuinely need the shell: installing packages, running builds/tests, git operations, process management. Be careful with destructive commands -- consider reversibility before running. If a command fails, read the error output before retrying with a different approach.",
         parameters: {
           type: "object",
           properties: { command: { type: "string" } },
