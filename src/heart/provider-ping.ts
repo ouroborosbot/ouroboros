@@ -97,6 +97,7 @@ function createRuntimeForPing(provider: AgentProvider, _config: ProviderConfig):
     "openai-codex": "codex-mini-latest",
     "github-copilot": "gpt-4o",
   }
+  /* v8 ignore next -- fallback: all known providers are in DEFAULT_MODELS @preserve */
   const model = DEFAULT_MODELS[provider] ?? "unknown"
   switch (provider) {
     case "anthropic":
