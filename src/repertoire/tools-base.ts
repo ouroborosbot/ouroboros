@@ -10,6 +10,7 @@ import type { Integration, ResolvedContext, FriendRecord } from "../mind/friends
 import type { FriendStore } from "../mind/friends/store";
 import { emitNervesEvent } from "../nerves/runtime";
 import { fileStateCache } from "../mind/file-state";
+import { trackModifiedFile, getModifiedFileCount, getPostImplementationScrutiny } from "../mind/scrutiny";
 import { getAgentRoot, getAgentName, loadAgentConfig } from "../heart/identity";
 import { getRepoRoot } from "../heart/identity";
 import { requestInnerWake } from "../heart/daemon/socket-client";
@@ -460,7 +461,9 @@ export const baseToolDefinitions: ToolDefinition[] = [
       const resolvedPath = resolveLocalToolPath(a.path)
       fs.mkdirSync(path.dirname(resolvedPath), { recursive: true })
       fs.writeFileSync(resolvedPath, a.content, "utf-8")
-      return "ok"
+      trackModifiedFile(resolvedPath)
+      const scrutiny = getPostImplementationScrutiny(getModifiedFileCount())
+      return scrutiny ? `ok\n\n${scrutiny}` : "ok"
     },
     summaryKeys: ["path"],
   },
@@ -538,11 +541,16 @@ export const baseToolDefinitions: ToolDefinition[] = [
 
       const diffResult = buildContextDiff(lines, changeStartLine, changeEndLine)
 
+      // Track modified file and compute scrutiny appendix
+      trackModifiedFile(resolvedPath)
+      const scrutiny = getPostImplementationScrutiny(getModifiedFileCount())
+
       // Append staleness warning if detected (do not block -- TTFA)
       if (stalenessCheck.stale) {
-        return `${diffResult}\n\n⚠️ warning: file changed externally since last read -- re-read recommended`
+        const base = `${diffResult}\n\n⚠️ warning: file changed externally since last read -- re-read recommended`
+        return scrutiny ? `${base}\n\n${scrutiny}` : base
       }
-      return diffResult
+      return scrutiny ? `${diffResult}\n\n${scrutiny}` : diffResult
     },
     summaryKeys: ["path"],
   },
