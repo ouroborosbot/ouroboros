@@ -774,6 +774,13 @@ export function contextSection(context?: ResolvedContext, options?: BuildSystemO
     }
   }
 
+  // Memory-awareness lines (locked content)
+  lines.push("")
+  lines.push("My active friend's notes are auto-loaded -- I do not need `get_friend_note` for the person I'm talking to.")
+  lines.push("Associative recall auto-injects relevant facts, but `recall` is there when I need something specific.")
+  lines.push("My psyche files are always loaded -- I already know who I am.")
+  lines.push("My task board is always loaded -- I already know my work.")
+
   return lines.join("\n")
 }
 
