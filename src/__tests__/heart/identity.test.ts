@@ -7,7 +7,12 @@ vi.mock("fs", () => ({
   writeFileSync: vi.fn(),
 }))
 
+vi.mock("../../heart/migrate-config", () => ({
+  migrateAgentConfigV1ToV2: vi.fn(),
+}))
+
 import * as fs from "fs"
+import { migrateAgentConfigV1ToV2 } from "../../heart/migrate-config"
 
 let savedArgv: string[]
 let savedWebsiteSiteName: string | undefined
@@ -872,5 +877,237 @@ describe("setAgentConfigOverride", () => {
     setAgentConfigOverride(override)
     expect(loadAgentConfig().provider).toBe("azure")
     expect(loadAgentConfig().version).toBe(2)
+  })
+})
+
+describe("AgentFacingConfig and AgentConfig v2 type", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it("AgentConfig requires humanFacing and agentFacing fields", async () => {
+    const mod = await import("../../heart/identity")
+
+    // Type-level test: construct v2 config and verify shape
+    const facingConfig: import("../../heart/identity").AgentFacingConfig = { provider: "anthropic", model: "claude-opus-4-6" }
+    expect(facingConfig.provider).toBe("anthropic")
+    expect(facingConfig.model).toBe("claude-opus-4-6")
+
+    const config: import("../../heart/identity").AgentConfig = {
+      version: 2,
+      enabled: true,
+      humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+    }
+    expect(config.humanFacing.provider).toBe("anthropic")
+    expect(config.humanFacing.model).toBe("claude-opus-4-6")
+    expect(config.agentFacing.provider).toBe("anthropic")
+    expect(config.agentFacing.model).toBe("claude-opus-4-6")
+    // Suppress unused import warning
+    expect(mod).toBeDefined()
+  })
+
+  it("AgentConfig provider field is optional (deprecated)", async () => {
+    const mod = await import("../../heart/identity")
+
+    // v2 config without provider field should still be valid
+    const config: import("../../heart/identity").AgentConfig = {
+      version: 2,
+      enabled: true,
+      humanFacing: { provider: "azure", model: "gpt-4o" },
+      agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+    }
+    expect(config.provider).toBeUndefined()
+    expect(config.humanFacing.provider).toBe("azure")
+    expect(config.agentFacing.provider).toBe("anthropic")
+    // Suppress unused import warning
+    expect(mod).toBeDefined()
+  })
+})
+
+describe("loadAgentConfig v2 inline migration", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    process.argv = ["node", "cli-entry.js", "--agent", "ouroboros"]
+    vi.mocked(migrateAgentConfigV1ToV2).mockReset()
+  })
+
+  it("auto-migrates v1 config on disk and returns v2", async () => {
+    const v1Json = JSON.stringify({
+      version: 1,
+      enabled: true,
+      provider: "anthropic",
+      phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+    })
+    const v2Json = JSON.stringify({
+      version: 2,
+      enabled: true,
+      humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+    })
+
+    // First read returns v1, migration transforms on disk, second read returns v2
+    vi.mocked(fs.readFileSync)
+      .mockReturnValueOnce(v1Json)
+      .mockReturnValueOnce(v2Json)
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    const config = loadAgentConfig()
+
+    expect(migrateAgentConfigV1ToV2).toHaveBeenCalledTimes(1)
+    expect(config.version).toBe(2)
+    expect(config.humanFacing).toEqual({ provider: "anthropic", model: "claude-opus-4-6" })
+    expect(config.agentFacing).toEqual({ provider: "anthropic", model: "claude-opus-4-6" })
+  })
+
+  it("returns v2 config directly without migration", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 2,
+        enabled: true,
+        humanFacing: { provider: "azure", model: "gpt-4o" },
+        agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+      }),
+    )
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    const config = loadAgentConfig()
+
+    expect(migrateAgentConfigV1ToV2).not.toHaveBeenCalled()
+    expect(config.version).toBe(2)
+    expect(config.humanFacing).toEqual({ provider: "azure", model: "gpt-4o" })
+    expect(config.agentFacing).toEqual({ provider: "anthropic", model: "claude-opus-4-6" })
+  })
+
+  it("rejects config missing humanFacing after migration", async () => {
+    const v1Json = JSON.stringify({
+      version: 1,
+      enabled: true,
+      provider: "anthropic",
+      phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+    })
+    // Migration "ran" but produced malformed output (no humanFacing)
+    const badV2Json = JSON.stringify({
+      version: 2,
+      enabled: true,
+      agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+    })
+
+    vi.mocked(fs.readFileSync)
+      .mockReturnValueOnce(v1Json)
+      .mockReturnValueOnce(badV2Json)
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/humanFacing/)
+  })
+
+  it("rejects config missing agentFacing", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 2,
+        enabled: true,
+        humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+      }),
+    )
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/agentFacing/)
+  })
+
+  it("rejects invalid provider in humanFacing", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 2,
+        enabled: true,
+        humanFacing: { provider: "not-a-provider", model: "some-model" },
+        agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+      }),
+    )
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/humanFacing/)
+  })
+
+  it("rejects invalid provider in agentFacing", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 2,
+        enabled: true,
+        humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+        agentFacing: { provider: "bad-provider", model: "some-model" },
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+      }),
+    )
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/agentFacing/)
+  })
+
+  it("rejects non-string model in humanFacing", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 2,
+        enabled: true,
+        humanFacing: { provider: "anthropic", model: 123 },
+        agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+      }),
+    )
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/humanFacing/)
+  })
+
+  it("rejects non-string model in agentFacing", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 2,
+        enabled: true,
+        humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+        agentFacing: { provider: "anthropic", model: null },
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+      }),
+    )
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/agentFacing/)
+  })
+})
+
+describe("buildDefaultAgentTemplate v2", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it("returns v2 config with both facings defaulting to anthropic claude-opus-4-6", async () => {
+    const { buildDefaultAgentTemplate } = await import("../../heart/identity")
+    const template = buildDefaultAgentTemplate("testbot")
+
+    expect(template.version).toBe(2)
+    expect(template.humanFacing).toEqual({ provider: "anthropic", model: "claude-opus-4-6" })
+    expect(template.agentFacing).toEqual({ provider: "anthropic", model: "claude-opus-4-6" })
+    // provider field should not be set on v2 templates
+    expect(template.provider).toBeUndefined()
+  })
+
+  it("has version 2", async () => {
+    const { buildDefaultAgentTemplate } = await import("../../heart/identity")
+    const template = buildDefaultAgentTemplate("testbot")
+    expect(template.version).toBe(2)
   })
 })

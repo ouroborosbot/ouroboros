@@ -783,6 +783,67 @@ describe("github-copilot auth flow", () => {
   })
 })
 
+describe("readAgentConfigForAgent v2 inline migration", () => {
+  it("auto-migrates v1 config on disk and returns v2", () => {
+    emitTestEvent("readAgentConfigForAgent v1 auto-migration")
+    const bundlesRoot = makeTempDir("auth-flow-v1-migration")
+    const secretsRoot = makeTempDir("auth-flow-v1-migration-secrets")
+    const agentName = "MigrateBot"
+
+    // Write v1 config
+    const agentRoot = path.join(bundlesRoot, `${agentName}.ouro`)
+    fs.mkdirSync(agentRoot, { recursive: true })
+    fs.writeFileSync(
+      path.join(agentRoot, "agent.json"),
+      JSON.stringify({
+        version: 1,
+        enabled: true,
+        provider: "anthropic",
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+      }, null, 2) + "\n",
+    )
+
+    // Write secrets with model
+    const secretsDir = path.join(secretsRoot, agentName)
+    fs.mkdirSync(secretsDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(secretsDir, "secrets.json"),
+      JSON.stringify({
+        providers: { anthropic: { model: "claude-opus-4-6", setupToken: "tok" } },
+      }, null, 2) + "\n",
+    )
+
+    const { config } = readAgentConfigForAgent(agentName, bundlesRoot)
+    expect(config.version).toBe(2)
+    expect(config.humanFacing).toEqual({ provider: "anthropic", model: "claude-opus-4-6" })
+    expect(config.agentFacing).toEqual({ provider: "anthropic", model: "claude-opus-4-6" })
+  })
+
+  it("returns v2 config directly without migration", () => {
+    emitTestEvent("readAgentConfigForAgent v2 no migration")
+    const bundlesRoot = makeTempDir("auth-flow-v2-direct")
+    const agentName = "V2Bot"
+
+    const agentRoot = path.join(bundlesRoot, `${agentName}.ouro`)
+    fs.mkdirSync(agentRoot, { recursive: true })
+    fs.writeFileSync(
+      path.join(agentRoot, "agent.json"),
+      JSON.stringify({
+        version: 2,
+        enabled: true,
+        humanFacing: { provider: "azure", model: "gpt-4o" },
+        agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+      }, null, 2) + "\n",
+    )
+
+    const { config } = readAgentConfigForAgent(agentName, bundlesRoot)
+    expect(config.version).toBe(2)
+    expect(config.humanFacing).toEqual({ provider: "azure", model: "gpt-4o" })
+    expect(config.agentFacing).toEqual({ provider: "anthropic", model: "claude-opus-4-6" })
+  })
+})
+
 describe("writeAgentModel", () => {
   it("updates model for anthropic provider", () => {
     emitTestEvent("writeAgentModel anthropic")
