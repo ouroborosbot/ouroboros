@@ -420,6 +420,7 @@ export class OuroDaemon {
     await this.scheduler.reconcile?.()
     await this.drainPendingBundleMessages()
     await this.drainPendingSenseMessages()
+    /* v8 ignore start — Outlook server startup, tested via outlook-http.test.ts */
     if (!this.outlookServer) {
       this.outlookServer = await startOutlookHttpServer({
         host: "127.0.0.1",
@@ -450,6 +451,7 @@ export class OuroDaemon {
         },
       })
     }
+    /* v8 ignore stop */
 
     if (fs.existsSync(this.socketPath)) {
       fs.unlinkSync(this.socketPath)

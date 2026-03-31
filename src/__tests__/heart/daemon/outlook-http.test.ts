@@ -281,6 +281,96 @@ describe("outlook http", () => {
     await server.stop()
   })
 
+  it("serves inner-transcript and machine health/logs endpoints", async () => {
+    const { startOutlookHttpServer } = await import("../../../heart/daemon/outlook-http")
+
+    const server = await startOutlookHttpServer({
+      host: "127.0.0.1",
+      port: 0,
+      readMachineState: () => ({ productName: "Ouro Outlook", agentCount: 0 }) as any,
+      readAgentState: () => null,
+      renderApp: () => "<!doctype html><title>Outlook</title>",
+      readAgentSessions: () => ({ totalCount: 0, activeCount: 0, staleCount: 0, items: [] }),
+      readAgentTranscript: (_agent, friendId) => (
+        friendId === "self"
+          ? { friendId: "self", friendName: "self", channel: "inner", key: "dialog", sessionPath: "/p", messageCount: 3, lastUsage: null, continuity: null, messages: [] }
+          : null
+      ),
+      readAgentCoding: () => ({ totalCount: 0, activeCount: 0, blockedCount: 0, items: [] }),
+      readAgentAttention: () => ({ queueLength: 0, queueItems: [], pendingChannels: [], returnObligations: [] }),
+      readAgentBridges: () => ({ totalCount: 0, activeCount: 0, items: [] }),
+      readAgentMemory: () => ({ diaryEntryCount: 0, recentDiaryEntries: [], journalEntryCount: 0, recentJournalEntries: [] }),
+      readAgentFriends: () => ({ totalFriends: 0, friends: [] }),
+      readAgentHabits: () => ({ totalCount: 0, activeCount: 0, pausedCount: 0, degradedCount: 0, overdueCount: 0, items: [] }),
+      readDaemonHealth: () => ({ status: "ok", mode: "dev", pid: 1, startedAt: "", uptimeSeconds: 0, safeMode: null, degradedComponents: [], agentHealth: {}, habitHealth: {} }),
+      readLogs: () => ({ logPath: null, totalLines: 0, entries: [] }),
+    })
+
+    // Inner transcript
+    const inner = await fetch(`${server.origin}/outlook/api/agents/test/inner-transcript`).then((r) => r.json())
+    expect(inner).toEqual(expect.objectContaining({ messageCount: 3 }))
+
+    // Machine health
+    const health = await fetch(`${server.origin}/outlook/api/machine/health`).then((r) => r.json())
+    expect(health).toEqual(expect.objectContaining({ status: "ok" }))
+
+    // Machine logs
+    const logs = await fetch(`${server.origin}/outlook/api/machine/logs`).then((r) => r.json())
+    expect(logs).toEqual(expect.objectContaining({ totalLines: 0 }))
+
+    await server.stop()
+  })
+
+  it("constructs default hooks from bundlesRoot when provided", async () => {
+    vi.resetModules()
+    const fs = await import("fs")
+    const os = await import("os")
+    const path = await import("path")
+    const bundlesRoot = fs.mkdtempSync(path.join(os.tmpdir(), "outlook-hooks-"))
+
+    const { startOutlookHttpServer } = await import("../../../heart/daemon/outlook-http")
+    const server = await startOutlookHttpServer({
+      host: "127.0.0.1",
+      port: 0,
+      bundlesRoot,
+      renderApp: () => "<!doctype html><title>test</title>",
+    })
+
+    // These should all return empty/default data without crashing
+    const sessions = await fetch(`${server.origin}/outlook/api/agents/nobody/sessions`).then((r) => r.json())
+    expect(sessions.totalCount).toBe(0)
+
+    const coding = await fetch(`${server.origin}/outlook/api/agents/nobody/coding`).then((r) => r.json())
+    expect(coding.totalCount).toBe(0)
+
+    const bridges = await fetch(`${server.origin}/outlook/api/agents/nobody/bridges`).then((r) => r.json())
+    expect(bridges.totalCount).toBe(0)
+
+    const attention = await fetch(`${server.origin}/outlook/api/agents/nobody/attention`).then((r) => r.json())
+    expect(attention.queueLength).toBe(0)
+
+    const memory = await fetch(`${server.origin}/outlook/api/agents/nobody/memory`).then((r) => r.json())
+    expect(memory.diaryEntryCount).toBe(0)
+
+    const friends = await fetch(`${server.origin}/outlook/api/agents/nobody/friends`).then((r) => r.json())
+    expect(friends.totalFriends).toBe(0)
+
+    const habits = await fetch(`${server.origin}/outlook/api/agents/nobody/habits`).then((r) => r.json())
+    expect(habits.totalCount).toBe(0)
+
+    const health = await fetch(`${server.origin}/outlook/api/machine/health`).then((r) => r.json())
+    expect(health).toBeTruthy()
+
+    const logs = await fetch(`${server.origin}/outlook/api/machine/logs`).then((r) => r.json())
+    expect(logs.totalLines).toBe(0)
+
+    const inner = await fetch(`${server.origin}/outlook/api/agents/nobody/inner-transcript`).then((r) => r.json())
+    expect(inner.messageCount).toBe(0)
+
+    await server.stop()
+    fs.rmSync(bundlesRoot, { recursive: true, force: true })
+  })
+
   it("streams SSE events and supports manual broadcast", async () => {
     const { startOutlookHttpServer } = await import("../../../heart/daemon/outlook-http")
 

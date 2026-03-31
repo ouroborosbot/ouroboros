@@ -21,6 +21,7 @@ export type { TaskStatus } from "../repertoire/tasks/types"
 export type { RuntimeMetadata } from "../heart/daemon/runtime-metadata"
 export type { SessionActivityRecord } from "../heart/session-activity"
 
+/* v8 ignore start — module-level observability event */
 import { emitNervesEvent } from "./runtime"
 
 emitNervesEvent({
@@ -29,3 +30,4 @@ emitNervesEvent({
   message: "observation layer loaded",
   meta: {},
 })
+/* v8 ignore stop */

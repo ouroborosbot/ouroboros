@@ -730,6 +730,23 @@ describe("outlook deep readers", () => {
       expect(inventory.items).toEqual([])
     })
 
+    it("derives needs-reply state when last message is from user", async () => {
+      const bundlesRoot = makeBundleRoot()
+      const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+      writeAgentConfig(alphaRoot)
+      writeJson(path.join(alphaRoot, "state", "sessions", "friend-1", "cli", "session.json"), {
+        version: 1,
+        messages: [
+          { role: "assistant", content: "Hello." },
+          { role: "user", content: "What are you working on?" },
+        ],
+        state: { lastFriendActivityAt: "2026-03-30T10:00:00.000Z" },
+      })
+      const { readSessionInventory } = await import("../../../heart/daemon/outlook-read")
+      const inv = readSessionInventory("alpha", { bundlesRoot })
+      expect(inv.items[0]!.replyState).toBe("needs-reply")
+    })
+
     it("handles malformed session files without crashing", async () => {
       const bundlesRoot = makeBundleRoot()
       const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
@@ -1115,6 +1132,65 @@ describe("outlook deep readers", () => {
       expect(logs.entries).toHaveLength(10)
       // Should be the last 10 entries
       expect(logs.entries[0]!.event).toBe("event-190")
+    })
+  })
+
+  describe("readCodingDeep edge cases", () => {
+    it("handles malformed coding records with missing fields", async () => {
+      const bundlesRoot = makeBundleRoot()
+      const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+      writeCodingState(alphaRoot, [
+        { session: { id: "c1", status: "running", runner: 42, workdir: null, lastActivityAt: null, failure: { command: "test" } } },
+        { session: { id: "c2", status: "completed", originSession: { friendId: "f", channel: 42 }, obligationId: 123, scopeFile: 456 } },
+      ])
+      const { readCodingDeep } = await import("../../../heart/daemon/outlook-read")
+      const deep = readCodingDeep(alphaRoot)
+      expect(deep.items.length).toBe(2)
+      expect(deep.items[0]!.runner).toBe("claude")
+      expect(deep.items[0]!.workdir).toBe("")
+      expect(deep.items[0]!.failure).toBeTruthy()
+      expect(deep.items[1]!.originSession).toBeNull()
+      expect(deep.items[1]!.obligationId).toBeNull()
+    })
+
+    it("handles unparseable coding state", async () => {
+      const bundlesRoot = makeBundleRoot()
+      const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+      fs.mkdirSync(path.join(alphaRoot, "state", "coding"), { recursive: true })
+      fs.writeFileSync(path.join(alphaRoot, "state", "coding", "sessions.json"), "{bad", "utf-8")
+      const { readCodingDeep } = await import("../../../heart/daemon/outlook-read")
+      const deep = readCodingDeep(alphaRoot)
+      expect(deep.totalCount).toBe(0)
+    })
+  })
+
+  describe("readBridgeInventory edge cases", () => {
+    it("handles malformed bridge records", async () => {
+      const bundlesRoot = makeBundleRoot()
+      const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+      writeJson(path.join(alphaRoot, "state", "bridges", "b1.json"), { id: "b1", attachedSessions: [{ friendId: 42 }], task: { taskName: 42 } })
+      writeJson(path.join(alphaRoot, "state", "bridges", "b2.json"), { noId: true })
+      fs.writeFileSync(path.join(alphaRoot, "state", "bridges", "b3.json"), "{bad", "utf-8")
+      const { readBridgeInventory } = await import("../../../heart/daemon/outlook-read")
+      const inv = readBridgeInventory(alphaRoot)
+      expect(inv.totalCount).toBe(1)
+      expect(inv.items[0]!.attachedSessions).toEqual([])
+      expect(inv.items[0]!.task).toBeNull()
+    })
+  })
+
+  describe("readDaemonHealthDeep edge cases", () => {
+    it("handles minimal/sparse health data", async () => {
+      const tmpDir = makeBundleRoot()
+      const healthPath = path.join(tmpDir, "health.json")
+      writeJson(healthPath, { status: "ok" })
+      const { readDaemonHealthDeep } = await import("../../../heart/daemon/outlook-read")
+      const health = readDaemonHealthDeep(healthPath)
+      expect(health).not.toBeNull()
+      expect(health!.degradedComponents).toEqual([])
+      expect(health!.agentHealth).toEqual({})
+      expect(health!.habitHealth).toEqual({})
+      expect(health!.safeMode).toBeNull()
     })
   })
 

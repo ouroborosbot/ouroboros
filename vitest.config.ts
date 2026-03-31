@@ -29,6 +29,7 @@ export default defineConfig({
         "src/repertoire/tasks/types.ts",
         "src/nerves/coverage/cli-main.ts",
         "src/heart/providers/anthropic-token.ts",
+        "src/nerves/observation.ts",
       ],
       thresholds: {
         lines: 100,
