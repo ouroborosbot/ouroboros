@@ -4069,3 +4069,123 @@ describe("system prompt group headers", () => {
     expect(dynamicIdx).toBeGreaterThan(howIdx)
   })
 })
+
+describe("liveWorldStateSection (Unit 1.3)", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    const DEFAULT_AGENT_CONTEXT = { maxTokens: 80000, contextMargin: 20 }
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
+      context: { ...DEFAULT_AGENT_CONTEXT },
+    })
+    mockGetBoard.mockReset().mockReturnValue({
+      compact: "",
+      full: "",
+      byStatus: {
+        drafting: [], processing: [], validating: [],
+        collaborating: [], paused: [], blocked: [],
+        done: [], cancelled: [],
+      },
+      actionRequired: [],
+      unresolvedDependencies: [],
+      activeSessions: [],
+    })
+  })
+
+  const minimalActiveWorkFrame = {
+    centerOfGravity: "shared-work",
+    currentSession: { friendId: "friend-1", channel: "teams", key: "conv-1", sessionPath: "/tmp/s.json" },
+    currentObligation: null,
+    inner: { status: "idle", hasPending: false, job: { status: "idle", content: null, origin: null, mode: "reflect", obligationStatus: null, surfacedResult: null, queuedAt: null, startedAt: null, surfacedAt: null } },
+    bridges: [],
+    taskPressure: { compactBoard: "", liveTaskNames: [], activeBridges: [] },
+    friendActivity: { freshestForCurrentFriend: null, otherLiveSessionsForCurrentFriend: [], allOtherLiveSessions: [] },
+    codingSessions: [],
+    otherCodingSessions: [],
+    pendingObligations: [],
+    bridgeSuggestion: null,
+    mustResolveBeforeHandoff: false,
+  }
+
+  it("buildSystem with active world-state includes '## live world-state checkpoint' section", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli", { activeWorkFrame: minimalActiveWorkFrame } as any)
+    expect(result).toContain("## live world-state checkpoint")
+  })
+
+  it("world-state section contains live conversation, active lane, current artifact, next action", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli", { activeWorkFrame: minimalActiveWorkFrame } as any)
+    expect(result).toContain("- live conversation:")
+    expect(result).toContain("- active lane:")
+    expect(result).toContain("- current artifact:")
+    expect(result).toContain("- next action:")
+  })
+
+  it("world-state section appears inside '# dynamic state for this turn' group", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli", { activeWorkFrame: minimalActiveWorkFrame } as any)
+    const dynamicIdx = result.indexOf("# dynamic state for this turn")
+    const checkpointIdx = result.indexOf("## live world-state checkpoint")
+    const friendIdx = result.indexOf("# friend context")
+
+    expect(checkpointIdx).toBeGreaterThan(dynamicIdx)
+    expect(checkpointIdx).toBeLessThan(friendIdx)
+  })
+
+  it("world-state section includes authority line about stale history", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli", { activeWorkFrame: minimalActiveWorkFrame } as any)
+    expect(result).toContain("if older transcript history disagrees, treat it as stale")
+  })
+
+  it("world-state section returns empty when no active work frame exists", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+    expect(result).not.toContain("## live world-state checkpoint")
+  })
+})
