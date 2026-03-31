@@ -194,6 +194,23 @@ export function App() {
               <p className="mt-0.5">{machine.overview.daemon.mode} · {machine.overview.freshness.status}</p>
             </div>
           </SidebarFooter>
+          {/* Agent status line — subtle, agent-voiced */}
+          {selectedAgent && agentView && (
+            <div className="px-4 py-2 border-t border-ouro-moss/20">
+              <p className="text-xs italic text-ouro-shadow/70">
+                {(() => {
+                  const inner = (agentView as any)?.inner
+                  const status = inner?.status
+                  if (status === "working" || inner?.hasPending) return "thinking through something privately"
+                  const work = (agentView as any)?.work
+                  const obCount = work?.obligations?.openCount ?? 0
+                  if (obCount > 2) return "a few loose ends"
+                  if (obCount > 0) return "carrying something"
+                  return "steady"
+                })()}
+              </p>
+            </div>
+          )}
         </Sidebar>
       }
     >

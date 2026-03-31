@@ -1277,6 +1277,89 @@ function parseHabitFrontmatter(content: string): ParsedHabitFrontmatter | null {
   }
 }
 
+// ---------------------------------------------------------------------------
+// "What needs me now" — aggregates across all surfaces
+// ---------------------------------------------------------------------------
+
+export function readNeedsMeView(agentName: string, options: OutlookReadOptions = {}): import("./outlook-types").OutlookNeedsMeView {
+  const bundlesRoot = options.bundlesRoot ?? getAgentBundlesRoot()
+  const now = options.now?.() ?? new Date()
+  const agentRoot = path.join(bundlesRoot, `${agentName}.ouro`)
+  const items: import("./outlook-types").OutlookNeedsMeItem[] = []
+
+  // 1. Sessions that need a reply (last message is from user)
+  const sessions = readSessionInventory(agentName, options)
+  for (const s of sessions.items) {
+    if (s.replyState === "needs-reply") {
+      items.push({
+        urgency: "owed-reply",
+        label: `${s.friendName} is waiting for a reply`,
+        detail: `via ${s.channel} · ${s.latestUserExcerpt ? truncateExcerpt(s.latestUserExcerpt, 80) ?? "" : ""}`,
+        ref: { tab: "sessions", focus: `${s.friendId}/${s.channel}/${s.key}` },
+        ageMs: now.getTime() - Date.parse(s.lastActivityAt),
+      })
+    }
+  }
+
+  // 2. Obligations that are blocking or stale
+  const obligations = readObligationSummary(agentRoot)
+  for (const o of obligations.items) {
+    const ageMs = now.getTime() - Date.parse(o.updatedAt)
+    const isStale = ageMs > 24 * 60 * 60 * 1000
+
+    if (o.status === "pending" || o.status === "investigating") {
+      items.push({
+        urgency: isStale ? "stale-delegation" : "blocking-obligation",
+        label: truncateExcerpt(o.content, 80) ?? o.id,
+        detail: `${o.status}${o.nextAction ? ` · next: ${o.nextAction}` : ""}`,
+        ref: { tab: "work", focus: o.id },
+        ageMs,
+      })
+    }
+  }
+
+  // 3. Pending attention queue items (someone delegated work that hasn't been picked up)
+  const pendingChannels = scanPendingChannels(agentRoot)
+  for (const p of pendingChannels) {
+    if (p.friendId === "self") continue
+    const friendName = resolveFriendName(path.join(agentRoot, "friends"), p.friendId)
+    items.push({
+      urgency: "stale-delegation",
+      label: `${p.messageCount} pending from ${friendName}`,
+      detail: `${p.channel}/${p.key}`,
+      ref: { tab: "connections" },
+      ageMs: null,
+    })
+  }
+
+  // 4. Overdue habits
+  const habits = readHabitView(agentRoot, options)
+  for (const h of habits.items) {
+    if (h.isOverdue) {
+      items.push({
+        urgency: "overdue-habit",
+        label: `${h.title} is overdue`,
+        detail: h.cadence ? `every ${h.cadence} · last ${h.lastRun ?? "never"}` : "no cadence set",
+        ref: { tab: "inner" },
+        ageMs: h.overdueMs,
+      })
+    }
+  }
+
+  // Sort: owed replies first, then blocking obligations, then stale, then habits
+  const urgencyOrder: Record<string, number> = {
+    "owed-reply": 0,
+    "blocking-obligation": 1,
+    "broken-return": 2,
+    "stale-delegation": 3,
+    "return-ready": 4,
+    "overdue-habit": 5,
+  }
+  items.sort((a, b) => (urgencyOrder[a.urgency] ?? 99) - (urgencyOrder[b.urgency] ?? 99))
+
+  return { items }
+}
+
 function parseCadenceMs(cadence: string | null): number | null {
   if (!cadence) return null
   const match = /^(\d+)\s*(m|min|h|hr|d|day)s?$/i.exec(cadence.trim())

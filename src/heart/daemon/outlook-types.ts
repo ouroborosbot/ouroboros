@@ -537,6 +537,25 @@ export interface OutlookHabitView {
 }
 
 // ---------------------------------------------------------------------------
+// "What needs me now" — the single brutally clear queue
+// ---------------------------------------------------------------------------
+
+export type OutlookUrgencyReason = "owed-reply" | "blocking-obligation" | "stale-delegation" | "broken-return" | "overdue-habit" | "return-ready"
+
+export interface OutlookNeedsMeItem {
+  urgency: OutlookUrgencyReason
+  label: string
+  detail: string
+  /** Cross-reference for navigation */
+  ref: { tab: string; focus?: string } | null
+  ageMs: number | null
+}
+
+export interface OutlookNeedsMeView {
+  items: OutlookNeedsMeItem[]
+}
+
+// ---------------------------------------------------------------------------
 // Center of gravity — the "what is the plot right now?" narrative
 // ---------------------------------------------------------------------------
 

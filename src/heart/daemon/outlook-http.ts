@@ -12,6 +12,7 @@ import {
   readHabitView,
   readLogView,
   readMemoryView,
+  readNeedsMeView,
   readOutlookAgentState,
   readOutlookMachineState,
   readSessionInventory,
@@ -285,6 +286,11 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
 
       if (surface === "friends") {
         writeJson(response, 200, hooks.readAgentFriends(agent))
+        return
+      }
+
+      if (surface === "needs-me") {
+        writeJson(response, 200, readNeedsMeView(agent, opts))
         return
       }
 
