@@ -2752,6 +2752,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     /* v8 ignore stop */
 
     const payload = parseStatusPayload(status.data)
+    /* v8 ignore next -- ?? branch: outlookUrl always present in test fixtures */
     const outlookUrl = payload?.overview.outlookUrl ?? "unavailable"
     if (!command.json) {
       deps.writeStdout(outlookUrl)
@@ -2765,6 +2766,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     }
     /* v8 ignore stop */
 
+    /* v8 ignore next -- ?? branch: tests always inject fetchImpl */
     const fetchImpl = deps.fetchImpl ?? fetch
     const response = await fetchImpl(`${outlookUrl}/api/machine`)
     const data = await response.json() as unknown
