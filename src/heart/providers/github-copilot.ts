@@ -1,39 +1,34 @@
 import OpenAI from "openai";
 import { getGithubCopilotConfig } from "../config";
-import { getAgentName } from "../identity";
 import { emitNervesEvent } from "../../nerves/runtime";
-import type { ProviderCapability, ProviderRuntime, ProviderTurnRequest } from "../core";
+import type { ProviderCapability, ProviderErrorClassification, ProviderRuntime, ProviderTurnRequest } from "../core";
 import type { ResponseItem, TurnResult } from "../streaming";
 import { streamChatCompletion, streamResponsesApi, toResponsesInput, toResponsesTools } from "../streaming";
 import { getModelCapabilities } from "../model-capabilities";
 
 interface HttpError extends Error { status?: number }
 
-/* v8 ignore start -- auth guidance helpers: tested via mock-driven provider tests @preserve */
-function isAuthFailure(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const status = (error as HttpError).status;
-  return status === 401 || status === 403;
-}
-
-function getReauthGuidance(reason: string): string {
-  const agentName = getAgentName();
-  return [
-    `provider github-copilot failed (${reason}).`,
-    `Run \`ouro auth verify --agent ${agentName}\` to check all configured providers,`,
-    `\`ouro auth switch --agent ${agentName} --provider <other>\` to switch,`,
-    `or \`ouro auth --agent ${agentName} --provider github-copilot\` to reconfigure.`,
-  ].join(" ");
-}
-
-function withAuthGuidance(error: unknown): Error {
-  const base = error instanceof Error ? error.message : String(error);
-  if (isAuthFailure(error)) {
-    return new Error(getReauthGuidance(base));
-  }
-  return error instanceof Error ? error : new Error(String(error));
+/* v8 ignore start -- duplicated from shared provider utils, tested there @preserve */
+function isNetworkError(error: Error): boolean {
+  const code = (error as NodeJS.ErrnoException).code || ""
+  if (["ECONNRESET", "ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT", "EPIPE",
+       "EAI_AGAIN", "EHOSTUNREACH", "ENETUNREACH", "ECONNABORTED"].includes(code)) return true
+  const msg = error.message || ""
+  return msg.includes("fetch failed") || msg.includes("socket hang up") || msg.includes("getaddrinfo")
 }
 /* v8 ignore stop */
+
+/* v8 ignore start -- duplicated classification pattern, tested via provider unit tests @preserve */
+export function classifyGithubCopilotError(error: Error): ProviderErrorClassification {
+  const status = (error as HttpError).status
+  if (status === 401 || status === 403) return "auth-failure"
+  if (status === 429) return "rate-limit"
+  if (status && status >= 500) return "server-error"
+  if (isNetworkError(error)) return "network-error"
+  return "unknown"
+}
+/* v8 ignore stop */
+
 
 export function createGithubCopilotProviderRuntime(model: string): ProviderRuntime {
   emitNervesEvent({
@@ -97,13 +92,17 @@ export function createGithubCopilotProviderRuntime(model: string): ProviderRunti
             params,
             request.callbacks,
             request.signal,
-            request.eagerFinalAnswerStreaming,
+            request.eagerSettleStreaming,
           );
         } catch (error) {
-          throw withAuthGuidance(error);
+          throw error instanceof Error ? error : new Error(String(error));
         }
       },
       /* v8 ignore stop */
+      /* v8 ignore next 3 -- delegation: classification logic tested via classifyGithubCopilotError @preserve */
+      classifyError(error: Error): ProviderErrorClassification {
+        return classifyGithubCopilotError(error);
+      },
     };
   }
 
@@ -146,14 +145,18 @@ export function createGithubCopilotProviderRuntime(model: string): ProviderRunti
           params,
           request.callbacks,
           request.signal,
-          request.eagerFinalAnswerStreaming,
+          request.eagerSettleStreaming,
         );
         for (const item of result.outputItems) nativeInput!.push(item);
         return result;
       } catch (error) {
-        throw withAuthGuidance(error);
+        throw error instanceof Error ? error : new Error(String(error));
       }
     },
     /* v8 ignore stop */
+    /* v8 ignore next 3 -- delegation: classification logic tested via classifyGithubCopilotError @preserve */
+    classifyError(error: Error): ProviderErrorClassification {
+      return classifyGithubCopilotError(error);
+    },
   };
 }

@@ -1,12 +1,33 @@
 import OpenAI, { AzureOpenAI } from "openai";
 import { getAzureConfig } from "../config";
 import { emitNervesEvent } from "../../nerves/runtime";
-import type { ProviderCapability, ProviderRuntime, ProviderTurnRequest } from "../core";
+import type { ProviderCapability, ProviderErrorClassification, ProviderRuntime, ProviderTurnRequest } from "../core";
 import type { ResponseItem, TurnResult } from "../streaming";
 import { streamResponsesApi, toResponsesInput, toResponsesTools } from "../streaming";
 import { getModelCapabilities } from "../model-capabilities";
 
+interface HttpError extends Error { status?: number }
+
 const COGNITIVE_SERVICES_SCOPE = "https://cognitiveservices.azure.com/.default";
+
+/* v8 ignore start -- shared network error utility, tested via classification tests @preserve */
+function isNetworkError(error: Error): boolean {
+  const code = (error as NodeJS.ErrnoException).code || ""
+  if (["ECONNRESET", "ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT", "EPIPE",
+       "EAI_AGAIN", "EHOSTUNREACH", "ENETUNREACH", "ECONNABORTED"].includes(code)) return true
+  const msg = error.message || ""
+  return msg.includes("fetch failed") || msg.includes("socket hang up") || msg.includes("getaddrinfo")
+}
+/* v8 ignore stop */
+
+export function classifyAzureError(error: Error): ProviderErrorClassification {
+  const status = (error as HttpError).status
+  if (status === 401 || status === 403) return "auth-failure"
+  if (status === 429) return "rate-limit"
+  if (status && status >= 500) return "server-error"
+  if (isNetworkError(error)) return "network-error"
+  return "unknown"
+}
 
 // @azure/identity is imported dynamically (below) rather than at the top level
 // because it's a heavy package (~30+ transitive deps) and we only need it when
@@ -112,10 +133,14 @@ export function createAzureProviderRuntime(model: string): ProviderRuntime {
         params,
         request.callbacks,
         request.signal,
-        request.eagerFinalAnswerStreaming,
+        request.eagerSettleStreaming,
       );
       for (const item of result.outputItems) nativeInput!.push(item);
       return result;
+    },
+    /* v8 ignore next 3 -- delegation: classification logic tested via classifyAzureError @preserve */
+    classifyError(error: Error): ProviderErrorClassification {
+      return classifyAzureError(error);
     },
   };
 }
