@@ -4694,3 +4694,107 @@ describe("memory-awareness lines in contextSection (Unit 1.8)", () => {
     expect(result).toContain("My task board is always loaded")
   })
 })
+
+describe("pre-implementation scrutiny", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    setAgentProvider("minimax")
+    mockGetBoard.mockReset().mockReturnValue({
+      compact: "",
+      full: "",
+      byStatus: {
+        drafting: [],
+        processing: [],
+        "validating": [],
+        collaborating: [],
+        paused: [],
+        blocked: [],
+        done: [],
+        cancelled: [],
+      },
+      actionRequired: [],
+      unresolvedDependencies: [],
+      activeSessions: [],
+    })
+  })
+
+  it("buildSystem includes scrutiny section when channel has coding tools (cli)", async () => {
+    setupReadFileSync()
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = await buildSystem("cli")
+    expect(result).toContain("pre-implementation scrutiny")
+  })
+
+  it("scrutiny section contains stranger-with-candy framing", async () => {
+    setupReadFileSync()
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = await buildSystem("cli")
+    expect(result).toContain("What is this plan NOT telling me")
+  })
+
+  it("scrutiny section contains tinfoil-hat framing", async () => {
+    setupReadFileSync()
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = await buildSystem("cli")
+    expect(result).toContain("What external system does this plan trust")
+  })
+
+  it("scrutiny section uses first-person voice", async () => {
+    setupReadFileSync()
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = await buildSystem("cli")
+    expect(result).toContain("I'm going to examine this plan through deeply suspicious eyes")
+  })
+
+  it("preImplementationScrutinySection returns empty when hasCodingTools is false", async () => {
+    const { preImplementationScrutinySection } = await import("../../mind/scrutiny")
+    const result = preImplementationScrutinySection(false)
+    expect(result).toBe("")
+  })
+
+  it("preImplementationScrutinySection returns scrutiny text when hasCodingTools is true", async () => {
+    const { preImplementationScrutinySection } = await import("../../mind/scrutiny")
+    const result = preImplementationScrutinySection(true)
+    expect(result).toContain("pre-implementation scrutiny")
+    expect(result).toContain("I'm going to examine this plan through deeply suspicious eyes")
+    expect(result).toContain("What is this plan NOT telling me")
+    expect(result).toContain("What external system does this plan trust")
+  })
+
+  it("scrutiny section contains anti-hallucination clause", async () => {
+    const { preImplementationScrutinySection } = await import("../../mind/scrutiny")
+    const result = preImplementationScrutinySection(true)
+    expect(result).toContain("silence is a valid outcome")
+  })
+
+  it("scrutiny section is placed in how-i-work group after workspace discipline", async () => {
+    setupReadFileSync()
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+    const result = await buildSystem("cli")
+    const workspaceDisciplineIdx = result.indexOf("## how i work")
+    const scrutinyIdx = result.indexOf("## pre-implementation scrutiny")
+    expect(workspaceDisciplineIdx).toBeGreaterThan(-1)
+    expect(scrutinyIdx).toBeGreaterThan(-1)
+    expect(scrutinyIdx).toBeGreaterThan(workspaceDisciplineIdx)
+  })
+})
