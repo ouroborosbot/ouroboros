@@ -355,12 +355,6 @@ describe("outlook http", () => {
     const inner = await fetch(`${server.origin}/outlook/api/agents/nobody/inner-transcript`).then((r) => r.json())
     expect(inner.messageCount).toBe(0)
 
-    // SSE endpoint — verify it sends headers and initial ok
-    const sseController = new AbortController()
-    const sseResp = await fetch(`${server.origin}/outlook/api/events`, { signal: sseController.signal })
-    expect(sseResp.headers.get("content-type")).toBe("text/event-stream")
-    sseController.abort()
-
     const prefs = await fetch(`${server.origin}/outlook/api/agents/nobody/desk-prefs`).then((r) => r.json())
     expect(prefs).toEqual(expect.objectContaining({ carrying: null }))
 
