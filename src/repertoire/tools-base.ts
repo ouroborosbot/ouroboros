@@ -711,7 +711,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       function: {
         name: "claude",
         description:
-          "use claude code to query this codebase or get an outside perspective. useful for code review, second opinions, and asking questions about your own source.",
+          "use claude code to query this codebase or get an outside perspective. Use for code review, second opinions, or questions that benefit from a fresh perspective outside this conversation's context.",
         parameters: {
           type: "object",
           properties: { prompt: { type: "string" } },
@@ -1489,7 +1489,7 @@ export const ponderTool: OpenAI.ChatCompletionFunctionTool = {
   type: "function",
   function: {
     name: "ponder",
-    description: "i need to sit with this. from a conversation, takes the thread inward with a thought and a parting word. from inner dialog, keeps the wheel turning for another pass. must be the only tool call in the turn.",
+    description: "i need to sit with this. from a conversation, takes the thread inward with a thought and a parting word. from inner dialog, keeps the wheel turning for another pass. must be the only tool call in the turn. Use when a question deserves more thought than this turn allows. Don't ponder trivial questions.",
     parameters: {
       type: "object",
       properties: {
@@ -1525,7 +1525,7 @@ export const settleTool: OpenAI.ChatCompletionFunctionTool = {
   function: {
     name: "settle",
     description:
-      "respond to the user with your message. call this tool when you are ready to deliver your response.",
+      "respond to the user with your message. call this tool when you are ready to deliver your response. Only call when you have a substantive response. If you're settling with 'I'll look into that,' you probably should be using a tool instead.",
     parameters: {
       type: "object",
       properties: {

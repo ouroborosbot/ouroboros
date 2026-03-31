@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { baseToolDefinitions, ponderTool, settleTool } from "../../repertoire/tools-base"
 import { codingToolDefinitions } from "../../repertoire/coding/tools"
+import { adoSemanticToolDefinitions } from "../../repertoire/ado-semantic"
 
 function getBaseDescription(toolName: string): string {
   const def = baseToolDefinitions.find((d) => d.tool.function.name === toolName)
@@ -11,6 +12,12 @@ function getBaseDescription(toolName: string): string {
 function getCodingDescription(toolName: string): string {
   const def = codingToolDefinitions.find((d) => d.tool.function.name === toolName)
   if (!def) throw new Error(`Tool '${toolName}' not found in codingToolDefinitions`)
+  return def.tool.function.description ?? ""
+}
+
+function getAdoDescription(toolName: string): string {
+  const def = adoSemanticToolDefinitions.find((d) => d.tool.function.name === toolName)
+  if (!def) throw new Error(`Tool '${toolName}' not found in adoSemanticToolDefinitions`)
   return def.tool.function.description ?? ""
 }
 
@@ -105,6 +112,31 @@ describe("Phase 2: tool description enrichment", () => {
     it("claude description contains second opinions guidance", () => {
       const desc = getBaseDescription("claude")
       expect(desc).toContain("second opinions")
+    })
+
+    it("ado_backlog_list description contains WIQL guidance", () => {
+      const desc = getAdoDescription("ado_backlog_list")
+      expect(desc).toContain("Use this instead of raw WIQL queries")
+    })
+
+    it("ado_create_epic description contains preview guidance", () => {
+      const desc = getAdoDescription("ado_create_epic")
+      expect(desc).toContain("Use ado_preview_changes first")
+    })
+
+    it("ado_create_issue description contains preview guidance", () => {
+      const desc = getAdoDescription("ado_create_issue")
+      expect(desc).toContain("Use ado_preview_changes first")
+    })
+
+    it("ado_move_items description contains preview guidance", () => {
+      const desc = getAdoDescription("ado_move_items")
+      expect(desc).toContain("Use ado_preview_changes first")
+    })
+
+    it("ado_restructure_backlog description contains preview guidance", () => {
+      const desc = getAdoDescription("ado_restructure_backlog")
+      expect(desc).toContain("Use ado_preview_changes first")
     })
   })
 })
