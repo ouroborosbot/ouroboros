@@ -202,4 +202,126 @@ describe("outlook http", () => {
     await server.stop()
     vi.doUnmock("../../../heart/daemon/outlook-read")
   })
+
+  it("serves deep inspectability endpoints for agent surfaces", async () => {
+    const { startOutlookHttpServer } = await import("../../../heart/daemon/outlook-http")
+
+    const server = await startOutlookHttpServer({
+      host: "127.0.0.1",
+      port: 0,
+      readMachineState: () => ({ productName: "Ouro Outlook", agentCount: 1 }) as any,
+      readAgentState: () => null,
+      renderApp: () => "<!doctype html><title>Outlook</title>",
+      readAgentSessions: () => ({ totalCount: 3, activeCount: 2, staleCount: 1, items: [] }),
+      readAgentTranscript: (_agent, friendId) => (
+        friendId === "friend-1"
+          ? { friendId: "friend-1", friendName: "Ari", channel: "cli", key: "session", sessionPath: "/p", messageCount: 5, lastUsage: null, continuity: null, messages: [] }
+          : null
+      ),
+      readAgentCoding: () => ({ totalCount: 1, activeCount: 1, blockedCount: 0, items: [] }),
+      readAgentAttention: () => ({ queueLength: 2, queueItems: [], pendingChannels: [], returnObligations: [] }),
+      readAgentBridges: () => ({ totalCount: 1, activeCount: 1, items: [] }),
+      readAgentMemory: () => ({ diaryEntryCount: 5, recentDiaryEntries: [], journalEntryCount: 2, recentJournalEntries: [] }),
+      readAgentFriends: () => ({ totalFriends: 3, friends: [] }),
+      readAgentHabits: () => ({ totalCount: 2, activeCount: 1, pausedCount: 1, degradedCount: 0, overdueCount: 0, items: [] }),
+      readDaemonHealth: () => ({ status: "ok", mode: "dev", pid: 1, startedAt: "", uptimeSeconds: 0, safeMode: null, degradedComponents: [], agentHealth: {}, habitHealth: {} }),
+      readLogs: () => ({ logPath: null, totalLines: 0, entries: [] }),
+    })
+
+    // Session inventory
+    const sessions = await fetch(`${server.origin}/outlook/api/agents/slugger/sessions`).then((r) => r.json())
+    expect(sessions).toEqual(expect.objectContaining({ totalCount: 3, activeCount: 2 }))
+
+    // Session transcript
+    const transcript = await fetch(`${server.origin}/outlook/api/agents/slugger/sessions/friend-1/cli/session`).then((r) => r.json())
+    expect(transcript).toEqual(expect.objectContaining({ friendId: "friend-1", messageCount: 5 }))
+
+    // Missing transcript
+    const missingTranscript = await fetch(`${server.origin}/outlook/api/agents/slugger/sessions/nobody/cli/session`)
+    expect(missingTranscript.status).toBe(404)
+
+    // Coding deep
+    const coding = await fetch(`${server.origin}/outlook/api/agents/slugger/coding`).then((r) => r.json())
+    expect(coding).toEqual(expect.objectContaining({ totalCount: 1 }))
+
+    // Attention
+    const attention = await fetch(`${server.origin}/outlook/api/agents/slugger/attention`).then((r) => r.json())
+    expect(attention).toEqual(expect.objectContaining({ queueLength: 2 }))
+
+    // Bridges
+    const bridges = await fetch(`${server.origin}/outlook/api/agents/slugger/bridges`).then((r) => r.json())
+    expect(bridges).toEqual(expect.objectContaining({ totalCount: 1 }))
+
+    // Memory
+    const memory = await fetch(`${server.origin}/outlook/api/agents/slugger/memory`).then((r) => r.json())
+    expect(memory).toEqual(expect.objectContaining({ diaryEntryCount: 5 }))
+
+    // Friends
+    const friends = await fetch(`${server.origin}/outlook/api/agents/slugger/friends`).then((r) => r.json())
+    expect(friends).toEqual(expect.objectContaining({ totalFriends: 3 }))
+
+    // Habits
+    const habits = await fetch(`${server.origin}/outlook/api/agents/slugger/habits`).then((r) => r.json())
+    expect(habits).toEqual(expect.objectContaining({ totalCount: 2 }))
+
+    // Daemon health
+    const health = await fetch(`${server.origin}/outlook/api/machine/health`).then((r) => r.json())
+    expect(health).toEqual(expect.objectContaining({ status: "ok", mode: "dev" }))
+
+    // Logs
+    const logs = await fetch(`${server.origin}/outlook/api/machine/logs`).then((r) => r.json())
+    expect(logs).toEqual(expect.objectContaining({ totalLines: 0 }))
+
+    // Unknown agent surface
+    const unknown = await fetch(`${server.origin}/outlook/api/agents/slugger/nope`)
+    expect(unknown.status).toBe(404)
+    const unknownBody = await unknown.json()
+    expect(unknownBody.error).toBe("unknown agent surface: nope")
+
+    await server.stop()
+  })
+
+  it("streams SSE events and supports manual broadcast", async () => {
+    const { startOutlookHttpServer } = await import("../../../heart/daemon/outlook-http")
+
+    const server = await startOutlookHttpServer({
+      host: "127.0.0.1",
+      port: 0,
+      readMachineState: () => ({ productName: "Ouro Outlook", agentCount: 0 }) as any,
+      readAgentState: () => null,
+      renderApp: () => "<!doctype html><title>Outlook</title>",
+    })
+
+    // Connect an SSE client
+    const controller = new AbortController()
+    const sseResponse = await fetch(`${server.origin}/outlook/api/events`, {
+      headers: { accept: "text/event-stream" },
+      signal: controller.signal,
+    })
+
+    expect(sseResponse.status).toBe(200)
+    expect(sseResponse.headers.get("content-type")).toBe("text/event-stream")
+
+    // Broadcast an event
+    server.broadcast("state-changed", { at: "2026-03-30T16:00:00.000Z" })
+
+    // Read what the client received
+    const reader = sseResponse.body!.getReader()
+    const decoder = new TextDecoder()
+    let accumulated = ""
+
+    // Read chunks until we have the broadcast event
+    while (!accumulated.includes("state-changed")) {
+      const { value, done } = await reader.read()
+      if (done) break
+      accumulated += decoder.decode(value, { stream: true })
+    }
+
+    expect(accumulated).toContain(":ok")
+    expect(accumulated).toContain("event: state-changed")
+    expect(accumulated).toContain("2026-03-30T16:00:00.000Z")
+
+    controller.abort()
+    await server.stop()
+  })
 })

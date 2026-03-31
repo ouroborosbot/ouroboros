@@ -4,7 +4,6 @@ import {
   type OutlookAgentState,
   type OutlookAgentSummary,
   type OutlookAgentView,
-  type OutlookAttentionLevel,
   type OutlookInnerSummary,
   type OutlookMachineDaemonSummary,
   type OutlookMachineMood,
@@ -16,21 +15,13 @@ import {
   type OutlookViewer,
 } from "./outlook-types"
 
-const ATTENTION_RANK: Record<OutlookAttentionLevel, number> = {
-  degraded: 0,
-  stale: 1,
-  blocked: 2,
-  active: 3,
-  idle: 4,
-}
-
 function deriveAttention(agent: OutlookAgentSummary): OutlookMachineAgentView["attention"] {
   if (agent.degraded.status === "degraded") {
-    return { level: "degraded", label: "Needs intervention" }
+    return { level: "degraded", label: "Degraded" }
   }
 
   if (agent.freshness.status === "stale") {
-    return { level: "stale", label: "Needs reorientation" }
+    return { level: "stale", label: "Stale" }
   }
 
   if (agent.tasks.blockedCount > 0 || agent.coding.blockedCount > 0) {
@@ -38,7 +29,7 @@ function deriveAttention(agent: OutlookAgentSummary): OutlookMachineAgentView["a
   }
 
   if (agent.tasks.liveCount > 0 || agent.coding.activeCount > 0 || agent.obligations.openCount > 0) {
-    return { level: "active", label: "In motion" }
+    return { level: "active", label: "Active" }
   }
 
   return { level: "idle", label: "Idle" }
@@ -106,16 +97,15 @@ export function buildOutlookMachineView(input: {
 }): OutlookMachineView {
   const totals = buildTotals(input.machine)
   const agents = input.machine.agents
-    .map((agent, index) => ({
+    .map((agent) => ({
       ...agent,
       attention: deriveAttention(agent),
-      _index: index,
     }))
     .sort((left, right) => {
-      const levelDelta = ATTENTION_RANK[left.attention.level] - ATTENTION_RANK[right.attention.level]
-      return levelDelta !== 0 ? levelDelta : left._index - right._index
+      const leftAt = left.freshness.latestActivityAt ?? ""
+      const rightAt = right.freshness.latestActivityAt ?? ""
+      return rightAt.localeCompare(leftAt)
     })
-    .map(({ _index: _discarded, ...agent }) => agent)
 
   return {
     overview: {

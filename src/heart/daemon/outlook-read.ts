@@ -14,14 +14,38 @@ import {
   OUTLOOK_PRODUCT_NAME,
   type OutlookAgentState,
   type OutlookAgentSummary,
+  type OutlookAttentionQueueItem,
+  type OutlookAttentionView,
+  type OutlookBridgeInventory,
+  type OutlookBridgeItem,
+  type OutlookCodingDeep,
+  type OutlookCodingDeepItem,
   type OutlookCodingItem,
+  type OutlookDaemonHealthDeep,
   type OutlookDegradedState,
+  type OutlookDiaryEntry,
   type OutlookFreshness,
+  type OutlookFriendSummary,
+  type OutlookFriendView,
+  type OutlookHabitItem,
+  type OutlookHabitView,
   type OutlookIssue,
+  type OutlookJournalEntry,
+  type OutlookLogEntry,
+  type OutlookLogView,
   type OutlookMachineState,
+  type OutlookMemoryView,
   type OutlookObligationItem,
+  type OutlookPendingChannel,
+  type OutlookSessionContinuity,
+  type OutlookSessionInventory,
+  type OutlookSessionInventoryItem,
   type OutlookSessionItem,
+  type OutlookSessionTranscript,
+  type OutlookSessionUsage,
   type OutlookTaskSummary,
+  type OutlookTranscriptMessage,
+  type OutlookTranscriptToolCall,
 } from "./outlook-types"
 
 interface OutlookReadOptions {
@@ -131,6 +155,8 @@ function readObligationSummary(agentRoot: string): { items: OutlookObligationIte
       content: obligation.content,
       updatedAt: obligation.updatedAt ?? obligation.createdAt,
       nextAction: obligation.nextAction ?? null,
+      origin: obligation.origin ?? null,
+      currentSurface: obligation.currentSurface ?? null,
     }))
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
 
@@ -391,4 +417,852 @@ export function readOutlookMachineState(options: OutlookReadOptions = {}): Outlo
     degraded: summarizeDegraded(degradedIssues),
     agents: agentStates.map(summarizeAgent),
   }
+}
+
+// ---------------------------------------------------------------------------
+// Session inventory — enumerate all sessions with summary metadata
+// ---------------------------------------------------------------------------
+
+interface SessionEnvelope {
+  version?: number
+  messages?: Array<Record<string, unknown>>
+  lastUsage?: Record<string, unknown>
+  state?: Record<string, unknown>
+}
+
+function parseSessionUsage(raw: Record<string, unknown> | undefined): OutlookSessionUsage | null {
+  if (!raw) return null
+  const inputTokens = typeof raw.input_tokens === "number" ? raw.input_tokens : 0
+  const outputTokens = typeof raw.output_tokens === "number" ? raw.output_tokens : 0
+  const reasoningTokens = typeof raw.reasoning_tokens === "number" ? raw.reasoning_tokens : 0
+  const totalTokens = typeof raw.total_tokens === "number" ? raw.total_tokens : 0
+  if (inputTokens === 0 && outputTokens === 0 && totalTokens === 0) return null
+  return { input_tokens: inputTokens, output_tokens: outputTokens, reasoning_tokens: reasoningTokens, total_tokens: totalTokens }
+}
+
+function parseSessionContinuity(raw: Record<string, unknown> | undefined): OutlookSessionContinuity | null {
+  if (!raw) return null
+  return {
+    mustResolveBeforeHandoff: raw.mustResolveBeforeHandoff === true,
+    lastFriendActivityAt: typeof raw.lastFriendActivityAt === "string" ? raw.lastFriendActivityAt : null,
+  }
+}
+
+function extractContent(message: Record<string, unknown>): string | null {
+  if (typeof message.content === "string") return message.content
+  return null
+}
+
+function extractToolCallNames(message: Record<string, unknown>): string[] {
+  const toolCalls = message.tool_calls
+  if (!Array.isArray(toolCalls)) return []
+  return toolCalls
+    .map((call) => {
+      if (call && typeof call === "object" && "function" in call) {
+        const fn = (call as Record<string, unknown>).function
+        if (fn && typeof fn === "object" && "name" in fn) {
+          return typeof (fn as Record<string, unknown>).name === "string" ? (fn as Record<string, unknown>).name as string : null
+        }
+      }
+      return null
+    })
+    .filter((name): name is string => name !== null)
+}
+
+function estimateTokenCount(messages: Array<Record<string, unknown>>): number {
+  let charCount = 0
+  for (const msg of messages) {
+    const content = extractContent(msg)
+    if (content) charCount += content.length
+    const toolCalls = msg.tool_calls
+    if (Array.isArray(toolCalls)) {
+      charCount += JSON.stringify(toolCalls).length
+    }
+  }
+  return Math.ceil(charCount / 4)
+}
+
+function readSessionEnvelope(sessionPath: string): SessionEnvelope | null {
+  try {
+    const raw = fs.readFileSync(sessionPath, "utf-8")
+    return JSON.parse(raw) as SessionEnvelope
+  } catch {
+    return null
+  }
+}
+
+function resolveAllSessionPaths(sessionsDir: string): Array<{ friendId: string; channel: string; key: string; sessionPath: string }> {
+  const results: Array<{ friendId: string; channel: string; key: string; sessionPath: string }> = []
+  if (!fs.existsSync(sessionsDir)) return results
+
+  for (const friendId of safeReaddir(sessionsDir)) {
+    const friendDir = path.join(sessionsDir, friendId)
+    if (!safeIsDirectory(friendDir)) continue
+    for (const channel of safeReaddir(friendDir)) {
+      const channelDir = path.join(friendDir, channel)
+      if (!safeIsDirectory(channelDir)) continue
+      for (const file of safeReaddir(channelDir)) {
+        if (!file.endsWith(".json")) continue
+        const key = file.slice(0, -5)
+        results.push({
+          friendId,
+          channel,
+          key,
+          sessionPath: path.join(channelDir, file),
+        })
+      }
+    }
+  }
+  return results
+}
+
+function safeReaddir(dir: string): string[] {
+  try {
+    return fs.readdirSync(dir)
+  } catch {
+    return []
+  }
+}
+
+function safeIsDirectory(filePath: string): boolean {
+  try {
+    return fs.statSync(filePath).isDirectory()
+  } catch {
+    return false
+  }
+}
+
+function resolveFriendName(friendsDir: string, friendId: string): string {
+  try {
+    const raw = fs.readFileSync(path.join(friendsDir, `${friendId}.json`), "utf-8")
+    const parsed = JSON.parse(raw) as { name?: unknown }
+    return typeof parsed.name === "string" ? parsed.name : friendId
+  } catch {
+    return friendId
+  }
+}
+
+export function readSessionInventory(agentName: string, options: OutlookReadOptions = {}): OutlookSessionInventory {
+  const bundlesRoot = options.bundlesRoot ?? getAgentBundlesRoot()
+  const now = options.now?.() ?? new Date()
+  const agentRoot = path.join(bundlesRoot, `${agentName}.ouro`)
+  const sessionsDir = path.join(agentRoot, "state", "sessions")
+  const friendsDir = path.join(agentRoot, "friends")
+
+  const allSessions = resolveAllSessionPaths(sessionsDir)
+  const items: OutlookSessionInventoryItem[] = []
+
+  for (const { friendId, channel, key, sessionPath } of allSessions) {
+    if (friendId === "self" && channel === "inner") continue
+
+    const envelope = readSessionEnvelope(sessionPath)
+    const messages = Array.isArray(envelope?.messages) ? envelope.messages : []
+    const lastUsage = parseSessionUsage(envelope?.lastUsage as Record<string, unknown> | undefined)
+    const continuity = parseSessionContinuity(envelope?.state as Record<string, unknown> | undefined)
+
+    const lastActivityAt = continuity?.lastFriendActivityAt ?? safeFileMtime(sessionPath) ?? now.toISOString()
+    const activitySource: "friend-facing" | "mtime-fallback" = continuity?.lastFriendActivityAt ? "friend-facing" : "mtime-fallback"
+
+    const userMessages = messages.filter((m) => m.role === "user")
+    const assistantMessages = messages.filter((m) => m.role === "assistant")
+    const lastUser = userMessages.length > 0 ? userMessages[userMessages.length - 1]! : null
+    const lastAssistant = assistantMessages.length > 0 ? assistantMessages[assistantMessages.length - 1]! : null
+
+    const latestToolCallNames: string[] = []
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const names = extractToolCallNames(messages[i]!)
+      if (names.length > 0) {
+        latestToolCallNames.push(...names)
+        break
+      }
+    }
+
+    const friendName = resolveFriendName(friendsDir, friendId)
+
+    // Derive reply state from message pattern
+    const lastMsg = messages.length > 0 ? messages[messages.length - 1]! : null
+    const mustResolve = continuity?.mustResolveBeforeHandoff === true
+    let replyState: "needs-reply" | "on-hold" | "monitoring" | "idle" = "idle"
+    if (mustResolve) {
+      replyState = "on-hold"
+    } else if (lastMsg?.role === "user") {
+      replyState = "needs-reply"
+    } else if (messages.length > 0) {
+      replyState = "monitoring"
+    }
+
+    items.push({
+      friendId,
+      friendName,
+      channel,
+      key,
+      sessionPath,
+      lastActivityAt,
+      activitySource,
+      replyState,
+      messageCount: messages.length,
+      lastUsage,
+      continuity,
+      latestUserExcerpt: truncateExcerpt(extractContent(lastUser ?? {})),
+      latestAssistantExcerpt: truncateExcerpt(extractContent(lastAssistant ?? {})),
+      latestToolCallNames,
+      estimatedTokens: messages.length > 0 ? estimateTokenCount(messages) : null,
+    })
+  }
+
+  items.sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt))
+
+  const ageThreshold = now.getTime() - STALE_THRESHOLD_MS
+  const activeCount = items.filter((item) => Date.parse(item.lastActivityAt) >= ageThreshold).length
+
+  return {
+    totalCount: items.length,
+    activeCount,
+    staleCount: items.length - activeCount,
+    items,
+  }
+}
+
+function truncateExcerpt(content: string | null, maxLength = 200): string | null {
+  if (!content) return null
+  if (content.length <= maxLength) return content
+  const truncated = content.slice(0, maxLength)
+  const lastSpace = truncated.lastIndexOf(" ")
+  return (lastSpace > maxLength * 0.6 ? truncated.slice(0, lastSpace) : truncated) + "…"
+}
+
+function safeFileMtime(filePath: string): string | null {
+  try {
+    return fs.statSync(filePath).mtime.toISOString()
+  } catch {
+    return null
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Session transcript — full x-ray of one session
+// ---------------------------------------------------------------------------
+
+export function readSessionTranscript(
+  agentName: string,
+  friendId: string,
+  channel: string,
+  key: string,
+  options: OutlookReadOptions = {},
+): OutlookSessionTranscript | null {
+  const bundlesRoot = options.bundlesRoot ?? getAgentBundlesRoot()
+  const agentRoot = path.join(bundlesRoot, `${agentName}.ouro`)
+  const sessionPath = path.join(agentRoot, "state", "sessions", friendId, channel, `${key}.json`)
+
+  const envelope = readSessionEnvelope(sessionPath)
+  if (!envelope) return null
+
+  const rawMessages = Array.isArray(envelope.messages) ? envelope.messages : []
+  const friendsDir = path.join(agentRoot, "friends")
+  const friendName = resolveFriendName(friendsDir, friendId)
+
+  const messages: OutlookTranscriptMessage[] = rawMessages.map((msg, index) => {
+    const role = typeof msg.role === "string" ? msg.role as OutlookTranscriptMessage["role"] : "user"
+    const content = extractContent(msg)
+    const result: OutlookTranscriptMessage = { index, role, content }
+
+    if (typeof msg.name === "string") result.name = msg.name
+    if (typeof msg.tool_call_id === "string") result.tool_call_id = msg.tool_call_id
+
+    if (Array.isArray(msg.tool_calls)) {
+      result.tool_calls = msg.tool_calls
+        .filter((call): call is Record<string, unknown> => call != null && typeof call === "object")
+        .map((call) => {
+          const fn = call.function as Record<string, unknown> | undefined
+          return {
+            id: typeof call.id === "string" ? call.id : "",
+            type: typeof call.type === "string" ? call.type : "function",
+            function: {
+              name: typeof fn?.name === "string" ? fn.name : "unknown",
+              arguments: typeof fn?.arguments === "string" ? fn.arguments : JSON.stringify(fn?.arguments ?? ""),
+            },
+          } satisfies OutlookTranscriptToolCall
+        })
+    }
+
+    return result
+  })
+
+  return {
+    friendId,
+    friendName,
+    channel,
+    key,
+    sessionPath,
+    messageCount: messages.length,
+    lastUsage: parseSessionUsage(envelope.lastUsage as Record<string, unknown> | undefined),
+    continuity: parseSessionContinuity(envelope.state as Record<string, unknown> | undefined),
+    messages,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Coding deep — full details for all coding sessions
+// ---------------------------------------------------------------------------
+
+export function readCodingDeep(agentRoot: string): OutlookCodingDeep {
+  const stateFilePath = path.join(agentRoot, "state", "coding", "sessions.json")
+
+  if (!fs.existsSync(stateFilePath)) {
+    return { totalCount: 0, activeCount: 0, blockedCount: 0, items: [] }
+  }
+
+  let parsed: { records?: Array<{ session?: Record<string, unknown> }> }
+  try {
+    parsed = JSON.parse(fs.readFileSync(stateFilePath, "utf-8")) as typeof parsed
+  } catch {
+    return { totalCount: 0, activeCount: 0, blockedCount: 0, items: [] }
+  }
+
+  const items: OutlookCodingDeepItem[] = Array.isArray(parsed.records)
+    ? parsed.records.flatMap((record) => {
+      const s = record?.session
+      if (!s || typeof s.id !== "string" || typeof s.status !== "string") return []
+
+      const checkpoint = typeof s.checkpoint === "string" ? s.checkpoint
+        : typeof s.stderrTail === "string" && s.stderrTail.trim().length > 0 ? s.stderrTail.trim()
+          : typeof s.stdoutTail === "string" && s.stdoutTail.trim().length > 0 ? s.stdoutTail.trim()
+            : null
+
+      const originSession = s.originSession as Record<string, unknown> | undefined
+      const normalizedOrigin = originSession
+        && typeof originSession.friendId === "string"
+        && typeof originSession.channel === "string"
+        && typeof originSession.key === "string"
+        ? { friendId: originSession.friendId, channel: originSession.channel, key: originSession.key }
+        : null
+
+      const failure = s.failure as Record<string, unknown> | null | undefined
+      const normalizedFailure = failure && typeof failure === "object"
+        ? {
+            command: typeof failure.command === "string" ? failure.command : "",
+            args: Array.isArray(failure.args) ? failure.args.map(String) : [],
+            code: typeof failure.code === "number" ? failure.code : null,
+            signal: typeof failure.signal === "string" ? failure.signal : null,
+            stdoutTail: typeof failure.stdoutTail === "string" ? failure.stdoutTail : "",
+            stderrTail: typeof failure.stderrTail === "string" ? failure.stderrTail : "",
+          }
+        : null
+
+      return [{
+        id: s.id,
+        runner: (typeof s.runner === "string" ? s.runner : "claude") as OutlookCodingDeepItem["runner"],
+        status: s.status as OutlookCodingDeepItem["status"],
+        checkpoint,
+        taskRef: typeof s.taskRef === "string" ? s.taskRef : null,
+        workdir: typeof s.workdir === "string" ? s.workdir : "",
+        originSession: normalizedOrigin,
+        obligationId: typeof s.obligationId === "string" ? s.obligationId : null,
+        scopeFile: typeof s.scopeFile === "string" ? s.scopeFile : null,
+        stateFile: typeof s.stateFile === "string" ? s.stateFile : null,
+        artifactPath: typeof s.artifactPath === "string" ? s.artifactPath : null,
+        pid: typeof s.pid === "number" ? s.pid : null,
+        startedAt: typeof s.startedAt === "string" ? s.startedAt : "",
+        lastActivityAt: typeof s.lastActivityAt === "string" ? s.lastActivityAt : "",
+        endedAt: typeof s.endedAt === "string" ? s.endedAt : null,
+        restartCount: typeof s.restartCount === "number" ? s.restartCount : 0,
+        lastExitCode: typeof s.lastExitCode === "number" ? s.lastExitCode : null,
+        lastSignal: typeof s.lastSignal === "string" ? s.lastSignal : null,
+        stdoutTail: typeof s.stdoutTail === "string" ? s.stdoutTail : "",
+        stderrTail: typeof s.stderrTail === "string" ? s.stderrTail : "",
+        failure: normalizedFailure,
+      }]
+    })
+    : []
+
+  return {
+    totalCount: items.length,
+    activeCount: items.filter((item) => ACTIVE_CODING_STATUSES.has(item.status)).length,
+    blockedCount: items.filter((item) => BLOCKED_CODING_STATUSES.has(item.status)).length,
+    items,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Attention / pending / inbox
+// ---------------------------------------------------------------------------
+
+function scanPendingChannels(agentRoot: string): OutlookPendingChannel[] {
+  const pendingRoot = path.join(agentRoot, "state", "pending")
+  const channels: OutlookPendingChannel[] = []
+
+  for (const friendId of safeReaddir(pendingRoot)) {
+    if (friendId === "self") continue
+    const friendDir = path.join(pendingRoot, friendId)
+    if (!safeIsDirectory(friendDir)) continue
+    for (const channel of safeReaddir(friendDir)) {
+      const channelDir = path.join(friendDir, channel)
+      if (!safeIsDirectory(channelDir)) continue
+      for (const key of safeReaddir(channelDir)) {
+        const keyDir = path.join(channelDir, key)
+        if (!safeIsDirectory(keyDir)) continue
+        const files = safeReaddir(keyDir).filter((f) => f.endsWith(".json") || f.endsWith(".json.processing"))
+        if (files.length > 0) {
+          channels.push({ friendId, channel, key, messageCount: files.length })
+        }
+      }
+    }
+  }
+
+  return channels
+}
+
+function readPendingMessagesNonDestructive(pendingDir: string): Array<Record<string, unknown>> {
+  const files = safeReaddir(pendingDir).filter((f) => f.endsWith(".json") || f.endsWith(".json.processing"))
+  const messages: Array<Record<string, unknown>> = []
+  for (const file of files.sort()) {
+    try {
+      const raw = fs.readFileSync(path.join(pendingDir, file), "utf-8")
+      messages.push(JSON.parse(raw) as Record<string, unknown>)
+    } catch {
+      // skip unparseable pending messages
+    }
+  }
+  return messages
+}
+
+export function readAttentionView(agentName: string, options: OutlookReadOptions = {}): OutlookAttentionView {
+  const bundlesRoot = options.bundlesRoot ?? getAgentBundlesRoot()
+  const agentRoot = path.join(bundlesRoot, `${agentName}.ouro`)
+  const friendsDir = path.join(agentRoot, "friends")
+
+  const pendingChannels = scanPendingChannels(agentRoot)
+
+  // Build attention queue items from pending messages across all channels
+  const queueItems: OutlookAttentionQueueItem[] = []
+  const pendingRoot = path.join(agentRoot, "state", "pending")
+
+  for (const pending of pendingChannels) {
+    const pendingDir = path.join(pendingRoot, pending.friendId, pending.channel, pending.key)
+    const messages = readPendingMessagesNonDestructive(pendingDir)
+    for (const msg of messages) {
+      const delegatedFrom = msg.delegatedFrom as Record<string, unknown> | undefined
+      queueItems.push({
+        id: typeof msg.timestamp === "number" ? `${msg.timestamp}-${pending.friendId}` : `pending-${Date.now()}`,
+        friendId: pending.friendId,
+        friendName: resolveFriendName(friendsDir, pending.friendId),
+        channel: pending.channel,
+        key: pending.key,
+        bridgeId: delegatedFrom && typeof delegatedFrom.bridgeId === "string" ? delegatedFrom.bridgeId : null,
+        delegatedContent: typeof msg.content === "string" ? msg.content : "",
+        obligationId: typeof msg.obligationId === "string" ? msg.obligationId : null,
+        source: "pending",
+        timestamp: typeof msg.timestamp === "number" ? msg.timestamp : 0,
+      })
+    }
+  }
+
+  queueItems.sort((a, b) => a.timestamp - b.timestamp)
+
+  // Return obligations
+  const returnObligations = readObligationSummary(agentRoot).items
+
+  return {
+    queueLength: queueItems.length,
+    queueItems,
+    pendingChannels,
+    returnObligations,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Bridge inventory — all bridge records
+// ---------------------------------------------------------------------------
+
+export function readBridgeInventory(agentRoot: string): OutlookBridgeInventory {
+  const bridgesDir = path.join(agentRoot, "state", "bridges")
+  const items: OutlookBridgeItem[] = []
+
+  for (const file of safeReaddir(bridgesDir)) {
+    if (!file.endsWith(".json")) continue
+    try {
+      const raw = fs.readFileSync(path.join(bridgesDir, file), "utf-8")
+      const bridge = JSON.parse(raw) as Record<string, unknown>
+
+      if (typeof bridge.id !== "string") continue
+
+      const attachedSessions = Array.isArray(bridge.attachedSessions)
+        ? (bridge.attachedSessions as Array<Record<string, unknown>>)
+            .filter((s) => typeof s.friendId === "string")
+            .map((s) => ({
+              friendId: s.friendId as string,
+              channel: typeof s.channel === "string" ? s.channel : "",
+              key: typeof s.key === "string" ? s.key : "",
+              sessionPath: typeof s.sessionPath === "string" ? s.sessionPath : "",
+              snapshot: typeof s.snapshot === "string" ? s.snapshot : null,
+            }))
+        : []
+
+      const taskLink = bridge.task as Record<string, unknown> | null | undefined
+      const normalizedTask = taskLink && typeof taskLink === "object" && typeof taskLink.taskName === "string"
+        ? {
+            taskName: taskLink.taskName as string,
+            path: typeof taskLink.path === "string" ? taskLink.path : "",
+            mode: typeof taskLink.mode === "string" ? taskLink.mode : "bound",
+            boundAt: typeof taskLink.boundAt === "string" ? taskLink.boundAt : "",
+          }
+        : null
+
+      items.push({
+        id: bridge.id,
+        objective: typeof bridge.objective === "string" ? bridge.objective : "",
+        summary: typeof bridge.summary === "string" ? bridge.summary : "",
+        lifecycle: typeof bridge.lifecycle === "string" ? bridge.lifecycle : "unknown",
+        runtime: typeof bridge.runtime === "string" ? bridge.runtime : "unknown",
+        createdAt: typeof bridge.createdAt === "string" ? bridge.createdAt : "",
+        updatedAt: typeof bridge.updatedAt === "string" ? bridge.updatedAt : "",
+        attachedSessions,
+        task: normalizedTask,
+      })
+    } catch {
+      // skip unparseable bridge files
+    }
+  }
+
+  items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  const activeCount = items.filter((item) => item.lifecycle === "active").length
+
+  return {
+    totalCount: items.length,
+    activeCount,
+    items,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Daemon health deep
+// ---------------------------------------------------------------------------
+
+export function readDaemonHealthDeep(healthPath?: string): OutlookDaemonHealthDeep | null {
+  const resolvedPath = healthPath ?? path.join(process.env.HOME ?? "", ".ouro-cli", "daemon-health.json")
+  try {
+    const raw = fs.readFileSync(resolvedPath, "utf-8")
+    const health = JSON.parse(raw) as Record<string, unknown>
+
+    return {
+      status: typeof health.status === "string" ? health.status : "unknown",
+      mode: typeof health.mode === "string" ? health.mode : "unknown",
+      pid: typeof health.pid === "number" ? health.pid : 0,
+      startedAt: typeof health.startedAt === "string" ? health.startedAt : "",
+      uptimeSeconds: typeof health.uptimeSeconds === "number" ? health.uptimeSeconds : 0,
+      safeMode: health.safeMode && typeof health.safeMode === "object"
+        ? {
+            active: (health.safeMode as Record<string, unknown>).active === true,
+            reason: typeof (health.safeMode as Record<string, unknown>).reason === "string" ? (health.safeMode as Record<string, unknown>).reason as string : "",
+            enteredAt: typeof (health.safeMode as Record<string, unknown>).enteredAt === "string" ? (health.safeMode as Record<string, unknown>).enteredAt as string : "",
+          }
+        : null,
+      degradedComponents: Array.isArray(health.degraded)
+        ? (health.degraded as Array<Record<string, unknown>>).map((c) => ({
+            component: typeof c.component === "string" ? c.component : "",
+            reason: typeof c.reason === "string" ? c.reason : "",
+            since: typeof c.since === "string" ? c.since : "",
+          }))
+        : [],
+      agentHealth: health.agents && typeof health.agents === "object"
+        ? Object.fromEntries(
+            Object.entries(health.agents as Record<string, Record<string, unknown>>).map(([name, entry]) => [
+              name,
+              {
+                status: typeof entry.status === "string" ? entry.status : "unknown",
+                pid: typeof entry.pid === "number" ? entry.pid : null,
+                crashes: typeof entry.crashes === "number" ? entry.crashes : 0,
+              },
+            ]),
+          )
+        : {},
+      habitHealth: health.habits && typeof health.habits === "object"
+        ? Object.fromEntries(
+            Object.entries(health.habits as Record<string, Record<string, unknown>>).map(([name, entry]) => [
+              name,
+              {
+                cronStatus: typeof entry.cronStatus === "string" ? entry.cronStatus : "unknown",
+                lastFired: typeof entry.lastFired === "string" ? entry.lastFired : null,
+                fallback: entry.fallback === true,
+              },
+            ]),
+          )
+        : {},
+    }
+  } catch {
+    return null
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Memory / journal inspection
+// ---------------------------------------------------------------------------
+
+export function readMemoryView(agentRoot: string): OutlookMemoryView {
+  // Read diary entries from facts.jsonl
+  const diaryRoot = path.join(agentRoot, "diary")
+  const legacyDiaryRoot = path.join(agentRoot, "psyche", "memory")
+  const effectiveDiaryRoot = fs.existsSync(diaryRoot) ? diaryRoot : fs.existsSync(legacyDiaryRoot) ? legacyDiaryRoot : null
+
+  const diaryEntries: OutlookDiaryEntry[] = []
+  if (effectiveDiaryRoot) {
+    const factsPath = path.join(effectiveDiaryRoot, "facts.jsonl")
+    try {
+      const raw = fs.readFileSync(factsPath, "utf-8")
+      for (const line of raw.split("\n")) {
+        if (!line.trim()) continue
+        try {
+          const entry = JSON.parse(line) as Record<string, unknown>
+          if (typeof entry.id === "string" && typeof entry.text === "string") {
+            diaryEntries.push({
+              id: entry.id,
+              text: entry.text,
+              source: typeof entry.source === "string" ? entry.source : "",
+              createdAt: typeof entry.createdAt === "string" ? entry.createdAt : "",
+            })
+          }
+        } catch {
+          // skip unparseable lines
+        }
+      }
+    } catch {
+      // no diary facts file
+    }
+  }
+
+  // Sort by createdAt descending, take recent
+  diaryEntries.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+
+  // Read journal index
+  const journalDir = path.join(agentRoot, "journal")
+  const journalEntries: OutlookJournalEntry[] = []
+  const indexPath = path.join(journalDir, ".index.json")
+  try {
+    const raw = fs.readFileSync(indexPath, "utf-8")
+    const index = JSON.parse(raw) as Array<Record<string, unknown>>
+    if (Array.isArray(index)) {
+      for (const entry of index) {
+        if (typeof entry.filename === "string") {
+          journalEntries.push({
+            filename: entry.filename,
+            preview: typeof entry.preview === "string" ? entry.preview : "",
+            mtime: typeof entry.mtime === "number" ? entry.mtime : 0,
+          })
+        }
+      }
+    }
+  } catch {
+    // no journal index
+  }
+
+  journalEntries.sort((a, b) => b.mtime - a.mtime)
+
+  return {
+    diaryEntryCount: diaryEntries.length,
+    recentDiaryEntries: diaryEntries.slice(0, 20),
+    journalEntryCount: journalEntries.length,
+    recentJournalEntries: journalEntries.slice(0, 20),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Friend / relationship economics
+// ---------------------------------------------------------------------------
+
+export function readFriendView(agentName: string, options: OutlookReadOptions = {}): OutlookFriendView {
+  const bundlesRoot = options.bundlesRoot ?? getAgentBundlesRoot()
+  const agentRoot = path.join(bundlesRoot, `${agentName}.ouro`)
+  const friendsDir = path.join(agentRoot, "friends")
+  const sessionsDir = path.join(agentRoot, "state", "sessions")
+
+  const friends: OutlookFriendSummary[] = []
+
+  for (const file of safeReaddir(friendsDir)) {
+    if (!file.endsWith(".json")) continue
+    const friendId = file.slice(0, -5)
+    try {
+      const raw = fs.readFileSync(path.join(friendsDir, file), "utf-8")
+      const record = JSON.parse(raw) as Record<string, unknown>
+
+      // Count sessions and channels for this friend
+      const friendSessionsDir = path.join(sessionsDir, friendId)
+      const channels = new Set<string>()
+      let sessionCount = 0
+      let latestActivity: string | null = null
+
+      for (const channel of safeReaddir(friendSessionsDir)) {
+        const channelDir = path.join(friendSessionsDir, channel)
+        if (!safeIsDirectory(channelDir)) continue
+        for (const keyFile of safeReaddir(channelDir)) {
+          if (!keyFile.endsWith(".json")) continue
+          channels.add(channel)
+          sessionCount++
+          const mtime = safeFileMtime(path.join(channelDir, keyFile))
+          if (mtime && (!latestActivity || mtime > latestActivity)) {
+            latestActivity = mtime
+          }
+        }
+      }
+
+      friends.push({
+        friendId,
+        friendName: typeof record.name === "string" ? record.name : friendId,
+        totalTokens: typeof record.totalTokens === "number" ? record.totalTokens : 0,
+        sessionCount,
+        channels: [...channels].sort(),
+        lastActivityAt: latestActivity,
+      })
+    } catch {
+      // skip unparseable friend records
+    }
+  }
+
+  friends.sort((a, b) => b.totalTokens - a.totalTokens)
+
+  return {
+    totalFriends: friends.length,
+    friends,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Log / event reading (NDJSON)
+// ---------------------------------------------------------------------------
+
+export function readLogView(logPath: string | null, limit = 100): OutlookLogView {
+  if (!logPath || !fs.existsSync(logPath)) {
+    return { logPath, totalLines: 0, entries: [] }
+  }
+
+  try {
+    const raw = fs.readFileSync(logPath, "utf-8")
+    const lines = raw.split("\n").filter((l) => l.trim().length > 0)
+    const totalLines = lines.length
+    const recentLines = lines.slice(-limit)
+
+    const entries: OutlookLogEntry[] = []
+    for (const line of recentLines) {
+      try {
+        const parsed = JSON.parse(line) as Record<string, unknown>
+        entries.push({
+          ts: typeof parsed.ts === "string" ? parsed.ts : "",
+          level: typeof parsed.level === "string" ? parsed.level : "info",
+          event: typeof parsed.event === "string" ? parsed.event : "",
+          component: typeof parsed.component === "string" ? parsed.component : "",
+          message: typeof parsed.message === "string" ? parsed.message : "",
+          trace_id: typeof parsed.trace_id === "string" ? parsed.trace_id : "",
+          meta: parsed.meta && typeof parsed.meta === "object" ? parsed.meta as Record<string, unknown> : {},
+        })
+      } catch {
+        // skip unparseable log lines
+      }
+    }
+
+    return { logPath, totalLines, entries }
+  } catch {
+    return { logPath, totalLines: 0, entries: [] }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Habit inspection
+// ---------------------------------------------------------------------------
+
+export function readHabitView(agentRoot: string, options: OutlookReadOptions = {}): OutlookHabitView {
+  const habitsDir = path.join(agentRoot, "habits")
+  const now = options.now?.() ?? new Date()
+  const items: OutlookHabitItem[] = []
+
+  for (const file of safeReaddir(habitsDir)) {
+    if (!file.endsWith(".md")) continue
+    try {
+      const raw = fs.readFileSync(path.join(habitsDir, file), "utf-8")
+      const habit = parseHabitFrontmatter(raw)
+      if (!habit) continue
+
+      const cadenceMs = parseCadenceMs(habit.cadence)
+      let isOverdue = false
+      let overdueMs: number | null = null
+      if (habit.status === "active" && habit.lastRun && cadenceMs) {
+        const elapsed = now.getTime() - Date.parse(habit.lastRun)
+        if (elapsed > cadenceMs) {
+          isOverdue = true
+          overdueMs = elapsed - cadenceMs
+        }
+      }
+
+      items.push({
+        name: habit.name ?? file.slice(0, -3),
+        title: habit.title ?? file.slice(0, -3),
+        cadence: habit.cadence,
+        status: habit.status === "paused" ? "paused" : "active",
+        lastRun: habit.lastRun,
+        bodyExcerpt: truncateExcerpt(habit.body, 120),
+        isDegraded: false,
+        degradedReason: null,
+        isOverdue,
+        overdueMs,
+      })
+    } catch {
+      // skip unparseable habit files
+    }
+  }
+
+  items.sort((a, b) => {
+    if (a.isOverdue && !b.isOverdue) return -1
+    if (!a.isOverdue && b.isOverdue) return 1
+    return a.name.localeCompare(b.name)
+  })
+
+  return {
+    totalCount: items.length,
+    activeCount: items.filter((h) => h.status === "active").length,
+    pausedCount: items.filter((h) => h.status === "paused").length,
+    degradedCount: items.filter((h) => h.isDegraded).length,
+    overdueCount: items.filter((h) => h.isOverdue).length,
+    items,
+  }
+}
+
+interface ParsedHabitFrontmatter {
+  name: string | null
+  title: string | null
+  cadence: string | null
+  status: string | null
+  lastRun: string | null
+  body: string | null
+}
+
+function parseHabitFrontmatter(content: string): ParsedHabitFrontmatter | null {
+  const fmMatch = /^---\n([\s\S]*?)\n---/.exec(content)
+  if (!fmMatch) return null
+
+  const fm = fmMatch[1]!
+  const body = content.slice(fmMatch[0].length).trim() || null
+
+  function extract(key: string): string | null {
+    const match = new RegExp(`^${key}:\\s*(.+)$`, "m").exec(fm)
+    return match ? match[1]!.trim() : null
+  }
+
+  return {
+    name: extract("name"),
+    title: extract("title"),
+    cadence: extract("cadence"),
+    status: extract("status"),
+    lastRun: extract("lastRun") ?? extract("last_run"),
+    body,
+  }
+}
+
+function parseCadenceMs(cadence: string | null): number | null {
+  if (!cadence) return null
+  const match = /^(\d+)\s*(m|min|h|hr|d|day)s?$/i.exec(cadence.trim())
+  if (!match) return null
+  const value = parseInt(match[1]!, 10)
+  const unit = match[2]!.toLowerCase()
+  if (unit === "m" || unit === "min") return value * 60 * 1000
+  if (unit === "h" || unit === "hr") return value * 60 * 60 * 1000
+  if (unit === "d" || unit === "day") return value * 24 * 60 * 60 * 1000
+  return null
 }

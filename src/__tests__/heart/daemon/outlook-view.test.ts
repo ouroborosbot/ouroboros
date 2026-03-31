@@ -99,11 +99,12 @@ describe("outlook machine view", () => {
       ],
     }))
 
-    expect(view.agents.map((agent) => agent.agentName)).toEqual(["alpha", "gamma", "beta"])
+    // Sorted by recency: beta (07:34) > alpha (07:32) > gamma (03-28)
+    expect(view.agents.map((agent) => agent.agentName)).toEqual(["beta", "alpha", "gamma"])
     expect(view.agents.map((agent) => agent.attention)).toEqual([
-      expect.objectContaining({ level: "degraded", label: "Needs intervention" }),
-      expect.objectContaining({ level: "stale", label: "Needs reorientation" }),
-      expect.objectContaining({ level: "active", label: "In motion" }),
+      expect.objectContaining({ level: "active", label: "Active" }),
+      expect.objectContaining({ level: "degraded", label: "Degraded" }),
+      expect.objectContaining({ level: "stale", label: "Stale" }),
     ])
   })
 
@@ -219,10 +220,7 @@ describe("outlook machine view", () => {
     expect(view.agents).toEqual([
       expect.objectContaining({
         agentName: "alpha",
-        attention: {
-          level: "blocked",
-          label: "Blocked",
-        },
+        attention: { level: "blocked", label: "Blocked" },
       }),
     ])
   })

@@ -6,6 +6,7 @@ import type { InnerJobStatus } from "./thoughts"
 export const OUTLOOK_PRODUCT_NAME = "Ouro Outlook" as const
 export const OUTLOOK_RELEASE_INTERACTION_MODEL = "read-only" as const
 export const OUTLOOK_DEFAULT_INNER_VISIBILITY = "summary" as const
+export const OUTLOOK_DEFAULT_PORT = 6876 as const
 
 export type OutlookFreshnessStatus = "fresh" | "stale" | "unknown"
 export type OutlookHealthStatus = "ok" | "degraded"
@@ -42,6 +43,8 @@ export interface OutlookObligationItem {
   content: string
   updatedAt: string
   nextAction: string | null
+  origin: { friendId: string; channel: string; key: string } | null
+  currentSurface: { kind: string; label: string } | null
 }
 
 export interface OutlookObligationSummary {
@@ -158,6 +161,7 @@ export interface OutlookEntryPoint {
 }
 
 export type OutlookAttentionLevel = "degraded" | "stale" | "blocked" | "active" | "idle"
+/** @deprecated mood is synthetic — will be removed in nerves refactor */
 export type OutlookMachineMood = "calm" | "watchful" | "strained"
 
 export interface OutlookAttentionSummary {
@@ -252,4 +256,341 @@ export interface OutlookAgentView {
   work: OutlookAgentWorkView
   inner: OutlookAgentInnerView
   activity: OutlookAgentActivityView
+}
+
+// ---------------------------------------------------------------------------
+// Session x-ray: inventory + transcript inspection
+// ---------------------------------------------------------------------------
+
+export interface OutlookSessionUsage {
+  input_tokens: number
+  output_tokens: number
+  reasoning_tokens: number
+  total_tokens: number
+}
+
+export interface OutlookSessionContinuity {
+  mustResolveBeforeHandoff: boolean
+  lastFriendActivityAt: string | null
+}
+
+export type OutlookSessionReplyState = "needs-reply" | "on-hold" | "monitoring" | "idle"
+
+export interface OutlookSessionInventoryItem {
+  friendId: string
+  friendName: string
+  channel: string
+  key: string
+  sessionPath: string
+  lastActivityAt: string
+  activitySource: "friend-facing" | "mtime-fallback"
+  replyState: OutlookSessionReplyState
+  messageCount: number
+  lastUsage: OutlookSessionUsage | null
+  continuity: OutlookSessionContinuity | null
+  latestUserExcerpt: string | null
+  latestAssistantExcerpt: string | null
+  latestToolCallNames: string[]
+  estimatedTokens: number | null
+}
+
+export interface OutlookSessionInventory {
+  totalCount: number
+  activeCount: number
+  staleCount: number
+  items: OutlookSessionInventoryItem[]
+}
+
+export interface OutlookTranscriptToolCall {
+  id: string
+  type: string
+  function: {
+    name: string
+    arguments: string
+  }
+}
+
+export interface OutlookTranscriptMessage {
+  index: number
+  role: "system" | "user" | "assistant" | "tool"
+  content: string | null
+  name?: string
+  tool_call_id?: string
+  tool_calls?: OutlookTranscriptToolCall[]
+}
+
+export interface OutlookSessionTranscript {
+  friendId: string
+  friendName: string
+  channel: string
+  key: string
+  sessionPath: string
+  messageCount: number
+  lastUsage: OutlookSessionUsage | null
+  continuity: OutlookSessionContinuity | null
+  messages: OutlookTranscriptMessage[]
+}
+
+// ---------------------------------------------------------------------------
+// Coding deep inspection
+// ---------------------------------------------------------------------------
+
+export interface OutlookCodingFailureDiagnostics {
+  command: string
+  args: string[]
+  code: number | null
+  signal: string | null
+  stdoutTail: string
+  stderrTail: string
+}
+
+export interface OutlookCodingDeepItem {
+  id: string
+  runner: CodingRunner
+  status: CodingSessionStatus
+  checkpoint: string | null
+  taskRef: string | null
+  workdir: string
+  originSession: CodingSessionOrigin | null
+  obligationId: string | null
+  scopeFile: string | null
+  stateFile: string | null
+  artifactPath: string | null
+  pid: number | null
+  startedAt: string
+  lastActivityAt: string
+  endedAt: string | null
+  restartCount: number
+  lastExitCode: number | null
+  lastSignal: string | null
+  stdoutTail: string
+  stderrTail: string
+  failure: OutlookCodingFailureDiagnostics | null
+}
+
+export interface OutlookCodingDeep {
+  totalCount: number
+  activeCount: number
+  blockedCount: number
+  items: OutlookCodingDeepItem[]
+}
+
+// ---------------------------------------------------------------------------
+// Attention / pending / inbox
+// ---------------------------------------------------------------------------
+
+export interface OutlookAttentionQueueItem {
+  id: string
+  friendId: string
+  friendName: string
+  channel: string
+  key: string
+  bridgeId: string | null
+  delegatedContent: string
+  obligationId: string | null
+  source: string
+  timestamp: number
+}
+
+export interface OutlookPendingChannel {
+  friendId: string
+  channel: string
+  key: string
+  messageCount: number
+}
+
+export interface OutlookAttentionView {
+  queueLength: number
+  queueItems: OutlookAttentionQueueItem[]
+  pendingChannels: OutlookPendingChannel[]
+  returnObligations: OutlookObligationItem[]
+}
+
+// ---------------------------------------------------------------------------
+// Bridge inventory (deep)
+// ---------------------------------------------------------------------------
+
+export interface OutlookBridgeSessionRef {
+  friendId: string
+  channel: string
+  key: string
+  sessionPath: string
+  snapshot: string | null
+}
+
+export interface OutlookBridgeTaskLink {
+  taskName: string
+  path: string
+  mode: string
+  boundAt: string
+}
+
+export interface OutlookBridgeItem {
+  id: string
+  objective: string
+  summary: string
+  lifecycle: string
+  runtime: string
+  createdAt: string
+  updatedAt: string
+  attachedSessions: OutlookBridgeSessionRef[]
+  task: OutlookBridgeTaskLink | null
+}
+
+export interface OutlookBridgeInventory {
+  totalCount: number
+  activeCount: number
+  items: OutlookBridgeItem[]
+}
+
+// ---------------------------------------------------------------------------
+// Daemon health deep inspection
+// ---------------------------------------------------------------------------
+
+export interface OutlookSafeModeState {
+  active: boolean
+  reason: string
+  enteredAt: string
+}
+
+export interface OutlookDegradedComponent {
+  component: string
+  reason: string
+  since: string
+}
+
+export interface OutlookAgentHealthEntry {
+  status: string
+  pid: number | null
+  crashes: number
+}
+
+export interface OutlookHabitHealthEntry {
+  cronStatus: string
+  lastFired: string | null
+  fallback: boolean
+}
+
+export interface OutlookDaemonHealthDeep {
+  status: string
+  mode: string
+  pid: number
+  startedAt: string
+  uptimeSeconds: number
+  safeMode: OutlookSafeModeState | null
+  degradedComponents: OutlookDegradedComponent[]
+  agentHealth: Record<string, OutlookAgentHealthEntry>
+  habitHealth: Record<string, OutlookHabitHealthEntry>
+}
+
+// ---------------------------------------------------------------------------
+// Memory / journal inspection
+// ---------------------------------------------------------------------------
+
+export interface OutlookDiaryEntry {
+  id: string
+  text: string
+  source: string
+  createdAt: string
+}
+
+export interface OutlookJournalEntry {
+  filename: string
+  preview: string
+  mtime: number
+}
+
+export interface OutlookMemoryView {
+  diaryEntryCount: number
+  recentDiaryEntries: OutlookDiaryEntry[]
+  journalEntryCount: number
+  recentJournalEntries: OutlookJournalEntry[]
+}
+
+// ---------------------------------------------------------------------------
+// Friend / relationship economics
+// ---------------------------------------------------------------------------
+
+export interface OutlookFriendSummary {
+  friendId: string
+  friendName: string
+  totalTokens: number
+  sessionCount: number
+  channels: string[]
+  lastActivityAt: string | null
+}
+
+export interface OutlookFriendView {
+  totalFriends: number
+  friends: OutlookFriendSummary[]
+}
+
+// ---------------------------------------------------------------------------
+// Habits
+// ---------------------------------------------------------------------------
+
+export interface OutlookHabitItem {
+  name: string
+  title: string
+  cadence: string | null
+  status: "active" | "paused"
+  lastRun: string | null
+  bodyExcerpt: string | null
+  isDegraded: boolean
+  degradedReason: string | null
+  isOverdue: boolean
+  overdueMs: number | null
+}
+
+export interface OutlookHabitView {
+  totalCount: number
+  activeCount: number
+  pausedCount: number
+  degradedCount: number
+  overdueCount: number
+  items: OutlookHabitItem[]
+}
+
+// ---------------------------------------------------------------------------
+// Center of gravity — the "what is the plot right now?" narrative
+// ---------------------------------------------------------------------------
+
+export interface OutlookCenterOfGravity {
+  summary: string
+  currentLane: "idle" | "session-work" | "inner-work" | "coding" | "obligation-pressure" | "habit-cycle"
+  activePressures: OutlookPressureItem[]
+  waitingOn: OutlookWaitingItem[]
+}
+
+export interface OutlookPressureItem {
+  kind: "obligation" | "task" | "coding" | "inner" | "attention" | "habit"
+  label: string
+  urgency: "low" | "medium" | "high"
+}
+
+export interface OutlookWaitingItem {
+  kind: "friend" | "coding" | "inner" | "bridge"
+  who: string
+  since: string | null
+  detail: string
+}
+
+// ---------------------------------------------------------------------------
+// Log / event inspection
+// ---------------------------------------------------------------------------
+
+export interface OutlookLogEntry {
+  ts: string
+  level: string
+  event: string
+  component: string
+  message: string
+  trace_id: string
+  meta: Record<string, unknown>
+}
+
+export interface OutlookLogView {
+  logPath: string | null
+  totalLines: number
+  entries: OutlookLogEntry[]
 }

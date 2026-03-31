@@ -644,3 +644,534 @@ describe("outlook direct reads", () => {
     vi.doUnmock("../../../heart/daemon/agent-discovery")
   })
 })
+
+// ---------------------------------------------------------------------------
+// Deep reader tests
+// ---------------------------------------------------------------------------
+
+describe("outlook deep readers", () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  describe("readSessionInventory", () => {
+    it("enumerates all sessions with message counts, usage, excerpts, and tool call names", async () => {
+      const bundlesRoot = makeBundleRoot()
+      const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+
+      writeAgentConfig(alphaRoot)
+      writeJson(path.join(alphaRoot, "friends", "friend-1.json"), { name: "Ari" })
+      writeJson(path.join(alphaRoot, "friends", "friend-2.json"), { name: "Sam" })
+      writeJson(path.join(alphaRoot, "state", "sessions", "friend-1", "cli", "session.json"), {
+        version: 1,
+        messages: [
+          { role: "system", content: "You are a helpful agent." },
+          { role: "user", content: "Hello, what can you do?" },
+          { role: "assistant", content: null, tool_calls: [{ id: "tc-1", type: "function", function: { name: "list_tasks", arguments: "{}" } }] },
+          { role: "tool", content: "No active tasks.", tool_call_id: "tc-1" },
+          { role: "assistant", content: "I have no active tasks right now." },
+        ],
+        lastUsage: { input_tokens: 500, output_tokens: 120, reasoning_tokens: 10, total_tokens: 630 },
+        state: { lastFriendActivityAt: "2026-03-30T10:00:00.000Z", mustResolveBeforeHandoff: true },
+      })
+      writeJson(path.join(alphaRoot, "state", "sessions", "friend-2", "teams", "thread.json"), {
+        version: 1,
+        messages: [
+          { role: "user", content: "Quick question about the deploy." },
+          { role: "assistant", content: "Sure, what's up?" },
+        ],
+        state: { lastFriendActivityAt: "2026-03-29T08:00:00.000Z" },
+      })
+      // Inner session should be excluded
+      writeJson(path.join(alphaRoot, "state", "sessions", "self", "inner", "dialog.json"), {
+        version: 1,
+        messages: [{ role: "system", content: "inner" }],
+      })
+
+      const { readSessionInventory } = await import("../../../heart/daemon/outlook-read")
+      const inventory = readSessionInventory("alpha", {
+        bundlesRoot,
+        now: () => new Date("2026-03-30T12:00:00.000Z"),
+      })
+
+      expect(inventory.totalCount).toBe(2)
+      expect(inventory.activeCount).toBe(1) // friend-1 is within 24h
+      expect(inventory.staleCount).toBe(1)  // friend-2 is beyond 24h
+
+      // Sorted by lastActivityAt descending
+      expect(inventory.items[0]!.friendName).toBe("Ari")
+      expect(inventory.items[0]!.messageCount).toBe(5)
+      expect(inventory.items[0]!.lastUsage).toEqual({
+        input_tokens: 500, output_tokens: 120, reasoning_tokens: 10, total_tokens: 630,
+      })
+      expect(inventory.items[0]!.continuity).toEqual({
+        mustResolveBeforeHandoff: true,
+        lastFriendActivityAt: "2026-03-30T10:00:00.000Z",
+      })
+      expect(inventory.items[0]!.latestUserExcerpt).toBe("Hello, what can you do?")
+      expect(inventory.items[0]!.latestAssistantExcerpt).toBe("I have no active tasks right now.")
+      expect(inventory.items[0]!.latestToolCallNames).toEqual(["list_tasks"])
+      expect(inventory.items[0]!.estimatedTokens).toBeGreaterThan(0)
+
+      expect(inventory.items[1]!.friendName).toBe("Sam")
+      expect(inventory.items[1]!.messageCount).toBe(2)
+      expect(inventory.items[1]!.lastUsage).toBeNull()
+    })
+
+    it("handles empty sessions directory gracefully", async () => {
+      const bundlesRoot = makeBundleRoot()
+      const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+      writeAgentConfig(alphaRoot)
+
+      const { readSessionInventory } = await import("../../../heart/daemon/outlook-read")
+      const inventory = readSessionInventory("alpha", { bundlesRoot })
+
+      expect(inventory.totalCount).toBe(0)
+      expect(inventory.items).toEqual([])
+    })
+
+    it("handles malformed session files without crashing", async () => {
+      const bundlesRoot = makeBundleRoot()
+      const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+      writeAgentConfig(alphaRoot)
+      fs.mkdirSync(path.join(alphaRoot, "state", "sessions", "friend-1", "cli"), { recursive: true })
+      fs.writeFileSync(path.join(alphaRoot, "state", "sessions", "friend-1", "cli", "session.json"), "{bad-json", "utf-8")
+
+      const { readSessionInventory } = await import("../../../heart/daemon/outlook-read")
+      const inventory = readSessionInventory("alpha", { bundlesRoot })
+
+      expect(inventory.totalCount).toBe(1)
+      expect(inventory.items[0]!.messageCount).toBe(0)
+      expect(inventory.items[0]!.lastUsage).toBeNull()
+    })
+  })
+
+  describe("readSessionTranscript", () => {
+    it("returns full transcript with tool calls and tool results", async () => {
+      const bundlesRoot = makeBundleRoot()
+      const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+      writeAgentConfig(alphaRoot)
+      writeJson(path.join(alphaRoot, "friends", "friend-1.json"), { name: "Ari" })
+      writeJson(path.join(alphaRoot, "state", "sessions", "friend-1", "cli", "session.json"), {
+        version: 1,
+        messages: [
+          { role: "system", content: "You are a helpful agent." },
+          { role: "user", content: "Run the tests." },
+          { role: "assistant", content: null, tool_calls: [
+            { id: "tc-1", type: "function", function: { name: "run_tests", arguments: '{"suite":"unit"}' } },
+          ] },
+          { role: "tool", content: "All 42 tests passed.", tool_call_id: "tc-1" },
+          { role: "assistant", content: "All tests pass." },
+        ],
+        lastUsage: { input_tokens: 200, output_tokens: 50, reasoning_tokens: 0, total_tokens: 250 },
+        state: { mustResolveBeforeHandoff: false, lastFriendActivityAt: "2026-03-30T10:00:00.000Z" },
+      })
+
+      const { readSessionTranscript } = await import("../../../heart/daemon/outlook-read")
+      const transcript = readSessionTranscript("alpha", "friend-1", "cli", "session", { bundlesRoot })
+
+      expect(transcript).not.toBeNull()
+      expect(transcript!.friendName).toBe("Ari")
+      expect(transcript!.messageCount).toBe(5)
+      expect(transcript!.messages[0]).toEqual({
+        index: 0, role: "system", content: "You are a helpful agent.",
+      })
+      expect(transcript!.messages[2]).toMatchObject({
+        index: 2, role: "assistant", content: null,
+        tool_calls: [{ id: "tc-1", type: "function", function: { name: "run_tests", arguments: '{"suite":"unit"}' } }],
+      })
+      expect(transcript!.messages[3]).toMatchObject({
+        index: 3, role: "tool", content: "All 42 tests passed.", tool_call_id: "tc-1",
+      })
+      expect(transcript!.lastUsage!.total_tokens).toBe(250)
+      expect(transcript!.continuity!.mustResolveBeforeHandoff).toBe(false)
+    })
+
+    it("returns null for nonexistent sessions", async () => {
+      const bundlesRoot = makeBundleRoot()
+      const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+      writeAgentConfig(alphaRoot)
+
+      const { readSessionTranscript } = await import("../../../heart/daemon/outlook-read")
+      const transcript = readSessionTranscript("alpha", "nobody", "cli", "session", { bundlesRoot })
+      expect(transcript).toBeNull()
+    })
+  })
+
+  describe("readCodingDeep", () => {
+    it("exposes full coding session diagnostics including failure details", async () => {
+      const bundlesRoot = makeBundleRoot()
+      const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+      writeCodingState(alphaRoot, [
+        buildCodingRecord({
+          id: "c-001",
+          status: "failed",
+          obligationId: "ob-1",
+          scopeFile: "/tmp/scope.md",
+          stateFile: "/tmp/state.json",
+          artifactPath: "/tmp/artifact.md",
+          failure: {
+            command: "npm",
+            args: ["test"],
+            code: 1,
+            signal: null,
+            stdoutTail: "test output",
+            stderrTail: "ERR: test failed",
+          },
+        }),
+        buildCodingRecord({
+          id: "c-002",
+          status: "running",
+        }),
+      ])
+
+      const { readCodingDeep } = await import("../../../heart/daemon/outlook-read")
+      const deep = readCodingDeep(alphaRoot)
+
+      expect(deep.totalCount).toBe(2)
+      expect(deep.activeCount).toBe(1) // running
+      expect(deep.blockedCount).toBe(0)
+
+      const failed = deep.items.find((i) => i.id === "c-001")!
+      expect(failed.failure).toEqual({
+        command: "npm",
+        args: ["test"],
+        code: 1,
+        signal: null,
+        stdoutTail: "test output",
+        stderrTail: "ERR: test failed",
+      })
+      expect(failed.obligationId).toBe("ob-1")
+      expect(failed.scopeFile).toBe("/tmp/scope.md")
+    })
+
+    it("handles missing coding state file", async () => {
+      const { readCodingDeep } = await import("../../../heart/daemon/outlook-read")
+      const deep = readCodingDeep("/tmp/nonexistent-agent.ouro")
+      expect(deep.totalCount).toBe(0)
+      expect(deep.items).toEqual([])
+    })
+  })
+
+  describe("readAttentionView", () => {
+    it("scans pending channels non-destructively and builds attention queue", async () => {
+      const bundlesRoot = makeBundleRoot()
+      const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+      writeAgentConfig(alphaRoot)
+      writeJson(path.join(alphaRoot, "friends", "friend-1.json"), { name: "Ari" })
+
+      // Write pending messages
+      writeJson(path.join(alphaRoot, "state", "pending", "friend-1", "cli", "session", "1000-abc.json"), {
+        from: "friend-1",
+        content: "Can you check the deploy?",
+        timestamp: 1000,
+        delegatedFrom: { friendId: "friend-1", channel: "cli", key: "session", bridgeId: "bridge-1" },
+        obligationId: "ob-1",
+      })
+      writeJson(path.join(alphaRoot, "state", "pending", "friend-1", "cli", "session", "2000-def.json"), {
+        from: "friend-1",
+        content: "Also check the logs.",
+        timestamp: 2000,
+      })
+
+      // Write obligation for return obligations
+      writeJson(path.join(alphaRoot, "state", "obligations", "ob-1.json"), {
+        id: "ob-1",
+        origin: { friendId: "friend-1", channel: "cli", key: "session" },
+        content: "Deploy check requested.",
+        status: "investigating",
+        createdAt: "2026-03-30T10:00:00.000Z",
+        updatedAt: "2026-03-30T10:30:00.000Z",
+        nextAction: "check deploy status",
+      })
+
+      const { readAttentionView } = await import("../../../heart/daemon/outlook-read")
+      const attention = readAttentionView("alpha", { bundlesRoot })
+
+      expect(attention.queueLength).toBe(2)
+      expect(attention.queueItems[0]!.timestamp).toBe(1000) // FIFO
+      expect(attention.queueItems[0]!.friendName).toBe("Ari")
+      expect(attention.queueItems[0]!.bridgeId).toBe("bridge-1")
+      expect(attention.queueItems[0]!.obligationId).toBe("ob-1")
+      expect(attention.queueItems[1]!.delegatedContent).toBe("Also check the logs.")
+      expect(attention.pendingChannels).toHaveLength(1)
+      expect(attention.pendingChannels[0]!.messageCount).toBe(2)
+      expect(attention.returnObligations).toHaveLength(1)
+    })
+
+    it("handles empty pending state", async () => {
+      const bundlesRoot = makeBundleRoot()
+      const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+      writeAgentConfig(alphaRoot)
+
+      const { readAttentionView } = await import("../../../heart/daemon/outlook-read")
+      const attention = readAttentionView("alpha", { bundlesRoot })
+
+      expect(attention.queueLength).toBe(0)
+      expect(attention.pendingChannels).toEqual([])
+    })
+  })
+
+  describe("readBridgeInventory", () => {
+    it("reads all bridge records with attached sessions and task links", async () => {
+      const bundlesRoot = makeBundleRoot()
+      const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+      writeJson(path.join(alphaRoot, "state", "bridges", "bridge-1.json"), {
+        id: "bridge-1",
+        objective: "Deploy the feature",
+        summary: "Coordinated deploy between Ari and Sam",
+        lifecycle: "active",
+        runtime: "stable",
+        createdAt: "2026-03-30T09:00:00.000Z",
+        updatedAt: "2026-03-30T10:00:00.000Z",
+        attachedSessions: [
+          { friendId: "friend-1", channel: "cli", key: "session", sessionPath: "/path/to/session.json", snapshot: "checkpoint A" },
+        ],
+        task: { taskName: "deploy-feature", path: "/tasks/deploy.md", mode: "bound", boundAt: "2026-03-30T09:00:00.000Z" },
+      })
+      writeJson(path.join(alphaRoot, "state", "bridges", "bridge-2.json"), {
+        id: "bridge-2",
+        objective: "Old bridge",
+        lifecycle: "completed",
+        createdAt: "2026-03-28T09:00:00.000Z",
+        updatedAt: "2026-03-28T10:00:00.000Z",
+        attachedSessions: [],
+        task: null,
+      })
+
+      const { readBridgeInventory } = await import("../../../heart/daemon/outlook-read")
+      const bridges = readBridgeInventory(alphaRoot)
+
+      expect(bridges.totalCount).toBe(2)
+      expect(bridges.activeCount).toBe(1)
+      expect(bridges.items[0]!.id).toBe("bridge-1") // sorted by updatedAt desc
+      expect(bridges.items[0]!.attachedSessions).toHaveLength(1)
+      expect(bridges.items[0]!.task!.taskName).toBe("deploy-feature")
+    })
+
+    it("handles missing bridges directory", async () => {
+      const { readBridgeInventory } = await import("../../../heart/daemon/outlook-read")
+      const bridges = readBridgeInventory("/tmp/nonexistent-agent.ouro")
+      expect(bridges.totalCount).toBe(0)
+    })
+  })
+
+  describe("readDaemonHealthDeep", () => {
+    it("reads full daemon health state", async () => {
+      const tmpDir = makeBundleRoot()
+      const healthPath = path.join(tmpDir, "daemon-health.json")
+      writeJson(healthPath, {
+        status: "ok",
+        mode: "dev",
+        pid: 12345,
+        startedAt: "2026-03-30T08:00:00.000Z",
+        uptimeSeconds: 3600,
+        safeMode: { active: false, reason: "", enteredAt: "" },
+        degraded: [
+          { component: "bluebubbles", reason: "connection lost", since: "2026-03-30T09:00:00.000Z" },
+        ],
+        agents: {
+          slugger: { status: "running", pid: 12346, crashes: 0 },
+        },
+        habits: {
+          checkup: { cronStatus: "registered", lastFired: "2026-03-30T10:00:00.000Z", fallback: false },
+        },
+      })
+
+      const { readDaemonHealthDeep } = await import("../../../heart/daemon/outlook-read")
+      const health = readDaemonHealthDeep(healthPath)
+
+      expect(health).not.toBeNull()
+      expect(health!.pid).toBe(12345)
+      expect(health!.degradedComponents).toHaveLength(1)
+      expect(health!.degradedComponents[0]!.component).toBe("bluebubbles")
+      expect(health!.agentHealth.slugger).toEqual({ status: "running", pid: 12346, crashes: 0 })
+      expect(health!.habitHealth.checkup.cronStatus).toBe("registered")
+    })
+
+    it("returns null for missing health file", async () => {
+      const { readDaemonHealthDeep } = await import("../../../heart/daemon/outlook-read")
+      const health = readDaemonHealthDeep("/tmp/nonexistent-health.json")
+      expect(health).toBeNull()
+    })
+  })
+
+  describe("readMemoryView", () => {
+    it("reads diary facts and journal index", async () => {
+      const tmpRoot = makeBundleRoot()
+      const agentRoot = path.join(tmpRoot, "agent.ouro")
+
+      // Write diary facts
+      fs.mkdirSync(path.join(agentRoot, "diary"), { recursive: true })
+      const facts = [
+        { id: "f1", text: "User prefers concise answers.", source: "session", createdAt: "2026-03-30T10:00:00.000Z", embedding: [] },
+        { id: "f2", text: "Deploy pipeline uses GitHub Actions.", source: "observation", createdAt: "2026-03-29T10:00:00.000Z", embedding: [] },
+      ]
+      fs.writeFileSync(path.join(agentRoot, "diary", "facts.jsonl"), facts.map((f) => JSON.stringify(f)).join("\n") + "\n", "utf-8")
+
+      // Write journal index
+      fs.mkdirSync(path.join(agentRoot, "journal"), { recursive: true })
+      writeJson(path.join(agentRoot, "journal", ".index.json"), [
+        { filename: "2026-03-30.md", preview: "Today I worked on Outlook", mtime: 1711800000000, embedding: [] },
+        { filename: "2026-03-29.md", preview: "Daemon hosting design", mtime: 1711713600000, embedding: [] },
+      ])
+
+      const { readMemoryView } = await import("../../../heart/daemon/outlook-read")
+      const memory = readMemoryView(agentRoot)
+
+      expect(memory.diaryEntryCount).toBe(2)
+      expect(memory.recentDiaryEntries[0]!.text).toBe("User prefers concise answers.")
+      expect(memory.journalEntryCount).toBe(2)
+      expect(memory.recentJournalEntries[0]!.filename).toBe("2026-03-30.md")
+    })
+
+    it("handles missing diary and journal directories", async () => {
+      const { readMemoryView } = await import("../../../heart/daemon/outlook-read")
+      const memory = readMemoryView("/tmp/nonexistent-agent.ouro")
+      expect(memory.diaryEntryCount).toBe(0)
+      expect(memory.journalEntryCount).toBe(0)
+    })
+
+    it("reads from legacy psyche/memory path when diary/ does not exist", async () => {
+      const tmpRoot = makeBundleRoot()
+      const agentRoot = path.join(tmpRoot, "agent.ouro")
+
+      fs.mkdirSync(path.join(agentRoot, "psyche", "memory"), { recursive: true })
+      const facts = [{ id: "f1", text: "Legacy fact.", source: "legacy", createdAt: "2026-03-28T10:00:00.000Z", embedding: [] }]
+      fs.writeFileSync(path.join(agentRoot, "psyche", "memory", "facts.jsonl"), facts.map((f) => JSON.stringify(f)).join("\n") + "\n", "utf-8")
+
+      const { readMemoryView } = await import("../../../heart/daemon/outlook-read")
+      const memory = readMemoryView(agentRoot)
+
+      expect(memory.diaryEntryCount).toBe(1)
+      expect(memory.recentDiaryEntries[0]!.text).toBe("Legacy fact.")
+    })
+  })
+
+  describe("readFriendView", () => {
+    it("reads friend records with token spend and session counts", async () => {
+      const bundlesRoot = makeBundleRoot()
+      const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+      writeAgentConfig(alphaRoot)
+      writeJson(path.join(alphaRoot, "friends", "friend-1.json"), { name: "Ari", totalTokens: 50000 })
+      writeJson(path.join(alphaRoot, "friends", "friend-2.json"), { name: "Sam", totalTokens: 12000 })
+
+      writeJson(path.join(alphaRoot, "state", "sessions", "friend-1", "cli", "session.json"), { version: 1, messages: [] })
+      writeJson(path.join(alphaRoot, "state", "sessions", "friend-1", "teams", "thread.json"), { version: 1, messages: [] })
+      writeJson(path.join(alphaRoot, "state", "sessions", "friend-2", "cli", "session.json"), { version: 1, messages: [] })
+
+      const { readFriendView } = await import("../../../heart/daemon/outlook-read")
+      const friends = readFriendView("alpha", { bundlesRoot })
+
+      expect(friends.totalFriends).toBe(2)
+      // Sorted by totalTokens descending
+      expect(friends.friends[0]!.friendName).toBe("Ari")
+      expect(friends.friends[0]!.totalTokens).toBe(50000)
+      expect(friends.friends[0]!.sessionCount).toBe(2)
+      expect(friends.friends[0]!.channels).toEqual(["cli", "teams"])
+      expect(friends.friends[1]!.friendName).toBe("Sam")
+      expect(friends.friends[1]!.sessionCount).toBe(1)
+    })
+  })
+
+  describe("readLogView", () => {
+    it("reads recent NDJSON log entries", async () => {
+      const tmpDir = makeBundleRoot()
+      const logPath = path.join(tmpDir, "nerves.ndjson")
+      const entries = [
+        { ts: "2026-03-30T09:00:00.000Z", level: "info", event: "daemon.started", component: "daemon", message: "Daemon started", trace_id: "t1", meta: {} },
+        { ts: "2026-03-30T09:01:00.000Z", level: "warn", event: "sense.degraded", component: "bluebubbles", message: "Connection lost", trace_id: "t2", meta: { reason: "timeout" } },
+      ]
+      fs.writeFileSync(logPath, entries.map((e) => JSON.stringify(e)).join("\n") + "\n", "utf-8")
+
+      const { readLogView } = await import("../../../heart/daemon/outlook-read")
+      const logs = readLogView(logPath)
+
+      expect(logs.totalLines).toBe(2)
+      expect(logs.entries).toHaveLength(2)
+      expect(logs.entries[0]!.event).toBe("daemon.started")
+      expect(logs.entries[1]!.meta).toEqual({ reason: "timeout" })
+    })
+
+    it("returns empty for null log path", async () => {
+      const { readLogView } = await import("../../../heart/daemon/outlook-read")
+      const logs = readLogView(null)
+      expect(logs.totalLines).toBe(0)
+    })
+
+    it("respects limit parameter for large logs", async () => {
+      const tmpDir = makeBundleRoot()
+      const logPath = path.join(tmpDir, "nerves.ndjson")
+      const lines: string[] = []
+      for (let i = 0; i < 200; i++) {
+        lines.push(JSON.stringify({ ts: `2026-03-30T09:${String(i).padStart(2, "0")}:00.000Z`, level: "info", event: `event-${i}`, component: "test", message: `msg ${i}`, trace_id: `t${i}`, meta: {} }))
+      }
+      fs.writeFileSync(logPath, lines.join("\n") + "\n", "utf-8")
+
+      const { readLogView } = await import("../../../heart/daemon/outlook-read")
+      const logs = readLogView(logPath, 10)
+
+      expect(logs.totalLines).toBe(200)
+      expect(logs.entries).toHaveLength(10)
+      // Should be the last 10 entries
+      expect(logs.entries[0]!.event).toBe("event-190")
+    })
+  })
+
+  describe("readHabitView", () => {
+    it("reads habit files with cadence, overdue detection, and status", async () => {
+      const tmpRoot = makeBundleRoot()
+      const agentRoot = path.join(tmpRoot, "agent.ouro")
+      fs.mkdirSync(path.join(agentRoot, "habits"), { recursive: true })
+
+      fs.writeFileSync(path.join(agentRoot, "habits", "checkup.md"), [
+        "---",
+        "name: checkup",
+        "title: Regular checkup",
+        "cadence: 30m",
+        "status: active",
+        "lastRun: 2026-03-30T08:00:00.000Z",
+        "---",
+        "",
+        "Run a health check on all active systems.",
+      ].join("\n"), "utf-8")
+
+      fs.writeFileSync(path.join(agentRoot, "habits", "reflect.md"), [
+        "---",
+        "name: reflect",
+        "title: Daily reflection",
+        "cadence: 1d",
+        "status: paused",
+        "---",
+        "",
+        "Reflect on recent activity.",
+      ].join("\n"), "utf-8")
+
+      const { readHabitView } = await import("../../../heart/daemon/outlook-read")
+      // Set now to 2 hours after lastRun — checkup is overdue (cadence 30m)
+      const habits = readHabitView(agentRoot, {
+        now: () => new Date("2026-03-30T10:00:00.000Z"),
+      })
+
+      expect(habits.totalCount).toBe(2)
+      expect(habits.activeCount).toBe(1)
+      expect(habits.pausedCount).toBe(1)
+
+      const checkup = habits.items.find((h) => h.name === "checkup")!
+      expect(checkup.isOverdue).toBe(true)
+      expect(checkup.overdueMs).toBeGreaterThan(0)
+      expect(checkup.cadence).toBe("30m")
+      expect(checkup.bodyExcerpt).toContain("health check")
+
+      const reflect = habits.items.find((h) => h.name === "reflect")!
+      expect(reflect.status).toBe("paused")
+      expect(reflect.isOverdue).toBe(false) // paused habits can't be overdue
+    })
+
+    it("handles missing habits directory", async () => {
+      const { readHabitView } = await import("../../../heart/daemon/outlook-read")
+      const habits = readHabitView("/tmp/nonexistent-agent.ouro")
+      expect(habits.totalCount).toBe(0)
+    })
+  })
+})
