@@ -403,7 +403,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       type: "function",
       function: {
         name: "read_file",
-        description: "read file contents",
+        description: "Read file contents. Results include line numbers. Use offset/limit for large files -- don't read the whole thing if you only need a section. Use this tool before editing any file. When reading code, read enough context to understand the surrounding logic, not just the target line.",
         parameters: {
           type: "object",
           properties: {
@@ -434,7 +434,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       type: "function",
       function: {
         name: "write_file",
-        description: "write content to file",
+        description: "Prefer this tool for creating new files or fully replacing existing ones. You MUST read an existing file with read_file before overwriting it. Prefer edit_file for modifying existing files -- it only sends the diff. Do not create documentation files (*.md, README) by default; only do so when explicitly asked or when documentation is clearly part of the requested change.",
         parameters: {
           type: "object",
           properties: { path: { type: "string" }, content: { type: "string" } },
@@ -456,7 +456,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       function: {
         name: "edit_file",
         description:
-          "surgically edit a file by replacing an exact string. the file must have been read via read_file first. old_string must match exactly one location in the file.",
+          "Surgically edit a file by replacing an exact string. The file MUST have been read via read_file first -- this tool will reject the call otherwise. old_string must match EXACTLY ONE location in the file -- if it matches zero or multiple, the edit fails. To fix: provide more surrounding context to make the match unique. Preserve exact indentation (tabs/spaces) from the file. Prefer this over write_file for modifications -- it only sends the diff.",
         parameters: {
           type: "object",
           properties: {
@@ -520,7 +520,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       type: "function",
       function: {
         name: "glob",
-        description: "find files matching a glob pattern. returns matching paths sorted alphabetically, one per line.",
+        description: "Find files matching a glob pattern, sorted alphabetically. Use this instead of shell commands like `find` or `ls`. For broad exploratory searches that would require multiple rounds of globbing and grepping, consider using claude or coding_spawn.",
         parameters: {
           type: "object",
           properties: {
@@ -544,7 +544,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       function: {
         name: "grep",
         description:
-          "search file contents for lines matching a regex pattern. searches recursively when given a directory. returns matching lines with file path and line numbers.",
+          "Search file contents for lines matching a regex pattern. Searches recursively in directories. Use this instead of shell commands like `grep` or `rg`. Returns matching lines with file path and line numbers. Use context_lines for surrounding context. Use include to filter file types (e.g., '*.ts').",
         parameters: {
           type: "object",
           properties: {
