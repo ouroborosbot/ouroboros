@@ -44,7 +44,7 @@ export class FileStateCache {
       this.entries.delete(filePath)
     }
 
-    const hash = createHash("sha256").update(content).digest("hex")
+    const hash = contentHash(content)
     const fullRead = offset === undefined && limit === undefined
 
     this.entries.set(filePath, {
@@ -99,7 +99,7 @@ export class FileStateCache {
     // mtime differs -- check content hash as fallback (handles touch / cloud sync)
     try {
       const currentContent = readFileSync(filePath, "utf-8")
-      const currentHash = createHash("sha256").update(currentContent).digest("hex")
+      const currentHash = contentHash(currentContent)
       if (currentHash === entry.hash) return { stale: false }
       return { stale: true, reason: `file modified since last read (mtime and content differ)` }
     } catch {

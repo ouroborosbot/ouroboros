@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
-import { FileStateCache } from "../../mind/file-state"
+import { FileStateCache, contentHash } from "../../mind/file-state"
 import * as fs from "fs"
 import * as path from "path"
 import * as os from "os"
@@ -192,6 +192,34 @@ describe("FileStateCache", () => {
 
       const result = cache.isStale(tmpFile)
       expect(result.stale).toBe(false)
+    })
+
+    it("returns not stale when stat succeeds but read fails", () => {
+      fs.writeFileSync(tmpFile, "content")
+      const mtime = fs.statSync(tmpFile).mtimeMs
+      cache.record(tmpFile, "content", mtime)
+
+      // Change mtime to trigger hash check, then make file unreadable
+      const futureTime = mtime + 10000
+      fs.utimesSync(tmpFile, new Date(futureTime), new Date(futureTime))
+      fs.chmodSync(tmpFile, 0o000)
+
+      const result = cache.isStale(tmpFile)
+      // Can't read to hash-compare, so treat as not stale
+      expect(result.stale).toBe(false)
+
+      // Restore permissions for cleanup
+      fs.chmodSync(tmpFile, 0o644)
+    })
+  })
+
+  describe("contentHash", () => {
+    it("returns sha256 hex digest", () => {
+      const hash = contentHash("hello world")
+      expect(hash).toBeTypeOf("string")
+      expect(hash.length).toBe(64)
+      // Known sha256 of "hello world"
+      expect(hash).toBe("b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9")
     })
   })
 })
