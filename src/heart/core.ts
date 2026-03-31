@@ -10,7 +10,7 @@ import {
 import { loadAgentConfig } from "./identity";
 import { execTool, summarizeArgs, finalAnswerTool, noResponseTool, goInwardTool, getToolsForChannel, isConfirmationRequired } from "../repertoire/tools";
 import type { ToolContext } from "../repertoire/tools";
-import { getChannelCapabilities, type Facing } from "../mind/friends/channel";
+import { getChannelCapabilities, channelToFacing, type Facing } from "../mind/friends/channel";
 import type { AssistantMessageWithReasoning, ResponseItem } from "./streaming";
 import { emitNervesEvent } from "../nerves/runtime";
 import type { TurnResult } from "./streaming";
@@ -555,7 +555,8 @@ export async function runAgent(
   signal?: AbortSignal,
   options?: RunAgentOptions,
 ): Promise<{ usage?: UsageData; outcome: RunAgentOutcome; completion?: CompletionMetadata }> {
-  const providerRuntime = getProviderRuntime();
+  const facing = channelToFacing(channel);
+  const providerRuntime = getProviderRuntime(facing);
   const provider = providerRuntime.id;
   const toolChoiceRequired = options?.toolChoiceRequired ?? true;
   const traceId = options?.traceId;

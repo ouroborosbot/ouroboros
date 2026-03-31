@@ -14,6 +14,8 @@ vi.mock("../../heart/identity", () => ({
   getAgentName: vi.fn(() => "testagent"),
   loadAgentConfig: vi.fn(() => ({
     provider: "anthropic",
+    humanFacing: { provider: "anthropic", model: "mock-model" },
+    agentFacing: { provider: "anthropic", model: "mock-model" },
     context: { maxTokens: 80000, contextMargin: 20 },
     phrases: { thinking: [], tool: [], followup: [] },
   })),
@@ -50,6 +52,7 @@ vi.mock("../../mind/friends/channel", () => ({
     supportsStreaming: true,
     supportsRichCards: false,
   })),
+  channelToFacing: vi.fn(() => "human"),
 }))
 
 vi.mock("../../mind/first-impressions", () => ({

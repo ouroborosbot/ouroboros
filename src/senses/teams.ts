@@ -537,7 +537,7 @@ export async function handleTeamsMessage(text: string, stream: TeamsStream, conv
     adoToken: teamsContext.adoToken,
     githubToken: teamsContext.githubToken,
     signin: teamsContext.signin,
-    summarize: createSummarize(),
+    summarize: createSummarize("human"),
     tenantId: teamsContext.tenantId,
     botApi: teamsContext.botApi,
   } : {}

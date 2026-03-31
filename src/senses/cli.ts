@@ -801,7 +801,7 @@ export async function main(agentName?: string, options?: { pasteDebounceMs?: num
   await applyPendingUpdates(getAgentBundlesRoot(), getPackageVersion())
 
   // Fail fast if provider is misconfigured (triggers human-readable error + exit)
-  getProvider()
+  getProvider("human")
 
   // Resolve context kernel (identity + channel) for CLI
   const friendsPath = path.join(getAgentRoot(), "friends")
@@ -850,7 +850,7 @@ export async function main(agentName?: string, options?: { pasteDebounceMs?: num
   const cliCapabilities = getChannelCapabilities("cli")
   const currentAgentName = getAgentName()
   const pendingDir = getPendingDir(currentAgentName, friendId, "cli", "session")
-  const summarize = createSummarize()
+  const summarize = createSummarize("human")
 
   try {
     await runCliSession({
