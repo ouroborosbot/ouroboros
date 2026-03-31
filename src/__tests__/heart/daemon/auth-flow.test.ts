@@ -1013,3 +1013,47 @@ describe("writeAgentModel with facing (agent.json)", () => {
     expect(result.configPath).toBe(configPath)
   })
 })
+
+describe("readAgentConfigForAgent v2 validation edge cases", () => {
+  it("throws when humanFacing is missing from v2 config", () => {
+    emitTestEvent("readAgentConfigForAgent missing humanFacing")
+    const bundlesRoot = makeTempDir("auth-flow-missing-hf")
+    const agentName = "NoHumanFacing"
+    const agentRoot = path.join(bundlesRoot, `${agentName}.ouro`)
+    fs.mkdirSync(agentRoot, { recursive: true })
+    fs.writeFileSync(
+      path.join(agentRoot, "agent.json"),
+      JSON.stringify({ version: 2, enabled: true, agentFacing: { provider: "anthropic", model: "" } }) + "\n",
+    )
+    expect(() => readAgentConfigForAgent(agentName, bundlesRoot)).toThrow("unsupported provider")
+  })
+
+  it("throws when agentFacing is missing from v2 config", () => {
+    emitTestEvent("readAgentConfigForAgent missing agentFacing")
+    const bundlesRoot = makeTempDir("auth-flow-missing-af")
+    const agentName = "NoAgentFacing"
+    const agentRoot = path.join(bundlesRoot, `${agentName}.ouro`)
+    fs.mkdirSync(agentRoot, { recursive: true })
+    fs.writeFileSync(
+      path.join(agentRoot, "agent.json"),
+      JSON.stringify({ version: 2, enabled: true, humanFacing: { provider: "anthropic", model: "" } }) + "\n",
+    )
+    expect(() => readAgentConfigForAgent(agentName, bundlesRoot)).toThrow("unsupported provider")
+  })
+
+  it("treats missing version field as v1 and triggers migration", () => {
+    emitTestEvent("readAgentConfigForAgent no version field")
+    const bundlesRoot = makeTempDir("auth-flow-no-version")
+    const agentName = "NoVersionBot"
+    const agentRoot = path.join(bundlesRoot, `${agentName}.ouro`)
+    fs.mkdirSync(agentRoot, { recursive: true })
+    fs.writeFileSync(
+      path.join(agentRoot, "agent.json"),
+      JSON.stringify({ enabled: true, provider: "anthropic" }) + "\n",
+    )
+    // Should trigger v1->v2 migration (version missing = treated as 1)
+    const { config } = readAgentConfigForAgent(agentName, bundlesRoot)
+    expect(config.humanFacing.provider).toBe("anthropic")
+    expect(config.agentFacing.provider).toBe("anthropic")
+  })
+})

@@ -1042,6 +1042,89 @@ describe("loadAgentConfig v2 inline migration", () => {
     expect(config.agentFacing).toEqual({ provider: "anthropic", model: "claude-opus-4-6" })
   })
 
+  it("treats non-numeric version as v1 and triggers migration", async () => {
+    const noVersionJson = JSON.stringify({
+      enabled: true,
+      provider: "anthropic",
+      phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+    })
+    const v2Json = JSON.stringify({
+      version: 2,
+      enabled: true,
+      humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+    })
+
+    vi.mocked(fs.readFileSync)
+      .mockReturnValueOnce(noVersionJson)
+      .mockReturnValueOnce(v2Json)
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    const config = loadAgentConfig()
+
+    expect(migrateAgentConfigV1ToV2).toHaveBeenCalledTimes(1)
+    expect(config.version).toBe(2)
+  })
+
+  it("handles string version field and triggers migration", async () => {
+    const stringVersionJson = JSON.stringify({
+      version: "1",
+      enabled: true,
+      provider: "anthropic",
+      phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+    })
+    const v2Json = JSON.stringify({
+      version: 2,
+      enabled: true,
+      humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+    })
+
+    vi.mocked(fs.readFileSync)
+      .mockReturnValueOnce(stringVersionJson)
+      .mockReturnValueOnce(v2Json)
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    const config = loadAgentConfig()
+
+    expect(migrateAgentConfigV1ToV2).toHaveBeenCalledTimes(1)
+    expect(config.version).toBe(2)
+  })
+
+  it("treats non-numeric version in post-migration config as v1 defensively", async () => {
+    // After migration, if version is somehow still a string, the defensive branch treats it as 1
+    const v1Json = JSON.stringify({
+      version: 1,
+      enabled: true,
+      provider: "anthropic",
+      phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+    })
+    // Migration "ran" but version came back as a string
+    const postMigrationJson = JSON.stringify({
+      version: "2",
+      enabled: true,
+      humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+    })
+
+    vi.mocked(fs.readFileSync)
+      .mockReturnValueOnce(v1Json)
+      .mockReturnValueOnce(postMigrationJson)
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    const config = loadAgentConfig()
+
+    // Version defaults to 1 when non-numeric, which still passes validation
+    expect(config.version).toBe(1)
+    expect(config.humanFacing).toEqual({ provider: "anthropic", model: "claude-opus-4-6" })
+  })
+
   it("rejects config missing humanFacing after migration", async () => {
     const v1Json = JSON.stringify({
       version: 1,
@@ -1087,6 +1170,22 @@ describe("loadAgentConfig v2 inline migration", () => {
         version: 2,
         enabled: true,
         humanFacing: { provider: "not-a-provider", model: "some-model" },
+        agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+        phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
+      }),
+    )
+
+    const { loadAgentConfig, resetIdentity } = await import("../../heart/identity")
+    resetIdentity()
+    expect(() => loadAgentConfig()).toThrow(/humanFacing/)
+  })
+
+  it("rejects missing provider in humanFacing (nullish provider branch)", async () => {
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({
+        version: 2,
+        enabled: true,
+        humanFacing: { model: "some-model" },
         agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
         phrases: { thinking: ["t"], tool: ["t"], followup: ["f"] },
       }),

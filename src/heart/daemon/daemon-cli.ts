@@ -1427,6 +1427,7 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
     const systemPrompt = buildSpecialistSystemPrompt(soulText, identity.content, existingBundles, {
       tempDir,
       provider: providerRaw,
+      model: providerConfig.model ?? "",
     })
 
     // Build specialist tools

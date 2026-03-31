@@ -242,4 +242,106 @@ describe("migrateAgentConfigV1ToV2", () => {
     expect((secrets as any).teams.clientId).toBe("abc")
     expect((secrets as any).integrations.perplexityApiKey).toBe("pplx-123")
   })
+
+  it("migrates v1 config with no provider field, defaults humanFacing/agentFacing to anthropic", async () => {
+    emitTestEvent("migrate v1 no provider defaults to anthropic")
+    const bundlesRoot = temp("no-provider")
+    const bundleRoot = path.join(bundlesRoot, "NoProvider.ouro")
+    fs.mkdirSync(bundleRoot, { recursive: true })
+    writeAgentJson(bundleRoot, {
+      version: 1,
+      enabled: true,
+    })
+
+    const migrate = await getMigrateFunction()
+    await migrate(bundleRoot)
+
+    const config = readAgentJson(bundleRoot)
+    expect(config.version).toBe(2)
+    expect(config.humanFacing).toEqual({ provider: "anthropic", model: "" })
+    expect(config.agentFacing).toEqual({ provider: "anthropic", model: "" })
+    expect(config.provider).toBeUndefined()
+  })
+
+  it("migrates config when version field is missing (treated as v1)", async () => {
+    emitTestEvent("migrate no version field")
+    const bundlesRoot = temp("no-version")
+    const bundleRoot = path.join(bundlesRoot, "NoVersion.ouro")
+    fs.mkdirSync(bundleRoot, { recursive: true })
+    writeAgentJson(bundleRoot, {
+      enabled: true,
+      provider: "anthropic",
+    })
+
+    const migrate = await getMigrateFunction()
+    await migrate(bundleRoot)
+
+    const config = readAgentJson(bundleRoot)
+    expect(config.version).toBe(2)
+    expect(config.humanFacing).toEqual({ provider: "anthropic", model: "" })
+  })
+
+  it("handles provider secrets with no model field (non-string rawModel)", async () => {
+    emitTestEvent("migrate non-string model in secrets")
+    const bundlesRoot = temp("nonstring-model")
+    const secretsRoot = temp("nonstring-model-secrets")
+    const bundleRoot = path.join(bundlesRoot, "NonStringModel.ouro")
+    fs.mkdirSync(bundleRoot, { recursive: true })
+    writeAgentJson(bundleRoot, {
+      version: 1,
+      enabled: true,
+      provider: "anthropic",
+    })
+    writeSecretsJson(path.join(secretsRoot, "NonStringModel"), {
+      providers: { anthropic: { model: 12345, setupToken: "tok" } },
+    })
+
+    const migrate = await getMigrateFunction()
+    await migrate(bundleRoot, { secretsRoot })
+
+    const config = readAgentJson(bundleRoot)
+    expect(config.humanFacing).toEqual({ provider: "anthropic", model: "" })
+  })
+
+  it("handles provider entry missing from secrets providers map", async () => {
+    emitTestEvent("migrate missing provider secrets entry")
+    const bundlesRoot = temp("missing-provider-entry")
+    const secretsRoot = temp("missing-provider-entry-secrets")
+    const bundleRoot = path.join(bundlesRoot, "MissingEntry.ouro")
+    fs.mkdirSync(bundleRoot, { recursive: true })
+    writeAgentJson(bundleRoot, {
+      version: 1,
+      enabled: true,
+      provider: "anthropic",
+    })
+    writeSecretsJson(path.join(secretsRoot, "MissingEntry"), {
+      providers: { minimax: { model: "MiniMax-Text-01", apiKey: "key" } },
+    })
+
+    const migrate = await getMigrateFunction()
+    await migrate(bundleRoot, { secretsRoot })
+
+    const config = readAgentJson(bundleRoot)
+    expect(config.humanFacing).toEqual({ provider: "anthropic", model: "" })
+  })
+
+  it("skips when version is explicitly set to 2 as a number", async () => {
+    emitTestEvent("migrate skip v2 numeric version")
+    const bundlesRoot = temp("skip-v2-numeric")
+    const bundleRoot = path.join(bundlesRoot, "AlreadyV2.ouro")
+    fs.mkdirSync(bundleRoot, { recursive: true })
+    writeAgentJson(bundleRoot, {
+      version: 2,
+      enabled: true,
+      humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+    })
+
+    const migrate = await getMigrateFunction()
+    await migrate(bundleRoot)
+
+    const config = readAgentJson(bundleRoot)
+    expect(config.version).toBe(2)
+    expect(config.humanFacing).toEqual({ provider: "anthropic", model: "claude-opus-4-6" })
+  })
 })
