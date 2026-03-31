@@ -195,10 +195,8 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
     const origin = `http://${host}:${(server.address() as AddressInfo).port}`
 
     if (pathname === "/outlook/api/events") {
-      /* v8 ignore start — SSE headers */
       response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", "connection": "keep-alive", "access-control-allow-origin": "*" })
       response.write(":ok\n\n")
-      /* v8 ignore stop */
       sse.add(response)
       return
     }
