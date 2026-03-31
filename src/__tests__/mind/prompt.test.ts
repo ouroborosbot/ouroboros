@@ -4611,3 +4611,86 @@ describe("familyCrossSessionTruthSection trimmed (Unit 1.7)", () => {
     expect(result).not.toContain("i do not collapse down to only the current lane")
   })
 })
+
+describe("memory-awareness lines in contextSection (Unit 1.8)", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    const DEFAULT_AGENT_CONTEXT = { maxTokens: 80000, contextMargin: 20 }
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
+      context: { ...DEFAULT_AGENT_CONTEXT },
+    })
+    mockGetBoard.mockReset().mockReturnValue({
+      compact: "",
+      full: "",
+      byStatus: {
+        drafting: [], processing: [], validating: [],
+        collaborating: [], paused: [], blocked: [],
+        done: [], cancelled: [],
+      },
+      actionRequired: [],
+      unresolvedDependencies: [],
+      activeSessions: [],
+    })
+  })
+
+  it("includes 'My active friend's notes are auto-loaded'", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("teams", {}, makeOnboardingContext() as any)
+    expect(result).toContain("My active friend's notes are auto-loaded")
+  })
+
+  it("includes 'Associative recall auto-injects relevant facts'", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("teams", {}, makeOnboardingContext() as any)
+    expect(result).toContain("Associative recall auto-injects relevant facts")
+  })
+
+  it("includes 'My psyche files are always loaded'", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("teams", {}, makeOnboardingContext() as any)
+    expect(result).toContain("My psyche files are always loaded")
+  })
+
+  it("includes 'My task board is always loaded'", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("teams", {}, makeOnboardingContext() as any)
+    expect(result).toContain("My task board is always loaded")
+  })
+})
