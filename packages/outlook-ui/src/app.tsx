@@ -67,11 +67,18 @@ export function App() {
     } catch { /* retry on SSE */ }
   }, [selectedAgent])
 
+  const [deskPrefs, setDeskPrefs] = useState<Record<string, unknown> | null>(null)
+
   const loadAgent = useCallback(async (name: string) => {
-    if (!name) { setAgentView(null); return }
+    if (!name) { setAgentView(null); setDeskPrefs(null); return }
     try {
-      setAgentView(await fetchJson<Record<string, unknown>>(`/agents/${encodeURIComponent(name)}`))
-    } catch { setAgentView(null) }
+      const [view, prefs] = await Promise.all([
+        fetchJson<Record<string, unknown>>(`/agents/${encodeURIComponent(name)}`),
+        fetchJson<Record<string, unknown>>(`/agents/${encodeURIComponent(name)}/desk-prefs`),
+      ])
+      setAgentView(view)
+      setDeskPrefs(prefs)
+    } catch { setAgentView(null); setDeskPrefs(null) }
   }, [])
 
   useEffect(() => { loadMachine() }, [loadMachine])
@@ -194,11 +201,13 @@ export function App() {
               <p className="mt-0.5">{machine.overview.daemon.mode} · {machine.overview.freshness.status}</p>
             </div>
           </SidebarFooter>
-          {/* Agent status line — subtle, agent-voiced */}
+          {/* Agent status line — manual override or auto-derived */}
           {selectedAgent && agentView && (
             <div className="px-4 py-2 border-t border-ouro-moss/20">
               <p className="text-xs italic text-ouro-shadow/70">
                 {(() => {
+                  const manualStatus = (deskPrefs as any)?.statusLine
+                  if (manualStatus) return manualStatus
                   const inner = (agentView as any)?.inner
                   const status = inner?.status
                   if (status === "working" || inner?.hasPending) return "thinking through something privately"
@@ -217,6 +226,7 @@ export function App() {
       <AgentInspector
         agentName={selectedAgent}
         view={agentView}
+        deskPrefs={deskPrefs}
         initialRoute={initialRoute.current?.agent === selectedAgent ? initialRoute.current : undefined}
       />
     </SidebarLayout>

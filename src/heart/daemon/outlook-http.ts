@@ -10,6 +10,7 @@ import {
   readDaemonHealthDeep,
   readFriendView,
   readHabitView,
+  readDeskPrefs,
   readLogView,
   readMemoryView,
   readNeedsMeView,
@@ -286,6 +287,11 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
 
       if (surface === "friends") {
         writeJson(response, 200, hooks.readAgentFriends(agent))
+        return
+      }
+
+      if (surface === "desk-prefs") {
+        writeJson(response, 200, readDeskPrefs(agentRoot(agent)))
         return
       }
 

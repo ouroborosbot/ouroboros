@@ -78,6 +78,7 @@ function emptyByStatus(): Record<TaskStatus, number> {
     collaborating: 0,
     paused: 0,
     blocked: 0,
+    cancelled: 0,
     done: 0,
   }
 }
@@ -128,10 +129,9 @@ function readTaskSummary(agentRoot: string): { summary: OutlookTaskSummary; issu
   }
 
   const liveTaskNames = LIVE_TASK_STATUSES.flatMap((status) => board.byStatus[status])
-  const issues: OutlookIssue[] = [
-    ...index.parseErrors.map((detail) => issue("task-parse-error", detail)),
-    ...index.invalidFilenames.map((detail) => issue("task-invalid-filename", detail)),
-  ]
+  const issues: OutlookIssue[] = index.issues.map((taskIssue) =>
+    issue(taskIssue.code, `${taskIssue.target}: ${taskIssue.description}`)
+  )
 
   return {
     summary: {
@@ -1358,6 +1358,42 @@ export function readNeedsMeView(agentName: string, options: OutlookReadOptions =
   items.sort((a, b) => (urgencyOrder[a.urgency] ?? 99) - (urgencyOrder[b.urgency] ?? 99))
 
   return { items }
+}
+
+// ---------------------------------------------------------------------------
+// Agent desk preferences
+// ---------------------------------------------------------------------------
+
+export function readDeskPrefs(agentRoot: string): import("./outlook-types").OutlookDeskPrefs {
+  const prefsPath = path.join(agentRoot, "state", "outlook-prefs.json")
+  const defaults: import("./outlook-types").OutlookDeskPrefs = {
+    carrying: null,
+    statusLine: null,
+    tabOrder: null,
+    starredFriends: [],
+    pinnedConstellations: [],
+  }
+  try {
+    const raw = fs.readFileSync(prefsPath, "utf-8")
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    return {
+      carrying: typeof parsed.carrying === "string" ? parsed.carrying : null,
+      statusLine: typeof parsed.statusLine === "string" ? parsed.statusLine : null,
+      tabOrder: Array.isArray(parsed.tabOrder) ? parsed.tabOrder.filter((t): t is string => typeof t === "string") : null,
+      starredFriends: Array.isArray(parsed.starredFriends) ? parsed.starredFriends.filter((f): f is string => typeof f === "string") : [],
+      pinnedConstellations: Array.isArray(parsed.pinnedConstellations)
+        ? (parsed.pinnedConstellations as Array<Record<string, unknown>>).map((c) => ({
+            label: typeof c.label === "string" ? c.label : "",
+            friendIds: Array.isArray(c.friendIds) ? c.friendIds.filter((f): f is string => typeof f === "string") : [],
+            taskRefs: Array.isArray(c.taskRefs) ? c.taskRefs.filter((t): t is string => typeof t === "string") : [],
+            bridgeIds: Array.isArray(c.bridgeIds) ? c.bridgeIds.filter((b): b is string => typeof b === "string") : [],
+            codingIds: Array.isArray(c.codingIds) ? c.codingIds.filter((c2): c2 is string => typeof c2 === "string") : [],
+          }))
+        : [],
+    }
+  } catch {
+    return defaults
+  }
 }
 
 function parseCadenceMs(cadence: string | null): number | null {

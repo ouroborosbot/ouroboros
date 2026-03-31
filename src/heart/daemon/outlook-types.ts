@@ -1,4 +1,5 @@
-import type { CodingSessionOrigin, CodingSessionStatus, CodingRunner } from "../../nerves/observation"
+import type { CodingSession, CodingSessionOrigin } from "../../nerves/observation"
+import type { BridgeRecord, BridgeSessionRef, BridgeTaskLink } from "../../nerves/observation"
 import type { TaskStatus, RuntimeMetadata } from "../../nerves/observation"
 import type { UsageData } from "../../nerves/observation"
 import type { InnerJobStatus } from "./thoughts"
@@ -10,6 +11,31 @@ export const OUTLOOK_PRODUCT_NAME = "Ouro Outlook" as const
 export const OUTLOOK_RELEASE_INTERACTION_MODEL = "read-only" as const
 export const OUTLOOK_DEFAULT_INNER_VISIBILITY = "summary" as const
 export const OUTLOOK_DEFAULT_PORT = 6876 as const
+
+// ---------------------------------------------------------------------------
+// Agent desk preferences — customizable per-agent Outlook surface
+// ---------------------------------------------------------------------------
+
+export interface OutlookDeskPrefs {
+  /** Agent-written "what I'm carrying" text, shown at top of Overview */
+  carrying: string | null
+  /** Manual status line override (null = auto-derived) */
+  statusLine: string | null
+  /** Tab ordering — array of tab IDs in preferred order */
+  tabOrder: string[] | null
+  /** Starred friend IDs — gravitational relationships shown prominently */
+  starredFriends: string[]
+  /** Pinned constellations — linked threads the agent cares about */
+  pinnedConstellations: OutlookConstellation[]
+}
+
+export interface OutlookConstellation {
+  label: string
+  friendIds: string[]
+  taskRefs: string[]
+  bridgeIds: string[]
+  codingIds: string[]
+}
 
 export type OutlookFreshnessStatus = "fresh" | "stale" | "unknown"
 export type OutlookHealthStatus = "ok" | "degraded"
@@ -80,15 +106,11 @@ export interface OutlookInnerSummary {
   latestActivityAt: string | null
 }
 
-export interface OutlookCodingItem {
-  id: string
-  runner: CodingRunner
-  status: CodingSessionStatus
+/** Coding summary item — subset of CodingSession for list views */
+export type OutlookCodingItem = Pick<CodingSession, "id" | "runner" | "status" | "workdir" | "lastActivityAt"> & {
   checkpoint: string | null
   taskRef: string | null
-  workdir: string
   originSession: CodingSessionOrigin | null
-  lastActivityAt: string
 }
 
 export interface OutlookCodingSummary {
@@ -265,9 +287,10 @@ export interface OutlookAgentView {
 // Session x-ray: inventory + transcript inspection
 // ---------------------------------------------------------------------------
 
-/** Session usage — re-exported from domain type UsageData */
+/** Session usage — domain type */
 export type OutlookSessionUsage = UsageData
 
+/** Session continuity — derived from domain SessionContinuityState with required fields */
 export interface OutlookSessionContinuity {
   mustResolveBeforeHandoff: boolean
   lastFriendActivityAt: string | null
@@ -334,7 +357,11 @@ export interface OutlookSessionTranscript {
 // Coding deep inspection
 // ---------------------------------------------------------------------------
 
-/** Coding failure diagnostics — mirrors domain CodingFailureDiagnostics with string signal */
+/**
+ * Coding failure diagnostics for JSON-safe inspection.
+ * Structurally aligned with CodingFailureDiagnostics but uses string for signal
+ * (NodeJS.Signals is not JSON-serializable).
+ */
 export interface OutlookCodingFailureDiagnostics {
   command: string
   args: string[]
@@ -344,10 +371,16 @@ export interface OutlookCodingFailureDiagnostics {
   stderrTail: string
 }
 
+/**
+ * Full coding session for deep inspection.
+ * Structurally aligned with CodingSession but uses null instead of undefined
+ * for optional fields (JSON serialization normalizes undefined to null) and
+ * string for signal types.
+ */
 export interface OutlookCodingDeepItem {
   id: string
-  runner: CodingRunner
-  status: CodingSessionStatus
+  runner: CodingSession["runner"]
+  status: CodingSession["status"]
   checkpoint: string | null
   taskRef: string | null
   workdir: string
@@ -410,29 +443,16 @@ export interface OutlookAttentionView {
 // Bridge inventory (deep)
 // ---------------------------------------------------------------------------
 
-export interface OutlookBridgeSessionRef {
-  friendId: string
-  channel: string
-  key: string
-  sessionPath: string
-  snapshot: string | null
-}
+/** Bridge session ref — domain type re-exported */
+export type OutlookBridgeSessionRef = BridgeSessionRef
 
-export interface OutlookBridgeTaskLink {
-  taskName: string
-  path: string
-  mode: string
-  boundAt: string
-}
+/** Bridge task link — domain type with loosened mode (string instead of union) */
+export type OutlookBridgeTaskLink = Omit<BridgeTaskLink, "mode"> & { mode: string }
 
-export interface OutlookBridgeItem {
-  id: string
-  objective: string
-  summary: string
+/** Bridge for inspection — domain BridgeRecord with loosened lifecycle/runtime (string instead of typed enums) */
+export type OutlookBridgeItem = Omit<BridgeRecord, "lifecycle" | "runtime" | "attachedSessions" | "task"> & {
   lifecycle: string
   runtime: string
-  createdAt: string
-  updatedAt: string
   attachedSessions: OutlookBridgeSessionRef[]
   task: OutlookBridgeTaskLink | null
 }

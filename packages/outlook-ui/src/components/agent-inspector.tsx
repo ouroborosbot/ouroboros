@@ -12,6 +12,7 @@ import { RuntimeTab } from "./tabs/runtime"
 interface AgentInspectorProps {
   agentName: string
   view: Record<string, unknown> | null
+  deskPrefs?: Record<string, unknown> | null
   initialRoute?: RouteState
 }
 
@@ -32,7 +33,7 @@ function attentionColor(level: string): "red" | "yellow" | "lime" | "zinc" {
   return "zinc"
 }
 
-export function AgentInspector({ agentName, view, initialRoute }: AgentInspectorProps) {
+export function AgentInspector({ agentName, view, deskPrefs, initialRoute }: AgentInspectorProps) {
   const [activeTab, setActiveTab] = useState<TabId>(initialRoute?.tab ?? "overview")
   const [focusTarget, setFocusTarget] = useState<string | undefined>(initialRoute?.focus)
   const initialConsumed = useRef(false)
@@ -91,7 +92,15 @@ export function AgentInspector({ agentName, view, initialRoute }: AgentInspector
 
         {/* Tabs */}
         <nav className="mt-4 flex gap-0.5 overflow-x-auto border-b border-ouro-moss/20 -mx-1">
-          {TABS.map((tab) => (
+          {(() => {
+            const order = (deskPrefs as any)?.tabOrder as string[] | null
+            if (!order) return TABS
+            const ordered = order
+              .map((id) => TABS.find((t) => t.id === id))
+              .filter((t): t is typeof TABS[number] => t !== undefined)
+            const remaining = TABS.filter((t) => !order.includes(t.id))
+            return [...ordered, ...remaining]
+          })().map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -109,7 +118,7 @@ export function AgentInspector({ agentName, view, initialRoute }: AgentInspector
 
         {/* Tab content */}
         <div className="mt-6">
-          {activeTab === "overview" && <OverviewTab view={view} />}
+          {activeTab === "overview" && <OverviewTab view={view} deskPrefs={deskPrefs} />}
           {activeTab === "sessions" && <SessionsTab agentName={agentName} focus={focusTarget} onFocusConsumed={consumeFocus} />}
           {activeTab === "work" && <WorkTab agentName={agentName} view={view} focus={focusTarget} onFocusConsumed={consumeFocus} />}
           {activeTab === "connections" && <ConnectionsTab agentName={agentName} focus={focusTarget} onFocusConsumed={consumeFocus} />}

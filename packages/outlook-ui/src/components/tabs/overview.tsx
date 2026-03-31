@@ -29,7 +29,16 @@ const URGENCY_LABELS: Record<string, string> = {
   "overdue-habit": "overdue",
 }
 
-export function OverviewTab({ view }: { view: Record<string, unknown> }) {
+const URGENCY_WHY: Record<string, string> = {
+  "owed-reply": "Someone spoke last and is waiting for your response",
+  "blocking-obligation": "This obligation is open and blocking forward progress",
+  "broken-return": "Work was done but the result was never returned to the requester",
+  "stale-delegation": "This was delegated to you and hasn't been addressed",
+  "return-ready": "The result is ready — deliver it to close the loop",
+  "overdue-habit": "This routine is past its scheduled cadence",
+}
+
+export function OverviewTab({ view, deskPrefs }: { view: Record<string, unknown>; deskPrefs?: Record<string, unknown> | null }) {
   const nav = useNavigate()
   const [needsMe, setNeedsMe] = useState<{ items: NeedsMeItem[] } | null>(null)
   const agent = view.agent as Record<string, unknown>
@@ -73,6 +82,7 @@ export function OverviewTab({ view }: { view: Record<string, unknown> }) {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-ouro-bone">{item.label}</p>
                   <p className="text-xs text-ouro-shadow truncate">{item.detail}</p>
+                  <p className="text-[10px] italic text-ouro-shadow/60 mt-0.5">{URGENCY_WHY[item.urgency] ?? ""}</p>
                 </div>
                 {item.ageMs != null && (
                   <span className="shrink-0 text-xs tabular-nums text-ouro-shadow">
@@ -84,6 +94,43 @@ export function OverviewTab({ view }: { view: Record<string, unknown> }) {
           </div>
         </div>
       )}
+
+      {/* "What I'm carrying" — agent-written, editable via outlook-prefs.json */}
+      {(deskPrefs as any)?.carrying && (
+        <div className="rounded-xl bg-ouro-moss/10 p-4 ring-1 ring-ouro-glow/8">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ouro-glow">What I'm carrying</p>
+          <p className="mt-1 text-sm leading-relaxed text-ouro-bone">{(deskPrefs as any).carrying}</p>
+        </div>
+      )}
+
+      {/* Pinned constellations — linked threads */}
+      {(() => {
+        const constellations = ((deskPrefs as any)?.pinnedConstellations ?? []) as Array<Record<string, unknown>>
+        if (constellations.length === 0) return null
+        return (
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-ouro-glow">Pinned threads</p>
+            <div className="mt-2 space-y-2">
+              {constellations.map((c, i) => (
+                <div key={i} className="rounded-lg bg-ouro-void/40 px-3 py-2.5 ring-1 ring-ouro-moss/15">
+                  <p className="font-medium text-ouro-bone">{c.label as string}</p>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {((c.friendIds ?? []) as string[]).map((f) => (
+                      <button key={f} onClick={() => nav({ tab: "sessions" })} className="text-xs text-ouro-glow underline decoration-ouro-glow/30 underline-offset-2">friend:{f.slice(0,8)}…</button>
+                    ))}
+                    {((c.taskRefs ?? []) as string[]).map((t) => (
+                      <button key={t} onClick={() => nav({ tab: "work" })} className="text-xs text-ouro-glow underline decoration-ouro-glow/30 underline-offset-2">task:{t}</button>
+                    ))}
+                    {((c.bridgeIds ?? []) as string[]).map((b) => (
+                      <button key={b} onClick={() => nav({ tab: "connections", focus: b })} className="text-xs text-ouro-glow underline decoration-ouro-glow/30 underline-offset-2">bridge:{b.slice(0,8)}…</button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Center of gravity */}
       <div className="rounded-xl bg-ouro-moss/15 p-4 ring-1 ring-ouro-glow/10 sm:p-5">
