@@ -1,5 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest"
+import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import { FileStateCache } from "../../mind/file-state"
+import * as fs from "fs"
+import * as path from "path"
+import * as os from "os"
 
 describe("FileStateCache", () => {
   let cache: FileStateCache
@@ -124,6 +127,71 @@ describe("FileStateCache", () => {
       cache.record("/a", "hello", 1)
       cache.record("/b", "world", 2)
       expect(cache.get("/a")!.hash).not.toBe(cache.get("/b")!.hash)
+    })
+  })
+
+  describe("isStale", () => {
+    let tmpDir: string
+    let tmpFile: string
+
+    beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "file-state-test-"))
+      tmpFile = path.join(tmpDir, "test.txt")
+    })
+
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    })
+
+    it("returns not stale when file mtime matches recorded mtime", () => {
+      fs.writeFileSync(tmpFile, "hello")
+      const mtime = fs.statSync(tmpFile).mtimeMs
+      cache.record(tmpFile, "hello", mtime)
+
+      const result = cache.isStale(tmpFile)
+      expect(result.stale).toBe(false)
+    })
+
+    it("returns stale when file mtime is newer and content differs", () => {
+      fs.writeFileSync(tmpFile, "original")
+      const mtime = fs.statSync(tmpFile).mtimeMs
+      cache.record(tmpFile, "original", mtime)
+
+      // Modify the file (changes mtime and content)
+      fs.writeFileSync(tmpFile, "modified")
+
+      const result = cache.isStale(tmpFile)
+      expect(result.stale).toBe(true)
+      expect(result.reason).toBeDefined()
+    })
+
+    it("returns not stale when path is not in cache (no basis for comparison)", () => {
+      const result = cache.isStale("/nonexistent/path")
+      expect(result.stale).toBe(false)
+    })
+
+    it("uses content hash as fallback when mtime differs but content is same", () => {
+      fs.writeFileSync(tmpFile, "same content")
+      const mtime = fs.statSync(tmpFile).mtimeMs
+      cache.record(tmpFile, "same content", mtime)
+
+      // Touch the file to change mtime but keep same content
+      const futureTime = mtime + 10000
+      fs.utimesSync(tmpFile, new Date(futureTime), new Date(futureTime))
+
+      const result = cache.isStale(tmpFile)
+      // Content hash matches, so not stale despite mtime change
+      expect(result.stale).toBe(false)
+    })
+
+    it("returns not stale when file no longer exists (cannot compare)", () => {
+      fs.writeFileSync(tmpFile, "content")
+      const mtime = fs.statSync(tmpFile).mtimeMs
+      cache.record(tmpFile, "content", mtime)
+      fs.unlinkSync(tmpFile)
+
+      const result = cache.isStale(tmpFile)
+      expect(result.stale).toBe(false)
     })
   })
 })
