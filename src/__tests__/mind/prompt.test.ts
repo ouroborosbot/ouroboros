@@ -4303,3 +4303,120 @@ describe("pendingMessagesSection (Unit 1.4)", () => {
     expect(result).not.toContain("## pending messages")
   })
 })
+
+describe("toolContractsSection (Unit 1.5)", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    const DEFAULT_AGENT_CONTEXT = { maxTokens: 80000, contextMargin: 20 }
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
+      context: { ...DEFAULT_AGENT_CONTEXT },
+    })
+    mockGetBoard.mockReset().mockReturnValue({
+      compact: "",
+      full: "",
+      byStatus: {
+        drafting: [], processing: [], validating: [],
+        collaborating: [], paused: [], blocked: [],
+        done: [], cancelled: [],
+      },
+      actionRequired: [],
+      unresolvedDependencies: [],
+      activeSessions: [],
+    })
+  })
+
+  it("contains all 5 tool contracts with locked numbered format", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+    // Locked content: 5 numbered contracts
+    expect(result).toContain("## tool contracts")
+    expect(result).toContain("1. `save_friend_note` -- when I learn something about a person, I save it immediately")
+    expect(result).toContain("2. `diary_write` -- when I learn something general about a project, system, or decision")
+    expect(result).toContain("3. `get_friend_note` -- when I need context about someone not in this conversation")
+    expect(result).toContain("4. `recall` -- when I need to remember something from before")
+    expect(result).toContain("5. `query_session` -- when I need grounded session history")
+  })
+
+  it("contains tool behavior rules (tool_choice required, settle rules)", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+    expect(result).toContain("## tool behavior")
+    expect(result).toContain('tool_choice is set to "required"')
+    expect(result).toContain("I call `settle`")
+    expect(result).toContain("`settle` must be the only tool call in that turn")
+    expect(result).toContain("I do not call no-op tools before `settle`")
+  })
+
+  it("appears inside '# my tools & capabilities' group", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+    const toolsGroupIdx = result.indexOf("# my tools & capabilities")
+    const howGroupIdx = result.indexOf("# how i work")
+    const contractsIdx = result.indexOf("## tool contracts")
+
+    expect(contractsIdx).toBeGreaterThan(toolsGroupIdx)
+    expect(contractsIdx).toBeLessThan(howGroupIdx)
+  })
+
+  it("old sections no longer appear when new consolidated section present", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+    // Old section headings should not appear
+    expect(result).not.toContain("## diary and friend tool contracts")
+    expect(result).not.toContain("## what's already in my context")
+  })
+
+  it("tool behavior sub-section omitted when toolChoiceRequired is false", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli", { toolChoiceRequired: false })
+    // Tool contracts should still appear
+    expect(result).toContain("## tool contracts")
+    // But tool behavior should be omitted
+    expect(result).not.toContain("## tool behavior")
+  })
+})
