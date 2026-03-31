@@ -10,7 +10,7 @@ import {
 import { loadAgentConfig } from "./identity";
 import { execTool, summarizeArgs, finalAnswerTool, noResponseTool, goInwardTool, getToolsForChannel, isConfirmationRequired } from "../repertoire/tools";
 import type { ToolContext } from "../repertoire/tools";
-import { getChannelCapabilities } from "../mind/friends/channel";
+import { getChannelCapabilities, type Facing } from "../mind/friends/channel";
 import type { AssistantMessageWithReasoning, ResponseItem } from "./streaming";
 import { emitNervesEvent } from "../nerves/runtime";
 import type { TurnResult } from "./streaming";
@@ -67,15 +67,19 @@ export interface ProviderTurnRequest {
 }
 
 interface ProviderRegistry {
-  resolve(): ProviderRuntime | null;
+  resolve(provider?: ProviderId, model?: string): ProviderRuntime | null;
 }
 
-let _providerRuntime: { fingerprint: string; runtime: ProviderRuntime } | null = null;
+const _providerRuntimes: Record<Facing, { fingerprint: string; runtime: ProviderRuntime } | null> = {
+  human: null,
+  agent: null,
+};
 
-function getProviderRuntimeFingerprint(): string {
+function getProviderRuntimeFingerprint(facing: Facing): string {
   const config = loadAgentConfig();
-  const provider = config.humanFacing.provider;
-  const model = config.humanFacing.model;
+  const facingConfig = facing === "human" ? config.humanFacing : config.agentFacing;
+  const provider = facingConfig.provider;
+  const model = facingConfig.model;
   /* v8 ignore next -- switch: not all provider branches exercised in CI @preserve */
   switch (provider) {
     case "azure": {
@@ -113,21 +117,23 @@ export function createProviderRegistry(): ProviderRegistry {
   };
 
   return {
-    resolve(): ProviderRuntime | null {
-      const config = loadAgentConfig();
-      const provider = config.humanFacing.provider;
-      const model = config.humanFacing.model;
-      return factories[provider](model);
+    resolve(provider?: ProviderId, model?: string): ProviderRuntime | null {
+      const resolvedProvider = provider ?? loadAgentConfig().humanFacing.provider;
+      const resolvedModel = model ?? loadAgentConfig().humanFacing.model;
+      return factories[resolvedProvider](resolvedModel);
     },
   };
 }
 
-function getProviderRuntime(): ProviderRuntime {
+function getProviderRuntime(facing: Facing = "human"): ProviderRuntime {
   try {
-    const fingerprint = getProviderRuntimeFingerprint();
-    if (!_providerRuntime || _providerRuntime.fingerprint !== fingerprint) {
-      const runtime = createProviderRegistry().resolve();
-      _providerRuntime = runtime ? { fingerprint, runtime } : null;
+    const fingerprint = getProviderRuntimeFingerprint(facing);
+    const cached = _providerRuntimes[facing];
+    if (!cached || cached.fingerprint !== fingerprint) {
+      const config = loadAgentConfig();
+      const facingConfig = facing === "human" ? config.humanFacing : config.agentFacing;
+      const runtime = createProviderRegistry().resolve(facingConfig.provider, facingConfig.model);
+      _providerRuntimes[facing] = runtime ? { fingerprint, runtime } : null;
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -144,7 +150,7 @@ function getProviderRuntime(): ProviderRuntime {
     throw new Error("unreachable");
   }
 
-  if (!_providerRuntime) {
+  if (!_providerRuntimes[facing]) {
     emitNervesEvent({
       level: "error",
       event: "engine.provider_init_error",
@@ -155,7 +161,7 @@ function getProviderRuntime(): ProviderRuntime {
     process.exit(1);
     throw new Error("unreachable");
   }
-  return _providerRuntime.runtime;
+  return _providerRuntimes[facing]!.runtime;
 }
 
 /**
@@ -164,20 +170,21 @@ function getProviderRuntime(): ProviderRuntime {
  * provider fingerprint changes on disk.
  */
 export function resetProviderRuntime(): void {
-  _providerRuntime = null;
+  _providerRuntimes.human = null;
+  _providerRuntimes.agent = null;
 }
 
-export function getModel(): string {
-  return getProviderRuntime().model;
+export function getModel(facing: Facing = "human"): string {
+  return getProviderRuntime(facing).model;
 }
 
-export function getProvider(): ProviderId {
-  return getProviderRuntime().id;
+export function getProvider(facing: Facing = "human"): ProviderId {
+  return getProviderRuntime(facing).id;
 }
 
-export function createSummarize(): (transcript: string, instruction: string) => Promise<string> {
+export function createSummarize(facing: Facing = "human"): (transcript: string, instruction: string) => Promise<string> {
   return async (transcript: string, instruction: string): Promise<string> => {
-    const runtime = getProviderRuntime()
+    const runtime = getProviderRuntime(facing)
     const client = runtime.client as OpenAI
     const response = await client.chat.completions.create({
       model: runtime.model,
@@ -191,10 +198,11 @@ export function createSummarize(): (transcript: string, instruction: string) => 
   }
 }
 
-export function getProviderDisplayLabel(): string {
+export function getProviderDisplayLabel(facing: Facing = "human"): string {
   const config = loadAgentConfig();
-  const provider = config.humanFacing.provider;
-  const model = config.humanFacing.model || "unknown";
+  const facingConfig = facing === "human" ? config.humanFacing : config.agentFacing;
+  const provider = facingConfig.provider;
+  const model = facingConfig.model || "unknown";
   const providerLabelBuilders: Record<ProviderId, () => string> = {
     azure: () => {
       const azureCfg = getAzureConfig();
