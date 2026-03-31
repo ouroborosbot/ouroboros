@@ -136,10 +136,16 @@ async function setAgentProvider(provider: "azure" | "minimax" | "anthropic" | "o
 }
 
 async function setupMinimax(apiKey = "test-key", model = "test-model") {
-  await setAgentProvider("minimax")
+  vi.mocked(identity.loadAgentConfig).mockReturnValue({
+    name: "testagent",
+    configPath: "~/.agentsecrets/testagent/secrets.json",
+    provider: "minimax",
+    humanFacing: { provider: "minimax", model },
+    agentFacing: { provider: "minimax", model },
+  })
   const config = await import("../../heart/config")
   config.resetConfigCache()
-  config.patchRuntimeConfig({ providers: { minimax: { apiKey, model } } })
+  config.patchRuntimeConfig({ providers: { minimax: { apiKey } } })
 }
 
 async function setupAzure(
@@ -148,10 +154,16 @@ async function setupAzure(
   deployment = "test-deployment",
   modelName = "gpt-5.4-chat",
 ) {
-  await setAgentProvider("azure")
+  vi.mocked(identity.loadAgentConfig).mockReturnValue({
+    name: "testagent",
+    configPath: "~/.agentsecrets/testagent/secrets.json",
+    provider: "azure",
+    humanFacing: { provider: "azure", model: modelName },
+    agentFacing: { provider: "azure", model: modelName },
+  })
   const config = await import("../../heart/config")
   config.resetConfigCache()
-  config.patchRuntimeConfig({ providers: { azure: { apiKey, endpoint, deployment, modelName } } })
+  config.patchRuntimeConfig({ providers: { azure: { apiKey, endpoint, deployment } } })
 }
 
 function makeAnthropicSetupToken(): string {
@@ -180,10 +192,31 @@ function makeOpenAICodexAccessToken(accountId = "chatgpt-account-test"): string 
 
 async function setupConfig(partial: Record<string, unknown>) {
   const providers = (partial.providers ?? {}) as Record<string, unknown>
-  if (providers.azure) await setAgentProvider("azure")
-  else if (providers.anthropic) await setAgentProvider("anthropic")
-  else if (providers["openai-codex"]) await setAgentProvider("openai-codex")
-  else await setAgentProvider("minimax")
+  let provider: "azure" | "minimax" | "anthropic" | "openai-codex" = "minimax"
+  let model = ""
+  if (providers.azure) {
+    provider = "azure"
+    model = String((partial as any).humanFacingModel ?? "")
+  }
+  else if (providers.anthropic) {
+    provider = "anthropic"
+    model = String((partial as any).humanFacingModel ?? "")
+  }
+  else if (providers["openai-codex"]) {
+    provider = "openai-codex"
+    model = String((partial as any).humanFacingModel ?? "")
+  }
+  else {
+    provider = "minimax"
+    model = String((partial as any).humanFacingModel ?? "")
+  }
+  vi.mocked(identity.loadAgentConfig).mockReturnValue({
+    name: "testagent",
+    configPath: "~/.agentsecrets/testagent/secrets.json",
+    provider,
+    humanFacing: { provider, model },
+    agentFacing: { provider, model },
+  })
   const config = await import("../../heart/config")
   config.resetConfigCache()
   config.patchRuntimeConfig(partial as any)
@@ -341,10 +374,10 @@ describe("getProviderDisplayLabel", () => {
   it("formats the azure provider label", async () => {
     await setupConfig({
       provider: "azure",
+      humanFacingModel: "gpt-4.1",
       providers: {
         azure: {
           deployment: "gpt-4.1",
-          modelName: "gpt-4.1",
           apiKey: "azure-key",
           endpoint: "https://example.openai.azure.com",
         },
@@ -371,10 +404,10 @@ describe("getProviderDisplayLabel", () => {
     try {
       await setupConfig({
         provider: "azure",
+        humanFacingModel: "gpt-4.1",
         providers: {
           azure: {
             deployment: "",
-            modelName: "gpt-4.1",
             apiKey: "azure-key",
             endpoint: "https://example.openai.azure.com",
           },
@@ -388,13 +421,13 @@ describe("getProviderDisplayLabel", () => {
     }
   })
 
-  it("falls back to unknown in the azure provider label when modelName is blank", async () => {
+  it("falls back to unknown in the azure provider label when model is blank", async () => {
     await setupConfig({
       provider: "azure",
+      humanFacingModel: "",
       providers: {
         azure: {
           deployment: "gpt-4.1",
-          modelName: "",
           apiKey: "azure-key",
           endpoint: "https://example.openai.azure.com",
         },
@@ -406,21 +439,21 @@ describe("getProviderDisplayLabel", () => {
   })
 
   it("formats the anthropic provider label", async () => {
-    await setupConfig({ providers: { anthropic: { model: "claude-sonnet", setupToken: makeAnthropicSetupToken() } } })
+    await setupConfig({ humanFacingModel: "claude-sonnet", providers: { anthropic: { setupToken: makeAnthropicSetupToken() } } })
     const { getProviderDisplayLabel, resetProviderRuntime } = await import("../../heart/core")
     resetProviderRuntime()
     expect(getProviderDisplayLabel()).toBe("anthropic (claude-sonnet)")
   })
 
   it("formats the minimax provider label", async () => {
-    await setupConfig({ provider: "minimax", providers: { minimax: { model: "mini-max", apiKey: "minimax-key" } } })
+    await setupConfig({ provider: "minimax", humanFacingModel: "mini-max", providers: { minimax: { apiKey: "minimax-key" } } })
     const { getProviderDisplayLabel, resetProviderRuntime } = await import("../../heart/core")
     resetProviderRuntime()
     expect(getProviderDisplayLabel()).toBe("minimax (mini-max)")
   })
 
   it("formats the openai-codex provider label", async () => {
-    await setupConfig({ providers: { "openai-codex": { model: "gpt-5-codex", oauthAccessToken: makeOpenAICodexAccessToken() } } })
+    await setupConfig({ humanFacingModel: "gpt-5-codex", providers: { "openai-codex": { oauthAccessToken: makeOpenAICodexAccessToken() } } })
     const { getProviderDisplayLabel, resetProviderRuntime } = await import("../../heart/core")
     resetProviderRuntime()
     expect(getProviderDisplayLabel()).toBe("openai codex (gpt-5-codex)")
@@ -431,7 +464,8 @@ describe("getProviderDisplayLabel", () => {
       "anthropic",
       {
         provider: "anthropic",
-        providers: { anthropic: { model: "", setupToken: makeAnthropicSetupToken() } },
+        humanFacingModel: "",
+        providers: { anthropic: { setupToken: makeAnthropicSetupToken() } },
       },
       "anthropic (unknown)",
     ],
@@ -439,7 +473,8 @@ describe("getProviderDisplayLabel", () => {
       "minimax",
       {
         provider: "minimax",
-        providers: { minimax: { model: "", apiKey: "minimax-key" } },
+        humanFacingModel: "",
+        providers: { minimax: { apiKey: "minimax-key" } },
       },
       "minimax (unknown)",
     ],
@@ -447,7 +482,8 @@ describe("getProviderDisplayLabel", () => {
       "openai-codex",
       {
         provider: "openai-codex",
-        providers: { "openai-codex": { model: "", oauthAccessToken: makeOpenAICodexAccessToken() } },
+        humanFacingModel: "",
+        providers: { "openai-codex": { oauthAccessToken: makeOpenAICodexAccessToken() } },
       },
       "openai codex (unknown)",
     ],

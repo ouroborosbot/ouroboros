@@ -120,7 +120,7 @@ describe("reasoning effort flow in runAgent", () => {
     })
     const config = await import("../../heart/config")
     config.resetConfigCache()
-    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
   })
 
   it("provides supportedReasoningEfforts on ToolContext from provider runtime", async () => {

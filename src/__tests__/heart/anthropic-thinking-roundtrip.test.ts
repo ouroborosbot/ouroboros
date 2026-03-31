@@ -170,7 +170,7 @@ describe("runAgent stores _thinking_blocks on assistant messages", () => {
     })
     const config = await import("../../heart/config")
     config.resetConfigCache()
-    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
 
     // Mock the provider to return thinking blocks in outputItems
     const mockStreamTurn = vi.fn().mockResolvedValue({

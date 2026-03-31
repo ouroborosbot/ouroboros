@@ -71,7 +71,7 @@ describe("system prompt reasoning effort section", () => {
     emitTestEvent("prompt includes reasoning effort")
     const config = await import("../../heart/config")
     config.resetConfigCache()
-    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { resetPsycheCache, buildSystem } = await import("../../mind/prompt")
     resetPsycheCache()
     const system = await buildSystem("cli", {
@@ -86,7 +86,7 @@ describe("system prompt reasoning effort section", () => {
     emitTestEvent("prompt excludes reasoning effort")
     const config = await import("../../heart/config")
     config.resetConfigCache()
-    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { resetPsycheCache, buildSystem } = await import("../../mind/prompt")
     resetPsycheCache()
     const system = await buildSystem("cli", {
@@ -99,7 +99,7 @@ describe("system prompt reasoning effort section", () => {
     emitTestEvent("prompt no options no reasoning effort")
     const config = await import("../../heart/config")
     config.resetConfigCache()
-    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { resetPsycheCache, buildSystem } = await import("../../mind/prompt")
     resetPsycheCache()
     const system = await buildSystem("cli")
@@ -110,7 +110,7 @@ describe("system prompt reasoning effort section", () => {
     emitTestEvent("prompt reasoning effort varies by model")
     const config = await import("../../heart/config")
     config.resetConfigCache()
-    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { resetPsycheCache, buildSystem } = await import("../../mind/prompt")
     resetPsycheCache()
     const system = await buildSystem("cli", {
@@ -124,7 +124,7 @@ describe("system prompt reasoning effort section", () => {
     emitTestEvent("prompt reasoning effort empty levels")
     const config = await import("../../heart/config")
     config.resetConfigCache()
-    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { resetPsycheCache, buildSystem } = await import("../../mind/prompt")
     resetPsycheCache()
     const system = await buildSystem("cli", {
