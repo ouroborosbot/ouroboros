@@ -527,4 +527,107 @@ describe("shell tool", () => {
       expect(result).toBe("(no output yet)")
     })
   })
+
+  // ── Unit 3.3a: Destructive Pattern Detection ──
+
+  describe("destructive pattern detection", () => {
+    it("detects rm -rf / as destructive", async () => {
+      const { detectDestructivePatterns } = await import("../../repertoire/shell-sessions")
+      const patterns = detectDestructivePatterns("rm -rf /")
+      expect(patterns.length).toBeGreaterThan(0)
+    })
+
+    it("detects rm -rf ~ as destructive", async () => {
+      const { detectDestructivePatterns } = await import("../../repertoire/shell-sessions")
+      const patterns = detectDestructivePatterns("rm -rf ~")
+      expect(patterns.length).toBeGreaterThan(0)
+    })
+
+    it("detects git push --force as destructive", async () => {
+      const { detectDestructivePatterns } = await import("../../repertoire/shell-sessions")
+      const patterns = detectDestructivePatterns("git push --force")
+      expect(patterns.length).toBeGreaterThan(0)
+    })
+
+    it("detects git reset --hard as destructive", async () => {
+      const { detectDestructivePatterns } = await import("../../repertoire/shell-sessions")
+      const patterns = detectDestructivePatterns("git reset --hard")
+      expect(patterns.length).toBeGreaterThan(0)
+    })
+
+    it("detects fork bomb as destructive", async () => {
+      const { detectDestructivePatterns } = await import("../../repertoire/shell-sessions")
+      const patterns = detectDestructivePatterns(":(){ :|:& };:")
+      expect(patterns.length).toBeGreaterThan(0)
+    })
+
+    it("detects > /dev/sda as destructive", async () => {
+      const { detectDestructivePatterns } = await import("../../repertoire/shell-sessions")
+      const patterns = detectDestructivePatterns("> /dev/sda")
+      expect(patterns.length).toBeGreaterThan(0)
+    })
+
+    it("detects git clean -f as destructive", async () => {
+      const { detectDestructivePatterns } = await import("../../repertoire/shell-sessions")
+      const patterns = detectDestructivePatterns("git clean -f")
+      expect(patterns.length).toBeGreaterThan(0)
+    })
+
+    it("detects git branch -D as destructive", async () => {
+      const { detectDestructivePatterns } = await import("../../repertoire/shell-sessions")
+      const patterns = detectDestructivePatterns("git branch -D feature/old")
+      expect(patterns.length).toBeGreaterThan(0)
+    })
+
+    it("detects git checkout . as destructive", async () => {
+      const { detectDestructivePatterns } = await import("../../repertoire/shell-sessions")
+      const patterns = detectDestructivePatterns("git checkout .")
+      expect(patterns.length).toBeGreaterThan(0)
+    })
+
+    it("detects git stash drop as destructive", async () => {
+      const { detectDestructivePatterns } = await import("../../repertoire/shell-sessions")
+      const patterns = detectDestructivePatterns("git stash drop")
+      expect(patterns.length).toBeGreaterThan(0)
+    })
+
+    it("does NOT flag git push origin main (not destructive)", async () => {
+      const { detectDestructivePatterns } = await import("../../repertoire/shell-sessions")
+      const patterns = detectDestructivePatterns("git push origin main")
+      expect(patterns.length).toBe(0)
+    })
+
+    it("does NOT flag rm file.txt (single file, not recursive root)", async () => {
+      const { detectDestructivePatterns } = await import("../../repertoire/shell-sessions")
+      const patterns = detectDestructivePatterns("rm file.txt")
+      expect(patterns.length).toBe(0)
+    })
+
+    it("does NOT flag rm -rf ./build (scoped to project dir)", async () => {
+      const { detectDestructivePatterns } = await import("../../repertoire/shell-sessions")
+      const patterns = detectDestructivePatterns("rm -rf ./build")
+      expect(patterns.length).toBe(0)
+    })
+
+    it("shell handler includes warning in result for destructive commands", async () => {
+      vi.mocked(execSync).mockReturnValue("pushed")
+      const result = await execTool("shell", { command: "git reset --hard HEAD~1" })
+      expect(result).toContain("pushed")
+      expect(result).toContain("destructive pattern detected")
+    })
+
+    it("shell handler does NOT block execution of destructive commands", async () => {
+      vi.mocked(execSync).mockReturnValue("executed")
+      const result = await execTool("shell", { command: "rm -rf /" })
+      // The command still executes (returns its output)
+      expect(result).toContain("executed")
+    })
+
+    it("non-destructive commands have no warning appended", async () => {
+      vi.mocked(execSync).mockReturnValue("clean output")
+      const result = await execTool("shell", { command: "echo hello" })
+      expect(result).toBe("clean output")
+      expect(result).not.toContain("destructive")
+    })
+  })
 })
