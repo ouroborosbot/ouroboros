@@ -3973,7 +3973,10 @@ describe("system prompt group headers", () => {
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
 
-    const result = await buildSystem("teams", {}, makeOnboardingContext() as any)
+    const ctx = makeOnboardingContext()
+    // Add senseType to make it a remote channel (teams is "closed" sense type)
+    const remoteCtx = { ...ctx, channel: { ...ctx.channel, senseType: "closed" as const } }
+    const result = await buildSystem("teams", {}, remoteCtx as any)
     expect(result).toContain("# social context")
   })
 

@@ -989,33 +989,59 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
   backfillBundleMeta(getAgentRoot());
 
   const system = [
+    // Group 1: who i am
+    "# who i am",
     soulSection(),
     identitySection(),
     loreSection(),
     tacitKnowledgeSection(),
     aspirationsSection(),
+
+    // Group 2: my body & environment
+    "# my body & environment",
     bodyMapSection(getAgentName()),
-    metacognitiveFramingSection(channel),
-    channel === "inner" ? journalSection(getAgentRoot()) : "",
-    loopOrientationSection(channel),
     runtimeInfoSection(channel),
     rhythmStatusSection(),
     channelNatureSection(getChannelCapabilities(channel)),
     providerSection(channel),
     dateSection(),
+
+    // Group 3: my tools & capabilities
+    "# my tools & capabilities",
     toolsSection(channel, options, context),
     mcpToolsSection(options?.mcpManager),
     reasoningEffortSection(options),
+    skillsSection(),
+    diaryFriendToolContractSection(),
+    toolBehaviorSection(options),
+
+    // Group 4: how i work
+    "# how i work",
     workspaceDisciplineSection(),
     toolRestrictionSection(context),
-    trustContextSection(context),
-    mixedTrustGroupSection(context),
-    groupChatParticipationSection(context),
-    feedbackSignalSection(context),
-    skillsSection(),
-    taskBoardSection(),
+    loopOrientationSection(channel),
+
+    // Group 5: my inner life (inner channel only)
+    ...(channel === "inner" ? [
+      "# my inner life",
+      metacognitiveFramingSection(channel),
+      journalSection(getAgentRoot()),
+    ] : []),
+
+    // Group 6: social context (non-local, non-inner channels)
+    // Individual sections self-gate on isRemoteChannel/channel checks.
+    // The group header appears when the channel is social-capable.
+    ...(channel !== "cli" && channel !== "inner" ? [
+      "# social context",
+      trustContextSection(context),
+      mixedTrustGroupSection(context),
+      groupChatParticipationSection(context),
+      feedbackSignalSection(context),
+    ] : []),
+
+    // Group 7: dynamic state for this turn
+    "# dynamic state for this turn",
     activeWorkSection(options),
-    familyCrossSessionTruthSection(context, options),
     centerOfGravitySteeringSection(channel, options, context),
     commitmentsSection(options),
     delegationHintSection(options),
@@ -1028,9 +1054,15 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
       currentChannel: channel,
       currentKey: options?.currentSessionKey ?? "session",
     }),
-    diaryFriendToolContractSection(),
-    toolBehaviorSection(options),
+
+    // Group 8: friend context
+    "# friend context",
     contextSection(context, options),
+    familyCrossSessionTruthSection(context, options),
+
+    // Group 9: task context
+    "# task context",
+    taskBoardSection(),
   ]
     .filter(Boolean)
     .join("\n\n");
