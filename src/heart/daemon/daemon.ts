@@ -460,7 +460,7 @@ export class OuroDaemon {
           level: "warn",
           component: "daemon",
           event: "daemon.outlook_start_failed",
-          message: `Outlook server failed to start: ${error instanceof Error ? error.message : String(error)}`,
+          message: `Outlook server failed to start: ${String(error)}`,
           meta: { port: OUTLOOK_DEFAULT_PORT },
         })
       }
