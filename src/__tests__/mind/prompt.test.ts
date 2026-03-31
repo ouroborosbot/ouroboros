@@ -371,21 +371,12 @@ describe("buildSystem", () => {
       } as any,
     )
 
-    expect(result).toContain("if a family member asks what i'm up to or how things are going, that includes the material live work i can see across sessions, not just this thread.")
-    expect(result).toContain("i answer naturally from the live world-state in this prompt.")
-    expect(result).toContain("i treat the active-work section above as my reliable top-level surface for this.")
-    expect(result).toContain("i do not claim i lack a top-level view when that surface is already present.")
-    expect(result).toContain("i treat older checkpoints elsewhere in this transcript as stale history when they conflict with the active-work surface above.")
-    expect(result).toContain("i do not repeat an old coding lane or old checkpoint as current just because it appeared earlier in the thread.")
-    expect(result).toContain("i only reach for query_active_work when i want a fresh read of that same surface.")
-    expect(result).toContain("i do not rebuild whole-self status from scratch with query_session and coding_status unless i need to verify a specific gap.")
-    expect(result).toContain("i do not rely on canned status-question modes or phrase matching.")
-    expect(result).toContain("when the live ask is about status, i widen before answering:")
-    expect(result).toContain("- where i am right now")
-    expect(result).toContain("- any other material active sessions or coding lanes i can see")
-    expect(result).toContain("- the freshest concrete checkpoint")
-    expect(result).toContain("- the next concrete step")
-    expect(result).toContain("i do not collapse down to only the current lane.")
+    // Locked trimmed 5-line content
+    expect(result).toContain("## cross-session truth")
+    expect(result).toContain("live world-state across visible sessions and lanes")
+    expect(result).toContain("When live state conflicts with older transcript history, live state wins")
+    expect(result).toContain("what the next concrete step is")
+    expect(result).toContain("I say so plainly and note what still needs checking")
   })
 
   it("makes current trust context and candidate target chats explicit enough to reason about", async () => {
@@ -3635,8 +3626,8 @@ describe("active-work prompting", () => {
     })
 
     expect(result).toContain("## cross-session truth")
-    expect(result).toContain("i answer naturally from the live world-state in this prompt.")
-    expect(result).toContain("i do not rebuild whole-self status from scratch with query_session and coding_status unless i need to verify a specific gap.")
+    expect(result).toContain("live world-state across visible sessions and lanes")
+    expect(result).toContain("When live state conflicts with older transcript history, live state wins")
   })
 })
 

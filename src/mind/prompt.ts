@@ -540,22 +540,10 @@ function familyCrossSessionTruthSection(context?: ResolvedContext, options?: Bui
   if (!options?.activeWorkFrame) return ""
   if (context?.friend?.trustLevel !== "family") return ""
   return `## cross-session truth
-if a family member asks what i'm up to or how things are going, that includes the material live work i can see across sessions, not just this thread.
-i answer naturally from the live world-state in this prompt.
-i treat the active-work section above as my reliable top-level surface for this.
-i do not claim i lack a top-level view when that surface is already present.
-i treat older checkpoints elsewhere in this transcript as stale history when they conflict with the active-work surface above.
-i do not repeat an old coding lane or old checkpoint as current just because it appeared earlier in the thread.
-i only reach for query_active_work when i want a fresh read of that same surface.
-i do not rebuild whole-self status from scratch with query_session and coding_status unless i need to verify a specific gap.
-i do not rely on canned status-question modes or phrase matching.
-if part of the picture is still fuzzy, i say what i can see and what still needs checking.
-when the live ask is about status, i widen before answering:
-- where i am right now
-- any other material active sessions or coding lanes i can see
-- the freshest concrete checkpoint
-- the next concrete step
-i do not collapse down to only the current lane.`
+When family asks what I'm up to or how things are going, I answer from the live world-state across visible sessions and lanes, not just the current thread.
+When live state conflicts with older transcript history, live state wins.
+I say what I can see, what is active, and what the next concrete step is.
+If part of the picture is still unclear, I say so plainly and note what still needs checking.`
 }
 
 export function centerOfGravitySteeringSection(
