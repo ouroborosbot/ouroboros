@@ -16,7 +16,7 @@ import type { BundleMeta } from "./bundle-manifest";
 import { getFirstImpressions } from "./first-impressions";
 import { getTaskModule } from "../repertoire/tasks";
 import { listSessionActivity, type SessionActivityQuery } from "../heart/session-activity";
-import { formatActiveWorkFrame, formatOtherActiveSessionSummaries, type ActiveWorkFrame } from "../heart/active-work";
+import { formatActiveWorkFrame, formatLiveWorldStateCheckpoint, formatOtherActiveSessionSummaries, type ActiveWorkFrame } from "../heart/active-work";
 import type { DelegationDecision } from "../heart/delegation";
 import { deriveCommitments, formatCommitments } from "../heart/commitments";
 import { findActivePersistentObligation, findStatusObligation, renderActiveObligationSteering, renderConcreteStatusGuidance, renderLiveThreadStatusShape } from "./obligation-steering";
@@ -510,6 +510,11 @@ function bridgeContextSection(options?: BuildSystemOptions): string {
 function activeWorkSection(options?: BuildSystemOptions): string {
   if (!options?.activeWorkFrame) return ""
   return formatActiveWorkFrame(options.activeWorkFrame)
+}
+
+function liveWorldStateSection(options?: BuildSystemOptions): string {
+  if (!options?.activeWorkFrame) return ""
+  return formatLiveWorldStateCheckpoint(options.activeWorkFrame)
 }
 
 function familyCrossSessionTruthSection(context?: ResolvedContext, options?: BuildSystemOptions): string {
@@ -1041,6 +1046,7 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
 
     // Group 7: dynamic state for this turn
     "# dynamic state for this turn",
+    liveWorldStateSection(options),
     activeWorkSection(options),
     centerOfGravitySteeringSection(channel, options, context),
     commitmentsSection(options),

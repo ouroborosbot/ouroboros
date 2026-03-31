@@ -21,7 +21,7 @@ import { getCodingSessionManager } from "../repertoire/coding"
 import { listSessionActivity } from "../heart/session-activity"
 import { requestInnerWake } from "../heart/daemon/socket-client"
 import type { SessionActivityRecord } from "../heart/session-activity"
-import { buildActiveWorkFrame, formatLiveWorldStateCheckpoint, type ActiveWorkFrame } from "../heart/active-work"
+import { buildActiveWorkFrame, type ActiveWorkFrame } from "../heart/active-work"
 import { decideDelegation } from "../heart/delegation"
 import { listTargetSessionCandidates } from "../heart/target-resolution"
 import { readInnerDialogRawData, deriveInnerDialogStatus, deriveInnerJob, getInnerDialogSessionPath } from "../heart/daemon/thoughts"
@@ -502,9 +502,10 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
   const sessionPending = input.drainPending(input.pendingDir)
   const pending = [...deferredReturns, ...sessionPending]
 
-  // Assemble messages: session messages + attention queue + live world-state checkpoint + pending + inbound user messages
+  // Assemble messages: session messages + attention queue + pending + inbound user messages
+  // NOTE: live world-state checkpoint moved to system prompt (buildSystem -> liveWorldStateSection)
   const extraPrefixSections = input.onPendingDrained?.(pending) ?? []
-  const prefixSections = [...extraPrefixSections, formatLiveWorldStateCheckpoint(activeWorkFrame)]
+  const prefixSections = [...extraPrefixSections]
   if (pending.length > 0) {
     const pendingSection = pending
       .map((msg) => `[pending from ${msg.from}]: ${msg.content}`)

@@ -338,12 +338,12 @@ describe("handleInboundTurn", () => {
       const messagesArg = runAgentCall[0] as ChatCompletionMessageParam[]
       // Pending messages should be formatted and included before the user message
       const allContent = messagesArg.map(m => typeof m.content === "string" ? m.content : "").join("\n")
-      expect(allContent).toContain("## live world-state checkpoint")
-      expect(allContent).toContain("if older transcript history disagrees, treat it as stale.")
+      // live world-state checkpoint moved to system prompt (Unit 1.3b)
+      expect(allContent).not.toContain("## live world-state checkpoint")
       expect(allContent).toContain("someone tried to reach you")
     })
 
-    it("injects a fresh live world-state checkpoint ahead of the inbound user turn", async () => {
+    it("does not inject live world-state checkpoint in user messages (moved to system prompt)", async () => {
       const input = makeInput({
         continuityIngressTexts: ["what are you up to?"],
         messages: [{ role: "user", content: "what are you up to?" }] as ChatCompletionMessageParam[],
@@ -354,9 +354,8 @@ describe("handleInboundTurn", () => {
       const runAgentCall = (input.runAgent as ReturnType<typeof vi.fn>).mock.calls[0]
       const messagesArg = runAgentCall[0] as ChatCompletionMessageParam[]
       const allContent = messagesArg.map((m) => typeof m.content === "string" ? m.content : "").join("\n")
-      expect(allContent).toContain("## live world-state checkpoint")
-      expect(allContent).toContain("- live conversation: cli/session")
-      expect(allContent).toContain("- current artifact: no artifact yet")
+      // checkpoint no longer prepended to user messages -- now in system prompt
+      expect(allContent).not.toContain("## live world-state checkpoint")
       expect(allContent).toContain("what are you up to?")
     })
 
@@ -1405,7 +1404,7 @@ describe("handleInboundTurn", () => {
       },
     )
 
-    it("injects the live world-state checkpoint into the inbound user message", async () => {
+    it("does not inject live world-state checkpoint into user messages (moved to system prompt)", async () => {
       const input = makeInput({
         messages: [{ role: "user", content: "hello" }],
       })
@@ -1413,11 +1412,10 @@ describe("handleInboundTurn", () => {
       const result = await handleInboundTurn(input)
 
       const userMessage = (result.messages ?? []).find((message) => message.role === "user")
-      expect(userMessage).toEqual(expect.objectContaining({
-        role: "user",
-        content: expect.stringContaining("## live world-state checkpoint"),
-      }))
-      expect(typeof userMessage?.content === "string" ? userMessage.content : "").toContain("hello")
+      // checkpoint no longer prepended to user messages -- now in system prompt
+      const content = typeof userMessage?.content === "string" ? userMessage.content : ""
+      expect(content).not.toContain("## live world-state checkpoint")
+      expect(content).toContain("hello")
     })
   })
 
