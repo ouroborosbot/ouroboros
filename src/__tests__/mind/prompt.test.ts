@@ -4189,3 +4189,117 @@ describe("liveWorldStateSection (Unit 1.3)", () => {
     expect(result).not.toContain("## live world-state checkpoint")
   })
 })
+
+describe("pendingMessagesSection (Unit 1.4)", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    const DEFAULT_AGENT_CONTEXT = { maxTokens: 80000, contextMargin: 20 }
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
+      context: { ...DEFAULT_AGENT_CONTEXT },
+    })
+    mockGetBoard.mockReset().mockReturnValue({
+      compact: "",
+      full: "",
+      byStatus: {
+        drafting: [], processing: [], validating: [],
+        collaborating: [], paused: [], blocked: [],
+        done: [], cancelled: [],
+      },
+      actionRequired: [],
+      unresolvedDependencies: [],
+      activeSessions: [],
+    })
+  })
+
+  it("buildSystem with pending messages includes '## pending messages' section", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli", {
+      pendingMessages: [
+        { from: "inner-dialog", content: "heads up: coding session finished" },
+      ],
+    } as any)
+    expect(result).toContain("## pending messages")
+  })
+
+  it("pending messages section format: '- from <source>: <content>' per message", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli", {
+      pendingMessages: [
+        { from: "inner-dialog", content: "coding session finished" },
+        { from: "bridge-1", content: "Ari says hi" },
+      ],
+    } as any)
+    expect(result).toContain("- from inner-dialog: coding session finished")
+    expect(result).toContain("- from bridge-1: Ari says hi")
+  })
+
+  it("pending messages section appears inside '# dynamic state for this turn' group", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli", {
+      pendingMessages: [{ from: "test", content: "hello" }],
+    } as any)
+    const dynamicIdx = result.indexOf("# dynamic state for this turn")
+    const pendingIdx = result.indexOf("## pending messages")
+    const friendIdx = result.indexOf("# friend context")
+
+    expect(pendingIdx).toBeGreaterThan(dynamicIdx)
+    expect(pendingIdx).toBeLessThan(friendIdx)
+  })
+
+  it("empty pending messages list -> section omitted from prompt", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli", { pendingMessages: [] } as any)
+    expect(result).not.toContain("## pending messages")
+  })
+
+  it("no pending messages option -> section omitted from prompt", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+    expect(result).not.toContain("## pending messages")
+  })
+})
