@@ -207,7 +207,7 @@ describe("buildSystem", () => {
     expect(result).toContain("i use lowercase")
   })
 
-  it("includes repo workspace discipline guidance for local harness edits", async () => {
+  it("includes workspace discipline guidance with locked content", async () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
@@ -215,10 +215,10 @@ describe("buildSystem", () => {
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
-    expect(result).toContain("## repo workspace discipline")
-    expect(result).toContain("source root")
-    expect(result).toContain("worktree path/branch")
-    expect(result).toContain("first concrete action")
+    expect(result).toContain("## how i work")
+    expect(result).toContain("I work conservatively")
+    expect(result).toContain("**reversibility and blast radius**")
+    expect(result).toContain("**engineering discipline**")
   })
 
   it("includes active bridge work when bridge context is present", async () => {
