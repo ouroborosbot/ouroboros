@@ -38,6 +38,8 @@ vi.mock("../../heart/identity", () => {
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
       provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
       context: { ...DEFAULT_AGENT_CONTEXT },
     })),
     getAgentName: vi.fn(() => "testagent"),
@@ -97,6 +99,8 @@ function setAgentProvider(provider: "azure" | "minimax" | "anthropic" | "openai-
     name: "testagent",
     configPath: "~/.agentsecrets/testagent/secrets.json",
     provider,
+    humanFacing: { provider, model: "" },
+    agentFacing: { provider, model: "" },
     context: { ...DEFAULT_AGENT_CONTEXT },
   })
 }
@@ -157,6 +161,7 @@ describe("buildSystem", () => {
         paused: [],
         blocked: [],
         done: [],
+        cancelled: [],
       },
       actionRequired: [],
       unresolvedDependencies: [],
@@ -168,7 +173,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
@@ -181,7 +186,7 @@ describe("buildSystem", () => {
     vi.mocked(fs.existsSync).mockReturnValue(false)
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
 
@@ -194,7 +199,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
@@ -206,7 +211,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
@@ -220,7 +225,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem(
@@ -239,7 +244,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem(
@@ -257,7 +262,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem(
@@ -300,7 +305,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const baseContext = makeOnboardingContext()
@@ -387,7 +392,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
 
@@ -465,7 +470,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
 
@@ -494,7 +499,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
 
@@ -523,7 +528,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem(
@@ -547,7 +552,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
@@ -559,7 +564,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
@@ -571,7 +576,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
@@ -583,7 +588,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
@@ -595,7 +600,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli")
@@ -608,7 +613,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("teams")
@@ -623,6 +628,8 @@ describe("buildSystem", () => {
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
       provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
       context: { maxTokens: 80000, contextMargin: 20 },
       senses: {
         cli: { enabled: true },
@@ -656,7 +663,7 @@ describe("buildSystem", () => {
     })
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
 
@@ -675,6 +682,8 @@ describe("buildSystem", () => {
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
       provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
       context: { maxTokens: 80000, contextMargin: 20 },
       senses: {
         cli: { enabled: true },
@@ -700,7 +709,7 @@ describe("buildSystem", () => {
     })
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
 
@@ -719,6 +728,8 @@ describe("buildSystem", () => {
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
       provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
       context: { maxTokens: 80000, contextMargin: 20 },
       senses: {
         cli: { enabled: true },
@@ -744,7 +755,7 @@ describe("buildSystem", () => {
     })
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
 
@@ -759,6 +770,8 @@ describe("buildSystem", () => {
       name: "testagent",
       configPath: "~/.agentsecrets/testagent/secrets.json",
       provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
       context: { maxTokens: 80000, contextMargin: 20 },
       senses: {
         cli: { enabled: true },
@@ -791,7 +804,7 @@ describe("buildSystem", () => {
     })
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
 
@@ -804,7 +817,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
@@ -815,7 +828,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
@@ -827,7 +840,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
@@ -850,6 +863,7 @@ describe("buildSystem", () => {
         paused: [],
         blocked: [],
         done: [],
+        cancelled: [],
       },
       actionRequired: [],
       unresolvedDependencies: [],
@@ -857,7 +871,7 @@ describe("buildSystem", () => {
     })
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
@@ -872,7 +886,7 @@ describe("buildSystem", () => {
     })
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
@@ -884,7 +898,7 @@ describe("buildSystem", () => {
     vi.mocked(listSkills).mockReturnValue(["code-review", "self-edit", "self-query"])
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
@@ -897,7 +911,7 @@ describe("buildSystem", () => {
     vi.mocked(listSkills).mockReturnValue([])
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
@@ -908,13 +922,21 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const prompt = await import("../../mind/prompt")
     expect("isOwnCodebase" in prompt).toBe(false)
   })
 
   it("includes azure provider string when azure config is set", async () => {
-    setAgentProvider("azure")
+    const DEFAULT_AGENT_CONTEXT = { maxTokens: 80000, contextMargin: 20 }
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "azure",
+      humanFacing: { provider: "azure", model: "test-model" },
+      agentFacing: { provider: "azure", model: "test-model" },
+      context: { ...DEFAULT_AGENT_CONTEXT },
+    })
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
@@ -924,7 +946,6 @@ describe("buildSystem", () => {
           apiKey: "test-azure-key",
           endpoint: "https://test.openai.azure.com",
           deployment: "gpt-4o-deploy",
-          modelName: "test-model",
         },
       },
     })
@@ -935,7 +956,15 @@ describe("buildSystem", () => {
   })
 
   it("includes anthropic provider string when Anthropic model is configured with Claude setup-token credentials", async () => {
-    setAgentProvider("anthropic")
+    const DEFAULT_AGENT_CONTEXT = { maxTokens: 80000, contextMargin: 20 }
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "anthropic",
+      humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      context: { ...DEFAULT_AGENT_CONTEXT },
+    })
     vi.mocked(fs.readFileSync).mockImplementation((filePath: any, _encoding?: any) => {
       const p = String(filePath)
       if (p.endsWith("SOUL.md")) return MOCK_SOUL
@@ -951,7 +980,6 @@ describe("buildSystem", () => {
     patchRuntimeConfig({
       providers: {
         anthropic: {
-          model: "claude-opus-4-6",
           setupToken: `sk-ant-oat01-${"a".repeat(80)}`,
         },
       },
@@ -970,14 +998,21 @@ describe("buildSystem", () => {
   })
 
   it("includes openai codex provider string when OpenAI Codex OAuth is configured", async () => {
-    setAgentProvider("openai-codex")
+    const DEFAULT_AGENT_CONTEXT = { maxTokens: 80000, contextMargin: 20 }
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "openai-codex",
+      humanFacing: { provider: "openai-codex", model: "gpt-5.4" },
+      agentFacing: { provider: "openai-codex", model: "gpt-5.4" },
+      context: { ...DEFAULT_AGENT_CONTEXT },
+    })
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
     patchRuntimeConfig({
       providers: {
         "openai-codex": {
-          model: "gpt-5.4",
           oauthAccessToken: makeOpenAICodexAccessToken(),
         },
       },
@@ -996,7 +1031,15 @@ describe("buildSystem", () => {
   })
 
   it("uses 'default' deployment when azure deployment is not set", async () => {
-    setAgentProvider("azure")
+    const DEFAULT_AGENT_CONTEXT = { maxTokens: 80000, contextMargin: 20 }
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "azure",
+      humanFacing: { provider: "azure", model: "test-model" },
+      agentFacing: { provider: "azure", model: "test-model" },
+      context: { ...DEFAULT_AGENT_CONTEXT },
+    })
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
@@ -1006,7 +1049,6 @@ describe("buildSystem", () => {
           apiKey: "test-azure-key",
           endpoint: "https://test.openai.azure.com",
           deployment: "temp-deploy",
-          modelName: "test-model",
         },
       },
     })
@@ -1038,7 +1080,7 @@ describe("buildSystem", () => {
     })
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
@@ -1058,7 +1100,7 @@ describe("buildSystem", () => {
     })
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem()
@@ -1084,7 +1126,7 @@ describe("buildSystem", () => {
     })
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     await buildSystem()
@@ -1095,7 +1137,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli", { toolChoiceRequired: true })
@@ -1109,7 +1151,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli", { toolChoiceRequired: false })
@@ -1121,7 +1163,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli")
@@ -1132,7 +1174,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli", { toolChoiceRequired: true })
@@ -1145,7 +1187,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli", { toolChoiceRequired: true })
@@ -1157,7 +1199,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli", { toolChoiceRequired: true })
@@ -1169,7 +1211,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli")
@@ -1181,7 +1223,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli", { toolChoiceRequired: false })
@@ -1200,7 +1242,7 @@ describe("buildSystem", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     // buildSystem with no options should never produce "## my flags"
@@ -1228,7 +1270,7 @@ describe("runtimeInfoSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = runtimeInfoSection("cli")
@@ -1240,7 +1282,7 @@ describe("runtimeInfoSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = runtimeInfoSection("cli")
@@ -1251,7 +1293,7 @@ describe("runtimeInfoSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = runtimeInfoSection("cli")
@@ -1262,7 +1304,7 @@ describe("runtimeInfoSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = runtimeInfoSection("teams")
@@ -1274,7 +1316,7 @@ describe("runtimeInfoSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = runtimeInfoSection("bluebubbles")
@@ -1288,7 +1330,7 @@ describe("runtimeInfoSection", () => {
     vi.mocked(fs.existsSync).mockReturnValue(false)
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     const { getPackageVersion } = await import("../../mind/bundle-manifest")
     resetPsycheCache()
@@ -1318,7 +1360,7 @@ describe("runtimeInfoSection", () => {
     vi.mocked(fs.existsSync).mockReturnValue(true)
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = runtimeInfoSection("cli")
@@ -1347,7 +1389,7 @@ describe("runtimeInfoSection", () => {
     vi.mocked(fs.existsSync).mockReturnValue(true)
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = runtimeInfoSection("cli")
@@ -1376,7 +1418,7 @@ describe("runtimeInfoSection", () => {
     vi.mocked(fs.existsSync).mockReturnValue(true)
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = runtimeInfoSection("cli")
@@ -1388,7 +1430,7 @@ describe("runtimeInfoSection", () => {
     vi.mocked(fs.existsSync).mockReturnValue(false)
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = runtimeInfoSection("cli")
@@ -1420,7 +1462,7 @@ describe("runtimeInfoSection", () => {
     vi.mocked(fs.existsSync).mockReturnValue(true)
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = runtimeInfoSection("cli")
@@ -1433,7 +1475,7 @@ describe("runtimeInfoSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = runtimeInfoSection("cli")
@@ -1444,7 +1486,7 @@ describe("runtimeInfoSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = runtimeInfoSection("inner")
@@ -1455,7 +1497,7 @@ describe("runtimeInfoSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = runtimeInfoSection("teams")
@@ -1466,7 +1508,7 @@ describe("runtimeInfoSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = runtimeInfoSection("bluebubbles")
@@ -1477,7 +1519,7 @@ describe("runtimeInfoSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = runtimeInfoSection("cli")
@@ -1492,7 +1534,7 @@ describe("runtimeInfoSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = runtimeInfoSection("cli")
@@ -1504,7 +1546,7 @@ describe("runtimeInfoSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = runtimeInfoSection("cli")
@@ -1519,7 +1561,7 @@ describe("runtimeInfoSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { runtimeInfoSection, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = runtimeInfoSection("cli")
@@ -1539,7 +1581,7 @@ describe("psyche loading", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     await buildSystem()
@@ -1561,7 +1603,7 @@ describe("psyche loading", () => {
     })
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     // Should not throw
@@ -1573,7 +1615,7 @@ describe("psyche loading", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     await buildSystem()
@@ -1592,7 +1634,7 @@ describe("psyche loading", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     await buildSystem()
@@ -2079,7 +2121,7 @@ describe("contextSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
 
@@ -2093,7 +2135,7 @@ describe("contextSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
 
@@ -2106,7 +2148,7 @@ describe("contextSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
 
@@ -2119,7 +2161,7 @@ describe("contextSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
 
@@ -2537,7 +2579,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const ctx = {
@@ -2570,7 +2612,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const ctx = {
@@ -2606,7 +2648,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli")
@@ -2617,7 +2659,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = buildSystem("cli")
@@ -2630,7 +2672,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("inner")
@@ -2642,7 +2684,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("inner")
@@ -2664,14 +2706,14 @@ describe("buildSystem with context", () => {
     mockGetBoard.mockReturnValueOnce({
       compact: "[Tasks] processing:1",
       full: "full",
-      byStatus: { drafting: [], processing: ["t"], "validating": [], collaborating: [], paused: [], blocked: [], done: [] },
+      byStatus: { drafting: [], processing: ["t"], "validating": [], collaborating: [], paused: [], blocked: [], done: [], cancelled: [] },
       actionRequired: [],
       unresolvedDependencies: [],
       activeSessions: [],
     })
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("inner")
@@ -2688,7 +2730,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("inner")
@@ -2701,7 +2743,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("inner")
@@ -2714,7 +2756,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
 
@@ -2735,7 +2777,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
 
@@ -2756,7 +2798,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("inner")
@@ -2768,7 +2810,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli")
@@ -2781,7 +2823,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli")
@@ -2793,7 +2835,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli")
@@ -2805,7 +2847,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli")
@@ -2819,7 +2861,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli")
@@ -2830,7 +2872,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli")
@@ -2841,7 +2883,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("inner")
@@ -2854,7 +2896,7 @@ describe("buildSystem with context", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli")
@@ -3009,7 +3051,7 @@ describe("loopOrientationSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli")
@@ -3020,7 +3062,7 @@ describe("loopOrientationSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("inner")
@@ -3104,7 +3146,7 @@ describe("channelNatureSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const ctx = {
@@ -3140,7 +3182,7 @@ describe("channelNatureSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const ctx = {
@@ -3175,7 +3217,7 @@ describe("channelNatureSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const result = await buildSystem("cli")
@@ -3278,7 +3320,7 @@ describe("mixedTrustGroupSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const ctx = {
@@ -3408,7 +3450,7 @@ describe("groupChatParticipationSection", () => {
     setupReadFileSync()
     const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
     resetConfigCache()
-    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key", model: "test-model" } } })
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
     const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
     resetPsycheCache()
     const ctx = {
@@ -3419,6 +3461,87 @@ describe("groupChatParticipationSection", () => {
     const result = await buildSystem("bluebubbles", undefined, ctx as any)
     expect(result).toContain("observe")
     expect(result).toMatch(/reaction|tapback/i)
+  })
+})
+
+// ── Unit 6a: providerSection facing derivation ──────────────────
+
+describe("providerSection facing derivation from channel", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    mockGetBoard.mockReset().mockReturnValue({
+      compact: "",
+      full: "",
+      byStatus: {
+        drafting: [],
+        processing: [],
+        "validating": [],
+        collaborating: [],
+        paused: [],
+        blocked: [],
+        done: [],
+      },
+      actionRequired: [],
+      unresolvedDependencies: [],
+      activeSessions: [],
+    })
+  })
+
+  it("buildSystem inner channel shows agent-facing provider in provider section", async () => {
+    const DEFAULT_AGENT_CONTEXT = { maxTokens: 80000, contextMargin: 20 }
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      humanFacing: { provider: "minimax", model: "human-display-model" },
+      agentFacing: { provider: "anthropic", model: "agent-display-model" },
+      context: { ...DEFAULT_AGENT_CONTEXT },
+    })
+    setupReadFileSync()
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({
+      providers: {
+        minimax: { apiKey: "mm-key" },
+        anthropic: { setupToken: `sk-ant-oat01-${"a".repeat(80)}` },
+      },
+    })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("inner")
+
+    // When channel is "inner", providerSection should show agent-facing provider
+    expect(result).toContain("## my provider")
+    expect(result).toContain("anthropic (agent-display-model)")
+    expect(result).not.toContain("human-display-model")
+  })
+
+  it("buildSystem cli channel shows human-facing provider in provider section", async () => {
+    const DEFAULT_AGENT_CONTEXT = { maxTokens: 80000, contextMargin: 20 }
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      humanFacing: { provider: "minimax", model: "human-display-model" },
+      agentFacing: { provider: "anthropic", model: "agent-display-model" },
+      context: { ...DEFAULT_AGENT_CONTEXT },
+    })
+    setupReadFileSync()
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({
+      providers: {
+        minimax: { apiKey: "mm-key" },
+        anthropic: { setupToken: `sk-ant-oat01-${"a".repeat(80)}` },
+      },
+    })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+
+    expect(result).toContain("## my provider")
+    expect(result).toContain("minimax (human-display-model)")
+    expect(result).not.toContain("agent-display-model")
   })
 })
 

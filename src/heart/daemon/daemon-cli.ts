@@ -9,6 +9,7 @@ import { emitNervesEvent } from "../../nerves/runtime"
 import { FileFriendStore } from "../../mind/friends/store-file"
 import type { FriendStore } from "../../mind/friends/store"
 import { isIdentityProvider, type IdentityProvider, type TrustLevel } from "../../mind/friends/types"
+import type { Facing } from "../../mind/friends/channel"
 import type { DaemonCommand, DaemonResponse } from "./daemon"
 import { registerOuroBundleUti as defaultRegisterOuroBundleUti } from "./ouro-uti"
 import { installOuroCommand as defaultInstallOuroCommand, type OuroPathInstallResult } from "./ouro-path-installer"
@@ -33,6 +34,7 @@ import { ensureCurrentDaemonRuntime } from "./daemon-runtime-sync"
 import { listEnabledBundleAgents } from "./agent-discovery"
 import { applyPendingUpdates, registerUpdateHook } from "./update-hooks"
 import { bundleMetaHook } from "./hooks/bundle-meta"
+import { agentConfigV2Hook } from "./hooks/agent-config-v2"
 import { getChangelogPath, getPackageVersion } from "../../mind/bundle-manifest"
 import { getTaskModule } from "../../repertoire/tasks"
 import { parseInnerDialogSession, formatThoughtTurns, getInnerDialogSessionPath, followThoughts } from "./thoughts"
@@ -63,7 +65,7 @@ export type OuroCliCommand =
   | { kind: "outlook"; json?: boolean }
   | { kind: "auth.run"; agent: string; provider?: AgentProvider }
   | { kind: "auth.verify"; agent: string; provider?: AgentProvider }
-  | { kind: "auth.switch"; agent: string; provider: AgentProvider }
+  | { kind: "auth.switch"; agent: string; provider: AgentProvider; facing?: Facing }
   | { kind: "chat.connect"; agent: string }
   | { kind: "message.send"; from: string; to: string; content: string; sessionId?: string; taskRef?: string }
   | { kind: "task.poke"; agent: string; taskId: string }
@@ -74,6 +76,7 @@ export type OuroCliCommand =
   | { kind: "task.actionable"; agent?: string }
   | { kind: "task.deps"; agent?: string }
   | { kind: "task.sessions"; agent?: string }
+  | { kind: "task.fix"; mode: "dry-run" | "safe" | "single"; issueId?: string; option?: number; agent?: string }
   | { kind: "whoami"; agent?: string }
   | { kind: "session.list"; agent?: string }
   | { kind: "thoughts"; agent?: string; last?: number; json?: boolean; follow?: boolean }
@@ -87,7 +90,7 @@ export type OuroCliCommand =
   | { kind: "changelog"; from?: string; agent?: string }
   | { kind: "mcp.list" }
   | { kind: "mcp.call"; server: string; tool: string; args?: string }
-  | { kind: "config.model"; agent: string; modelName: string }
+  | { kind: "config.model"; agent: string; modelName: string; facing?: Facing }
   | { kind: "config.models"; agent: string }
   | { kind: "hatch.start"; agentName?: string; humanName?: string; provider?: AgentProvider; credentials?: HatchCredentialsInput; migrationPath?: string }
   | { kind: "rollback"; version?: string }
@@ -445,6 +448,7 @@ function usage(): string {
     "  ouro task create <title> [--type <type>] [--agent <name>]",
     "  ouro task update <id> <status> [--agent <name>]",
     "  ouro task show <id> [--agent <name>]",
+    "  ouro task fix [--safe|--all] [<id> [--option <N>]] [--agent <name>]",
     "  ouro task actionable|deps|sessions [--agent <name>]",
     "  ouro reminder create <title> --body <body> [--at <iso>] [--cadence <interval>] [--category <category>] [--agent <name>]",
     "  ouro friend list [--agent <name>]",
@@ -914,7 +918,45 @@ function parseTaskCommand(args: string[]): OuroCliCommand {
   if (sub === "deps") return { kind: "task.deps", ...(agent ? { agent } : {}) }
   if (sub === "sessions") return { kind: "task.sessions", ...(agent ? { agent } : {}) }
 
+  if (sub === "fix") {
+    // fix --safe | fix --all | fix <id> [--option N] | fix (dry-run)
+    if (rest.length === 0) return { kind: "task.fix", mode: "dry-run", ...(agent ? { agent } : {}) }
+
+    const first = rest[0]
+    if (first === "--safe" || first === "--all") {
+      return { kind: "task.fix", mode: "safe", ...(agent ? { agent } : {}) }
+    }
+
+    // first arg is an issue ID (contains a colon, e.g. schema-missing-kind:one-shots/foo.md)
+    const issueId = first
+    let option: number | undefined
+    for (let i = 1; i < rest.length; i++) {
+      if (rest[i] === "--option" && rest[i + 1]) {
+        option = parseInt(rest[i + 1], 10)
+        i += 1
+      }
+    }
+    return {
+      kind: "task.fix",
+      mode: "single",
+      issueId,
+      ...(option !== undefined ? { option } : {}),
+      ...(agent ? { agent } : {}),
+    }
+  }
+
   throw new Error(`Usage\n${usage()}`)
+}
+
+function extractFacingFlag(args: string[]): { facing?: Facing; rest: string[] } {
+  const idx = args.indexOf("--facing")
+  if (idx === -1 || idx + 1 >= args.length) return { rest: args }
+  const value = args[idx + 1]
+  if (value !== "human" && value !== "agent") {
+    throw new Error(`--facing must be 'human' or 'agent'`)
+  }
+  const rest = [...args.slice(0, idx), ...args.slice(idx + 2)]
+  return { facing: value, rest }
 }
 
 function parseAuthCommand(args: string[]): OuroCliCommand {
@@ -922,7 +964,8 @@ function parseAuthCommand(args: string[]): OuroCliCommand {
   // Support both positional (`auth switch`) and flag (`auth --switch`) forms
   if (first === "verify" || first === "switch" || first === "--verify" || first === "--switch") {
     const subcommand = first.replace(/^--/, "")
-    const { agent, rest } = extractAgentFlag(args.slice(1))
+    const { agent, rest: afterAgent } = extractAgentFlag(args.slice(1))
+    const { facing, rest } = extractFacingFlag(afterAgent)
     let provider: AgentProvider | undefined
     /* v8 ignore start -- provider flag parsing: branches tested via CLI parsing tests @preserve */
     for (let i = 0; i < rest.length; i += 1) {
@@ -939,7 +982,7 @@ function parseAuthCommand(args: string[]): OuroCliCommand {
     if (!agent) throw new Error(`Usage\n${usage()}`)
     if (subcommand === "switch") {
       if (!provider) throw new Error(`auth switch requires --provider.\n${usage()}`)
-      return { kind: "auth.switch", agent, provider }
+      return facing ? { kind: "auth.switch", agent, provider, facing } : { kind: "auth.switch", agent, provider }
     }
     return provider ? { kind: "auth.verify", agent, provider } : { kind: "auth.verify", agent }
   }
@@ -1120,7 +1163,8 @@ function parseFriendCommand(args: string[]): OuroCliCommand {
 }
 
 function parseConfigCommand(args: string[]): OuroCliCommand {
-  const { agent, rest: cleaned } = extractAgentFlag(args)
+  const { agent, rest: afterAgent } = extractAgentFlag(args)
+  const { facing, rest: cleaned } = extractFacingFlag(afterAgent)
   const [sub, ...rest] = cleaned
   if (!sub) throw new Error(`Usage\n${usage()}`)
 
@@ -1128,7 +1172,7 @@ function parseConfigCommand(args: string[]): OuroCliCommand {
     if (!agent) throw new Error("--agent is required for config model")
     const modelName = rest[0]
     if (!modelName) throw new Error(`Usage: ouro config model --agent <name> <model-name>`)
-    return { kind: "config.model", agent, modelName }
+    return facing ? { kind: "config.model", agent, modelName, facing } : { kind: "config.model", agent, modelName }
   }
 
   if (sub === "models") {
@@ -1580,9 +1624,11 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
     const phrases = loadIdentityPhrases(bundleSourceDir, identity.fileName)
 
     setAgentConfigOverride({
-      version: 1,
+      version: 2,
       enabled: true,
       provider: providerRaw,
+      humanFacing: { provider: providerRaw, model: "" },
+      agentFacing: { provider: providerRaw, model: "" },
       phrases,
     })
     patchRuntimeConfig({
@@ -1594,6 +1640,7 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
     const systemPrompt = buildSpecialistSystemPrompt(soulText, identity.content, existingBundles, {
       tempDir,
       provider: providerRaw,
+      model: providerConfig.model ?? "",
     })
 
     // Build specialist tools
@@ -1916,6 +1963,7 @@ type TaskCliCommand = Extract<OuroCliCommand,
   | { kind: "task.actionable" }
   | { kind: "task.deps" }
   | { kind: "task.sessions" }
+  | { kind: "task.fix" }
 >
 
 type ReminderCliCommand = Extract<OuroCliCommand, { kind: "reminder.create" }>
@@ -1981,6 +2029,62 @@ function executeTaskCommand(command: TaskCliCommand, taskMod: TaskModule): strin
   if (command.kind === "task.deps") {
     const lines = taskMod.boardDeps()
     return lines.length > 0 ? lines.join("\n") : "no unresolved dependencies"
+  }
+
+  if (command.kind === "task.fix") {
+    try {
+      const fixOptions: import("../../repertoire/tasks/types").FixOptions = {
+        mode: command.mode,
+        ...(command.issueId ? { issueId: command.issueId } : {}),
+        ...(command.option !== undefined ? { option: command.option } : {}),
+      }
+      const result = taskMod.fix(fixOptions)
+
+      if (command.mode === "dry-run") {
+        if (result.remaining.length === 0) {
+          return `task health: clean`
+        }
+        const safeIssues = result.remaining.filter((i) => i.confidence === "safe")
+        const reviewIssues = result.remaining.filter((i) => i.confidence === "needs_review")
+        const lines: string[] = [`${result.remaining.length} issues found`]
+        if (safeIssues.length > 0) {
+          lines.push("", `safe fixes (${safeIssues.length}):`)
+          for (const issue of safeIssues) {
+            lines.push(`  ${issue.code}:${issue.target} -- ${issue.description}`)
+          }
+        }
+        if (reviewIssues.length > 0) {
+          lines.push("", `needs review (${reviewIssues.length}):`)
+          for (const issue of reviewIssues) {
+            lines.push(`  ${issue.code}:${issue.target} -- ${issue.description}`)
+          }
+        }
+        lines.push("", `task health: ${result.health}`)
+        return lines.join("\n")
+      }
+
+      // safe, single, or --all modes: show what was done
+      const lines: string[] = []
+      if (result.applied.length > 0) {
+        lines.push(`${result.applied.length} applied:`)
+        for (const issue of result.applied) {
+          lines.push(`  ${issue.code}:${issue.target}`)
+        }
+      }
+      if (result.remaining.length > 0) {
+        lines.push(`${result.remaining.length} remaining:`)
+        for (const issue of result.remaining) {
+          lines.push(`  ${issue.code}:${issue.target} -- ${issue.description}`)
+        }
+      }
+      if (result.applied.length === 0 && result.remaining.length === 0) {
+        lines.push("no issues")
+      }
+      lines.push(`task health: ${result.health}`)
+      return lines.join("\n")
+    } catch (error) {
+      return `error: ${error instanceof Error ? error.message : /* v8 ignore next -- defensive: non-Error catch branch @preserve */ String(error)}`
+    }
   }
 
   // command.kind === "task.sessions"
@@ -2399,6 +2503,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
     // Run update hooks before starting daemon so user sees the output
     registerUpdateHook(bundleMetaHook)
+    registerUpdateHook(agentConfigV2Hook)
     const bundlesRoot = getAgentBundlesRoot()
     const currentVersion = getPackageVersion()
 
@@ -2834,7 +2939,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   // ── task subcommands (local, no daemon socket needed) ──
   if (command.kind === "task.board" || command.kind === "task.create" || command.kind === "task.update" ||
       command.kind === "task.show" || command.kind === "task.actionable" || command.kind === "task.deps" ||
-      command.kind === "task.sessions") {
+      command.kind === "task.sessions" || command.kind === "task.fix") {
     /* v8 ignore start -- production default: requires full identity setup @preserve */
     const taskMod = deps.taskModule ?? getTaskModule()
     /* v8 ignore stop */
@@ -2934,7 +3039,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
   // ── auth (local, no daemon socket needed) ──
   if (command.kind === "auth.run") {
-    const provider = command.provider ?? readAgentConfigForAgent(command.agent).config.provider
+    const provider = command.provider ?? readAgentConfigForAgent(command.agent).config.humanFacing.provider
     /* v8 ignore next -- tests always inject runAuthFlow; default is for production @preserve */
     const authRunner = deps.runAuthFlow ?? defaultRunRuntimeAuthFlow
     const result = await authRunner({
@@ -2996,7 +3101,12 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       deps.writeStdout(message)
       return message
     }
-    writeAgentProviderSelection(command.agent, command.provider)
+    if (command.facing) {
+      writeAgentProviderSelection(command.agent, command.facing, command.provider)
+    } else {
+      writeAgentProviderSelection(command.agent, "human", command.provider)
+      writeAgentProviderSelection(command.agent, "agent", command.provider)
+    }
     const message = `switched ${command.agent} to ${command.provider} (verified working)`
     deps.writeStdout(message)
     return message
@@ -3007,7 +3117,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   /* v8 ignore start -- config models: tested via daemon-cli.test.ts @preserve */
   if (command.kind === "config.models") {
     const { config } = readAgentConfigForAgent(command.agent)
-    const provider = config.provider
+    const provider = config.humanFacing.provider
     if (provider !== "github-copilot") {
       const message = `model listing not available for ${provider} — check provider documentation.`
       deps.writeStdout(message)
@@ -3039,9 +3149,11 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   // ── config model (local, no daemon socket needed) ──
   /* v8 ignore start -- config model: tested via daemon-cli.test.ts @preserve */
   if (command.kind === "config.model") {
+    const facing = command.facing ?? "human"
     // Validate model availability for github-copilot before writing
     const { config } = readAgentConfigForAgent(command.agent)
-    if (config.provider === "github-copilot") {
+    const facingConfig = facing === "human" ? config.humanFacing : config.agentFacing
+    if (facingConfig.provider === "github-copilot") {
       const { secrets } = loadAgentSecrets(command.agent)
       const ghConfig = secrets.providers["github-copilot"]
       if (ghConfig.githubToken && ghConfig.baseUrl) {
@@ -3067,7 +3179,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
         }
       }
     }
-    const { provider, previousModel } = writeAgentModel(command.agent, command.modelName)
+    const { provider, previousModel } = writeAgentModel(command.agent, facing, command.modelName)
     const message = previousModel
       ? `updated ${command.agent} model on ${provider}: ${previousModel} → ${command.modelName}`
       : `set ${command.agent} model on ${provider}: ${command.modelName}`
