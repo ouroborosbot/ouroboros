@@ -3887,3 +3887,182 @@ describe("rhythmStatusSection", () => {
     expect(result).toBe("")
   })
 })
+
+describe("system prompt group headers", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    const DEFAULT_AGENT_CONTEXT = { maxTokens: 80000, contextMargin: 20 }
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
+      context: { ...DEFAULT_AGENT_CONTEXT },
+    })
+    mockGetBoard.mockReset().mockReturnValue({
+      compact: "",
+      full: "",
+      byStatus: {
+        drafting: [], processing: [], validating: [],
+        collaborating: [], paused: [], blocked: [],
+        done: [], cancelled: [],
+      },
+      actionRequired: [],
+      unresolvedDependencies: [],
+      activeSessions: [],
+    })
+  })
+
+  it("cli output contains core group headers in order", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+
+    // These group headers must appear as literal markdown H1 lines
+    const expectedHeaders = [
+      "# who i am",
+      "# my body & environment",
+      "# my tools & capabilities",
+      "# how i work",
+      "# dynamic state for this turn",
+      "# friend context",
+      "# task context",
+    ]
+
+    for (const header of expectedHeaders) {
+      expect(result).toContain(header)
+    }
+
+    // Verify ordering: each header appears after the previous one
+    for (let i = 1; i < expectedHeaders.length; i++) {
+      const prevIdx = result.indexOf(expectedHeaders[i - 1])
+      const currIdx = result.indexOf(expectedHeaders[i])
+      expect(currIdx).toBeGreaterThan(prevIdx)
+    }
+  })
+
+  it("inner channel output contains '# my inner life' group header", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("inner")
+    expect(result).toContain("# my inner life")
+  })
+
+  it("teams channel with remote context contains '# social context' group header", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("teams", {}, makeOnboardingContext() as any)
+    expect(result).toContain("# social context")
+  })
+
+  it("cli channel does NOT contain '# my inner life' or '# social context'", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+    expect(result).not.toContain("# my inner life")
+    expect(result).not.toContain("# social context")
+  })
+
+  it("group headers appear as literal markdown H1 lines in output", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+    const lines = result.split("\n")
+
+    // Each group header should appear on its own line starting with "# "
+    expect(lines.some(l => l.trim() === "# who i am")).toBe(true)
+    expect(lines.some(l => l.trim() === "# my body & environment")).toBe(true)
+    expect(lines.some(l => l.trim() === "# my tools & capabilities")).toBe(true)
+    expect(lines.some(l => l.trim() === "# how i work")).toBe(true)
+    expect(lines.some(l => l.trim() === "# dynamic state for this turn")).toBe(true)
+    expect(lines.some(l => l.trim() === "# friend context")).toBe(true)
+    expect(lines.some(l => l.trim() === "# task context")).toBe(true)
+  })
+
+  it("sections appear within their correct groups", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+
+    // Soul/identity content should appear after "# who i am" and before "# my body & environment"
+    const whoIdx = result.indexOf("# who i am")
+    const bodyIdx = result.indexOf("# my body & environment")
+    const soulIdx = result.indexOf("chaos monkey coding assistant")
+    expect(soulIdx).toBeGreaterThan(whoIdx)
+    expect(soulIdx).toBeLessThan(bodyIdx)
+
+    // Runtime info should appear after "# my body & environment" and before "# my tools & capabilities"
+    const toolsIdx = result.indexOf("# my tools & capabilities")
+    const bodyMapIdx = result.indexOf("## my body")
+    expect(bodyMapIdx).toBeGreaterThan(bodyIdx)
+    expect(bodyMapIdx).toBeLessThan(toolsIdx)
+
+    // Dynamic state header should appear after static sections
+    const dynamicIdx = result.indexOf("# dynamic state for this turn")
+    const howIdx = result.indexOf("# how i work")
+    expect(dynamicIdx).toBeGreaterThan(howIdx)
+  })
+
+  it("'# dynamic state for this turn' appears after all static sections", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+
+    const dynamicIdx = result.indexOf("# dynamic state for this turn")
+    const toolsIdx = result.indexOf("# my tools & capabilities")
+    const howIdx = result.indexOf("# how i work")
+
+    expect(dynamicIdx).toBeGreaterThan(toolsIdx)
+    expect(dynamicIdx).toBeGreaterThan(howIdx)
+  })
+})
