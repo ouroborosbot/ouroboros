@@ -94,10 +94,10 @@ describe("runtime auth flow", () => {
       }),
     })
 
-    expect(writeAgentProviderSelection(agentName, "openai-codex", bundlesRoot)).toBe(configPath)
+    expect(writeAgentProviderSelection(agentName, "human", "openai-codex", bundlesRoot)).toBe(configPath)
 
     const updated = JSON.parse(fs.readFileSync(configPath, "utf8")) as Record<string, unknown>
-    expect(updated.provider).toBe("openai-codex")
+    expect((updated.humanFacing as any).provider).toBe("openai-codex")
     expect(updated.customField).toBe("keep-me")
   })
 
@@ -851,63 +851,52 @@ describe("readAgentConfigForAgent v2 inline migration", () => {
 })
 
 describe("writeAgentModel", () => {
-  it("updates model for anthropic provider", () => {
+  it("updates model for anthropic provider in agent.json", () => {
     emitTestEvent("writeAgentModel anthropic")
     const bundlesRoot = makeTempDir("auth-flow-model-anthropic")
-    const homeDir = makeTempDir("auth-flow-model-home-anthropic")
-    writeAgentConfig(bundlesRoot, "ModelTest", "anthropic")
+    writeAgentConfig(bundlesRoot, "ModelTest", "anthropic", {
+      humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+    })
 
-    // Seed initial secrets
-    const secretsDir = path.join(homeDir, ".agentsecrets", "ModelTest")
-    fs.mkdirSync(secretsDir, { recursive: true })
-    fs.writeFileSync(
-      path.join(secretsDir, "secrets.json"),
-      JSON.stringify({ providers: { anthropic: { model: "claude-opus-4-6", setupToken: "tok" } } }),
-    )
-
-    const result = writeAgentModel("ModelTest", "claude-sonnet-4.6", { bundlesRoot, homeDir })
+    const result = writeAgentModel("ModelTest", "human", "claude-sonnet-4.6", { bundlesRoot })
     expect(result.provider).toBe("anthropic")
     expect(result.previousModel).toBe("claude-opus-4-6")
 
-    const updated = JSON.parse(fs.readFileSync(result.secretsPath, "utf8")) as any
-    expect(updated.providers.anthropic.model).toBe("claude-sonnet-4.6")
+    const updated = JSON.parse(fs.readFileSync(result.configPath, "utf8")) as any
+    expect(updated.humanFacing.model).toBe("claude-sonnet-4.6")
   })
 
-  it("updates modelName for azure provider", () => {
+  it("updates model for azure provider in agent.json", () => {
     emitTestEvent("writeAgentModel azure")
     const bundlesRoot = makeTempDir("auth-flow-model-azure")
-    const homeDir = makeTempDir("auth-flow-model-home-azure")
-    writeAgentConfig(bundlesRoot, "AzureModel", "azure")
+    writeAgentConfig(bundlesRoot, "AzureModel", "azure", {
+      humanFacing: { provider: "azure", model: "gpt-4o-mini" },
+      agentFacing: { provider: "azure", model: "gpt-4o-mini" },
+    })
 
-    const secretsDir = path.join(homeDir, ".agentsecrets", "AzureModel")
-    fs.mkdirSync(secretsDir, { recursive: true })
-    fs.writeFileSync(
-      path.join(secretsDir, "secrets.json"),
-      JSON.stringify({ providers: { azure: { modelName: "gpt-4o-mini", apiKey: "k", endpoint: "e", deployment: "d", apiVersion: "v" } } }),
-    )
-
-    const result = writeAgentModel("AzureModel", "gpt-5", { bundlesRoot, homeDir })
+    const result = writeAgentModel("AzureModel", "human", "gpt-5", { bundlesRoot })
     expect(result.provider).toBe("azure")
     expect(result.previousModel).toBe("gpt-4o-mini")
 
-    const updated = JSON.parse(fs.readFileSync(result.secretsPath, "utf8")) as any
-    expect(updated.providers.azure.modelName).toBe("gpt-5")
+    const updated = JSON.parse(fs.readFileSync(result.configPath, "utf8")) as any
+    expect(updated.humanFacing.model).toBe("gpt-5")
   })
 
   it("handles empty previous model", () => {
     emitTestEvent("writeAgentModel empty previous")
     const bundlesRoot = makeTempDir("auth-flow-model-empty")
-    const homeDir = makeTempDir("auth-flow-model-home-empty")
-    writeAgentConfig(bundlesRoot, "EmptyModel", "minimax")
+    writeAgentConfig(bundlesRoot, "EmptyModel", "minimax", {
+      humanFacing: { provider: "minimax", model: "" },
+      agentFacing: { provider: "minimax", model: "" },
+    })
 
-    // No secrets file — will create from defaults
-    const result = writeAgentModel("EmptyModel", "minimax-text-02", { bundlesRoot, homeDir })
+    const result = writeAgentModel("EmptyModel", "human", "minimax-text-02", { bundlesRoot })
     expect(result.provider).toBe("minimax")
-    // Default model from template
-    expect(result.previousModel).toBe("minimax-text-01")
+    expect(result.previousModel).toBe("")
 
-    const updated = JSON.parse(fs.readFileSync(result.secretsPath, "utf8")) as any
-    expect(updated.providers.minimax.model).toBe("minimax-text-02")
+    const updated = JSON.parse(fs.readFileSync(result.configPath, "utf8")) as any
+    expect(updated.humanFacing.model).toBe("minimax-text-02")
   })
 })
 

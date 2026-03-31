@@ -8,6 +8,7 @@ import { emitNervesEvent } from "../../nerves/runtime"
 import { FileFriendStore } from "../../mind/friends/store-file"
 import type { FriendStore } from "../../mind/friends/store"
 import { isIdentityProvider, type IdentityProvider, type TrustLevel } from "../../mind/friends/types"
+import type { Facing } from "../../mind/friends/channel"
 import type { DaemonCommand, DaemonResponse } from "./daemon"
 import { registerOuroBundleUti as defaultRegisterOuroBundleUti } from "./ouro-uti"
 import { installOuroCommand as defaultInstallOuroCommand, type OuroPathInstallResult } from "./ouro-path-installer"
@@ -59,7 +60,7 @@ export type OuroCliCommand =
   | { kind: "daemon.logs" }
   | { kind: "auth.run"; agent: string; provider?: AgentProvider }
   | { kind: "auth.verify"; agent: string; provider?: AgentProvider }
-  | { kind: "auth.switch"; agent: string; provider: AgentProvider }
+  | { kind: "auth.switch"; agent: string; provider: AgentProvider; facing?: Facing }
   | { kind: "chat.connect"; agent: string }
   | { kind: "message.send"; from: string; to: string; content: string; sessionId?: string; taskRef?: string }
   | { kind: "task.poke"; agent: string; taskId: string }
@@ -83,7 +84,7 @@ export type OuroCliCommand =
   | { kind: "changelog"; from?: string; agent?: string }
   | { kind: "mcp.list" }
   | { kind: "mcp.call"; server: string; tool: string; args?: string }
-  | { kind: "config.model"; agent: string; modelName: string }
+  | { kind: "config.model"; agent: string; modelName: string; facing?: Facing }
   | { kind: "config.models"; agent: string }
   | { kind: "hatch.start"; agentName?: string; humanName?: string; provider?: AgentProvider; credentials?: HatchCredentialsInput; migrationPath?: string }
   | { kind: "rollback"; version?: string }
@@ -813,12 +814,24 @@ function parseTaskCommand(args: string[]): OuroCliCommand {
   throw new Error(`Usage\n${usage()}`)
 }
 
+function extractFacingFlag(args: string[]): { facing?: Facing; rest: string[] } {
+  const idx = args.indexOf("--facing")
+  if (idx === -1 || idx + 1 >= args.length) return { rest: args }
+  const value = args[idx + 1]
+  if (value !== "human" && value !== "agent") {
+    throw new Error(`--facing must be 'human' or 'agent'`)
+  }
+  const rest = [...args.slice(0, idx), ...args.slice(idx + 2)]
+  return { facing: value, rest }
+}
+
 function parseAuthCommand(args: string[]): OuroCliCommand {
   const first = args[0]
   // Support both positional (`auth switch`) and flag (`auth --switch`) forms
   if (first === "verify" || first === "switch" || first === "--verify" || first === "--switch") {
     const subcommand = first.replace(/^--/, "")
-    const { agent, rest } = extractAgentFlag(args.slice(1))
+    const { agent, rest: afterAgent } = extractAgentFlag(args.slice(1))
+    const { facing, rest } = extractFacingFlag(afterAgent)
     let provider: AgentProvider | undefined
     /* v8 ignore start -- provider flag parsing: branches tested via CLI parsing tests @preserve */
     for (let i = 0; i < rest.length; i += 1) {
@@ -835,7 +848,7 @@ function parseAuthCommand(args: string[]): OuroCliCommand {
     if (!agent) throw new Error(`Usage\n${usage()}`)
     if (subcommand === "switch") {
       if (!provider) throw new Error(`auth switch requires --provider.\n${usage()}`)
-      return { kind: "auth.switch", agent, provider }
+      return facing ? { kind: "auth.switch", agent, provider, facing } : { kind: "auth.switch", agent, provider }
     }
     return provider ? { kind: "auth.verify", agent, provider } : { kind: "auth.verify", agent }
   }
@@ -997,7 +1010,8 @@ function parseFriendCommand(args: string[]): OuroCliCommand {
 }
 
 function parseConfigCommand(args: string[]): OuroCliCommand {
-  const { agent, rest: cleaned } = extractAgentFlag(args)
+  const { agent, rest: afterAgent } = extractAgentFlag(args)
+  const { facing, rest: cleaned } = extractFacingFlag(afterAgent)
   const [sub, ...rest] = cleaned
   if (!sub) throw new Error(`Usage\n${usage()}`)
 
@@ -1005,7 +1019,7 @@ function parseConfigCommand(args: string[]): OuroCliCommand {
     if (!agent) throw new Error("--agent is required for config model")
     const modelName = rest[0]
     if (!modelName) throw new Error(`Usage: ouro config model --agent <name> <model-name>`)
-    return { kind: "config.model", agent, modelName }
+    return facing ? { kind: "config.model", agent, modelName, facing } : { kind: "config.model", agent, modelName }
   }
 
   if (sub === "models") {
@@ -2303,7 +2317,12 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       deps.writeStdout(message)
       return message
     }
-    writeAgentProviderSelection(command.agent, command.provider)
+    if (command.facing) {
+      writeAgentProviderSelection(command.agent, command.facing, command.provider)
+    } else {
+      writeAgentProviderSelection(command.agent, "human", command.provider)
+      writeAgentProviderSelection(command.agent, "agent", command.provider)
+    }
     const message = `switched ${command.agent} to ${command.provider}`
     deps.writeStdout(message)
     return message
@@ -2346,9 +2365,11 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
   // ── config model (local, no daemon socket needed) ──
   /* v8 ignore start -- config model: tested via daemon-cli.test.ts @preserve */
   if (command.kind === "config.model") {
+    const facing = command.facing ?? "human"
     // Validate model availability for github-copilot before writing
     const { config } = readAgentConfigForAgent(command.agent)
-    if (config.humanFacing.provider === "github-copilot") {
+    const facingConfig = facing === "human" ? config.humanFacing : config.agentFacing
+    if (facingConfig.provider === "github-copilot") {
       const { secrets } = loadAgentSecrets(command.agent)
       const ghConfig = secrets.providers["github-copilot"]
       if (ghConfig.githubToken && ghConfig.baseUrl) {
@@ -2374,7 +2395,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
         }
       }
     }
-    const { provider, previousModel } = writeAgentModel(command.agent, command.modelName)
+    const { provider, previousModel } = writeAgentModel(command.agent, facing, command.modelName)
     const message = previousModel
       ? `updated ${command.agent} model on ${provider}: ${previousModel} → ${command.modelName}`
       : `set ${command.agent} model on ${provider}: ${command.modelName}`

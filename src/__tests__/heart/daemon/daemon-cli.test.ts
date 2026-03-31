@@ -859,8 +859,9 @@ describe("ouro CLI execution", () => {
       const result = await runOuroCli(["auth", "switch", "--agent", agentName, "--provider", "github-copilot"], deps)
       expect(result).toContain("switched")
       expect(result).toContain("github-copilot")
-      const updated = JSON.parse(fs.readFileSync(agentConfigPath, "utf-8")) as { provider: string }
-      expect(updated.provider).toBe("github-copilot")
+      const updated = JSON.parse(fs.readFileSync(agentConfigPath, "utf-8")) as any
+      expect(updated.humanFacing.provider).toBe("github-copilot")
+      expect(updated.agentFacing.provider).toBe("github-copilot")
     } finally {
       fs.rmSync(agentRoot, { recursive: true, force: true })
       fs.rmSync(secretsDir, { recursive: true, force: true })
@@ -904,8 +905,9 @@ describe("ouro CLI execution", () => {
       const result = await runOuroCli(["auth", "--switch", "--agent", agentName, "--provider", "github-copilot"], deps)
       expect(result).toContain("switched")
       expect(result).toContain("github-copilot")
-      const updated = JSON.parse(fs.readFileSync(agentConfigPath, "utf-8")) as { provider: string }
-      expect(updated.provider).toBe("github-copilot")
+      const updated = JSON.parse(fs.readFileSync(agentConfigPath, "utf-8")) as any
+      expect(updated.humanFacing.provider).toBe("github-copilot")
+      expect(updated.agentFacing.provider).toBe("github-copilot")
     } finally {
       fs.rmSync(agentRoot, { recursive: true, force: true })
       fs.rmSync(secretsDir, { recursive: true, force: true })

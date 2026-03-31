@@ -5,6 +5,7 @@ import * as path from "path"
 import { emitNervesEvent } from "../../nerves/runtime"
 import { getAgentBundlesRoot, getAgentSecretsPath, type AgentConfig, type AgentProvider } from "../identity"
 import { migrateAgentConfigV1ToV2 } from "../migrate-config"
+import type { Facing } from "../../mind/friends/channel"
 import type { HatchCredentialsInput } from "./hatch-flow"
 
 const ANTHROPIC_SETUP_TOKEN_PREFIX = "sk-ant-oat01-"
@@ -214,17 +215,22 @@ export function readAgentConfigForAgent(
 
 export function writeAgentProviderSelection(
   agentName: string,
+  facing: Facing,
   provider: AgentProvider,
   bundlesRoot = getAgentBundlesRoot(),
 ): string {
   const { configPath, config } = readAgentConfigForAgent(agentName, bundlesRoot)
-  const nextConfig = { ...config, provider }
+  const facingKey = facing === "human" ? "humanFacing" : "agentFacing"
+  const nextConfig = {
+    ...config,
+    [facingKey]: { ...config[facingKey], provider },
+  }
   fs.writeFileSync(configPath, `${JSON.stringify(nextConfig, null, 2)}\n`, "utf8")
   emitNervesEvent({
     component: "daemon",
     event: "daemon.auth_provider_selected",
     message: "updated agent provider selection after auth flow",
-    meta: { agentName, provider, configPath },
+    meta: { agentName, facing, provider, configPath },
   })
   return configPath
 }
@@ -273,30 +279,29 @@ export function writeProviderCredentials(
   return { secretsPath, secrets }
 }
 
-const MODEL_FIELD: Record<string, string> = {
-  azure: "modelName",
-  minimax: "model",
-  anthropic: "model",
-  "openai-codex": "model",
-  "github-copilot": "model",
-}
-
 export function writeAgentModel(
   agentName: string,
+  facing: Facing,
   modelName: string,
-  deps: ProviderSecretsDeps & { bundlesRoot?: string } = {},
-): { secretsPath: string; provider: AgentProvider; previousModel: string } {
-  const { config } = readAgentConfigForAgent(agentName, deps.bundlesRoot)
-  const provider = config.humanFacing.provider
-  const { secretsPath, secrets } = loadAgentSecrets(agentName, deps)
-  const providerSecrets = secrets.providers[provider] as Record<string, string>
-  /* v8 ignore next -- fallback: all known providers are in MODEL_FIELD @preserve */
-  const fieldName = MODEL_FIELD[provider] ?? "model"
-  /* v8 ignore next -- defensive: fieldName always exists in template @preserve */
-  const previousModel = providerSecrets[fieldName] ?? ""
-  providerSecrets[fieldName] = modelName
-  writeSecrets(secretsPath, secrets)
-  return { secretsPath, provider, previousModel }
+  deps: { bundlesRoot?: string } = {},
+): { configPath: string; provider: AgentProvider; previousModel: string } {
+  const { configPath, config } = readAgentConfigForAgent(agentName, deps.bundlesRoot)
+  const facingKey = facing === "human" ? "humanFacing" : "agentFacing"
+  const facingBlock = config[facingKey]
+  const previousModel = facingBlock.model
+  const provider = facingBlock.provider
+  const nextConfig = {
+    ...config,
+    [facingKey]: { ...facingBlock, model: modelName },
+  }
+  fs.writeFileSync(configPath, `${JSON.stringify(nextConfig, null, 2)}\n`, "utf8")
+  emitNervesEvent({
+    component: "daemon",
+    event: "daemon.config_model_updated",
+    message: "updated agent model in agent.json",
+    meta: { agentName, facing, provider, modelName, previousModel, configPath },
+  })
+  return { configPath, provider, previousModel }
 }
 
 function readCodexAccessToken(homeDir: string): string {
