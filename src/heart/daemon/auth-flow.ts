@@ -387,25 +387,25 @@ export async function collectRuntimeAuthCredentials(
   }
 
   if (input.provider === "openai-codex") {
-    let token = readCodexAccessToken(homeDir)
+    // Always run codex login when auth is explicitly requested — stale tokens
+    // are indistinguishable from valid ones without an API call, and the user
+    // is asking to re-authenticate.
+    emitNervesEvent({
+      component: "daemon",
+      event: "daemon.auth_codex_login_start",
+      message: "starting codex login for runtime auth",
+      meta: { agentName: input.agentName },
+    })
+    const result = spawnSync("codex", ["login"], { stdio: "inherit" })
+    if (result.error) {
+      throw new Error(`Failed to run 'codex login': ${result.error.message}`)
+    }
+    if (result.status !== 0) {
+      throw new Error(`'codex login' exited with status ${result.status}.`)
+    }
+    const token = readCodexAccessToken(homeDir)
     if (!token) {
-      emitNervesEvent({
-        component: "daemon",
-        event: "daemon.auth_codex_login_start",
-        message: "starting codex login for runtime auth",
-        meta: { agentName: input.agentName },
-      })
-      const result = spawnSync("codex", ["login"], { stdio: "inherit" })
-      if (result.error) {
-        throw new Error(`Failed to run 'codex login': ${result.error.message}`)
-      }
-      if (result.status !== 0) {
-        throw new Error(`'codex login' exited with status ${result.status}.`)
-      }
-      token = readCodexAccessToken(homeDir)
-      if (!token) {
-        throw new Error("Codex login completed but no token was found in ~/.codex/auth.json. Re-run `codex login` and try again.")
-      }
+      throw new Error("Codex login completed but no token was found in ~/.codex/auth.json. Re-run `codex login` and try again.")
     }
     return { oauthAccessToken: token }
   }
