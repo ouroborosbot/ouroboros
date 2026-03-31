@@ -367,6 +367,12 @@ describe("outlook http", () => {
     const inner = await fetch(`${server.origin}/outlook/api/agents/nobody/inner-transcript`).then((r) => r.json())
     expect(inner.messageCount).toBe(0)
 
+    const prefs = await fetch(`${server.origin}/outlook/api/agents/nobody/desk-prefs`).then((r) => r.json())
+    expect(prefs).toEqual(expect.objectContaining({ carrying: null }))
+
+    const needsMe = await fetch(`${server.origin}/outlook/api/agents/nobody/needs-me`).then((r) => r.json())
+    expect(needsMe).toEqual(expect.objectContaining({ items: expect.any(Array) }))
+
     await server.stop()
     fs.rmSync(bundlesRoot, { recursive: true, force: true })
   })

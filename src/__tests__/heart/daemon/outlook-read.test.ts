@@ -747,6 +747,66 @@ describe("outlook deep readers", () => {
       expect(inv.items[0]!.replyState).toBe("needs-reply")
     })
 
+    it("derives on-hold state when mustResolveBeforeHandoff is set", async () => {
+      const bundlesRoot = makeBundleRoot()
+      const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+      writeAgentConfig(alphaRoot)
+      writeJson(path.join(alphaRoot, "state", "sessions", "friend-1", "cli", "session.json"), {
+        version: 1,
+        messages: [{ role: "user", content: "hello" }, { role: "assistant", content: "hi" }],
+        state: { lastFriendActivityAt: "2026-03-30T10:00:00.000Z", mustResolveBeforeHandoff: true },
+      })
+      const { readSessionInventory } = await import("../../../heart/daemon/outlook-read")
+      const inv = readSessionInventory("alpha", { bundlesRoot })
+      expect(inv.items[0]!.replyState).toBe("on-hold")
+    })
+
+    it("returns idle state for empty sessions", async () => {
+      const bundlesRoot = makeBundleRoot()
+      const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+      writeAgentConfig(alphaRoot)
+      writeJson(path.join(alphaRoot, "state", "sessions", "friend-1", "cli", "session.json"), {
+        version: 1,
+        messages: [],
+      })
+      const { readSessionInventory } = await import("../../../heart/daemon/outlook-read")
+      const inv = readSessionInventory("alpha", { bundlesRoot })
+      expect(inv.items[0]!.replyState).toBe("idle")
+    })
+
+    it("handles sessions with no usage and no continuity", async () => {
+      const bundlesRoot = makeBundleRoot()
+      const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+      writeAgentConfig(alphaRoot)
+      writeJson(path.join(alphaRoot, "state", "sessions", "friend-1", "cli", "session.json"), {
+        version: 1,
+        messages: [{ role: "user", content: "test" }],
+      })
+      const { readSessionInventory } = await import("../../../heart/daemon/outlook-read")
+      const inv = readSessionInventory("alpha", { bundlesRoot })
+      expect(inv.items[0]!.lastUsage).toBeNull()
+      expect(inv.items[0]!.continuity).toBeNull()
+      expect(inv.items[0]!.replyState).toBe("needs-reply")
+    })
+
+    it("handles obligations without origin or currentSurface", async () => {
+      const bundlesRoot = makeBundleRoot()
+      const alphaRoot = path.join(bundlesRoot, "alpha.ouro")
+      writeAgentConfig(alphaRoot)
+      writeJson(path.join(alphaRoot, "state", "sessions", "self", "inner", "dialog.json"), { version: 1, messages: [] })
+      writeJson(path.join(alphaRoot, "state", "sessions", "self", "inner", "runtime.json"), { status: "idle" })
+      writeJson(path.join(alphaRoot, "state", "obligations", "ob-no-origin.json"), {
+        id: "ob-no-origin",
+        content: "test obligation",
+        status: "pending",
+        createdAt: "2026-03-30T10:00:00.000Z",
+      })
+      const { readOutlookAgentState } = await import("../../../heart/daemon/outlook-read")
+      const state = readOutlookAgentState("alpha", { bundlesRoot, now: () => new Date("2026-03-30T12:00:00.000Z") })
+      expect(state.obligations.items[0]!.origin).toBeNull()
+      expect(state.obligations.items[0]!.currentSurface).toBeNull()
+    })
+
     it("handles malformed session files without crashing", async () => {
       const bundlesRoot = makeBundleRoot()
       const alphaRoot = path.join(bundlesRoot, "alpha.ouro")

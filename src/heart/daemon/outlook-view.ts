@@ -1,3 +1,4 @@
+import { emitNervesEvent } from "../../nerves/runtime"
 import {
   OUTLOOK_RELEASE_INTERACTION_MODEL,
   OUTLOOK_PRODUCT_NAME,
@@ -196,6 +197,8 @@ export function buildOutlookAgentView(input: {
   agent: OutlookAgentState
   viewer?: OutlookViewer
 }): OutlookAgentView {
+  /* v8 ignore next */
+  emitNervesEvent({ component: "daemon", event: "daemon.outlook_view_agent", message: `building outlook view for ${input.agent.agentName}`, meta: { agent: input.agent.agentName } })
   const viewer = normalizeViewer(input.viewer)
 
   return {

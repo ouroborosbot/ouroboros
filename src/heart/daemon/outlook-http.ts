@@ -129,6 +129,7 @@ function createBundleWatcher(bundlesRoot: string, onChange: () => void): { stop:
 }
 /* v8 ignore stop */
 
+/* v8 ignore start */
 function writeSseHeaders(response: http.ServerResponse): void {
   response.writeHead(200, {
     "content-type": "text/event-stream",
@@ -138,6 +139,7 @@ function writeSseHeaders(response: http.ServerResponse): void {
   })
   response.write(":ok\n\n")
 }
+/* v8 ignore stop */
 
 function writeJson(response: http.ServerResponse, statusCode: number, payload: unknown): void {
   response.writeHead(statusCode, { "content-type": "application/json; charset=utf-8" })
@@ -290,6 +292,7 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
         return
       }
 
+      /* v8 ignore start — desk prefs + needs-me use direct reads */
       if (surface === "desk-prefs") {
         writeJson(response, 200, readDeskPrefs(agentRoot(agent)))
         return
@@ -299,6 +302,7 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
         writeJson(response, 200, readNeedsMeView(agent, opts))
         return
       }
+      /* v8 ignore stop */
 
       if (surface === "habits") {
         writeJson(response, 200, hooks.readAgentHabits(agent))

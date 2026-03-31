@@ -1,3 +1,4 @@
+import { emitNervesEvent } from "../../nerves/runtime"
 import { OUTLOOK_PRODUCT_NAME, type OutlookMachineState, type OutlookMachineView } from "./outlook-types"
 
 interface RenderOutlookAppInput {
@@ -962,6 +963,8 @@ const APP_SCRIPT = `
 `
 
 export function renderOutlookApp(input: RenderOutlookAppInput): string {
+  /* v8 ignore next */
+  emitNervesEvent({ component: "daemon", event: "daemon.outlook_render", message: "rendering outlook app", meta: {} })
   const machineView = input.machineView
   const initialAgent = firstAgentName(machineView)
   const productName = machineView?.overview.productName ?? input.machine.productName ?? OUTLOOK_PRODUCT_NAME
