@@ -142,7 +142,7 @@ const codingSpawnTool: OpenAI.ChatCompletionTool = {
   type: "function",
   function: {
     name: "coding_spawn",
-    description: "spawn a coding session using claude/codex and explicit task-threaded guidance",
+    description: "Spawn a coding session using claude or codex with task-threaded guidance. The coding session runs as a separate process with its own context. Give it a COMPLETE, SELF-CONTAINED task description -- it cannot see this conversation, doesn't know what you've tried, doesn't understand the broader context. Include: what to do, why, what files are involved, what 'done' looks like. Never delegate understanding -- don't write 'based on the conversation, fix the bug.' Write the specific file paths, line numbers, and what to change. Include any required verification steps or tests in the task description so the coding session knows how to prove the work is done.",
     parameters: {
       type: "object",
       properties: {
@@ -162,7 +162,7 @@ const codingStatusTool: OpenAI.ChatCompletionTool = {
   type: "function",
   function: {
     name: "coding_status",
-    description: "inspect coding sessions; omit sessionId to list all active/known sessions",
+    description: "Inspect coding sessions. Omit sessionId to list all active/known sessions with their status. Use this to check progress before asking the human for a status update.",
     parameters: {
       type: "object",
       properties: {
@@ -176,7 +176,7 @@ const codingTailTool: OpenAI.ChatCompletionTool = {
   type: "function",
   function: {
     name: "coding_tail",
-    description: "show recent stdout/stderr tail for a coding session in a readable format",
+    description: "Show recent stdout/stderr output from a coding session. Use this to understand what the session is doing or why it might be stuck. Read the actual output before reporting status -- don't guess.",
     parameters: {
       type: "object",
       properties: {
