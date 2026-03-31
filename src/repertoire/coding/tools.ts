@@ -6,6 +6,7 @@ import type { ToolContext } from "../tools-base"
 import { getAgentRoot } from "../../heart/identity"
 import { advanceObligation, createObligation, findPendingObligationForOrigin } from "../../heart/obligations"
 import { emitNervesEvent } from "../../nerves/runtime"
+import { getCodingCompletionScrutiny } from "../../mind/scrutiny"
 import type { CodingRunner, CodingSession, CodingSessionRequest } from "./types"
 
 const RUNNERS: CodingRunner[] = ["claude", "codex"]
@@ -36,6 +37,35 @@ function emitCodingToolEvent(toolName: string): void {
     message: "coding tool handler invoked",
     meta: { toolName },
   })
+}
+
+/**
+ * Count distinct file paths mentioned in a coding session's stdout output.
+ * Looks for path-like tokens (containing / and a file extension).
+ * Returns the count of unique paths found.
+ */
+export function countFilesInSessionOutput(session: CodingSession): number {
+  const text = `${session.stdoutTail}\n${session.stderrTail}`
+  // Match path-like tokens: contain at least one / and a file extension
+  const pathPattern = /(?:^|\s)((?:\/|\.\/|\.\.\/)?(?:[\w.@-]+\/)+[\w.-]+\.[\w]+)/gm
+  const paths = new Set<string>()
+  let match
+  while ((match = pathPattern.exec(text)) !== null) {
+    paths.add(match[1])
+  }
+  return paths.size
+}
+
+/**
+ * If a coding session is completed, append scrutiny to the result.
+ * Returns the original result with scrutiny appended, or unchanged if
+ * the session is not completed or has no file changes.
+ */
+function appendCompletionScrutiny(result: string, session: CodingSession): string {
+  if (session.status !== "completed") return result
+  const fileCount = countFilesInSessionOutput(session)
+  const scrutiny = getCodingCompletionScrutiny(fileCount)
+  return scrutiny ? `${result}\n\n${scrutiny}` : result
 }
 
 function sameOriginSession(
@@ -332,7 +362,7 @@ export const codingToolDefinitions = [
 
       const session = manager.getSession(sessionId)
       if (!session) return `session not found: ${sessionId}`
-      return JSON.stringify(session)
+      return appendCompletionScrutiny(JSON.stringify(session), session)
     },
     summaryKeys: ["sessionId"],
   },
@@ -345,7 +375,7 @@ export const codingToolDefinitions = [
 
       const session = getCodingSessionManager().getSession(sessionId)
       if (!session) return `session not found: ${sessionId}`
-      return formatCodingTail(session)
+      return appendCompletionScrutiny(formatCodingTail(session), session)
     },
     summaryKeys: ["sessionId"],
   },
