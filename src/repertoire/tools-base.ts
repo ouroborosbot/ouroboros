@@ -8,7 +8,7 @@ import { getIntegrationsConfig, resolveSessionPath } from "../heart/config";
 import type { Integration, ResolvedContext, FriendRecord } from "../mind/friends/types";
 import type { FriendStore } from "../mind/friends/store";
 import { emitNervesEvent } from "../nerves/runtime";
-import { getAgentRoot, getAgentName } from "../heart/identity";
+import { getAgentRoot, getAgentName, loadAgentConfig } from "../heart/identity";
 import { getRepoRoot } from "../heart/identity";
 import { requestInnerWake } from "../heart/daemon/socket-client";
 import {
@@ -659,15 +659,26 @@ export const baseToolDefinitions: ToolDefinition[] = [
         description: "Run a shell command and return stdout/stderr. Working directory persists between calls. Use dedicated tools instead of shell when available: read_file instead of cat, edit_file instead of sed, glob instead of find, grep instead of grep/rg. Reserve shell for operations that genuinely need the shell: installing packages, running builds/tests, git operations, process management. Be careful with destructive commands -- consider reversibility before running. If a command fails, read the error output before retrying with a different approach.",
         parameters: {
           type: "object",
-          properties: { command: { type: "string" } },
+          properties: {
+            command: { type: "string" },
+            timeout_ms: {
+              type: "number",
+              description: "Timeout in milliseconds. Default: 30000. Max: 600000.",
+            },
+          },
           required: ["command"],
         },
       },
     },
     handler: (a) => {
+      const MAX_TIMEOUT = 600000
+      const requestedTimeout = Number(a.timeout_ms) || 0
+      const configDefault = loadAgentConfig().shell?.defaultTimeout ?? 30000
+      const baseTimeout = requestedTimeout > 0 ? requestedTimeout : configDefault
+      const timeout = Math.min(baseTimeout, MAX_TIMEOUT)
       return execSync(a.command, {
         encoding: "utf-8",
-        timeout: 30000,
+        timeout,
       })
     },
     summaryKeys: ["command"],
