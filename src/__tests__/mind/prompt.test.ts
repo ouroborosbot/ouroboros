@@ -4519,3 +4519,104 @@ describe("workspaceDisciplineSection expanded (Unit 1.6)", () => {
     expect(result).toContain("I create new commits rather than amending")
   })
 })
+
+describe("familyCrossSessionTruthSection trimmed (Unit 1.7)", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    const DEFAULT_AGENT_CONTEXT = { maxTokens: 80000, contextMargin: 20 }
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      provider: "minimax",
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
+      context: { ...DEFAULT_AGENT_CONTEXT },
+    })
+    mockGetBoard.mockReset().mockReturnValue({
+      compact: "",
+      full: "",
+      byStatus: {
+        drafting: [], processing: [], validating: [],
+        collaborating: [], paused: [], blocked: [],
+        done: [], cancelled: [],
+      },
+      actionRequired: [],
+      unresolvedDependencies: [],
+      activeSessions: [],
+    })
+  })
+
+  const familyContext = {
+    friend: {
+      id: "uuid-1",
+      name: "Ari",
+      externalIds: [],
+      tenantMemberships: [],
+      toolPreferences: {},
+      notes: {},
+      totalTokens: 5000,
+      createdAt: "2026-01-01",
+      updatedAt: "2026-03-01",
+      schemaVersion: 1,
+      trustLevel: "family",
+    },
+    channel: {
+      channel: "teams" as const,
+      senseType: "closed" as const,
+      availableIntegrations: ["ado" as const, "graph" as const],
+      supportsMarkdown: true,
+      supportsStreaming: true,
+      supportsRichCards: true,
+      maxMessageLength: 28000,
+    },
+  }
+
+  const minimalFrame = {
+    centerOfGravity: "shared-work",
+    currentSession: { friendId: "uuid-1", channel: "teams", key: "conv-1", sessionPath: "/tmp/s.json" },
+    currentObligation: null,
+    inner: { status: "idle", hasPending: false, job: { status: "idle", content: null, origin: null, mode: "reflect", obligationStatus: null, surfacedResult: null, queuedAt: null, startedAt: null, surfacedAt: null } },
+    bridges: [],
+    taskPressure: { compactBoard: "", liveTaskNames: [], activeBridges: [] },
+    friendActivity: { freshestForCurrentFriend: null, otherLiveSessionsForCurrentFriend: [], allOtherLiveSessions: [] },
+    codingSessions: [],
+    otherCodingSessions: [],
+    pendingObligations: [],
+    bridgeSuggestion: null,
+    mustResolveBeforeHandoff: false,
+  }
+
+  it("contains locked 5-line content", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("teams", { activeWorkFrame: minimalFrame } as any, familyContext as any)
+    expect(result).toContain("live world-state across visible sessions and lanes")
+    expect(result).toContain("When live state conflicts with older transcript history, live state wins")
+  })
+
+  it("does NOT contain old verbose content", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("teams", { activeWorkFrame: minimalFrame } as any, familyContext as any)
+    // Old verbose phrases that should be gone
+    expect(result).not.toContain("i treat the active-work section above as my reliable top-level surface")
+    expect(result).not.toContain("i do not claim i lack a top-level view")
+    expect(result).not.toContain("i only reach for query_active_work")
+    expect(result).not.toContain("i do not rebuild whole-self status from scratch")
+    expect(result).not.toContain("i do not collapse down to only the current lane")
+  })
+})
