@@ -98,3 +98,37 @@ export function resetShellSessions(): void {
   }
   sessions.clear()
 }
+
+// ── Destructive Pattern Detection ──
+
+interface DestructivePattern {
+  name: string
+  regex: RegExp
+}
+
+const DESTRUCTIVE_PATTERNS: DestructivePattern[] = [
+  { name: "rm -rf root/home", regex: /rm\s+-rf\s+[/~]/ },
+  { name: "git push --force", regex: /git\s+push\s+--force/ },
+  { name: "git reset --hard", regex: /git\s+reset\s+--hard/ },
+  { name: "git clean -f", regex: /git\s+clean\s+-f/ },
+  { name: "git branch -D", regex: /git\s+branch\s+-D/ },
+  { name: "fork bomb", regex: /:\(\)\s*\{/ },
+  { name: "write to raw device", regex: />\s*\/dev\/sd/ },
+  { name: "git checkout .", regex: /git\s+checkout\s+\./ },
+  { name: "git stash drop", regex: /git\s+stash\s+drop/ },
+]
+
+/**
+ * Detect destructive patterns in a shell command.
+ * Returns list of matched pattern names. Empty array = safe.
+ * This is a friction layer, not a hard block.
+ */
+export function detectDestructivePatterns(command: string): string[] {
+  const matched: string[] = []
+  for (const pattern of DESTRUCTIVE_PATTERNS) {
+    if (pattern.regex.test(command)) {
+      matched.push(pattern.name)
+    }
+  }
+  return matched
+}

@@ -616,11 +616,12 @@ describe("shell tool", () => {
       expect(result).toContain("destructive pattern detected")
     })
 
-    it("shell handler does NOT block execution of destructive commands", async () => {
+    it("shell handler does NOT block execution of destructive commands (friction only)", async () => {
       vi.mocked(execSync).mockReturnValue("executed")
-      const result = await execTool("shell", { command: "rm -rf /" })
-      // The command still executes (returns its output)
+      const result = await execTool("shell", { command: "git reset --hard HEAD~1" })
+      // The command still executes (returns its output) -- detection is friction, not a gate
       expect(result).toContain("executed")
+      expect(result).toContain("destructive pattern detected")
     })
 
     it("non-destructive commands have no warning appended", async () => {

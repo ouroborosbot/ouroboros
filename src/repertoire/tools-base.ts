@@ -4,7 +4,7 @@ import * as fg from "fast-glob";
 import { execSync, spawnSync } from "child_process";
 import * as path from "path";
 import { listSkills, loadSkill } from "./skills";
-import { spawnBackgroundShell, getShellSession, listShellSessions, tailShellSession } from "./shell-sessions";
+import { spawnBackgroundShell, getShellSession, listShellSessions, tailShellSession, detectDestructivePatterns } from "./shell-sessions";
 import { getIntegrationsConfig, resolveSessionPath } from "../heart/config";
 import type { Integration, ResolvedContext, FriendRecord } from "../mind/friends/types";
 import type { FriendStore } from "../mind/friends/store";
@@ -676,6 +676,18 @@ export const baseToolDefinitions: ToolDefinition[] = [
       },
     },
     handler: (a) => {
+      // Destructive pattern detection (friction, not a block)
+      const destructivePatterns = detectDestructivePatterns(a.command)
+      if (destructivePatterns.length > 0) {
+        emitNervesEvent({
+          level: "warn",
+          event: "tool.shell.destructive_detected",
+          component: "tools",
+          message: `destructive pattern detected: ${destructivePatterns.join(", ")}`,
+          meta: { command: a.command, patterns: destructivePatterns },
+        })
+      }
+
       // Background mode: spawn and return immediately
       if (a.background === "true") {
         const session = spawnBackgroundShell(a.command)
@@ -687,10 +699,15 @@ export const baseToolDefinitions: ToolDefinition[] = [
       const configDefault = loadAgentConfig().shell?.defaultTimeout ?? 30000
       const baseTimeout = requestedTimeout > 0 ? requestedTimeout : configDefault
       const timeout = Math.min(baseTimeout, MAX_TIMEOUT)
-      return execSync(a.command, {
+      const output = execSync(a.command, {
         encoding: "utf-8",
         timeout,
       })
+
+      if (destructivePatterns.length > 0) {
+        return `${output}\n\n--- destructive pattern detected: ${destructivePatterns.join(", ")} ---`
+      }
+      return output
     },
     summaryKeys: ["command"],
   },
