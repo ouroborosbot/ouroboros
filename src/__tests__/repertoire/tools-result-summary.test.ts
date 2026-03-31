@@ -33,6 +33,27 @@ describe("Unit 2.6 - tool result formatting for remote channels", () => {
     expect(summary).toContain("spawned")
   })
 
+  it("coding_spawn failure includes task ref and failed status", () => {
+    const summary = buildToolResultSummary("coding_spawn", { runner: "claude", taskRef: "fix-bug-123", workdir: "/repo", prompt: "fix" }, "error: spawn failed", false)
+    expect(summary).toContain("fix-bug-123")
+    expect(summary).toContain("failed")
+  })
+
+  it("edit_file handles missing path arg gracefully", () => {
+    const summary = buildToolResultSummary("edit_file", { old_string: "a", new_string: "b" }, "ok", true)
+    expect(summary).toContain("unknown")
+  })
+
+  it("shell handles missing command arg gracefully", () => {
+    const summary = buildToolResultSummary("shell", {}, "ok", true)
+    expect(summary).toContain("$ ?")
+  })
+
+  it("coding_spawn handles missing taskRef gracefully", () => {
+    const summary = buildToolResultSummary("coding_spawn", { runner: "claude", workdir: "/repo", prompt: "do it" }, "spawned", true)
+    expect(summary).toContain("unknown")
+  })
+
   it("unrecognized tool falls back to arg summary", () => {
     const summary = buildToolResultSummary("recall", { query: "something" }, "some result", true)
     expect(summary).toContain("query=something")
