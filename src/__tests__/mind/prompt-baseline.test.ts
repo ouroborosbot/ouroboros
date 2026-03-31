@@ -196,4 +196,66 @@ describe("token baseline measurement", () => {
     expect(written).toContain("teams")
     expect(written).toContain("inner")
   })
+
+  it("captures regression baseline prompts for each channel", async () => {
+    setupReadFileSync()
+    vi.mocked(fs.existsSync).mockReturnValue(false)
+    vi.mocked(fs.readdirSync).mockReturnValue([])
+
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({ providers: { minimax: { apiKey: "test-key" } } })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+
+    const channels = ["cli", "teams", "bluebubbles", "inner", "mcp"] as const
+    const channelDescriptions: Record<string, string> = {
+      cli: "CLI coding session (has edit_file, shell, coding tools)",
+      teams: "Teams 1:1 chat (has trust, feedback, social tools)",
+      bluebubbles: "BlueBubbles group chat (has observe, group participation)",
+      inner: "Inner dialog heartbeat (has metacognitive, journal tools)",
+      mcp: "MCP channel (programmatic access)",
+    }
+
+    const regressionSignals = [
+      "## Regression signals to watch",
+      "",
+      "- **Personality flattening**: Does the prompt retain humor, lowercase style, chaos-monkey energy?",
+      "- **Lost metacognitive flow**: Does inner channel still get ponder/rest framing?",
+      "- **ponder/rest/settle misuse**: Are tool contracts clear about when to use each?",
+      "- **Friend note confusion**: Does context section clearly separate auto-loaded vs manual recall?",
+      "- **Cross-session truth**: Does family trust section correctly reference live world-state?",
+      "- **Tool behavior**: Is tool_choice=required + settle contract present and clear?",
+    ]
+
+    for (const channel of channels) {
+      resetPsycheCache()
+      const prompt = await buildSystem(channel)
+
+      const header = [
+        `# Regression Baseline: ${channel}`,
+        "",
+        `**Channel**: ${channel}`,
+        `**Description**: ${channelDescriptions[channel]}`,
+        `**Date**: ${new Date().toISOString().slice(0, 10)}`,
+        `**Characters**: ${prompt.length}`,
+        `**Approx tokens**: ${Math.ceil(prompt.length / 4)}`,
+        "",
+        ...regressionSignals,
+        "",
+        "---",
+        "",
+        "## Full assembled system prompt",
+        "",
+        prompt,
+      ]
+
+      const filename = `baseline-prompt-${channel}.md`
+      realFs.writeFileSync(realPath.join(ARTIFACTS_DIR, filename), header.join("\n"), "utf-8")
+
+      // Verify file was written with expected content
+      const written = realFs.readFileSync(realPath.join(ARTIFACTS_DIR, filename), "utf-8")
+      expect(written).toContain(`Regression Baseline: ${channel}`)
+      expect(written).toContain("Full assembled system prompt")
+    }
+  })
 })
