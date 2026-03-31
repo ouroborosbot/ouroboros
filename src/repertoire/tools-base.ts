@@ -786,7 +786,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       function: {
         name: "recall",
         description:
-          "recall what i know — search my diary and journal for facts, thoughts, and working notes that match a query",
+          "Search my diary and journal for facts, thoughts, and working notes matching a query. Uses semantic similarity -- phrasing matters. Try different angles if the first query doesn't find what you're looking for. Check recall before asking the human something you might already know.",
         parameters: {
           type: "object",
           properties: { query: { type: "string" } },
@@ -843,7 +843,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       function: {
         name: "diary_write",
         description:
-          "write an entry in my diary — something i learned, noticed, or concluded that i want to recall later. optional 'about' tags the entry to a person, topic, or context.",
+          "Write an entry in my diary -- something I learned, noticed, or concluded that I want to recall later. Use 'about' to tag the entry to a person, topic, or context. Write for my future self: include enough context that the entry makes sense without the surrounding conversation. Prefer durable conclusions over passing noise. Don't duplicate what already belongs in friend notes.",
         parameters: {
           type: "object",
           properties: {
