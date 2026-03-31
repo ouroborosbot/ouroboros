@@ -910,3 +910,117 @@ describe("writeAgentModel", () => {
     expect(updated.providers.minimax.model).toBe("minimax-text-02")
   })
 })
+
+describe("writeAgentProviderSelection with facing", () => {
+  it("writes to humanFacing when facing is 'human'", () => {
+    emitTestEvent("writeAgentProviderSelection human facing")
+    const bundlesRoot = makeTempDir("auth-flow-provider-human")
+    const agentName = "FacingHumanBot"
+    const configPath = writeAgentConfig(bundlesRoot, agentName, "anthropic", {
+      humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+    })
+
+    writeAgentProviderSelection(agentName, "human", "openai-codex", bundlesRoot)
+
+    const updated = JSON.parse(fs.readFileSync(configPath, "utf8")) as Record<string, any>
+    expect(updated.humanFacing.provider).toBe("openai-codex")
+    // agentFacing should be unchanged
+    expect(updated.agentFacing.provider).toBe("anthropic")
+  })
+
+  it("writes to agentFacing when facing is 'agent'", () => {
+    emitTestEvent("writeAgentProviderSelection agent facing")
+    const bundlesRoot = makeTempDir("auth-flow-provider-agent")
+    const agentName = "FacingAgentBot"
+    const configPath = writeAgentConfig(bundlesRoot, agentName, "anthropic", {
+      humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+    })
+
+    writeAgentProviderSelection(agentName, "agent", "github-copilot", bundlesRoot)
+
+    const updated = JSON.parse(fs.readFileSync(configPath, "utf8")) as Record<string, any>
+    expect(updated.agentFacing.provider).toBe("github-copilot")
+    // humanFacing should be unchanged
+    expect(updated.humanFacing.provider).toBe("anthropic")
+  })
+})
+
+describe("writeAgentModel with facing (agent.json)", () => {
+  it("writes model to humanFacing in agent.json for 'human' facing", () => {
+    emitTestEvent("writeAgentModel human facing agent.json")
+    const bundlesRoot = makeTempDir("auth-flow-model-human-facing")
+    const agentName = "ModelHumanBot"
+    const configPath = writeAgentConfig(bundlesRoot, agentName, "anthropic", {
+      humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      agentFacing: { provider: "anthropic", model: "claude-sonnet-4.6" },
+    })
+
+    const result = writeAgentModel(agentName, "human", "claude-haiku-35", { bundlesRoot })
+    expect(result.provider).toBe("anthropic")
+    expect(result.previousModel).toBe("claude-opus-4-6")
+
+    const updated = JSON.parse(fs.readFileSync(configPath, "utf8")) as Record<string, any>
+    expect(updated.humanFacing.model).toBe("claude-haiku-35")
+    // agentFacing model should be unchanged
+    expect(updated.agentFacing.model).toBe("claude-sonnet-4.6")
+  })
+
+  it("writes model to agentFacing in agent.json for 'agent' facing", () => {
+    emitTestEvent("writeAgentModel agent facing agent.json")
+    const bundlesRoot = makeTempDir("auth-flow-model-agent-facing")
+    const agentName = "ModelAgentBot"
+    const configPath = writeAgentConfig(bundlesRoot, agentName, "azure", {
+      humanFacing: { provider: "azure", model: "gpt-4o" },
+      agentFacing: { provider: "azure", model: "gpt-4o-mini" },
+    })
+
+    const result = writeAgentModel(agentName, "agent", "gpt-5", { bundlesRoot })
+    expect(result.provider).toBe("azure")
+    expect(result.previousModel).toBe("gpt-4o-mini")
+
+    const updated = JSON.parse(fs.readFileSync(configPath, "utf8")) as Record<string, any>
+    expect(updated.agentFacing.model).toBe("gpt-5")
+    // humanFacing model should be unchanged
+    expect(updated.humanFacing.model).toBe("gpt-4o")
+  })
+
+  it("does not write model to secrets.json", () => {
+    emitTestEvent("writeAgentModel no secrets write")
+    const bundlesRoot = makeTempDir("auth-flow-model-no-secrets")
+    const homeDir = makeTempDir("auth-flow-model-no-secrets-home")
+    const agentName = "NoSecretsModelBot"
+    writeAgentConfig(bundlesRoot, agentName, "anthropic", {
+      humanFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+      agentFacing: { provider: "anthropic", model: "claude-opus-4-6" },
+    })
+
+    // Seed secrets without model
+    const secretsDir = path.join(homeDir, ".agentsecrets", agentName)
+    fs.mkdirSync(secretsDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(secretsDir, "secrets.json"),
+      JSON.stringify({ providers: { anthropic: { setupToken: "tok" } } }),
+    )
+
+    writeAgentModel(agentName, "human", "claude-haiku-35", { bundlesRoot })
+
+    // Secrets should NOT have model written to it
+    const secrets = JSON.parse(fs.readFileSync(path.join(secretsDir, "secrets.json"), "utf8")) as any
+    expect(secrets.providers.anthropic.model).toBeUndefined()
+  })
+
+  it("returns configPath instead of secretsPath", () => {
+    emitTestEvent("writeAgentModel returns configPath")
+    const bundlesRoot = makeTempDir("auth-flow-model-configpath")
+    const agentName = "ConfigPathBot"
+    const configPath = writeAgentConfig(bundlesRoot, agentName, "minimax", {
+      humanFacing: { provider: "minimax", model: "minimax-text-01" },
+      agentFacing: { provider: "minimax", model: "minimax-text-01" },
+    })
+
+    const result = writeAgentModel(agentName, "human", "minimax-text-02", { bundlesRoot })
+    expect(result.configPath).toBe(configPath)
+  })
+})
