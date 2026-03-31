@@ -13,16 +13,30 @@ export interface FileStateCacheEntry {
   limit?: number
   fullRead: boolean
   recordedAt: number
+  messageId?: string
+}
+
+export interface FileStateSnapshot {
+  filePath: string
+  hash: string
+  mtime: number
+  messageId?: string
+  createdAt: number
 }
 
 /**
  * Session-scoped LRU cache tracking file reads.
  * Stores content hashes (not full content) to limit memory.
  * Keyed by absolute file path.
+ *
+ * Also maintains a separate snapshot list for future rewind support.
+ * Snapshots are indexed by content hash and linked to conversation messages.
  */
 export class FileStateCache {
   private entries: Map<string, FileStateCacheEntry>
   private maxSize: number
+  private snapshots: FileStateSnapshot[] = []
+  private maxSnapshots: number = 100
 
   constructor(maxSize: number = 50) {
     this.entries = new Map()
@@ -38,6 +52,7 @@ export class FileStateCache {
     mtime: number,
     offset?: number,
     limit?: number,
+    messageId?: string,
   ): void {
     // If key already exists, delete it so re-insertion moves it to end (most recent)
     if (this.entries.has(filePath)) {
@@ -54,6 +69,7 @@ export class FileStateCache {
       limit: fullRead ? undefined : limit,
       fullRead,
       recordedAt: Date.now(),
+      messageId,
     })
 
     // Evict LRU (first entry in Map iteration order) if over capacity
@@ -109,7 +125,55 @@ export class FileStateCache {
   }
 
   /**
-   * Clear all cached entries.
+   * Create a pre-edit snapshot of the current cache state for a file.
+   * Snapshots are stored separately from the LRU cache for future rewind support.
+   * Returns undefined if the path is not in cache.
+   */
+  snapshot(filePath: string): FileStateSnapshot | undefined {
+    const entry = this.entries.get(filePath)
+    if (entry === undefined) return undefined
+
+    const snap: FileStateSnapshot = {
+      filePath,
+      hash: entry.hash,
+      mtime: entry.mtime,
+      messageId: entry.messageId,
+      createdAt: Date.now(),
+    }
+
+    this.snapshots.push(snap)
+
+    // Evict oldest snapshots if over capacity
+    if (this.snapshots.length > this.maxSnapshots) {
+      this.snapshots = this.snapshots.slice(this.snapshots.length - this.maxSnapshots)
+    }
+
+    return snap
+  }
+
+  /**
+   * Get all snapshots in creation order.
+   */
+  getSnapshots(): readonly FileStateSnapshot[] {
+    return this.snapshots
+  }
+
+  /**
+   * Look up a snapshot by content hash. Returns the first match.
+   */
+  lookupSnapshotByHash(hash: string): FileStateSnapshot | undefined {
+    return this.snapshots.find(s => s.hash === hash)
+  }
+
+  /**
+   * Clear all snapshots.
+   */
+  clearSnapshots(): void {
+    this.snapshots = []
+  }
+
+  /**
+   * Clear all cached entries (does not clear snapshots).
    */
   clear(): void {
     this.entries.clear()

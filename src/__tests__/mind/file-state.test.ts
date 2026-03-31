@@ -222,4 +222,92 @@ describe("FileStateCache", () => {
       expect(hash).toBe("b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9")
     })
   })
+
+  describe("messageId on cache entries", () => {
+    it("stores optional messageId with record", () => {
+      cache.record("/tmp/foo.ts", "content", 1234567890, undefined, undefined, "msg-001")
+      const entry = cache.get("/tmp/foo.ts")
+      expect(entry!.messageId).toBe("msg-001")
+    })
+
+    it("messageId is undefined when not provided", () => {
+      cache.record("/tmp/foo.ts", "content", 1234567890)
+      const entry = cache.get("/tmp/foo.ts")
+      expect(entry!.messageId).toBeUndefined()
+    })
+  })
+
+  describe("snapshots", () => {
+    it("creates a snapshot from current cache entry", () => {
+      cache.record("/tmp/foo.ts", "content", 1000, undefined, undefined, "msg-001")
+      const snap = cache.snapshot("/tmp/foo.ts")
+      expect(snap).toBeDefined()
+      expect(snap!.hash).toBe(contentHash("content"))
+      expect(snap!.mtime).toBe(1000)
+      expect(snap!.messageId).toBe("msg-001")
+      expect(snap!.filePath).toBe("/tmp/foo.ts")
+    })
+
+    it("returns undefined when path is not in cache", () => {
+      expect(cache.snapshot("/nonexistent")).toBeUndefined()
+    })
+
+    it("stores snapshots separately from LRU cache", () => {
+      cache.record("/tmp/foo.ts", "content", 1000)
+      cache.snapshot("/tmp/foo.ts")
+
+      // Clearing LRU cache should not clear snapshots
+      cache.clear()
+      expect(cache.get("/tmp/foo.ts")).toBeUndefined()
+
+      const snapshots = cache.getSnapshots()
+      expect(snapshots.length).toBe(1)
+    })
+
+    it("getSnapshots returns all snapshots in order", () => {
+      cache.record("/a", "a", 1)
+      cache.snapshot("/a")
+      cache.record("/b", "b", 2)
+      cache.snapshot("/b")
+
+      const snapshots = cache.getSnapshots()
+      expect(snapshots.length).toBe(2)
+      expect(snapshots[0].filePath).toBe("/a")
+      expect(snapshots[1].filePath).toBe("/b")
+    })
+
+    it("lookupSnapshotByHash returns matching snapshot", () => {
+      cache.record("/tmp/foo.ts", "content", 1000, undefined, undefined, "msg-001")
+      cache.snapshot("/tmp/foo.ts")
+      const hash = contentHash("content")
+
+      const found = cache.lookupSnapshotByHash(hash)
+      expect(found).toBeDefined()
+      expect(found!.filePath).toBe("/tmp/foo.ts")
+      expect(found!.messageId).toBe("msg-001")
+    })
+
+    it("lookupSnapshotByHash returns undefined when no match", () => {
+      expect(cache.lookupSnapshotByHash("nonexistent-hash")).toBeUndefined()
+    })
+
+    it("enforces max 100 snapshots per session", () => {
+      for (let i = 0; i < 101; i++) {
+        cache.record(`/file-${i}`, `content-${i}`, i)
+        cache.snapshot(`/file-${i}`)
+      }
+      const snapshots = cache.getSnapshots()
+      expect(snapshots.length).toBe(100)
+      // First snapshot should be evicted
+      expect(snapshots[0].filePath).toBe("/file-1")
+      expect(snapshots[99].filePath).toBe("/file-100")
+    })
+
+    it("clearSnapshots removes all snapshots", () => {
+      cache.record("/a", "a", 1)
+      cache.snapshot("/a")
+      cache.clearSnapshots()
+      expect(cache.getSnapshots().length).toBe(0)
+    })
+  })
 })
