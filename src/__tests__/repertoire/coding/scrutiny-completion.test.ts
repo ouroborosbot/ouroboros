@@ -198,6 +198,30 @@ describe("coding completion scrutiny", () => {
     expect(result).not.toContain("stranger-with-candy")
   })
 
+  it("coding_status does NOT include scrutiny when completed session has no file paths", async () => {
+    const session = {
+      id: "sess-nofiles",
+      runner: "claude",
+      workdir: "/tmp",
+      status: "completed",
+      stdoutTail: "Task complete. No files changed.",
+      stderrTail: "",
+      pid: 123,
+      startedAt: "2026-03-31T00:00:00Z",
+      lastActivityAt: "2026-03-31T00:01:00Z",
+      endedAt: "2026-03-31T00:01:00Z",
+      restartCount: 0,
+      lastExitCode: 0,
+      lastSignal: null,
+      failure: null,
+    }
+    manager.getSession.mockReturnValue(session)
+
+    const result = await execTool("coding_status", { sessionId: "sess-nofiles" })
+    expect(result).not.toContain("Before moving on")
+    expect(result).not.toContain("stranger-with-candy")
+  })
+
   it("coding_status without sessionId (list mode) does NOT include scrutiny", async () => {
     manager.listSessions.mockReturnValue([])
     const result = await execTool("coding_status", {})
