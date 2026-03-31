@@ -1,4 +1,10 @@
 import { createHash } from "crypto"
+import { statSync, readFileSync } from "fs"
+
+/** Compute sha256 hex hash of content */
+export function contentHash(content: string): string {
+  return createHash("sha256").update(content).digest("hex")
+}
 
 export interface FileStateCacheEntry {
   hash: string
@@ -71,9 +77,44 @@ export class FileStateCache {
   }
 
   /**
+   * Check if a file has been modified since the last recorded read.
+   * Uses mtime as primary signal, content hash as fallback for cloud sync / touch scenarios.
+   * Returns { stale: false } if the path is not in cache or the file cannot be stat'd.
+   */
+  isStale(filePath: string): { stale: boolean; reason?: string } {
+    const entry = this.entries.get(filePath)
+    if (entry === undefined) return { stale: false }
+
+    let currentMtime: number
+    try {
+      currentMtime = statSync(filePath).mtimeMs
+    } catch {
+      // File doesn't exist or can't be stat'd -- no basis for staleness
+      return { stale: false }
+    }
+
+    // Fast path: mtime unchanged means not stale
+    if (currentMtime === entry.mtime) return { stale: false }
+
+    // mtime differs -- check content hash as fallback (handles touch / cloud sync)
+    try {
+      const currentContent = readFileSync(filePath, "utf-8")
+      const currentHash = createHash("sha256").update(currentContent).digest("hex")
+      if (currentHash === entry.hash) return { stale: false }
+      return { stale: true, reason: `file modified since last read (mtime and content differ)` }
+    } catch {
+      // Can't read file -- treat as not stale (file may have been deleted)
+      return { stale: false }
+    }
+  }
+
+  /**
    * Clear all cached entries.
    */
   clear(): void {
     this.entries.clear()
   }
 }
+
+/** Session-scoped singleton instance used by tool handlers */
+export const fileStateCache = new FileStateCache()

@@ -9,6 +9,7 @@ import { getIntegrationsConfig, resolveSessionPath } from "../heart/config";
 import type { Integration, ResolvedContext, FriendRecord } from "../mind/friends/types";
 import type { FriendStore } from "../mind/friends/store";
 import { emitNervesEvent } from "../nerves/runtime";
+import { fileStateCache } from "../mind/file-state";
 import { getAgentRoot, getAgentName, loadAgentConfig } from "../heart/identity";
 import { getRepoRoot } from "../heart/identity";
 import { requestInnerWake } from "../heart/daemon/socket-client";
@@ -422,6 +423,18 @@ export const baseToolDefinitions: ToolDefinition[] = [
       editFileReadTracker.add(resolvedPath)
       const offset = a.offset ? parseInt(a.offset, 10) : undefined
       const limit = a.limit ? parseInt(a.limit, 10) : undefined
+
+      // Record in file state cache for staleness detection
+      try {
+        const mtime = fs.statSync(resolvedPath).mtimeMs
+        const readContent = (offset === undefined && limit === undefined)
+          ? content
+          : content.split("\n").slice(offset ? offset - 1 : 0, limit !== undefined ? (offset ? offset - 1 : 0) + limit : undefined).join("\n")
+        fileStateCache.record(resolvedPath, readContent, mtime, offset, limit)
+      } catch {
+        // stat failed -- skip cache recording
+      }
+
       if (offset === undefined && limit === undefined) return content
       const lines = content.split("\n")
       const start = offset ? offset - 1 : 0
@@ -475,6 +488,9 @@ export const baseToolDefinitions: ToolDefinition[] = [
         return `error: you must read the file with read_file before editing it. call read_file on ${a.path} first.`
       }
 
+      // Check staleness before editing
+      const stalenessCheck = fileStateCache.isStale(resolvedPath)
+
       let content: string
       try {
         content = fs.readFileSync(resolvedPath, "utf-8")
@@ -505,6 +521,14 @@ export const baseToolDefinitions: ToolDefinition[] = [
       const updated = content.slice(0, idx) + a.new_string + content.slice(idx + a.old_string.length)
       fs.writeFileSync(resolvedPath, updated, "utf-8")
 
+      // Update file state cache with new content
+      try {
+        const newMtime = fs.statSync(resolvedPath).mtimeMs
+        fileStateCache.record(resolvedPath, updated, newMtime)
+      } catch {
+        // stat failed -- skip cache update
+      }
+
       // Build contextual diff
       const lines = updated.split("\n")
       const prefixLines = content.slice(0, idx).split("\n")
@@ -512,7 +536,13 @@ export const baseToolDefinitions: ToolDefinition[] = [
       const newStringLines = a.new_string.split("\n")
       const changeEndLine = changeStartLine + newStringLines.length
 
-      return buildContextDiff(lines, changeStartLine, changeEndLine)
+      const diffResult = buildContextDiff(lines, changeStartLine, changeEndLine)
+
+      // Append staleness warning if detected (do not block -- TTFA)
+      if (stalenessCheck.stale) {
+        return `${diffResult}\n\n⚠️ warning: file changed externally since last read -- re-read recommended`
+      }
+      return diffResult
     },
     summaryKeys: ["path"],
   },
