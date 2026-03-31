@@ -498,6 +498,7 @@ export interface BuildSystemOptions {
   providerCapabilities?: ReadonlySet<import("../heart/core").ProviderCapability>;
   supportedReasoningEfforts?: readonly string[];
   mcpManager?: McpManager;
+  pendingMessages?: Array<{ from: string; content: string }>;
 }
 
 function bridgeContextSection(options?: BuildSystemOptions): string {
@@ -515,6 +516,16 @@ function activeWorkSection(options?: BuildSystemOptions): string {
 function liveWorldStateSection(options?: BuildSystemOptions): string {
   if (!options?.activeWorkFrame) return ""
   return formatLiveWorldStateCheckpoint(options.activeWorkFrame)
+}
+
+function pendingMessagesSection(options?: BuildSystemOptions): string {
+  const pending = options?.pendingMessages
+  if (!pending || pending.length === 0) return ""
+  const lines = ["## pending messages"]
+  for (const msg of pending) {
+    lines.push(`- from ${msg.from}: ${msg.content}`)
+  }
+  return lines.join("\n")
 }
 
 function familyCrossSessionTruthSection(context?: ResolvedContext, options?: BuildSystemOptions): string {
@@ -1047,6 +1058,7 @@ export async function buildSystem(channel: Channel = "cli", options?: BuildSyste
     // Group 7: dynamic state for this turn
     "# dynamic state for this turn",
     liveWorldStateSection(options),
+    pendingMessagesSection(options),
     activeWorkSection(options),
     centerOfGravitySteeringSection(channel, options, context),
     commitmentsSection(options),

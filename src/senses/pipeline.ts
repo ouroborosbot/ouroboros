@@ -503,17 +503,21 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
   const pending = [...deferredReturns, ...sessionPending]
 
   // Assemble messages: session messages + attention queue + pending + inbound user messages
-  // NOTE: live world-state checkpoint moved to system prompt (buildSystem -> liveWorldStateSection)
+  // NOTE: live world-state checkpoint and pending messages moved to system prompt
   const extraPrefixSections = input.onPendingDrained?.(pending) ?? []
-  const prefixSections = [...extraPrefixSections]
   if (pending.length > 0) {
+    // Append pending messages section to the system prompt (sessionMessages[0])
     const pendingSection = pending
-      .map((msg) => `[pending from ${msg.from}]: ${msg.content}`)
+      .map((msg) => `- from ${msg.from}: ${msg.content}`)
       .join("\n")
-    prefixSections.push(`## pending messages\n${pendingSection}`)
+    const pendingBlock = `\n\n## pending messages\n${pendingSection}`
+    if (sessionMessages.length > 0 && sessionMessages[0].role === "system" && typeof sessionMessages[0].content === "string") {
+      sessionMessages[0] = { ...sessionMessages[0], content: sessionMessages[0].content + pendingBlock }
+    }
   }
-  if (input.messages.length > 0) {
-    input.messages[0] = prependTurnSections(input.messages[0], prefixSections)
+  // extraPrefixSections from onPendingDrained still prepend to user message (e.g., inner dialog wakes)
+  if (extraPrefixSections.length > 0 && input.messages.length > 0) {
+    input.messages[0] = prependTurnSections(input.messages[0], extraPrefixSections)
   }
 
   // Append user messages from the inbound turn
