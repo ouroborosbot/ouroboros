@@ -33,6 +33,7 @@ import { ensureCurrentDaemonRuntime } from "./daemon-runtime-sync"
 import { listEnabledBundleAgents } from "./agent-discovery"
 import { applyPendingUpdates, registerUpdateHook } from "./update-hooks"
 import { bundleMetaHook } from "./hooks/bundle-meta"
+import { agentConfigV2Hook } from "./hooks/agent-config-v2"
 import { getChangelogPath, getPackageVersion } from "../../mind/bundle-manifest"
 import { getTaskModule } from "../../repertoire/tasks"
 import { parseInnerDialogSession, formatThoughtTurns, getInnerDialogSessionPath, followThoughts } from "./thoughts"
@@ -2091,6 +2092,7 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
     // Run update hooks before starting daemon so user sees the output
     registerUpdateHook(bundleMetaHook)
+    registerUpdateHook(agentConfigV2Hook)
     const bundlesRoot = getAgentBundlesRoot()
     const currentVersion = getPackageVersion()
 

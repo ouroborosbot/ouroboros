@@ -27,6 +27,7 @@ import { getChannelCapabilities } from "../mind/friends/channel"
 import { acquireSessionLock, SessionLockError } from "./session-lock"
 import { applyPendingUpdates, registerUpdateHook } from "../heart/daemon/update-hooks"
 import { bundleMetaHook } from "../heart/daemon/hooks/bundle-meta"
+import { agentConfigV2Hook } from "../heart/daemon/hooks/agent-config-v2"
 import { getPackageVersion } from "../mind/bundle-manifest"
 import { formatEchoedInputSummary, StreamingWordWrapper } from "./cli-layout"
 
@@ -798,6 +799,7 @@ export async function main(agentName?: string, options?: { pasteDebounceMs?: num
 
   // Fallback: apply pending updates for daemon-less direct CLI usage
   registerUpdateHook(bundleMetaHook)
+  registerUpdateHook(agentConfigV2Hook)
   await applyPendingUpdates(getAgentBundlesRoot(), getPackageVersion())
 
   // Fail fast if provider is misconfigured (triggers human-readable error + exit)
