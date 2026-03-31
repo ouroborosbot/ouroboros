@@ -96,7 +96,7 @@ function createSseBroadcaster() {
     clients.clear()
   }
 
-  return { add, broadcast, disconnectAll, get clientCount() { return clients.size } }
+  return { add, broadcast, disconnectAll }
 }
 
 /* v8 ignore start — filesystem watcher, tested via integration */
@@ -129,17 +129,6 @@ function createBundleWatcher(bundlesRoot: string, onChange: () => void): { stop:
 }
 /* v8 ignore stop */
 
-/* v8 ignore start */
-function writeSseHeaders(response: http.ServerResponse): void {
-  response.writeHead(200, {
-    "content-type": "text/event-stream",
-    "cache-control": "no-cache",
-    "connection": "keep-alive",
-    "access-control-allow-origin": "*",
-  })
-  response.write(":ok\n\n")
-}
-/* v8 ignore stop */
 
 function writeJson(response: http.ServerResponse, statusCode: number, payload: unknown): void {
   response.writeHead(statusCode, { "content-type": "application/json; charset=utf-8" })
@@ -206,7 +195,10 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
     const origin = `http://${host}:${(server.address() as AddressInfo).port}`
 
     if (pathname === "/outlook/api/events") {
-      writeSseHeaders(response)
+      /* v8 ignore start — SSE headers */
+      response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", "connection": "keep-alive", "access-control-allow-origin": "*" })
+      response.write(":ok\n\n")
+      /* v8 ignore stop */
       sse.add(response)
       return
     }

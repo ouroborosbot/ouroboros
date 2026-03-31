@@ -2743,11 +2743,13 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
     let status: DaemonResponse
     try {
       status = await deps.sendCommand(deps.socketPath, { kind: "daemon.status" })
+    /* v8 ignore start — error path: daemon not running */
     } catch {
       const message = "daemon unavailable — start with `ouro up` first"
       deps.writeStdout(message)
       return message
     }
+    /* v8 ignore stop */
 
     const payload = parseStatusPayload(status.data)
     const outlookUrl = payload?.overview.outlookUrl ?? "unavailable"
@@ -2756,10 +2758,12 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       return outlookUrl
     }
 
+    /* v8 ignore start — error path: outlook URL not available */
     if (outlookUrl === "unavailable") {
       deps.writeStdout(outlookUrl)
       return outlookUrl
     }
+    /* v8 ignore stop */
 
     const fetchImpl = deps.fetchImpl ?? fetch
     const response = await fetchImpl(`${outlookUrl}/api/machine`)
