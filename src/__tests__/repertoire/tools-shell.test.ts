@@ -20,6 +20,9 @@ vi.mock("../../repertoire/skills", () => ({
   loadSkill: vi.fn(),
 }))
 
+// Use real shell-sessions module (not mocked) so we test actual behavior
+// But we mock child_process.spawn which it uses internally
+
 vi.mock("../../repertoire/graph-client", () => ({
   getProfile: vi.fn(),
   graphRequest: vi.fn(),
@@ -75,6 +78,7 @@ vi.mock("../../heart/identity", () => {
 import { execSync, spawn } from "child_process"
 import { loadAgentConfig } from "../../heart/identity"
 import { EventEmitter } from "events"
+import { resetShellSessions } from "../../repertoire/shell-sessions"
 
 describe("shell tool", () => {
   let execTool: (name: string, args: any, ctx?: any) => Promise<string>
@@ -85,6 +89,7 @@ describe("shell tool", () => {
 
   beforeEach(async () => {
     vi.resetModules()
+    resetShellSessions()
     vi.mocked(execSync).mockReset()
     vi.mocked(loadAgentConfig).mockReset().mockReturnValue({
       name: "testagent",
@@ -339,6 +344,187 @@ describe("shell tool", () => {
     it("shell_tail with unknown id returns not found", async () => {
       const result = await execTool("shell_tail", { id: "nonexistent-id" })
       expect(result).toContain("not found")
+    })
+
+    it("shell_tail returns buffered stdout from background process", async () => {
+      const { spawnBackgroundShell, tailShellSession } = await import("../../repertoire/shell-sessions")
+      const stdoutEmitter = new EventEmitter()
+      const stderrEmitter = new EventEmitter()
+      const procEmitter = new EventEmitter()
+      const mockProc = Object.assign(procEmitter, {
+        pid: 33333,
+        stdout: stdoutEmitter,
+        stderr: stderrEmitter,
+        stdin: { write: vi.fn(), end: vi.fn() },
+        kill: vi.fn(),
+      })
+      vi.mocked(spawn).mockReturnValue(mockProc as any)
+
+      const session = spawnBackgroundShell("echo test")
+
+      // Simulate stdout data
+      stdoutEmitter.emit("data", Buffer.from("line one\nline two\n"))
+
+      const output = tailShellSession(session.id)
+      expect(output).toContain("line one")
+      expect(output).toContain("line two")
+    })
+
+    it("process close event updates status to exited with exit code", async () => {
+      const { spawnBackgroundShell, getShellSession } = await import("../../repertoire/shell-sessions")
+      const stdoutEmitter = new EventEmitter()
+      const stderrEmitter = new EventEmitter()
+      const procEmitter = new EventEmitter()
+      const mockProc = Object.assign(procEmitter, {
+        pid: 44444,
+        stdout: stdoutEmitter,
+        stderr: stderrEmitter,
+        stdin: { write: vi.fn(), end: vi.fn() },
+        kill: vi.fn(),
+      })
+      vi.mocked(spawn).mockReturnValue(mockProc as any)
+
+      const session = spawnBackgroundShell("exit 0")
+      expect(session.status).toBe("running")
+
+      // Simulate process close
+      procEmitter.emit("close", 0)
+
+      const updated = getShellSession(session.id)
+      expect(updated!.status).toBe("exited")
+      expect(updated!.exitCode).toBe(0)
+    })
+
+    it("resetShellSessions kills running processes and clears map", async () => {
+      const shellSessions = await import("../../repertoire/shell-sessions")
+      const procEmitter = new EventEmitter()
+      const mockKill = vi.fn()
+      const mockProc = Object.assign(procEmitter, {
+        pid: 55555,
+        stdout: new EventEmitter(),
+        stderr: new EventEmitter(),
+        stdin: { write: vi.fn(), end: vi.fn() },
+        kill: mockKill,
+      })
+      vi.mocked(spawn).mockReturnValue(mockProc as any)
+
+      shellSessions.spawnBackgroundShell("sleep 999")
+      const before = shellSessions.listShellSessions()
+      expect(before.length).toBe(1)
+
+      shellSessions.resetShellSessions()
+      expect(mockKill).toHaveBeenCalled()
+
+      const after = shellSessions.listShellSessions()
+      expect(after.length).toBe(0)
+    })
+
+    it("output buffer caps at MAX_OUTPUT_LINES", async () => {
+      const shellSessions = await import("../../repertoire/shell-sessions")
+      const stdoutEmitter = new EventEmitter()
+      const procEmitter = new EventEmitter()
+      const mockProc = Object.assign(procEmitter, {
+        pid: 66666,
+        stdout: stdoutEmitter,
+        stderr: new EventEmitter(),
+        stdin: { write: vi.fn(), end: vi.fn() },
+        kill: vi.fn(),
+      })
+      vi.mocked(spawn).mockReturnValue(mockProc as any)
+
+      const session = shellSessions.spawnBackgroundShell("generate-lots")
+
+      // Emit 250 lines (over the 200 cap)
+      const bigOutput = Array.from({ length: 250 }, (_, i) => `line-${i}`).join("\n")
+      stdoutEmitter.emit("data", Buffer.from(bigOutput))
+
+      const output = shellSessions.tailShellSession(session.id, 300)
+      const lines = output!.split("\n").filter((l) => l.length > 0)
+      expect(lines.length).toBeLessThanOrEqual(200)
+    })
+
+    it("stderr output is also captured", async () => {
+      const shellSessions = await import("../../repertoire/shell-sessions")
+      const stdoutEmitter = new EventEmitter()
+      const stderrEmitter = new EventEmitter()
+      const procEmitter = new EventEmitter()
+      const mockProc = Object.assign(procEmitter, {
+        pid: 77777,
+        stdout: stdoutEmitter,
+        stderr: stderrEmitter,
+        stdin: { write: vi.fn(), end: vi.fn() },
+        kill: vi.fn(),
+      })
+      vi.mocked(spawn).mockReturnValue(mockProc as any)
+
+      const session = shellSessions.spawnBackgroundShell("some-cmd")
+      stderrEmitter.emit("data", Buffer.from("error output\n"))
+
+      const output = shellSessions.tailShellSession(session.id)
+      expect(output).toContain("error output")
+    })
+
+    it("appendOutput skips leading empty lines when output is empty", async () => {
+      const shellSessions = await import("../../repertoire/shell-sessions")
+      const stdoutEmitter = new EventEmitter()
+      const procEmitter = new EventEmitter()
+      const mockProc = Object.assign(procEmitter, {
+        pid: 90001,
+        stdout: stdoutEmitter,
+        stderr: new EventEmitter(),
+        stdin: { write: vi.fn(), end: vi.fn() },
+        kill: vi.fn(),
+      })
+      vi.mocked(spawn).mockReturnValue(mockProc as any)
+
+      const session = shellSessions.spawnBackgroundShell("cmd")
+
+      // Emit data that splits into an empty first line (output is empty, line is empty -> skip)
+      stdoutEmitter.emit("data", Buffer.from("\nfirst real line\n"))
+
+      const output = shellSessions.tailShellSession(session.id)
+      // The first empty line should be skipped, only "first real line" and trailing empty
+      expect(output).not.toMatch(/^\n/)
+    })
+
+    it("resetShellSessions skips kill for already-exited processes", async () => {
+      const shellSessions = await import("../../repertoire/shell-sessions")
+      const procEmitter = new EventEmitter()
+      const mockKill = vi.fn()
+      const mockProc = Object.assign(procEmitter, {
+        pid: 90002,
+        stdout: new EventEmitter(),
+        stderr: new EventEmitter(),
+        stdin: { write: vi.fn(), end: vi.fn() },
+        kill: mockKill,
+      })
+      vi.mocked(spawn).mockReturnValue(mockProc as any)
+
+      shellSessions.spawnBackgroundShell("done-cmd")
+      // Simulate process exiting
+      procEmitter.emit("close", 0)
+
+      shellSessions.resetShellSessions()
+      // kill should NOT have been called since process already exited
+      expect(mockKill).not.toHaveBeenCalled()
+    })
+
+    it("shell_tail returns (no output yet) when buffer is empty", async () => {
+      const shellSessions = await import("../../repertoire/shell-sessions")
+      const procEmitter = new EventEmitter()
+      const mockProc = Object.assign(procEmitter, {
+        pid: 88888,
+        stdout: new EventEmitter(),
+        stderr: new EventEmitter(),
+        stdin: { write: vi.fn(), end: vi.fn() },
+        kill: vi.fn(),
+      })
+      vi.mocked(spawn).mockReturnValue(mockProc as any)
+
+      const session = shellSessions.spawnBackgroundShell("silent-cmd")
+
+      const result = await execTool("shell_tail", { id: session.id })
+      expect(result).toBe("(no output yet)")
     })
   })
 })
