@@ -1146,7 +1146,7 @@ export function readLogView(logPath: string | null, limit = 100): OutlookLogView
         const parsed = JSON.parse(line) as Record<string, unknown>
         entries.push({
           ts: typeof parsed.ts === "string" ? parsed.ts : "",
-          level: typeof parsed.level === "string" ? parsed.level : "info",
+          level: typeof parsed.level === "string" ? parsed.level as OutlookLogEntry["level"] : "info",
           event: typeof parsed.event === "string" ? parsed.event : "",
           component: typeof parsed.component === "string" ? parsed.component : "",
           message: typeof parsed.message === "string" ? parsed.message : "",

@@ -1,7 +1,10 @@
-import type { CodingSessionOrigin, CodingSessionStatus, CodingRunner } from "../../repertoire/coding/types"
-import type { TaskStatus } from "../../repertoire/tasks/types"
-import type { RuntimeMetadata } from "./runtime-metadata"
+import type { CodingSessionOrigin, CodingSessionStatus, CodingRunner } from "../../nerves/observation"
+import type { TaskStatus, RuntimeMetadata } from "../../nerves/observation"
+import type { UsageData } from "../../nerves/observation"
 import type { InnerJobStatus } from "./thoughts"
+
+// Re-export domain types through the observation layer
+export type { UsageData } from "../../nerves/observation"
 
 export const OUTLOOK_PRODUCT_NAME = "Ouro Outlook" as const
 export const OUTLOOK_RELEASE_INTERACTION_MODEL = "read-only" as const
@@ -262,12 +265,8 @@ export interface OutlookAgentView {
 // Session x-ray: inventory + transcript inspection
 // ---------------------------------------------------------------------------
 
-export interface OutlookSessionUsage {
-  input_tokens: number
-  output_tokens: number
-  reasoning_tokens: number
-  total_tokens: number
-}
+/** Session usage — re-exported from domain type UsageData */
+export type OutlookSessionUsage = UsageData
 
 export interface OutlookSessionContinuity {
   mustResolveBeforeHandoff: boolean
@@ -335,6 +334,7 @@ export interface OutlookSessionTranscript {
 // Coding deep inspection
 // ---------------------------------------------------------------------------
 
+/** Coding failure diagnostics — mirrors domain CodingFailureDiagnostics with string signal */
 export interface OutlookCodingFailureDiagnostics {
   command: string
   args: string[]
@@ -447,29 +447,14 @@ export interface OutlookBridgeInventory {
 // Daemon health deep inspection
 // ---------------------------------------------------------------------------
 
-export interface OutlookSafeModeState {
-  active: boolean
-  reason: string
-  enteredAt: string
-}
+import type { SafeModeState, DegradedComponent, AgentHealth, HabitHealth } from "../../nerves/observation"
+import type { LogEvent } from "../../nerves/observation"
 
-export interface OutlookDegradedComponent {
-  component: string
-  reason: string
-  since: string
-}
-
-export interface OutlookAgentHealthEntry {
-  status: string
-  pid: number | null
-  crashes: number
-}
-
-export interface OutlookHabitHealthEntry {
-  cronStatus: string
-  lastFired: string | null
-  fallback: boolean
-}
+export type OutlookSafeModeState = SafeModeState
+export type OutlookDegradedComponent = DegradedComponent
+export type OutlookAgentHealthEntry = AgentHealth
+export type OutlookHabitHealthEntry = HabitHealth
+export type OutlookLogEntry = LogEvent
 
 export interface OutlookDaemonHealthDeep {
   status: string
@@ -578,16 +563,6 @@ export interface OutlookWaitingItem {
 // ---------------------------------------------------------------------------
 // Log / event inspection
 // ---------------------------------------------------------------------------
-
-export interface OutlookLogEntry {
-  ts: string
-  level: string
-  event: string
-  component: string
-  message: string
-  trace_id: string
-  meta: Record<string, unknown>
-}
 
 export interface OutlookLogView {
   logPath: string | null
