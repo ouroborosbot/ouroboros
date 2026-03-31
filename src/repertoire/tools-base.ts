@@ -4,6 +4,7 @@ import * as fg from "fast-glob";
 import { execSync, spawnSync } from "child_process";
 import * as path from "path";
 import { listSkills, loadSkill } from "./skills";
+import { spawnBackgroundShell, getShellSession, listShellSessions, tailShellSession } from "./shell-sessions";
 import { getIntegrationsConfig, resolveSessionPath } from "../heart/config";
 import type { Integration, ResolvedContext, FriendRecord } from "../mind/friends/types";
 import type { FriendStore } from "../mind/friends/store";
@@ -665,12 +666,22 @@ export const baseToolDefinitions: ToolDefinition[] = [
               type: "number",
               description: "Timeout in milliseconds. Default: 30000. Max: 600000.",
             },
+            background: {
+              type: "boolean",
+              description: "Run in background. Returns immediately with a process ID. Use shell_status/shell_tail to monitor.",
+            },
           },
           required: ["command"],
         },
       },
     },
     handler: (a) => {
+      // Background mode: spawn and return immediately
+      if (a.background === "true") {
+        const session = spawnBackgroundShell(a.command)
+        return JSON.stringify({ id: session.id, command: session.command, status: session.status })
+      }
+
       const MAX_TIMEOUT = 600000
       const requestedTimeout = Number(a.timeout_ms) || 0
       const configDefault = loadAgentConfig().shell?.defaultTimeout ?? 30000
@@ -682,6 +693,53 @@ export const baseToolDefinitions: ToolDefinition[] = [
       })
     },
     summaryKeys: ["command"],
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "shell_status",
+        description: "Check status of background shell processes. Omit id to list all.",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Background shell process ID" },
+          },
+        },
+      },
+    },
+    handler: (a) => {
+      if (!a.id) {
+        return JSON.stringify(listShellSessions())
+      }
+      const session = getShellSession(a.id)
+      if (!session) return `process not found: ${a.id}`
+      return JSON.stringify(session)
+    },
+    summaryKeys: ["id"],
+  },
+  {
+    tool: {
+      type: "function",
+      function: {
+        name: "shell_tail",
+        description: "Show recent output from a background shell process.",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Background shell process ID" },
+          },
+          required: ["id"],
+        },
+      },
+    },
+    handler: (a) => {
+      if (!a.id) return "id is required"
+      const output = tailShellSession(a.id)
+      if (output === undefined) return `process not found: ${a.id}`
+      return output || "(no output yet)"
+    },
+    summaryKeys: ["id"],
   },
   {
     tool: {
