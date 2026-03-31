@@ -3459,3 +3459,84 @@ describe("groupChatParticipationSection", () => {
     expect(result).toMatch(/reaction|tapback/i)
   })
 })
+
+// ── Unit 6a: providerSection facing derivation ──────────────────
+
+describe("providerSection facing derivation from channel", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    mockGetBoard.mockReset().mockReturnValue({
+      compact: "",
+      full: "",
+      byStatus: {
+        drafting: [],
+        processing: [],
+        "validating": [],
+        collaborating: [],
+        paused: [],
+        blocked: [],
+        done: [],
+      },
+      actionRequired: [],
+      unresolvedDependencies: [],
+      activeSessions: [],
+    })
+  })
+
+  it("buildSystem inner channel shows agent-facing provider in provider section", async () => {
+    const DEFAULT_AGENT_CONTEXT = { maxTokens: 80000, contextMargin: 20 }
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      humanFacing: { provider: "minimax", model: "human-display-model" },
+      agentFacing: { provider: "anthropic", model: "agent-display-model" },
+      context: { ...DEFAULT_AGENT_CONTEXT },
+    })
+    setupReadFileSync()
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({
+      providers: {
+        minimax: { apiKey: "mm-key" },
+        anthropic: { setupToken: `sk-ant-oat01-${"a".repeat(80)}` },
+      },
+    })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("inner")
+
+    // When channel is "inner", providerSection should show agent-facing provider
+    expect(result).toContain("## my provider")
+    expect(result).toContain("anthropic (agent-display-model)")
+    expect(result).not.toContain("human-display-model")
+  })
+
+  it("buildSystem cli channel shows human-facing provider in provider section", async () => {
+    const DEFAULT_AGENT_CONTEXT = { maxTokens: 80000, contextMargin: 20 }
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      humanFacing: { provider: "minimax", model: "human-display-model" },
+      agentFacing: { provider: "anthropic", model: "agent-display-model" },
+      context: { ...DEFAULT_AGENT_CONTEXT },
+    })
+    setupReadFileSync()
+    const { patchRuntimeConfig, resetConfigCache } = await import("../../heart/config")
+    resetConfigCache()
+    patchRuntimeConfig({
+      providers: {
+        minimax: { apiKey: "mm-key" },
+        anthropic: { setupToken: `sk-ant-oat01-${"a".repeat(80)}` },
+      },
+    })
+    const { buildSystem, resetPsycheCache } = await import("../../mind/prompt")
+    resetPsycheCache()
+
+    const result = await buildSystem("cli")
+
+    expect(result).toContain("## my provider")
+    expect(result).toContain("minimax (human-display-model)")
+    expect(result).not.toContain("agent-display-model")
+  })
+})

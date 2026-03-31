@@ -8844,3 +8844,128 @@ describe("facing-aware provider runtime", () => {
     expect(mockOpenAICtor.mock.calls.length).toBeGreaterThan(callsBefore)
   })
 })
+
+// ── Unit 6a: Call site facing derivation tests ──────────────────
+
+describe("runAgent facing derivation from channel", () => {
+  beforeEach(async () => {
+    vi.resetModules()
+    mockCreate.mockReset()
+    mockResponsesCreate.mockReset()
+    mockOpenAICtor.mockReset()
+    mockInjectAssociativeRecall.mockReset().mockResolvedValue(undefined)
+    vi.mocked(fs.readFileSync).mockImplementation(defaultReadFileSync)
+  })
+
+  it("runAgent with channel inner uses agent-facing provider runtime", async () => {
+    // Set up different models for human and agent facing
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      humanFacing: { provider: "minimax", model: "human-only-model" },
+      agentFacing: { provider: "minimax", model: "agent-only-model" },
+    })
+    const config = await import("../../heart/config")
+    config.resetConfigCache()
+    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "mm-key" } } })
+
+    // Mock the streaming response
+    mockCreate.mockReturnValue({
+      [Symbol.asyncIterator]: async function* () {
+        yield { choices: [{ delta: { content: "inner response" } }] }
+      },
+    })
+
+    const core = await import("../../heart/core")
+    core.resetProviderRuntime()
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    // Call runAgent with channel "inner"
+    await core.runAgent([{ role: "system", content: "test" }], callbacks, "inner")
+
+    // The model used should be the agent-facing model
+    const callArgs = mockCreate.mock.calls[0][0]
+    expect(callArgs.model).toBe("agent-only-model")
+  })
+
+  it("runAgent with channel cli uses human-facing provider runtime", async () => {
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      humanFacing: { provider: "minimax", model: "human-only-model" },
+      agentFacing: { provider: "minimax", model: "agent-only-model" },
+    })
+    const config = await import("../../heart/config")
+    config.resetConfigCache()
+    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "mm-key" } } })
+
+    mockCreate.mockReturnValue({
+      [Symbol.asyncIterator]: async function* () {
+        yield { choices: [{ delta: { content: "cli response" } }] }
+      },
+    })
+
+    const core = await import("../../heart/core")
+    core.resetProviderRuntime()
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await core.runAgent([{ role: "system", content: "test" }], callbacks, "cli")
+
+    const callArgs = mockCreate.mock.calls[0][0]
+    expect(callArgs.model).toBe("human-only-model")
+  })
+
+  it("runAgent with no channel defaults to human-facing provider", async () => {
+    vi.mocked(identity.loadAgentConfig).mockReturnValue({
+      name: "testagent",
+      configPath: "~/.agentsecrets/testagent/secrets.json",
+      humanFacing: { provider: "minimax", model: "human-default" },
+      agentFacing: { provider: "minimax", model: "agent-default" },
+    })
+    const config = await import("../../heart/config")
+    config.resetConfigCache()
+    config.patchRuntimeConfig({ providers: { minimax: { apiKey: "mm-key" } } })
+
+    mockCreate.mockReturnValue({
+      [Symbol.asyncIterator]: async function* () {
+        yield { choices: [{ delta: { content: "default response" } }] }
+      },
+    })
+
+    const core = await import("../../heart/core")
+    core.resetProviderRuntime()
+
+    const callbacks: ChannelCallbacks = {
+      onModelStart: () => {},
+      onModelStreamStart: () => {},
+      onTextChunk: () => {},
+      onReasoningChunk: () => {},
+      onToolStart: () => {},
+      onToolEnd: () => {},
+      onError: () => {},
+    }
+
+    await core.runAgent([{ role: "system", content: "test" }], callbacks)
+
+    const callArgs = mockCreate.mock.calls[0][0]
+    expect(callArgs.model).toBe("human-default")
+  })
+})
