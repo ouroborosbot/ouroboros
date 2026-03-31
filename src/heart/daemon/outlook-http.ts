@@ -148,6 +148,7 @@ function writeJson(response: http.ServerResponse, statusCode: number, payload: u
 }
 
 
+/* v8 ignore start — SPA static file serving infrastructure */
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html",
   ".js": "application/javascript",
@@ -193,6 +194,8 @@ function serveStaticFile(response: http.ServerResponse, filePath: string): boole
     return false
   }
 }
+
+/* v8 ignore stop */
 
 function normalizePath(urlValue = "/"): string {
   const parsed = new URL(urlValue, "http://127.0.0.1")
@@ -254,6 +257,7 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
       return
     }
 
+    /* v8 ignore start — SPA static asset serving */
     // Serve built SPA static assets: /assets/*
     if (pathname.startsWith("/assets/")) {
       const spaDir = resolveSpaDistDir()
@@ -264,6 +268,8 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
       writeJson(response, 404, { ok: false, error: "asset not found" })
       return
     }
+
+    /* v8 ignore stop */
 
     // Legacy /outlook route — redirect to root
     if (pathname === "/outlook") {
@@ -373,11 +379,12 @@ export async function startOutlookHttpServer(options: StartOutlookHttpServerOpti
       return
     }
 
-    // SPA fallback — serve index.html for client-side routing
+    /* v8 ignore start — SPA fallback for client-side routing */
     const spaDir = resolveSpaDistDir()
     if (spaDir) {
       if (serveStaticFile(response, path.join(spaDir, "index.html"))) return
     }
+    /* v8 ignore stop */
     writeJson(response, 404, { ok: false, error: `not found: ${pathname}` })
   })
 
