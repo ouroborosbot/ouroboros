@@ -546,23 +546,45 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
       tuiStore = new TuiStore()
       cliCallbacks = createTuiCallbacks(tuiStore)
 
-      const handleExit = () => {
+      // Ctrl-C state machine (Claude Code behavior):
+      // During generation: abort current request
+      // Idle with text: clear input
+      // Idle empty (first): warn
+      // Idle empty (second): exit
+      let ctrlCWarned = false
+      const handleCtrlC = (hasInput: boolean): import("./cli/ouro-tui").CtrlCAction => {
         if (currentAbort) {
+          // During generation: abort the request
           currentAbort.abort()
-        } else {
+          ctrlCWarned = false
+          return "abort"
+        }
+        if (hasInput) {
+          ctrlCWarned = false
+          return "clear"
+        }
+        if (ctrlCWarned) {
+          ctrlCWarned = false
           closed = true
           inputQueue!.close()
+          return "exit"
         }
+        ctrlCWarned = true
+        return "warn"
       }
 
       // TUI root: subscribes to store, passes props to OuroTui
+      // Elapsed timer is local React state (no store.notify overhead)
       const storeRef = tuiStore
       function TuiRoot(): any {
         const [, forceUpdate] = React.useState(0)
         const [elapsed, setElapsed] = React.useState(0)
-        React.useEffect(() => storeRef.subscribe(() => forceUpdate((n: number) => n + 1)), [])
+        React.useEffect(() => storeRef.subscribe(() => {
+          forceUpdate((n: number) => n + 1)
+          // Reset ctrlC warning on any state change (new turn, etc.)
+        }), [])
         React.useEffect(() => {
-          const iv = setInterval(() => { storeRef.updateElapsed(); setElapsed(storeRef.elapsed) }, 1000)
+          const iv = setInterval(() => setElapsed(storeRef.getElapsed()), 1000)
           return () => clearInterval(iv)
         }, [])
         return React.createElement(OuroTui, {
@@ -572,8 +594,9 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
           live: storeRef.live,
           elapsedSeconds: elapsed,
           contextPercent: 0,
-          onSubmit: (text: string) => { inputQueue!.push(text) },
-          onExit: handleExit,
+          onSubmit: (text: string) => { ctrlCWarned = false; inputQueue!.push(text) },
+          onCtrlC: handleCtrlC,
+          headerShown: storeRef.headerShown,
         })
       }
 

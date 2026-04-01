@@ -26,15 +26,23 @@ export class TuiStore {
     kickMessage: null,
     inputSuppressed: false,
   }
-  private _elapsed = 0
   private _spinnerStart = 0
   private _hadTool = false
   private _turnId = 0
   private _listeners = new Set<Listener>()
+  private _headerShown = false
 
   get completedMessages(): readonly CompletedMessage[] { return this._completed }
   get live(): Readonly<LiveState> { return this._live }
-  get elapsed(): number { return this._elapsed }
+  get headerShown(): boolean { return this._headerShown }
+
+  /** Elapsed seconds since spinner started — computed on demand, not stored */
+  getElapsed(): number {
+    if (this._live.loading && this._spinnerStart > 0) {
+      return Math.floor((Date.now() - this._spinnerStart) / 1000)
+    }
+    return 0
+  }
 
   subscribe(fn: Listener): () => void {
     this._listeners.add(fn)
@@ -80,9 +88,19 @@ export class TuiStore {
 
   toolStart(name: string, args: Record<string, string>): void {
     this._hadTool = true
+    // Before showing tool in-progress, commit any buffered streaming text
+    // so it doesn't disappear when the live area switches to tool display
+    if (this._live.streamingText.trim()) {
+      this._completed = [...this._completed, {
+        id: `asst-${this._turnId}-${Date.now()}`,
+        role: "assistant" as const,
+        content: this._live.streamingText.trim(),
+      }]
+    }
     this._live = {
       ...this._live,
       loading: true,
+      streamingText: "",
       activeTool: { name, args },
       spinnerPhrase: pickPhrase(getPhrases().tool),
     }
@@ -135,6 +153,7 @@ export class TuiStore {
         content: this._live.streamingText.trim(),
       }]
     }
+    // Clear streaming text immediately — prevents double display
     this._live = {
       ...this._live,
       loading: false,
@@ -148,21 +167,15 @@ export class TuiStore {
 
   /** Add a user message to completed (for display) */
   addUserMessage(text: string): void {
+    if (this._completed.length === 0) {
+      this._headerShown = false // first message triggers header
+    }
     this._completed = [...this._completed, {
       id: `user-${Date.now()}`,
       role: "user",
       content: text,
     }]
     this.notify()
-  }
-
-  updateElapsed(): void {
-    if (this._live.loading) {
-      this._elapsed = Math.floor((Date.now() - this._spinnerStart) / 1000)
-    } else {
-      this._elapsed = 0
-    }
-    // Don't notify for elapsed-only updates (timer handles its own re-render)
   }
 }
 

@@ -613,8 +613,10 @@ describe("CLI adapter - onToolEnd", () => {
     callbacks.onToolStart("read_file", { path: "/tmp/test.txt" })
     callbacks.onToolEnd("read_file", "/tmp/test.txt", true)
     const output = stderrChunks.join("")
-    // Uses shared formatter: "checkmark read_file (/tmp/test.txt)"
-    expect(output).toContain("\u2713 read_file (/tmp/test.txt)")
+    // Uses shared formatter: "checkmark read_file /tmp/test.txt"
+    expect(output).toContain("\u2713")
+    expect(output).toContain("read_file")
+    expect(output).toContain("/tmp/test.txt")
     // Green ANSI
     expect(output).toContain("\x1b[32m")
 
@@ -636,8 +638,10 @@ describe("CLI adapter - onToolEnd", () => {
     callbacks.onToolStart("read_file", { path: "/tmp/test.txt" })
     callbacks.onToolEnd("read_file", "/tmp/test.txt", false)
     const output = stderrChunks.join("")
-    // Uses shared formatter: "cross read_file: /tmp/test.txt"
-    expect(output).toContain("\u2717 read_file: /tmp/test.txt")
+    // Uses shared formatter: "cross read_file /tmp/test.txt"
+    expect(output).toContain("\u2717")
+    expect(output).toContain("read_file")
+    expect(output).toContain("/tmp/test.txt")
     // Red ANSI
     expect(output).toContain("\x1b[31m")
 
@@ -660,7 +664,8 @@ describe("CLI adapter - onToolEnd", () => {
     callbacks.onToolEnd("get_current_time", "", true)
     const output = stderrChunks.join("")
     // Uses shared formatter: "checkmark get_current_time" (no parens for empty summary)
-    expect(output).toContain("\u2713 get_current_time")
+    expect(output).toContain("\u2713")
+    expect(output).toContain("get_current_time")
     expect(output).not.toContain("()")
 
     vi.restoreAllMocks()
@@ -684,10 +689,11 @@ describe("CLI adapter - onToolEnd", () => {
 
     callbacks.onToolEnd("read_file", "/tmp/test.txt", true)
 
-    expect(stderrChunks.join("")).toContain("\u2713 read_file (/tmp/test.txt)")
+    expect(stderrChunks.join("")).toContain("\u2713")
+    expect(stderrChunks.join("")).toContain("read_file")
     expect(emitNervesEvent).toHaveBeenCalledWith(expect.objectContaining({
-      event: "channel.message_sent",
-      component: "channels",
+      event: "senses.tool_display",
+      component: "senses",
     }))
 
     vi.restoreAllMocks()

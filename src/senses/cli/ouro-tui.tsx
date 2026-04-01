@@ -9,13 +9,14 @@
  * Design language: ouroboros brand palette from ouroboros.bot / Outlook UI.
  * ZERO business logic here — pure rendering from CliStore state.
  */
-import React, { useState, useRef, useEffect } from "react"
+import React, { useState, useRef, useEffect, useCallback } from "react"
 import { Text, Box, Static, useInput } from "ink"
 
 // ─── Ouroboros Brand Palette (ANSI RGB) ─────────────────────────────
 // From packages/outlook-ui/src/style.css and ouroboros.bot
 const OURO = {
   scale: "#2f8f4e",    // primary green
+  teal: "#4ec9b0",     // tool/accent teal
   glow: "#74e08f",     // bright green (highlights)
   bone: "#eef2ea",     // light text
   mist: "#a5b8a8",     // dim text
@@ -23,14 +24,13 @@ const OURO = {
   fang: "#d35f47",     // error red
   gold: "#d6b56f",     // warning amber
   moss: "#183325",     // subtle bg accent
+  separator: "#3a5a40", // dim line separator
 } as const
 
-// ─── Snake Spinner ──────────────────────────────────────────────────
-// Ouroboros: serpent eating its own tail. The animation cycles through
-// a snake-like chase pattern.
-const SNAKE_FRAMES = ["◜", "◠", "◝", "◞", "◡", "◟"]
+// ─── Ring Spinner (growing/shrinking) ───────────────────────────────
+const RING_FRAMES = ["∙", "○", "◎", "●", "◎", "○"]
 
-function snakeColor(elapsedSec: number): string {
+function ringColor(elapsedSec: number): string {
   if (elapsedSec >= 45) return OURO.fang
   if (elapsedSec >= 15) return OURO.gold
   return OURO.scale
@@ -55,6 +55,8 @@ export interface LiveState {
   inputSuppressed: boolean
 }
 
+export type CtrlCAction = "abort" | "clear" | "warn" | "exit"
+
 export interface TuiProps {
   readonly agentName: string
   readonly model: string
@@ -63,7 +65,8 @@ export interface TuiProps {
   readonly elapsedSeconds: number
   readonly contextPercent: number
   readonly onSubmit: (text: string) => void
-  readonly onExit: () => void
+  readonly onCtrlC: (hasInput: boolean) => CtrlCAction
+  readonly headerShown: boolean
 }
 
 // ─── Header ─────────────────────────────────────────────────────────
@@ -73,37 +76,73 @@ function Header({ agentName, model, contextPercent }: {
   readonly model: string
   readonly contextPercent: number
 }): React.ReactElement {
-  const ctxColor = contextPercent > 80 ? OURO.fang : contextPercent > 60 ? OURO.gold : OURO.scale
+  const showCtx = contextPercent > 0
   return (
     <Box flexDirection="column">
       <Text color={OURO.scale} bold>{"  ◎ "}<Text color={OURO.glow} bold>{agentName}</Text></Text>
-      <Text color={OURO.shadow}>{"    "}{model} · ctx: <Text color={ctxColor}>{contextPercent}%</Text></Text>
-      <Text color={OURO.moss}>{"  ─────────────────────────────────────────"}</Text>
+      <Text color={OURO.shadow}>{"    "}{model}{showCtx ? <Text> · ctx: <Text color={contextPercent > 80 ? OURO.fang : contextPercent > 60 ? OURO.gold : OURO.scale}>{contextPercent}%</Text></Text> : ""}</Text>
+      <Text color={OURO.separator}>{"  ─────────────────────────────────────────"}</Text>
     </Box>
   )
 }
 
 // ─── Message Rendering ──────────────────────────────────────────────
 
-function RoleLabel({ role }: { readonly role: string }): React.ReactElement {
-  if (role === "user") return <Text color={OURO.bone} bold>{"  you"}</Text>
-  if (role === "assistant") return <Text color={OURO.glow} bold>{"  ◎"}</Text>
-  return <Text color={OURO.shadow}>{"  ⊘ "}{role}</Text>
+function truncateArgs(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max - 1) + "…" : s
+}
+
+function ToolResultLine({ tc }: { readonly tc: { name: string; argSummary: string; success?: boolean } }): React.ReactElement {
+  const icon = tc.success !== false ? "✓" : "✗"
+  const iconColor = tc.success !== false ? OURO.scale : OURO.fang
+  const argColor = tc.success === false ? OURO.fang : OURO.shadow
+  return (
+    <Text>
+      {"  "}<Text color={iconColor}>{icon}</Text>{" "}
+      <Text color={OURO.teal}>{tc.name}</Text>{" "}
+      <Text color={argColor}>{truncateArgs(tc.argSummary, 60)}</Text>
+    </Text>
+  )
+}
+
+function TurnSeparator(): React.ReactElement {
+  return <Text color={OURO.separator}>{"  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─"}</Text>
 }
 
 function MessageBlock({ msg }: { readonly msg: CompletedMessage }): React.ReactElement {
+  if (msg.role === "tool") {
+    // Tool results: compact one-liners, no role label
+    return (
+      <Box flexDirection="column">
+        {msg.toolCalls?.map((tc, i) => <ToolResultLine key={i} tc={tc} />)}
+      </Box>
+    )
+  }
+
+  if (msg.role === "user") {
+    return (
+      <Box flexDirection="column">
+        <TurnSeparator />
+        <Text color={OURO.bone} bold>{"  you"}</Text>
+        {msg.content ? <Text color={OURO.bone}>{"  "}{msg.content}</Text> : null}
+        <Text>{""}</Text>
+      </Box>
+    )
+  }
+
+  if (msg.role === "assistant") {
+    return (
+      <Box flexDirection="column">
+        {msg.content ? <Text color={OURO.mist}>{"  ⎿ "}{msg.content}</Text> : null}
+        <Text>{""}</Text>
+      </Box>
+    )
+  }
+
+  // system or other
   return (
     <Box flexDirection="column">
-      <RoleLabel role={msg.role} />
-      {msg.content ? <Text color={msg.role === "user" ? OURO.bone : OURO.mist}>{"  "}{msg.content}</Text> : null}
-      {msg.toolCalls?.map((tc, i) => {
-        const icon = tc.success !== false ? "✓" : "✗"
-        const color = tc.success !== false ? OURO.scale : OURO.fang
-        return (
-          <Text key={i} color={color}>{"  "}{icon} <Text color={OURO.scale} bold>{tc.name}</Text> <Text color={OURO.shadow}>{tc.argSummary}</Text></Text>
-        )
-      })}
-      <Text>{""}</Text>
+      <Text color={OURO.shadow}>{"  "}{msg.content}</Text>
     </Box>
   )
 }
@@ -116,16 +155,29 @@ function Spinner({ phrase, elapsed }: {
 }): React.ReactElement {
   const [frame, setFrame] = useState(0)
   useEffect(() => {
-    const iv = setInterval(() => setFrame(f => (f + 1) % SNAKE_FRAMES.length), 100)
+    const iv = setInterval(() => setFrame(f => (f + 1) % RING_FRAMES.length), 120)
     return () => clearInterval(iv)
   }, [])
 
-  const color = snakeColor(elapsed)
+  const color = ringColor(elapsed)
   const timeStr = elapsed > 0 ? `${elapsed}s` : ""
 
   return (
     <Text color={color}>
-      {"  "}{SNAKE_FRAMES[frame]} {timeStr ? <Text color={OURO.shadow}>{timeStr} · </Text> : ""}{phrase}
+      {"  "}{RING_FRAMES[frame]} {timeStr ? <Text color={OURO.shadow}>{timeStr} · </Text> : ""}{phrase}
+    </Text>
+  )
+}
+
+function ActiveToolLine({ tool }: {
+  readonly tool: { name: string; args: Record<string, string> }
+}): React.ReactElement {
+  const argStr = Object.values(tool.args)[0] ?? ""
+  return (
+    <Text>
+      {"  "}<Text color={OURO.shadow}>∙</Text>{" "}
+      <Text color={OURO.teal}>{tool.name}</Text>{" "}
+      <Text color={OURO.shadow}>{truncateArgs(argStr, 60)}</Text>
     </Text>
   )
 }
@@ -136,17 +188,14 @@ function LiveArea({ live, elapsed }: {
 }): React.ReactElement {
   return (
     <Box flexDirection="column">
-      {/* Streaming assistant text */}
+      {/* Streaming assistant text — only shown if there IS streaming text */}
       {live.streamingText ? (
-        <Box flexDirection="column">
-          <Text color={OURO.glow} bold>{"  ◎"}</Text>
-          <Text color={OURO.mist}>{"  "}{live.streamingText}</Text>
-        </Box>
+        <Text color={OURO.mist}>{"  ⎿ "}{live.streamingText}</Text>
       ) : null}
 
-      {/* Active tool */}
+      {/* Active tool (in-progress) */}
       {live.activeTool ? (
-        <Text color={OURO.scale}>{"  ⟳ "}<Text bold>{live.activeTool.name}</Text> <Text color={OURO.shadow}>{Object.values(live.activeTool.args)[0] ?? ""}</Text></Text>
+        <ActiveToolLine tool={live.activeTool} />
       ) : null}
 
       {/* Spinner */}
@@ -169,15 +218,37 @@ function LiveArea({ live, elapsed }: {
 
 // ─── Input ──────────────────────────────────────────────────────────
 
-function InputArea({ onSubmit, suppressed }: {
+function InputArea({ onSubmit, suppressed, onCtrlC }: {
   readonly onSubmit: (text: string) => void
   readonly suppressed: boolean
+  readonly onCtrlC: (hasInput: boolean) => CtrlCAction
 }): React.ReactElement {
   const [input, setInput] = useState("")
+  const [exitWarning, setExitWarning] = useState(false)
   const inputRef = useRef("")
 
+  const handleCtrlC = useCallback(() => {
+    const action = onCtrlC(inputRef.current.length > 0)
+    if (action === "clear") {
+      inputRef.current = ""
+      setInput("")
+      setExitWarning(false)
+    } else if (action === "warn") {
+      setExitWarning(true)
+    }
+    // "abort" and "exit" are handled by the parent (cli.ts)
+  }, [onCtrlC])
+
   useInput((inputChar, key) => {
+    if (key.ctrl && inputChar === "c") {
+      handleCtrlC()
+      return
+    }
     if (suppressed) return
+
+    // Any non-Ctrl-C input clears exit warning
+    setExitWarning(false)
+
     if (key.return) {
       const text = inputRef.current
       if (text.trim()) onSubmit(text)
@@ -199,9 +270,14 @@ function InputArea({ onSubmit, suppressed }: {
   if (suppressed) return <Text>{""}</Text>
 
   return (
-    <Box>
-      <Text color={OURO.scale} bold>{"  ᐳ "}</Text>
-      <Text color={OURO.bone}>{input}</Text>
+    <Box flexDirection="column">
+      {exitWarning ? (
+        <Text color={OURO.shadow}>{"  (press Ctrl-C again to exit)"}</Text>
+      ) : null}
+      <Box>
+        <Text color={OURO.teal} bold>{"  > "}</Text>
+        <Text color={OURO.bone}>{input}</Text>
+      </Box>
     </Box>
   )
 }
@@ -216,22 +292,16 @@ export function OuroTui({
   elapsedSeconds,
   contextPercent,
   onSubmit,
-  onExit,
+  onCtrlC,
+  headerShown,
 }: TuiProps): React.ReactElement {
-  // Ctrl-C handling
-  useInput((_input, key) => {
-    if (key.ctrl && _input === "c") {
-      onExit()
-    }
-  })
-
   return (
     <Box flexDirection="column">
       {/* Completed messages — rendered ONCE by Static, scroll up naturally */}
       <Static items={completedMessages}>
         {(msg, index) => {
           // First item: render header before it
-          if (index === 0) {
+          if (index === 0 && !headerShown) {
             return (
               <Box key={msg.id} flexDirection="column">
                 <Header agentName={agentName} model={model} contextPercent={contextPercent} />
@@ -248,7 +318,7 @@ export function OuroTui({
       <LiveArea live={live} elapsed={elapsedSeconds} />
 
       {/* Input */}
-      <InputArea onSubmit={onSubmit} suppressed={live.inputSuppressed} />
+      <InputArea onSubmit={onSubmit} suppressed={live.inputSuppressed} onCtrlC={onCtrlC} />
     </Box>
   )
 }
