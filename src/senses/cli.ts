@@ -589,7 +589,7 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
         }, [])
         return React.createElement(OuroTui, {
           agentName: options.agentName,
-          model: "",
+          model: loadAgentConfig().humanFacing?.model ?? "",
           completedMessages: storeRef.completedMessages as any,
           live: storeRef.live,
           elapsedSeconds: elapsed,

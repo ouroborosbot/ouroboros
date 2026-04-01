@@ -77,10 +77,11 @@ function Header({ agentName, model, contextPercent }: {
   readonly contextPercent: number
 }): React.ReactElement {
   const showCtx = contextPercent > 0
+  const cwd = process.cwd().replace(process.env.HOME ?? "", "~")
   return (
     <Box flexDirection="column">
       <Text color={OURO.scale} bold>{"  ◎ "}<Text color={OURO.glow} bold>{agentName}</Text></Text>
-      <Text color={OURO.shadow}>{"    "}{model}{showCtx ? <Text> · ctx: <Text color={contextPercent > 80 ? OURO.fang : contextPercent > 60 ? OURO.gold : OURO.scale}>{contextPercent}%</Text></Text> : ""}</Text>
+      <Text color={OURO.shadow}>{"    "}{model ? `${model} · ` : ""}{cwd}{showCtx ? <Text> · ctx: <Text color={contextPercent > 80 ? OURO.fang : contextPercent > 60 ? OURO.gold : OURO.scale}>{contextPercent}%</Text></Text> : ""}</Text>
       <Text color={OURO.separator}>{"  ─────────────────────────────────────────"}</Text>
     </Box>
   )
@@ -293,24 +294,21 @@ export function OuroTui({
   contextPercent,
   onSubmit,
   onCtrlC,
-  headerShown,
 }: TuiProps): React.ReactElement {
   return (
     <Box flexDirection="column">
-      {/* Completed messages — rendered ONCE by Static, scroll up naturally */}
-      <Static items={completedMessages}>
-        {(msg, index) => {
-          // First item: render header before it
-          if (index === 0 && !headerShown) {
+      {/* Header — always visible, rendered once via Static with a sentinel item */}
+      <Static items={[{ id: "__header__" }, ...completedMessages] as any[]}>
+        {(item: any, index: number) => {
+          if (index === 0) {
             return (
-              <Box key={msg.id} flexDirection="column">
+              <Box key="header" flexDirection="column">
                 <Header agentName={agentName} model={model} contextPercent={contextPercent} />
                 <Text>{""}</Text>
-                <MessageBlock msg={msg} />
               </Box>
             )
           }
-          return <MessageBlock key={msg.id} msg={msg} />
+          return <MessageBlock key={item.id} msg={item} />
         }}
       </Static>
 
