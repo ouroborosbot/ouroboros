@@ -82,6 +82,17 @@ vi.mock("../../heart/daemon/auth-flow", async () => {
   }
 })
 
+const mockFileStateCacheClear = vi.fn()
+const mockResetSessionModifiedFiles = vi.fn()
+
+vi.mock("../../mind/file-state", () => ({
+  fileStateCache: { clear: (...args: any[]) => mockFileStateCacheClear(...args) },
+}))
+
+vi.mock("../../mind/scrutiny", () => ({
+  resetSessionModifiedFiles: (...args: any[]) => mockResetSessionModifiedFiles(...args),
+}))
+
 // ── Test helpers ──────────────────────────────────────────────────
 
 function makeFriend(overrides: Partial<FriendRecord> = {}): FriendRecord {
@@ -186,6 +197,8 @@ describe("handleInboundTurn", () => {
     mockFindBridgesForSession.mockReset().mockReturnValue([])
     mockListTargetSessionCandidates.mockReset().mockResolvedValue([])
     mockListCodingSessions.mockReset().mockReturnValue([])
+    mockFileStateCacheClear.mockReset()
+    mockResetSessionModifiedFiles.mockReset()
   })
 
   // Step 1: friend resolution
@@ -1573,6 +1586,114 @@ describe("handleInboundTurn", () => {
       expect(result.failoverMessage).toBeUndefined()
       expect(result.turnOutcome).toBe("errored")
       expect(mockRunHealthInventory).not.toHaveBeenCalled()
+    })
+  })
+
+  // Session reset (lines 238-244)
+  describe("session reset on key change", () => {
+    it("resets file-state cache and scrutiny tracking when session key changes", async () => {
+      // First call establishes a session key
+      const input1 = makeInput({
+        channel: "cli",
+        sessionKey: "session-A",
+      } as any)
+      await handleInboundTurn(input1)
+
+      // Clear mocks so we can assert they're called on the second call
+      mockFileStateCacheClear.mockClear()
+      mockResetSessionModifiedFiles.mockClear()
+
+      // Second call with a different session key triggers the reset
+      const input2 = makeInput({
+        channel: "cli",
+        sessionKey: "session-B",
+      } as any)
+      await handleInboundTurn(input2)
+
+      expect(mockFileStateCacheClear).toHaveBeenCalledTimes(1)
+      expect(mockResetSessionModifiedFiles).toHaveBeenCalledTimes(1)
+    })
+
+    it("resets when channel changes even with same session key", async () => {
+      const input1 = makeInput({
+        channel: "cli",
+        sessionKey: "same-key",
+      } as any)
+      await handleInboundTurn(input1)
+
+      mockFileStateCacheClear.mockClear()
+      mockResetSessionModifiedFiles.mockClear()
+
+      const input2 = makeInput({
+        channel: "teams",
+        capabilities: makeCapabilities({ channel: "teams", senseType: "closed" }),
+        sessionKey: "same-key",
+      } as any)
+      await handleInboundTurn(input2)
+
+      expect(mockFileStateCacheClear).toHaveBeenCalledTimes(1)
+      expect(mockResetSessionModifiedFiles).toHaveBeenCalledTimes(1)
+    })
+
+    it("does not reset when session key stays the same", async () => {
+      const input1 = makeInput({
+        channel: "cli",
+        sessionKey: "stable-key",
+      } as any)
+      await handleInboundTurn(input1)
+
+      mockFileStateCacheClear.mockClear()
+      mockResetSessionModifiedFiles.mockClear()
+
+      const input2 = makeInput({
+        channel: "cli",
+        sessionKey: "stable-key",
+      } as any)
+      await handleInboundTurn(input2)
+
+      expect(mockFileStateCacheClear).not.toHaveBeenCalled()
+      expect(mockResetSessionModifiedFiles).not.toHaveBeenCalled()
+    })
+  })
+
+  // extraPrefixSections from onPendingDrained (line 523)
+  describe("onPendingDrained extra prefix sections", () => {
+    it("prepends extra sections to first user message when onPendingDrained returns non-empty array", async () => {
+      const pendingMsgs: PendingMessage[] = [
+        { from: "inner-dialog", content: "woke up", timestamp: 1000 },
+      ]
+      const input = makeInput({
+        drainPending: vi.fn().mockReturnValue(pendingMsgs),
+        messages: [{ role: "user", content: "hi there" }] as ChatCompletionMessageParam[],
+        onPendingDrained: vi.fn().mockReturnValue(["## Wake context", "Inner dialog surfaced a thought"]),
+      } as any)
+
+      await handleInboundTurn(input)
+
+      expect(input.runAgent).toHaveBeenCalledTimes(1)
+      const runAgentCall = (input.runAgent as ReturnType<typeof vi.fn>).mock.calls[0]
+      const msgs = runAgentCall[0] as ChatCompletionMessageParam[]
+      const userMsg = msgs.find(m => m.role === "user" && typeof m.content === "string")
+      expect(userMsg).toBeTruthy()
+      expect((userMsg as any).content).toContain("## Wake context")
+      expect((userMsg as any).content).toContain("Inner dialog surfaced a thought")
+      expect((userMsg as any).content).toContain("hi there")
+    })
+
+    it("does not prepend when onPendingDrained returns empty array", async () => {
+      const input = makeInput({
+        drainPending: vi.fn().mockReturnValue([]),
+        messages: [{ role: "user", content: "hi there" }] as ChatCompletionMessageParam[],
+        onPendingDrained: vi.fn().mockReturnValue([]),
+      } as any)
+
+      await handleInboundTurn(input)
+
+      const runAgentCall = (input.runAgent as ReturnType<typeof vi.fn>).mock.calls[0]
+      const msgs = runAgentCall[0] as ChatCompletionMessageParam[]
+      const userMsg = msgs.find(m => m.role === "user" && typeof m.content === "string")
+      expect(userMsg).toBeTruthy()
+      expect((userMsg as any).content).toBe("hi there")
     })
   })
 })
