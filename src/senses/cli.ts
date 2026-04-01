@@ -2,7 +2,7 @@ import OpenAI from "openai"
 import * as readline from "readline"
 import * as os from "os"
 import * as path from "path"
-import React from "react"
+// React imported dynamically inside useInk path to avoid top-level yoga-wasm-web crash in CJS
 import { runAgent, ChannelCallbacks, getProvider, createSummarize } from "../heart/core"
 import { buildSystem } from "../mind/prompt"
 import { pickPhrase, getPhrases } from "../mind/phrases"
@@ -31,7 +31,7 @@ import { bundleMetaHook } from "../heart/daemon/hooks/bundle-meta"
 import { agentConfigV2Hook } from "../heart/daemon/hooks/agent-config-v2"
 import { getPackageVersion } from "../mind/bundle-manifest"
 import { StreamingWordWrapper } from "./cli-layout"
-import { CliStore, createInkCallbacks, InkCliApp } from "./cli/adapter"
+// CliStore, createInkCallbacks, InkCliApp imported dynamically inside useInk path
 
 export { formatEchoedInputSummary, wrapCliText, StreamingWordWrapper } from "./cli-layout"
 
@@ -595,21 +595,31 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
     ?? [{ role: "system", content: await buildSystem("cli") }]
 
   // ─── Rendering setup (dual-path: Ink for production, imperative for tests) ───
-  const useInk = !options._testInputSource
-  const store = useInk ? new CliStore() : null
+  const useInk = !options._testInputSource && process.stdin.isTTY === true
+  let store: import("./cli/adapter").CliStore | null = null
   const inputQueue = useInk ? new InputQueue() : null
   let currentAbort: AbortController | null = null
   let closed = false
+  let cliCallbacks: ChannelCallbacks & { flushMarkdown(): void }
 
   let inkInstance: { unmount: () => void } | null = null
   if (useInk) {
-    const ink = await import("ink")
+    // Dynamic import: React, Ink, and adapter are loaded only when rendering (avoids yoga-wasm-web top-level-await crash in CJS)
+    const [ink, React, adapter] = await Promise.all([
+      import("ink"),
+      import("react"),
+      import("./cli/adapter"),
+    ])
+    const { CliStore: CliStoreClass, createInkCallbacks, InkCliApp } = adapter
+
+    store = new CliStoreClass()
+    cliCallbacks = createInkCallbacks(store)
 
     if (options.banner !== false) {
       const bannerText = typeof options.banner === "string"
         ? options.banner
         : `${options.agentName} (type /commands for help)`
-      store!.setBanner([`\n${bannerText}\n`])
+      store.setBanner([`\n${bannerText}\n`])
     }
 
     const handleExit = () => {
@@ -622,23 +632,23 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
     }
 
     inkInstance = ink.render(
-      React.createElement(InkCliApp, {
-        store: store!,
+      React.default.createElement(InkCliApp, {
+        store,
         onSubmit: (text: string) => { inputQueue!.push(text) },
         onExit: handleExit,
       }),
       { exitOnCtrlC: false, patchConsole: false },
     )
-  } else if (options.banner !== false) {
-    const bannerText = typeof options.banner === "string"
-      ? options.banner
-      : `${options.agentName} (type /commands for help)`
-    // eslint-disable-next-line no-console -- terminal UX: startup banner (test/headless path)
-    console.log(`\n${bannerText}\n`)
+  } else {
+    cliCallbacks = createCliCallbacks()
+    if (options.banner !== false) {
+      const bannerText = typeof options.banner === "string"
+        ? options.banner
+        : `${options.agentName} (type /commands for help)`
+      // eslint-disable-next-line no-console -- terminal UX: startup banner (test/headless path)
+      console.log(`\n${bannerText}\n`)
+    }
   }
-
-  // Ink path uses store-based callbacks; test path uses imperative stdout callbacks
-  const cliCallbacks = useInk ? createInkCallbacks(store!) : createCliCallbacks()
 
   // Display helpers: route to Ink store or stderr/stdout depending on mode
   const display = {
@@ -744,7 +754,19 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
   }
 
   try {
-    const inputSource = useInk ? inputQueue! : options._testInputSource!
+    // Input source: Ink queue for TTY, test source for tests, readline fallback for non-TTY
+    let inputSource: AsyncIterable<string>
+    let rl: readline.Interface | null = null
+    if (useInk) {
+      inputSource = inputQueue!
+    } else if (options._testInputSource) {
+      inputSource = options._testInputSource
+    } else {
+      // Fallback: readline for non-TTY environments (pipes, non-interactive terminals)
+      rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: false })
+      inputSource = rl
+      process.stdout.write(CLI_PROMPT)
+    }
     for await (const input of inputSource) {
       if (closed) break
       if (!input.trim()) continue
