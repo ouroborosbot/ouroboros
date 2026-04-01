@@ -23,6 +23,7 @@ export default defineConfig({
       exclude: [
         "src/__tests__/**",
         "src/**/*.d.ts",
+        "src/**/*.tsx",
         "src/senses/*-entry.ts",
         "src/reflection/*-entry.ts",
         "src/repertoire/coding/types.ts",
