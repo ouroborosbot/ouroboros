@@ -171,6 +171,7 @@ function prependTurnSections(
   message: ChatCompletionMessageParam,
   sections: string[],
 ): ChatCompletionMessageParam {
+  /* v8 ignore next -- defensive: only user messages with non-empty sections reach here @preserve */
   if (message.role !== "user" || sections.length === 0) return message
   const prefix = sections.join("\n\n")
 
