@@ -528,7 +528,6 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
   let cliCallbacks!: ChannelCallbacks & { flushMarkdown(): void }
   let tuiStore: import("./cli/tui-store").TuiStore | null = null
   let inkRef: { unmount: () => void } | null = null
-  void inkRef // suppress unused warning
   const inputQueue = useTui ? new InputQueue() : null
   let rl: readline.Interface | null = null
 
@@ -859,6 +858,9 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
     }
   } finally {
     rl?.close()
+    if (inkRef) {
+      inkRef.unmount()
+    }
     if (options.banner !== false) {
       // eslint-disable-next-line no-console -- terminal UX: goodbye
       console.log("bye")
