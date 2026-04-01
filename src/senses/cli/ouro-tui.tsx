@@ -11,6 +11,7 @@
  */
 import React, { useState, useRef, useEffect, useCallback } from "react"
 import { Text, Box, Static, useInput } from "ink"
+import { StreamingMarkdown } from "./streaming-markdown"
 
 // ─── Ouroboros Brand Palette (ANSI RGB) ─────────────────────────────
 // From packages/outlook-ui/src/style.css and ouroboros.bot
@@ -49,6 +50,7 @@ export interface LiveState {
   streamingText: string
   loading: boolean
   spinnerPhrase: string
+  spinnerPhrasePool: string[]
   activeTool: { name: string; args: Record<string, string> } | null
   errorMessage: string | null
   kickMessage: string | null
@@ -79,9 +81,17 @@ function Header({ agentName, model, contextPercent }: {
   const showCtx = contextPercent > 0
   const cwd = process.cwd().replace(process.env.HOME ?? "", "~")
   return (
-    <Box flexDirection="column">
-      <Text color={OURO.scale} bold>{"◎ "}<Text color={OURO.glow} bold>{agentName}</Text></Text>
-      <Text color={OURO.shadow}>{"  "}{model ? `${model} · ` : ""}{cwd}{showCtx ? <Text> · ctx: <Text color={contextPercent > 80 ? OURO.fang : contextPercent > 60 ? OURO.gold : OURO.scale}>{contextPercent}%</Text></Text> : ""}</Text>
+    <Box>
+      <Box flexDirection="column">
+        <Text color={OURO.scale}>{"  ╭───╮"}</Text>
+        <Text color={OURO.scale}>{"  │"}<Text color={OURO.glow}>{"◎"}</Text><Text color={OURO.scale}>{"│"}</Text></Text>
+        <Text color={OURO.scale}>{"  ╰─"}<Text color={OURO.glow}>{"∽"}</Text><Text color={OURO.scale}>{"╯"}</Text></Text>
+      </Box>
+      <Box flexDirection="column" marginLeft={1}>
+        <Text color={OURO.glow} bold>{agentName}</Text>
+        <Text color={OURO.shadow}>{model ? `${model} · ` : ""}{cwd}</Text>
+        {showCtx ? <Text color={OURO.shadow}>{"ctx: "}<Text color={contextPercent > 80 ? OURO.fang : contextPercent > 60 ? OURO.gold : OURO.scale}>{contextPercent}%</Text></Text> : null}
+      </Box>
     </Box>
   )
 }
@@ -126,10 +136,9 @@ function MessageBlock({ msg }: { readonly msg: CompletedMessage }): React.ReactE
   }
 
   if (msg.role === "assistant") {
-    // Assistant messages: just the text, no prefix, no indentation
     return (
       <Box flexDirection="column">
-        {msg.content ? <Text color={OURO.mist}>{msg.content}</Text> : null}
+        {msg.content ? <StreamingMarkdown text={msg.content} /> : null}
         <Text>{""}</Text>
       </Box>
     )
@@ -144,22 +153,36 @@ function MessageBlock({ msg }: { readonly msg: CompletedMessage }): React.ReactE
 
 // ─── Live Area (re-renders) ─────────────────────────────────────────
 
-function Spinner({ phrase, elapsed }: {
-  readonly phrase: string
+function Spinner({ phrasePool, elapsed }: {
+  readonly phrasePool: string[]
   readonly elapsed: number
 }): React.ReactElement {
   const [frame, setFrame] = useState(0)
+  const [currentPhrase, setCurrentPhrase] = useState(() =>
+    phrasePool.length > 0 ? phrasePool[Math.floor(Math.random() * phrasePool.length)] : ""
+  )
+
+  // Animate ring frames
   useEffect(() => {
     const iv = setInterval(() => setFrame(f => (f + 1) % RING_FRAMES.length), 120)
     return () => clearInterval(iv)
   }, [])
+
+  // Rotate phrases every 3 seconds
+  useEffect(() => {
+    if (phrasePool.length <= 1) return
+    const iv = setInterval(() => {
+      setCurrentPhrase(phrasePool[Math.floor(Math.random() * phrasePool.length)])
+    }, 3000)
+    return () => clearInterval(iv)
+  }, [phrasePool])
 
   const color = ringColor(elapsed)
   const timeStr = elapsed > 0 ? `${elapsed}s` : ""
 
   return (
     <Text color={color}>
-      {RING_FRAMES[frame]} {timeStr ? <Text color={OURO.shadow}>{timeStr} · </Text> : ""}{phrase}
+      {RING_FRAMES[frame]} {timeStr ? <Text color={OURO.shadow}>{timeStr} · </Text> : ""}{currentPhrase}
     </Text>
   )
 }
@@ -185,7 +208,7 @@ function LiveArea({ live, elapsed }: {
     <Box flexDirection="column">
       {/* Streaming assistant text — only shown if there IS streaming text */}
       {live.streamingText ? (
-        <Text color={OURO.mist}>{live.streamingText}</Text>
+        <StreamingMarkdown text={live.streamingText} />
       ) : null}
 
       {live.activeTool ? (
@@ -193,7 +216,7 @@ function LiveArea({ live, elapsed }: {
       ) : null}
 
       {live.loading ? (
-        <Spinner phrase={live.spinnerPhrase} elapsed={elapsed} />
+        <Spinner phrasePool={live.spinnerPhrasePool} elapsed={elapsed} />
       ) : null}
 
       {live.errorMessage ? (

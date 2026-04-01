@@ -21,6 +21,7 @@ export class TuiStore {
     streamingText: "",
     loading: false,
     spinnerPhrase: "",
+    spinnerPhrasePool: [],
     activeTool: null,
     errorMessage: null,
     kickMessage: null,
@@ -62,6 +63,7 @@ export class TuiStore {
       ...this._live,
       loading: true,
       spinnerPhrase: pickPhrase(pool),
+      spinnerPhrasePool: pool,
       streamingText: "",
       activeTool: null,
       errorMessage: null,
@@ -103,6 +105,7 @@ export class TuiStore {
       streamingText: "",
       activeTool: { name, args },
       spinnerPhrase: pickPhrase(getPhrases().tool),
+      spinnerPhrasePool: getPhrases().tool,
     }
     this._spinnerStart = Date.now()
     this.notify()
