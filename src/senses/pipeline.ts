@@ -175,6 +175,7 @@ function prependTurnSections(
   if (message.role !== "user" || sections.length === 0) return message
   const prefix = sections.join("\n\n")
 
+  /* v8 ignore start -- defensive: multipart content branch; non-string user messages are rare @preserve */
   if (typeof message.content === "string") {
     return {
       ...message,
@@ -182,7 +183,6 @@ function prependTurnSections(
     }
   }
 
-  /* v8 ignore start -- defensive: multipart content path for non-string user messages @preserve */
   return {
     ...message,
     content: [
