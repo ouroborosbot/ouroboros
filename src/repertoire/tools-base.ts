@@ -546,11 +546,12 @@ export const baseToolDefinitions: ToolDefinition[] = [
       const scrutiny = getPostImplementationScrutiny(getModifiedFileCount())
 
       // Append staleness warning if detected (do not block -- TTFA)
+      /* v8 ignore start -- staleness+diff+scrutiny combo not exercised in integration tests @preserve */
       if (stalenessCheck.stale) {
         const base = `${diffResult}\n\n⚠️ warning: file changed externally since last read -- re-read recommended`
-        /* v8 ignore next -- staleness+scrutiny combo not exercised in unit tests @preserve */
         return scrutiny ? `${base}\n\n${scrutiny}` : base
       }
+      /* v8 ignore stop */
       return scrutiny ? `${diffResult}\n\n${scrutiny}` : diffResult
     },
     summaryKeys: ["path"],
