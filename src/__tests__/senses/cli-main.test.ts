@@ -88,6 +88,30 @@ vi.mock("readline", () => ({
   createInterface: (...a: any[]) => mocks.createInterface(...a),
   cursorTo: (...a: any[]) => mocks.cursorTo(...a),
 }))
+// Ink mock: captures the onSubmit prop so tests can push input through it
+let capturedInkOnSubmit: ((text: string) => void) | null = null
+let capturedInkOnExit: (() => void) | null = null
+vi.mock("ink", () => ({
+  render: vi.fn((element: any) => {
+    // React.createElement passes props as the second arg
+    // The element is { type, props, ... }
+    if (element && element.props) {
+      capturedInkOnSubmit = element.props.onSubmit ?? null
+      capturedInkOnExit = element.props.onExit ?? null
+    }
+    return {
+      unmount: vi.fn(),
+      waitUntilExit: vi.fn().mockResolvedValue(undefined),
+      rerender: vi.fn(),
+      cleanup: vi.fn(),
+      clear: vi.fn(),
+    }
+  }),
+  Text: vi.fn(() => null),
+  Box: vi.fn(() => null),
+  useInput: vi.fn(),
+  useApp: vi.fn(() => ({ exit: vi.fn() })),
+}))
 vi.mock("../../heart/core", () => ({
   runAgent: (...a: any[]) => mocks.runAgent(...a),
   buildSystem: (...a: any[]) => mocks.buildSystem(...a),
@@ -235,8 +259,34 @@ function restoreSpies() {
   consoleSpy?.mockRestore()
 }
 
+/**
+ * Schedule input to be pushed through the captured Ink onSubmit callback.
+ * After all input is pushed, calls onExit to close the input queue.
+ * Returns a cleanup function.
+ */
+function scheduleInkInput(inputSequence: string[], delayMs = 10) {
+  let timer: NodeJS.Timeout | null = null
+  let idx = 0
+
+  function pushNext() {
+    if (idx < inputSequence.length && capturedInkOnSubmit) {
+      capturedInkOnSubmit(inputSequence[idx++])
+      timer = setTimeout(pushNext, delayMs)
+    } else if (capturedInkOnExit) {
+      // All input consumed -- signal exit to close the input queue
+      capturedInkOnExit()
+    }
+  }
+
+  // Start pushing after a tick to let runCliSession set up the loop
+  timer = setTimeout(pushNext, delayMs)
+
+  return {
+    cancel: () => { if (timer) clearTimeout(timer) },
+  }
+}
+
 function createMockRl(inputSequence: string[]) {
-  let inputIdx = 0
   let closeHandler: (() => void) | null = null
   let sigintHandler: ((...args: any[]) => void) | null = null
 
@@ -252,9 +302,6 @@ function createMockRl(inputSequence: string[]) {
     line: "",
     [Symbol.asyncIterator]: () => ({
       next: async (): Promise<IteratorResult<string>> => {
-        if (inputIdx < inputSequence.length) {
-          return { value: inputSequence[inputIdx++], done: false }
-        }
         return { value: undefined as any, done: true }
       },
     }),
@@ -365,6 +412,10 @@ function setupBasic(opts: {
     dispatchFn = (name: string) => name === "exit" ? { handled: true, result: { action: "exit" } } : { handled: false },
   } = opts
 
+  // Reset captured Ink callbacks
+  capturedInkOnSubmit = null
+  capturedInkOnExit = null
+
   const { mockRl, getCloseHandler, getSigintHandler } = createMockRl(inputSequence)
   mocks.createInterface.mockReturnValue(mockRl)
   mocks.loadSession.mockReturnValue(loadSessionReturn)
@@ -375,7 +426,10 @@ function setupBasic(opts: {
   }
   mocks.registry.dispatch.mockImplementation(dispatchFn)
 
-  return { mockRl, getCloseHandler, getSigintHandler }
+  // Schedule input through Ink's onSubmit callback
+  const inputScheduler = scheduleInkInput(inputSequence)
+
+  return { mockRl, getCloseHandler, getSigintHandler, inputScheduler }
 }
 
 // ── tests ──

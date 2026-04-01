@@ -2,6 +2,7 @@ import OpenAI from "openai"
 import * as readline from "readline"
 import * as os from "os"
 import * as path from "path"
+import React from "react"
 import { runAgent, ChannelCallbacks, getProvider, createSummarize } from "../heart/core"
 import { buildSystem } from "../mind/prompt"
 import { pickPhrase, getPhrases } from "../mind/phrases"
@@ -29,7 +30,8 @@ import { applyPendingUpdates, registerUpdateHook } from "../heart/daemon/update-
 import { bundleMetaHook } from "../heart/daemon/hooks/bundle-meta"
 import { agentConfigV2Hook } from "../heart/daemon/hooks/agent-config-v2"
 import { getPackageVersion } from "../mind/bundle-manifest"
-import { formatEchoedInputSummary, StreamingWordWrapper } from "./cli-layout"
+import { StreamingWordWrapper } from "./cli-layout"
+import { CliStore, createInkCallbacks, InkCliApp } from "./cli/adapter"
 
 export { formatEchoedInputSummary, wrapCliText, StreamingWordWrapper } from "./cli-layout"
 
@@ -484,6 +486,52 @@ export async function* createDebouncedLines(source: AsyncIterable<string>, debou
   }
 }
 
+/**
+ * Async queue that bridges push-based Ink input to pull-based async iteration.
+ * Input from Ink's onSubmit callback is pushed; the business logic loop awaits via for-await.
+ */
+export class InputQueue implements AsyncIterable<string> {
+  private queue: string[] = []
+  private resolve: ((value: IteratorResult<string>) => void) | null = null
+  private done = false
+
+  push(input: string): void {
+    if (this.done) return
+    if (this.resolve) {
+      const r = this.resolve
+      this.resolve = null
+      r({ value: input, done: false })
+    } else {
+      this.queue.push(input)
+    }
+  }
+
+  close(): void {
+    this.done = true
+    if (this.resolve) {
+      const r = this.resolve
+      this.resolve = null
+      r({ value: undefined as unknown as string, done: true })
+    }
+  }
+
+  [Symbol.asyncIterator](): AsyncIterator<string> {
+    return {
+      next: (): Promise<IteratorResult<string>> => {
+        if (this.queue.length > 0) {
+          return Promise.resolve({ value: this.queue.shift()!, done: false })
+        }
+        if (this.done) {
+          return Promise.resolve({ value: undefined as unknown as string, done: true })
+        }
+        return new Promise<IteratorResult<string>>((resolve) => {
+          this.resolve = resolve
+        })
+      },
+    }
+  }
+}
+
 export interface RunCliSessionOptions {
   agentName: string;
   tools?: OpenAI.ChatCompletionFunctionTool[];
@@ -516,6 +564,9 @@ export interface RunCliSessionOptions {
   skipSystemPromptRefresh?: boolean;
   /** Returns and clears pending content prefix to prepend to the next user message. */
   getContentPrefix?: () => string | undefined;
+  /** Inject an input source for testing. When provided, Ink rendering is skipped
+   *  and input is pulled from this async iterable instead. */
+  _testInputSource?: AsyncIterable<string>;
   /** Custom turn handler. When provided, replaces the internal runAgent call.
    *  The handler receives the messages array (by reference), user input, callbacks,
    *  signal, and options. It is responsible for calling runAgent (or pipeline). */
@@ -535,8 +586,6 @@ export interface RunCliSessionResult {
 
 export async function runCliSession(options: RunCliSessionOptions): Promise<RunCliSessionResult> {
   /* v8 ignore start -- integration: runCliSession is interactive, tested via E2E @preserve */
-  const pasteDebounceMs = options.pasteDebounceMs ?? 50
-
   const registry = createCommandRegistry()
   if (!options.disableCommands) {
     registerDefaultCommands(registry)
@@ -545,22 +594,54 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
   const messages: OpenAI.ChatCompletionMessageParam[] = options.messages
     ?? [{ role: "system", content: await buildSystem("cli") }]
 
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true })
-  const ctrl = new InputController(rl)
+  // ─── Ink rendering setup ─────────────────────────────────────
+  const store = new CliStore()
+  const inputQueue = new InputQueue()
   let currentAbort: AbortController | null = null
-  const history: string[] = []
   let closed = false
-  rl.on("close", () => { closed = true })
+  const useTestInput = !!options._testInputSource
 
-  if (options.banner !== false) {
+  // When _testInputSource is provided, skip Ink (for tests / headless usage)
+  let inkInstance: { unmount: () => void } | null = null
+  if (!useTestInput) {
+    // Lazy-load Ink to minimize startup impact (<200ms)
+    const ink = await import("ink")
+
+    // Banner
+    if (options.banner !== false) {
+      const bannerText = typeof options.banner === "string"
+        ? options.banner
+        : `${options.agentName} (type /commands for help)`
+      store.setBanner([`\n${bannerText}\n`])
+    }
+
+    // Ctrl-C during model execution aborts; at idle, exits
+    const handleExit = () => {
+      if (currentAbort) {
+        currentAbort.abort()
+      } else {
+        closed = true
+        inputQueue.close()
+      }
+    }
+
+    inkInstance = ink.render(
+      React.createElement(InkCliApp, {
+        store,
+        onSubmit: (text: string) => { inputQueue.push(text) },
+        onExit: handleExit,
+      }),
+      { exitOnCtrlC: false, patchConsole: false },
+    )
+  } else if (options.banner !== false) {
     const bannerText = typeof options.banner === "string"
       ? options.banner
       : `${options.agentName} (type /commands for help)`
-    // eslint-disable-next-line no-console -- terminal UX: startup banner
+    // eslint-disable-next-line no-console -- terminal UX: startup banner (test/headless path)
     console.log(`\n${bannerText}\n`)
   }
 
-  const cliCallbacks = createCliCallbacks()
+  const cliCallbacks = createInkCallbacks(store)
   const effectiveToolContext: ToolContext = {
     signin: options.toolContext?.signin ?? (async () => undefined),
     ...options.toolContext,
@@ -572,7 +653,8 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
         }
         messages.push(assistantMessage)
         await options.onAsyncAssistantMessage?.(messages, assistantMessage)
-        writeCliAsyncAssistantMessage(rl, message)
+        // Show async message via Ink store
+        store.appendText(message)
         await options.toolContext?.codingFeedback?.send(message)
       },
     },
@@ -588,8 +670,6 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
         if (name === options.exitOnToolCall) {
           exitToolResult = result
           exitToolFired = true
-          // Abort immediately so the model doesn't generate more output
-          // (e.g. reasoning about calling settle after complete_adoption)
           currentAbort?.abort()
         }
         return result
@@ -599,28 +679,6 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
   // Resolve toolChoiceRequired: use explicit option if set, else fall back to toggle
   const getEffectiveToolChoiceRequired = () =>
     options.toolChoiceRequired !== undefined ? options.toolChoiceRequired : getToolChoiceRequired()
-
-  // Ctrl-C at the input prompt: clear line or warn/exit
-  rl.on("SIGINT", () => {
-    const rlInt = rl as ReadlineInternals
-    const currentLine = rlInt.line || ""
-    const result = handleSigint(rl, currentLine)
-    if (result === "clear") {
-      rlInt.line = "";
-      rlInt.cursor = 0
-      process.stdout.write(`\r\x1b[K${CLI_PROMPT}`)
-    } else if (result === "warn") {
-      rlInt.line = "";
-      rlInt.cursor = 0
-      process.stdout.write("\r\x1b[K")
-      process.stderr.write("press Ctrl-C again to exit\n")
-      process.stdout.write(CLI_PROMPT)
-    } else {
-      rl.close()
-    }
-  })
-
-  const debouncedLines = (source: AsyncIterable<string>) => createDebouncedLines(source, pasteDebounceMs)
 
   emitNervesEvent({
     component: "senses",
@@ -636,7 +694,7 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
   if (options.autoFirstTurn && messages.length > 0 && messages[messages.length - 1]?.role === "user") {
     currentAbort = new AbortController()
     const traceId = createTraceId()
-    ctrl.suppress(() => currentAbort!.abort())
+    store.suppressInput()
     let result: { usage?: UsageData } | undefined
     try {
       result = await runAgent(messages, cliCallbacks, options.skipSystemPromptRefresh ? undefined : "cli", currentAbort.signal, {
@@ -647,49 +705,43 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
         toolContext: effectiveToolContext,
       })
     } catch (err) {
-      // AbortError (Ctrl-C) -- silently continue to prompt
-      // All other errors: show the user what happened
       if (!(err instanceof DOMException && err.name === "AbortError")) {
-        process.stderr.write(`\x1b[31m${err instanceof Error ? err.message : String(err)}\x1b[0m\n`)
+        store.setError(err instanceof Error ? err.message : String(err))
       }
     }
     cliCallbacks.flushMarkdown()
-    ctrl.restore()
+    store.restoreInput()
     currentAbort = null
 
     if (exitToolFired) {
       exitReason = "tool_exit"
-      rl.close()
+      closed = true
+      inputQueue.close()
     } else {
       const lastMsg = messages[messages.length - 1]
       if (lastMsg?.role === "assistant" && !(typeof lastMsg.content === "string" ? lastMsg.content : "").trim()) {
-        process.stderr.write("\x1b[33m(empty response)\x1b[0m\n")
+        store.setError("(empty response)")
       }
-      process.stdout.write("\n\n")
       if (options.onTurnEnd) {
         await options.onTurnEnd(messages, result ?? { usage: undefined })
       }
     }
   }
 
-  if (!exitToolFired) {
-    process.stdout.write(CLI_PROMPT)
-  }
-
   try {
-    for await (const input of debouncedLines(rl)) {
+    const inputSource = useTestInput ? options._testInputSource! : inputQueue
+    for await (const input of inputSource) {
       if (closed) break
-      if (!input.trim()) { process.stdout.write(CLI_PROMPT); continue }
+      if (!input.trim()) continue
 
       // Optional input gate (e.g. trust gate in main)
       if (options.onInput) {
         const gate = options.onInput(input)
         if (!gate.allowed) {
           if (gate.reply) {
-            process.stdout.write(`${gate.reply}\n`)
+            store.appendText(gate.reply)
           }
           if (closed) break
-          process.stdout.write(CLI_PROMPT)
           continue
         }
       }
@@ -706,34 +758,23 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
               messages.length = 0
               messages.push({ role: "system", content: await buildSystem("cli") })
               await options.onNewSession?.()
-              // eslint-disable-next-line no-console -- terminal UX: session cleared
-              console.log("session cleared")
-              process.stdout.write(CLI_PROMPT)
+              store.appendText("session cleared")
               continue
             } else if (dispatchResult.result.action === "response") {
-              // eslint-disable-next-line no-console -- terminal UX: command dispatch result
-              console.log(dispatchResult.result.message || "")
-              process.stdout.write(CLI_PROMPT)
+              store.appendText(dispatchResult.result.message || "")
               continue
             }
           }
         }
       }
 
-      // Re-style the echoed input lines without leaving wrapped paste remnants behind.
-      const cols = process.stdout.columns || 80
-      process.stdout.write(formatEchoedInputSummary(input, cols))
-
-      addHistory(history, input)
-
       currentAbort = new AbortController()
-      ctrl.suppress(() => currentAbort!.abort())
+      store.suppressInput()
       let result: { usage?: UsageData; turnOutcome?: string; commandAction?: string } | undefined
       try {
         if (options.runTurn) {
           // Pipeline-based turn: the runTurn callback handles user message assembly,
           // pending drain, trust gate, runAgent, postTurn, and token accumulation.
-          // Commands (e.g. /debug, /exit, /new) are intercepted in the pipeline.
           result = await options.runTurn(messages, input, cliCallbacks, currentAbort.signal, effectiveToolContext)
 
           // Handle pipeline-intercepted commands with loop-control side effects
@@ -744,14 +785,11 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
               messages.length = 0
               messages.push({ role: "system", content: await buildSystem("cli") })
               await options.onNewSession?.()
-              // eslint-disable-next-line no-console -- terminal UX: session cleared
-              console.log("session cleared")
-              process.stdout.write(CLI_PROMPT)
+              store.appendText("session cleared")
               continue
             }
             // For "response" commands: the pipeline already emitted the response via onTextChunk
             cliCallbacks.flushMarkdown()
-            process.stdout.write(CLI_PROMPT)
             continue
           }
         } else {
@@ -768,14 +806,12 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
           })
         }
       } catch (err) {
-        // AbortError (Ctrl-C) -- silently return to prompt
-        // All other errors: show the user what happened
         if (!(err instanceof DOMException && err.name === "AbortError")) {
-          process.stderr.write(`\x1b[31m${err instanceof Error ? err.message : String(err)}\x1b[0m\n`)
+          store.setError(err instanceof Error ? err.message : String(err))
         }
       }
       cliCallbacks.flushMarkdown()
-      ctrl.restore()
+      store.restoreInput()
       currentAbort = null
 
       // Check if exit tool was fired during this turn
@@ -787,10 +823,8 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
       // Safety net: never silently swallow an empty response
       const lastMsg = messages[messages.length - 1]
       if (lastMsg?.role === "assistant" && !(typeof lastMsg.content === "string" ? lastMsg.content : "").trim()) {
-        process.stderr.write("\x1b[33m(empty response)\x1b[0m\n")
+        store.setError("(empty response)")
       }
-
-      process.stdout.write("\n\n")
 
       // Post-turn hook (session persistence, pending drain, prompt refresh, etc.)
       if (options.onTurnEnd) {
@@ -798,10 +832,9 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
       }
 
       if (closed) break
-      process.stdout.write(CLI_PROMPT)
     }
   } finally {
-    rl.close()
+    inkInstance?.unmount()
     if (options.banner !== false) {
       // eslint-disable-next-line no-console -- terminal UX: goodbye
       console.log("bye")
