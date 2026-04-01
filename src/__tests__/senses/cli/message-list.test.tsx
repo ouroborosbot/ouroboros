@@ -98,6 +98,31 @@ describe("ScrollableMessageList", () => {
     expect(lastFrame()).toBeDefined()
   })
 
+  it("handles system messages (render as empty)", () => {
+    const messages: DisplayMessage[] = [
+      { role: "system", content: "You are helpful" },
+      { role: "assistant", content: "Hello!" },
+    ]
+    const { lastFrame } = render(
+      <ScrollableMessageList messages={messages} viewportHeight={10} />,
+    )
+    const frame = lastFrame()!
+    expect(frame).toContain("Hello!")
+    // System message content should not appear in output
+    expect(frame).not.toContain("You are helpful")
+  })
+
+  it("handles assistant message with null content", () => {
+    const messages: DisplayMessage[] = [
+      { role: "assistant", content: null },
+      { role: "assistant", content: "visible" },
+    ]
+    const { lastFrame } = render(
+      <ScrollableMessageList messages={messages} viewportHeight={10} />,
+    )
+    expect(lastFrame()).toContain("visible")
+  })
+
   it("handles messages with variable heights", () => {
     const messages: DisplayMessage[] = [
       { role: "assistant", content: "short" },
