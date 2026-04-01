@@ -13,16 +13,14 @@
 import { pickPhrase } from "../../mind/phrases"
 import { emitNervesEvent } from "../../nerves/runtime"
 
-// Ouroboros snake-themed spinner frames
+// Ring spinner frames (growing/shrinking — option #6)
 const SNAKE_FRAMES = [
-  "\u{1F40D}",   // snake emoji
-  "\u25E0",      // upper half circle
-  "\u25D4",      // circle with upper right quadrant
-  "\u25D1",      // circle with right half
-  "\u25D5",      // circle with all but upper left quadrant
-  "\u25E1",      // lower half circle
-  "\u25CB",      // white circle (tail swallowed)
-  "\u25CF",      // black circle (digesting)
+  "\u2219",      // ∙ (small dot)
+  "\u25CB",      // ○ (white circle)
+  "\u25CE",      // ◎ (bullseye)
+  "\u25CF",      // ● (black circle)
+  "\u25CE",      // ◎ (bullseye)
+  "\u25CB",      // ○ (white circle)
 ]
 
 // ANSI color helpers — RGB escape sequences
