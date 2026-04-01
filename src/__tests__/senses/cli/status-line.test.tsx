@@ -202,6 +202,20 @@ describe("StatusLine", () => {
     expect(frame).toContain("45s")
   })
 
+  it("handles zero tokensTotal gracefully (no division by zero)", () => {
+    const { lastFrame } = render(
+      <StatusLine
+        model="gpt-4o"
+        provider="azure"
+        tokensUsed={0}
+        tokensTotal={0}
+        elapsedSeconds={0}
+      />,
+    )
+    const frame = lastFrame()!
+    expect(frame).toContain("0%")
+  })
+
   it("handles zero tokens gracefully", () => {
     const { lastFrame } = render(
       <StatusLine
