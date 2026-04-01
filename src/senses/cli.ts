@@ -2,15 +2,13 @@ import OpenAI from "openai"
 import * as readline from "readline"
 import * as os from "os"
 import * as path from "path"
-// React imported dynamically inside useInk path to avoid top-level yoga-wasm-web crash in CJS
 import { runAgent, ChannelCallbacks, getProvider, createSummarize } from "../heart/core"
 import { buildSystem } from "../mind/prompt"
 import { pickPhrase, getPhrases } from "../mind/phrases"
-import { formatToolResult, formatKick, formatError } from "../mind/format"
+import { formatKick, formatError } from "../mind/format"
 import { sessionPath } from "../heart/config"
 import { loadSession, deleteSession, postTurn } from "../mind/context"
 import { getPendingDir, drainDeferredReturns, drainPending, type PendingMessage } from "../mind/pending"
-// refreshSystemPrompt removed: runAgent already handles prompt refresh per-turn
 import type { UsageData } from "../mind/context"
 import { createCommandRegistry, registerDefaultCommands, parseSlashCommand, getToolChoiceRequired } from "./commands"
 import { getAgentName, setAgentName, getAgentRoot, getAgentBundlesRoot, loadAgentConfig } from "../heart/identity"
@@ -31,7 +29,8 @@ import { bundleMetaHook } from "../heart/daemon/hooks/bundle-meta"
 import { agentConfigV2Hook } from "../heart/daemon/hooks/agent-config-v2"
 import { getPackageVersion } from "../mind/bundle-manifest"
 import { StreamingWordWrapper } from "./cli-layout"
-// CliStore, createInkCallbacks, InkCliApp imported dynamically inside useInk path
+import { ImperativeSpinner } from "./cli/spinner-imperative"
+import { writeToolEnd } from "./cli/tool-display"
 
 export { formatEchoedInputSummary, wrapCliText, StreamingWordWrapper } from "./cli-layout"
 
@@ -83,85 +82,15 @@ export function writeCliAsyncAssistantMessage(
 
 // Module-level active spinner for log coordination.
 // The terminal log sink calls these to avoid interleaving with spinner output.
-let _activeSpinner: Spinner | null = null
+let _activeSpinner: ImperativeSpinner | null = null
 /* v8 ignore start -- spinner coordination: exercised at runtime, not unit-testable without real terminal @preserve */
 export function pauseActiveSpinner(): void { _activeSpinner?.pause() }
 export function resumeActiveSpinner(): void { _activeSpinner?.resume() }
 /* v8 ignore stop */
-export function setActiveSpinner(s: Spinner | null): void { _activeSpinner = s }
+export function setActiveSpinner(s: ImperativeSpinner | null): void { _activeSpinner = s }
 
-
-// spinner that only touches stderr, cleans up after itself
-// exported for direct testability (stop-without-start branch)
-export class Spinner {
-  private frames = ["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"]
-  private i = 0
-  private iv: NodeJS.Timeout | null = null
-  private piv: NodeJS.Timeout | null = null
-  private msg = ""
-  private phrases: readonly string[] | null = null
-  private lastPhrase = ""
-  private stopped = false
-
-  constructor(m = "working", phrases?: readonly string[]) {
-    this.msg = m
-    if (phrases && phrases.length > 0) this.phrases = phrases
-  }
-
-  start() {
-    this.stopped = false
-    process.stderr.write("\r\x1b[K")
-    this.spin()
-    this.iv = setInterval(() => this.spin(), 80)
-    if (this.phrases) {
-      this.piv = setInterval(() => this.rotatePhrase(), 1500)
-    }
-  }
-
-  private spin() {
-    // Guard: clearInterval can't prevent already-dequeued callbacks
-    /* v8 ignore next -- race guard: timer callback fires after stop() @preserve */
-    if (this.stopped) return
-    process.stderr.write(`\r\x1b[K${this.frames[this.i]} ${this.msg}... `)
-    this.i = (this.i + 1) % this.frames.length
-  }
-
-  private rotatePhrase() {
-    /* v8 ignore next -- race guard: timer callback fires after stop() @preserve */
-    if (this.stopped) return
-    const next = pickPhrase(this.phrases!, this.lastPhrase)
-    this.lastPhrase = next
-    this.msg = next
-  }
-
-  /* v8 ignore start -- pause/resume: exercised at runtime via log sink coordination @preserve */
-  /** Clear the spinner line temporarily so other output can print cleanly. */
-  pause() {
-    if (this.stopped) return
-    process.stderr.write("\r\x1b[K")
-  }
-
-  /** Restore the spinner line after a pause. */
-  resume() {
-    if (this.stopped) return
-    this.spin()
-  }
-  /* v8 ignore stop */
-
-  stop(ok?: string) {
-    this.stopped = true
-    if (this.iv) { clearInterval(this.iv); this.iv = null }
-    if (this.piv) { clearInterval(this.piv); this.piv = null }
-    process.stderr.write("\r\x1b[K")
-    /* v8 ignore next -- ok parameter currently unused by callers @preserve */
-    if (ok) process.stderr.write(`\x1b[32m\u2713\x1b[0m ${ok}\n`)
-  }
-
-  fail(msg: string) {
-    this.stop()
-    process.stderr.write(`\x1b[31m\u2717\x1b[0m ${msg}\n`)
-  }
-}
+// Re-export ImperativeSpinner as Spinner for backward compatibility
+export { ImperativeSpinner as Spinner } from "./cli/spinner-imperative"
 
 // Input controller: pauses readline during model/tool execution.
 // Does NOT touch raw mode — readline with terminal:true manages raw mode
@@ -342,8 +271,8 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
     message: "cli callbacks created",
     meta: {},
   })
-  let currentSpinner: Spinner | null = null
-  function setSpinner(s: Spinner | null) { currentSpinner = s; setActiveSpinner(s) }
+  let currentSpinner: ImperativeSpinner | null = null
+  function setSpinner(s: ImperativeSpinner | null) { currentSpinner = s; setActiveSpinner(s) }
   let hadToolRun = false
   let textDirty = false // true when text/reasoning was written without a trailing newline
   const streamer = new MarkdownStreamer()
@@ -359,7 +288,7 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
       const phrases = getPhrases()
       const pool = hadToolRun ? phrases.followup : phrases.thinking
       const first = pickPhrase(pool)
-      setSpinner(new Spinner(first, pool))
+      setSpinner(new ImperativeSpinner(first, pool))
       currentSpinner!.start()
     },
     onModelStreamStart: () => {
@@ -405,16 +334,14 @@ export function createCliCallbacks(): ChannelCallbacks & { flushMarkdown(): void
       }
       const toolPhrases = getPhrases().tool
       const first = pickPhrase(toolPhrases)
-      setSpinner(new Spinner(first, toolPhrases))
+      setSpinner(new ImperativeSpinner(first, toolPhrases))
       currentSpinner!.start()
       hadToolRun = true
     },
     onToolEnd: (name: string, argSummary: string, success: boolean) => {
       currentSpinner?.stop()
       setSpinner(null)
-      const msg = formatToolResult(name, argSummary, success)
-      const color = success ? "\x1b[32m" : "\x1b[31m"
-      process.stderr.write(`${color}${msg}\x1b[0m\n`)
+      writeToolEnd(name, argSummary, success)
     },
     onError: (error: Error, severity: "transient" | "terminal") => {
       if (severity === "transient") {
@@ -594,78 +521,106 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
   const messages: OpenAI.ChatCompletionMessageParam[] = options.messages
     ?? [{ role: "system", content: await buildSystem("cli") }]
 
-  // ─── Rendering setup (dual-path: Ink for production, imperative for tests) ───
-  const useInk = !options._testInputSource && process.stdin.isTTY === true
-  let store: import("./cli/adapter").CliStore | null = null
-  const inputQueue = useInk ? new InputQueue() : null
+  // ─── Rendering: TUI (Ink + Static) for TTY, imperative for tests/pipes ───
+  const useTui = !options._testInputSource && process.stdin.isTTY === true
   let currentAbort: AbortController | null = null
   let closed = false
-  let cliCallbacks: ChannelCallbacks & { flushMarkdown(): void }
+  let cliCallbacks!: ChannelCallbacks & { flushMarkdown(): void }
+  let tuiStore: import("./cli/tui-store").TuiStore | null = null
+  let inkRef: { unmount: () => void } | null = null
+  void inkRef // suppress unused warning
+  const inputQueue = useTui ? new InputQueue() : null
+  let rl: readline.Interface | null = null
 
-  let inkInstance: { unmount: () => void } | null = null
-  if (useInk) {
-    // Dynamic import: React, Ink, and adapter are loaded only when rendering (avoids yoga-wasm-web top-level-await crash in CJS)
-    const [ink, React, adapter] = await Promise.all([
-      import("ink"),
-      import("react"),
-      import("./cli/adapter"),
-    ])
-    const { CliStore: CliStoreClass, createInkCallbacks, InkCliApp } = adapter
+  if (useTui) {
+    try {
+      const [ink, React, tuiMod, storeMod] = await Promise.all([
+        import("ink"),
+        import("react"),
+        import("./cli/ouro-tui"),
+        import("./cli/tui-store"),
+      ])
+      const { OuroTui } = tuiMod
+      const { TuiStore, createTuiCallbacks } = storeMod
 
-    store = new CliStoreClass()
-    cliCallbacks = createInkCallbacks(store)
+      tuiStore = new TuiStore()
+      cliCallbacks = createTuiCallbacks(tuiStore)
 
-    if (options.banner !== false) {
-      const bannerText = typeof options.banner === "string"
-        ? options.banner
-        : `${options.agentName} (type /commands for help)`
-      store.setBanner([`\n${bannerText}\n`])
-    }
-
-    const handleExit = () => {
-      if (currentAbort) {
-        currentAbort.abort()
-      } else {
-        closed = true
-        inputQueue!.close()
+      const handleExit = () => {
+        if (currentAbort) {
+          currentAbort.abort()
+        } else {
+          closed = true
+          inputQueue!.close()
+        }
       }
-    }
 
-    inkInstance = ink.render(
-      React.default.createElement(InkCliApp, {
-        store,
-        onSubmit: (text: string) => { inputQueue!.push(text) },
-        onExit: handleExit,
-      }),
-      { exitOnCtrlC: false, patchConsole: false },
-    )
-  } else {
+      // TUI root: subscribes to store, passes props to OuroTui
+      const storeRef = tuiStore
+      function TuiRoot(): any {
+        const [, forceUpdate] = React.useState(0)
+        const [elapsed, setElapsed] = React.useState(0)
+        React.useEffect(() => storeRef.subscribe(() => forceUpdate((n: number) => n + 1)), [])
+        React.useEffect(() => {
+          const iv = setInterval(() => { storeRef.updateElapsed(); setElapsed(storeRef.elapsed) }, 1000)
+          return () => clearInterval(iv)
+        }, [])
+        return React.createElement(OuroTui, {
+          agentName: options.agentName,
+          model: "",
+          completedMessages: storeRef.completedMessages as any,
+          live: storeRef.live,
+          elapsedSeconds: elapsed,
+          contextPercent: 0,
+          onSubmit: (text: string) => { inputQueue!.push(text) },
+          onExit: handleExit,
+        })
+      }
+
+      inkRef = ink.render(React.createElement(TuiRoot), { exitOnCtrlC: false, patchConsole: false })
+    } catch (err) {
+      // Ink failed to load (CJS compat, missing deps, etc.) — fall through to imperative
+      emitNervesEvent({
+        component: "senses",
+        event: "senses.tui_fallback",
+        message: `TUI failed to load, falling back to imperative: ${err instanceof Error ? err.message : String(err)}`,
+        meta: {},
+      })
+    }
+  }
+
+  // Fallback to imperative callbacks if TUI didn't initialize
+  if (!tuiStore) {
     cliCallbacks = createCliCallbacks()
     if (options.banner !== false) {
       const bannerText = typeof options.banner === "string"
         ? options.banner
         : `${options.agentName} (type /commands for help)`
-      // eslint-disable-next-line no-console -- terminal UX: startup banner (test/headless path)
+      // eslint-disable-next-line no-console -- terminal UX: startup banner
       console.log(`\n${bannerText}\n`)
     }
   }
 
-  // Display helpers: route to Ink store or stderr/stdout depending on mode
+  // Display helpers: route to TUI store or imperative stderr/stdout
   const display = {
     error: (msg: string) => {
-      if (store) store.setError(msg)
+      if (tuiStore) tuiStore.setError(msg)
       else process.stderr.write(`\x1b[31m${msg}\x1b[0m\n`)
     },
     warn: (msg: string) => {
-      if (store) store.setError(msg)
+      if (tuiStore) tuiStore.setError(msg) // TUI shows warnings as errors (amber color handled in component)
       else process.stderr.write(`\x1b[33m${msg}\x1b[0m\n`)
     },
     text: (msg: string) => {
-      if (store) store.appendText(msg)
+      if (tuiStore) tuiStore.appendText(msg)
       else process.stdout.write(`${msg}\n`)
     },
-    suppressInput: () => { store?.suppressInput() },
-    restoreInput: () => { store?.restoreInput() },
+    suppressInput: () => {
+      if (tuiStore) tuiStore.suppressInput()
+    },
+    restoreInput: () => {
+      if (tuiStore) tuiStore.restoreInput()
+    },
   }
   const effectiveToolContext: ToolContext = {
     signin: options.toolContext?.signin ?? (async () => undefined),
@@ -678,7 +633,6 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
         }
         messages.push(assistantMessage)
         await options.onAsyncAssistantMessage?.(messages, assistantMessage)
-        // Show async message via Ink store
         display.text(message)
         await options.toolContext?.codingFeedback?.send(message)
       },
@@ -741,7 +695,6 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
     if (exitToolFired) {
       exitReason = "tool_exit"
       closed = true
-      inputQueue?.close()
     } else {
       const lastMsg = messages[messages.length - 1]
       if (lastMsg?.role === "assistant" && !(typeof lastMsg.content === "string" ? lastMsg.content : "").trim()) {
@@ -754,16 +707,19 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
   }
 
   try {
-    // Input source: Ink queue for TTY, test source for tests, readline fallback for non-TTY
+    // Input source: TUI queue for Ink, test source for tests, readline fallback
     let inputSource: AsyncIterable<string>
-    let rl: readline.Interface | null = null
-    if (useInk) {
-      inputSource = inputQueue!
+    let inputCtrl: InputController | null = null
+    if (tuiStore && inputQueue) {
+      // TUI path: input comes from Ink's onSubmit → InputQueue
+      inputSource = inputQueue
     } else if (options._testInputSource) {
       inputSource = options._testInputSource
     } else {
-      // Fallback: readline for non-TTY environments (pipes, non-interactive terminals)
-      rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: false })
+      // Imperative fallback: readline
+      const isTTY = process.stdin.isTTY === true
+      rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: isTTY })
+      inputCtrl = new InputController(rl)
       inputSource = rl
       process.stdout.write(CLI_PROMPT)
     }
@@ -806,8 +762,12 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
         }
       }
 
+      // Track user message in TUI for display
+      if (tuiStore) tuiStore.addUserMessage(input)
+
       currentAbort = new AbortController()
-      display.suppressInput()
+      if (tuiStore) tuiStore.suppressInput()
+      inputCtrl?.suppress(() => { currentAbort?.abort() })
       let result: { usage?: UsageData; turnOutcome?: string; commandAction?: string } | undefined
       try {
         if (options.runTurn) {
@@ -850,7 +810,9 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
         }
       }
       cliCallbacks.flushMarkdown()
-      display.restoreInput()
+      if (!tuiStore) process.stdout.write("\n") // ensure response ends with newline before prompt (imperative only)
+      if (tuiStore) tuiStore.restoreInput()
+      inputCtrl?.restore()
       currentAbort = null
 
       // Check if exit tool was fired during this turn
@@ -873,7 +835,7 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
       if (closed) break
     }
   } finally {
-    inkInstance?.unmount()
+    rl?.close()
     if (options.banner !== false) {
       // eslint-disable-next-line no-console -- terminal UX: goodbye
       console.log("bye")
