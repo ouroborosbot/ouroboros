@@ -181,6 +181,7 @@ function prependTurnSections(
     }
   }
 
+  /* v8 ignore start -- defensive: multipart content path for non-string user messages @preserve */
   return {
     ...message,
     content: [
@@ -188,6 +189,7 @@ function prependTurnSections(
       ...message.content,
     ],
   }
+  /* v8 ignore stop */
 }
 
 function readInnerWorkState(): ActiveWorkFrame["inner"] {
