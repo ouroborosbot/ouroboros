@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "child_process"
 import { randomUUID } from "crypto"
+import { emitNervesEvent } from "../nerves/runtime"
 
 export interface ShellSession {
   id: string
@@ -57,9 +58,22 @@ export function spawnBackgroundShell(command: string): ShellSession {
   proc.on("close", (code) => {
     session.info.status = "exited"
     session.info.exitCode = code
+    emitNervesEvent({
+      component: "repertoire",
+      event: "repertoire.shell.process_exit",
+      message: "background shell process exited",
+      meta: { id, command, exitCode: code, pid: proc.pid },
+    })
   })
 
   sessions.set(id, session)
+
+  emitNervesEvent({
+    component: "repertoire",
+    event: "repertoire.shell.spawn",
+    message: "spawned background shell session",
+    meta: { id, command, pid: proc.pid },
+  })
 
   return { ...session.info }
 }
@@ -67,6 +81,12 @@ export function spawnBackgroundShell(command: string): ShellSession {
 export function getShellSession(id: string): ShellSession | undefined {
   const session = sessions.get(id)
   if (!session) return undefined
+  emitNervesEvent({
+    component: "repertoire",
+    event: "repertoire.shell.status_check",
+    message: "checked shell session status",
+    meta: { id, status: session.info.status, exitCode: session.info.exitCode },
+  })
   return { ...session.info }
 }
 
@@ -86,6 +106,12 @@ export function tailShellSession(id: string, lines = 50): string | undefined {
   const session = sessions.get(id)
   if (!session) return undefined
   const tail = session.info.output.slice(-lines)
+  emitNervesEvent({
+    component: "repertoire",
+    event: "repertoire.shell.tail",
+    message: "tailed shell session output",
+    meta: { id, requestedLines: lines, returnedLines: tail.length },
+  })
   return tail.join("\n")
 }
 

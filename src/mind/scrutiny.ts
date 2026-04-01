@@ -1,3 +1,5 @@
+import { emitNervesEvent } from "../nerves/runtime"
+
 /**
  * Scrutiny passes: adversarial review prompts injected into the agent's
  * system prompt and tool results during coding work.
@@ -23,6 +25,12 @@
  */
 export function preImplementationScrutinySection(hasCodingTools: boolean): string {
   if (!hasCodingTools) return ""
+
+  emitNervesEvent({
+    component: "mind",
+    event: "mind.scrutiny.pre_implementation_emit",
+    message: "emitting pre-implementation scrutiny section",
+  })
 
   return `## pre-implementation scrutiny
 
@@ -102,6 +110,12 @@ const sessionModifiedFiles = new Set<string>()
 /** Track a file as modified in this session. */
 export function trackModifiedFile(filePath: string): void {
   sessionModifiedFiles.add(filePath)
+  emitNervesEvent({
+    component: "mind",
+    event: "mind.scrutiny.track_file",
+    message: "tracked modified file for scrutiny",
+    meta: { path: filePath, totalTracked: sessionModifiedFiles.size },
+  })
 }
 
 /** Get the count of distinct files modified this session. */
@@ -111,6 +125,12 @@ export function getModifiedFileCount(): number {
 
 /** Reset the modified file tracker (for testing or new sessions). */
 export function resetSessionModifiedFiles(): void {
+  emitNervesEvent({
+    component: "mind",
+    event: "mind.scrutiny.reset",
+    message: "reset session modified files tracker",
+    meta: { previousCount: sessionModifiedFiles.size },
+  })
   sessionModifiedFiles.clear()
 }
 
@@ -124,7 +144,21 @@ export function resetSessionModifiedFiles(): void {
  */
 export function getPostImplementationScrutiny(distinctFileCount: number): string {
   if (distinctFileCount <= 0) return ""
-  if (distinctFileCount <= 2) return SHORT_CHECKLIST
+  if (distinctFileCount <= 2) {
+    emitNervesEvent({
+      component: "mind",
+      event: "mind.scrutiny.post_implementation_tier1",
+      message: "emitting tier-1 post-implementation scrutiny",
+      meta: { distinctFileCount },
+    })
+    return SHORT_CHECKLIST
+  }
+  emitNervesEvent({
+    component: "mind",
+    event: "mind.scrutiny.post_implementation_tier2",
+    message: "emitting tier-2 post-implementation scrutiny",
+    meta: { distinctFileCount },
+  })
   return FULL_POST_IMPLEMENTATION_SCRUTINY
 }
 

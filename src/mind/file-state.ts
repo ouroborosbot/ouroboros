@@ -1,5 +1,6 @@
 import { createHash } from "crypto"
 import { statSync, readFileSync } from "fs"
+import { emitNervesEvent } from "../nerves/runtime"
 
 /** Compute sha256 hex hash of content */
 export function contentHash(content: string): string {
@@ -72,6 +73,13 @@ export class FileStateCache {
       messageId,
     })
 
+    emitNervesEvent({
+      component: "mind",
+      event: "mind.file_state.record",
+      message: "recorded file state",
+      meta: { path: filePath, hash, fullRead },
+    })
+
     // Evict LRU (first entry in Map iteration order) if over capacity
     if (this.entries.size > this.maxSize) {
       const firstKey = this.entries.keys().next().value as string
@@ -89,6 +97,14 @@ export class FileStateCache {
     // Promote to most-recently-used by re-inserting
     this.entries.delete(filePath)
     this.entries.set(filePath, entry)
+
+    emitNervesEvent({
+      component: "mind",
+      event: "mind.file_state.get",
+      message: "retrieved file state",
+      meta: { path: filePath, hash: entry.hash },
+    })
+
     return entry
   }
 
@@ -117,6 +133,12 @@ export class FileStateCache {
       const currentContent = readFileSync(filePath, "utf-8")
       const currentHash = contentHash(currentContent)
       if (currentHash === entry.hash) return { stale: false }
+      emitNervesEvent({
+        component: "mind",
+        event: "mind.file_state.stale_detected",
+        message: "file staleness detected",
+        meta: { path: filePath, previousHash: entry.hash, currentHash },
+      })
       return { stale: true, reason: `file modified since last read (mtime and content differ)` }
     } catch {
       // Can't read file -- treat as not stale (file may have been deleted)
@@ -142,6 +164,13 @@ export class FileStateCache {
     }
 
     this.snapshots.push(snap)
+
+    emitNervesEvent({
+      component: "mind",
+      event: "mind.file_state.snapshot_created",
+      message: "created file state snapshot",
+      meta: { path: filePath, hash: snap.hash },
+    })
 
     // Evict oldest snapshots if over capacity
     if (this.snapshots.length > this.maxSnapshots) {
@@ -176,6 +205,12 @@ export class FileStateCache {
    * Clear all cached entries (does not clear snapshots).
    */
   clear(): void {
+    emitNervesEvent({
+      component: "mind",
+      event: "mind.file_state.clear",
+      message: "cleared file state cache",
+      meta: { entryCount: this.entries.size },
+    })
     this.entries.clear()
   }
 }
