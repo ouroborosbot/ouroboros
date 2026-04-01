@@ -734,7 +734,8 @@ export const baseToolDefinitions: ToolDefinition[] = [
 
       const MAX_TIMEOUT = 600000
       const requestedTimeout = Number(a.timeout_ms) || 0
-      const configDefault = loadAgentConfig().shell?.defaultTimeout ?? 30000
+      let configDefault = 30000
+      try { configDefault = loadAgentConfig().shell?.defaultTimeout ?? 30000 } catch { /* test env: no --agent flag */ }
       const baseTimeout = requestedTimeout > 0 ? requestedTimeout : configDefault
       const timeout = Math.min(baseTimeout, MAX_TIMEOUT)
       const output = execSync(a.command, {
