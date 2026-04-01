@@ -87,4 +87,29 @@ describe("InlineDiff (Ink)", () => {
     // Should indicate no changes or just show context
     expect(frame).toContain("same")
   })
+
+  it("handles multi-line additions at end", () => {
+    const before = "line one"
+    const after = "line one\nline two\nline three"
+    const { lastFrame } = render(<InlineDiff before={before} after={after} filePath="test.ts" />)
+    const frame = lastFrame()!
+    expect(frame).toContain("line two")
+    expect(frame).toContain("line three")
+  })
+
+  it("handles multi-line removals at end", () => {
+    const before = "line one\nline two\nline three"
+    const after = "line one"
+    const { lastFrame } = render(<InlineDiff before={before} after={after} filePath="test.ts" />)
+    const frame = lastFrame()!
+    expect(frame).toContain("line two")
+    expect(frame).toContain("line three")
+  })
+
+  it("handles both empty before and after", () => {
+    const { lastFrame } = render(<InlineDiff before="" after="" filePath="empty.ts" />)
+    const frame = lastFrame()!
+    // Should show file header at minimum
+    expect(frame).toContain("empty.ts")
+  })
 })
