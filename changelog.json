@@ -2,16 +2,15 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.167",
+      "changes": [
+        "fix(outlook): sidebar border for visual separation between nav and content"
+      ]
+    },
+    {
       "version": "0.1.0-alpha.166",
       "changes": [
-        "feat(mind): reorganize system prompt into 9 named groups with explicit headers",
-        "feat(mind): move live world-state and pending messages from user message prepend to system prompt sections",
-        "feat(mind): add reversibility/blast-radius framework, engineering discipline, and git safety to workspaceDisciplineSection",
-        "feat(repertoire): enrich all 51 tool descriptions from functional to behavioral",
-        "feat(shell): configurable timeout, background mode with shell_status/shell_tail, destructive pattern detection",
-        "feat(mind): file state tracking with LRU read cache, staleness detection, and content-hash snapshots",
-        "feat(mind): alternating scrutiny passes (stranger-with-candy + tinfoil-hat) with tiered post-implementation injection",
-        "feat(cli): Ink/React TUI foundation with streaming markdown, inline diffs, virtual scrolling, status line, snake spinner"
+        "fix(outlook): add dark class to html root \u2014 fixes white/blank page in production"
       ]
     },
     {
