@@ -594,41 +594,37 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
   const messages: OpenAI.ChatCompletionMessageParam[] = options.messages
     ?? [{ role: "system", content: await buildSystem("cli") }]
 
-  // ─── Ink rendering setup ─────────────────────────────────────
-  const store = new CliStore()
-  const inputQueue = new InputQueue()
+  // ─── Rendering setup (dual-path: Ink for production, imperative for tests) ───
+  const useInk = !options._testInputSource
+  const store = useInk ? new CliStore() : null
+  const inputQueue = useInk ? new InputQueue() : null
   let currentAbort: AbortController | null = null
   let closed = false
-  const useTestInput = !!options._testInputSource
 
-  // When _testInputSource is provided, skip Ink (for tests / headless usage)
   let inkInstance: { unmount: () => void } | null = null
-  if (!useTestInput) {
-    // Lazy-load Ink to minimize startup impact (<200ms)
+  if (useInk) {
     const ink = await import("ink")
 
-    // Banner
     if (options.banner !== false) {
       const bannerText = typeof options.banner === "string"
         ? options.banner
         : `${options.agentName} (type /commands for help)`
-      store.setBanner([`\n${bannerText}\n`])
+      store!.setBanner([`\n${bannerText}\n`])
     }
 
-    // Ctrl-C during model execution aborts; at idle, exits
     const handleExit = () => {
       if (currentAbort) {
         currentAbort.abort()
       } else {
         closed = true
-        inputQueue.close()
+        inputQueue!.close()
       }
     }
 
     inkInstance = ink.render(
       React.createElement(InkCliApp, {
-        store,
-        onSubmit: (text: string) => { inputQueue.push(text) },
+        store: store!,
+        onSubmit: (text: string) => { inputQueue!.push(text) },
         onExit: handleExit,
       }),
       { exitOnCtrlC: false, patchConsole: false },
@@ -641,7 +637,26 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
     console.log(`\n${bannerText}\n`)
   }
 
-  const cliCallbacks = createInkCallbacks(store)
+  // Ink path uses store-based callbacks; test path uses imperative stdout callbacks
+  const cliCallbacks = useInk ? createInkCallbacks(store!) : createCliCallbacks()
+
+  // Display helpers: route to Ink store or stderr/stdout depending on mode
+  const display = {
+    error: (msg: string) => {
+      if (store) store.setError(msg)
+      else process.stderr.write(`\x1b[31m${msg}\x1b[0m\n`)
+    },
+    warn: (msg: string) => {
+      if (store) store.setError(msg)
+      else process.stderr.write(`\x1b[33m${msg}\x1b[0m\n`)
+    },
+    text: (msg: string) => {
+      if (store) store.appendText(msg)
+      else process.stdout.write(`${msg}\n`)
+    },
+    suppressInput: () => { store?.suppressInput() },
+    restoreInput: () => { store?.restoreInput() },
+  }
   const effectiveToolContext: ToolContext = {
     signin: options.toolContext?.signin ?? (async () => undefined),
     ...options.toolContext,
@@ -654,7 +669,7 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
         messages.push(assistantMessage)
         await options.onAsyncAssistantMessage?.(messages, assistantMessage)
         // Show async message via Ink store
-        store.appendText(message)
+        display.text(message)
         await options.toolContext?.codingFeedback?.send(message)
       },
     },
@@ -694,7 +709,7 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
   if (options.autoFirstTurn && messages.length > 0 && messages[messages.length - 1]?.role === "user") {
     currentAbort = new AbortController()
     const traceId = createTraceId()
-    store.suppressInput()
+    display.suppressInput()
     let result: { usage?: UsageData } | undefined
     try {
       result = await runAgent(messages, cliCallbacks, options.skipSystemPromptRefresh ? undefined : "cli", currentAbort.signal, {
@@ -706,21 +721,21 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
       })
     } catch (err) {
       if (!(err instanceof DOMException && err.name === "AbortError")) {
-        store.setError(err instanceof Error ? err.message : String(err))
+        display.error(err instanceof Error ? err.message : String(err))
       }
     }
     cliCallbacks.flushMarkdown()
-    store.restoreInput()
+    display.restoreInput()
     currentAbort = null
 
     if (exitToolFired) {
       exitReason = "tool_exit"
       closed = true
-      inputQueue.close()
+      inputQueue?.close()
     } else {
       const lastMsg = messages[messages.length - 1]
       if (lastMsg?.role === "assistant" && !(typeof lastMsg.content === "string" ? lastMsg.content : "").trim()) {
-        store.setError("(empty response)")
+        display.warn("(empty response)")
       }
       if (options.onTurnEnd) {
         await options.onTurnEnd(messages, result ?? { usage: undefined })
@@ -729,7 +744,7 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
   }
 
   try {
-    const inputSource = useTestInput ? options._testInputSource! : inputQueue
+    const inputSource = useInk ? inputQueue! : options._testInputSource!
     for await (const input of inputSource) {
       if (closed) break
       if (!input.trim()) continue
@@ -739,7 +754,7 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
         const gate = options.onInput(input)
         if (!gate.allowed) {
           if (gate.reply) {
-            store.appendText(gate.reply)
+            display.text(gate.reply)
           }
           if (closed) break
           continue
@@ -758,10 +773,11 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
               messages.length = 0
               messages.push({ role: "system", content: await buildSystem("cli") })
               await options.onNewSession?.()
-              store.appendText("session cleared")
+              // eslint-disable-next-line no-console -- terminal UX: session cleared
+              console.log("session cleared")
               continue
             } else if (dispatchResult.result.action === "response") {
-              store.appendText(dispatchResult.result.message || "")
+              display.text(dispatchResult.result.message || "")
               continue
             }
           }
@@ -769,7 +785,7 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
       }
 
       currentAbort = new AbortController()
-      store.suppressInput()
+      display.suppressInput()
       let result: { usage?: UsageData; turnOutcome?: string; commandAction?: string } | undefined
       try {
         if (options.runTurn) {
@@ -785,7 +801,8 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
               messages.length = 0
               messages.push({ role: "system", content: await buildSystem("cli") })
               await options.onNewSession?.()
-              store.appendText("session cleared")
+              // eslint-disable-next-line no-console -- terminal UX: session cleared
+              console.log("session cleared")
               continue
             }
             // For "response" commands: the pipeline already emitted the response via onTextChunk
@@ -807,11 +824,11 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
         }
       } catch (err) {
         if (!(err instanceof DOMException && err.name === "AbortError")) {
-          store.setError(err instanceof Error ? err.message : String(err))
+          display.error(err instanceof Error ? err.message : String(err))
         }
       }
       cliCallbacks.flushMarkdown()
-      store.restoreInput()
+      display.restoreInput()
       currentAbort = null
 
       // Check if exit tool was fired during this turn
@@ -823,7 +840,7 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
       // Safety net: never silently swallow an empty response
       const lastMsg = messages[messages.length - 1]
       if (lastMsg?.role === "assistant" && !(typeof lastMsg.content === "string" ? lastMsg.content : "").trim()) {
-        store.setError("(empty response)")
+        display.warn("(empty response)")
       }
 
       // Post-turn hook (session persistence, pending drain, prompt refresh, etc.)
@@ -846,7 +863,7 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
   return { exitReason, toolResult: exitToolResult }
 }
 
-export async function main(agentName?: string, options?: { pasteDebounceMs?: number }) {
+export async function main(agentName?: string, options?: { pasteDebounceMs?: number; _testInputSource?: AsyncIterable<string> }) {
   if (agentName) setAgentName(agentName)
   const pasteDebounceMs = options?.pasteDebounceMs ?? 50
 
@@ -916,6 +933,7 @@ export async function main(agentName?: string, options?: { pasteDebounceMs?: num
       agentName: currentAgentName,
       pasteDebounceMs,
       messages: sessionMessages,
+      _testInputSource: options?._testInputSource,
       onAsyncAssistantMessage: async (messages, _assistantMessage) => {
         postTurn(messages, sessPath, undefined, undefined, sessionState)
       },
