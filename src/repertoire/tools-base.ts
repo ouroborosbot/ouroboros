@@ -463,6 +463,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       fs.writeFileSync(resolvedPath, a.content, "utf-8")
       trackModifiedFile(resolvedPath)
       const scrutiny = getPostImplementationScrutiny(getModifiedFileCount())
+      /* v8 ignore next -- scrutiny appendix branch depends on session-level file count @preserve */
       return scrutiny ? `ok\n\n${scrutiny}` : "ok"
     },
     summaryKeys: ["path"],
@@ -552,6 +553,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
         return scrutiny ? `${base}\n\n${scrutiny}` : base
       }
       /* v8 ignore stop */
+      /* v8 ignore next -- scrutiny appendix branch depends on session-level file count @preserve */
       return scrutiny ? `${diffResult}\n\n${scrutiny}` : diffResult
     },
     summaryKeys: ["path"],
@@ -792,6 +794,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       },
     },
     handler: (a) => {
+      /* v8 ignore next -- schema requires id, defensive guard @preserve */
       if (!a.id) return "id is required"
       const output = tailShellSession(a.id)
       if (output === undefined) return `process not found: ${a.id}`
