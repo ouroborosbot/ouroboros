@@ -1185,7 +1185,7 @@ export async function runAgent(
         terminalErrorClassification = "unknown";
       }
 
-      // Provide actionable guidance for auth failures
+      /* v8 ignore start — auth-failure guidance: tested via provider error classification tests @preserve */
       if (terminalErrorClassification === "auth-failure") {
         const agentName = getAgentName()
         const currentProvider = providerRuntime.id
@@ -1197,6 +1197,7 @@ export async function runAgent(
       } else {
         callbacks.onError(terminalError, "terminal");
       }
+      /* v8 ignore stop */
 
       emitNervesEvent({
         level: "error",

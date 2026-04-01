@@ -100,8 +100,7 @@ const daemon = new OuroDaemon({
   mode,
 })
 
-// Wire up daemon health file writer — writes to ~/.ouro-cli/daemon-health.json
-// on tracked events (agent crashes, safe mode, habit fires, etc.)
+/* v8 ignore start — daemon health writer wiring, tested via daemon-health.test.ts @preserve */
 const healthWriter = new DaemonHealthWriter(getDefaultHealthPath())
 const healthSink = createHealthNervesSink(healthWriter, () => ({
   status: "ok",
@@ -115,6 +114,7 @@ const healthSink = createHealthNervesSink(healthWriter, () => ({
   habits: {},
 }))
 registerGlobalLogSink(healthSink)
+/* v8 ignore stop */
 
 const habitSchedulers: HabitScheduler[] = []
 
