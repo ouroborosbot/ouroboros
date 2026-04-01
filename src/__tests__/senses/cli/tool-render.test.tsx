@@ -53,6 +53,14 @@ describe("ToolParams", () => {
     expect(lastFrame()).toBeDefined()
   })
 
+  it("handles args with only non-string values", () => {
+    const { lastFrame } = render(
+      <ToolParams name="unknown" args={{ count: 42, flag: true }} />,
+    )
+    // Should render without crash -- no string value to display
+    expect(lastFrame()).toBeDefined()
+  })
+
   it("truncates long values", () => {
     const longPath = "/very/long/path/" + "a".repeat(200) + ".ts"
     const { lastFrame } = render(
@@ -228,5 +236,20 @@ describe("ToolExecutionBlock", () => {
       />,
     )
     expect(lastFrame()).toContain("edit_file")
+  })
+
+  it("uses 'unknown' as filePath when args.path is not a string", () => {
+    const { lastFrame } = render(
+      <ToolExecutionBlock
+        name="edit_file"
+        args={{}}
+        result="ok"
+        success={true}
+        fileBefore="old"
+        fileAfter="new"
+      />,
+    )
+    const frame = lastFrame()!
+    expect(frame).toContain("unknown")
   })
 })
