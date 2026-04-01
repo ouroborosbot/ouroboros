@@ -80,9 +80,8 @@ function Header({ agentName, model, contextPercent }: {
   const cwd = process.cwd().replace(process.env.HOME ?? "", "~")
   return (
     <Box flexDirection="column">
-      <Text color={OURO.scale} bold>{"  ◎ "}<Text color={OURO.glow} bold>{agentName}</Text></Text>
-      <Text color={OURO.shadow}>{"    "}{model ? `${model} · ` : ""}{cwd}{showCtx ? <Text> · ctx: <Text color={contextPercent > 80 ? OURO.fang : contextPercent > 60 ? OURO.gold : OURO.scale}>{contextPercent}%</Text></Text> : ""}</Text>
-      <Text color={OURO.separator}>{"  ─────────────────────────────────────────"}</Text>
+      <Text color={OURO.scale} bold>{"◎ "}<Text color={OURO.glow} bold>{agentName}</Text></Text>
+      <Text color={OURO.shadow}>{"  "}{model ? `${model} · ` : ""}{cwd}{showCtx ? <Text> · ctx: <Text color={contextPercent > 80 ? OURO.fang : contextPercent > 60 ? OURO.gold : OURO.scale}>{contextPercent}%</Text></Text> : ""}</Text>
     </Box>
   )
 }
@@ -99,20 +98,15 @@ function ToolResultLine({ tc }: { readonly tc: { name: string; argSummary: strin
   const argColor = tc.success === false ? OURO.fang : OURO.shadow
   return (
     <Text>
-      {"  "}<Text color={iconColor}>{icon}</Text>{" "}
+      <Text color={iconColor}>{icon}</Text>{" "}
       <Text color={OURO.teal}>{tc.name}</Text>{" "}
       <Text color={argColor}>{truncateArgs(tc.argSummary, 60)}</Text>
     </Text>
   )
 }
 
-function TurnSeparator(): React.ReactElement {
-  return <Text color={OURO.separator}>{"  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─"}</Text>
-}
-
 function MessageBlock({ msg }: { readonly msg: CompletedMessage }): React.ReactElement {
   if (msg.role === "tool") {
-    // Tool results: compact one-liners, no role label
     return (
       <Box flexDirection="column">
         {msg.toolCalls?.map((tc, i) => <ToolResultLine key={i} tc={tc} />)}
@@ -121,29 +115,29 @@ function MessageBlock({ msg }: { readonly msg: CompletedMessage }): React.ReactE
   }
 
   if (msg.role === "user") {
+    // User messages: bold with a dim > echo, like Claude Code's ) prefix
     return (
       <Box flexDirection="column">
-        <TurnSeparator />
-        <Text color={OURO.bone} bold>{"  you"}</Text>
-        {msg.content ? <Text color={OURO.bone}>{"  "}{msg.content}</Text> : null}
+        <Text>{""}</Text>
+        {msg.content ? <Text color={OURO.bone} bold>{msg.content}</Text> : null}
         <Text>{""}</Text>
       </Box>
     )
   }
 
   if (msg.role === "assistant") {
+    // Assistant messages: just the text, no prefix, no indentation
     return (
       <Box flexDirection="column">
-        {msg.content ? <Text color={OURO.mist}>{"  ⎿ "}{msg.content}</Text> : null}
+        {msg.content ? <Text color={OURO.mist}>{msg.content}</Text> : null}
         <Text>{""}</Text>
       </Box>
     )
   }
 
-  // system or other
   return (
     <Box flexDirection="column">
-      <Text color={OURO.shadow}>{"  "}{msg.content}</Text>
+      <Text color={OURO.shadow}>{msg.content}</Text>
     </Box>
   )
 }
@@ -165,7 +159,7 @@ function Spinner({ phrase, elapsed }: {
 
   return (
     <Text color={color}>
-      {"  "}{RING_FRAMES[frame]} {timeStr ? <Text color={OURO.shadow}>{timeStr} · </Text> : ""}{phrase}
+      {RING_FRAMES[frame]} {timeStr ? <Text color={OURO.shadow}>{timeStr} · </Text> : ""}{phrase}
     </Text>
   )
 }
@@ -176,7 +170,7 @@ function ActiveToolLine({ tool }: {
   const argStr = Object.values(tool.args)[0] ?? ""
   return (
     <Text>
-      {"  "}<Text color={OURO.shadow}>∙</Text>{" "}
+      <Text color={OURO.shadow}>∙</Text>{" "}
       <Text color={OURO.teal}>{tool.name}</Text>{" "}
       <Text color={OURO.shadow}>{truncateArgs(argStr, 60)}</Text>
     </Text>
@@ -191,27 +185,23 @@ function LiveArea({ live, elapsed }: {
     <Box flexDirection="column">
       {/* Streaming assistant text — only shown if there IS streaming text */}
       {live.streamingText ? (
-        <Text color={OURO.mist}>{"  ⎿ "}{live.streamingText}</Text>
+        <Text color={OURO.mist}>{live.streamingText}</Text>
       ) : null}
 
-      {/* Active tool (in-progress) */}
       {live.activeTool ? (
         <ActiveToolLine tool={live.activeTool} />
       ) : null}
 
-      {/* Spinner */}
       {live.loading ? (
         <Spinner phrase={live.spinnerPhrase} elapsed={elapsed} />
       ) : null}
 
-      {/* Error */}
       {live.errorMessage ? (
-        <Text color={OURO.fang}>{"  ✗ "}{live.errorMessage}</Text>
+        <Text color={OURO.fang}>{"✗ "}{live.errorMessage}</Text>
       ) : null}
 
-      {/* Kick */}
       {live.kickMessage ? (
-        <Text color={OURO.gold}>{"  ↻ "}{live.kickMessage}</Text>
+        <Text color={OURO.gold}>{"↻ "}{live.kickMessage}</Text>
       ) : null}
     </Box>
   )
@@ -280,10 +270,10 @@ function InputArea({ onSubmit, suppressed, onCtrlC }: {
   return (
     <Box flexDirection="column">
       {exitWarning ? (
-        <Text color={OURO.shadow}>{"  (press Ctrl-C again to exit)"}</Text>
+        <Text color={OURO.shadow}>{"(press Ctrl-C again to exit)"}</Text>
       ) : null}
       <Box>
-        <Text color={OURO.teal} bold>{"  > "}</Text>
+        <Text color={OURO.teal} bold>{"> "}</Text>
         <Text color={OURO.bone}>{input}</Text>
         {!suppressed && cursorVisible ? <Text color={OURO.scale}>{"█"}</Text> : <Text>{" "}</Text>}
       </Box>
