@@ -29,7 +29,7 @@
     "test": "vitest run",
     "test:coverage:vitest": "vitest run --coverage",
     "test:coverage": "node scripts/run-coverage-gate.cjs",
-    "build": "tsc",
+    "build": "tsc && (cd packages/outlook-ui && npm install --ignore-scripts 2>/dev/null && npm run build && cp -r dist ../../dist/outlook-ui) || echo 'outlook-ui build skipped'",
     "lint": "eslint src/",
     "audit:nerves": "npm run build && node dist/nerves/coverage/cli-main.js"
   },
@@ -39,9 +39,7 @@
     "@microsoft/teams.apps": "^2.0.5",
     "@microsoft/teams.dev": "^2.0.5",
     "fast-glob": "^3.3.3",
-    "ink": "^4.4.1",
     "openai": "^6.27.0",
-    "react": "^18.3.1",
     "semver": "^7.7.4"
   },
   "repository": {
@@ -49,11 +47,9 @@
     "url": "https://github.com/ouroborosbot/ouroboros"
   },
   "devDependencies": {
-    "@types/react": "^18.3.28",
     "@types/semver": "^7.7.1",
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^10.0.2",
-    "ink-testing-library": "^4.0.0",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.56.1",
     "vitest": "^4.0.18"

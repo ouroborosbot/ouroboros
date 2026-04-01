@@ -2,6 +2,37 @@
   "_note": "This changelog is maintained as part of the PR/version-bump workflow. Agent-curated, not auto-generated. Agents read this file directly via read_file to understand what changed between versions.",
   "versions": [
     {
+      "version": "0.1.0-alpha.165",
+      "changes": [
+        "fix(daemon): dont launchctl bootstrap during ouro up \u2014 write plist only, prevents competing daemon process"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.164",
+      "changes": [
+        "fix(daemon): keep /dev/null fds open until parent exits \u2014 fixes ouro up daemon crash"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.163",
+      "changes": [
+        "fix(daemon): redirect detached spawn stdio to /dev/null \u2014 fixes ouro up daemon crash"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.162",
+      "changes": [
+        "fix(daemon): handle EPIPE in detached daemon \u2014 suppress pipe errors when parent exits after ouro up"
+      ]
+    },
+    {
+      "version": "0.1.0-alpha.161",
+      "changes": [
+        "feat(outlook): serve React SPA at root (/), daemon serves static assets",
+        "fix(daemon): graceful EADDRINUSE handling for Outlook port"
+      ]
+    },
+    {
       "version": "0.1.0-alpha.160",
       "changes": [
         "feat(outlook): total inspectability expansion \u2014 14 API endpoints, session x-ray, obligation chain tracing, coding deep inspection, attention/pending queue, bridge inventory, habit triage, memory/journal, friend economics, SSE live updates",
