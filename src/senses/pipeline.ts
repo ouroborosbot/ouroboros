@@ -230,7 +230,20 @@ function readInnerWorkState(): ActiveWorkFrame["inner"] {
 
 // ── Pipeline ──────────────────────────────────────────────────────
 
+let _lastSessionKey: string | null = null
+
 export async function handleInboundTurn(input: InboundTurnInput): Promise<InboundTurnResult> {
+  // Reset session-scoped state when the session changes
+  const sessionKey = `${input.channel}/${input.sessionKey ?? "session"}`
+  if (sessionKey !== _lastSessionKey) {
+    _lastSessionKey = sessionKey
+    // Reset file-state cache and scrutiny tracking for the new session
+    const { fileStateCache } = await import("../mind/file-state")
+    const { resetSessionModifiedFiles } = await import("../mind/scrutiny")
+    fileStateCache.clear()
+    resetSessionModifiedFiles()
+  }
+
   // Step 0: Check for pending failover reply
   if (input.failoverState?.pending) {
     const userText = input.messages
@@ -502,19 +515,9 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
   const sessionPending = input.drainPending(input.pendingDir)
   const pending = [...deferredReturns, ...sessionPending]
 
-  // Assemble messages: session messages + attention queue + pending + inbound user messages
-  // NOTE: live world-state checkpoint and pending messages moved to system prompt
+  // Assemble messages: session messages + pending + inbound user messages
+  // NOTE: live world-state checkpoint and pending messages are rendered via buildSystem (system prompt sections)
   const extraPrefixSections = input.onPendingDrained?.(pending) ?? []
-  if (pending.length > 0) {
-    // Append pending messages section to the system prompt (sessionMessages[0])
-    const pendingSection = pending
-      .map((msg) => `- from ${msg.from}: ${msg.content}`)
-      .join("\n")
-    const pendingBlock = `\n\n## pending messages\n${pendingSection}`
-    if (sessionMessages.length > 0 && sessionMessages[0].role === "system" && typeof sessionMessages[0].content === "string") {
-      sessionMessages[0] = { ...sessionMessages[0], content: sessionMessages[0].content + pendingBlock }
-    }
-  }
   // extraPrefixSections from onPendingDrained still prepend to user message (e.g., inner dialog wakes)
   if (extraPrefixSections.length > 0 && input.messages.length > 0) {
     input.messages[0] = prependTurnSections(input.messages[0], extraPrefixSections)
@@ -532,6 +535,7 @@ export async function handleInboundTurn(input: InboundTurnInput): Promise<Inboun
     bridgeContext,
     activeWorkFrame,
     delegationDecision,
+    pendingMessages: pending.length > 0 ? pending.map((msg) => ({ from: msg.from, content: msg.content })) : undefined,
     currentSessionKey: currentSession.key,
     currentObligation,
     mustResolveBeforeHandoff,

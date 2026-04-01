@@ -1015,7 +1015,8 @@ function channelHasCodingTools(
   providerCapabilities?: ReadonlySet<import("../heart/core").ProviderCapability>,
 ): boolean {
   const tools = getToolsForChannel(getChannelCapabilities(channel), undefined, undefined, providerCapabilities)
-  return tools.some((t) => t.function.name === "edit_file")
+  const codingToolNames = new Set(["edit_file", "write_file", "shell", "coding_spawn"])
+  return tools.some((t) => codingToolNames.has(t.function.name))
 }
 
 export async function buildSystem(channel: Channel = "cli", options?: BuildSystemOptions, context?: ResolvedContext): Promise<string> {

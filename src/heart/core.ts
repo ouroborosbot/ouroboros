@@ -274,6 +274,8 @@ export interface RunAgentOptions {
   /** When true, the observe tool is available in 1:1 chats (normally group-only).
    *  Used for reaction/feedback signals where silence is natural even in DMs. */
   isReactionSignal?: boolean;
+  /** Pending messages from other sessions/inner dialog, rendered in system prompt. */
+  pendingMessages?: Array<{ from: string; content: string }>;
 }
 
 export type RunAgentOutcome =

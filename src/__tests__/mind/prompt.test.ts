@@ -4101,7 +4101,7 @@ describe("liveWorldStateSection (Unit 1.3)", () => {
     mustResolveBeforeHandoff: false,
   }
 
-  it("buildSystem with active world-state includes '## live world-state checkpoint' section", async () => {
+  it("buildSystem with active world-state includes '## live world-state' section", async () => {
     setupReadFileSync()
     vi.mocked(fs.existsSync).mockReturnValue(false)
     vi.mocked(fs.readdirSync).mockReturnValue([])
@@ -4112,7 +4112,7 @@ describe("liveWorldStateSection (Unit 1.3)", () => {
     resetPsycheCache()
 
     const result = await buildSystem("cli", { activeWorkFrame: minimalActiveWorkFrame } as any)
-    expect(result).toContain("## live world-state checkpoint")
+    expect(result).toContain("## live world-state")
   })
 
   it("world-state section contains live conversation, active lane, current artifact, next action", async () => {
@@ -4144,7 +4144,7 @@ describe("liveWorldStateSection (Unit 1.3)", () => {
 
     const result = await buildSystem("cli", { activeWorkFrame: minimalActiveWorkFrame } as any)
     const dynamicIdx = result.indexOf("# dynamic state for this turn")
-    const checkpointIdx = result.indexOf("## live world-state checkpoint")
+    const checkpointIdx = result.indexOf("## live world-state")
     const friendIdx = result.indexOf("# friend context")
 
     expect(checkpointIdx).toBeGreaterThan(dynamicIdx)
@@ -4162,7 +4162,7 @@ describe("liveWorldStateSection (Unit 1.3)", () => {
     resetPsycheCache()
 
     const result = await buildSystem("cli", { activeWorkFrame: minimalActiveWorkFrame } as any)
-    expect(result).toContain("if older transcript history disagrees, treat it as stale")
+    expect(result).toContain("If older transcript history conflicts with it, this state wins.")
   })
 
   it("world-state section returns empty when no active work frame exists", async () => {
@@ -4176,7 +4176,7 @@ describe("liveWorldStateSection (Unit 1.3)", () => {
     resetPsycheCache()
 
     const result = await buildSystem("cli")
-    expect(result).not.toContain("## live world-state checkpoint")
+    expect(result).not.toContain("## live world-state")
   })
 })
 

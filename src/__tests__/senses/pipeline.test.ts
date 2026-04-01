@@ -321,7 +321,7 @@ describe("handleInboundTurn", () => {
       expect(input.drainPending).not.toHaveBeenCalled()
     })
 
-    it("includes pending messages in runAgent context when present", async () => {
+    it("includes pending messages in runAgent options when present", async () => {
       const pendingMsgs: PendingMessage[] = [
         { from: "trust-gate", content: "someone tried to reach you", timestamp: 1000 },
         { from: "inner-dialog", content: "thought about something", timestamp: 1001 },
@@ -333,14 +333,17 @@ describe("handleInboundTurn", () => {
       await handleInboundTurn(input)
 
       expect(input.runAgent).toHaveBeenCalledTimes(1)
-      // The pipeline should have included pending in the messages
       const runAgentCall = (input.runAgent as ReturnType<typeof vi.fn>).mock.calls[0]
+      const options = runAgentCall[4] as RunAgentOptions
+      // Pending messages now flow through runAgentOptions.pendingMessages
+      expect(options.pendingMessages).toEqual([
+        { from: "trust-gate", content: "someone tried to reach you" },
+        { from: "inner-dialog", content: "thought about something" },
+      ])
+      // Messages should NOT contain pending content directly
       const messagesArg = runAgentCall[0] as ChatCompletionMessageParam[]
-      // Pending messages should be formatted and included before the user message
       const allContent = messagesArg.map(m => typeof m.content === "string" ? m.content : "").join("\n")
-      // live world-state checkpoint moved to system prompt (Unit 1.3b)
-      expect(allContent).not.toContain("## live world-state checkpoint")
-      expect(allContent).toContain("someone tried to reach you")
+      expect(allContent).not.toContain("someone tried to reach you")
     })
 
     it("does not inject live world-state checkpoint in user messages (moved to system prompt)", async () => {
@@ -354,8 +357,8 @@ describe("handleInboundTurn", () => {
       const runAgentCall = (input.runAgent as ReturnType<typeof vi.fn>).mock.calls[0]
       const messagesArg = runAgentCall[0] as ChatCompletionMessageParam[]
       const allContent = messagesArg.map((m) => typeof m.content === "string" ? m.content : "").join("\n")
-      // checkpoint no longer prepended to user messages -- now in system prompt
-      expect(allContent).not.toContain("## live world-state checkpoint")
+      // world-state no longer prepended to user messages -- now in system prompt via buildSystem
+      expect(allContent).not.toContain("## live world-state")
       expect(allContent).toContain("what are you up to?")
     })
 
@@ -380,9 +383,12 @@ describe("handleInboundTurn", () => {
       ])
 
       const runAgentCall = (input.runAgent as ReturnType<typeof vi.fn>).mock.calls[0]
-      const messagesArg = runAgentCall[0] as ChatCompletionMessageParam[]
-      const allContent = messagesArg.map(m => typeof m.content === "string" ? m.content : "").join("\n")
-      expect(allContent.indexOf("penguins surfaced")).toBeLessThan(allContent.indexOf("a local pending note"))
+      const options = runAgentCall[4] as RunAgentOptions
+      // Deferred returns should come before session pending in the pendingMessages array
+      expect(options.pendingMessages).toEqual([
+        { from: "testagent", content: "penguins surfaced" },
+        { from: "inner-dialog", content: "a local pending note" },
+      ])
     })
 
     it("does not modify messages when pending exists but input.messages is empty", async () => {
@@ -400,7 +406,7 @@ describe("handleInboundTurn", () => {
       expect(input.runAgent).toHaveBeenCalledTimes(1)
     })
 
-    it("pending messages go to system prompt, not user content (multimodal preserved)", async () => {
+    it("pending messages go to runAgentOptions, not user content (multimodal preserved)", async () => {
       const pendingMsgs: PendingMessage[] = [
         { from: "instinct", content: "someone reached out", timestamp: 1000 },
       ]
@@ -417,16 +423,17 @@ describe("handleInboundTurn", () => {
 
       const runAgentCall = (input.runAgent as ReturnType<typeof vi.fn>).mock.calls[0]
       const msgs = runAgentCall[0] as ChatCompletionMessageParam[]
-      // User message should be unchanged -- pending moved to system prompt
+      // User message should be unchanged -- pending flows through runAgentOptions
       const userMsg = msgs.find(m => m.role === "user" && Array.isArray(m.content))
       expect(userMsg).toBeTruthy()
       const parts = (userMsg as any).content as Array<{ type: string; text?: string }>
       expect(parts[0]).toEqual({ type: "text", text: "hello" })
       expect(parts[1]).toEqual({ type: "image_url", image_url: { url: "https://example.com/img.png" } })
-      // Pending messages should be in system prompt
-      const sysMsg = msgs.find(m => m.role === "system")
-      expect(typeof sysMsg?.content === "string" ? sysMsg.content : "").toContain("## pending messages")
-      expect(typeof sysMsg?.content === "string" ? sysMsg.content : "").toContain("someone reached out")
+      // Pending messages should be in runAgentOptions, not in session messages
+      const options = runAgentCall[4] as RunAgentOptions
+      expect(options.pendingMessages).toEqual([
+        { from: "instinct", content: "someone reached out" },
+      ])
     })
 
     it("does not modify first message when pending exists but first message is not user role", async () => {
