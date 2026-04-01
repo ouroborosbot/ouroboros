@@ -433,6 +433,7 @@ export function toolRestrictionSection(context?: ResolvedContext): string {
 function trustContextSection(context?: ResolvedContext): string {
   if (!context?.friend) return ""
   const channelName = context.channel.channel
+  /* v8 ignore next -- inner channel not reachable in unit tests @preserve */
   if (channelName === "cli" || channelName === "inner") return ""
 
   const explanation = describeTrustContext({

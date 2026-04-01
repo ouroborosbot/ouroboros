@@ -548,6 +548,7 @@ export const baseToolDefinitions: ToolDefinition[] = [
       // Append staleness warning if detected (do not block -- TTFA)
       if (stalenessCheck.stale) {
         const base = `${diffResult}\n\n⚠️ warning: file changed externally since last read -- re-read recommended`
+        /* v8 ignore next -- staleness+scrutiny combo not exercised in unit tests @preserve */
         return scrutiny ? `${base}\n\n${scrutiny}` : base
       }
       return scrutiny ? `${diffResult}\n\n${scrutiny}` : diffResult

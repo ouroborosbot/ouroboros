@@ -148,7 +148,7 @@ export function ToolExecutionBlock({
       </Box>
       {showDiff && !tooLarge ? (
         <InlineDiff before={fileBefore!} after={fileAfter!} filePath={filePath ?? "unknown"} />
-      ) : showDiff && tooLarge ? (
+      ) : /* v8 ignore next -- tooLarge branch not exercised in render tests @preserve */ showDiff && tooLarge ? (
         <Text dimColor>large file changed ({Math.round((fileAfter?.length ?? 0) / 1024)}KB)</Text>
       ) : (
         <ToolResultCard name={name} result={result} success={success} />

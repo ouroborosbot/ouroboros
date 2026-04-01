@@ -85,6 +85,7 @@ function computeDiff(before: string, after: string): DiffLine[] {
 
 function DiffLineComponent({ line }: { readonly line: DiffLine }): React.ReactElement {
   const num = line.type === "remove" ? line.oldNum : line.newNum
+  /* v8 ignore next -- defensive fallback; line numbers always present @preserve */
   const lineNum = num !== undefined ? String(num) : ""
 
   const prefix = line.type === "add" ? "+" : line.type === "remove" ? "-" : " "
