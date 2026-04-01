@@ -226,7 +226,14 @@ function InputArea({ onSubmit, suppressed, onCtrlC }: {
 }): React.ReactElement {
   const [input, setInput] = useState("")
   const [exitWarning, setExitWarning] = useState(false)
+  const [cursorVisible, setCursorVisible] = useState(true)
   const inputRef = useRef("")
+
+  // Blinking cursor
+  useEffect(() => {
+    const iv = setInterval(() => setCursorVisible(v => !v), 530)
+    return () => clearInterval(iv)
+  }, [])
 
   const handleCtrlC = useCallback(() => {
     const action = onCtrlC(inputRef.current.length > 0)
@@ -278,6 +285,7 @@ function InputArea({ onSubmit, suppressed, onCtrlC }: {
       <Box>
         <Text color={OURO.teal} bold>{"  > "}</Text>
         <Text color={OURO.bone}>{input}</Text>
+        {!suppressed && cursorVisible ? <Text color={OURO.scale}>{"█"}</Text> : <Text>{" "}</Text>}
       </Box>
     </Box>
   )
