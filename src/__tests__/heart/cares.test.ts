@@ -86,6 +86,21 @@ describe("care store", () => {
       expect(c1.id).not.toBe(c2.id)
     })
 
+    it("handles creation without relatedEntities", () => {
+      const care = createCare(tmpDir, {
+        label: "no entities",
+        why: "test",
+        status: "active",
+        salience: 5,
+        stewardship: "mine",
+      })
+
+      expect(care.relatedEntities).toBeUndefined()
+      const filePath = path.join(tmpDir, "state", "cares", `${care.id}.json`)
+      const stored = JSON.parse(fs.readFileSync(filePath, "utf-8")) as CareRecord
+      expect(stored.relatedEntities).toBeUndefined()
+    })
+
     it("creates the cares directory if it does not exist", () => {
       const caresDir = path.join(tmpDir, "state", "cares")
       expect(fs.existsSync(caresDir)).toBe(false)
