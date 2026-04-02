@@ -83,6 +83,14 @@ describe("agent relationship store", () => {
       expect(rel.sharedMissions).toContain("mission-1")
     })
 
+    it("adds new missionId to existing relationship", () => {
+      recordInteraction(tmpDir, "slugger", { missionId: "mission-1" })
+      const rel = recordInteraction(tmpDir, "slugger", { missionId: "mission-2" })
+      expect(rel.sharedMissions).toContain("mission-1")
+      expect(rel.sharedMissions).toContain("mission-2")
+      expect(rel.sharedMissions).toHaveLength(2)
+    })
+
     it("does not duplicate missionIds in sharedMissions", () => {
       recordInteraction(tmpDir, "slugger", {
         displayName: "Slugger",
