@@ -344,7 +344,9 @@ export function OuroTui({
           if (index === 0) {
             return (
               <Box key="header" flexDirection="column">
+                <Text>{""}</Text>
                 <Header agentName={agentName} model={model} contextPercent={contextPercent} />
+                <Text>{""}</Text>
                 <Text>{""}</Text>
               </Box>
             )
@@ -356,7 +358,8 @@ export function OuroTui({
       {/* Live area — re-renders on every state change */}
       <LiveArea live={live} elapsed={elapsedSeconds} />
 
-      {/* Input */}
+      {/* Input — with breathing room above */}
+      {!live.loading && !live.streamingText ? <Text>{""}</Text> : null}
       <InputArea onSubmit={onSubmit} suppressed={live.inputSuppressed} onCtrlC={onCtrlC} />
     </Box>
   )
