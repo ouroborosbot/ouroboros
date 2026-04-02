@@ -278,10 +278,12 @@ function LiveArea({ live, elapsed }: {
 
 // ─── Input ──────────────────────────────────────────────────────────
 
-function InputArea({ onSubmit, suppressed, onCtrlC }: {
+function InputArea({ onSubmit, suppressed, onCtrlC, agentName, model }: {
   readonly onSubmit: (text: string) => void
   readonly suppressed: boolean
   readonly onCtrlC: (hasInput: boolean) => CtrlCAction
+  readonly agentName: string
+  readonly model: string
 }): React.ReactElement {
   const [input, setInput] = useState("")
   const [exitWarning, setExitWarning] = useState(false)
@@ -336,16 +338,24 @@ function InputArea({ onSubmit, suppressed, onCtrlC }: {
 
   if (suppressed) return <Text>{""}</Text>
 
+  // Get terminal width for the separator line
+  const cols = process.stdout.columns || 80
+
   return (
     <Box flexDirection="column">
+      {/* Thin separator line above input */}
+      <Text dimColor>{"─".repeat(cols)}</Text>
       {exitWarning ? (
         <Text color={OURO.shadow}>{"(press Ctrl-C again to exit)"}</Text>
       ) : null}
+      {/* Input prompt */}
       <Box>
         <Text color={OURO.teal} bold>{") "}</Text>
         <Text color={OURO.bone}>{input}</Text>
         {!suppressed && cursorVisible ? <Text color={OURO.scale}>{"█"}</Text> : <Text>{" "}</Text>}
       </Box>
+      {/* Status bar below input */}
+      <Text dimColor>{agentName}{model ? ` · ${model}` : ""}</Text>
     </Box>
   )
 }
@@ -386,7 +396,7 @@ export function OuroTui({
 
       {/* Input — with breathing room above */}
       {!live.loading && !live.streamingText ? <Text>{""}</Text> : null}
-      <InputArea onSubmit={onSubmit} suppressed={live.inputSuppressed} onCtrlC={onCtrlC} />
+      <InputArea onSubmit={onSubmit} suppressed={live.inputSuppressed} onCtrlC={onCtrlC} agentName={agentName} model={model} />
     </Box>
   )
 }
