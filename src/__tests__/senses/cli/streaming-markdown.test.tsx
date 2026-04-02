@@ -2,7 +2,6 @@ import React from "react"
 import { describe, it, expect, afterEach } from "vitest"
 import { render, cleanup } from "ink-testing-library"
 
-// Will be implemented in src/senses/cli/streaming-markdown.tsx
 import { StreamingMarkdown } from "../../../senses/cli/streaming-markdown"
 
 afterEach(() => {
@@ -18,9 +17,7 @@ describe("StreamingMarkdown (Ink)", () => {
   it("renders bold markdown as ANSI bold", () => {
     const { lastFrame } = render(<StreamingMarkdown text="this is **bold** text" />)
     const frame = lastFrame()!
-    // Should contain the word "bold" somewhere in the output
     expect(frame).toContain("bold")
-    // Should not contain raw markdown asterisks
     expect(frame).not.toContain("**")
   })
 
@@ -28,7 +25,6 @@ describe("StreamingMarkdown (Ink)", () => {
     const { lastFrame } = render(<StreamingMarkdown text="use `npm install` here" />)
     const frame = lastFrame()!
     expect(frame).toContain("npm install")
-    // Should not contain raw backtick wrappers
     expect(frame).not.toMatch(/`npm install`/)
   })
 
@@ -44,7 +40,6 @@ describe("StreamingMarkdown (Ink)", () => {
   it("handles empty text gracefully", () => {
     const { lastFrame } = render(<StreamingMarkdown text="" />)
     const frame = lastFrame()
-    // Should render without crash -- may be empty or whitespace
     expect(frame).toBeDefined()
   })
 
@@ -63,7 +58,6 @@ describe("StreamingMarkdown (Ink)", () => {
     const longText = "a".repeat(200)
     const { lastFrame } = render(<StreamingMarkdown text={longText} maxWidth={80} />)
     const frame = lastFrame()!
-    // All characters should be present
     const stripped = frame.replace(/\n/g, "")
     expect(stripped).toContain("a".repeat(80))
   })
@@ -73,7 +67,6 @@ describe("StreamingMarkdown (Ink)", () => {
     const frame = lastFrame()!
     const lines = frame.split("\n").filter(l => l.length > 0)
     for (const line of lines) {
-      // No trailing whitespace padding
       expect(line).toBe(line.trimEnd())
     }
   })
@@ -82,7 +75,6 @@ describe("StreamingMarkdown (Ink)", () => {
     const { lastFrame } = render(<StreamingMarkdown text="this is *italic* text" />)
     const frame = lastFrame()!
     expect(frame).toContain("italic")
-    // Should not contain raw asterisks wrapping "italic"
     expect(frame).not.toMatch(/\*italic\*/)
   })
 
@@ -96,7 +88,6 @@ describe("StreamingMarkdown (Ink)", () => {
   it("wraps text when maxWidth is very small", () => {
     const { lastFrame } = render(<StreamingMarkdown text="hello world foo bar" maxWidth={5} />)
     const frame = lastFrame()!
-    // Should have wrapped text
     expect(frame).toContain("hello")
   })
 
@@ -110,7 +101,6 @@ describe("StreamingMarkdown (Ink)", () => {
     const longWord = "a".repeat(20)
     const { lastFrame } = render(<StreamingMarkdown text={longWord} maxWidth={10} />)
     const frame = lastFrame()!
-    // All characters should be present
     const stripped = frame.replace(/\n/g, "")
     expect(stripped.length).toBeGreaterThanOrEqual(20)
   })
@@ -130,12 +120,9 @@ describe("StreamingMarkdown (Ink)", () => {
   })
 
   it("wraps remaining text after long-word split", () => {
-    // A line with no spaces that's slightly longer than maxWidth
-    // Tests the remaining text after the while loop
     const text = "a".repeat(15)
     const { lastFrame } = render(<StreamingMarkdown text={text} maxWidth={10} />)
     const frame = lastFrame()!
-    // Should have all characters present
     const stripped = frame.replace(/\n/g, "")
     expect(stripped).toContain("aaaaaa")
   })
@@ -169,7 +156,6 @@ describe("StreamingMarkdown (Ink)", () => {
     const { lastFrame } = render(<StreamingMarkdown text="> This is quoted" />)
     const frame = lastFrame()!
     expect(frame).toContain("This is quoted")
-    // Should contain the vertical bar prefix
     expect(frame).toContain("\u2502")
   })
 
@@ -187,7 +173,6 @@ describe("StreamingMarkdown (Ink)", () => {
     const frame = lastFrame()!
     expect(frame).toContain("click here")
     expect(frame).toContain("https://example.com")
-    // Should not contain raw markdown link syntax
     expect(frame).not.toContain("[click here]")
   })
 
@@ -235,5 +220,113 @@ describe("StreamingMarkdown (Ink)", () => {
     const frame = lastFrame()!
     expect(frame).toContain("1. first")
     expect(frame).toContain("2. second")
+  })
+
+  // ─── Horizontal rule tests ────────────────────────────────────────
+
+  it("renders --- as a horizontal rule", () => {
+    const { lastFrame } = render(<StreamingMarkdown text={"before\n---\nafter"} />)
+    const frame = lastFrame()!
+    expect(frame).toContain("before")
+    expect(frame).toContain("after")
+    expect(frame).toContain("\u2500") // box-drawing dash
+    expect(frame).not.toContain("---")
+  })
+
+  it("renders *** as a horizontal rule", () => {
+    const { lastFrame } = render(<StreamingMarkdown text={"above\n***\nbelow"} />)
+    const frame = lastFrame()!
+    expect(frame).toContain("above")
+    expect(frame).toContain("below")
+    expect(frame).toContain("\u2500")
+  })
+
+  it("renders ___ as a horizontal rule", () => {
+    const { lastFrame } = render(<StreamingMarkdown text={"top\n___\nbottom"} />)
+    const frame = lastFrame()!
+    expect(frame).toContain("top")
+    expect(frame).toContain("bottom")
+    expect(frame).toContain("\u2500")
+  })
+
+  // ─── Diff rendering tests ─────────────────────────────────────────
+
+  it("renders diff blocks with colored lines", () => {
+    const text = [
+      "diff --git a/file.ts b/file.ts",
+      "--- a/file.ts",
+      "+++ b/file.ts",
+      "@@ -1,3 +1,3 @@",
+      " unchanged",
+      "-removed line",
+      "+added line",
+    ].join("\n")
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    expect(frame).toContain("diff --git a/file.ts b/file.ts")
+    expect(frame).toContain("removed line")
+    expect(frame).toContain("added line")
+    expect(frame).toContain("unchanged")
+  })
+
+  it("renders fenced diff code blocks as diffs", () => {
+    const text = "```diff\n-old\n+new\n```"
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    expect(frame).toContain("old")
+    expect(frame).toContain("new")
+  })
+
+  it("does not treat plain lines starting with + or - as diffs without signal", () => {
+    const text = "- bullet one\n- bullet two"
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    // Should render as paragraph (bullet list), not diff
+    expect(frame).toContain("- bullet one")
+    expect(frame).toContain("- bullet two")
+  })
+
+  // ─── Streaming edge case tests ────────────────────────────────────
+
+  it("handles partial code fence (opened but not closed) during streaming", () => {
+    const text = "before\n```js\nconst x = 1\nconst y = 2"
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    // Should not crash, and should show the code lines
+    expect(frame).toContain("const x = 1")
+    expect(frame).toContain("const y = 2")
+  })
+
+  it("handles partial bold (** opened but not closed) during streaming", () => {
+    const text = "this is **bold but not clo"
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    // Should not crash
+    expect(frame).toBeDefined()
+    expect(frame).toContain("this is")
+  })
+
+  it("handles partial inline code (backtick opened but not closed) during streaming", () => {
+    const text = "use `npm inst"
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    expect(frame).toBeDefined()
+    expect(frame).toContain("use")
+  })
+
+  // ─── Diff with @@ hunk markers ────────────────────────────────────
+
+  it("renders @@ hunk headers in diff blocks", () => {
+    const text = [
+      "diff --git a/x.ts b/x.ts",
+      "@@ -10,6 +10,8 @@",
+      " context",
+      "+added",
+    ].join("\n")
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    expect(frame).toContain("@@ -10,6 +10,8 @@")
+    expect(frame).toContain("context")
+    expect(frame).toContain("added")
   })
 })

@@ -5,12 +5,17 @@ import { Text, Box } from "ink"
  * Render markdown-formatted text as Ink components with ANSI styling.
  *
  * Supports: # headings, **bold**, *italic*, `inline code`, ```fenced code blocks```,
- * > blockquotes, [links](url), ~~strikethrough~~, bullet/numbered lists.
+ * > blockquotes, [links](url), ~~strikethrough~~, bullet/numbered lists,
+ * horizontal rules (--- / ***), and unified diff coloring.
  *
  * Designed for streaming: accepts partial text and re-renders as text prop grows.
+ * Incomplete code fences are rendered as dim text without crashing.
  *
  * Copy-paste integrity: no padding characters are injected. Visual hierarchy
  * comes from color/bold/dim styling only.
+ *
+ * Uses standard ANSI colors (cyan, green, red, dim, bold, italic, underline)
+ * that work on both light and dark terminal themes.
  */
 
 interface StreamingMarkdownProps {
@@ -35,18 +40,39 @@ interface Segment {
 // ─── Line-Level Block Types ────────────────────────────────────────
 
 interface Block {
-  type: "paragraph" | "heading" | "codeblock" | "blockquote" | "blank"
+  type: "paragraph" | "heading" | "codeblock" | "blockquote" | "blank" | "hr" | "diff"
   level?: number        // heading level (1-6)
   language?: string     // code block language
   lines: string[]       // raw text lines for this block
 }
 
-// Ouroboros brand: green-family palette
-const OURO_CODE_COLOR = "#4ec9b0"    // teal-green for inline code
-const OURO_LINK_COLOR = "#4ec9b0"    // teal for links
-const OURO_CODEBLOCK_DIM = true       // dim for code blocks (subtle, readable)
-
 // ─── Block Parser ──────────────────────────────────────────────────
+
+const HR_PATTERN = /^(\s*[-*_]){3,}\s*$/
+
+/** Detect if a line is a diff header or hunk marker. */
+function isDiffLine(line: string): boolean {
+  return (
+    line.startsWith("diff --git") ||
+    line.startsWith("index ") ||
+    line.startsWith("--- ") ||
+    line.startsWith("+++ ") ||
+    line.startsWith("@@") ||
+    line.startsWith("+") ||
+    line.startsWith("-")
+  )
+}
+
+/** Check if a block of consecutive lines looks like a unified diff. */
+function looksLikeDiff(lines: string[]): boolean {
+  // Need at least one strong diff signal (not just lines starting with +/-)
+  return lines.some(l =>
+    l.startsWith("diff --git") ||
+    l.startsWith("@@") ||
+    l.startsWith("--- a/") ||
+    l.startsWith("+++ b/"),
+  )
+}
 
 function parseBlocks(input: string): Block[] {
   const rawLines = input.split("\n")
@@ -56,19 +82,41 @@ function parseBlocks(input: string): Block[] {
   while (i < rawLines.length) {
     const line = rawLines[i]
 
-    // Fenced code block
+    // Fenced code block (``` with optional language)
     if (line.trimStart().startsWith("```")) {
       const langMatch = line.match(/^```(\w*)/)
       const language = langMatch?.[1] ?? ""
+
+      // Special case: ```diff → render as diff block
+      if (language === "diff") {
+        const codeLines: string[] = []
+        i++
+        while (i < rawLines.length && !rawLines[i].trimStart().startsWith("```")) {
+          codeLines.push(rawLines[i])
+          i++
+        }
+        // Skip closing fence if present
+        if (i < rawLines.length) i++
+        blocks.push({ type: "diff", lines: codeLines })
+        continue
+      }
+
       const codeLines: string[] = []
       i++
       while (i < rawLines.length && !rawLines[i].trimStart().startsWith("```")) {
         codeLines.push(rawLines[i])
         i++
       }
-      // Skip closing fence if present
+      // Skip closing fence if present (if not, it's a streaming partial)
       if (i < rawLines.length) i++
       blocks.push({ type: "codeblock", language, lines: codeLines })
+      continue
+    }
+
+    // Horizontal rule (---, ***, ___)
+    if (HR_PATTERN.test(line)) {
+      blocks.push({ type: "hr", lines: [line] })
+      i++
       continue
     }
 
@@ -91,6 +139,22 @@ function parseBlocks(input: string): Block[] {
       continue
     }
 
+    // Diff block detection: consecutive diff-like lines with a strong signal
+    if (isDiffLine(line)) {
+      const diffLines: string[] = []
+      const startI = i
+      while (i < rawLines.length && isDiffLine(rawLines[i])) {
+        diffLines.push(rawLines[i])
+        i++
+      }
+      if (looksLikeDiff(diffLines)) {
+        blocks.push({ type: "diff", lines: diffLines })
+        continue
+      }
+      // Not actually a diff — backtrack and treat as paragraph
+      i = startI
+    }
+
     // Blank line
     if (line.trim() === "") {
       blocks.push({ type: "blank", lines: [""] })
@@ -105,7 +169,8 @@ function parseBlocks(input: string): Block[] {
       rawLines[i].trim() !== "" &&
       !rawLines[i].trimStart().startsWith("```") &&
       !rawLines[i].match(/^#{1,6}\s/) &&
-      !rawLines[i].match(/^>\s?/)
+      !rawLines[i].match(/^>\s?/) &&
+      !HR_PATTERN.test(rawLines[i])
     ) {
       paraLines.push(rawLines[i])
       i++
@@ -222,13 +287,13 @@ function wrapText(text: string, maxWidth: number): string {
 
 function SegmentRenderer({ segment }: { readonly segment: Segment }): React.ReactElement {
   if (segment.codeBlock) {
-    return <Text dimColor={OURO_CODEBLOCK_DIM}>{segment.text}</Text>
+    return <Text dimColor>{segment.text}</Text>
   }
   if (segment.code) {
-    return <Text color={OURO_CODE_COLOR}>{segment.text}</Text>
+    return <Text color="cyan">{segment.text}</Text>
   }
   if (segment.link) {
-    return <Text><Text color={OURO_LINK_COLOR}>{segment.link.text}</Text><Text dimColor>{` (${segment.link.url})`}</Text></Text>
+    return <Text><Text color="cyan">{segment.link.text}</Text><Text dimColor>{` (${segment.link.url})`}</Text></Text>
   }
   if (segment.strikethrough) {
     return <Text dimColor strikethrough>{segment.text}</Text>
@@ -255,6 +320,29 @@ function InlineLine({ text: lineText }: { readonly text: string }): React.ReactE
   )
 }
 
+// ─── Diff Line Renderer ───────────────────────────────────────────
+
+function DiffLine({ line }: { readonly line: string }): React.ReactElement {
+  if (line.startsWith("@@")) {
+    return <Text color="cyan">{line}</Text>
+  }
+  if (
+    line.startsWith("diff --git") ||
+    line.startsWith("index ") ||
+    line.startsWith("--- ") ||
+    line.startsWith("+++ ")
+  ) {
+    return <Text bold>{line}</Text>
+  }
+  if (line.startsWith("+")) {
+    return <Text color="green">{line}</Text>
+  }
+  if (line.startsWith("-")) {
+    return <Text color="red">{line}</Text>
+  }
+  return <Text>{line}</Text>
+}
+
 // ─── Block Renderer ────────────────────────────────────────────────
 
 function BlockRenderer({ block }: { readonly block: Block }): React.ReactElement {
@@ -262,11 +350,13 @@ function BlockRenderer({ block }: { readonly block: Block }): React.ReactElement
     case "blank":
       return <Text>{""}</Text>
 
+    case "hr":
+      return <Text dimColor>{"────────────────────────────────────────"}</Text>
+
     case "heading": {
       const text = block.lines.join(" ")
-      // H1 = bold + bright, H2-H3 = bold, H4+ = bold dimmer
       if ((block.level ?? 1) === 1) {
-        return <Text bold color="#eef2ea">{text}</Text>
+        return <Text bold underline>{text}</Text>
       }
       return <Text bold>{text}</Text>
     }
@@ -280,13 +370,22 @@ function BlockRenderer({ block }: { readonly block: Block }): React.ReactElement
         </Box>
       )
 
+    case "diff":
+      return (
+        <Box flexDirection="column">
+          {block.lines.map((line, i) => (
+            <DiffLine key={i} line={line} />
+          ))}
+        </Box>
+      )
+
     case "blockquote":
       return (
         <Box flexDirection="column">
           {block.lines.map((line, i) => (
             <Text key={i}>
-              <Text dimColor>{"│ "}</Text>
-              <InlineLine text={line} />
+              <Text dimColor>{"\u2502 "}</Text>
+              <Text italic><InlineLine text={line} /></Text>
             </Text>
           ))}
         </Box>
