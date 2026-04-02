@@ -299,7 +299,7 @@ function InputArea({
 
   return (
     <Box>
-      <Text color={OURO_TEAL} bold>{"> "}</Text>
+      <Text color={OURO_TEAL} bold>{") "}</Text>
       <Text>{input}</Text>
     </Box>
   )

@@ -64,7 +64,7 @@ interface InkAppProps {
 function UserMessage({ content }: { readonly content: string }): React.ReactElement {
   return (
     <Box>
-      <Text color={OURO_TEAL} bold>{"> "}</Text>
+      <Text color={OURO_TEAL} bold>{") "}</Text>
       <Text>{content}</Text>
     </Box>
   )
@@ -152,7 +152,7 @@ function InputArea({
 
   return (
     <Box>
-      <Text color={OURO_TEAL} bold>{"> "}</Text>
+      <Text color={OURO_TEAL} bold>{") "}</Text>
       <Text>{input}</Text>
     </Box>
   )

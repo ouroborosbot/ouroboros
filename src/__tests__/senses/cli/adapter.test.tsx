@@ -280,7 +280,7 @@ describe("InkCliApp", () => {
   it("shows prompt indicator when idle", () => {
     const onSubmit = vi.fn()
     const { lastFrame } = render(<InkCliApp store={store} onSubmit={onSubmit} />)
-    expect(lastFrame()).toContain(">")
+    expect(lastFrame()).toContain(")")
   })
 
   it("renders streaming text", () => {
@@ -340,9 +340,9 @@ describe("InkCliApp", () => {
     store.suppressInput()
     const { lastFrame } = render(<InkCliApp store={store} onSubmit={onSubmit} />)
     const frame = lastFrame()!
-    // The prompt ">" should not appear when suppressed
+    // The prompt ")" should not appear when suppressed
     // Input area renders empty text when suppressed
-    expect(frame).not.toContain(">")
+    expect(frame).not.toContain(")")
   })
 
   it("produces no padding characters in output", () => {

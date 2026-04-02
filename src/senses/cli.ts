@@ -58,7 +58,7 @@ export function getCliContinuityIngressTexts(input: string): string[] {
 // readline.Interface exposes undocumented mutable line/cursor for in-progress input
 type ReadlineInternals = readline.Interface & { line: string; cursor: number }
 
-const CLI_PROMPT = "\x1b[36m> \x1b[0m"
+const CLI_PROMPT = "\x1b[36m) \x1b[0m"
 
 export function writeCliAsyncAssistantMessage(
   rl: readline.Interface,

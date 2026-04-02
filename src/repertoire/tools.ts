@@ -393,6 +393,14 @@ export function buildToolResultSummary(
       const exitCode = success ? 0 : 1
       return `$ ${cmd} (exit ${exitCode})`
     }
+    case "read_file":
+      return `path=${args.path ?? "unknown"}`
+    case "write_file":
+      return `path=${args.path ?? "unknown"}`
+    case "glob":
+      return `pattern=${args.pattern ?? "?"} ${args.cwd ? `cwd=${args.cwd}` : ""}`.trim()
+    case "grep":
+      return `pattern=${args.pattern ?? "?"} ${args.path ? `path=${args.path}` : ""}`.trim()
     case "coding_spawn": {
       const taskRef = args.taskRef ?? "unknown"
       const status = success ? "spawned" : "failed"

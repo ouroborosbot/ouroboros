@@ -58,4 +58,43 @@ describe("Unit 2.6 - tool result formatting for remote channels", () => {
     const summary = buildToolResultSummary("recall", { query: "something" }, "some result", true)
     expect(summary).toContain("query=something")
   })
+
+  it("read_file result shows path", () => {
+    const summary = buildToolResultSummary("read_file", { path: "/src/index.ts" }, "contents...", true)
+    expect(summary).toContain("path=/src/index.ts")
+  })
+
+  it("read_file handles missing path gracefully", () => {
+    const summary = buildToolResultSummary("read_file", {}, "contents...", true)
+    expect(summary).toContain("path=unknown")
+  })
+
+  it("write_file result shows path", () => {
+    const summary = buildToolResultSummary("write_file", { path: "/src/out.ts" }, "ok", true)
+    expect(summary).toContain("path=/src/out.ts")
+  })
+
+  it("glob result shows pattern and cwd", () => {
+    const summary = buildToolResultSummary("glob", { pattern: "src/**/*.ts", cwd: "/repo" }, "found files", true)
+    expect(summary).toContain("pattern=src/**/*.ts")
+    expect(summary).toContain("cwd=/repo")
+  })
+
+  it("glob result shows pattern without cwd when absent", () => {
+    const summary = buildToolResultSummary("glob", { pattern: "*.json" }, "found files", true)
+    expect(summary).toContain("pattern=*.json")
+    expect(summary).not.toContain("cwd=")
+  })
+
+  it("grep result shows pattern and path", () => {
+    const summary = buildToolResultSummary("grep", { pattern: "TODO", path: "/src" }, "matches", true)
+    expect(summary).toContain("pattern=TODO")
+    expect(summary).toContain("path=/src")
+  })
+
+  it("grep result shows pattern without path when absent", () => {
+    const summary = buildToolResultSummary("grep", { pattern: "FIXME" }, "matches", true)
+    expect(summary).toContain("pattern=FIXME")
+    expect(summary).not.toContain("path=")
+  })
 })

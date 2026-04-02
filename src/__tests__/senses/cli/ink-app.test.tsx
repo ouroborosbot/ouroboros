@@ -18,7 +18,7 @@ describe("InkApp (CLI TUI Shell)", () => {
     const { lastFrame } = render(<InkApp messages={[]} />)
     const frame = lastFrame()!
     // Should contain the ouroboros prompt indicator
-    expect(frame).toContain(">")
+    expect(frame).toContain(")")
   })
 
   it("renders assistant messages as markdown", () => {
@@ -61,7 +61,7 @@ describe("InkApp (CLI TUI Shell)", () => {
     // InkApp renders with onSubmit; stdin interaction tested via integration tests
     const { lastFrame } = render(<InkApp messages={[]} onSubmit={onSubmit} />)
     expect(lastFrame()).toBeDefined()
-    expect(lastFrame()).toContain(">")
+    expect(lastFrame()).toContain(")")
   })
 
   it("shows spinner text when loading is true", () => {
@@ -177,7 +177,7 @@ describe("InkApp (CLI TUI Shell)", () => {
     // Verifies InputArea component mounts (stdin interaction tested via integration)
     const onSubmit = vi.fn()
     const { lastFrame } = render(<InkApp messages={[]} onSubmit={onSubmit} />)
-    expect(lastFrame()).toContain(">")
+    expect(lastFrame()).toContain(")")
   })
 
   it("renders with no onSubmit prop (optional)", () => {

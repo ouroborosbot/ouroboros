@@ -1348,7 +1348,7 @@ describe("runCliSession", () => {
     expect(writes).toEqual([
       "\r\x1b[K",
       "codex coding-001 completed: hi\n",
-      "\x1b[36m> \x1b[0m",
+      "\x1b[36m) \x1b[0m",
       "continue typing",
     ])
     expect(mocks.cursorTo).toHaveBeenCalledWith(process.stdout, 6)
@@ -1369,7 +1369,7 @@ describe("runCliSession", () => {
     expect(writes).toEqual([
       "\r\x1b[K",
       "codex coding-001 completed: hi\n",
-      "\x1b[36m> \x1b[0m",
+      "\x1b[36m) \x1b[0m",
       "continue typing",
     ])
     expect(mocks.cursorTo).not.toHaveBeenCalled()
@@ -1390,7 +1390,7 @@ describe("runCliSession", () => {
     expect(writes).toEqual([
       "\r\x1b[K",
       "codex coding-001 completed: hi\n",
-      "\x1b[36m> \x1b[0m",
+      "\x1b[36m) \x1b[0m",
     ])
     expect(mocks.cursorTo).not.toHaveBeenCalled()
   })

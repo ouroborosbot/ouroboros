@@ -118,9 +118,8 @@ function Header({ agentName, model, contextPercent }: {
 
 // ─── Message Rendering ──────────────────────────────────────────────
 
-function truncateArgs(s: string, max: number): string {
-  return s.length > max ? s.slice(0, max - 1) + "…" : s
-}
+// Flow control tools are invisible to the user — they are internal agent mechanics
+const FLOW_CONTROL_TOOLS = new Set(["settle", "ponder", "observe", "rest"])
 
 function ToolResultLine({ tc }: { readonly tc: { name: string; argSummary: string; success?: boolean } }): React.ReactElement {
   const icon = tc.success !== false ? "✓" : "✗"
@@ -130,16 +129,19 @@ function ToolResultLine({ tc }: { readonly tc: { name: string; argSummary: strin
     <Text>
       <Text color={iconColor}>{icon}</Text>{" "}
       <Text color={OURO.teal}>{tc.name}</Text>{" "}
-      <Text color={argColor}>{truncateArgs(tc.argSummary, 60)}</Text>
+      <Text color={argColor}>{tc.argSummary}</Text>
     </Text>
   )
 }
 
 function MessageBlock({ msg }: { readonly msg: CompletedMessage }): React.ReactElement {
   if (msg.role === "tool") {
+    // Filter out flow control tools — they are invisible agent mechanics
+    const visibleCalls = msg.toolCalls?.filter(tc => !FLOW_CONTROL_TOOLS.has(tc.name))
+    if (!visibleCalls || visibleCalls.length === 0) return <Text>{""}</Text>
     return (
       <Box flexDirection="column">
-        {msg.toolCalls?.map((tc, i) => <ToolResultLine key={i} tc={tc} />)}
+        {visibleCalls.map((tc, i) => <ToolResultLine key={i} tc={tc} />)}
       </Box>
     )
   }
@@ -207,15 +209,39 @@ function Spinner({ phrasePool, elapsed }: {
   )
 }
 
+function formatActiveToolArgs(name: string, args: Record<string, string>): string {
+  switch (name) {
+    case "shell":
+      return `$ ${args.command ?? "?"}`
+    case "read_file":
+      return `path=${args.path ?? "?"}`
+    case "write_file":
+      return `path=${args.path ?? "?"}`
+    case "edit_file":
+      return args.path ?? "?"
+    case "glob":
+      return `pattern=${args.pattern ?? "?"}`
+    case "grep":
+      return `pattern=${args.pattern ?? "?"} ${args.path ? `path=${args.path}` : ""}`.trim()
+    default: {
+      // Show first 2 key=value pairs
+      const entries = Object.entries(args).slice(0, 2)
+      return entries.map(([k, v]) => `${k}=${String(v).slice(0, 50)}`).join(" ")
+    }
+  }
+}
+
 function ActiveToolLine({ tool }: {
   readonly tool: { name: string; args: Record<string, string> }
 }): React.ReactElement {
-  const argStr = Object.values(tool.args)[0] ?? ""
+  // Hide flow control tools from in-progress display
+  if (FLOW_CONTROL_TOOLS.has(tool.name)) return <Text>{""}</Text>
+  const argStr = formatActiveToolArgs(tool.name, tool.args)
   return (
     <Text>
-      <Text color={OURO.shadow}>∙</Text>{" "}
+      <Text color={OURO.shadow}>{"∙"}</Text>{" "}
       <Text color={OURO.teal}>{tool.name}</Text>{" "}
-      <Text color={OURO.shadow}>{truncateArgs(argStr, 60)}</Text>
+      <Text color={OURO.shadow}>{argStr}</Text>
     </Text>
   )
 }
@@ -316,7 +342,7 @@ function InputArea({ onSubmit, suppressed, onCtrlC }: {
         <Text color={OURO.shadow}>{"(press Ctrl-C again to exit)"}</Text>
       ) : null}
       <Box>
-        <Text color={OURO.teal} bold>{"> "}</Text>
+        <Text color={OURO.teal} bold>{") "}</Text>
         <Text color={OURO.bone}>{input}</Text>
         {!suppressed && cursorVisible ? <Text color={OURO.scale}>{"█"}</Text> : <Text>{" "}</Text>}
       </Box>

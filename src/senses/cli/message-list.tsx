@@ -31,7 +31,7 @@ function MessageItem({ message }: { readonly message: DisplayMessage }): React.R
   if (message.role === "user" && message.content) {
     return (
       <Box>
-        <Text color={OURO_TEAL} bold>{"> "}</Text>
+        <Text color={OURO_TEAL} bold>{") "}</Text>
         <Text>{message.content}</Text>
       </Box>
     )

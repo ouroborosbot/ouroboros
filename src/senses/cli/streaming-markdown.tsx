@@ -4,7 +4,9 @@ import { Text, Box } from "ink"
 /**
  * Render markdown-formatted text as Ink components with ANSI styling.
  *
- * Supports: **bold**, *italic*, `inline code`, and ```fenced code blocks```.
+ * Supports: # headings, **bold**, *italic*, `inline code`, ```fenced code blocks```,
+ * > blockquotes, [links](url), ~~strikethrough~~, bullet/numbered lists.
+ *
  * Designed for streaming: accepts partial text and re-renders as text prop grows.
  *
  * Copy-paste integrity: no padding characters are injected. Visual hierarchy
@@ -18,54 +20,146 @@ interface StreamingMarkdownProps {
   readonly maxWidth?: number
 }
 
+// ─── Inline Segment Types ──────────────────────────────────────────
+
 interface Segment {
   text: string
   bold?: boolean
   italic?: boolean
   code?: boolean
   codeBlock?: boolean
+  strikethrough?: boolean
+  link?: { text: string; url: string }
 }
 
+// ─── Line-Level Block Types ────────────────────────────────────────
+
+interface Block {
+  type: "paragraph" | "heading" | "codeblock" | "blockquote" | "blank"
+  level?: number        // heading level (1-6)
+  language?: string     // code block language
+  lines: string[]       // raw text lines for this block
+}
+
+// Ouroboros brand: green-family palette
+const OURO_CODE_COLOR = "#4ec9b0"    // teal-green for inline code
+const OURO_LINK_COLOR = "#4ec9b0"    // teal for links
+const OURO_CODEBLOCK_DIM = true       // dim for code blocks (subtle, readable)
+
+// ─── Block Parser ──────────────────────────────────────────────────
+
+function parseBlocks(input: string): Block[] {
+  const rawLines = input.split("\n")
+  const blocks: Block[] = []
+  let i = 0
+
+  while (i < rawLines.length) {
+    const line = rawLines[i]
+
+    // Fenced code block
+    if (line.trimStart().startsWith("```")) {
+      const langMatch = line.match(/^```(\w*)/)
+      const language = langMatch?.[1] ?? ""
+      const codeLines: string[] = []
+      i++
+      while (i < rawLines.length && !rawLines[i].trimStart().startsWith("```")) {
+        codeLines.push(rawLines[i])
+        i++
+      }
+      // Skip closing fence if present
+      if (i < rawLines.length) i++
+      blocks.push({ type: "codeblock", language, lines: codeLines })
+      continue
+    }
+
+    // Heading (# through ######)
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/)
+    if (headingMatch) {
+      blocks.push({ type: "heading", level: headingMatch[1].length, lines: [headingMatch[2]] })
+      i++
+      continue
+    }
+
+    // Blockquote (> text)
+    if (line.match(/^>\s?/)) {
+      const quoteLines: string[] = []
+      while (i < rawLines.length && rawLines[i].match(/^>\s?/)) {
+        quoteLines.push(rawLines[i].replace(/^>\s?/, ""))
+        i++
+      }
+      blocks.push({ type: "blockquote", lines: quoteLines })
+      continue
+    }
+
+    // Blank line
+    if (line.trim() === "") {
+      blocks.push({ type: "blank", lines: [""] })
+      i++
+      continue
+    }
+
+    // Regular paragraph (collect consecutive non-special lines)
+    const paraLines: string[] = []
+    while (
+      i < rawLines.length &&
+      rawLines[i].trim() !== "" &&
+      !rawLines[i].trimStart().startsWith("```") &&
+      !rawLines[i].match(/^#{1,6}\s/) &&
+      !rawLines[i].match(/^>\s?/)
+    ) {
+      paraLines.push(rawLines[i])
+      i++
+    }
+    if (paraLines.length > 0) {
+      blocks.push({ type: "paragraph", lines: paraLines })
+    }
+  }
+
+  return blocks
+}
+
+// ─── Inline Parser ─────────────────────────────────────────────────
+
 /**
- * Parse markdown text into styled segments.
- * Handles: fenced code blocks, inline code, bold, italic.
+ * Parse inline markdown (bold, italic, code, links, strikethrough)
+ * from a single line of text.
  */
-function parseMarkdown(input: string): Segment[] {
+function parseInline(text: string): Segment[] {
   const segments: Segment[] = []
   const placeholders: { idx: number; segment: Segment }[] = []
 
-  // Step 1: extract fenced code blocks
-  let text = input.replace(/```(?:\w*\n)?([\s\S]*?)```/g, (_m, code: string) => {
-    const idx = placeholders.length
-    placeholders.push({ idx, segment: { text: code.replace(/\n$/, ""), codeBlock: true } })
-    return `\x00BLOCK${idx}\x00`
-  })
-
-  // Step 2: extract inline code
-  text = text.replace(/`([^`\n]+)`/g, (_m, code: string) => {
+  // Step 1: extract inline code
+  let processed = text.replace(/`([^`\n]+)`/g, (_m, code: string) => {
     const idx = placeholders.length
     placeholders.push({ idx, segment: { text: code, code: true } })
-    return `\x00CODE${idx}\x00`
+    return `\x00PH${idx}\x00`
   })
 
-  // Step 3: parse bold and italic from remaining text
-  // Split on placeholder boundaries to preserve them
-  const parts = text.split(/(\x00(?:BLOCK|CODE)\d+\x00)/)
+  // Step 2: extract links [text](url)
+  processed = processed.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, linkText: string, url: string) => {
+    const idx = placeholders.length
+    placeholders.push({ idx, segment: { text: linkText, link: { text: linkText, url } } })
+    return `\x00PH${idx}\x00`
+  })
+
+  // Step 3: extract strikethrough ~~text~~
+  processed = processed.replace(/~~(.+?)~~/g, (_m, content: string) => {
+    const idx = placeholders.length
+    placeholders.push({ idx, segment: { text: content, strikethrough: true } })
+    return `\x00PH${idx}\x00`
+  })
+
+  // Step 4: parse bold and italic from remaining text
+  const parts = processed.split(/(\x00PH\d+\x00)/)
 
   for (const part of parts) {
-    // Check if this is a placeholder
-    const blockMatch = part.match(/^\x00BLOCK(\d+)\x00$/)
-    if (blockMatch) {
-      segments.push(placeholders[parseInt(blockMatch[1])].segment)
-      continue
-    }
-    const codeMatch = part.match(/^\x00CODE(\d+)\x00$/)
-    if (codeMatch) {
-      segments.push(placeholders[parseInt(codeMatch[1])].segment)
+    const phMatch = part.match(/^\x00PH(\d+)\x00$/)
+    if (phMatch) {
+      segments.push(placeholders[parseInt(phMatch[1])].segment)
       continue
     }
 
-    // Parse bold and italic in this text fragment
+    // Parse **bold** and *italic* / _italic_
     parseInlineStyles(part, segments)
   }
 
@@ -73,34 +167,33 @@ function parseMarkdown(input: string): Segment[] {
 }
 
 function parseInlineStyles(text: string, segments: Segment[]): void {
-  // Match **bold** and *italic* patterns
-  const pattern = /(\*\*(.+?)\*\*)|(\*(.+?)\*)/g
+  // Match **bold**, *italic*, and _italic_ patterns
+  const pattern = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(_(.+?)_)/g
   let lastIndex = 0
   let match: RegExpExecArray | null
 
   while ((match = pattern.exec(text)) !== null) {
-    // Add text before the match
     if (match.index > lastIndex) {
       segments.push({ text: text.slice(lastIndex, match.index) })
     }
 
-    /* v8 ignore next -- bold branch not exercised in rendering tests @preserve */
     if (match[2]) {
-      // Bold
       segments.push({ text: match[2], bold: true })
     } else if (match[4]) {
-      // Italic
       segments.push({ text: match[4], italic: true })
+    } else if (match[6]) {
+      segments.push({ text: match[6], italic: true })
     }
 
     lastIndex = match.index + match[0].length
   }
 
-  // Add remaining text
   if (lastIndex < text.length) {
     segments.push({ text: text.slice(lastIndex) })
   }
 }
+
+// ─── Word Wrap ─────────────────────────────────────────────────────
 
 function wrapText(text: string, maxWidth: number): string {
   /* v8 ignore next -- defensive guard for non-positive width @preserve */
@@ -113,7 +206,6 @@ function wrapText(text: string, maxWidth: number): string {
     } else {
       let remaining = line
       while (remaining.length > maxWidth) {
-        // Try to break at a space
         let breakAt = remaining.lastIndexOf(" ", maxWidth)
         if (breakAt <= 0) breakAt = maxWidth
         result.push(remaining.slice(0, breakAt))
@@ -126,9 +218,7 @@ function wrapText(text: string, maxWidth: number): string {
   return result.join("\n")
 }
 
-// Ouroboros brand: green-family palette
-const OURO_CODE_COLOR = "#4ec9b0"    // teal-green for inline code
-const OURO_CODEBLOCK_DIM = true       // dim for code blocks (subtle, readable)
+// ─── Segment Renderer ──────────────────────────────────────────────
 
 function SegmentRenderer({ segment }: { readonly segment: Segment }): React.ReactElement {
   if (segment.codeBlock) {
@@ -136,6 +226,12 @@ function SegmentRenderer({ segment }: { readonly segment: Segment }): React.Reac
   }
   if (segment.code) {
     return <Text color={OURO_CODE_COLOR}>{segment.text}</Text>
+  }
+  if (segment.link) {
+    return <Text><Text color={OURO_LINK_COLOR}>{segment.link.text}</Text><Text dimColor>{` (${segment.link.url})`}</Text></Text>
+  }
+  if (segment.strikethrough) {
+    return <Text dimColor strikethrough>{segment.text}</Text>
   }
   if (segment.bold) {
     return <Text bold>{segment.text}</Text>
@@ -146,21 +242,82 @@ function SegmentRenderer({ segment }: { readonly segment: Segment }): React.Reac
   return <Text>{segment.text}</Text>
 }
 
+// ─── Inline Line Renderer ──────────────────────────────────────────
+
+function InlineLine({ text: lineText }: { readonly text: string }): React.ReactElement {
+  const segs = parseInline(lineText)
+  return (
+    <Text>
+      {segs.map((seg, i) => (
+        <SegmentRenderer key={i} segment={seg} />
+      ))}
+    </Text>
+  )
+}
+
+// ─── Block Renderer ────────────────────────────────────────────────
+
+function BlockRenderer({ block }: { readonly block: Block }): React.ReactElement {
+  switch (block.type) {
+    case "blank":
+      return <Text>{""}</Text>
+
+    case "heading": {
+      const text = block.lines.join(" ")
+      // H1 = bold + bright, H2-H3 = bold, H4+ = bold dimmer
+      if ((block.level ?? 1) === 1) {
+        return <Text bold color="#eef2ea">{text}</Text>
+      }
+      return <Text bold>{text}</Text>
+    }
+
+    case "codeblock":
+      return (
+        <Box flexDirection="column">
+          {block.lines.map((line, i) => (
+            <Text key={i} dimColor>{line}</Text>
+          ))}
+        </Box>
+      )
+
+    case "blockquote":
+      return (
+        <Box flexDirection="column">
+          {block.lines.map((line, i) => (
+            <Text key={i}>
+              <Text dimColor>{"│ "}</Text>
+              <InlineLine text={line} />
+            </Text>
+          ))}
+        </Box>
+      )
+
+    case "paragraph":
+      return (
+        <Box flexDirection="column">
+          {block.lines.map((line, i) => (
+            <InlineLine key={i} text={line} />
+          ))}
+        </Box>
+      )
+  }
+}
+
+// ─── Main Component ────────────────────────────────────────────────
+
 export function StreamingMarkdown({ text, maxWidth }: StreamingMarkdownProps): React.ReactElement {
   const processed = maxWidth ? wrapText(text, maxWidth) : text
-  const segments = parseMarkdown(processed)
+  const blocks = parseBlocks(processed)
 
-  if (segments.length === 0) {
+  if (blocks.length === 0) {
     return <Text>{""}</Text>
   }
 
   return (
     <Box flexDirection="column">
-      <Text>
-        {segments.map((seg, i) => (
-          <SegmentRenderer key={i} segment={seg} />
-        ))}
-      </Text>
+      {blocks.map((block, i) => (
+        <BlockRenderer key={i} block={block} />
+      ))}
     </Box>
   )
 }
