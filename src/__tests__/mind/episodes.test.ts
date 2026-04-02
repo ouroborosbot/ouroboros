@@ -144,7 +144,6 @@ describe("episode store", () => {
         relatedEntities: [],
         salience: "low",
       })
-      // Small delay to ensure different timestamps
       const ep2 = emitEpisode(tmpDir, {
         kind: "coding_milestone",
         summary: "second",
@@ -152,6 +151,12 @@ describe("episode store", () => {
         relatedEntities: [],
         salience: "low",
       })
+
+      // Ensure distinct timestamps by backdating ep1
+      const ep1Path = path.join(tmpDir, "state", "episodes", `${ep1.id}.json`)
+      const ep1Data = JSON.parse(fs.readFileSync(ep1Path, "utf-8")) as EpisodeRecord
+      ep1Data.timestamp = "2020-01-01T00:00:00.000Z"
+      fs.writeFileSync(ep1Path, JSON.stringify(ep1Data, null, 2), "utf-8")
 
       const episodes = readRecentEpisodes(tmpDir)
       expect(episodes).toHaveLength(2)
