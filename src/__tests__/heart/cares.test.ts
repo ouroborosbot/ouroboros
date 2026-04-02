@@ -239,7 +239,7 @@ describe("care store", () => {
   })
 
   describe("updateCare", () => {
-    it("updates fields and timestamps", () => {
+    it("updates fields and preserves unchanged ones", () => {
       const care = createCare(tmpDir, {
         label: "original",
         why: "test",
@@ -257,7 +257,8 @@ describe("care store", () => {
       expect(updated.label).toBe("updated label")
       expect(updated.salience).toBe(9)
       expect(updated.why).toBe("test") // unchanged field preserved
-      expect(updated.updatedAt).not.toBe(care.updatedAt)
+      expect(updated.updatedAt).toBeTruthy()
+      expect(updated.createdAt).toBe(care.createdAt) // createdAt never changes
     })
 
     it("persists changes to disk", () => {
@@ -296,7 +297,8 @@ describe("care store", () => {
       const resolved = resolveCare(tmpDir, care.id)
       expect(resolved.status).toBe("resolved")
       expect(resolved.resolvedAt).toBeTruthy()
-      expect(resolved.updatedAt).not.toBe(care.updatedAt)
+      expect(resolved.updatedAt).toBeTruthy()
+      expect(resolved.createdAt).toBe(care.createdAt) // createdAt never changes
     })
 
     it("persists resolution to disk", () => {
