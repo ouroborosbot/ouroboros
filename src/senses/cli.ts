@@ -867,7 +867,21 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
   } finally {
     rl?.close()
     if (inkRef) {
+      // Suppress React "state update on unmounted component" warnings during cleanup.
+      // Ink's useInput hook fires after unmount — this is harmless but noisy.
+      const origWarn = console.warn
+      const origError = console.error
+      console.warn = (...args: unknown[]) => {
+        if (typeof args[0] === "string" && args[0].includes("Can't perform a React state update")) return
+        origWarn.apply(console, args)
+      }
+      console.error = (...args: unknown[]) => {
+        if (typeof args[0] === "string" && args[0].includes("Can't perform a React state update")) return
+        origError.apply(console, args)
+      }
       inkRef.unmount()
+      // Restore after a tick (React warnings fire asynchronously)
+      setTimeout(() => { console.warn = origWarn; console.error = origError }, 100)
     }
     if (options.banner !== false) {
       // eslint-disable-next-line no-console -- terminal UX: goodbye
