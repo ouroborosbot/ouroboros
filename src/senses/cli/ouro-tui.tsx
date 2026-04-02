@@ -70,16 +70,17 @@ export interface TuiProps {
   readonly onSubmit: (text: string) => void
   readonly onCtrlC: (hasInput: boolean) => CtrlCAction
   readonly headerShown: boolean
+  readonly cwd: string
 }
 
 // ─── Header ─────────────────────────────────────────────────────────
 
-function Header({ agentName, model, contextPercent }: {
+function Header({ agentName, model, contextPercent, cwd }: {
   readonly agentName: string
   readonly model: string
   readonly contextPercent: number
+  readonly cwd: string
 }): React.ReactElement {
-  const cwd = process.cwd().replace(process.env.HOME ?? "", "~")
   const showCtx = contextPercent > 0
   const info = [agentName, model, cwd, showCtx ? `ctx ${contextPercent}%` : ""].filter(Boolean).join(" · ")
 
@@ -432,6 +433,7 @@ export function OuroTui({
   contextPercent,
   onSubmit,
   onCtrlC,
+  cwd,
 }: TuiProps): React.ReactElement {
   return (
     <Box flexDirection="column">
@@ -442,7 +444,7 @@ export function OuroTui({
             return (
               <Box key="header" flexDirection="column">
                 <Text>{" "}</Text>
-                <Header agentName={agentName} model={model} contextPercent={contextPercent} />
+                <Header agentName={agentName} model={model} contextPercent={contextPercent} cwd={cwd} />
                 <Text color={OURO.shadow}>{"  Press Ctrl-C twice to exit \u00b7 \u2191\u2193 history \u00b7 Esc clear"}</Text>
                 <Text>{" "}</Text>
               </Box>

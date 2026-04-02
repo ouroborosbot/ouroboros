@@ -181,7 +181,7 @@ describe("CLI main(): applyPendingUpdates wiring", () => {
   })
 
   it("calls applyPendingUpdates with bundlesRoot and current version", async () => {
-    await main("testagent", { pasteDebounceMs: 0 })
+    await main("testagent", { pasteDebounceMs: 0, _testInputSource: (async function*() {})() })
 
     expect(mocks.applyPendingUpdates).toHaveBeenCalledTimes(1)
     expect(mocks.applyPendingUpdates).toHaveBeenCalledWith("/mock/AgentBundles", "0.1.0-test")
@@ -194,7 +194,7 @@ describe("CLI main(): applyPendingUpdates wiring", () => {
     })
     // main() calls runCliSession internally -- we can't easily mock it without
     // restructuring, so we verify applyPendingUpdates was called by the time main returns
-    await main("testagent", { pasteDebounceMs: 0 })
+    await main("testagent", { pasteDebounceMs: 0, _testInputSource: (async function*() {})() })
 
     expect(callOrder).toContain("applyPendingUpdates")
     expect(mocks.applyPendingUpdates).toHaveBeenCalled()

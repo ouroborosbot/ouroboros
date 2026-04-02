@@ -603,6 +603,7 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
           onSubmit: (text: string) => { ctrlCWarned = false; inputQueue!.push(text) },
           onCtrlC: handleCtrlC,
           headerShown: storeRef.headerShown,
+          cwd: process.cwd().replace(process.env.HOME ?? "", "~"),
         })
       }
 
