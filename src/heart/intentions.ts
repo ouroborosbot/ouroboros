@@ -118,7 +118,7 @@ export function readOpenIntentions(
   intentions.sort((a, b) => {
     const salienceDiff = salienceRank(b.salience) - salienceRank(a.salience)
     if (salienceDiff !== 0) return salienceDiff
-    return b.createdAt > a.createdAt ? 1 : b.createdAt < a.createdAt ? -1 : 0
+    return b.createdAt.localeCompare(a.createdAt)
   })
 
   const result = intentions.slice(0, limit)

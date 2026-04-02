@@ -209,6 +209,31 @@ describe("intentions store", () => {
       expect(open[0].id).toBe(withSalience.id)
       expect(open[1].id).toBe(noSalience.id)
     })
+
+    it("handles unknown salience values gracefully (ranks as 0)", () => {
+      const normal = captureIntention(tmpDir, {
+        content: "normal salience",
+        salience: "low",
+        source: "thought",
+      })
+      const weird = captureIntention(tmpDir, {
+        content: "unknown salience",
+        source: "thought",
+      })
+
+      // Manually write an unrecognized salience value to disk
+      const dir = path.join(tmpDir, "state", "intentions")
+      const filePath = path.join(dir, `${weird.id}.json`)
+      const data = JSON.parse(fs.readFileSync(filePath, "utf-8")) as IntentionRecord
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- testing backward-compat with unknown salience
+      ;(data as any).salience = "unknown-value"
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8")
+
+      const open = readOpenIntentions(tmpDir)
+      expect(open).toHaveLength(2)
+      // Normal "low" salience (rank 1) should sort before unknown (rank 0)
+      expect(open[0].id).toBe(normal.id)
+    })
   })
 
   describe("resolveIntention", () => {
