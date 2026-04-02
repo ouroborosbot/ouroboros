@@ -137,7 +137,7 @@ function ToolResultLine({ tc }: { readonly tc: { name: string; argSummary: strin
 function MessageBlock({ msg }: { readonly msg: CompletedMessage }): React.ReactElement {
   if (msg.role === "tool") {
     const visibleCalls = msg.toolCalls?.filter(tc => !FLOW_CONTROL_TOOLS.has(tc.name))
-    if (!visibleCalls || visibleCalls.length === 0) return <Text>{" "}</Text>
+    if (!visibleCalls || visibleCalls.length === 0) return <Box height={1}><Text>{" "}</Text></Box>
     return (
       <Box flexDirection="column">
         {visibleCalls.map((tc, i) => <ToolResultLine key={i} tc={tc} />)}
@@ -147,11 +147,9 @@ function MessageBlock({ msg }: { readonly msg: CompletedMessage }): React.ReactE
 
   if (msg.role === "user") {
     return (
-      <Box flexDirection="column">
-        <Text>{" "}</Text>
-        <Text>{" "}</Text>
+      <Box flexDirection="column" marginTop={1}>
         {msg.content ? <Text color={OURO.bone} bold>{msg.content}</Text> : null}
-        <Text>{" "}</Text>
+        <Box height={1}><Text>{" "}</Text></Box>
       </Box>
     )
   }
@@ -160,17 +158,15 @@ function MessageBlock({ msg }: { readonly msg: CompletedMessage }): React.ReactE
     return (
       <Box flexDirection="column">
         {msg.content ? <StreamingMarkdown text={msg.content} /> : null}
-        <Text>{" "}</Text>
-        <Text>{" "}</Text>
+        <Box height={1}><Text>{" "}</Text></Box>
       </Box>
     )
   }
 
   return (
-    <Box flexDirection="column">
-      <Text>{" "}</Text>
+    <Box flexDirection="column" marginTop={1}>
       <Text color={OURO.shadow}>{msg.content}</Text>
-      <Text>{" "}</Text>
+      <Box height={1}><Text>{" "}</Text></Box>
     </Box>
   )
 }
@@ -237,7 +233,7 @@ function ActiveToolLine({ tool }: {
   readonly tool: { name: string; args: Record<string, string> }
 }): React.ReactElement {
   // Hide flow control tools from in-progress display
-  if (FLOW_CONTROL_TOOLS.has(tool.name)) return <Text>{" "}</Text>
+  if (FLOW_CONTROL_TOOLS.has(tool.name)) return <Box height={1}><Text>{" "}</Text></Box>
   const argStr = formatActiveToolArgs(tool.name, tool.args)
   return (
     <Text>
@@ -323,6 +319,12 @@ function InputArea({ onSubmit, suppressed, onCtrlC, agentName, model, history }:
     // Any non-Ctrl-C input clears exit warning
     setExitWarning(false)
 
+    if (key.escape) {
+      inputRef.current = ""
+      setInput("")
+      historyIdx.current = -1
+      return
+    }
     if (key.return) {
       const text = inputRef.current
       if (text.trim()) onSubmit(text)
@@ -372,10 +374,10 @@ function InputArea({ onSubmit, suppressed, onCtrlC, agentName, model, history }:
     }
   })
 
-  if (suppressed) return <Text>{" "}</Text>
+  if (suppressed) return <Box height={1}><Text>{" "}</Text></Box>
 
-  // Get terminal width for the separator line
-  const cols = process.stdout.columns || 80
+  // Get terminal width for the separator line (capped at 120, minus 2 for safety margin)
+  const cols = Math.min(process.stdout.columns || 80, 120) - 2
 
   return (
     <Box flexDirection="column">
@@ -418,7 +420,7 @@ export function OuroTui({
               <Box key="header" flexDirection="column">
                 <Text>{" "}</Text>
                 <Header agentName={agentName} model={model} contextPercent={contextPercent} />
-                <Text>{" "}</Text>
+                <Text color={OURO.shadow}>{"  Press Ctrl-C twice to exit \u00b7 \u2191\u2193 history \u00b7 Esc clear"}</Text>
                 <Text>{" "}</Text>
               </Box>
             )
@@ -428,9 +430,9 @@ export function OuroTui({
       </Static>
 
       {/* Live area — re-renders on every state change */}
-      {(live.loading || live.streamingText || live.activeTool) ? <Text>{" "}</Text> : null}
+      {(live.loading || live.streamingText || live.activeTool) ? <Box height={1}><Text>{" "}</Text></Box> : null}
       <LiveArea live={live} elapsed={elapsedSeconds} />
-      {(live.loading || live.streamingText || live.activeTool) ? <Text>{" "}</Text> : null}
+      {(live.loading || live.streamingText || live.activeTool) ? <Box height={1}><Text>{" "}</Text></Box> : null}
 
       {/* Input */}
       <InputArea
