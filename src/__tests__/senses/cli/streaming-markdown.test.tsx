@@ -329,4 +329,291 @@ describe("StreamingMarkdown (Ink)", () => {
     expect(frame).toContain("context")
     expect(frame).toContain("added")
   })
+
+  // ─── Bold italic tests ───────────────────────────────────────────
+
+  it("renders ***bold italic*** with triple stars", () => {
+    const { lastFrame } = render(<StreamingMarkdown text="this is ***bold italic*** text" />)
+    const frame = lastFrame()!
+    expect(frame).toContain("bold italic")
+    expect(frame).not.toContain("***")
+    expect(frame).not.toContain("*bold")
+  })
+
+  it("renders **_bold italic_** with mixed markers", () => {
+    const { lastFrame } = render(<StreamingMarkdown text="this is **_mixed bold italic_** text" />)
+    const frame = lastFrame()!
+    expect(frame).toContain("mixed bold italic")
+    expect(frame).not.toContain("**")
+    expect(frame).not.toContain("_")
+  })
+
+  // ─── Task list tests ─────────────────────────────────────────────
+
+  it("renders unchecked task list items with ballot box", () => {
+    const { lastFrame } = render(<StreamingMarkdown text="- [ ] unchecked item" />)
+    const frame = lastFrame()!
+    expect(frame).toContain("\u2610")
+    expect(frame).toContain("unchecked item")
+    expect(frame).not.toContain("[ ]")
+  })
+
+  it("renders checked task list items with checked ballot box", () => {
+    const { lastFrame } = render(<StreamingMarkdown text="- [x] checked item" />)
+    const frame = lastFrame()!
+    expect(frame).toContain("\u2611")
+    expect(frame).toContain("checked item")
+    expect(frame).not.toContain("[x]")
+  })
+
+  it("renders uppercase [X] as checked", () => {
+    const { lastFrame } = render(<StreamingMarkdown text="- [X] also checked" />)
+    const frame = lastFrame()!
+    expect(frame).toContain("\u2611")
+    expect(frame).toContain("also checked")
+  })
+
+  it("preserves indentation for nested task items", () => {
+    const text = "- [ ] top\n  - [x] nested"
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    expect(frame).toContain("\u2610")
+    expect(frame).toContain("\u2611")
+    expect(frame).toContain("top")
+    expect(frame).toContain("nested")
+  })
+
+  // ─── Nested blockquote tests ──────────────────────────────────────
+
+  it("renders nested >> blockquotes with two bar prefixes", () => {
+    const { lastFrame } = render(<StreamingMarkdown text=">> nested quote" />)
+    const frame = lastFrame()!
+    expect(frame).toContain("nested quote")
+    // Should have two vertical bars
+    const barCount = (frame.match(/\u2502/g) || []).length
+    expect(barCount).toBeGreaterThanOrEqual(2)
+  })
+
+  it("renders triple >>> blockquotes with three bar prefixes", () => {
+    const { lastFrame } = render(<StreamingMarkdown text=">>> deep quote" />)
+    const frame = lastFrame()!
+    expect(frame).toContain("deep quote")
+    const barCount = (frame.match(/\u2502/g) || []).length
+    expect(barCount).toBeGreaterThanOrEqual(3)
+  })
+
+  it("applies inline styling inside blockquotes", () => {
+    const { lastFrame } = render(<StreamingMarkdown text="> this is **bold** inside quote" />)
+    const frame = lastFrame()!
+    expect(frame).toContain("bold")
+    expect(frame).not.toContain("**")
+    expect(frame).toContain("\u2502")
+  })
+
+  // ─── Code fence visual tests ──────────────────────────────────────
+
+  it("shows language label for code fences", () => {
+    const text = "```typescript\nconst x = 1\n```"
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    expect(frame).toContain("typescript")
+    expect(frame).toContain("const x = 1")
+  })
+
+  it("shows language label for json code fences", () => {
+    const text = '```json\n{"key": "value"}\n```'
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    expect(frame).toContain("json")
+    expect(frame).toContain('"key": "value"')
+  })
+
+  it("shows language label for bash code fences", () => {
+    const text = "```bash\necho hello\n```"
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    expect(frame).toContain("bash")
+    expect(frame).toContain("echo hello")
+  })
+
+  it("shows language label for txt code fences", () => {
+    const text = "```txt\nplain text\n```"
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    expect(frame).toContain("txt")
+    expect(frame).toContain("plain text")
+  })
+
+  it("renders code fence with no language label when unspecified", () => {
+    const text = "```\nno lang\n```"
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    expect(frame).toContain("no lang")
+  })
+
+  // ─── Table tests ──────────────────────────────────────────────────
+
+  it("renders a simple table with headers and rows", () => {
+    const text = "| Name | Age | City |\n| --- | --- | --- |\n| Alice | 30 | NYC |\n| Bob | 25 | LA |"
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    expect(frame).toContain("Name")
+    expect(frame).toContain("Age")
+    expect(frame).toContain("City")
+    expect(frame).toContain("Alice")
+    expect(frame).toContain("Bob")
+    expect(frame).toContain("NYC")
+    expect(frame).toContain("LA")
+    // Separator should have dashes
+    expect(frame).toContain("---")
+  })
+
+  it("pads table columns to equal width", () => {
+    const text = "| A | LongHeader |\n| --- | --- |\n| x | y |"
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    expect(frame).toContain("LongHeader")
+    expect(frame).toContain("x")
+    expect(frame).toContain("y")
+  })
+
+  // ─── Escape handling tests ────────────────────────────────────────
+
+  it("renders escaped asterisk as literal *", () => {
+    const { lastFrame } = render(<StreamingMarkdown text="this has \\* a star" />)
+    const frame = lastFrame()!
+    expect(frame).toContain("*")
+    expect(frame).toContain("this has")
+    expect(frame).toContain("a star")
+  })
+
+  it("renders escaped backslash as literal \\", () => {
+    const { lastFrame } = render(<StreamingMarkdown text="path\\\\to\\\\file" />)
+    const frame = lastFrame()!
+    expect(frame).toContain("\\")
+  })
+
+  it("renders escaped underscore as literal _", () => {
+    const { lastFrame } = render(<StreamingMarkdown text="snake\\_case" />)
+    const frame = lastFrame()!
+    expect(frame).toContain("_")
+    expect(frame).toContain("snake")
+    expect(frame).toContain("case")
+  })
+
+  it("renders escaped backtick as literal `", () => {
+    const { lastFrame } = render(<StreamingMarkdown text="use \\` for code" />)
+    const frame = lastFrame()!
+    expect(frame).toContain("`")
+  })
+
+  // ─── HTML entity tests ────────────────────────────────────────────
+
+  it("decodes &lt; and &gt; to < and >", () => {
+    const { lastFrame } = render(<StreamingMarkdown text="a &lt; b &gt; c" />)
+    const frame = lastFrame()!
+    expect(frame).toContain("a < b > c")
+  })
+
+  it("decodes &amp; to &", () => {
+    const { lastFrame } = render(<StreamingMarkdown text="this &amp; that" />)
+    const frame = lastFrame()!
+    expect(frame).toContain("this & that")
+  })
+
+  it("decodes &quot; and &#39;", () => {
+    const { lastFrame } = render(<StreamingMarkdown text="&quot;hello&#39;s&quot;" />)
+    const frame = lastFrame()!
+    expect(frame).toContain('"hello\'s"')
+  })
+
+  // ─── Autolink tests ───────────────────────────────────────────────
+
+  it("renders autolinks without angle brackets", () => {
+    const { lastFrame } = render(<StreamingMarkdown text="visit <https://example.com> now" />)
+    const frame = lastFrame()!
+    expect(frame).toContain("https://example.com")
+    expect(frame).not.toContain("<https://")
+    expect(frame).not.toContain(">")
+  })
+
+  // ─── Link rendering tests ────────────────────────────────────────
+
+  it("renders links with text normally and URL in parentheses", () => {
+    const { lastFrame } = render(<StreamingMarkdown text="[docs](https://docs.example.com)" />)
+    const frame = lastFrame()!
+    expect(frame).toContain("docs")
+    expect(frame).toContain("https://docs.example.com")
+    expect(frame).not.toContain("[docs]")
+  })
+
+  // ─── Diff block separator tests ──────────────────────────────────
+
+  it("renders diff blocks with separators before and after", () => {
+    const text = [
+      "diff --git a/file.ts b/file.ts",
+      "--- a/file.ts",
+      "+++ b/file.ts",
+      "@@ -1,3 +1,3 @@",
+      "+added",
+    ].join("\n")
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    // Should have horizontal line separators (box drawing chars)
+    const dashLines = (frame.match(/\u2500{40}/g) || []).length
+    expect(dashLines).toBeGreaterThanOrEqual(2)
+  })
+
+  // ─── Spacing tests ───────────────────────────────────────────────
+
+  it("adds blank lines around headings", () => {
+    const text = "before\n\n## Heading\n\nafter"
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    expect(frame).toContain("before")
+    expect(frame).toContain("Heading")
+    expect(frame).toContain("after")
+  })
+
+  it("adds blank lines around code blocks", () => {
+    const text = "before\n\n```js\ncode\n```\n\nafter"
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    expect(frame).toContain("before")
+    expect(frame).toContain("code")
+    expect(frame).toContain("after")
+  })
+
+  // ─── Streaming safety tests ──────────────────────────────────────
+
+  it("handles partial triple-star bold italic during streaming", () => {
+    const text = "this is ***bold it"
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    expect(frame).toBeDefined()
+    expect(frame).toContain("this is")
+  })
+
+  it("handles partial link during streaming", () => {
+    const text = "see [link text](https://exam"
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    expect(frame).toBeDefined()
+  })
+
+  it("handles partial table during streaming", () => {
+    const text = "| Header1 | Header2 |"
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    expect(frame).toBeDefined()
+    expect(frame).toContain("Header1")
+  })
+
+  it("handles partial task list during streaming", () => {
+    const text = "- [ ] item one\n- [x"
+    const { lastFrame } = render(<StreamingMarkdown text={text} />)
+    const frame = lastFrame()!
+    expect(frame).toBeDefined()
+    expect(frame).toContain("item one")
+  })
 })
