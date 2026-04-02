@@ -32,10 +32,12 @@ export class TuiStore {
   private _turnId = 0
   private _listeners = new Set<Listener>()
   private _headerShown = false
+  private _inputHistory: string[] = []
 
   get completedMessages(): readonly CompletedMessage[] { return this._completed }
   get live(): Readonly<LiveState> { return this._live }
   get headerShown(): boolean { return this._headerShown }
+  get inputHistory(): readonly string[] { return this._inputHistory }
 
   /** Elapsed seconds since spinner started — computed on demand, not stored */
   getElapsed(): number {
@@ -168,17 +170,23 @@ export class TuiStore {
     this.notify()
   }
 
-  /** Add a user message to completed (for display) */
+  /** Add a user message to completed (for display) AND input history */
   addUserMessage(text: string): void {
     if (this._completed.length === 0) {
-      this._headerShown = false // first message triggers header
+      this._headerShown = false
     }
     this._completed = [...this._completed, {
       id: `user-${Date.now()}`,
       role: "user",
       content: text,
     }]
+    this._inputHistory.push(text)
     this.notify()
+  }
+
+  /** Seed input history from previous session messages (display only, no rendering) */
+  seedHistory(texts: string[]): void {
+    this._inputHistory.push(...texts)
   }
 }
 

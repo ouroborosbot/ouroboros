@@ -63,6 +63,7 @@ export interface TuiProps {
   readonly agentName: string
   readonly model: string
   readonly completedMessages: CompletedMessage[]
+  readonly inputHistory: readonly string[]
   readonly live: LiveState
   readonly elapsedSeconds: number
   readonly contextPercent: number
@@ -374,14 +375,23 @@ function InputArea({ onSubmit, suppressed, onCtrlC, agentName, model, history }:
     }
   })
 
-  if (suppressed) return <Box height={1}><Text>{" "}</Text></Box>
+  // Get terminal width (capped for sanity)
+  const cols = Math.min(process.stdout.columns || 80, 200)
 
-  // Get terminal width for the separator line (capped at 120, minus 2 for safety margin)
-  const cols = Math.min(process.stdout.columns || 80, 120) - 2
+  if (suppressed) {
+    // During model generation: show status bar but no input
+    return (
+      <Box flexDirection="column">
+        <Text dimColor>{"─".repeat(cols)}</Text>
+        <Text dimColor>{agentName}{model ? ` · ${model}` : ""}</Text>
+        <Text dimColor>{"─".repeat(cols)}</Text>
+      </Box>
+    )
+  }
 
   return (
     <Box flexDirection="column">
-      {/* Thin separator line above input */}
+      {/* Top separator */}
       <Text dimColor>{"─".repeat(cols)}</Text>
       {exitWarning ? (
         <Text color={OURO.shadow}>{"(press Ctrl-C again to exit)"}</Text>
@@ -390,10 +400,12 @@ function InputArea({ onSubmit, suppressed, onCtrlC, agentName, model, history }:
       <Box>
         <Text color={OURO.teal} bold>{") "}</Text>
         <Text color={OURO.bone}>{input}</Text>
-        {!suppressed && cursorVisible ? <Text color={OURO.scale}>{"█"}</Text> : <Text>{" "}</Text>}
+        {cursorVisible ? <Text color={OURO.scale}>{"█"}</Text> : <Text>{" "}</Text>}
       </Box>
-      {/* Status bar below input */}
+      {/* Status bar */}
       <Text dimColor>{agentName}{model ? ` · ${model}` : ""}</Text>
+      {/* Bottom separator */}
+      <Text dimColor>{"─".repeat(cols)}</Text>
     </Box>
   )
 }
@@ -404,6 +416,7 @@ export function OuroTui({
   agentName,
   model,
   completedMessages,
+  inputHistory,
   live,
   elapsedSeconds,
   contextPercent,
@@ -441,7 +454,7 @@ export function OuroTui({
         onCtrlC={onCtrlC}
         agentName={agentName}
         model={model}
-        history={completedMessages.filter(m => m.role === "user").map(m => m.content)}
+        history={inputHistory}
       />
     </Box>
   )

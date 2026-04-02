@@ -545,12 +545,11 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
       tuiStore = new TuiStore()
       cliCallbacks = createTuiCallbacks(tuiStore)
 
-      // Seed TUI store with user messages from previous session (for up/down history)
-      for (const msg of messages) {
-        if (msg.role === "user" && typeof msg.content === "string") {
-          tuiStore.addUserMessage(msg.content)
-        }
-      }
+      // Seed input history from previous session (for up/down arrows) — NOT display
+      const prevUserMsgs = messages
+        .filter((msg): msg is { role: "user"; content: string } => msg.role === "user" && typeof msg.content === "string")
+        .map(msg => msg.content)
+      tuiStore.seedHistory(prevUserMsgs)
 
       // Ctrl-C state machine (Claude Code behavior):
       // During generation: abort current request
@@ -597,6 +596,7 @@ export async function runCliSession(options: RunCliSessionOptions): Promise<RunC
           agentName: options.agentName,
           model: loadAgentConfig().humanFacing?.model ?? "",
           completedMessages: storeRef.completedMessages as any,
+          inputHistory: storeRef.inputHistory,
           live: storeRef.live,
           elapsedSeconds: elapsed,
           contextPercent: 0,
