@@ -1541,7 +1541,7 @@ async function defaultRunAdoptionSpecialist(): Promise<string | null> {
     // Default models per provider (used when entering new credentials)
     const defaultModels: Record<AgentProvider, string> = {
       anthropic: "claude-opus-4-6",
-      minimax: "MiniMax-Text-01",
+      minimax: "MiniMax-M2.7",
       "openai-codex": "gpt-5.4",
       "github-copilot": "claude-sonnet-4.6",
       azure: "",
@@ -2492,20 +2492,6 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
       }
     }
 
-    if (deps.ensureDaemonBootPersistence) {
-      try {
-        await Promise.resolve(deps.ensureDaemonBootPersistence(deps.socketPath))
-      } catch (error) {
-        emitNervesEvent({
-          level: "warn",
-          component: "daemon",
-          event: "daemon.system_setup_launchd_error",
-          message: "failed to persist daemon boot startup",
-          meta: { error: error instanceof Error ? error.message : String(error), socketPath: deps.socketPath },
-        })
-      }
-    }
-
     // Run update hooks before starting daemon so user sees the output
     registerUpdateHook(bundleMetaHook)
     registerUpdateHook(agentConfigV2Hook)
@@ -2544,6 +2530,24 @@ export async function runOuroCli(args: string[], deps: OuroCliDeps = createDefau
 
     const daemonResult = await ensureDaemonRunning(deps)
     deps.writeStdout(daemonResult.message)
+
+    // Persist boot startup AFTER daemon is running — bootstrap is safe now
+    // because the daemon socket exists, so launchd's KeepAlive registers
+    // for crash recovery without starting a competing process.
+    if (deps.ensureDaemonBootPersistence) {
+      try {
+        await Promise.resolve(deps.ensureDaemonBootPersistence(deps.socketPath))
+      } catch (error) {
+        emitNervesEvent({
+          level: "warn",
+          component: "daemon",
+          event: "daemon.system_setup_launchd_error",
+          message: "failed to persist daemon boot startup",
+          meta: { error: error instanceof Error ? error.message : String(error), socketPath: deps.socketPath },
+        })
+      }
+    }
+
     return daemonResult.message
   }
 

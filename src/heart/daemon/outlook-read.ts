@@ -1305,6 +1305,10 @@ export function readNeedsMeView(agentName: string, options: OutlookReadOptions =
   const agentRoot = path.join(bundlesRoot, `${agentName}.ouro`)
   const items: import("./outlook-types").OutlookNeedsMeItem[] = []
 
+  // Load dismissed obligations to filter them out
+  const prefs = readDeskPrefs(agentRoot)
+  const dismissed = new Set(prefs.dismissedObligations)
+
   // 1. Sessions that need a reply (last message is from user)
   const sessions = readSessionInventory(agentName, options)
   for (const s of sessions.items) {
@@ -1322,14 +1326,19 @@ export function readNeedsMeView(agentName: string, options: OutlookReadOptions =
   // 2. Obligations that are blocking or stale
   const obligations = readObligationSummary(agentRoot)
   for (const o of obligations.items) {
+    if (dismissed.has(o.id)) continue
     const ageMs = now.getTime() - Date.parse(o.updatedAt)
     const isStale = ageMs > 24 * 60 * 60 * 1000
 
-    if (o.status === "pending" || o.status === "investigating") {
+    // Return-ready: obligation has a surface (result exists) but status is still open
+    const hasResult = o.currentSurface !== null
+    const isOpen = o.status === "pending" || o.status === "investigating" || o.status === "waiting_for_merge" || o.status === "updating_runtime"
+
+    if (isOpen) {
       items.push({
-        urgency: isStale ? "stale-delegation" : "blocking-obligation",
+        urgency: hasResult ? "return-ready" : isStale ? "stale-delegation" : "blocking-obligation",
         label: truncateExcerpt(o.content, 80) ?? o.id,
-        detail: `${o.status}${o.nextAction ? ` · next: ${o.nextAction}` : ""}`,
+        detail: hasResult ? `result ready — ${o.currentSurface!.kind}: ${o.currentSurface!.label}` : `${o.status}${o.nextAction ? ` · next: ${o.nextAction}` : ""}`,
         ref: { tab: "work", focus: o.id },
         ageMs,
       })
@@ -1393,6 +1402,7 @@ export function readDeskPrefs(agentRoot: string): import("./outlook-types").Outl
     tabOrder: null,
     starredFriends: [],
     pinnedConstellations: [],
+    dismissedObligations: [],
   }
   try {
     const raw = fs.readFileSync(prefsPath, "utf-8")
@@ -1411,6 +1421,7 @@ export function readDeskPrefs(agentRoot: string): import("./outlook-types").Outl
             codingIds: Array.isArray(c.codingIds) ? c.codingIds.filter((c2): c2 is string => typeof c2 === "string") : [],
           }))
         : [],
+      dismissedObligations: Array.isArray(parsed.dismissedObligations) ? parsed.dismissedObligations.filter((id): id is string => typeof id === "string") : [],
     }
   } catch {
     return defaults
