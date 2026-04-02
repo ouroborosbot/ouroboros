@@ -144,6 +144,23 @@ describe("presence", () => {
       expect(presence.mission).toContain("3")
     })
 
+    it("uses singular form for exactly 1 obligation/bridge/lane", () => {
+      const presence = derivePresence(tmpDir, "ouroboros", {
+        activeSessions: 1,
+        openObligations: 1,
+        activeBridges: 1,
+        codingLanes: 1,
+        currentTempo: "standard",
+      })
+      expect(presence.mission).toContain("1 open obligation,")
+      expect(presence.mission).toContain("1 active bridge,")
+      expect(presence.mission).toContain("1 coding lane")
+      // Singular - no trailing 's'
+      expect(presence.mission).not.toContain("obligations")
+      expect(presence.mission).not.toContain("bridges")
+      expect(presence.mission).not.toContain("lanes")
+    })
+
     it("passes through currentTempo", () => {
       for (const tempo of ["brief", "standard", "dense", "crisis"] as const) {
         const presence = derivePresence(tmpDir, "ouroboros", {
@@ -178,6 +195,15 @@ describe("presence", () => {
     })
 
     it("returns null when presence file does not exist", () => {
+      const read = readPresence(tmpDir, "ouroboros")
+      expect(read).toBeNull()
+    })
+
+    it("returns null when presence file contains malformed JSON", () => {
+      const dir = path.join(tmpDir, "state", "presence")
+      fs.mkdirSync(dir, { recursive: true })
+      fs.writeFileSync(path.join(dir, "self.json"), "not valid json{{{", "utf-8")
+
       const read = readPresence(tmpDir, "ouroboros")
       expect(read).toBeNull()
     })
