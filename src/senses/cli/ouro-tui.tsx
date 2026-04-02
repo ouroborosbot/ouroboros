@@ -320,8 +320,8 @@ function InputArea({ onSubmit, suppressed, onCtrlC, agentName, model, history }:
     }
     if (suppressed) return
 
-    // Any non-Ctrl-C input clears exit warning
-    setExitWarning(false)
+    // Any non-Ctrl-C input clears tooltip
+    setTooltip("")
 
     if (key.escape) {
       if (inputRef.current) {
