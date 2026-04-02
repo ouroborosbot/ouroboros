@@ -136,9 +136,8 @@ function ToolResultLine({ tc }: { readonly tc: { name: string; argSummary: strin
 
 function MessageBlock({ msg }: { readonly msg: CompletedMessage }): React.ReactElement {
   if (msg.role === "tool") {
-    // Filter out flow control tools — they are invisible agent mechanics
     const visibleCalls = msg.toolCalls?.filter(tc => !FLOW_CONTROL_TOOLS.has(tc.name))
-    if (!visibleCalls || visibleCalls.length === 0) return <Text>{""}</Text>
+    if (!visibleCalls || visibleCalls.length === 0) return <Text>{" "}</Text>
     return (
       <Box flexDirection="column">
         {visibleCalls.map((tc, i) => <ToolResultLine key={i} tc={tc} />)}
@@ -147,12 +146,12 @@ function MessageBlock({ msg }: { readonly msg: CompletedMessage }): React.ReactE
   }
 
   if (msg.role === "user") {
-    // User messages: bold with a dim > echo, like Claude Code's ) prefix
     return (
       <Box flexDirection="column">
-        <Text>{""}</Text>
+        <Text>{" "}</Text>
+        <Text>{" "}</Text>
         {msg.content ? <Text color={OURO.bone} bold>{msg.content}</Text> : null}
-        <Text>{""}</Text>
+        <Text>{" "}</Text>
       </Box>
     )
   }
@@ -161,14 +160,17 @@ function MessageBlock({ msg }: { readonly msg: CompletedMessage }): React.ReactE
     return (
       <Box flexDirection="column">
         {msg.content ? <StreamingMarkdown text={msg.content} /> : null}
-        <Text>{""}</Text>
+        <Text>{" "}</Text>
+        <Text>{" "}</Text>
       </Box>
     )
   }
 
   return (
     <Box flexDirection="column">
+      <Text>{" "}</Text>
       <Text color={OURO.shadow}>{msg.content}</Text>
+      <Text>{" "}</Text>
     </Box>
   )
 }
@@ -235,7 +237,7 @@ function ActiveToolLine({ tool }: {
   readonly tool: { name: string; args: Record<string, string> }
 }): React.ReactElement {
   // Hide flow control tools from in-progress display
-  if (FLOW_CONTROL_TOOLS.has(tool.name)) return <Text>{""}</Text>
+  if (FLOW_CONTROL_TOOLS.has(tool.name)) return <Text>{" "}</Text>
   const argStr = formatActiveToolArgs(tool.name, tool.args)
   return (
     <Text>
@@ -370,7 +372,7 @@ function InputArea({ onSubmit, suppressed, onCtrlC, agentName, model, history }:
     }
   })
 
-  if (suppressed) return <Text>{""}</Text>
+  if (suppressed) return <Text>{" "}</Text>
 
   // Get terminal width for the separator line
   const cols = process.stdout.columns || 80
@@ -414,10 +416,10 @@ export function OuroTui({
           if (index === 0) {
             return (
               <Box key="header" flexDirection="column">
-                <Text>{""}</Text>
+                <Text>{" "}</Text>
                 <Header agentName={agentName} model={model} contextPercent={contextPercent} />
-                <Text>{""}</Text>
-                <Text>{""}</Text>
+                <Text>{" "}</Text>
+                <Text>{" "}</Text>
               </Box>
             )
           }
@@ -426,9 +428,9 @@ export function OuroTui({
       </Static>
 
       {/* Live area — re-renders on every state change */}
-      {(live.loading || live.streamingText || live.activeTool) ? <Text>{""}</Text> : null}
+      {(live.loading || live.streamingText || live.activeTool) ? <Text>{" "}</Text> : null}
       <LiveArea live={live} elapsed={elapsedSeconds} />
-      {(live.loading || live.streamingText || live.activeTool) ? <Text>{""}</Text> : null}
+      {(live.loading || live.streamingText || live.activeTool) ? <Text>{" "}</Text> : null}
 
       {/* Input */}
       <InputArea
