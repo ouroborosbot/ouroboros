@@ -426,10 +426,11 @@ export function OuroTui({
       </Static>
 
       {/* Live area — re-renders on every state change */}
+      {(live.loading || live.streamingText || live.activeTool) ? <Text>{""}</Text> : null}
       <LiveArea live={live} elapsed={elapsedSeconds} />
+      {(live.loading || live.streamingText || live.activeTool) ? <Text>{""}</Text> : null}
 
-      {/* Input — with breathing room above */}
-      {!live.loading && !live.streamingText ? <Text>{""}</Text> : null}
+      {/* Input */}
       <InputArea
         onSubmit={onSubmit}
         suppressed={live.inputSuppressed}
