@@ -286,7 +286,6 @@ function InputArea({ onSubmit, suppressed, onCtrlC, agentName, model, history }:
   readonly history: readonly string[]
 }): React.ReactElement {
   const [input, setInput] = useState("")
-  const [exitWarning, setExitWarning] = useState(false)
   const [tooltip, setTooltip] = useState("")
   const [cursorVisible, setCursorVisible] = useState(true)
   const inputRef = useRef("")
@@ -304,10 +303,10 @@ function InputArea({ onSubmit, suppressed, onCtrlC, agentName, model, history }:
     if (action === "clear") {
       inputRef.current = ""
       setInput("")
-      setExitWarning(false)
+      setTooltip("")
       setTooltip("")
     } else if (action === "warn") {
-      setExitWarning(true)
+      // tooltip handled below
       setTooltip("Ctrl-C again to exit")
       setTimeout(() => setTooltip(""), 3000)
     }
