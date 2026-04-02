@@ -14,11 +14,18 @@ export interface ObligationSurface {
   label: string
 }
 
+export interface WaitingOnRef {
+  kind: "friend" | "agent" | "coding" | "merge" | "runtime" | "time" | "none"
+  target: string
+  detail: string
+}
+
 export interface ObligationMeaning {
-  salience: number
+  salience: "low" | "medium" | "high" | "critical"
   careReason?: string
-  waitingOn?: string
-  stalenessClass: "fresh" | "aging" | "stale" | "ancient"
+  waitingOn?: WaitingOnRef | null
+  stalenessClass: "fresh" | "warm" | "stale" | "cold" | "at-risk"
+  lastMeaningfulChangeAt?: string
   resumeHint?: string
 }
 

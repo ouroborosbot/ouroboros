@@ -7,6 +7,7 @@ import {
   enrichObligation,
   type Obligation,
   type ObligationMeaning,
+  type WaitingOnRef,
 } from "../../heart/obligations"
 
 describe("obligation enrichment", () => {
@@ -29,41 +30,82 @@ describe("obligation enrichment", () => {
         content: "research architecture options",
       })
 
+      const waitingOn: WaitingOnRef = {
+        kind: "friend",
+        target: "ari",
+        detail: "PR review from Ari",
+      }
+
       const meaning: ObligationMeaning = {
-        salience: 8,
+        salience: "high",
         careReason: "this affects the core harness stability",
-        waitingOn: "PR review from Ari",
+        waitingOn,
         stalenessClass: "fresh",
+        lastMeaningfulChangeAt: "2026-04-01T10:00:00.000Z",
         resumeHint: "start by reading the PR comments",
       }
 
       const enriched = enrichObligation(tmpDir, ob.id, meaning)
 
       expect(enriched.meaning).toBeDefined()
-      expect(enriched.meaning!.salience).toBe(8)
+      expect(enriched.meaning!.salience).toBe("high")
       expect(enriched.meaning!.careReason).toBe("this affects the core harness stability")
-      expect(enriched.meaning!.waitingOn).toBe("PR review from Ari")
+      expect(enriched.meaning!.waitingOn).toEqual(waitingOn)
       expect(enriched.meaning!.stalenessClass).toBe("fresh")
+      expect(enriched.meaning!.lastMeaningfulChangeAt).toBe("2026-04-01T10:00:00.000Z")
       expect(enriched.meaning!.resumeHint).toBe("start by reading the PR comments")
     })
 
-    it("meaning fields are all present in ObligationMeaning", () => {
+    it("meaning fields allow optional properties to be omitted", () => {
       const ob = createObligation(tmpDir, {
         origin: sampleOrigin,
         content: "test meaning fields",
       })
 
       const meaning: ObligationMeaning = {
-        salience: 5,
-        stalenessClass: "aging",
+        salience: "medium",
+        stalenessClass: "warm",
       }
 
       const enriched = enrichObligation(tmpDir, ob.id, meaning)
-      expect(enriched.meaning!.salience).toBe(5)
-      expect(enriched.meaning!.stalenessClass).toBe("aging")
+      expect(enriched.meaning!.salience).toBe("medium")
+      expect(enriched.meaning!.stalenessClass).toBe("warm")
       expect(enriched.meaning!.careReason).toBeUndefined()
       expect(enriched.meaning!.waitingOn).toBeUndefined()
       expect(enriched.meaning!.resumeHint).toBeUndefined()
+      expect(enriched.meaning!.lastMeaningfulChangeAt).toBeUndefined()
+    })
+
+    it("waitingOn can be explicitly null", () => {
+      const ob = createObligation(tmpDir, {
+        origin: sampleOrigin,
+        content: "test null waitingOn",
+      })
+
+      const meaning: ObligationMeaning = {
+        salience: "low",
+        waitingOn: null,
+        stalenessClass: "fresh",
+      }
+
+      const enriched = enrichObligation(tmpDir, ob.id, meaning)
+      expect(enriched.meaning!.waitingOn).toBeNull()
+    })
+
+    it("salience is an enum string, not a number", () => {
+      const ob = createObligation(tmpDir, {
+        origin: sampleOrigin,
+        content: "test salience enum",
+      })
+
+      for (const salience of ["low", "medium", "high", "critical"] as const) {
+        const enriched = enrichObligation(tmpDir, ob.id, {
+          salience,
+          stalenessClass: "fresh",
+        })
+        expect(enriched.meaning!.salience).toBe(salience)
+        expect(typeof enriched.meaning!.salience).toBe("string")
+      }
     })
   })
 
@@ -90,7 +132,7 @@ describe("obligation enrichment", () => {
       })
 
       const meaning: ObligationMeaning = {
-        salience: 7,
+        salience: "high",
         stalenessClass: "stale",
         resumeHint: "check if blocker is resolved",
       }
@@ -100,7 +142,7 @@ describe("obligation enrichment", () => {
       const filePath = path.join(tmpDir, "state", "obligations", `${ob.id}.json`)
       const stored = JSON.parse(fs.readFileSync(filePath, "utf-8")) as Obligation
       expect(stored.meaning).toBeDefined()
-      expect(stored.meaning!.salience).toBe(7)
+      expect(stored.meaning!.salience).toBe("high")
       expect(stored.meaning!.stalenessClass).toBe("stale")
       expect(stored.meaning!.resumeHint).toBe("check if blocker is resolved")
     })
@@ -112,8 +154,8 @@ describe("obligation enrichment", () => {
       })
 
       enrichObligation(tmpDir, ob.id, {
-        salience: 9,
-        stalenessClass: "ancient",
+        salience: "critical",
+        stalenessClass: "cold",
       })
 
       const filePath = path.join(tmpDir, "state", "obligations", `${ob.id}.json`)
@@ -127,10 +169,10 @@ describe("obligation enrichment", () => {
     it("throws when obligation does not exist", () => {
       expect(() =>
         enrichObligation(tmpDir, "nonexistent-id", {
-          salience: 5,
+          salience: "medium",
           stalenessClass: "fresh",
         }),
-      ).toThrow()
+      ).toThrow("Obligation not found: nonexistent-id")
     })
 
     it("overwrites previous meaning on re-enrichment", () => {
@@ -140,17 +182,17 @@ describe("obligation enrichment", () => {
       })
 
       enrichObligation(tmpDir, ob.id, {
-        salience: 3,
+        salience: "low",
         stalenessClass: "fresh",
       })
 
       const updated = enrichObligation(tmpDir, ob.id, {
-        salience: 9,
+        salience: "critical",
         stalenessClass: "stale",
         careReason: "escalated priority",
       })
 
-      expect(updated.meaning!.salience).toBe(9)
+      expect(updated.meaning!.salience).toBe("critical")
       expect(updated.meaning!.stalenessClass).toBe("stale")
       expect(updated.meaning!.careReason).toBe("escalated priority")
     })
@@ -161,13 +203,48 @@ describe("obligation enrichment", () => {
         content: "staleness test",
       })
 
-      for (const stalenessClass of ["fresh", "aging", "stale", "ancient"] as const) {
+      for (const stalenessClass of ["fresh", "warm", "stale", "cold", "at-risk"] as const) {
         const enriched = enrichObligation(tmpDir, ob.id, {
-          salience: 5,
+          salience: "medium",
           stalenessClass,
         })
         expect(enriched.meaning!.stalenessClass).toBe(stalenessClass)
       }
+    })
+
+    it("supports structured WaitingOnRef with all kind values", () => {
+      const ob = createObligation(tmpDir, {
+        origin: sampleOrigin,
+        content: "waitingOn test",
+      })
+
+      for (const kind of ["friend", "agent", "coding", "merge", "runtime", "time", "none"] as const) {
+        const enriched = enrichObligation(tmpDir, ob.id, {
+          salience: "medium",
+          stalenessClass: "fresh",
+          waitingOn: { kind, target: "test-target", detail: `waiting on ${kind}` },
+        })
+        expect(enriched.meaning!.waitingOn).toEqual({
+          kind,
+          target: "test-target",
+          detail: `waiting on ${kind}`,
+        })
+      }
+    })
+
+    it("updates updatedAt timestamp on enrichment", () => {
+      const ob = createObligation(tmpDir, {
+        origin: sampleOrigin,
+        content: "timestamp test",
+      })
+
+      const enriched = enrichObligation(tmpDir, ob.id, {
+        salience: "low",
+        stalenessClass: "fresh",
+      })
+
+      expect(enriched.updatedAt).toBeDefined()
+      expect(new Date(enriched.updatedAt!).getTime()).toBeGreaterThan(0)
     })
   })
 })
