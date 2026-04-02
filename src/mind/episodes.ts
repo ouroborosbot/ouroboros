@@ -100,7 +100,7 @@ export function readRecentEpisodes(
     }
   }
 
-  episodes.sort((a, b) => (b.timestamp > a.timestamp ? 1 : b.timestamp < a.timestamp ? -1 : 0))
+  episodes.sort((a, b) => b.timestamp.localeCompare(a.timestamp))
 
   const result = episodes.slice(0, limit)
 

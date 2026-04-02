@@ -285,6 +285,37 @@ describe("episode store", () => {
       expect(episodes).toHaveLength(1)
     })
 
+    it("handles equal timestamps in sort (stable order)", () => {
+      const ep1 = emitEpisode(tmpDir, {
+        kind: "bridge_event",
+        summary: "alpha",
+        whyItMattered: "test",
+        relatedEntities: [],
+        salience: "low",
+      })
+      const ep2 = emitEpisode(tmpDir, {
+        kind: "bridge_event",
+        summary: "beta",
+        whyItMattered: "test",
+        relatedEntities: [],
+        salience: "low",
+      })
+
+      // Set both to the exact same timestamp
+      const sharedTimestamp = "2025-06-15T12:00:00.000Z"
+      for (const id of [ep1.id, ep2.id]) {
+        const filePath = path.join(tmpDir, "state", "episodes", `${id}.json`)
+        const data = JSON.parse(fs.readFileSync(filePath, "utf-8")) as EpisodeRecord
+        data.timestamp = sharedTimestamp
+        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8")
+      }
+
+      const episodes = readRecentEpisodes(tmpDir)
+      expect(episodes).toHaveLength(2)
+      // Both returned, order is stable (0 comparison means no swap)
+      expect(episodes.map((e) => e.timestamp)).toEqual([sharedTimestamp, sharedTimestamp])
+    })
+
     it("combines kind and since filters", () => {
       const old = emitEpisode(tmpDir, {
         kind: "obligation_shift",
