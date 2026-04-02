@@ -78,20 +78,18 @@ function Header({ agentName, model, contextPercent }: {
   readonly model: string
   readonly contextPercent: number
 }): React.ReactElement {
-  const showCtx = contextPercent > 0
   const cwd = process.cwd().replace(process.env.HOME ?? "", "~")
+  const showCtx = contextPercent > 0
+  const info = [agentName, model, cwd, showCtx ? `ctx ${contextPercent}%` : ""].filter(Boolean).join(" · ")
+  // Snake body length adapts to content
+  const bodyLen = Math.max(info.length + 2, 20)
+  const pad = bodyLen - info.length
+  const headOffset = bodyLen + 3 // " < " prefix = 3 chars before body
   return (
-    <Box>
-      <Box flexDirection="column">
-        <Text color={OURO.scale}>{"  ╭───╮"}</Text>
-        <Text color={OURO.scale}>{"  │"}<Text color={OURO.glow}>{"◎"}</Text><Text color={OURO.scale}>{"│"}</Text></Text>
-        <Text color={OURO.scale}>{"  ╰─"}<Text color={OURO.glow}>{"∽"}</Text><Text color={OURO.scale}>{"╯"}</Text></Text>
-      </Box>
-      <Box flexDirection="column" marginLeft={1}>
-        <Text color={OURO.glow} bold>{agentName}</Text>
-        <Text color={OURO.shadow}>{model ? `${model} · ` : ""}{cwd}</Text>
-        {showCtx ? <Text color={OURO.shadow}>{"ctx: "}<Text color={contextPercent > 80 ? OURO.fang : contextPercent > 60 ? OURO.gold : OURO.scale}>{contextPercent}%</Text></Text> : null}
-      </Box>
+    <Box flexDirection="column">
+      <Text color={OURO.scale}>{" ".repeat(headOffset)}{"____"}</Text>
+      <Text color={OURO.scale}>{"  "}{" ".repeat(0)}{"_".repeat(bodyLen)}<Text color={OURO.glow}>{"/ O  \\___/"}</Text></Text>
+      <Text color={OURO.scale}>{" <  "}<Text color={OURO.glow}>{info}</Text>{" ".repeat(pad)}{"_____/   \\"}</Text>
     </Box>
   )
 }
