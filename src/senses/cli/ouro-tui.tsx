@@ -287,6 +287,7 @@ function InputArea({ onSubmit, suppressed, onCtrlC, agentName, model, history }:
 }): React.ReactElement {
   const [input, setInput] = useState("")
   const [exitWarning, setExitWarning] = useState(false)
+  const [tooltip, setTooltip] = useState("")
   const [cursorVisible, setCursorVisible] = useState(true)
   const inputRef = useRef("")
   const historyIdx = useRef(-1) // -1 = not browsing history
@@ -304,8 +305,11 @@ function InputArea({ onSubmit, suppressed, onCtrlC, agentName, model, history }:
       inputRef.current = ""
       setInput("")
       setExitWarning(false)
+      setTooltip("")
     } else if (action === "warn") {
       setExitWarning(true)
+      setTooltip("Ctrl-C again to exit")
+      setTimeout(() => setTooltip(""), 3000)
     }
     // "abort" and "exit" are handled by the parent (cli.ts)
   }, [onCtrlC])
@@ -321,9 +325,15 @@ function InputArea({ onSubmit, suppressed, onCtrlC, agentName, model, history }:
     setExitWarning(false)
 
     if (key.escape) {
-      inputRef.current = ""
-      setInput("")
-      historyIdx.current = -1
+      if (inputRef.current) {
+        inputRef.current = ""
+        setInput("")
+        historyIdx.current = -1
+        setTooltip("Esc again to clear")
+        setTimeout(() => setTooltip(""), 2000)
+      } else {
+        setTooltip("")
+      }
       return
     }
     if (key.return) {
@@ -393,17 +403,18 @@ function InputArea({ onSubmit, suppressed, onCtrlC, agentName, model, history }:
     <Box flexDirection="column">
       {/* Top separator */}
       <Text dimColor>{"─".repeat(cols)}</Text>
-      {exitWarning ? (
-        <Text color={OURO.shadow}>{"(press Ctrl-C again to exit)"}</Text>
-      ) : null}
       {/* Input prompt */}
       <Box>
         <Text color={OURO.teal} bold>{") "}</Text>
         <Text color={OURO.bone}>{input}</Text>
         {cursorVisible ? <Text color={OURO.scale}>{"█"}</Text> : <Text>{" "}</Text>}
       </Box>
-      {/* Status bar */}
-      <Text dimColor>{agentName}{model ? ` · ${model}` : ""}</Text>
+      {/* Status bar with right-aligned tooltip */}
+      <Box>
+        <Text dimColor>{agentName}{model ? ` · ${model}` : ""}</Text>
+        <Box flexGrow={1} />
+        {tooltip ? <Text dimColor>{tooltip}</Text> : null}
+      </Box>
       {/* Bottom separator */}
       <Text dimColor>{"─".repeat(cols)}</Text>
     </Box>
