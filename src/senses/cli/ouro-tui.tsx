@@ -278,17 +278,20 @@ function LiveArea({ live, elapsed }: {
 
 // ─── Input ──────────────────────────────────────────────────────────
 
-function InputArea({ onSubmit, suppressed, onCtrlC, agentName, model }: {
+function InputArea({ onSubmit, suppressed, onCtrlC, agentName, model, history }: {
   readonly onSubmit: (text: string) => void
   readonly suppressed: boolean
   readonly onCtrlC: (hasInput: boolean) => CtrlCAction
   readonly agentName: string
   readonly model: string
+  readonly history: readonly string[]
 }): React.ReactElement {
   const [input, setInput] = useState("")
   const [exitWarning, setExitWarning] = useState(false)
   const [cursorVisible, setCursorVisible] = useState(true)
   const inputRef = useRef("")
+  const historyIdx = useRef(-1) // -1 = not browsing history
+  const savedInput = useRef("") // saves current input when entering history
 
   // Blinking cursor
   useEffect(() => {
@@ -323,16 +326,47 @@ function InputArea({ onSubmit, suppressed, onCtrlC, agentName, model }: {
       if (text.trim()) onSubmit(text)
       inputRef.current = ""
       setInput("")
+      historyIdx.current = -1
       return
     }
     if (key.backspace || key.delete) {
       inputRef.current = inputRef.current.slice(0, -1)
       setInput(inputRef.current)
+      historyIdx.current = -1
+      return
+    }
+    // Up arrow: browse history (newest first)
+    if (key.upArrow && history.length > 0) {
+      if (historyIdx.current === -1) {
+        // Entering history — save current input
+        savedInput.current = inputRef.current
+        historyIdx.current = history.length - 1
+      } else if (historyIdx.current > 0) {
+        historyIdx.current--
+      }
+      inputRef.current = history[historyIdx.current]
+      setInput(inputRef.current)
+      return
+    }
+    // Down arrow: browse forward or restore saved input
+    if (key.downArrow) {
+      if (historyIdx.current >= 0) {
+        if (historyIdx.current < history.length - 1) {
+          historyIdx.current++
+          inputRef.current = history[historyIdx.current]
+        } else {
+          // Past end of history — restore saved input
+          historyIdx.current = -1
+          inputRef.current = savedInput.current
+        }
+        setInput(inputRef.current)
+      }
       return
     }
     if (!key.ctrl && !key.meta && inputChar) {
       inputRef.current += inputChar
       setInput(inputRef.current)
+      historyIdx.current = -1 // typing resets history browsing
     }
   })
 
@@ -396,7 +430,14 @@ export function OuroTui({
 
       {/* Input — with breathing room above */}
       {!live.loading && !live.streamingText ? <Text>{""}</Text> : null}
-      <InputArea onSubmit={onSubmit} suppressed={live.inputSuppressed} onCtrlC={onCtrlC} agentName={agentName} model={model} />
+      <InputArea
+        onSubmit={onSubmit}
+        suppressed={live.inputSuppressed}
+        onCtrlC={onCtrlC}
+        agentName={agentName}
+        model={model}
+        history={completedMessages.filter(m => m.role === "user").map(m => m.content)}
+      />
     </Box>
   )
 }
