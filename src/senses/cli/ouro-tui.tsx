@@ -81,15 +81,37 @@ function Header({ agentName, model, contextPercent }: {
   const cwd = process.cwd().replace(process.env.HOME ?? "", "~")
   const showCtx = contextPercent > 0
   const info = [agentName, model, cwd, showCtx ? `ctx ${contextPercent}%` : ""].filter(Boolean).join(" · ")
-  // Snake body length adapts to content
-  const bodyLen = Math.max(info.length + 2, 20)
-  const pad = bodyLen - info.length
-  const headOffset = bodyLen + 3 // " < " prefix = 3 chars before body
+
+  // 3-segment snake: TAIL (fixed) + MIDDLE (stretches) + HEAD (fixed)
+  // From the reference art, segments split at the dots:
+  //
+  //    .                  .     ____
+  //  __.__________________.____/ O  \___/
+  // <__.__________________._________/   \
+  //
+  // TAIL:     line1=""     line2=" __"   line3="<__"
+  // MIDDLE:   line1=" "    line2="_"     line3="_" (or text)
+  // HEAD:     line1="     ____"  line2="____/ O  \\___/"  line3="_________/   \\"
+
+  const HEAD1 = "     ____"
+  const HEAD2 = "____/ O  \\___/"
+  const HEAD3 = "_________/   \\"
+  const TAIL1 = "   "
+  const TAIL2 = " __"
+  const TAIL3 = "<__"
+
+  const middleLen = Math.max(info.length, 20)
+  const textPad = middleLen - info.length
+
+  const line1 = TAIL1 + " ".repeat(middleLen) + HEAD1
+  const line2 = TAIL2 + "_".repeat(middleLen) + HEAD2
+  const line3text = info + "_".repeat(textPad)
+
   return (
     <Box flexDirection="column">
-      <Text color={OURO.scale}>{" ".repeat(headOffset)}{"____"}</Text>
-      <Text color={OURO.scale}>{"  "}{" ".repeat(0)}{"_".repeat(bodyLen)}<Text color={OURO.glow}>{"/ O  \\___/"}</Text></Text>
-      <Text color={OURO.scale}>{" <  "}<Text color={OURO.glow}>{info}</Text>{" ".repeat(pad)}{"_____/   \\"}</Text>
+      <Text color={OURO.scale}>{line1}</Text>
+      <Text color={OURO.scale}>{line2}</Text>
+      <Text color={OURO.scale}>{TAIL3}<Text color={OURO.glow}>{line3text}</Text><Text color={OURO.scale}>{HEAD3}</Text></Text>
     </Box>
   )
 }
